@@ -1,6 +1,8 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.util.LambdaCounter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -8,14 +10,18 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.StreetRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
+import static com.conveyal.r5.transit.TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
+import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
 
 /**
+ * Pre-compute walking transfers between transit stops via the street network, up to a given distance limit.
  * TODO optimization: combine TransferFinder with stop-to-vertex distance table builder.
  */
 public class TransferFinder {
@@ -33,9 +39,9 @@ public class TransferFinder {
     StreetLayer streetLayer;
 
     /**
-     * Should chooses whether to search via the street network or straight line distance based on the presence of
-     * OSM street data (whether the street layer is null). However the street layer will always contain transit
-     * stop vertices so not sure that can work.
+     * Eventually this should choose whether to search via the street network or straight line distance based on the
+     * presence of OSM street data (whether the street layer is null). However the street layer will always be present,
+     * at least to contain transit stop vertices, so the choice cannot be made based only on the absence of a streetLayer.
      */
     public TransferFinder(TransportNetwork network) {
         this.transitLayer = network.transitLayer;
@@ -56,9 +62,9 @@ public class TransferFinder {
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = PARKRIDE_DISTANCE_LIMIT_METERS;
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.transitStopSearch = true;
             streetRouter.route();
@@ -86,48 +92,48 @@ public class TransferFinder {
                 parkRidesWithoutStops++;
             }
         }
-        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, TransitLayer.PARKRIDE_DISTANCE_LIMIT);
+        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, PARKRIDE_DISTANCE_LIMIT_METERS);
     }
 
+    /**
+     * For each stop, store all transfers out of that stop as packed pairs of (toStopIndex, distance).
+     * When applying scenarios, we want to find transfers for only the newly added stops, keeping the existing transfers.
+     * However, existing transfer lists will be extended if new stops are reachable from existing stops.
+     */
     public void findTransfers () {
-        int unconnectedStops = 0;
-        // For each stop, store all transfers out of that stop as packed pairs of (toStopIndex, distance)
-        final List<TIntList> transfersForStop = transitLayer.transfersForStop;
-        // When applying scenarios we want to find transfers for only the newly added stops.
-        // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
-        int firstStopIndex = transfersForStop.size();
+        // Look at the existing list of transfers (if any) and do enough iterations to make that transfer list as long
+        // as the list of stops.
+        int firstStopToProcess = transitLayer.transfersForStop.size();
+        int nStopsTotal = transitLayer.getStopCount();
+        int nStopsToProcess =  nStopsTotal - firstStopToProcess;
+        LOG.info("Finding transfers through the street network from {} stops...", nStopsToProcess);
+        LambdaCounter stopCounter = new LambdaCounter(LOG, nStopsToProcess, 10_000,
+                "Found transfers from {} of {} transit stops.");
+        LambdaCounter unconnectedCounter = new LambdaCounter(LOG, nStopsToProcess, 1_000,
+                "{} of {} transit stops are unlinked.");
 
-        // Iterating over all stops to generate transfers take a long time, so it is nice to have a progress counter.
-        LOG.info("Finding transfers through the street network from stops...");
-        LambdaCounter progressCounter = new LambdaCounter(
-                LOG,
-                transitLayer.getStopCount() - transfersForStop.size(),
-                10_000,
-                "Progress: {} of {} stops processed."
-        );
-
-        // TODO Parallelize with streams. See distance table generation.
-        for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
-            progressCounter.increment();
-
+        // Create transfers for all new stops, appending them to the list of transfers for any existing stops.
+        // This handles both newly built networks and the case where a scenario adds stops to an existing network.
+        transitLayer.transfersForStop.addAll(
+                IntStream.range(firstStopToProcess, nStopsTotal).parallel().mapToObj(sourceStopIndex -> {
+            stopCounter.increment();
             // From each stop, run a street search looking for other transit stops.
-            int originStreetVertex = transitLayer.streetVertexForStop.get(s);
+            int originStreetVertex = transitLayer.streetVertexForStop.get(sourceStopIndex);
             if (originStreetVertex == -1) {
-                unconnectedStops++;
-                // Every iteration must add an array to transfersForStop to maintain the right length.
-                transfersForStop.add(EMPTY_INT_LIST);
-                continue;
+                unconnectedCounter.increment();
+                // We must add an array to transfersForStop for every source stop to maintain the right length.
+                return EMPTY_INT_LIST;
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = TRANSFER_DISTANCE_LIMIT_METERS;
 
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
-            // FIXME the following is technically incorrect, measure that it's actually improving calculation speed
+            // TODO the following optimization is incorrect for some loop and U-shaped routes, measure that it's actually improving routing speed
             retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
@@ -137,36 +143,40 @@ public class TransferFinder {
                 packedTransfers.add(distance);
                 return true;
             });
-            // Record this list of transfers as leading out of the stop with index s.
+            // Record this list of transfers as leading out of the stop with index sourceStopIndex.
+            // Deduplicate empty lists.
             if (packedTransfers.size() > 0) {
-                transfersForStop.add(packedTransfers);
+                return packedTransfers;
             } else {
-                transfersForStop.add(EMPTY_INT_LIST);
+                return EMPTY_INT_LIST;
             }
-            // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
-            // all transfers out of a scenario stop into a base network stop we must also create the reverse transfer.
-            // The original packed transfers list is copied on write to avoid perturbing the base network.
-            // This is technically slightly incorrect, as distance(a, b) != distance(b, a), but for walking the equality
-            // is close to holding.
-            if (firstStopIndex > 0) {
-                final int originStopIndex = s; // Why oh why, Java?
-                // don't build transfers to other new stops
-                distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
-                    if (targetStopIndex < firstStopIndex) {
-                        TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
-                        packedTransfersCopy.add(originStopIndex);
-                        packedTransfersCopy.add(distance);
-                        transfersForStop.set(targetStopIndex, packedTransfersCopy);
-                    }
-                    return true;
-                });
-            }
+        }).collect(Collectors.toList()));
+        LOG.info("Done finding transfers. {} stops were not linked to the street network.", unconnectedCounter.getCount());
 
+        // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
+        // all transfers out of a scenario stop into a base network stop we must also create the reverse transfer.
+        // The original packed transfers list is copied on write to avoid perturbing the base network.
+        // This is technically slightly incorrect, as distance(a, b) != distance(b, a), but for walking the equality
+        // is close to holding. We do this by post-processing the list to allow parallel computation above. This
+        // post-processing stage is much faster than performing the street searches and does not lend itself well to
+        // a streaming approach.
+        if (firstStopToProcess > 0) {
+            LOG.info("Appending inverse transfers for scenario application...", nStopsToProcess);
+            for (int sourceStopIndex = firstStopToProcess; sourceStopIndex < nStopsTotal; sourceStopIndex++) {
+                TIntList distancesToTargetStops = transitLayer.transfersForStop.get(sourceStopIndex);
+                for (int i = 0; i < distancesToTargetStops.size(); i += 2) {
+                    int targetStopIndex = distancesToTargetStops.get(i);
+                    int distance = distancesToTargetStops.get(i + 1);
+                    // Only create inverted transfers when target is a pre-existing (non-scenario) stop
+                    if (targetStopIndex < firstStopToProcess) {
+                        TIntList packedTransfersCopy = new TIntArrayList(transitLayer.transfersForStop.get(targetStopIndex));
+                        packedTransfersCopy.add(sourceStopIndex);
+                        packedTransfersCopy.add(distance);
+                        transitLayer.transfersForStop.set(targetStopIndex, packedTransfersCopy);
+                    }
+                }
+            }
         }
-        progressCounter.done();
-        // Store the transfers in the transit layer
-        transitLayer.transfersForStop = transfersForStop;
-        LOG.info("Done finding transfers. {} stops are unlinked.", unconnectedStops);
     }
 
 

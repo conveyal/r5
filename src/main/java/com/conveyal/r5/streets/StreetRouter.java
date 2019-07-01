@@ -35,6 +35,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+
 /**
  * This routes over the street layer of a TransitNetwork.
  * It is a throw-away calculator object that retains routing state after the search is finished.
@@ -308,7 +310,7 @@ public class StreetRouter {
      * travel on!
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
-     * @param lon Longitude in flating point (not fixed int) degrees.
+     * @param lon Longitude in floating point (not fixed int) degrees.
      * @return true if an edge was found near the specified coordinate
      */
     public boolean setOrigin (double lat, double lon) {
@@ -317,6 +319,7 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
         }
+
         originSplit = split;
         bestStatesAtEdge.clear();
         queue.clear();
@@ -325,17 +328,20 @@ public class StreetRouter {
         State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
         State startState1 = new State(split.vertex1, split.edge, streetMode);
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
+        int offStreetTime = split.distanceToEdge_mm / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
+        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState1.durationSeconds = startState1.weight;
-        startState1.distance = split.distance1_mm;
+        startState1.distance = split.distance1_mm + split.distanceToEdge_mm;
         edge.advance();
+
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
+        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState0.durationSeconds = startState0.weight;
-        startState0.distance = split.distance0_mm;
+        startState0.distance = split.distance0_mm + split.distanceToEdge_mm;
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
         if (profileRequest.reverseSearch) {
@@ -515,9 +521,9 @@ public class StreetRouter {
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         if (transitStopSearch) {
-            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         } else if (flagSearch != null) {
-            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         }
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
@@ -748,7 +754,6 @@ public class StreetRouter {
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex0);
         }
-
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
@@ -1195,5 +1200,19 @@ public class StreetRouter {
         }
     }
 
+    /**
+     * Continue a search by walking (presumably after a car or bicycle search is complete).
+     * This allows accessing transit stops that are linked to edges that are only walkable, but not drivable or bikeable.
+     * This maintains the total travel time limit and other parameters.
+     * NOTE: this conflicts with the rule that a router should not be reused.
+     * This is a good example of why we may want to change that rule. Alternatively this could construct a new StreetRouter.
+     * Just allowing more than one mode doesn't give the desired effect - we really want a sequence of separate modes.
+     */
+    public void keepRoutingOnFoot() {
+        queue.clear();
+        bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
+        streetMode = StreetMode.WALK;
+        route();
+    }
 
 }

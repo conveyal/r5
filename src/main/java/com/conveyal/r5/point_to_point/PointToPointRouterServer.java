@@ -193,7 +193,7 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.timeLimitSeconds = profileRequest.getMaxTimeSeconds(LegMode.valueOf(streetMode.toString()));
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.transitStopSearch = true;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
@@ -252,7 +252,7 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.timeLimitSeconds = profileRequest.getMaxTimeSeconds(LegMode.valueOf(streetMode.toString()));
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
             streetRouter.flagSearchQuantity = 50;
@@ -308,7 +308,7 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.timeLimitSeconds = profileRequest.getMaxTimeSeconds(LegMode.valueOf(streetMode.toString()));
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
             streetRouter.flagSearchQuantity = 50;

@@ -204,7 +204,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = TransitLayer.WALK_DISTANCE_LIMIT_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
         streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;

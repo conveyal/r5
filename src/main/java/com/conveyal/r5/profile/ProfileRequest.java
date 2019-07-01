@@ -14,6 +14,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
@@ -28,6 +30,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     // Analyst used to serialize the request along with regional analysis results into MapDB.
     // In Analysis, the request is still saved but as JSON in MongoDB.
     private static final long serialVersionUID = -6501962907644662303L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProfileRequest.class);
+
+    private static final int SECONDS_PER_MINUTE = 60;
 
     //From and to zonedDateTime filled in GraphQL request
     //Based on those two variables and timezone from/totime and date is filled
@@ -63,7 +69,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
     
-    /** The speed of driving, in meters per second. Roads from OSM use the speed limit, this is the speed used when propagating from the street network to a pointset. */
+    /** The speed of driving, in meters per second. Roads from OSM use the speed limit; this is the speed used when
+     * linking the street network to a pointset (i.e. it is applied between the true origin and the first street
+     * vertex, and between the last street vertex and the true destination). Note that slow speeds specified here may
+     * result in longer travel times than expected on long, high-speed blocks. But we tolerate some imprecision at
+     * the scale of individual blocks (see conversation at #436)*/
     public float carSpeed = 2.22f; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
@@ -73,7 +83,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * Maximum walk time before and after using transit, in minutes
      *
      * NB the time to reach the destination after leaving transit is considered separately from the time to reach
-     * transit at the start of the search; e.g. if you set maxWalkTime to 600 (ten minutes), you could potentially walk
+     * transit at the start of the search; e.g. if you set maxWalkTime to 10, you could potentially walk
      * up to ten minutes to reach transit, and up to _another_ ten minutes to reach the destination after leaving transit.
      *
      * This is required because hard resource limiting on non-objective variables is algorithmically invalid. Consider
@@ -136,10 +146,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes = 5;
 
     /**
-     * The maximum duration of any transit trip found by this search. Results used to be very sensitive to this
-     * when we were using mean travel times, now we use medians so we could set this to 2 hours.
+     * The maximum duration of any trip found by this search.
      */
-    public int maxTripDurationMinutes = 4 * 60;
+    public int maxTripDurationMinutes = 2 * 60;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.
@@ -255,32 +264,31 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
-        case WALK:
-            return walkSpeed;
-        case BICYCLE:
-            return bikeSpeed;
-        case CAR:
-            return carSpeed;
-        default:
-            break;
+            case WALK:
+                return walkSpeed;
+            case BICYCLE:
+                return bikeSpeed;
+            case CAR:
+                return carSpeed;
+            default:
+                throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
         }
-        throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
     }
 
     /**
-     * @return the maximum pre-transit travel time for the given mode in minutes
+     * @return the maximum travel time on a single leg for the given mode in integer seconds.
      */
     @JsonIgnore
-    public int getMaxAccessTimeForMode (StreetMode mode) {
+    public int getMaxTimeSeconds(StreetMode mode) {
         switch (mode) {
             case CAR:
-                return maxCarTime;
+                return maxCarTime * SECONDS_PER_MINUTE;
             case BICYCLE:
-                return maxBikeTime;
+                return maxBikeTime * SECONDS_PER_MINUTE;
             case WALK:
-                return maxWalkTime;
+                return maxWalkTime * SECONDS_PER_MINUTE;
             default:
-                throw new IllegalArgumentException("Invalid mode");
+                throw new IllegalArgumentException("Invalid mode " + mode.toString());
         }
     }
 
@@ -401,47 +409,40 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Returns maxCar/Bike/Walk based on LegMode
-     *
-     * @param mode
-     * @return
+     * @return maximum time in integer seconds that may be spent on a leg using the given mode
      */
     @JsonIgnore
-    public int getTimeLimit(LegMode mode) {
+    public int getMaxTimeSeconds(LegMode mode) {
         switch (mode) {
-        case CAR:
-            return maxCarTime * 60;
-        case BICYCLE:
-            return maxBikeTime * 60;
-        case WALK:
-            return maxWalkTime * 60;
-        default:
-            System.err.println("Unknown mode in getTimeLimit:"+mode.toString());
-            return streetTime * 60;
+            case CAR:
+                return maxCarTime * 60;
+            case BICYCLE:
+                return maxBikeTime * 60;
+            case WALK:
+                return maxWalkTime * 60;
+            default:
+                LOG.error("Unknown mode: {}", mode);
+                return streetTime * 60;
         }
     }
 
     /**
-     * Returns minCar/BikeTime based on StreetMode
-     *
-     * default is 0
-     *
-     * @param mode
-     * @return min number of seconds that this mode should be used to get to stop/Park ride/bike share etc.
+     * @return min number of seconds that the specified mode should be used to get to stop/Park ride/bike share etc.
+     *         defaults to zero for modes other than CAR or BICYCLE.
      */
     @JsonIgnore
-    public int getMinTimeLimit(StreetMode mode) {
+    public int getMinTimeSeconds(StreetMode mode) {
         switch (mode) {
-        case CAR:
-            return minCarTime * 60;
-        case BICYCLE:
-            return minBikeTime * 60;
-        default:
-            return 0;
+            case CAR:
+                return minCarTime * 60;
+            case BICYCLE:
+                return minBikeTime * 60;
+            default:
+                return 0;
         }
     }
 
-    /** Return the length of the time window in minutes */
+    /** Return the length of the time window in truncated integer minutes */
     @JsonIgnore
     public int getTimeWindowLengthMinutes() {
         return (toTime - fromTime) / 60;

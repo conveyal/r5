@@ -4,6 +4,10 @@ language: java
 jdk:
 - oraclejdk8
 
+# Maven semantic-release uses v10 now
+node_js:
+  - 10
+
 # Replace Travis's default Maven installation step with a no-op.
 # This avoids redundantly pre-running 'mvn install -DskipTests' every time.
 install: true
@@ -19,7 +23,7 @@ before_install: |
 # install dependencies used in after_success here because they don't get cached if called in after_success
 before_script:
   - pip install --user awscli && export PATH=$PATH:~/.local/bin/
-  - yarn global add @conveyal/maven-semantic-release semantic-release
+  - yarn global add @conveyal/maven-semantic-release semantic-release@15
 
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
@@ -76,6 +80,7 @@ cache:
     - $HOME/.m2
     - $HOME/.cache/yarn
     - $HOME/.cache/pip
+  yarn: true
 
 notifications:
   slack: conveyal:vqrkN7708qU1OTL9XkbMqQFV

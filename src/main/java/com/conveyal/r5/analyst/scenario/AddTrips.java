@@ -84,6 +84,7 @@ public class AddTrips extends Modification {
         info.route_short_name = "";
         info.route_long_name = this.comment;
         info.route_id = this.routeId;
+        info.route_type = this.mode;
         info.color = "4444FF";
         this.routeIndex = transitLayer.routes.size();
         transitLayer.routes.add(info);

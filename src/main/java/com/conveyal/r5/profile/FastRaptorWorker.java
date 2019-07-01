@@ -57,6 +57,8 @@ public class FastRaptorWorker {
      */
     public static final int BOARD_SLACK_SECONDS = 60;
 
+    public static final int SECONDS_PER_MINUTE = 60;
+
     /**
      * Step for departure times. Use caution when changing this as we use the functions
      * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1
@@ -628,7 +630,7 @@ public class FastRaptorWorker {
     private void doTransfers (RaptorState state) {
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
-        int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * 60 * 1000);
+        int maxWalkMillimeters = walkSpeedMillimetersPerSecond * (request.maxWalkTime * SECONDS_PER_MINUTE);
 
         for (int stop = state.nonTransferStopsTouched.nextSetBit(0); stop > -1; stop = state.nonTransferStopsTouched.nextSetBit(stop + 1)) {
             // no need to consider loop transfers, since we don't mark patterns here any more

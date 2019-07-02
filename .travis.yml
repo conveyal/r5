@@ -4,6 +4,10 @@ language: java
 jdk:
 - oraclejdk8
 
+# Maven semantic-release uses v10 now
+node_js:
+  - 10
+
 # Replace Travis's default Maven installation step with a no-op.
 # This avoids redundantly pre-running 'mvn install -DskipTests' every time.
 install: true
@@ -76,6 +80,7 @@ cache:
     - $HOME/.m2
     - $HOME/.cache/yarn
     - $HOME/.cache/pip
+  yarn: true
 
 notifications:
   slack: conveyal:vqrkN7708qU1OTL9XkbMqQFV

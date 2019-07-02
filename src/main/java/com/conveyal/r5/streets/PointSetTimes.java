@@ -3,6 +3,8 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.FastRaptorWorker;
 
+import java.util.Arrays;
+
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
@@ -25,12 +27,10 @@ public class PointSetTimes {
         this.travelTimes = travelTimes;
     }
 
-    /**
-     * Construct a PointSetTimes with no times. This is only useful as a target for repeated merging operations.
-     */
-    public PointSetTimes(PointSet pointSet) {
-        this.pointSet = pointSet;
-        this.travelTimes = null;
+    public static PointSetTimes allUnreached (PointSet pointSet) {
+        int[] times = new int[pointSet.featureCount()];
+        Arrays.fill(times, FastRaptorWorker.UNREACHED);
+        return new PointSetTimes(pointSet, times);
     }
 
     public int size()  {
@@ -40,7 +40,6 @@ public class PointSetTimes {
     public int getTravelTimeToPoint (int p) {
         return travelTimes[p];
     }
-
 
     /**
      * Increment all reachable points by the given number of seconds.

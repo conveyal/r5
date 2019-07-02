@@ -472,7 +472,11 @@ public class AnalystWorker implements Runnable {
             // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
             // TODO move this after the asynchronous loading of the rest of the necessary data?
             if (!task.makeTauiSite) {
-                task.pointSet = pointSetCache.get(task.grid);
+                task.destinationPointSet = pointSetCache.get(task.destinationPointSetId);
+            }
+
+            if (task.originPointSetId != null) {
+                task.originPointSet = pointSetCache.get(task.originPointSetId);
             }
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.

@@ -36,7 +36,7 @@ public class PointSetCache {
                 .build(new CacheLoader<String, PointSet>() {
                     @Override
                     public PointSet load(String s) throws Exception {
-                        return loadGrid(s);
+                        return loadPointSet(s);
                     }
                 });
 
@@ -49,7 +49,7 @@ public class PointSetCache {
         s3 = AmazonS3ClientBuilder.standard().withRegion(region).build();
     }
 
-    private PointSet loadGrid (String key) throws IOException {
+    private PointSet loadPointSet(String key) throws IOException {
         S3Object obj = s3.getObject(bucket, key);
         // no need to check if it exists; if it doesn't getObject will throw an exception which will be caught in the
         // get function below
@@ -77,7 +77,7 @@ public class PointSetCache {
         try {
             return cache.get(key);
         } catch (ExecutionException e) {
-            LOG.error("Error retrieving grid {}", key, e);
+            LOG.error("Error retrieving destinationPointSetId {}", key, e);
             throw new RuntimeException(e);
         }
     }

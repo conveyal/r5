@@ -154,7 +154,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             } else {
                 // A non-static-site regional task. We expect a valid grid of opportunities to be specified as the
                 // destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
-                this.webMercatorExtents = WebMercatorExtents.forGrid(((RegionalTask)task).pointSet);
+                this.webMercatorExtents = WebMercatorExtents.forGrid(((RegionalTask)task).destinationPointSet);
             }
 
             // Some accumulated comments on destination grid size (current and future):

@@ -15,25 +15,25 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      */
     public int x = -1, y = -1;
 
-    public int originIndex;
-
     /**
      * The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
      * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
      * will be an accessibility value per origin, rather than a grid of travel times from that origin.
      */
-    public String grid;
+    public String destinationPointSetId;
     
     /**
      * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the
      * worker.
      */
-    public transient PointSet pointSet;
+    public transient PointSet destinationPointSet;
 
     /**
      * Key for pointset to use as origins.
      */
     public String originPointSetId;
+
+    public transient PointSet originPointSet;
 
     /**
      * Key for pointset to use as destinations.

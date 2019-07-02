@@ -24,11 +24,8 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 /**
  * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
- * accessibility analysis.
- *
- * Although we currently only use one implementation of this abstract class, which represents an implicit set of
- * points on a regular grid in the web Mercator projection, we're keeping the abstraction so we can one day (re)-
- * implement freeform sets of points that are not on grids.
+ * accessibility analysis. Legacy Transport Analyst used freeform pointsets; early versions of Conveyal Analysis
+ * instead favored regular grids in the web mercator projection.  This abstraction handles both.
  */
 public abstract class PointSet {
 

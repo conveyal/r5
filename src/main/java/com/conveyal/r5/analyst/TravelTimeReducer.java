@@ -76,10 +76,10 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
-        calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).pointSet != null;
+        calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).destinationPointSet != null;
         if (calculateAccessibility) {
             accessibilityResult = new AccessibilityResult(
-                new PointSet[] {((RegionalTask)task).pointSet},
+                new PointSet[] {((RegionalTask)task).destinationPointSet},
                 new int[]{task.maxTripDurationMinutes},
                 task.percentiles
             );

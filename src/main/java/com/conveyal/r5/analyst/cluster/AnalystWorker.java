@@ -475,10 +475,6 @@ public class AnalystWorker implements Runnable {
                 task.destinationPointSet = pointSetCache.get(task.destinationPointSetId);
             }
 
-            if (task.originPointSetId != null) {
-                task.originPointSet = pointSetCache.get(task.originPointSetId);
-            }
-
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.

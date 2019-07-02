@@ -200,6 +200,7 @@ public class EdgeStore implements Serializable {
 
         // Street categories.
         // FIXME some street categories are mutually exclusive and should not be flags, just narrow numbers.
+        // This could be done with static utility functions that write the low N bits of a number into a given position.
         // Maybe reserve the first 4-5 bits (or a whole byte, and 16 bits for flags) for mutually exclusive edge types.
         UNUSED (0), // This flag is deprecated and currently unused. Use it for something new and interesting!
         BIKE_PATH (1),
@@ -229,12 +230,16 @@ public class EdgeStore implements Serializable {
         // If this flag is present, the edge is good idea to use for linking. Excludes runnels, motorways, and covered roads.
         LINKABLE(20),
 
-        // Bicycle level of traffic stress for this street.
+        // The highest five bits of the flags field represent the bicycle level of traffic stress (LTS) for this street.
         // See http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
-        // Comments below pasted from that document.
+        // The comments below on the LTS flag for each level 1 through 4 are pasted from that document.
         // FIXME bicycle LTS should not really be flags, the categories are mutually exclusive and can be stored in 2 bits.
 
-        // If this flag is set, then its LTS has been loaded from OSM tags and we will not apply further processing to infer it.
+        /**
+         * If this flag is set, then its LTS has been loaded from OSM tags and we will not apply further processing to
+         * infer it. We jump to flag number 27 here to group all five LTS flags together at the high end of the 32-bit
+         * integer flags field.
+         */
         BIKE_LTS_EXPLICIT (27),
 
         /**
@@ -274,7 +279,9 @@ public class EdgeStore implements Serializable {
          */
         BIKE_LTS_4 (31);
 
-        /** In each enum value this field should contain an integer with only a single bit switched on. */
+        /**
+         * In each enum value this field should contain an integer with only a single bit switched on (a power of two).
+         */
         public final int flag;
 
         /** Conveniently create a unique integer flag pattern for each of the enum values. */

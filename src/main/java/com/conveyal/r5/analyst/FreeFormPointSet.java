@@ -11,6 +11,8 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.LittleEndianDataInputStream;
+import com.google.common.io.LittleEndianDataOutputStream;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
@@ -824,5 +826,49 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     public static class Style implements Serializable{
         public Map<String, String> attributes = new ConcurrentHashMap<String, String>();
     }
+
+    /** Write coordinates for these points, in binary format. */
+    public void write (OutputStream outputStream) throws IOException {
+        // Java's DataOutputStream only outputs big-endian format ("network byte order").
+        // These grids will be read out of Javascript typed arrays which use the machine's native byte order.
+        // On almost all current hardware this is little-endian. Guava saves us again.
+        LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(outputStream);
+        // Header
+        out.writeUTF(description);
+        out.writeUTF(label);
+        out.writeInt(ids.length);
+        for (String id : ids) {
+            out.writeUTF(id);
+        }
+        for (double lat : lats) {
+            out.writeDouble(lat);
+        }
+        for (double lon : lons) {
+            out.writeDouble(lon);
+        }
+
+        out.close();
+    }
+
+    public FreeFormPointSet (InputStream inputStream) throws  IOException {
+        LittleEndianDataInputStream data = new LittleEndianDataInputStream(inputStream);
+        this.description = data.readUTF();
+        this.label = data.readUTF();
+        this.capacity = data.readInt();
+
+        for (int i = 0; i < capacity; i++) {
+            ids[i] = data.readUTF();
+        }
+
+        for (int i = 0; i < capacity; i++) {
+            lats[i] = data.readDouble();
+        }
+
+        for (int i = 0; i < capacity; i++) {
+            lons[i] = data.readDouble();
+        }
+
+    }
+
 
 }

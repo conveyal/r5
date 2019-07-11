@@ -1,15 +1,13 @@
 package com.conveyal.r5.analyst.cluster;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * This is the model class used to report accessibility indicators to the backend/broker
+ * Was used to report accessibility indicators to the backend/broker; replaced by {@link CombinedWorkResult}
  * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
  * So the rows are the percentiles, and the columns are the accessibility values for particular cutoffs of that percentile of travel time.
  * There are also more cutoffs than percentiles, so given Java's 2D array representation this is more efficient.
- * A paticular result value should be keyed on (destinationGrid, percentile, cutoff).
+ * A particular result value should be keyed on (destinationGrid, percentile, cutoff).
  */
+@Deprecated
 public class RegionalWorkResult {
 
     public String jobId;
@@ -33,6 +31,15 @@ public class RegionalWorkResult {
 
     public void setAcccessibilityValue (int gridIndex, int percentileIndex, int cutoffMinutesIndex, int value) {
         accessibilityValues[gridIndex][percentileIndex][cutoffMinutesIndex] = value;
+    }
+
+    /**
+     * Wrap this old-style result into a new result.  This updated method won't be present on old workers, but it
+     * will be available for use in the Broker via the R5 dependency.
+     * @return new CombinedWorkResult with this result's accessibility values and null travelTimeValues
+     */
+    public CombinedWorkResult toCombinedResult() {
+        return new CombinedWorkResult(null, this.accessibilityValues);
     }
 
 }

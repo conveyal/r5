@@ -17,10 +17,10 @@ public class TravelTimeResult {
     // used to be stored as longs, but can probably still use with impunity without fear of overflow
     public final int nSamplesPerPoint;
 
-    // Travel time values, indexed by percentile and target (grid cell/point)
-    int[][] values;
-
     public final int nPoints;
+
+    // Travel time values, indexed by percentile (sample) and target (grid cell/point)
+    int[][] values;
 
     TravelTimeResult(AnalysisTask task) {
         nSamplesPerPoint = task.percentiles.length;
@@ -54,6 +54,8 @@ public class TravelTimeResult {
             values[i][targetIndex] = i;
         }
     }
+
+    public int[][] getValues() { return values;}
 
     public int[] getTravelTimesForSample(int sampleIndex) { return values[sampleIndex]; }
 

@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
-import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.PointSetCache;
@@ -161,7 +161,7 @@ public class AnalystWorker implements Runnable {
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
-    private List<RegionalWorkResult> workResults = new ArrayList<>();
+    private List<CombinedWorkResult> workResults = new ArrayList<>();
 
     /** The last time (in milliseconds since the epoch) that we polled for work. */
     private long lastPollingTime;
@@ -421,7 +421,7 @@ public class AnalystWorker implements Runnable {
 
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+        OneOriginContainer oneOriginContainer = computer.computeTravelTimes();
 
         // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
         // it back to the broker. Compression ratios here are extreme (100x is not uncommon).
@@ -431,12 +431,12 @@ public class AnalystWorker implements Runnable {
 
         // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
         if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-            ((TimeGrid)oneOriginResult.travelTimes).writeGeotiff(byteArrayOutputStream, task);
+            ((TimeGrid) oneOriginContainer.travelTimes).writeGeotiff(byteArrayOutputStream, task);
         } else {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.
             // TODO eventually reuse same code path as static site time grid saving
-            oneOriginResult.travelTimes.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            oneOriginContainer.travelTimes.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -498,15 +498,15 @@ public class AnalystWorker implements Runnable {
 
             // Perform the core travel time and accessibility computations.
             TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-            OneOriginResult oneOriginResult = computer.computeTravelTimes();
+            OneOriginContainer oneOriginContainer = computer.computeTravelTimes();
 
             if (task.makeTauiSite) {
                 // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
                 // value because we're generating a set of time grids for a static site. We only save a file if it has
                 // non-default contents, as a way to save storage and bandwidth.
                 // TODO eventually carry out actions based on what's present in the result, not on the request type.
-                if (oneOriginResult.travelTimes.anyCellReached()) {
-                    PersistenceBuffer persistenceBuffer = oneOriginResult.travelTimes.writeToPersistenceBuffer();
+                if (oneOriginContainer.travelTimes.anyCellReached()) {
+                    PersistenceBuffer persistenceBuffer = oneOriginContainer.travelTimes.writeToPersistenceBuffer();
                     String timesFileName = task.taskId + "_times.dat";
                     filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
                 } else {
@@ -519,7 +519,7 @@ public class AnalystWorker implements Runnable {
             // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
             // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
             synchronized (workResults) {
-                workResults.add(oneOriginResult.toRegionalWorkResult(task));
+                workResults.add(oneOriginContainer.setJobAndTaskIds(task).toResult());
             }
             throughputTracker.recordTaskCompletion(task.jobId);
         } catch (Exception ex) {
@@ -540,9 +540,9 @@ public class AnalystWorker implements Runnable {
             e.printStackTrace();
         }
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            RegionalWorkResult workResult = new RegionalWorkResult(task.jobId, task.taskId, 1, 1, 1);
+            OneOriginContainer emptyContainer = new OneOriginContainer(task);
             synchronized (workResults) {
-                workResults.add(workResult);
+                workResults.add(emptyContainer.toResult());
             }
         } else {
             LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);
@@ -581,7 +581,7 @@ public class AnalystWorker implements Runnable {
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {
-            workerStatus.results = new ArrayList<>(workResults);
+            workerStatus.combinedResults = new ArrayList<>(workResults);
             workResults.clear();
         }
 
@@ -623,7 +623,7 @@ public class AnalystWorker implements Runnable {
         // for later re-delivery, safely interleaving with new results that may be coming from other worker threads.
         synchronized (workResults) {
             // TODO check here that results are not piling up too much?
-            workResults.addAll(workerStatus.results);
+            workResults.addAll(workerStatus.combinedResults);
         }
         return null;
     }

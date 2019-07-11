@@ -1,11 +1,7 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.cluster.Origin;
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.profile.PerTargetPropagater;
-
-import java.util.Base64;
 
 /**
  * Computes an accessibility indicator at a single origin cell in a Web Mercator grid, using destination densities from
@@ -103,7 +99,7 @@ public class BootstrappingTravelTimeReducer {
      * bootstrapReplicationsOfAccessibility will all still be zero and the output will be zero, which allows
      * shortcutting around routing and propagation when the origin point is not connected to the street network.
      */
-    public OneOriginResult finish () {
+    public OneOriginContainer finish () {
         // Only one accessibility figure, no bootstrapping.
         return null;
     }

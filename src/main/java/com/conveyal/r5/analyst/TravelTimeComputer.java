@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
@@ -21,7 +21,6 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.function.IntFunction;
 
@@ -56,7 +55,7 @@ public class TravelTimeComputer {
      * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending on
      * what's in the task it's given. TODO factor out each major step of this process into private methods.
      */
-    public OneOriginResult computeTravelTimes() {
+    public OneOriginContainer computeTravelTimes() {
 
         // 0. Preliminary range checking and setup =====================================================================
         if (!request.directModes.equals(request.accessModes)) {

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.common.R5Version;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -48,7 +49,8 @@ public class WorkerStatus {
     public String jvmVendor;
     public String jvmVersion;
     public String ipAddress;
-    public List<RegionalWorkResult> results;
+    @Deprecated public List<RegionalWorkResult> results;
+    public List<CombinedWorkResult> combinedResults;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }

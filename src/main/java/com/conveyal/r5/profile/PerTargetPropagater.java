@@ -1,12 +1,11 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
-import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
@@ -135,7 +134,7 @@ public class PerTargetPropagater {
      * After constructing a propagator and setting any additional options or optional fields,
      * call this method to actually perform the travel time propagation.
      */
-    public OneOriginResult propagate () {
+    public OneOriginContainer propagate () {
 
         long startTimeMillis = System.currentTimeMillis();
 

@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
@@ -31,7 +31,7 @@ public class TravelTimeReducer {
     /** Reduced travel time results. May be null if we're only recording accessibility. */
     private TravelTimeResult travelTimes = null;
 
-    private AccessibilityResult accessibilityResult = null;
+    private AccessibilityAccumulator accessibilityAccumulator = null;
 
     private final boolean retainTravelTimes;
 
@@ -78,11 +78,7 @@ public class TravelTimeReducer {
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
         calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).destinationPointSet != null;
         if (calculateAccessibility) {
-            accessibilityResult = new AccessibilityResult(
-                new PointSet[] {((RegionalTask)task).destinationPointSet},
-                new int[]{task.maxTripDurationMinutes},
-                task.percentiles
-            );
+            accessibilityAccumulator = new AccessibilityAccumulator(task);
         }
     }
 
@@ -150,13 +146,13 @@ public class TravelTimeReducer {
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
             // needs to be made absolute to handle multiple different extents.
-            Grid grid = (Grid) accessibilityResult.pointSets[0]; // TODO handle freeform pointsets
+            Grid grid = (Grid) accessibilityAccumulator.destinationPointSets[0]; // TODO handle freeform pointsets
             int x = target % grid.width;
             int y = target / grid.width;
             double amount = grid.grid[x][y];
             for (int p = 0; p < nPercentiles; p++) {
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
-                    accessibilityResult.incrementAccessibility(0, 0, p, amount);
+                    accessibilityAccumulator.incrementAccessibility(0, 0, p, amount);
                 }
             }
         }
@@ -190,8 +186,8 @@ public class TravelTimeReducer {
      * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around
      * routing and propagation when the origin point is not connected to the street network.
      */
-    public OneOriginResult finish () {
-        return new OneOriginResult(travelTimes, accessibilityResult);
+    public OneOriginContainer finish () {
+        return new OneOriginContainer(travelTimes, accessibilityAccumulator);
     }
 
 }

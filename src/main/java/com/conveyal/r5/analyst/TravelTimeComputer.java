@@ -87,6 +87,8 @@ public class TravelTimeComputer {
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         // TODO merge multiple destination pointsets from a regional request into a single supergrid?
         WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
+
+        // read from regionalTask?
         PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
 
         // I. Access to transit (or direct non-transit travel to destination) ==========================================

@@ -71,6 +71,7 @@ public class PerTargetPropagater {
     /**
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
      * transit stop. May be null, only needs to be set if we're recording paths, as in a static site.
+     * TODO Is this superseded by perIterationPaths below?
      */
     public List<Path[]> pathsToStopsForIteration = null;
 

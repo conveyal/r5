@@ -1,10 +1,9 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.error.UnsupportedGeometryException;
-import com.conveyal.r5.common.SphericalDistanceLibrary;
+import com.conveyal.r5.profile.FastRaptorWorker;
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -14,7 +13,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygon;
 import gnu.trove.map.TObjectIntMap;
@@ -613,7 +611,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         for (int i = 0; i < times.length; i++) { // capacity is now 1 if this is
             // a one-to-many indicator
             int t = times[i];
-            if (t != Integer.MAX_VALUE)
+            if (t != FastRaptorWorker.UNREACHED)
                 jgen.writeNumberField(ids[i], t);
         }
         jgen.writeEndObject();

@@ -1,9 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-
-import java.util.List;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
@@ -32,8 +29,6 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      * Key for pointset to use as origins.
      */
     public String originPointSetId;
-
-    public transient PointSet originPointSet;
 
     /**
      * Key for pointset to use as destinations.

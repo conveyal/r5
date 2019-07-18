@@ -9,11 +9,11 @@ public class CombinedWorkResult {
     public int taskId;
 
     /**
-     * Values from a travelTimeResult, keyed on percentile and target index
+     * Values from a travelTimeResult, keyed on percentile of total travel time and target index
      */
     public int[][] travelTimeValues;
 
-    // TODO Paths
+    // TODO paths and components (access/egress, wait) of travel time?
 
     /**
      * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.

@@ -44,7 +44,7 @@ public class PerTargetPropagater {
     private PointSet targets;
 
     /** All modes for which we want to perform egress propagation through the street network. */
-    public final Set<StreetMode> modes;
+    public final Set<LegMode> modes;
 
     private final List<LinkedPointSet> linkedTargets;
 
@@ -102,7 +102,7 @@ public class PerTargetPropagater {
     public PerTargetPropagater(
                 PointSet targets,
                 StreetLayer streetLayer,
-                Set<StreetMode> modes,
+                Set<LegMode> modes,
                 AnalysisTask task,
                 int[][] travelTimesToStopsForIteration,
                 int[] nonTransitTravelTimesToTargets
@@ -123,9 +123,12 @@ public class PerTargetPropagater {
             throw new IllegalArgumentException("Non-transit travel times must have the same number of entries as there are points.");
         }
         linkedTargets = new ArrayList<>(modes.size());
-        for (StreetMode mode : modes) {
-            LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
+        for (LegMode mode : modes) {
+            LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, LegMode.toStreetMode(mode));
             linkedTargetsForMode.makePointToStopDistanceTablesIfNeeded();
+            if (mode == LegMode.CAR || mode == LegMode.BICYCLE_RENT) {
+                linkedTargetsForMode.computeEgressStopDelaysIfNeeded();
+            }
             linkedTargets.add(linkedTargetsForMode);
         }
     }
@@ -260,11 +263,6 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
-        // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
-        final int waitingTimeSeconds =
-                (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
-                (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
-
         // Determine an egress limit in the same units as the egress cost tables in the linked point set.
         int egressLimit;
         if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
@@ -290,7 +288,6 @@ public class PerTargetPropagater {
                         }
                         // Propagate from the current stop out to the target.
                         int secondsFromStopToTarget;
-
                         if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
                             secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
                         } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
@@ -299,8 +296,16 @@ public class PerTargetPropagater {
                             throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                         }
 
-                        // Account for any additional delay waiting for taxi or autonomous vehicle.
-                        secondsFromStopToTarget += waitingTimeSeconds;
+                        // Account for any additional delay waiting for pickup at the egress stop.
+                        // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been
+                        //  requested (triggering the building of egressStopDelayTables above, which leads to
+                        //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
+                        //  be ignored when running a secnario without pickup delay modifications.
+                        if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
+                                && linkedTargets.streetLayer.waitTimePolygons != null
+                                && linkedTargets.egressStopDelaysSeconds != null) {
+                                    secondsFromStopToTarget += linkedTargets.egressStopDelaysSeconds[stop];
+                        }
 
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;
                         if (timeAtTarget < cutoffSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {

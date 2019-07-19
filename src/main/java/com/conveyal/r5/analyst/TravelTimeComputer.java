@@ -259,14 +259,11 @@ public class TravelTimeComputer {
         // III. Egress Propagation ======================================================================================
         // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
 
-        // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
-        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
-
         // This propagator will link the destinations to the street layer for all modes as needed.
         PerTargetPropagater perTargetPropagater = new PerTargetPropagater(
                 destinations,
                 network.streetLayer,
-                egressStreetModes,
+                request.egressModes,
                 request,
                 transitTravelTimesToStops,
                 nonTransitTravelTimesToDestinations.travelTimes);

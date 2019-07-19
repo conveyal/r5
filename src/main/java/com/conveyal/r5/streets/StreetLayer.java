@@ -1555,6 +1555,14 @@ public class StreetLayer implements Serializable, Cloneable {
         } else {
             // TODO verify x, y order in coordinate
             Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
+            return getWaitTime(point);
+        }
+    }
+
+    public int getWaitTime (Point point) {
+        if (waitTimePolygons == null) {
+            return 0;
+        } else {
             ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
             // Convert minutes to seconds
             return (int)(polygon.data * 60);

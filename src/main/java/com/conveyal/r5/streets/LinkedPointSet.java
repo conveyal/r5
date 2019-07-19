@@ -6,7 +6,9 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
-import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -96,6 +98,12 @@ public class LinkedPointSet implements Serializable {
      * edge to the point to be linked)
      */
     public int[] distances1_mm;
+
+    /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,
+     * scooter pickup, etc.)
+     */
+    public int[] egressStopDelaysSeconds;
 
     // TODO Refactor the following three fields out into their own classes
 
@@ -609,6 +617,15 @@ public class LinkedPointSet implements Serializable {
                 }
             }
             pointToStopLinkageCostTables = Arrays.asList(result);
+        }
+    }
+
+    public void computeEgressStopDelaysIfNeeded() {
+        if (egressStopDelaysSeconds != null) return;
+        LOG.info("Calculating pickup delays at {} egress stops", stopToPointLinkageCostTables.size());
+        for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
+            Point point = streetLayer.parentNetwork.transitLayer.getJTSPointForStopFixed(stop);
+            egressStopDelaysSeconds[stop] = streetLayer.getWaitTime(point);
         }
     }
 

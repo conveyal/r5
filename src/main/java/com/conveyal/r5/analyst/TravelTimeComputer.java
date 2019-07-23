@@ -216,7 +216,7 @@ public class TravelTimeComputer {
             for (int target = 0; target < nonTransitTravelTimesToDestinations.size(); target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
-                travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
+                travelTimeReducer.replicateTravelTimesAndRecord(target, travelTimeSeconds);
             }
             return travelTimeReducer.finish();
         }

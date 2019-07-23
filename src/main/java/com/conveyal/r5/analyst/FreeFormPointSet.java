@@ -88,7 +88,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     // Each structured attribute must also contain an array of magnitudes with the same length as these arrays.
 
     /** A unique identifier for each feature. */
-    protected String[] ids;
+    public String[] ids;
 
     /** The latitude of each feature (or its centroid if it's not a point). */
     protected double[] lats;

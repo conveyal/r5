@@ -102,11 +102,6 @@ public class TimeGrid extends TravelTimeResult{
         }
     }
 
-    @Override
-    public int calculateNPoints() {
-        return extents.getArea() * nSamplesPerPoint;
-    }
-
     /**
      * Write this grid out in GeoTIFF format.
      * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.

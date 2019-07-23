@@ -13,7 +13,7 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public int x = -1, y = -1;
 
     /**
-     * The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
+     * The pointset key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
      * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
      * will be an accessibility value per origin, rather than a grid of travel times from that origin.
      */
@@ -34,6 +34,11 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      * Key for pointset to use as destinations.
      */
     public String destinationPointSetIds;
+
+    /**
+     * Is explicitly when freeform pointset supplied as origin; otherwise 0
+     */
+    public int nTravelTimeTargetsPerOrigin;
 
     /**
      * Whether to calculate travel times from each origin to the one destination with matching id. If false, travel

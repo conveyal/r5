@@ -1,11 +1,13 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.OneOriginContainer;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
@@ -145,7 +147,24 @@ public class PerTargetPropagater {
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
         perIterationPaths = calculateComponents ? new Path[nIterations] : null;
 
-        for (int targetIdx = 0; targetIdx < nTargets; targetIdx++) {
+        int startTarget = 0;
+        int endTarget = nTargets;
+
+        // One-to-one task assumes each origin in a freeform pointset corresponds to one destination (the point in the
+        // destination pointset with the same id)
+        if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) {
+            String originId = ((RegionalTask) request).id;
+            if (originId != null) {
+                // NB task.taskId is integer index (set when Broker makes task for job); task.id is origin id in supplied
+                // freeform pointset
+                startTarget = ((FreeFormPointSet) linkedTargets.get(0).pointSet).getIndexForFeature(originId);
+                endTarget = 1;
+            } else {
+                LOG.error("One-to-one travel time analysis requested, but no matched origin-destination pair found.");
+            }
+        }
+
+        for (int targetIdx = startTarget; targetIdx < endTarget; targetIdx++) {
 
             // Initialize the travel times to that achieved without transit (if any).
             // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
@@ -171,7 +190,7 @@ public class PerTargetPropagater {
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
-            int[] percentilesMinutes = travelTimeReducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
+            int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetIdx, perIterationTravelTimes);
 
             if (calculateComponents) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
@@ -183,7 +202,7 @@ public class PerTargetPropagater {
             }
         }
         LOG.info("Propagating {} iterations from {} stops to {} target points took {}s",
-                nIterations, nStops, nTargets, (System.currentTimeMillis() - startTimeMillis) / 1000d
+                nIterations, nStops, endTarget, (System.currentTimeMillis() - startTimeMillis) / 1000d
         );
         if (pathWriter != null) {
             pathWriter.finishAndStorePaths();

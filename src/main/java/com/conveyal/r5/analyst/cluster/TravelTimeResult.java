@@ -22,9 +22,16 @@ public class TravelTimeResult {
     // Travel time values, indexed by percentile (sample) and target (grid cell/point)
     int[][] values;
 
-    TravelTimeResult(AnalysisTask task) {
+    public TravelTimeResult(AnalysisTask task) {
         nSamplesPerPoint = task.percentiles.length;
-        nPoints = calculateNPoints();
+
+        if (task instanceof RegionalTask && ((RegionalTask) task).nTravelTimeTargetsPerOrigin != 0) {
+            // Number of destination targets specified explicitly in task
+            nPoints = ((RegionalTask) task).nTravelTimeTargetsPerOrigin;
+        } else {
+            // Number of destination targets not specified explicitly, so infer from grid
+            nPoints = task.width * task.height;
+        }
 
         // Initialization: Fill the values array the default unreachable value.
         // This way the grid is valid even if we don't write anything into it
@@ -46,12 +53,12 @@ public class TravelTimeResult {
 
     // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
     // So no real risk of overflowing an int index.
-    public void setTarget(int targetIndex, int[] pixelValues) {
-        if (pixelValues.length != nSamplesPerPoint) {
+    public void setTarget(int targetIndex, int[] targetValues) {
+        if (targetValues.length != nSamplesPerPoint) {
             throw new IllegalArgumentException("Incorrect number of values per pixel.");
         }
-        for (int i : pixelValues) {
-            values[i][targetIndex] = i;
+        for (int i = 0; i < targetValues.length; i++) {
+            values[i][targetIndex] = targetValues[i];
         }
     }
 
@@ -75,11 +82,6 @@ public class TravelTimeResult {
     public void writeToDataOutput(DataOutput dataOutput) {
 
     }
-
-    public int calculateNPoints() {
-        return values[0].length;
-    }
-
 
     /**
      * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save

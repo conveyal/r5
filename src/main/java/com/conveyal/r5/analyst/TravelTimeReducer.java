@@ -75,11 +75,24 @@ public class TravelTimeReducer {
             travelTimes = new TimeGrid(task);
         }
 
-        // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
-        calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).destinationPointSet != null;
-        if (calculateAccessibility) {
-            accessibilityAccumulator = new AccessibilityAccumulator(task);
+        // Decide what we want to calculate
+        boolean calcAccessibility = false;
+        if (task instanceof RegionalTask) {
+            RegionalTask regionalTask = (RegionalTask) task;
+            if (regionalTask.originPointSetId == null) {
+                // No origins specified explicitly, use grid
+                if (regionalTask.destinationPointSet != null) {
+                    // Destinations specified, calculate cumulative accessibility indicators to them
+                    calcAccessibility = true;
+                    accessibilityAccumulator = new AccessibilityAccumulator(task);
+                }
+            } else {
+                // Origins specified explicitly, calculate times for them
+                travelTimes = new TravelTimeResult(regionalTask);
+                // TODO options for calculating accessibility from freeform points
+            }
         }
+        this.calculateAccessibility = calcAccessibility;
     }
 
 
@@ -105,28 +118,28 @@ public class TravelTimeReducer {
     }
 
     /**
-     * Given a single travel time, replicate it to match the expected number of percentiles.
+     * Given a single travel time, replicate it to match the expected number of percentiles, then record value for
+     * target.
      *
      * @param timeSeconds Single travel time, for results with no variation, e.g. from walking, biking, or driving.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] recordTravelTimesForTarget (int target, int timeSeconds){
-        int[] percentileTravelTimesMinutes = new int[nPercentiles];
-        Arrays.fill(new int[nPercentiles], convertToMinutes(timeSeconds));
-        return recordTravelTimesForTarget(target, percentileTravelTimesMinutes);
+    public int[] replicateTravelTimesAndRecord (int target, int timeSeconds){
+        int[] travelTimesMinutes = new int[nPercentiles];
+        Arrays.fill(travelTimesMinutes, convertToMinutes(timeSeconds));
+        return recordTravelTimesForTarget(target, travelTimesMinutes);
     }
 
     /**
-     * Given a list of travel times of the expected length, extract the requested percentiles. Either the extracted
-     * percentiles or the resulting accessibility values (or both) are then stored.
+     * Given a list of travel times of the expected length, extract the requested percentiles, then record value for
+     * target.
      * WARNING: this method destructively sorts the supplied times in place.
      * Their positions in the array will no longer correspond to the raptor iterations that produced them.
      * @param timesSeconds which will be destructively sorted in place to extract percentiles.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] recordTravelTimesForTarget (int target, int[] timesSeconds) {
-        // TODO factor out getPercentiles method for clarity
-        // Sort the times at each target and read off percentiles at the pre-calculated indexes.
+    public int[] extractTravelTimesAndRecord (int target, int[] timesSeconds) {
+        // Sort the times at each target and extract percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
         if (timesSeconds.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
@@ -138,7 +151,20 @@ public class TravelTimeReducer {
                 percentileTravelTimesMinutes[p] = convertToMinutes(timeSeconds);
             }
         } else {
-            throw new ParameterException("You must supply the expected number of travel time values");
+            throw new ParameterException(timesSeconds.length + " iterations supplied; expected " + timesPerDestination);
+        }
+        return recordTravelTimesForTarget(target, percentileTravelTimesMinutes);
+    }
+
+    /**
+     * Given a list of travel times of the expected length, store the extracted percentiles of travel time and/or
+     * accessibility values.
+     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
+     */
+    private int[] recordTravelTimesForTarget (int target, int[] percentileTravelTimesMinutes) {
+        if (percentileTravelTimesMinutes.length != nPercentiles) {
+            throw new ParameterException(percentileTravelTimesMinutes.length + " percentile values supplied; expected" +
+                    " " + nPercentiles);
         }
         if (retainTravelTimes) {
             travelTimes.setTarget(target, percentileTravelTimesMinutes);

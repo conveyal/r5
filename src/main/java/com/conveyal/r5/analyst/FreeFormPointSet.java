@@ -565,7 +565,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         }
     }
 
-    public void writeJsonProperties(JsonGenerator jgen) throws JsonGenerationException, IOException {
+    public void writeJsonProperties(JsonGenerator jgen) throws IOException {
         jgen.writeObjectFieldStart("properties");
         {
 

@@ -29,22 +29,19 @@ import java.util.stream.IntStream;
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
  * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
  * edge (like a Splice or a Sample in OTP).
+ *
+ * FIXME I'm not sure LinkedPointSet should be serializable... or why EgressCostTable has a transient field.
  */
 public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
-    /* Constants */
+    // CONSTANTS
 
     public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
 
-    public static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
-
-    public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
-
-    public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
-
-    /* Fields */
+    // FIELDS IDENTIFYING THIS OBJECT
+    // A PointSet, linked to a particular StreetLayer, for a given StreetMode.
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built
@@ -65,60 +62,34 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    /**
-     * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
-     * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
-     * in the UI.
-     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L187.
-     * We would then fail fast on any programming errors that don't set or copy the limit.
-     */
-    int linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
+    // FIELDS CONTAINING LINKAGE INFORMATION
+    // for each point, the distance to each end of the nearest edge.
 
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
      * edge pairs.
      */
-    public int[] edges;
+    public final int[] edges;
 
     /**
      * For each point, distance from the point to the split point (closest point on the edge to the point to be linked)
      */
-    public int[] distancesToEdge_mm;
+    public final int[] distancesToEdge_mm;
 
     /**
      * For each point, distance from the beginning vertex of the edge geometry up to the split point (closest point on
      * the edge to the point to be linked)
      */
-    public int[] distances0_mm;
+    public final int[] distances0_mm;
 
     /**
      * For each point, distance from the end vertex of the edge geometry up to the split point (closest point on the
      * edge to the point to be linked)
      */
-    public int[] distances1_mm;
+    public final int[] distances1_mm;
 
-    // TODO Refactor the following three fields out into their own classes
-
-    /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
-     * pairs. */
-    public List<int[]> stopToPointLinkageCostTables;
-
-    /**
-     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance. For walk
-     * and bike, distance is in millimeters; for car, distance is actually time in seconds. Inverted version of
-     * stopToPointLinkageCostTables. This is used in PerTargetPropagator to find all the stops near a particular point
-     * (grid cell) so we can perform propagation to that grid cell only. We only retain a few percentiles of travel
-     * time at each target cell, so doing one cell at a time allows us to keep the output size within reason.
-     */
-    public transient List<TIntIntMap> pointToStopLinkageCostTables;
-
-    /**
-     * By default, linkage costs are distances (between stops and pointset points). For modes where speeds vary
-     * by link, it doesn't make sense to store distances, so we store times.
-     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L510-540.
-     * We would then fail fast on any programming errors that don't set or copy the cost unit.
-     */
-    public RoutingVariable linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
+    // Factored out into a class. This will allow initializing only when needed.
+    public EgressCostTable egressCostTable = null;
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
@@ -126,6 +97,9 @@ public class LinkedPointSet implements Serializable {
      * Besides they are useful for later processing of LinkedPointSets. However once we start evicting
      * TransportNetworks, we have to make sure we're not holding references to entire StreetLayers in LinkedPointSets
      * (memory leak).
+     * When building a linkage for a scenario, the linkage for the baseline on which the scenario is built can be
+     * supplied as an optimization. We will reuse linkages and cost tables from that baseline as much as possible.
+     *
      * @param pointSet Points to be linked (e.g. web mercator grid, or eventually centroids)
      * @param streetLayer Streets to which the points should be linked
      * @param streetMode Mode by which to connect with and traverse the street network (e.g. from points to stops)
@@ -139,11 +113,6 @@ public class LinkedPointSet implements Serializable {
         this.streetMode = streetMode;
 
         final int nPoints = pointSet.featureCount();
-        final int nStops = streetLayer.parentNetwork.transitLayer.getStopCount();
-
-        // The regions within which we want to link points to edges, then connect transit stops to points.
-        // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
-        Geometry linkageCostRebuildZone = null;
 
         // TODO general purpose method to check compatability
         // The supplied baseLinkage must be for exactly the same pointSet as the linkage we're creating.
@@ -166,7 +135,6 @@ public class LinkedPointSet implements Serializable {
             distancesToEdge_mm = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
-            stopToPointLinkageCostTables = new ArrayList<>();
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
@@ -182,34 +150,8 @@ public class LinkedPointSet implements Serializable {
             distancesToEdge_mm = Arrays.copyOf(baseLinkage.distancesToEdge_mm, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
-            stopToPointLinkageCostTables = new ArrayList<>(baseLinkage.stopToPointLinkageCostTables);
-            linkageCostUnit = baseLinkage.linkageCostUnit;
-            // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
-            // This should be all the points within the (bird-fly) linking radius of any modified edge.
-            // The stop-to-vertex trees should already be rebuilt elsewhere when applying the scenario.
-            // This should be all the stops within the (network or bird-fly) tree radius of any modified edge, including
-            // any new stops that were created by the scenario (which will naturally fall within this distance).
-            // And build trees from stops to points.
-            // Even though currently the only changes to the street network are re-splitting edges to connect new
-            // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
-            // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
-            // vertices).
-            if (streetMode == StreetMode.WALK) {
-                // limit already set for WALK.
-            } else if (streetMode == StreetMode.BICYCLE) {
-                linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
-            } else if (streetMode == StreetMode.CAR) {
-                linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
-            } else {
-                throw new UnsupportedOperationException("Unrecognized streetMode");
-            }
 
-            linkageCostRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
         }
-
-        // If dealing with a scenario, pad out the stop trees list from the base linkage to match the new stop count.
-        // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
-        while (stopToPointLinkageCostTables.size() < nStops) stopToPointLinkageCostTables.add(null);
 
         // First, link the points in this PointSet to specific street vertices.
         // If no base linkage was supplied, parameter will evaluate to true and all points will be linked from scratch.
@@ -217,12 +159,11 @@ public class LinkedPointSet implements Serializable {
 
         // Second, make a table of linkage costs (distance or time) from each transit stop to the points in this
         // PointSet.
-        this.makeStopToPointLinkageCostTables(linkageCostRebuildZone);
-
+        this.egressCostTable = new EgressCostTable(this, baseLinkage);
     }
 
     /**
-     * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
+     * Construct a new LinkedPointSet for a grid that falls entirely within an existing gridded LinkedPointSet.
      *
      * @param sourceLinkage a LinkedPointSet whose PointSet must be a WebMercatorGridPointset
      * @param subGrid       the grid for which to create a linkage
@@ -256,6 +197,8 @@ public class LinkedPointSet implements Serializable {
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
 
+        // FIXME Grid-cropping math here and in EgressCostTable secondary constructor is identical. This seems to imply we should have a subgrid-mapping class.
+
         // Copy a subset of linkage information (edges and distances for each cell) over from the source linkage to
         // the new sub-linkage. This basically crops a smaller rectangle out of the larger one (or copies it if
         // dimensions are the same). Variables x, y, and pixel are relative to the new linkage, not the source one.
@@ -277,41 +220,7 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
-        // For each transit stop, we have a table of costs to reach pointset points (or null if none can be reached).
-        // If such tables have already been built for the source linkage, copy them and crop to a smaller rectangle as
-        // needed (as was done for the basic linkage information above).
-        stopToPointLinkageCostTables = sourceLinkage.stopToPointLinkageCostTables.stream()
-                .map(distanceTable -> {
-                    if (distanceTable == null) {
-                        // If the stop could not reach any points in the super-pointset,
-                        // it cannot reach any points in this sub-pointset.
-                        return null;
-                    }
-                    TIntList newDistanceTable = new TIntArrayList();
-                    for (int i = 0; i < distanceTable.length; i += 2) {
-                        int targetInSuperLinkage = distanceTable[i];
-                        int distance = distanceTable[i + 1];
-
-                        int superX = targetInSuperLinkage % superGrid.width;
-                        int superY = targetInSuperLinkage / superGrid.width;
-
-                        int subX = superX + superGrid.west - subGrid.west;
-                        int subY = superY + superGrid.north - subGrid.north;
-
-                        // Only retain distance information for points that fall within this sub-grid.
-                        if (subX >= 0 && subX < subGrid.width && subY >= 0 && subY < subGrid.height) {
-                            int targetInSubLinkage = subY * subGrid.width + subX;
-                            newDistanceTable.add(targetInSubLinkage);
-                            newDistanceTable.add(distance); // distance to target does not change when we crop the pointset
-                        }
-                    }
-                    if (newDistanceTable.isEmpty()) {
-                        // No points in the sub-pointset can be reached from this transit stop.
-                        return null;
-                    }
-                    return newDistanceTable.toArray();
-                })
-                .collect(Collectors.toList());
+        this.egressCostTable = new EgressCostTable(this, sourceLinkage, subGrid);
     }
 
 
@@ -433,21 +342,27 @@ public class LinkedPointSet implements Serializable {
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop. All points outside the distanceTableZone are skipped as an
-     * optimization. See JavaDoc on the caller makeStopToPointLinkageCostTables - this is one of the slowest parts of
-     * building a network.
+     * optimization. See JavaDoc on the caller: this is one of the slowest parts of building a network.
      *
+     * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
+     *
+     * @param distanceTableToVertices a map from integer vertex IDs to distances TODO in what units?
+     * @param distanceTableZone TODO clarify: in fixed or floating degrees etc.
      * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.
      */
-    private int[] extendDistanceTableToPoints (TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
+    public int[] extendDistanceTableToPoints (TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
         // TODO we don't really need a spatial index on a gridded point set.
         // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
         TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
+        // FIXME this is not correcting for the fact that HashGrid returns false positives. It's returning every point in the bounding box. But it is also sensitive to which vertices are passed in.
         relevantPoints.forEach(p -> {
-            // An edge index of -1 for a particular point indicates that this point is unlinked
-            if (edges[p] == -1) return true;
+            // An edge index of -1 for a particular point indicates that this point is unlinked.
+            if (edges[p] == -1) {
+                return true; // Continue to next iteration.
+            }
             edge.seek(edges[p]);
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
@@ -479,151 +394,5 @@ public class LinkedPointSet implements Serializable {
         });
         return packed.toArray();
     }
-
-    /**
-     * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
-     * PointSet.
-     * At one point we experimented with doing the entire search from the transit stops all the way up to the points
-     * within this method. However, that takes too long when switching PointSets. So we pre-cache distances to all
-     * street vertices in the TransitNetwork, and then just extend those tables to the points in the PointSet.
-     * This is one of the slowest steps in working with a new scenario. It takes about 50 seconds to link 400000 points.
-     * The run time is not shocking when you consider the complexity of the operation: there are nStops * nPoints
-     * iterations, which is 8000 * 400000 in the example case. This means 6 msec per transit stop, or 2e-8 sec per point
-     * iteration, which is not horribly slow. There are just too many iterations.
-     *
-     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the
-     *                        others alone. If null, build trees for all stops.
-     */
-    public void makeStopToPointLinkageCostTables(Geometry treeRebuildZone) {
-        LOG.info("Creating linkage cost tables from each transit stop to PointSet points.");
-        // FIXME this is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
-        pointSet.createSpatialIndexAsNeeded();
-        if (treeRebuildZone != null) {
-            LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
-        }
-        TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
-        int nStops = transitLayer.getStopCount();
-        int logFrequency = 1000;
-        if (streetMode == StreetMode.CAR) {
-            // Log more often because car searches are very slow.
-            logFrequency = 100;
-        }
-        LambdaCounter counter = new LambdaCounter(LOG, nStops, logFrequency,
-                "Computed distances to PointSet points from {} of {} transit stops.");
-        // Create a distance table from each transit stop to the points in this PointSet in parallel.
-        // Each table is a flattened 2D array. Two values for each point reachable from this stop: (pointIndex, cost)
-        // When applying a scenario, keep the existing distance table for those stops that could not be affected.
-        stopToPointLinkageCostTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
-            Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
-            // If the stop is not linked to the street network, it should have no distance table.
-            if (stopPoint == null) return null;
-            if (treeRebuildZone != null && !treeRebuildZone.contains(stopPoint)) {
-                // This stop is not affected by the scenario. Return the existing distance table.
-                // All new stops created by a scenario should be inside the relink zone, so
-                // all stops outside the relink zone should already have a distance table entry.
-                if (stopIndex >= stopToPointLinkageCostTables.size()) {
-                    throw new AssertionError("A stop created by a scenario is located outside relink zone.");
-                }
-                return stopToPointLinkageCostTables.get(stopIndex);
-            }
-
-            counter.increment();
-            Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
-            GeometryUtils.expandEnvelopeFixed(distanceTableZone, linkingDistanceLimitMeters);
-
-            if (streetMode == StreetMode.WALK) {
-                // Walking distances from stops to street vertices are saved in the transitLayer.
-                // Get the pre-computed distance table from the stop to the street vertices,
-                // then extend that table out from the street vertices to the points in this PointSet.
-                // TODO reuse the code that computes the walk tables at TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
-                TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
-                return distanceTableToVertices == null ? null :
-                        extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
-            } else {
-
-                StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
-                sr.streetMode = streetMode;
-                int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
-                if (vertexId < 0) {
-                    LOG.warn("Stop unlinked, cannot build distance table: {}", stopIndex);
-                    return null;
-                }
-                // TODO setting the origin point of the router to the stop vertex does not work.
-                // This is probably because link edges do not allow car traversal. We could traverse them.
-                // As a stopgap we perform car linking at the geographic coordinate of the stop.
-                // sr.setOrigin(vertexId);
-                VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexId);
-                sr.setOrigin(vertex.getLat(), vertex.getLon());
-
-                if (streetMode == StreetMode.BICYCLE) {
-
-                    sr.distanceLimitMeters = linkingDistanceLimitMeters;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    return extendDistanceTableToPoints(sr.getReachedVertices(), distanceTableZone);
-
-                } else if (streetMode == StreetMode.CAR) {
-                    // The speeds for Walk and Bicycle can be specified in an analysis request, so it makes sense above to
-                    // store distances and apply the requested speed. In contrast, car speeds vary by link and cannot be
-                    // set in analysis requests, so it makes sense to use seconds directly as the linkage cost.
-                    // TODO confirm this works as expected when modifications can affect street layer.
-                    sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
-                    linkageCostUnit = RoutingVariable.DURATION_SECONDS;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case it's much bigger than the driving radius.
-                    PointSetTimes driveTimesToAllPoints = eval(sr::getTravelTimeToVertex, null,
-                            OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
-                    // TODO optimization: should we make spatial index visit() method public to avoid copying results?
-                    TIntList packedDriveTimes = new TIntArrayList();
-                    for (int p = 0; p < driveTimesToAllPoints.size(); p++) {
-                        int driveTimeToPoint = driveTimesToAllPoints.getTravelTimeToPoint(p);
-                        if (driveTimeToPoint != Integer.MAX_VALUE) {
-                            packedDriveTimes.add(p);
-                            packedDriveTimes.add(driveTimeToPoint);
-                        }
-                    }
-                    if (packedDriveTimes.isEmpty()) {
-                        return null;
-                    } else {
-                        return packedDriveTimes.toArray();
-                    }
-                } else {
-                    throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
-                }
-            }
-        }).collect(Collectors.toList());
-        counter.done();
-    }
-
-
-    /**
-     * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
-     * The original calculation is performed from each stop out to the points it can reach.
-     */
-    public synchronized void transposeLinkageCostTablesIfNeeded() {
-        if (pointToStopLinkageCostTables != null) return;
-        // FIXME Method and block inside are both synchronized on "this", is that intentional? See comment below.
-        synchronized (this) {
-            // check again in case they were built while waiting on this synchronized block
-            if (pointToStopLinkageCostTables != null) return;
-            if (stopToPointLinkageCostTables == null) makeStopToPointLinkageCostTables(null);
-            TIntIntMap[] result = new TIntIntMap[size()];
-
-            for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
-                int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
-                if (stopToPointDistanceTable == null) continue;
-
-                for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
-                    int point = stopToPointDistanceTable[idx];
-                    int distance = stopToPointDistanceTable[idx + 1];
-                    if (result[point] == null) result[point] = new TIntIntHashMap();
-                    result[point].put(stop, distance);
-                }
-            }
-            pointToStopLinkageCostTables = Arrays.asList(result);
-        }
-    }
-
 
 }

@@ -6,7 +6,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
-import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
@@ -125,7 +124,7 @@ public class PerTargetPropagater {
         linkedTargets = new ArrayList<>(modes.size());
         for (StreetMode mode : modes) {
             LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
-            linkedTargetsForMode.makePointToStopDistanceTablesIfNeeded();
+            linkedTargetsForMode.transposeLinkageCostTablesIfNeeded();
             linkedTargets.add(linkedTargetsForMode);
         }
     }

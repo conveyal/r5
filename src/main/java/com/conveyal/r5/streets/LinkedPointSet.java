@@ -256,8 +256,9 @@ public class LinkedPointSet implements Serializable {
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
 
-        // Copy values over from the source linkage to the new sub-linkage
-        // x, y, and pixel are relative to the new linkage
+        // Copy a subset of linkage information (edges and distances for each cell) over from the source linkage to
+        // the new sub-linkage. This basically crops a smaller rectangle out of the larger one (or copies it if
+        // dimensions are the same). Variables x, y, and pixel are relative to the new linkage, not the source one.
         for (int y = 0, pixel = 0; y < subGrid.height; y++) {
             for (int x = 0; x < subGrid.width; x++, pixel++) {
                 int sourceColumn = subGrid.west + x - superGrid.west;
@@ -276,10 +277,16 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
+        // For each transit stop, we have a table of costs to reach pointset points (or null if none can be reached).
+        // If such tables have already been built for the source linkage, copy them and crop to a smaller rectangle as
+        // needed (as was done for the basic linkage information above).
         stopToPointLinkageCostTables = sourceLinkage.stopToPointLinkageCostTables.stream()
                 .map(distanceTable -> {
-                    if (distanceTable == null) return null; // if it was previously unlinked, it is still unlinked
-
+                    if (distanceTable == null) {
+                        // If the stop could not reach any points in the super-pointset,
+                        // it cannot reach any points in this sub-pointset.
+                        return null;
+                    }
                     TIntList newDistanceTable = new TIntArrayList();
                     for (int i = 0; i < distanceTable.length; i += 2) {
                         int targetInSuperLinkage = distanceTable[i];
@@ -291,16 +298,18 @@ public class LinkedPointSet implements Serializable {
                         int subX = superX + superGrid.west - subGrid.west;
                         int subY = superY + superGrid.north - subGrid.north;
 
+                        // Only retain distance information for points that fall within this sub-grid.
                         if (subX >= 0 && subX < subGrid.width && subY >= 0 && subY < subGrid.height) {
-                            // only retain connections to points that fall within the subGrid
                             int targetInSubLinkage = subY * subGrid.width + subX;
                             newDistanceTable.add(targetInSubLinkage);
                             newDistanceTable.add(distance); // distance to target does not change when we crop the pointset
                         }
                     }
-
-                    if (newDistanceTable.isEmpty()) return null; // not near any points in sub pointset
-                    else return newDistanceTable.toArray();
+                    if (newDistanceTable.isEmpty()) {
+                        // No points in the sub-pointset can be reached from this transit stop.
+                        return null;
+                    }
+                    return newDistanceTable.toArray();
                 })
                 .collect(Collectors.toList());
     }
@@ -587,10 +596,14 @@ public class LinkedPointSet implements Serializable {
         counter.done();
     }
 
-    // FIXME Method and block inside are both synchronized on "this", is that intentional? See comment in internal block.
-    public synchronized void makePointToStopDistanceTablesIfNeeded () {
-        if (pointToStopLinkageCostTables != null) return;
 
+    /**
+     * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
+     * The original calculation is performed from each stop out to the points it can reach.
+     */
+    public synchronized void transposeLinkageCostTablesIfNeeded() {
+        if (pointToStopLinkageCostTables != null) return;
+        // FIXME Method and block inside are both synchronized on "this", is that intentional? See comment below.
         synchronized (this) {
             // check again in case they were built while waiting on this synchronized block
             if (pointToStopLinkageCostTables != null) return;

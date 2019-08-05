@@ -111,7 +111,8 @@ public abstract class PointSet {
      * Constructor for a PointSet that initializes its cache of linkages upon deserialization.
      */
     public PointSet() {
-        this.linkageCache = CacheBuilder.newBuilder().maximumSize(LINKAGE_CACHE_SIZE)
+        this.linkageCache = CacheBuilder.newBuilder()
+                .maximumSize(LINKAGE_CACHE_SIZE)
                 .removalListener(notification -> LOG.warn("LINKAGE CACHE EVICTION. key: {}, cause: {}",
                         notification.getKey(), notification.getCause()))
                 .build(new LinkageCacheLoader());

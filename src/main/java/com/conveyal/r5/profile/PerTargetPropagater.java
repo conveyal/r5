@@ -127,7 +127,7 @@ public class PerTargetPropagater {
             LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
             // Transpose the cost table for propagation. Some tables are never used for propagation (like the
             // region-wide baseline). Transposing them only when needed should save a lot of memory.
-            linkedTargetsForMode.egressCostTable.makePointToStopTablesAsNeeded();
+            linkedTargetsForMode.egressCostTable.destructivelyTransposeForPropagationAsNeeded();
             linkedTargets.add(linkedTargetsForMode);
         }
     }

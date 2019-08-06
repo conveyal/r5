@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -66,9 +67,9 @@ public class EgressCostTable implements Serializable {
 
     /**
      * For each transit stop, the distances or times (i.e. "costs") to all nearby PointSet points as a flattened
-     * sequence of (point_index, cost) pairs.
+     * sequence of (point_index, cost) pairs. This is not final to allow it to be nulled when we transpose the table.
      */
-    public final List<int[]> stopToPointLinkageCostTables;
+    public List<int[]> stopToPointLinkageCostTables;
 
     /**
      * For each PointSet point, the transit stops from which it can be reached as a map from StopID to distance or time
@@ -337,38 +338,52 @@ public class EgressCostTable implements Serializable {
 
     /**
      * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
-     * The original calculation is performed from each stop out to the points it can reach.
-     * If we could throw away the original stop -> point tables, that would save a lot of memory. We could null out the
-     * entries in the source list as they are converted, allowing garbage collection of values.
-     * However: the geographic cropping and scenario base copying processes expect the original stop -> point tables to
-     * still exist. They would need to be rethought. This should actually simplify the geographic crop, but scenario
-     * base copying will be more challenging.
-     * Note though that only certain EgressCostTables serve as sources for copies; perhaps we can null out the
-     * stop-to-point tables in copied/cropped objects and allow only one generation of copying. We were effectively
-     * already avoiding data duplication in the region-wide cost tables by never calling the method that lazily
-     * transposed the tables.
+     * The original calculation is performed from each stop out to the points it can reach, primarily because there are
+     * usually fewer stops than destination points.
+     *
+     * Throwing away the original stop -> point tables should save a lot of memory. We null out the entries in the
+     * source list as they are converted, allowing garbage collection of values.
+     *
+     * The geographic cropping and scenario base copying processes expect the original stop -> point tables to still
+     * exist. However, each table seems to be used only as a source table for copies, or as a propagation table, but not
+     * both. Copied tables are always used for propagation, and once any one thread uses it for propagation it should
+     * never be a source for any other copies.
+     *
+     * We were effectively already avoiding data duplication in the region-wide cost tables by never calling the method
+     * that lazily transposed the tables.
+     * TODO really we should have separate EgressCostTable and PropagationEgressCostTable classes, one copied from the other.
+     * One should represent the region, or read-through crops of the whole region, and the other should be per-scenario.
      */
-    public synchronized void makePointToStopTablesAsNeeded() {
+    public synchronized void destructivelyTransposeForPropagationAsNeeded() {
         if (pointToStopLinkageCostTables == null) {
+            // Release reference to the source table, in order to fail fast if any other thread tries to read them.
+            // We make a local copy so we can release each reference while copying.
+            List<int[]> stopToPointTables = new ArrayList<>(this.stopToPointLinkageCostTables);
+            this.stopToPointLinkageCostTables = null;
             TIntIntMap[] result = new TIntIntMap[linkedPointSet.size()];
-            for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
-                int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
-                if (stopToPointDistanceTable == null) {
+            for (int stop = 0; stop < stopToPointTables.size(); stop++) {
+                int[] stopToPointTable = stopToPointTables.get(stop);
+                if (stopToPointTable == null) {
                     continue;
                 }
-                for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
-                    int point = stopToPointDistanceTable[idx];
-                    int distance = stopToPointDistanceTable[idx + 1];
-                    if (result[point] == null) result[point] = new TIntIntHashMap();
+                for (int idx = 0; idx < stopToPointTable.length; idx += 2) {
+                    int point = stopToPointTable[idx];
+                    int distance = stopToPointTable[idx + 1];
+                    if (result[point] == null) {
+                        result[point] = new TIntIntHashMap();
+                    }
                     result[point].put(stop, distance);
                 }
+                // Release the reference to this stop's table for garbage collection.
+                stopToPointTables.set(stop, null);
             }
+            // Make the transposed table available to propagation.
             this.pointToStopLinkageCostTables = Arrays.asList(result);
         }
     }
 
     /**
-     * You should first call makePointToStopTablesAsNeeded before calling this method.
+     * You should first call destructivelyTransposeForPropagationAsNeeded before calling this method.
      * @return for the given destination point index, a map from stop_index -> cost_to_reach_point for all nearby stops
      */
     public TIntIntMap getCostTableForPoint (int pointIndex) {

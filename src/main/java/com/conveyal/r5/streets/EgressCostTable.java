@@ -180,13 +180,18 @@ public class EgressCostTable implements Serializable {
         TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
 
-        int logFrequency = 1000;
+        // TODO create a multi-counter that can track two different numbers and include them in a single "Done" message.
+        // Maybe we should just make a custom ProgressCounter static inner class everywhere one is needed.
+        int copyLogFrequency = 5000;
+        int computeLogFrequency = 1000;
         if (streetMode == StreetMode.CAR) {
             // Log more often because car searches are very slow.
-            logFrequency = 100;
+            computeLogFrequency = 100;
         }
-        LambdaCounter counter = new LambdaCounter(LOG, nStops, logFrequency,
-                "Computed distances to PointSet points from {} of {} transit stops.");
+        final LambdaCounter computeCounter = new LambdaCounter(LOG, nStops, computeLogFrequency,
+                "Computed new stop -> point tables for {} of {} transit stops.");
+        final LambdaCounter copyCounter = new LambdaCounter(LOG, nStops, copyLogFrequency,
+                "Copied unchanged stop -> point tables for {} of {} transit stops.");
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // Each table is a flattened 2D array. Two values for each point reachable from this stop: (pointIndex, cost)
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
@@ -204,10 +209,11 @@ public class EgressCostTable implements Serializable {
                 // All stops created by the scenario should by definition be inside the relink zone.
                 // This conditional is handling stops outside the relink zone, which should always have existed before
                 // scenario application. Therefore they should be present in the base linkage cost tables.
+                copyCounter.increment();
                 return baseLinkage.egressCostTable.stopToPointLinkageCostTables.get(stopIndex);
             }
 
-            counter.increment();
+            computeCounter.increment();
             Envelope envelopeAroundStop = stopPoint.getEnvelopeInternal();
             GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, linkingDistanceLimitMeters);
 
@@ -275,7 +281,8 @@ public class EgressCostTable implements Serializable {
                 }
             }
         }).collect(Collectors.toList());
-        counter.done();
+        computeCounter.done();
+        copyCounter.done();
     }
 
     /**

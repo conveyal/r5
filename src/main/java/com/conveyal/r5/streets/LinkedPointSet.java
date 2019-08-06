@@ -2,8 +2,6 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
 import com.vividsolutions.jts.geom.*;
@@ -15,14 +13,9 @@ import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
-import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -232,7 +225,7 @@ public class LinkedPointSet implements Serializable {
      *            rather than simply splitting existing ones.
      */
     private void linkPointsToStreets (boolean all) {
-        LambdaCounter counter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
+        LambdaCounter linkCounter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
                 "Linked {} of {} PointSet points to streets.");
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
@@ -255,12 +248,16 @@ public class LinkedPointSet implements Serializable {
                     distances0_mm[p] = split.distance0_mm;
                     distances1_mm[p] = split.distance1_mm;
                 }
-                counter.increment();
+                linkCounter.increment();
             }
         });
         long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
-        counter.done();
-        LOG.info("{} points are not linked to the street network.", unlinked);
+        linkCounter.done();
+        LOG.info("      {} of {} points were copied unchanged from the source linkage.",
+                pointSet.featureCount() - linkCounter.getCount(),
+                pointSet.featureCount()
+        );
+        LOG.info("      {} points in resulting linkage were not linked to the street network.", unlinked);
     }
 
     /** @return the number of linkages, which should be the same as the number of points in the PointSet. */

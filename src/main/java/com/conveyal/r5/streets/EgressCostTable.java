@@ -132,7 +132,8 @@ public class EgressCostTable implements Serializable {
          * in the UI.
          * FIXME we should leave this uninitialized, only initializing once the linkage mode is known.
          * We would then fail fast on any programming errors that don't set or copy the limit.
-         * FIXME this appears to be used only in the constructor, should we really save it in an instance field? Maybe, just for debugging.
+         * FIXME this appears to be used only in the constructor, should we really save it in an instance field? Maybe,
+         *       just for debugging.
          */
         final int linkingDistanceLimitMeters;
 
@@ -149,7 +150,8 @@ public class EgressCostTable implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            // FIXME wait why are we only calculating a distance limit when a base linkage is supplied? Because otherwise we link all points and don't need a radius.
+            // FIXME wait why are we only calculating a distance limit when a base linkage is supplied? Because
+            //       otherwise we link all points and don't need a radius.
             if (streetMode == StreetMode.WALK) {
                 linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
             } else if (streetMode == StreetMode.BICYCLE) {
@@ -162,12 +164,14 @@ public class EgressCostTable implements Serializable {
             rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
         } else {
             rebuildZone = null; // rebuild everything.
-            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS; // TODO check pre-refactor code, isn't this assuming WALK mode unless there's a base linkage?
+            // TODO check pre-refactor code, isn't this assuming WALK mode unless there's a base linkage?
+            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
         }
 
          LOG.info("Creating linkage cost tables from each transit stop to PointSet points.");
-         // FIXME using a spatial index is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
-         // We could just do this in the method that uses the pointset spatial index (extendDistanceTableToPoints) but that's called in a tight loop.
+         // FIXME using a spatial index is wasting a lot of memory and not needed for gridded pointsets - overload for
+        //        gridded and freeform PointSets. We could just do this in the method that uses the pointset spatial
+        //        index (extendDistanceTableToPoints) but that's called in a tight loop.
          linkedPointSet.pointSet.createSpatialIndexAsNeeded();
 
         if (rebuildZone != null) {
@@ -195,7 +199,8 @@ public class EgressCostTable implements Serializable {
                 // This cannot be affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so
                 // all stops outside the relink zone should already have a distance table entry.
-                // TODO having a rebuild zone always implies there is a baseLinkage? If it's possible to not have a base linkage, this should return null.
+                // TODO having a rebuild zone always implies there is a baseLinkage? If it's possible to not have a base
+                //      linkage, this should return null.
                 // All stops created by the scenario should by definition be inside the relink zone.
                 // This conditional is handling stops outside the relink zone, which should always have existed before
                 // scenario application. Therefore they should be present in the base linkage cost tables.
@@ -210,7 +215,8 @@ public class EgressCostTable implements Serializable {
                 // Walking distances from stops to street vertices are saved in the TransitLayer.
                 // Get the pre-computed walking distance table from the stop to the street vertices,
                 // then extend that table out from the street vertices to the points in this PointSet.
-                // TODO reuse the code that computes the walk tables at TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
+                // TODO reuse the code that computes the walk tables at TransitLayer.buildOneDistanceTable() rather than
+                //      duplicating it below for other modes.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
@@ -243,7 +249,8 @@ public class EgressCostTable implements Serializable {
                     sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
                     sr.quantityToMinimize = linkageCostUnit;
                     sr.route();
-                    // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case it's much bigger than the driving radius.
+                    // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case
+                    //      it's much bigger than the driving radius.
                     PointSetTimes driveTimesToAllPoints = linkedPointSet.eval(
                             sr::getTravelTimeToVertex,
                             null,

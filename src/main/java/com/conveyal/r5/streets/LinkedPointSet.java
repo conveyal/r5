@@ -220,7 +220,7 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
-        this.egressCostTable = new EgressCostTable(this, sourceLinkage, subGrid);
+        this.egressCostTable = EgressCostTable.geographicallyCroppedCopy(this, sourceLinkage.egressCostTable);
     }
 
 

@@ -23,7 +23,21 @@ import java.util.stream.IntStream;
 import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
 
 /**
- * This holds pre-calculated distances from stops to points (and vice versa)
+ * The final stage of a one-to-many transit trip is what we call "propagation": extending travel times out from all
+ * transit stops that were reached to all destination points. This needs to be done hundreds or thousands of times for
+ * every stop, or for every target grid cell (depending on the number of simulated schedule Monte Carlo draws, and the
+ * number of different departure minutes in the analysis).
+ *
+ * In order to perform propagation quickly, we pre-build tables of travel distance or time from each transit stop to
+ * each destination point. These tables remain identical for a given scenario so are cached in the worker once built.
+ * Individual requests may specify lower time limits or car speeds, but these tables place hard upper limits on travel
+ * time, distance, and speed. For this reason, egress searches are are more limited than searches for transit access.
+ *
+ * Typically there are fewer transit stops than destination grid cells, so these tables are built outward from the
+ * transit stops. The tables are then transposed for actual use in propagation, where we iterate over the destinations.
+ *
+ * Note that these cost tables are only needed for egress from public transit. They are not needed for a particular
+ * mode if that mode is only being used for access to transit or direct travel to the destination points.
  */
 public class EgressCostTable {
 
@@ -37,28 +51,39 @@ public class EgressCostTable {
 
     public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
 
-    /** The linkage from which these cost tables are built. */
+    // FIELDS
+
+    /** The linkage from which these cost tables were built. */
     public final LinkedPointSet linkedPointSet;
 
     /**
      * By default, linkage costs are distances (between stops and pointset points). For modes where speeds vary
-     * by link, it doesn't make sense to store distances, so we store times.
-     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L510-540.
-     * We would then fail fast on any programming errors that don't set or copy the cost unit.
+     * by link, it doesn't make sense to store distances, so we store times. This is left uninitialized until the
+     * linkage mode is known, so we fail fast on any programming errors that don't set or copy the linkage cost unit.
      */
     public final StreetRouter.State.RoutingVariable linkageCostUnit;
 
-    /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
-     * pairs. */
+    /**
+     * For each transit stop, the distances or times (i.e. "costs") to all nearby PointSet points as a flattened
+     * sequence of (point_index, cost) pairs.
+     */
     public final List<int[]> stopToPointLinkageCostTables;
 
     /**
-     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance. For walk
-     * and bike, distance is in millimeters; for car, distance is actually time in seconds. Inverted version of
-     * stopToPointLinkageCostTables. This is used in PerTargetPropagator to find all the stops near a particular point
-     * (grid cell) so we can perform propagation to that grid cell only. We only retain a few percentiles of travel
-     * time at each target cell, so doing one cell at a time allows us to keep the output size within reason.
-     * TODO why is this transient? When is this serialized? Maybe just because it's bigger and has more references than the source table?
+     * For each PointSet point, the transit stops from which it can be reached as a map from StopID to distance or time
+     * (i.e. "cost"). For walk and bike, distance is in millimeters; for car, distance is actually time in seconds.
+     *
+     * This is a transposed version of stopToPointLinkageCostTables for direct use in propagation. This is used in
+     * PerTargetPropagator to find all the stops near a particular point (grid cell) so we can perform propagation to
+     * that grid cell only.
+     *
+     * We only retain a few percentiles of travel time at each target cell, so handling one cell at a time allows us to
+     * keep the output size within reason.
+     *
+     * TODO This appears to be transient only because the stopToPointLinkageCostTables are more compact (less references).
+     * We serialize one walk linkage and associated distance tables along with each TransportNetwork.
+     * However, keeping both of these in memory is a huge waste of space. The cost tables are one of the largest and
+     * most problematic objects in our application from a memory consumption point of view.
      */
     public transient List<TIntIntMap> pointToStopLinkageCostTables;
 
@@ -76,7 +101,7 @@ public class EgressCostTable {
      * It would be possible to pull out pure (even static) functions to set these final fields.
      * Or make some factory methods or classes which produce immutable tables.
      */
-    public EgressCostTable(LinkedPointSet linkedPointSet, LinkedPointSet baseLinkage) {
+    public EgressCostTable (LinkedPointSet linkedPointSet, LinkedPointSet baseLinkage) {
 
         this.linkedPointSet = linkedPointSet;
 
@@ -248,22 +273,36 @@ public class EgressCostTable {
     }
 
     /**
-     * Constructor for copying a strict sub-geographic area, with no rebuilding of any linkages or tables.
-     * Interestingly this has exactly the same signature as the other constructor, which makes me wonder if they can
-     * be combined into a single constructor.
+     * Private constructor used by factory methods or other constructors to allow fields to be immutable.
      */
-    public EgressCostTable (LinkedPointSet linkedPointSet, LinkedPointSet baseLinkage) {
-
+    private EgressCostTable (LinkedPointSet linkedPointSet,
+                            StreetRouter.State.RoutingVariable linkageCostUnit,
+                            List<int[]> stopToPointLinkageCostTables) {
         this.linkedPointSet = linkedPointSet;
-        this.linkageCostUnit = x;
+        this.linkageCostUnit = linkageCostUnit;
+        this.stopToPointLinkageCostTables = stopToPointLinkageCostTables;
+        makePointToStopTables(); // Rebuild transient field with transposed table.
+    }
 
-        WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) baseLinkage.pointSet;
-        WebMercatorGridPointSet subGrid = (WebMercatorGridPointSet) linkedPointSet.pointSet;
+    /**
+     * Factory method for copying a strict sub-geographic area, with no rebuilding of any linkages or tables.
+     * If implemented as a constructor, this has a similar or identical signature to the other constructor, which makes
+     * me wonder if they can or should be combined into a single constructor that can perform cropping and scenario
+     * (re)linking and cost table building.
+     *
+     * By taking an EgressCostTable instead of a LinkedPointSet as a parameter, we guarantee that both the source
+     * LinkedPointSet and EgressCostTable are defined.
+     */
+    public static EgressCostTable geographicallyCroppedCopy (LinkedPointSet subLinkage, EgressCostTable superCostTable) {
+
+        LinkedPointSet superLinkage = superCostTable.linkedPointSet;
+        final WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) superLinkage.pointSet;
+        final WebMercatorGridPointSet subGrid = (WebMercatorGridPointSet) subLinkage.pointSet;
 
         // For each transit stop, we have a table of costs to reach pointset points (or null if none can be reached).
         // If such tables have already been built for the source linkage, copy them and crop to a smaller rectangle as
         // needed (as was done for the basic linkage information above).
-        stopToPointLinkageCostTables = baseLinkage.egressCostTable.stopToPointLinkageCostTables.stream()
+        List<int[]> stopToPointLinkageCostTables = superCostTable.stopToPointLinkageCostTables.stream()
                 .map(distanceTable -> {
                     if (distanceTable == null) {
                         // If the stop could not reach any points in the super-pointset,
@@ -296,20 +335,24 @@ public class EgressCostTable {
                 })
                 .collect(Collectors.toList());
 
+        return new EgressCostTable(subLinkage, superCostTable.linkageCostUnit, stopToPointLinkageCostTables);
     }
 
     /**
      * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
      * The original calculation is performed from each stop out to the points it can reach.
      * TODO Can we throw away the original stop -> point tables? That would save a lot of memory.
-     * TODO The target field is now final and transient. We should decide whether this is rebuilding a transient field, or a persistent field.
+     * TODO The target field is now final and transient. We should decide whether this is rebuilding a transient field,
+     *      or a persistent field.
+     * We could null out the entries in the source list as they are converted, allowing garbage collection of values.
      */
     public void makePointToStopTables () {
         TIntIntMap[] result = new TIntIntMap[linkedPointSet.size()];
         for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
             int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
-            if (stopToPointDistanceTable == null) continue;
-
+            if (stopToPointDistanceTable == null) {
+                continue;
+            }
             for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
                 int point = stopToPointDistanceTable[idx];
                 int distance = stopToPointDistanceTable[idx + 1];

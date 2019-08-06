@@ -125,6 +125,9 @@ public class PerTargetPropagater {
         linkedTargets = new ArrayList<>(modes.size());
         for (StreetMode mode : modes) {
             LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
+            // Transpose the cost table for propagation. Some tables are never used for propagation (like the
+            // region-wide baseline). Transposing them only when needed should save a lot of memory.
+            linkedTargetsForMode.egressCostTable.makePointToStopTablesAsNeeded();
             linkedTargets.add(linkedTargetsForMode);
         }
     }
@@ -246,7 +249,7 @@ public class PerTargetPropagater {
 
         // Grab the set of nearby stops for this target, with their distances.
         EgressCostTable egressCostTable = linkedTargets.egressCostTable;
-        TIntIntMap pointToStopLinkageCostTable = egressCostTable.pointToStopLinkageCostTables.get(targetIndex);
+        TIntIntMap pointToStopLinkageCostTable = egressCostTable.getCostTableForPoint(targetIndex);
         StreetRouter.State.RoutingVariable unit = egressCostTable.linkageCostUnit;
 
         /**

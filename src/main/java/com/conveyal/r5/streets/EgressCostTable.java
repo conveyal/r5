@@ -15,6 +15,7 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,7 +40,7 @@ import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
  * Note that these cost tables are only needed for egress from public transit. They are not needed for a particular
  * mode if that mode is only being used for access to transit or direct travel to the destination points.
  */
-public class EgressCostTable {
+public class EgressCostTable implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(EgressCostTable.class);
 
@@ -83,9 +84,9 @@ public class EgressCostTable {
      * TODO This appears to be transient only because the stopToPointLinkageCostTables are more compact (less references).
      * We serialize one walk linkage and associated distance tables along with each TransportNetwork.
      * However, keeping both of these in memory is a huge waste of space. The cost tables are one of the largest and
-     * most problematic objects in our application from a memory consumption point of view.
+     * most problematic objects in our application from a memory consumption (and S3 data transfer) point of view.
      */
-    public transient List<TIntIntMap> pointToStopLinkageCostTables;
+    private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
      * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
@@ -267,9 +268,6 @@ public class EgressCostTable {
             }
         }).collect(Collectors.toList());
         counter.done();
-
-        // Transpose the table, making the one that's actually used in routing.
-        makePointToStopTables();
     }
 
     /**
@@ -281,7 +279,6 @@ public class EgressCostTable {
         this.linkedPointSet = linkedPointSet;
         this.linkageCostUnit = linkageCostUnit;
         this.stopToPointLinkageCostTables = stopToPointLinkageCostTables;
-        makePointToStopTables(); // Rebuild transient field with transposed table.
     }
 
     /**
@@ -341,26 +338,41 @@ public class EgressCostTable {
     /**
      * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
      * The original calculation is performed from each stop out to the points it can reach.
-     * TODO Can we throw away the original stop -> point tables? That would save a lot of memory.
-     * TODO The target field is now final and transient. We should decide whether this is rebuilding a transient field,
-     *      or a persistent field.
-     * We could null out the entries in the source list as they are converted, allowing garbage collection of values.
+     * If we could throw away the original stop -> point tables, that would save a lot of memory. We could null out the
+     * entries in the source list as they are converted, allowing garbage collection of values.
+     * However: the geographic cropping and scenario base copying processes expect the original stop -> point tables to
+     * still exist. They would need to be rethought. This should actually simplify the geographic crop, but scenario
+     * base copying will be more challenging.
+     * Note though that only certain EgressCostTables serve as sources for copies; perhaps we can null out the
+     * stop-to-point tables in copied/cropped objects and allow only one generation of copying. We were effectively
+     * already avoiding data duplication in the region-wide cost tables by never calling the method that lazily
+     * transposed the tables.
      */
-    public void makePointToStopTables () {
-        TIntIntMap[] result = new TIntIntMap[linkedPointSet.size()];
-        for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
-            int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
-            if (stopToPointDistanceTable == null) {
-                continue;
+    public synchronized void makePointToStopTablesAsNeeded() {
+        if (pointToStopLinkageCostTables == null) {
+            TIntIntMap[] result = new TIntIntMap[linkedPointSet.size()];
+            for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
+                int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
+                if (stopToPointDistanceTable == null) {
+                    continue;
+                }
+                for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
+                    int point = stopToPointDistanceTable[idx];
+                    int distance = stopToPointDistanceTable[idx + 1];
+                    if (result[point] == null) result[point] = new TIntIntHashMap();
+                    result[point].put(stop, distance);
+                }
             }
-            for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
-                int point = stopToPointDistanceTable[idx];
-                int distance = stopToPointDistanceTable[idx + 1];
-                if (result[point] == null) result[point] = new TIntIntHashMap();
-                result[point].put(stop, distance);
-            }
+            this.pointToStopLinkageCostTables = Arrays.asList(result);
         }
-        this.pointToStopLinkageCostTables = Arrays.asList(result);
+    }
+
+    /**
+     * You should first call makePointToStopTablesAsNeeded before calling this method.
+     * @return for the given destination point index, a map from stop_index -> cost_to_reach_point for all nearby stops
+     */
+    public TIntIntMap getCostTableForPoint (int pointIndex) {
+        return pointToStopLinkageCostTables.get(pointIndex);
     }
 
 }

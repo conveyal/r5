@@ -37,7 +37,7 @@ public class OneOriginContainer {
     }
 
     public CombinedWorkResult toResult() {
-        return new CombinedWorkResult(travelTimes.getValues(), accessibility.getIntValues());
+        return new CombinedWorkResult(this);
     }
 
     public OneOriginContainer setJobAndTaskIds(AnalysisTask task) {

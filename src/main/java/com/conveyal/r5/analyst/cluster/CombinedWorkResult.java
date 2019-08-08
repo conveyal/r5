@@ -1,7 +1,10 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.OneOriginContainer;
+
 /**
- * Model class used to report travel times, paths, and accessibility indicators to the backend/broker
+ * Model class used to report travel times and accessibility indicators to the backend/broker. Similar to
+ * OneOriginContainer, but with arrays for results instead of more descriptive objects
  */
 public class CombinedWorkResult {
 
@@ -9,7 +12,9 @@ public class CombinedWorkResult {
     public int taskId;
 
     /**
-     * Values from a travelTimeResult, keyed on percentile of total travel time and target index
+     * Values from a travelTimeResult, keyed on percentile of total travel time and target index. FIXME Note that the
+     * broker's polling system was not designed to handle large amounts of data; travel time results are currently
+     * an experimental feature and large numbers of targets may overwhelm the system.
      */
     public int[][] travelTimeValues;
 
@@ -26,9 +31,18 @@ public class CombinedWorkResult {
     /** Trivial no-arg constructor for deserialization. */
     public CombinedWorkResult() {};
 
-    public CombinedWorkResult(int[][] travelTimeValues, int[][][] accessibilityValues ) {
-        this.travelTimeValues = travelTimeValues;
-        this.accessibilityValues = accessibilityValues;
+    public CombinedWorkResult(RegionalWorkResult result) {
+        this.jobId = result.jobId;
+        this.taskId = result.taskId;
+        this.travelTimeValues = null;
+        this.accessibilityValues = result.accessibilityValues;
+    }
+
+    public CombinedWorkResult(OneOriginContainer container) {
+        this.jobId = container.jobId;
+        this.taskId = container.taskId;
+        this.travelTimeValues = container.travelTimes == null ? null : container.travelTimes.values;
+        this.accessibilityValues = container.accessibility.getIntValues();
     }
 
 }

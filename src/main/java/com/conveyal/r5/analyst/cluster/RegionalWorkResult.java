@@ -39,7 +39,7 @@ public class RegionalWorkResult {
      * @return new CombinedWorkResult with this result's accessibility values and null travelTimeValues
      */
     public CombinedWorkResult toCombinedResult() {
-        return new CombinedWorkResult(null, this.accessibilityValues);
+        return new CombinedWorkResult(this);
     }
 
 }

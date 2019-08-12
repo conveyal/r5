@@ -102,6 +102,8 @@ public class EgressCostTable implements Serializable {
      *
      * It would be possible to pull out pure (even static) functions to set these final fields.
      * Or make some factory methods or classes which produce immutable tables.
+     *
+     * BaseLinkage may be null if an EgressCostTable is being built for a baseline network.
      */
     public EgressCostTable (LinkedPointSet linkedPointSet, LinkedPointSet baseLinkage) {
 
@@ -112,7 +114,7 @@ public class EgressCostTable implements Serializable {
         } else {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         }
-        if (baseLinkage != null && this.linkageCostUnit != baseLinkage.egressCostTable.linkageCostUnit) {
+        if (baseLinkage != null && this.linkageCostUnit != baseLinkage.getEgressCostTable().linkageCostUnit) {
             throw new AssertionError("The base linkage's cost table is in the wrong units.");
         }
 
@@ -210,7 +212,7 @@ public class EgressCostTable implements Serializable {
                 // This conditional is handling stops outside the relink zone, which should always have existed before
                 // scenario application. Therefore they should be present in the base linkage cost tables.
                 copyCounter.increment();
-                return baseLinkage.egressCostTable.stopToPointLinkageCostTables.get(stopIndex);
+                return baseLinkage.getEgressCostTable().stopToPointLinkageCostTables.get(stopIndex);
             }
 
             computeCounter.increment();

@@ -93,17 +93,28 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         TransportNetwork scenarioNetwork = transportNetworkCache.getNetworkForScenario(key.networkId, key.scenarioId);
 
         // Get the set of points to which we are measuring travel time. TODO handle multiple destination grids.
-        setProgress(key, 50, "Fetching gridded point set...");
+        setProgress(key, 49, "Fetching gridded point set...");
         PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.webMercatorExtents, scenarioNetwork.gridPointSet);
 
         // Then rebuild grid linkages as needed
-        setProgress(key, 51, "Linking grids to the street network and finding distances...");
-        for (StreetMode mode : key.modes) {
+        // One linkage per mode, and one distance table per egress mode.
+        final int progressSteps = key.allModes.size() + key.egressModes.size();
+        int progressStepsComplete = 0;
+        setProgress(key, 50, "Linking grids to the street network and finding distances...");
+        for (StreetMode mode : key.allModes) {
             // Finer grained progress indicator:
             // int percentage = 50D/nModes * i / 50;
-            pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+            int percentComplete = (int)(50 + (progressStepsComplete * 50D / progressSteps)); // Encapsulate this logic
+            progressStepsComplete += 1;
+            setProgress(key, percentComplete, "Linking " + mode + " grid to the street network...");
+            LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+            if (key.egressModes.contains(mode)) {
+                percentComplete = (int)(50 + (progressStepsComplete * 50D / progressSteps));
+                progressStepsComplete += 1;
+                setProgress(key, percentComplete, "Computing egress cost tables for " + mode + "...");
+                linkedPointSet.getEgressCostTable();
+            }
         }
-
         // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.
         return scenarioNetwork;
     }
@@ -117,7 +128,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final String networkId;
         public final String scenarioId;
         public final WebMercatorExtents webMercatorExtents; // rename to destination grid extents
-        public final EnumSet<StreetMode> modes;
+        public final EnumSet<StreetMode> allModes;
+        public final EnumSet<StreetMode> egressModes;
         // Final key element is the destination density grids? Those are relatively quick to load though.
 
         /**
@@ -141,11 +153,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether transit is used).
             // See code in TravelTimeComputer for when each is used.
-            this.modes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
+            // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
+            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
+            this.egressModes = LegMode.toStreetModeSet(task.egressModes);
 
             if (task.isHighPriority() || task.makeStaticSite) {
                 // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.
-                // And generally remove the term "high priority" from the whole system.
+                //      And generally remove the term "high priority" from the whole system.
                 // High Priority is an obsolete term for "single point task".
                 // For single point tasks and static sites, there is no opportunity grid. The grid of destinations is
                 // the extents given in the task, which for static sites is also the grid of origins.
@@ -193,12 +207,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             return Objects.equals(networkId, other.networkId) &&
                     Objects.equals(scenarioId, other.scenarioId) &&
                     Objects.equals(webMercatorExtents, other.webMercatorExtents) &&
-                    Objects.equals(modes, other.modes);
+                    Objects.equals(allModes, other.allModes) &&
+                    Objects.equals(egressModes, other.egressModes);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(networkId, scenarioId, webMercatorExtents, modes);
+            return Objects.hash(networkId, scenarioId, webMercatorExtents, allModes, egressModes);
         }
     }
 

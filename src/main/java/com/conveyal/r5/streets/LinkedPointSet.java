@@ -34,7 +34,7 @@ public class LinkedPointSet implements Serializable {
     public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
 
     // FIELDS IDENTIFYING THIS OBJECT
-    // A PointSet, linked to a particular StreetLayer, for a given StreetMode.
+    // A LinkedPointSet is uniquely derived from: a PointSet, linked to a particular StreetLayer, for a given StreetMode.
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built
@@ -81,8 +81,31 @@ public class LinkedPointSet implements Serializable {
      */
     public final int[] distances1_mm;
 
-    // Factored out into a class. This will allow initializing only when needed.
-    public EgressCostTable egressCostTable = null;
+    /**
+     * LinkedPointSets and their EgressCostTables are often copied from existing ones.
+     * This field holds a reference to the source linkage from which the copy was made.
+     * But there are two different ways linkages and cost tables can be based on existing ones:
+     * Sometimes we perform a simple crop to a smaller geographic area; other times we recompute linkages and tables
+     * for a scenario that was built on top of a baseline network. By current design, we never do both at once. They
+     * would be done as two successive operations yielding new objects each time. TODO verify that fact.
+     */
+    private final LinkedPointSet baseLinkage;
+
+    /**
+     * As mentioned above, sometimes the new pointset is cropped out of the base linkage, other times built upon it to
+     * reflect scenario modifications. If this field is true, it was produced by cropping with no scenario application.
+     * This field is somewhat of a hack, part of the way we've deferred building the voluminous distance tables.
+     * As a simple first refactor, I'm keeping the existing two functions separate and just deferring the call until we
+     * are sure the distance table is needed. So in a way this is just a "function pointer" stating which distance table
+     * builder function to call.
+     */
+    private final boolean cropped;
+
+    /**
+     * The egress cost tables used to be included directly in LinkedPointSets, but are now factored out into a class.
+     * This field is not final because it's only built when needed.
+     */
+    private EgressCostTable egressCostTable;
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
@@ -104,6 +127,8 @@ public class LinkedPointSet implements Serializable {
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
         this.streetMode = streetMode;
+        this.baseLinkage = baseLinkage;
+        this.cropped = false; // This allows calling the correct cost table builder function later, see Javadoc on field.
 
         final int nPoints = pointSet.featureCount();
 
@@ -149,10 +174,6 @@ public class LinkedPointSet implements Serializable {
         // First, link the points in this PointSet to specific street vertices.
         // If no base linkage was supplied, parameter will evaluate to true and all points will be linked from scratch.
         this.linkPointsToStreets(baseLinkage == null);
-
-        // Second, make a table of linkage costs (distance or time) from each transit stop to the points in this
-        // PointSet.
-        this.egressCostTable = new EgressCostTable(this, baseLinkage);
     }
 
     /**
@@ -166,7 +187,6 @@ public class LinkedPointSet implements Serializable {
         if (!(sourceLinkage.pointSet instanceof WebMercatorGridPointSet)) {
             throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
         }
-
         WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) sourceLinkage.pointSet;
         if (superGrid.zoom != subGrid.zoom) {
             throw new IllegalArgumentException("Source and sub-grid zoom level do not match.");
@@ -180,9 +200,11 @@ public class LinkedPointSet implements Serializable {
 
         // Initialize the fields of the new LinkedPointSet instance.
         // Most characteristics are the same, but the new linkage is for the subset of points in the subGrid.
-        pointSet = subGrid;
-        streetLayer = sourceLinkage.streetLayer;
-        streetMode = sourceLinkage.streetMode;
+        this.pointSet = subGrid;
+        this.streetLayer = sourceLinkage.streetLayer;
+        this.streetMode = sourceLinkage.streetMode;
+        this.baseLinkage = sourceLinkage;
+        this.cropped = true; // This allows calling the correct cost table builder function later, see Javadoc on field.
 
         int nCells = subGrid.width * subGrid.height;
         edges = new int[nCells];
@@ -190,7 +212,8 @@ public class LinkedPointSet implements Serializable {
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
 
-        // FIXME Grid-cropping math here and in EgressCostTable secondary constructor is identical. This seems to imply we should have a subgrid-mapping class.
+        // FIXME Grid-cropping math here and in EgressCostTable secondary constructor is identical.
+        //       This seems to imply we should have a subgrid-mapping class.
 
         // Copy a subset of linkage information (edges and distances for each cell) over from the source linkage to
         // the new sub-linkage. This basically crops a smaller rectangle out of the larger one (or copies it if
@@ -212,10 +235,28 @@ public class LinkedPointSet implements Serializable {
                 }
             }
         }
-
-        this.egressCostTable = EgressCostTable.geographicallyCroppedCopy(this, sourceLinkage.egressCostTable);
     }
 
+    /**
+     * Get (and lazily build) the EgressCostTable derived from this linkage and its associated TransportNetwork.
+     * The synchronization is rather crude, but should do the job as long as all outside multi-threaded access to the
+     * cost table is via this method. Note that this will recursively lock the chain of base linkages on which this
+     * linkage is built, but if this is the only synchronized method then the linkage is still usable by non-egress
+     * searches simultaneously. This is being pretty heavily called though, maybe locking should only happen once we
+     * see that the table is null.
+     */
+    public synchronized EgressCostTable getEgressCostTable () {
+        if (this.egressCostTable == null) {
+            if (this.cropped) {
+                // This LinkedPointSet was simply cropped out of a larger existing one.
+                this.egressCostTable = EgressCostTable.geographicallyCroppedCopy(this, this.baseLinkage.getEgressCostTable());
+            } else {
+                // This is a rebuild for a diff between a scenario and a baseline.
+                this.egressCostTable = new EgressCostTable(this, baseLinkage);
+            }
+        }
+        return this.egressCostTable;
+    }
 
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.

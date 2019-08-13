@@ -117,11 +117,12 @@ public class TravelTimeComputer {
             boolean delayAtPickup = false;
 
             if (legMode == LegMode.CAR || legMode == LegMode.BICYCLE_RENT) {
-                if (pickupDelaySeconds < 0)
+                if (pickupDelaySeconds < 0) {
                     LOG.info("Pick-up service is not available at this location, continuing to next access mode (if any).");
-                continue;
-            } else {
-                delayAtPickup = true;
+                    continue;
+                } else {
+                    delayAtPickup = true;
+                }
             }
 
             // Convert from profile routing qualified mode to internal mode

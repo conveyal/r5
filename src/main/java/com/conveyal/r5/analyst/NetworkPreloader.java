@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -87,32 +88,30 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
     @Override
     protected TransportNetwork buildValue(Key key) {
 
+        ProgressListener progressListener = new ProgressListener();
+
         // First get the network, apply the scenario, and (re)build distance tables.
         // Those steps should eventually be pulled out of the cache loaders to make progress reporting more granular.
-        setProgress(key, 1, "Building network...");
+        setProgress(key, 0, "Building network...");
         TransportNetwork scenarioNetwork = transportNetworkCache.getNetworkForScenario(key.networkId, key.scenarioId);
 
         // Get the set of points to which we are measuring travel time. TODO handle multiple destination grids.
-        setProgress(key, 49, "Fetching gridded point set...");
+        setProgress(key, 0, "Fetching gridded point set...");
         PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.webMercatorExtents, scenarioNetwork.gridPointSet);
 
-        // Then rebuild grid linkages as needed
-        // One linkage per mode, and one distance table per egress mode.
-        final int progressSteps = key.allModes.size() + key.egressModes.size();
-        int progressStepsComplete = 0;
-        setProgress(key, 50, "Linking grids to the street network and finding distances...");
+        // Then rebuild grid linkages as needed.
+        // One linkage per mode, and one cost table per egress mode. Cost tables are slow to compute and not needed for
+        // access or direct legs.
+        // Note that we're able to pass a progress listener down into the EgressCostTable contruction process, but not
+        // into the linkage process, because the latter is encapsulated as a Google/Caffeine LoadingCache. We'll need
+        // some way to get LoadingCache's per-key locking, while still allowing a progress listener specific to the
+        // single request. Perhaps this will mean registering 0..N progressListeners per key in the cache. It may be a
+        // good idea to keep progressListener objects in fields on Factory classes rather than passing them as parameters
+        // into constructors or factory methods.
         for (StreetMode mode : key.allModes) {
-            // Finer grained progress indicator:
-            // int percentage = 50D/nModes * i / 50;
-            int percentComplete = (int)(50 + (progressStepsComplete * 50D / progressSteps)); // Encapsulate this logic
-            progressStepsComplete += 1;
-            setProgress(key, percentComplete, "Linking " + mode + " grid to the street network...");
             LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
             if (key.egressModes.contains(mode)) {
-                percentComplete = (int)(50 + (progressStepsComplete * 50D / progressSteps));
-                progressStepsComplete += 1;
-                setProgress(key, percentComplete, "Computing egress cost tables for " + mode + "...");
-                linkedPointSet.getEgressCostTable();
+                linkedPointSet.getEgressCostTable(progressListener);
             }
         }
         // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.

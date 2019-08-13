@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
 import com.vividsolutions.jts.geom.*;
@@ -244,8 +245,21 @@ public class LinkedPointSet implements Serializable {
      * linkage is built, but if this is the only synchronized method then the linkage is still usable by non-egress
      * searches simultaneously. This is being pretty heavily called though, maybe locking should only happen once we
      * see that the table is null.
+     *
+     * Rather than making these a property of LinkedPointSets, we may want to define them as a standalone entity that
+     * has its own factory class and loader/cache class keyed on LinkedPointSets.
+     *
+     * Note below that when we crop or scenario-rebuild an egress cost table, the required fields are always one
+     * LinkedPointSet, and the egressCostTable from the baseLinkage (if any) of that linkedPointSet. The baseLinkage
+     * is now available as a field on the current linkage, so it does not need to be passed as a parameter. So a
+     * factory class could depend on only a progressListener and the current LinkedPointSet.
+     *
+     * Really we should never be triggering a lazy table build anywhere a progress listener is not supplied.
+     * We should reqeust the table from a cache up front, in the NetworkPreloader, then it should be retained in a
+     * single "holder" object along with the network, linkages etc. and those pre-loaded references should be used
+     * throughout the rest of the task's processing.
      */
-    public synchronized EgressCostTable getEgressCostTable () {
+    public synchronized EgressCostTable getEgressCostTable (ProgressListener progressListener) {
         if (this.egressCostTable == null) {
             if (this.cropped) {
                 // This LinkedPointSet was simply cropped out of a larger existing one.

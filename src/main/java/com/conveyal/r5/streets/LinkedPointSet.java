@@ -624,10 +624,11 @@ public class LinkedPointSet implements Serializable {
         if (egressStopDelaysSeconds != null) return;
         int nStops = stopToPointLinkageCostTables.size();
         egressStopDelaysSeconds = new int[nStops];
-        LOG.info("Calculating pickup delays at {} egress stops", nStops);
+        LOG.info("Calculating pick-up delays for {} at {} egress stops", streetMode, nStops);
         for (int stop = 0; stop < nStops; stop++) {
-            Point point = streetLayer.parentNetwork.transitLayer.getJTSPointForStopFixed(stop);
-            egressStopDelaysSeconds[stop] = streetLayer.getWaitTime(point);
+            Geometry point = streetLayer.parentNetwork.transitLayer.getJTSPointForStopFixed(stop);
+            egressStopDelaysSeconds[stop] = point == null ? 0 :
+                    streetLayer.getWaitTime((Point) VertexStore.fixedDegreeGeometryToFloating(point));
         }
     }
 

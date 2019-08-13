@@ -76,9 +76,9 @@ public class TravelTimeComputer {
         // TODO Create and encapsulate this object within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
 
-        // Determine pick-up delay time for the access leg, which is generally specified in a scenario modification.
-        // Only find this time for CAR or BICYCLE_RENT, as it requires potentially slow geometry operations.
-        // Negative values mean no pickup service is available at the origin location.
+        // Look up pick-up delay time for the access leg, which is generally specified in a scenario modification.
+        // Only find this time if CAR or BICYCLE_RENT is an access mode, as this lookup requires potentially slow
+        // geometry operations. Negative values mean no pickup service is available at the origin location.
         final int pickupDelaySeconds;
 
         if (request.accessModes.contains(LegMode.CAR) || request.accessModes.contains(LegMode.BICYCLE_RENT)){
@@ -114,9 +114,14 @@ public class TravelTimeComputer {
         for (LegMode legMode : request.accessModes) {
             LOG.info("Performing street search for mode: {}", legMode);
 
-            if (legMode == LegMode.CAR || legMode == LegMode.BICYCLE_RENT && pickupDelaySeconds < 0) {
-                LOG.info("Pick-up service is not available at this location, continuing to next access mode (if any).");
+            boolean delayAtPickup = false;
+
+            if (legMode == LegMode.CAR || legMode == LegMode.BICYCLE_RENT) {
+                if (pickupDelaySeconds < 0)
+                    LOG.info("Pick-up service is not available at this location, continuing to next access mode (if any).");
                 continue;
+            } else {
+                delayAtPickup = true;
             }
 
             // Convert from profile routing qualified mode to internal mode
@@ -164,8 +169,9 @@ public class TravelTimeComputer {
             if (request.hasTransit()) {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
-                if (pickupDelaySeconds > 0) {
-                    LOG.info("Delaying transit access times by {} seconds (for pick-up wait).", pickupDelaySeconds);
+                if (delayAtPickup) {
+                    LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
+                            pickupDelaySeconds, legMode);
                     travelTimesToStopsSeconds.transformValues(i -> i + pickupDelaySeconds);
                 }
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
@@ -177,8 +183,9 @@ public class TravelTimeComputer {
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (pickupDelaySeconds > 0) {
-                LOG.info("Delaying direct travel times by {} seconds (for pick-up wait).", pickupDelaySeconds);
+            if (delayAtPickup) {
+                LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).", pickupDelaySeconds,
+                        legMode);
                 pointSetTimes.incrementAllReachable(pickupDelaySeconds);
             }
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);

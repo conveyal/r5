@@ -302,9 +302,15 @@ public class PerTargetPropagater {
                         //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
                         //  be ignored when running a secnario without pickup delay modifications.
                         if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
-                                && linkedTargets.streetLayer.waitTimePolygons != null
                                 && linkedTargets.egressStopDelaysSeconds != null) {
-                                    secondsFromStopToTarget += linkedTargets.egressStopDelaysSeconds[stop];
+                                    int delayAtEgress = linkedTargets.egressStopDelaysSeconds[stop];
+                                    if (delayAtEgress < 0) {
+                                        // Pickup for this mode not allowed at this stop, so trove iteration should
+                                        // continue
+                                        return true;
+                                    } else {
+                                        secondsFromStopToTarget += delayAtEgress;
+                                    }
                         }
 
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;

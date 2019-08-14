@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -90,6 +91,10 @@ public class EgressCostTable implements Serializable {
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
+     * Build an EgressCostTable for the given LinkedPointSet.
+     * If the LinkedPointSet is for a scenario built on top of a baseline, elements in the EgressCostTable for the
+     * baseline should be reused where possible, with only the differences recomputed.
+     *
      * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
      * PointSet.
      * At one point we experimented with doing the entire search from the transit stops all the way up to the points
@@ -105,7 +110,12 @@ public class EgressCostTable implements Serializable {
      *
      * BaseLinkage may be null if an EgressCostTable is being built for a baseline network.
      */
-    public EgressCostTable (LinkedPointSet linkedPointSet, LinkedPointSet baseLinkage) {
+    public EgressCostTable (LinkedPointSet linkedPointSet, ProgressListener progressListener) {
+
+        final LinkedPointSet baseLinkage = linkedPointSet.baseLinkage; // Can be null, for baseline (non-scenario) linkages.
+
+        final EgressCostTable baseEgressCostTable = (baseLinkage == null) ? null
+                : baseLinkage.getEgressCostTable(progressListener);
 
         this.linkedPointSet = linkedPointSet;
 
@@ -113,9 +123,6 @@ public class EgressCostTable implements Serializable {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         } else {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-        }
-        if (baseLinkage != null && this.linkageCostUnit != baseLinkage.getEgressCostTable().linkageCostUnit) {
-            throw new AssertionError("The base linkage's cost table is in the wrong units.");
         }
 
         // The regions within which we want to link points to edges, then connect transit stops to points.
@@ -140,6 +147,9 @@ public class EgressCostTable implements Serializable {
         final int linkingDistanceLimitMeters;
 
         if (baseLinkage != null) {
+            if (this.linkageCostUnit != baseEgressCostTable.linkageCostUnit) {
+                throw new AssertionError("The base linkage's cost table is in the wrong units.");
+            }
             // TODO perhaps create alternate constructor of EgressCostTable which copies an existing one
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // TODO check where and how we re-link to streets split/modified by the scenario.
@@ -190,6 +200,11 @@ public class EgressCostTable implements Serializable {
             // Log more often because car searches are very slow.
             computeLogFrequency = 100;
         }
+
+        // TODO only report progress on slow operations (building new tables), not copying existing ones?
+        // Precomputing which stops should be rebuilt would allow for nicer progress reporting.
+        progressListener.beginTask("Building egress impedance table for mode " + linkedPointSet.streetMode, nStops);
+
         final LambdaCounter computeCounter = new LambdaCounter(LOG, nStops, computeLogFrequency,
                 "Computed new stop -> point tables for {} of {} transit stops.");
         final LambdaCounter copyCounter = new LambdaCounter(LOG, nStops, copyLogFrequency,
@@ -199,6 +214,7 @@ public class EgressCostTable implements Serializable {
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
         // TODO factor out the function that computes a cost table for one stop.
         stopToPointLinkageCostTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+            progressListener.increment(); // TODO pre-count points inside rebuild zone, and only show progress for those
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
@@ -212,7 +228,7 @@ public class EgressCostTable implements Serializable {
                 // This conditional is handling stops outside the relink zone, which should always have existed before
                 // scenario application. Therefore they should be present in the base linkage cost tables.
                 copyCounter.increment();
-                return baseLinkage.getEgressCostTable().stopToPointLinkageCostTables.get(stopIndex);
+                return baseEgressCostTable.stopToPointLinkageCostTables.get(stopIndex);
             }
 
             computeCounter.increment();
@@ -307,9 +323,11 @@ public class EgressCostTable implements Serializable {
      * By taking an EgressCostTable instead of a LinkedPointSet as a parameter, we guarantee that both the source
      * LinkedPointSet and EgressCostTable are defined.
      */
-    public static EgressCostTable geographicallyCroppedCopy (LinkedPointSet subLinkage, EgressCostTable superCostTable) {
+    public static EgressCostTable geographicallyCroppedCopy (LinkedPointSet subLinkage, ProgressListener progressListener) {
 
-        LinkedPointSet superLinkage = superCostTable.linkedPointSet;
+        LinkedPointSet superLinkage = subLinkage.baseLinkage;
+        EgressCostTable superCostTable = superLinkage.getEgressCostTable(progressListener);
+
         final WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) superLinkage.pointSet;
         final WebMercatorGridPointSet subGrid = (WebMercatorGridPointSet) subLinkage.pointSet;
 

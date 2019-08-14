@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
@@ -90,7 +91,7 @@ public class LinkedPointSet implements Serializable {
      * for a scenario that was built on top of a baseline network. By current design, we never do both at once. They
      * would be done as two successive operations yielding new objects each time. TODO verify that fact.
      */
-    private final LinkedPointSet baseLinkage;
+    public final LinkedPointSet baseLinkage;
 
     /**
      * As mentioned above, sometimes the new pointset is cropped out of the base linkage, other times built upon it to
@@ -253,23 +254,32 @@ public class LinkedPointSet implements Serializable {
      * LinkedPointSet, and the egressCostTable from the baseLinkage (if any) of that linkedPointSet. The baseLinkage
      * is now available as a field on the current linkage, so it does not need to be passed as a parameter. So a
      * factory class could depend on only a progressListener and the current LinkedPointSet.
-     *
-     * Really we should never be triggering a lazy table build anywhere a progress listener is not supplied.
-     * We should reqeust the table from a cache up front, in the NetworkPreloader, then it should be retained in a
-     * single "holder" object along with the network, linkages etc. and those pre-loaded references should be used
-     * throughout the rest of the task's processing.
      */
     public synchronized EgressCostTable getEgressCostTable (ProgressListener progressListener) {
         if (this.egressCostTable == null) {
             if (this.cropped) {
                 // This LinkedPointSet was simply cropped out of a larger existing one.
-                this.egressCostTable = EgressCostTable.geographicallyCroppedCopy(this, this.baseLinkage.getEgressCostTable());
+                this.egressCostTable = EgressCostTable.geographicallyCroppedCopy(this, progressListener);
             } else {
                 // This is a rebuild for a diff between a scenario and a baseline.
-                this.egressCostTable = new EgressCostTable(this, baseLinkage);
+                this.egressCostTable = new EgressCostTable(this, progressListener);
             }
         }
         return this.egressCostTable;
+    }
+
+    /**
+     * Fetch the egressCostTable when you expect it to be already built.
+     * Eventually we should eliminate all calls to this method.
+     * We could also pass in a ProgressListener that logs instead of updating the web API.
+     *
+     * Really we should never be triggering a lazy table build anywhere a progress listener is not supplied.
+     * We should request the table from a cache up front, in the NetworkPreloader, then it should be retained in a
+     * single "holder" object along with the network, linkages etc. and those pre-loaded references should be used
+     * throughout the rest of the task's processing.
+     */
+    public synchronized EgressCostTable getEgressCostTable () {
+        return getEgressCostTable(new NoopProgressListener());
     }
 
     /**

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
@@ -88,8 +89,6 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
     @Override
     protected TransportNetwork buildValue(Key key) {
 
-        ProgressListener progressListener = new ProgressListener();
-
         // First get the network, apply the scenario, and (re)build distance tables.
         // Those steps should eventually be pulled out of the cache loaders to make progress reporting more granular.
         setProgress(key, 0, "Building network...");
@@ -109,8 +108,10 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         // good idea to keep progressListener objects in fields on Factory classes rather than passing them as parameters
         // into constructors or factory methods.
         for (StreetMode mode : key.allModes) {
+            setProgress(key, 0, "Linking destination grid to streets for " + mode + "...");
             LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
             if (key.egressModes.contains(mode)) {
+                ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
                 linkedPointSet.getEgressCostTable(progressListener);
             }
         }

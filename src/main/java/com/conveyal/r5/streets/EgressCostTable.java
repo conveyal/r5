@@ -52,7 +52,7 @@ public class EgressCostTable implements Serializable {
 
     public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
 
-    public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
+    public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 22; // ~80 kilometers per hour
 
     // FIELDS
 

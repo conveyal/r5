@@ -203,7 +203,11 @@ public class EgressCostTable implements Serializable {
 
         // TODO only report progress on slow operations (building new tables), not copying existing ones?
         // Precomputing which stops should be rebuilt would allow for nicer progress reporting.
-        progressListener.beginTask("Building egress impedance table for mode " + linkedPointSet.streetMode, nStops);
+        String taskDescription = String.format("Building %s egress tables for %s",
+                linkedPointSet.streetLayer.isScenarioCopy() ? "scenario" : "baseline",
+                streetMode.toString().toLowerCase()
+        );
+        progressListener.beginTask(taskDescription, nStops);
 
         final LambdaCounter computeCounter = new LambdaCounter(LOG, nStops, computeLogFrequency,
                 "Computed new stop -> point tables for {} of {} transit stops.");

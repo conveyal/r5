@@ -1,7 +1,6 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.profile.StreetMode;
-import org.hsqldb.lib.Collection;
 
 import java.util.EnumSet;
 import java.util.Set;
@@ -9,7 +8,7 @@ import java.util.Set;
 /**
  * Modes of transport on access or egress legs
  */
-public enum  LegMode {
+public enum LegMode {
     WALK, BICYCLE, CAR,
     //Renting a bicycle
     BICYCLE_RENT,
@@ -23,18 +22,21 @@ public enum  LegMode {
         else return StreetMode.WALK;
     }
 
-    /** Convert between these two enum types */
+    /**
+     * Convert between these two enum types.
+     * Additional qualifiers (RENT and PARK) on LegMode will be lost in the conversion to StreetMode.
+     */
     public static StreetMode toStreetMode (LegMode legMode) {
         if (legMode == LegMode.WALK) {
             return StreetMode.WALK;
         }
-        if (legMode == LegMode.BICYCLE) {
+        if (legMode == LegMode.BICYCLE || legMode == LegMode.BICYCLE_RENT) {
             return StreetMode.BICYCLE;
         }
-        if (legMode == LegMode.CAR) {
+        if (legMode == LegMode.CAR || legMode == LegMode.CAR_PARK) {
             return StreetMode.CAR;
         }
-        throw new RuntimeException("Unrecognized mode.");
+        throw new AssertionError("This enum value is not covered by a conditional branch: " + legMode);
     }
 
     public static EnumSet<StreetMode> toStreetModeSet (EnumSet<LegMode>... legModeSets) {

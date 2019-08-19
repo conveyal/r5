@@ -1,6 +1,6 @@
 language: java
 
-# R5 uses Java 8 features and Travis doesn't (yet) support OpenJDK 8
+# Oracle JDK is EOL, use OpenJDK 8
 jdk:
 - openjdk8
 

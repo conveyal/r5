@@ -71,7 +71,13 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
     @Override
     public JavaType typeFromId (DatabindContext context, String id) {
         // All types of modifications that this worker understands should be in the table.
-        return context.getTypeFactory().constructType(modificationTypes.get(id));
+        Class<? extends Modification> modificationClass = modificationTypes.get(id);
+        if (modificationClass == null) {
+            String message = String.format("The modification type ID '%s' was not recognized by this R5 worker.", id);
+            LOG.error(message);
+            throw new IllegalArgumentException(message);
+        }
+        return context.getTypeFactory().constructType(modificationClass);
     }
 
     @Override

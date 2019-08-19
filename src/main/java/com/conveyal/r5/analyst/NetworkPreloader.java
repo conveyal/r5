@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -89,21 +91,30 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
         // First get the network, apply the scenario, and (re)build distance tables.
         // Those steps should eventually be pulled out of the cache loaders to make progress reporting more granular.
-        setProgress(key, 1, "Building network...");
+        setProgress(key, 0, "Building network...");
         TransportNetwork scenarioNetwork = transportNetworkCache.getNetworkForScenario(key.networkId, key.scenarioId);
 
         // Get the set of points to which we are measuring travel time. TODO handle multiple destination grids.
-        setProgress(key, 50, "Fetching gridded point set...");
+        setProgress(key, 0, "Fetching gridded point set...");
         PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.webMercatorExtents, scenarioNetwork.gridPointSet);
 
-        // Then rebuild grid linkages as needed
-        setProgress(key, 51, "Linking grids to the street network and finding distances...");
-        for (StreetMode mode : key.modes) {
-            // Finer grained progress indicator:
-            // int percentage = 50D/nModes * i / 50;
-            pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+        // Then rebuild grid linkages as needed.
+        // One linkage per mode, and one cost table per egress mode. Cost tables are slow to compute and not needed for
+        // access or direct legs.
+        // Note that we're able to pass a progress listener down into the EgressCostTable contruction process, but not
+        // into the linkage process, because the latter is encapsulated as a Google/Caffeine LoadingCache. We'll need
+        // some way to get LoadingCache's per-key locking, while still allowing a progress listener specific to the
+        // single request. Perhaps this will mean registering 0..N progressListeners per key in the cache. It may be a
+        // good idea to keep progressListener objects in fields on Factory classes rather than passing them as parameters
+        // into constructors or factory methods.
+        for (StreetMode mode : key.allModes) {
+            setProgress(key, 0, "Linking destination grid to streets for " + mode + "...");
+            LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+            if (key.egressModes.contains(mode)) {
+                ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
+                linkedPointSet.getEgressCostTable(progressListener);
+            }
         }
-
         // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.
         return scenarioNetwork;
     }
@@ -117,7 +128,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final String networkId;
         public final String scenarioId;
         public final WebMercatorExtents webMercatorExtents; // rename to destination grid extents
-        public final EnumSet<StreetMode> modes;
+        public final EnumSet<StreetMode> allModes;
+        public final EnumSet<StreetMode> egressModes;
         // Final key element is the destination density grids? Those are relatively quick to load though.
 
         /**
@@ -141,11 +153,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether transit is used).
             // See code in TravelTimeComputer for when each is used.
-            this.modes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
+            // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
+            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
+            this.egressModes = LegMode.toStreetModeSet(task.egressModes);
 
             if (task.isHighPriority() || task.makeStaticSite) {
                 // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.
-                // And generally remove the term "high priority" from the whole system.
+                //      And generally remove the term "high priority" from the whole system.
                 // High Priority is an obsolete term for "single point task".
                 // For single point tasks and static sites, there is no opportunity grid. The grid of destinations is
                 // the extents given in the task, which for static sites is also the grid of origins.
@@ -193,12 +207,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             return Objects.equals(networkId, other.networkId) &&
                     Objects.equals(scenarioId, other.scenarioId) &&
                     Objects.equals(webMercatorExtents, other.webMercatorExtents) &&
-                    Objects.equals(modes, other.modes);
+                    Objects.equals(allModes, other.allModes) &&
+                    Objects.equals(egressModes, other.egressModes);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(networkId, scenarioId, webMercatorExtents, modes);
+            return Objects.hash(networkId, scenarioId, webMercatorExtents, allModes, egressModes);
         }
     }
 

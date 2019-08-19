@@ -6,7 +6,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
-import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
@@ -125,7 +125,9 @@ public class PerTargetPropagater {
         linkedTargets = new ArrayList<>(modes.size());
         for (StreetMode mode : modes) {
             LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
-            linkedTargetsForMode.makePointToStopDistanceTablesIfNeeded();
+            // Transpose the cost table for propagation. Some tables are never used for propagation (like the
+            // region-wide baseline). Transposing them only when needed should save a lot of memory.
+            linkedTargetsForMode.getEgressCostTable().destructivelyTransposeForPropagationAsNeeded();
             linkedTargets.add(linkedTargetsForMode);
         }
     }
@@ -246,8 +248,9 @@ public class PerTargetPropagater {
     private void propagateTransit (int targetIndex, LinkedPointSet linkedTargets) {
 
         // Grab the set of nearby stops for this target, with their distances.
-        TIntIntMap pointToStopLinkageCostTable = linkedTargets.pointToStopLinkageCostTables.get(targetIndex);
-        StreetRouter.State.RoutingVariable unit = linkedTargets.linkageCostUnit;
+        EgressCostTable egressCostTable = linkedTargets.getEgressCostTable();
+        TIntIntMap pointToStopLinkageCostTable = egressCostTable.getCostTableForPoint(targetIndex);
+        StreetRouter.State.RoutingVariable unit = egressCostTable.linkageCostUnit;
 
         /**
          * Pre-compute and retain a pre-multiplied integer speed to avoid float math in the loop below.

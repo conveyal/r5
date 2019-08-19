@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
  * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
+ * TODO verify the above comment, this doesn't seem to be serialized anywhere and it doesn't contain a Guava cache.
  */
 public class WebMercatorGridPointSetCache {
 

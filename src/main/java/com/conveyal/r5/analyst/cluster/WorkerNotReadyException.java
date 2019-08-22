@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.PreloadedNetwork;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.AsyncLoader;
 
@@ -12,9 +13,9 @@ import com.conveyal.r5.util.AsyncLoader;
  */
 public class WorkerNotReadyException extends Exception {
 
-    public final AsyncLoader.LoaderState<TransportNetwork> asyncLoaderState;
+    public final AsyncLoader.LoaderState<PreloadedNetwork> asyncLoaderState;
 
-    public WorkerNotReadyException(AsyncLoader.LoaderState<TransportNetwork> asyncLoaderState) {
+    public WorkerNotReadyException(AsyncLoader.LoaderState<PreloadedNetwork> asyncLoaderState) {
         super(asyncLoaderState.toString());
         this.asyncLoaderState = asyncLoaderState;
     }

@@ -48,6 +48,7 @@ public class PointSetTimes {
         for (int i = 0; i < travelTimes.length; i++) {
             if (travelTimes[i] != UNREACHED) {
                 travelTimes[i] += seconds;
+                // TODO handle overflow if (travelTimes < -1)
             }
         }
     }

@@ -2,7 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
+import com.conveyal.r5.analyst.progress.AsyncLoaderProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
@@ -13,7 +13,9 @@ import com.conveyal.r5.util.AsyncLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -68,7 +70,7 @@ import java.util.Objects;
  *
  * Created by abyrd on 2018-09-17
  */
-public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, TransportNetwork> {
+public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, PreloadedNetwork> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NetworkPreloader.class);
 
@@ -79,7 +81,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         this.transportNetworkCache = transportNetworkCache;
     }
 
-    public LoaderState<TransportNetwork> preloadData (AnalysisTask task) {
+    public LoaderState<PreloadedNetwork> preloadData (AnalysisTask task) {
         if (task.scenario != null) {
             transportNetworkCache.rememberScenario(task.scenario);
         }
@@ -87,8 +89,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
     }
 
     @Override
-    protected TransportNetwork buildValue(Key key) {
-
+    protected PreloadedNetwork buildValue(Key key) {
         // First get the network, apply the scenario, and (re)build distance tables.
         // Those steps should eventually be pulled out of the cache loaders to make progress reporting more granular.
         setProgress(key, 0, "Building network...");
@@ -107,16 +108,18 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         // single request. Perhaps this will mean registering 0..N progressListeners per key in the cache. It may be a
         // good idea to keep progressListener objects in fields on Factory classes rather than passing them as parameters
         // into constructors or factory methods.
+        List<LinkedPointSet> linkedPointSets = new ArrayList();
         for (StreetMode mode : key.allModes) {
             setProgress(key, 0, "Linking destination grid to streets for " + mode + "...");
             LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+            linkedPointSets.add(linkedPointSet);
             if (key.egressModes.contains(mode)) {
-                ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
+                ProgressListener progressListener = new AsyncLoaderProgressListener(this, key);
                 linkedPointSet.getEgressCostTable(progressListener);
             }
         }
         // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.
-        return scenarioNetwork;
+        return new PreloadedNetwork(scenarioNetwork, linkedPointSets);
     }
 
     /**

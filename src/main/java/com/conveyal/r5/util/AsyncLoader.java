@@ -138,6 +138,8 @@ public abstract class AsyncLoader<K,V> {
      * Throw an exception to indicate an error has occurred and the building process cannot complete.
      * It's not entirely clear this should return a value - might be better to call setValue within the overridden
      * method, just as we call setProgress or setError.
+     *
+     * TODO this method could also accept a progress reporter object.
      */
     protected abstract V buildValue(K key) throws Exception;
 

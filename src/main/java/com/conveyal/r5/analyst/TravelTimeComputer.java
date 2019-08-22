@@ -118,7 +118,6 @@ public class TravelTimeComputer {
                 LOG.info("Car pick-up service is not available at this location, continuing to next access mode (if any).");
                 continue;
             }
-
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
@@ -149,7 +148,8 @@ public class TravelTimeComputer {
             sr.route();
             // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
             // This implies you are dropped off or have a very easy parking spot for your vehicle.
-            // This kind of multi-stage search should also be used when building egress distance cost tables.
+            // This kind of multi-stage search should also be used when building egress cost tables.
+            // TODO Check whether it is already being done for egress cost tables.
             if (accessMode != StreetMode.WALK) {
                 sr.keepRoutingOnFoot();
             }
@@ -166,9 +166,11 @@ public class TravelTimeComputer {
 
             LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
-            PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
-                    streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
-
+            PointSetTimes pointSetTimes = linkedDestinations.eval(
+                    sr::getTravelTimeToVertex,
+                    streetSpeedMillimetersPerSecond,
+                    walkSpeedMillimetersPerSecond
+            );
             if (carPickupDelaySeconds > 0) {
                 LOG.info("Delaying travel times by {} seconds (for car pick-up wait).", carPickupDelaySeconds);
                 pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
@@ -178,7 +180,8 @@ public class TravelTimeComputer {
 
         // Handle park+ride, a mode represented in the request LegMode but not in the internal StreetMode.
         // FIXME this special case for CAR_PARK currently overwrites any results from other access modes.
-        // This is pretty ugly, and should be integrated into the mode loop above.
+        // This is just to exactly preserve some existing code and ensure similar behavior to the past. This is pretty
+        // ugly though, and should be integrated into the mode loop above.
         if (request.accessModes.contains(LegMode.CAR_PARK)) {
             // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
             // Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
@@ -195,8 +198,8 @@ public class TravelTimeComputer {
                 accessTimes = sr.getReachedStops();
                 foundAnyOriginPoint = true;
             }
-            // Disallow non-transit access.
-            // TODO should we allow non transit access with park and ride?
+            // Disallow non-transit access to preserve old behavior.
+            // But shouldn't we allow non transit access with park and ride?
             nonTransitTravelTimesToDestinations = PointSetTimes.allUnreached(destinations);
         }
 

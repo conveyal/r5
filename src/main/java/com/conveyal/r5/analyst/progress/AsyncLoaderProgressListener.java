@@ -1,19 +1,18 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.r5.analyst.NetworkPreloader;
+import com.conveyal.r5.util.AsyncLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This implementaton of ProgressListener posts updates to the NetworkPreloader about progress on preparing needed
- * inputs for a particular request.
+ * This implementaton of ProgressListener posts updates to the AsyncLoader about progress on preparing the value.
  */
-public class NetworkPreloaderProgressListener implements ProgressListener {
+public class AsyncLoaderProgressListener<K, V> implements ProgressListener {
 
     // We can eventually perform console logging here rather than through separate LambdaCounters.
     // In fact the LambdaCounter is a kind of ProgressListener.
     // Perhaps allow setting the logger field so log entries reflect the calling class instead of ProgressListener.
-    private static final Logger LOG = LoggerFactory.getLogger(NetworkPreloaderProgressListener.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AsyncLoaderProgressListener.class);
 
     private int totalElements;
 
@@ -21,9 +20,11 @@ public class NetworkPreloaderProgressListener implements ProgressListener {
 
     private int currentElement;
 
-    private final NetworkPreloader networkPreloader;
+    // These two fields uniquely identify which element being loaded into an AsyncLoader
 
-    private final NetworkPreloader.Key key;
+    private final AsyncLoader<K, V> asyncLoader;
+
+    private final K key;
 
     /**
      * Every how many work units we'll post an update.
@@ -33,11 +34,11 @@ public class NetworkPreloaderProgressListener implements ProgressListener {
 
     /**
      * Construct a ProgressListener that will post updated for a given key in the NetworkPreloader.
-     * @param networkPreloader The NetworkPreloader instance to which we'll post updates.
-     * @param key The key for the entry within the NetworkPreloader to which we'll post updates.
+     * @param asyncLoader The AsyncLoader instance to which we'll post updates.
+     * @param key The key for the entry within the AsyncLoader to which we'll post updates.
      */
-    public NetworkPreloaderProgressListener(NetworkPreloader networkPreloader, NetworkPreloader.Key key) {
-        this.networkPreloader = networkPreloader;
+    public AsyncLoaderProgressListener (AsyncLoader<K, V> asyncLoader, K key) {
+        this.asyncLoader = asyncLoader;
         this.key = key;
     }
 
@@ -55,7 +56,7 @@ public class NetworkPreloaderProgressListener implements ProgressListener {
         if (currentElement % updateFrequency == 0) {
             int percent = getPercentComplete();
             String status = String.format("%s... (%d%%)", description, percent);
-            networkPreloader.setProgress(key, percent, status);
+            asyncLoader.setProgress(key, percent, status);
         }
     }
 

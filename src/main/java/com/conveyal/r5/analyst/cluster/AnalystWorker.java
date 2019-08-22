@@ -6,6 +6,7 @@ import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.PreloadedNetwork;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
@@ -399,7 +400,7 @@ public class AnalystWorker implements Runnable {
         LOG.info("Handling single-point task {}", task.toString());
 
         // Get all the data needed to run one analysis task, or at least begin preparing it.
-        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
+        final AsyncLoader.LoaderState<PreloadedNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
@@ -413,7 +414,15 @@ public class AnalystWorker implements Runnable {
         // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
         // TODO allow for a list of multiple already loaded TransitNetworks.
         networkId = task.graphId;
-        TransportNetwork transportNetwork = networkLoaderState.value;
+        TransportNetwork transportNetwork = networkLoaderState.value.transportNetwork;
+
+        // We want to prevent the PreloadedNetwork networkLoaderState.value from being garbage collected, to avoid
+        // repeated lazy-building in method calls below. The local variable will remain in scope for the whole length
+        // of this method, but I'm not sure that will prevent it from being garbage collected since nothing references
+        // it after the above line.
+        // At least one reference says "Local variables are kept alive by the stack of a thread. This is not a real
+        // object virtual reference and thus is not visible. For all intents and purposes, local variables are GC roots."
+        // We could also just pass a PreloadedNetwork into TravelTimeComputer instead of a TransportNetwork.
 
         // After the AsyncLoader has reported all required data are ready for analysis, advance the shutdown clock to
         // reflect that the worker is performing single-point work.

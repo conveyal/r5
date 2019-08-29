@@ -2,7 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 
-import java.io.OutputStream;
+import java.io.InputStream;
 
 /**
  * This is an abstraction for long term file storage.
@@ -28,6 +28,12 @@ public abstract class FilePersistence {
      * The PersistenceBuffer must be marked 'done' before it is handed to this method.
      */
     public abstract void saveData (String directory, String fileName, PersistenceBuffer persistenceBuffer);
+
+    /**
+     * Get an input stream for the file of the given type with the given name.
+     * TODO this is the only method currently using FileCategory to automatically create bucket names. Extend to other methods.
+     */
+    public abstract InputStream getData (FileCategory category, String name);
 
     /**
      * This should be called when the application is shutting down to perform any cleanup, await completion,

@@ -144,7 +144,7 @@ public abstract class AsyncLoader<K,V> {
     /**
      * Call this method inside the buildValue method to indicate progress.
      */
-    protected void setProgress(K key, int percentComplete, String message) {
+    public void setProgress(K key, int percentComplete, String message) {
         synchronized (map) {
             map.put(key, new LoaderState(Status.BUILDING, message, percentComplete, null));
         }

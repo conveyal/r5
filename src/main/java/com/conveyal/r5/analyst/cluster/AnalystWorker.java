@@ -240,7 +240,9 @@ public class AnalystWorker implements Runnable {
         testTaskRedelivery = Boolean.parseBoolean(config.getProperty("test-task-redelivery", "false"));
 
         // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
-        filePersistence = new S3FilePersistence(config.getProperty("aws-region"));
+        // TODO Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
+        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
+        filePersistence = new S3FilePersistence(config.getProperty("aws-region"), config.getProperty("base-bucket", "analysis-staging"));
 
         // First, check whether we are running Analyst offline.
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));

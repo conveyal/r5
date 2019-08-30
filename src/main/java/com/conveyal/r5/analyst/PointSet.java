@@ -66,6 +66,8 @@ public abstract class PointSet {
     /**
      * Build a linkage and store it, bypassing the PointSet's internal cache of linkages because we want this particular
      * linkage to be serialized with the network (the Guava cache does not serialize its contents) and never evicted.
+     * The newly constructed linkage will also have an EgressCostTable built (since that's actually the slowest part of
+     * linkage, and one we want to serialize for later reuse).
      */
     public void buildUnevictableLinkage(StreetLayer streetLayer, StreetMode mode) {
         Tuple2<StreetLayer, StreetMode> key = new Tuple2<>(streetLayer, mode);
@@ -73,6 +75,7 @@ public abstract class PointSet {
             LOG.error("Un-evictable linkage is being built more than once.");
         }
         LinkedPointSet newLinkage = new LinkedPointSet(this, streetLayer, mode, null);
+        newLinkage.getEgressCostTable();
         linkageMap.put(key, newLinkage);
     }
 
@@ -111,7 +114,8 @@ public abstract class PointSet {
      * Constructor for a PointSet that initializes its cache of linkages upon deserialization.
      */
     public PointSet() {
-        this.linkageCache = CacheBuilder.newBuilder().maximumSize(LINKAGE_CACHE_SIZE)
+        this.linkageCache = CacheBuilder.newBuilder()
+                .maximumSize(LINKAGE_CACHE_SIZE)
                 .removalListener(notification -> LOG.warn("LINKAGE CACHE EVICTION. key: {}, cause: {}",
                         notification.getKey(), notification.getCause()))
                 .build(new LinkageCacheLoader());

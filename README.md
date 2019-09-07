@@ -24,3 +24,27 @@ R5 is developed primarily as a routing library for use in other projects (Convey
 ## Performing a Release
 
 Releases are automatically generated using [maven-semantic-release](https://github.com/conveyal/maven-semantic-release).
+
+## Structured Commit Messages
+
+We use structured commit messages to allow automated tools to determine release version numbers and generate changelogs.
+
+The first line of these messages is in the following format: `<type>(<scope>): <summary>` 
+
+The `(<scope>)` is optional. The `<summary>` should be in the present tense. The type should be one of the following:
+
+- feat: A new feature from the user point of view, not a new feature for the build.
+- fix: A bug fix from the user point of view, not a fix to the build.
+- docs: Changes to the user documentation, or to code comments.
+- style: Formatting, semicolons, brackets, indentation, line breaks. No change to program logic.
+- refactor: Changes to code which do not change behavior, e.g. renaming a variable.
+- test: Adding tests, refactoring tests. No changes to user code.
+- chore: Updating build process, scripts, etc. No changes to user code.
+
+The body of the commit message (if any) should begin after one blank line. If the commit meets the definition of a major version change according to semantic versioning (e.g. a change in API visible to an external module), the commit message body should begin with `BREAKING CHANGE: <description>`.
+
+Presence of a `fix` commit in a release should increment the number in the third (PATCH) position.
+Presence of a `feat` commit in a release should increment the number in the second (MINOR) position.
+Presence of a `BREAKING CHANGE` commit in a release should increment the number in the first (MAJOR) position.
+
+This is based on https://www.conventionalcommits.org.

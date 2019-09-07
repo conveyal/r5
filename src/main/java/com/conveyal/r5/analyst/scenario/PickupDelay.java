@@ -78,8 +78,13 @@ public class PickupDelay extends Modification {
         // Polygon will only be fetched from S3 once when the scenario is resolved, then after application the
         // resulting network is cached. Subsequent uses of this same modification should not re-trigger S3 fetches.
         try {
-            polygons = new IndexedPolygonCollection(polygonLayer, waitTimeAttribute, nameAttribute, priorityAttribute,
-                    defaultWait);
+            polygons = new IndexedPolygonCollection(
+                    polygonLayer,
+                    waitTimeAttribute,
+                    nameAttribute,
+                    priorityAttribute,
+                    defaultWait
+            );
             polygons.loadFromS3GeoJson();
             // Collect any errors from the IndexedPolygonCollection construction, so they can be seen in the UI.
             errors.addAll(polygons.getErrors());

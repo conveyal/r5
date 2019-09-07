@@ -87,6 +87,7 @@ public class AddTrips extends Modification {
         info.route_type = this.mode;
         info.color = "4444FF";
         this.routeIndex = transitLayer.routes.size();
+        // No protective copy is made here because TransportNetwork.scenarioCopy already deep-copies certain collections.
         transitLayer.routes.add(info);
 
         generatePattern(transitLayer, 0);

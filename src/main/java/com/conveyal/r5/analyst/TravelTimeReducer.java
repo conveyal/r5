@@ -33,7 +33,7 @@ public class TravelTimeReducer {
 
     private AccessibilityAccumulator accessibilityAccumulator = null;
 
-    private final boolean retainTravelTimes;
+    private final boolean makeIsochrones;
 
     private final boolean calculateAccessibility;
 
@@ -70,8 +70,8 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
-        if (retainTravelTimes) {
+        makeIsochrones = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
+        if (makeIsochrones) {
             travelTimes = new TimeGrid(task);
         }
 
@@ -166,7 +166,7 @@ public class TravelTimeReducer {
             throw new ParameterException(percentileTravelTimesMinutes.length + " percentile values supplied; expected" +
                     " " + nPercentiles);
         }
-        if (retainTravelTimes) {
+        if (travelTimes != null) {
             travelTimes.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {

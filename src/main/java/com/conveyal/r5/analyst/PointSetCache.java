@@ -58,15 +58,11 @@ public class PointSetCache {
 
         String extension = key.substring(key.lastIndexOf(".") + 1);
 
-        if ("grid".equalsIgnoreCase(extension)){ //TODO use format enum
+        if (PointSet.Format.GRID.toString().equalsIgnoreCase(extension)) {
             return Grid.read(is);
-        } else if ("csv".equalsIgnoreCase(extension)) {
-            Files.copy(is, Paths.get("pointsets/" + key)); // TODO stream instead of writing/reading file
-            return FreeFormPointSet.fromCsv(new File("pointsets" + key));
-        } else if ("geojson".equalsIgnoreCase(extension)){
-            Files.copy(is, Paths.get("pointsets/" + key)); // TODO stream instead of writing/reading file
-            return FreeFormPointSet.fromGeoJson(new File("pointsets" + key));
-        } else {
+        } else if (PointSet.Format.POINTSET.toString().equalsIgnoreCase(extension)) {
+            return new FreeFormPointSet(is);
+        } else { // TODO CSV, GEOJSON support?
             throw new UnsupportedOperationException("Unsupported pointset format");
         }
 

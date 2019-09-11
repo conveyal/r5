@@ -29,6 +29,10 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
  */
 public abstract class PointSet {
 
+    public enum Format {
+        CSV, POINTSET, GRID, PNG, TIFF
+    }
+
     private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
 
     /**

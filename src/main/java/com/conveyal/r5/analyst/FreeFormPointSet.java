@@ -10,8 +10,6 @@ import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.io.LittleEndianDataInputStream;
-import com.google.common.io.LittleEndianDataOutputStream;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygon;
@@ -33,6 +31,8 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -71,11 +71,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /** A detailed textual description of this FreeFormPointSet */
     public String description;
 
-    /** TODO what is this? */
-    public Map<String, PropertyMetadata> propMetadata = new HashMap<String, PropertyMetadata>();
-
-    // TODO why is this concurrent? what two threads are modifying the hashmap simultaneously?
-    public Map<String, int[]> properties = new ConcurrentHashMap<String, int[]>();
+    public Map<String, int[]> properties = new HashMap<String, int[]>();
 
     public int capacity = 0; // The total number of features this FreeFormPointSet can hold.
 
@@ -102,8 +98,8 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /**
      * Rather than trying to load anything and everything, we stick to a strict
      * format and rely on other tools to get the data into the correct format.
-     * This includes column headers in the category:subcategory:attribute format
-     * and coordinates in WGS84. Comment lines are allowed in these input files, and begin with a #.
+     * This includes headers and coordinates in WGS84. Comment lines are allowed in these input files, and begin with
+     * a #.
      */
     public static FreeFormPointSet fromCsv(File filename) throws IOException {
         /* First, scan through the file to count lines and check for errors. */
@@ -122,49 +118,72 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         /* If we reached here, the file is entirely readable. Start over. */
         reader = new CsvReader(filename.getAbsolutePath(), ',', Charset.forName("UTF8"));
         FreeFormPointSet ret = new FreeFormPointSet(nRecs);
+        ret.description = "description";
+        ret.label = "label";
         reader.readHeaders();
         if (reader.getHeaderCount() != nCols) {
             LOG.error("Number of headers changed.");
             return null;
         }
+        int idCol = -1;
         int latCol = -1;
         int lonCol = -1;
 
-        // An array of property magnitudes corresponding to each column in the input. 
+        // Map columns to property names by position in this array. Extra column for "count"
+        String[] propertyNames = new String[nCols + 1];
+
+        // An array of property magnitudes corresponding to each column in the input.
         // Some of these will remain null (specifically, the lat and lon columns which do not contain magnitudes)
-        int[][] properties = new int[nCols][ret.capacity];
+        int[][] properties = new int[nCols + 1][ret.capacity];
         for (int c = 0; c < nCols; c++) {
             String header = reader.getHeader(c);
             if (header.equalsIgnoreCase("lat") || header.equalsIgnoreCase("latitude")) {
                 latCol = c;
             } else if (header.equalsIgnoreCase("lon") || header.equalsIgnoreCase("longitude")) {
                 lonCol = c;
+            } else if (header.equalsIgnoreCase("Point") || header.equalsIgnoreCase("id")) {
+                idCol = c;
             } else {
-                ret.getOrCreatePropertyForId(header);
-                properties[c] = ret.properties.get(header);
+                propertyNames[c] = header;
+                properties[c] = new int[ret.capacity];
             }
         }
         if (latCol < 0 || lonCol < 0) {
             LOG.error("CSV file did not contain a latitude or longitude column.");
             throw new IOException();
         }
+        if (idCol < 0) {
+            LOG.error("CSV file did not contain an ID column.");
+            throw new IOException();
+        }
+        ret.ids = new String[nRecs];
         ret.lats = new double[nRecs];
         ret.lons = new double[nRecs];
+
+        propertyNames[nCols] = "Count";
+        properties[nCols] = new int[ret.capacity];
+
         while (reader.readRecord()) {
             int rec = (int) reader.getCurrentRecord();
+            properties[nCols][rec] = 1; // count column has value 1 for each record
             for (int c = 0; c < nCols; c++) {
-                if(c==latCol || c==lonCol){
+                if(c==latCol || c==lonCol || c == idCol){
                     continue;
                 }
-
                 int[] prop = properties[c];
                 int mag = Integer.parseInt(reader.get(c));
                 prop[rec] = mag;
             }
+            ret.ids[rec] = reader.get(idCol);
             ret.lats[rec] = Double.parseDouble(reader.get(latCol));
             ret.lons[rec] = Double.parseDouble(reader.get(lonCol));
         }
         ret.capacity = nRecs;
+        for (int i = 0; i < propertyNames.length; i++) {
+            if (propertyNames[i] != null) {
+                ret.properties.put(propertyNames[i], properties[i]);
+            }
+        }
         return ret;
     }
 
@@ -351,34 +370,6 @@ public class FreeFormPointSet extends PointSet implements Serializable {
                         ret.label = properties.get("label").asText();
                     if(properties.get("description") != null)
                         ret.label = properties.get("description").asText();
-
-                    if(properties.get("schema") != null) {
-
-                        Iterator<Entry<String, JsonNode>> catIter = properties.get("schema").fields();
-                        while (catIter.hasNext()) {
-                            Entry<String, JsonNode> catEntry = catIter.next();
-                            String catName = catEntry.getKey();
-                            JsonNode catNode = catEntry.getValue();
-
-                            PropertyMetadata cat = new PropertyMetadata(catName);
-
-                            if(catNode.get("label") != null)
-                                cat.label = catNode.get("label").asText();
-
-                            if(catNode.get("style") != null) {
-                                Iterator<Entry<String, JsonNode>> styleIter = catNode.get("style").fields();
-                                while (styleIter.hasNext()) {
-                                    Entry<String, JsonNode> styleEntry = styleIter.next();
-                                    String styleName = styleEntry.getKey();
-                                    JsonNode styleValue = styleEntry.getValue();
-
-                                    cat.addStyle(styleName, styleValue.asText());
-                                }
-                            }
-
-                            ret.propMetadata.put(catName, cat);
-                        }
-                    }
                 }
                 if (key.equals("features")) {
                     while (jp.nextToken() != JsonToken.END_ARRAY) {
@@ -466,7 +457,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         for (Entry<String,Integer> ad : feat.getProperties().entrySet()) {
             String propId = ad.getKey();
             Integer propVal = ad.getValue();
-            this.getOrCreatePropertyForId(propId);
+            this.createPropertyForId(propId);
             this.properties.get(propId)[index] = propVal;
         }
     }
@@ -498,35 +489,17 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return ret;
     }
 
-    public void setLabel(String catId, String label) {
-        PropertyMetadata meta = this.propMetadata.get(catId);
-        if(meta!=null){
-            meta.setLabel( label );
-        }
-    }
-
-    public void setStyle(String catId, String styleAttribute, String styleValue) {
-        PropertyMetadata meta = propMetadata.get(catId);
-
-        if(meta!=null){
-            meta.addStyle( styleAttribute, styleValue );
-        }
-    }
-
     /**
-     * Gets the Category object for the given ID, creating it if it doesn't
-     * exist.
+     * Creates property, returning false if the property already exists.
      */
-    public PropertyMetadata getOrCreatePropertyForId(String id) {
-        PropertyMetadata property = propMetadata.get(id);
-        if (property == null) {
-            property = new PropertyMetadata(id);
-            propMetadata.put(id, property);
-        }
-        if(!properties.containsKey(id))
-            properties.put(id, new int[capacity]);
+    public boolean createPropertyForId(String id) {
 
-        return property;
+        if (properties.containsKey(id)) {
+            return false;
+        } else {
+            properties.put(id, new int[capacity]);
+            return true;
+        }
     }
 
     public void writeJson(OutputStream out) {
@@ -565,6 +538,33 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         }
     }
 
+    public void writeJsonWithTimes(OutputStream out, String[] destinationIds, int[] times) {
+        try {
+            JsonFactory jsonFactory = new JsonFactory(); // ObjectMapper.getJsonFactory() is better
+            JsonGenerator jgen = jsonFactory.createGenerator(out);
+            jgen.setCodec(new ObjectMapper());
+            jgen.writeStartObject();
+            {
+
+                jgen.writeStringField("type", "FeatureCollection");
+
+                writeJsonProperties(jgen);
+
+                jgen.writeArrayFieldStart("features");
+                {
+                    for (int f = 0; f < capacity; f++) {
+                        writeFeature(f, jgen, true);
+                    }
+                }
+                jgen.writeEndArray();
+            }
+            jgen.writeEndObject();
+            jgen.close();
+        } catch (IOException ioex) {
+            LOG.info("IOException, connection may have been closed while streaming JSON.");
+        }
+    }
+
     public void writeJsonProperties(JsonGenerator jgen) throws IOException {
         jgen.writeObjectFieldStart("properties");
         {
@@ -576,26 +576,6 @@ public class FreeFormPointSet extends PointSet implements Serializable {
             if (description != null)
                 jgen.writeStringField("description", description);
 
-            jgen.writeObjectFieldStart("schema");
-            {
-                for (PropertyMetadata cat : this.propMetadata.values()) {
-                    jgen.writeObjectFieldStart(cat.id);
-                    {
-                        if (cat.label != null)
-                            jgen.writeStringField("label", cat.label);
-                        if (cat.style != null && cat.style.attributes != null) {
-                            jgen.writeObjectFieldStart("style");
-                            {
-                                for (String styleKey : cat.style.attributes.keySet()) {
-                                    jgen.writeStringField(styleKey, cat.style.attributes.get(styleKey));
-                                }
-                            }
-                            jgen.writeEndObject();
-                        }
-                    }
-                    jgen.writeEndObject();
-                }
-            }
             jgen.writeEndObject();
         }
         jgen.writeEndObject();
@@ -790,47 +770,9 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return lons[i];
     }
 
-    /**
-     * Contains display and styling information for a single property of features in a FreeFormPointSet.
-     * @author bmander
-     */
-    public static class PropertyMetadata implements Serializable{
-
-        /** A FreeFormPointSet-unique property identifier */
-        public String id;
-
-        /** A short description of this property for use in a legend or menu */
-        public String label;
-
-        /** The display style for features having this property (e.g. color) */
-        public Style style;
-
-        public PropertyMetadata(String id){
-            this.style = new Style();
-            this.id = id;
-        }
-
-        public void setLabel(String label) {
-            this.label = label;
-        }
-
-        public void addStyle(String styleAttribute, String styleValue) {
-            this.style.attributes.put(styleAttribute, styleValue);
-        }
-    }
-
-    /** TODO: clarify, does this contain CSS attribute-value pairs or...?
-     * @author bmander */
-    public static class Style implements Serializable{
-        public Map<String, String> attributes = new ConcurrentHashMap<String, String>();
-    }
-
     /** Write coordinates for these points, in binary format. */
     public void write (OutputStream outputStream) throws IOException {
-        // Java's DataOutputStream only outputs big-endian format ("network byte order").
-        // These grids will be read out of Javascript typed arrays which use the machine's native byte order.
-        // On almost all current hardware this is little-endian. Guava saves us again.
-        LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(outputStream);
+        DataOutputStream out = new DataOutputStream(outputStream);
         // Header
         out.writeUTF(description);
         out.writeUTF(label);
@@ -849,10 +791,13 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     }
 
     public FreeFormPointSet (InputStream inputStream) throws  IOException {
-        LittleEndianDataInputStream data = new LittleEndianDataInputStream(inputStream);
+        DataInputStream data = new DataInputStream(inputStream);
         this.description = data.readUTF();
         this.label = data.readUTF();
         this.capacity = data.readInt();
+        this.ids = new String[this.capacity];
+        this.lats = new double[this.capacity];
+        this.lons = new double[this.capacity];
 
         for (int i = 0; i < capacity; i++) {
             ids[i] = data.readUTF();
@@ -865,6 +810,8 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         for (int i = 0; i < capacity; i++) {
             lons[i] = data.readDouble();
         }
+
+        data.close();
 
     }
 

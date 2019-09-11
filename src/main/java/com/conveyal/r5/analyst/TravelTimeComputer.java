@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
@@ -88,8 +89,13 @@ public class TravelTimeComputer {
         // TODO merge multiple destination pointsets from a regional request into a single supergrid?
         WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
 
+        PointSet destinations;
         // read from regionalTask?
-        PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
+        if (destinationGridExtents != null) {
+            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
+        } else {
+            destinations = ((RegionalTask) request).destinationPointSet;
+        }
 
         // I. Access to transit (or direct non-transit travel to destination) ==========================================
         // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel

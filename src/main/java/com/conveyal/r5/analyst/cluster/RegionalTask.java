@@ -13,11 +13,12 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public int x = -1, y = -1;
 
     /**
-     * The pointset key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
-     * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
-     * will be an accessibility value per origin, rather than a grid of travel times from that origin.
+     * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. If this is not blank, the default
+     * TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set
+     * to false; and the returned results will be an accessibility value per origin, rather than a grid of travel
+     * times from that origin. // TODO replace with list
      */
-    public String destinationPointSetId;
+    public String destinationPointSetKey;
     
     /**
      * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the
@@ -26,14 +27,9 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public transient PointSet destinationPointSet;
 
     /**
-     * Key for pointset to use as origins.
+     * Key for pointset (e.g. regionId/datasetId.pointset) to use as origins.
      */
-    public String originPointSetId;
-
-    /**
-     * Key for pointset to use as destinations.
-     */
-    public String destinationPointSetIds;
+    public String originPointSetKey;
 
     /**
      * Is explicitly when freeform pointset supplied as origin; otherwise 0

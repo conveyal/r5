@@ -79,7 +79,7 @@ public class TravelTimeReducer {
         boolean calcAccessibility = false;
         if (task instanceof RegionalTask) {
             RegionalTask regionalTask = (RegionalTask) task;
-            if (regionalTask.originPointSetId == null) {
+            if (regionalTask.originPointSetKey == null) {
                 // No origins specified explicitly, use grid
                 if (regionalTask.destinationPointSet != null) {
                     // Destinations specified, calculate cumulative accessibility indicators to them

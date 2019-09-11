@@ -42,7 +42,7 @@ public class CombinedWorkResult {
         this.jobId = container.jobId;
         this.taskId = container.taskId;
         this.travelTimeValues = container.travelTimes == null ? null : container.travelTimes.values;
-        this.accessibilityValues = container.accessibility.getIntValues();
+        this.accessibilityValues = container.accessibility == null ? null : container.accessibility.getIntValues();
     }
 
 }

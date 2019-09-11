@@ -46,7 +46,7 @@ public class NetworkPreloaderProgressListener implements ProgressListener {
         this.description = description;
         this.totalElements = totalElements;
         this.currentElement = 0;
-        this.updateFrequency = totalElements / 100;
+        this.updateFrequency = totalElements / 100 + 1;
     }
 
     @Override

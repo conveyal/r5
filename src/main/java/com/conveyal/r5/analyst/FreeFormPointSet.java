@@ -44,17 +44,15 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * PointSets serve as named groups of destinations when calculating analyst one-to-many indicators.
- * They could also serve as origins in many-to-many indicators.
- *
- * PointSets are one of the three main web analyst resources: Pointsets, Indicators, and TimeSurfaces
+ * PointSets serve as groups of destinations or origins. They were a key resource in the legacy web analyst
+ * (aka OTP Analyst aka TransportAnalyst). For the first couple years of the new Conveyal Analysis, only
+ * WebMercatorGridPointSets were supported. This class re-enables non-gridded pointsets, re-using/modifying some of the
+ * legacy code, which was removed in R5 PR #338.
  */
 public class FreeFormPointSet extends PointSet implements Serializable {
 
@@ -73,7 +71,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
 
     public Map<String, int[]> properties = new HashMap<String, int[]>();
 
-    public int capacity = 0; // The total number of features this FreeFormPointSet can hold.
+    public int capacity = 0; // The total number of features this FreeFormPointSet holds.
 
     /**
      * Map from string IDs to their array indices. This is a view into FreeFormPointSet.ids, namely its reverse mapping.
@@ -81,7 +79,6 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     private transient TObjectIntMap<String> idIndexMap;
 
     // The characteristics of the features in this FreeFormPointSet. This is a column store.
-    // Each structured attribute must also contain an array of magnitudes with the same length as these arrays.
 
     /** A unique identifier for each feature. */
     public String[] ids;
@@ -96,8 +93,8 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     protected Polygon[] polygons; // TODO what do we do when there are no polygons?
 
     /**
-     * Rather than trying to load anything and everything, we stick to a strict
-     * format and rely on other tools to get the data into the correct format.
+     * Rather than trying to load anything and everything, we stick to a strict format and rely on other tools to get
+     * the data into the correct format.
      * This includes headers and coordinates in WGS84. Comment lines are allowed in these input files, and begin with
      * a #.
      */
@@ -187,11 +184,13 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return ret;
     }
 
+    // Not yet re-implemented
     public static FreeFormPointSet fromShapefile(File file) throws NoSuchAuthorityCodeException, IOException,
             FactoryException, IllegalArgumentException {
         return fromShapefile(file, null, null);
     }
 
+    // Not yet re-implemented
     public static FreeFormPointSet fromShapefile(File file, String originIDField, List<String> propertyFields) throws IOException, FactoryException, IllegalArgumentException {
         if ( ! file.exists())
             throw new RuntimeException("Shapefile does not exist.");
@@ -284,6 +283,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return ret;
     }
 
+    // Not yet re-implemented
     public static FreeFormPointSet fromGeoJson(File filename) {
         try {
             FileInputStream fis = new FileInputStream(filename);
@@ -308,7 +308,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
      * @return the number of features in the collection if it's valid, or -1 if
      *         it doesn't fit the OTPA format.
      */
-    public static int validateGeoJson(InputStream is) {
+    private static int validateGeoJson(InputStream is) {
         int n = 0;
         JsonFactory f = new JsonFactory();
         try {
@@ -509,7 +509,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /**
      * Use the Jackson streaming API to output this as GeoJSON without creating
      * another object. The Indicator is a column store, and is transposed WRT
-     * the JSON representation.
+     * the JSON representation. Not yet re-implemented
      */
     public void writeJson(OutputStream out, Boolean forcePoints) {
         try {
@@ -538,6 +538,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         }
     }
 
+    // Not yet re-implemented. Could be useful as an alternative to writing verbose CSV travel time matrices
     public void writeJsonWithTimes(OutputStream out, String[] destinationIds, int[] times) {
         try {
             JsonFactory jsonFactory = new JsonFactory(); // ObjectMapper.getJsonFactory() is better
@@ -565,7 +566,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         }
     }
 
-    public void writeJsonProperties(JsonGenerator jgen) throws IOException {
+    private void writeJsonProperties(JsonGenerator jgen) throws IOException {
         jgen.writeObjectFieldStart("properties");
         {
 
@@ -659,7 +660,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /**
      * Get a subset of this point set containing only the specified point IDs.
      */
-    public FreeFormPointSet slice(List<String> ids) {
+    private FreeFormPointSet slice(List<String> ids) {
 
         FreeFormPointSet ret = new FreeFormPointSet(ids.size());
 
@@ -684,7 +685,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return ret;
     }
 
-    public FreeFormPointSet slice(int start, int end) {
+    private FreeFormPointSet slice(int start, int end) {
         FreeFormPointSet ret = new FreeFormPointSet(end - start);
 
         ret.id = id;

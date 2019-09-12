@@ -6,10 +6,11 @@ import com.conveyal.r5.analyst.cluster.CombinedWorkResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**
- * This provides a single return type for all the kinds of results we can get from a travel time computer and reducer
- * for a single origin point:
- * Travel times to all destination cells, accessibility indicator values for various travel time cutoffs and percentiles
- * of travel time, travel time breakdowns into wait and ride and walk time, and paths to all destinations.
+ * This provides a single return type (for internal R5 use) for all the kinds of results we can get from a travel time
+ * computer and reducer for a single origin point:
+ * Currently - travel times to points in a destination pointset, accessibility indicator values for various travel
+ * time cutoffs and percentiles of travel time
+ * TODO - travel time breakdowns into wait and ride and walk time, and paths to destinations.
 ] */
 public class OneOriginContainer {
 

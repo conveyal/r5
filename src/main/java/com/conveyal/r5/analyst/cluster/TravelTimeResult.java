@@ -44,13 +44,6 @@ public class TravelTimeResult {
         }
     }
 
-    public TravelTimeResult(PointSet pointSet, int[] times) {
-        nPoints = pointSet.featureCount();
-        nSamplesPerPoint = 1;
-        values = new int[0][times.length];
-        values[0] = times;
-    }
-
     // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
     // So no real risk of overflowing an int index.
     public void setTarget(int targetIndex, int[] targetValues) {
@@ -63,12 +56,6 @@ public class TravelTimeResult {
     }
 
     public int[][] getValues() { return values;}
-
-    public int[] getTravelTimesForSample(int sampleIndex) { return values[sampleIndex]; }
-
-    public int getTravelTimeToPoint(int sampleIndex, int pointIndex){
-        return values[sampleIndex][pointIndex];
-    }
 
     /**
      * @return true if the search reached any destination cell, false if it did not reach any cells. No cells will be

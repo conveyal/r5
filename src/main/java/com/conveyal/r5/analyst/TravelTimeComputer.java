@@ -82,18 +82,22 @@ public class TravelTimeComputer {
         final int carPickupDelaySeconds = (request.accessModes.contains(LegMode.CAR)) ?
                 network.streetLayer.getWaitTime(request.fromLat, request.fromLon) : 0;
 
-        // Find the set of destinations for a one-to-many travel time calculation, not yet linked to the street network.
-        // By finding the extents and destinations up front, we ensure the exact same grid is used for all steps below.
+        // Find the set of destinations for a travel time calculation, not yet linked to the street network.
+        // By finding the extents and destinations up front, we ensure the exact same destination pointset is used for
+        // all steps below.
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         // TODO merge multiple destination pointsets from a regional request into a single supergrid?
-        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
-
         PointSet destinations;
-        // read from regionalTask?
+
+        // For now, use logic in the NetworkPreloader to return null extents if the request is not for a single-point
+        // (travel time surface), which implies the destination pointset is a grid.  This could be cleaned up.
+        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
         if (destinationGridExtents != null) {
+            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
             destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
         } else {
+            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = ((RegionalTask) request).destinationPointSet;
         }
 

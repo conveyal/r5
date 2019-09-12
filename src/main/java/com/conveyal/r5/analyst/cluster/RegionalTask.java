@@ -38,7 +38,8 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /**
      * Whether to calculate travel times from each origin to the one destination with matching id. If false, travel
-     * time results will be an array of travel times to all destinations.
+     * time results will be an array of travel times to all destinations. Not yet tested; implementation will also
+     * need to set this based on an incoming AnalysisRequest.
      */
     public boolean oneToOne;
 

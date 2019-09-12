@@ -1,18 +1,11 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
-import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.Coordinate;
-import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * A pointset that represents a grid of pixels from the web mercator projection.

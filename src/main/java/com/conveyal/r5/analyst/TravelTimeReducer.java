@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 /**
- * Given a bunch of travel times from an origin to a single destination grid cell, this collapses that long list into a
+ * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
  * limited number of percentiles, then optionally accumulates that destination's opportunity count into the appropriate
  * cumulative opportunities accessibility indicators at that origin.
  */
@@ -33,8 +33,6 @@ public class TravelTimeReducer {
 
     private AccessibilityAccumulator accessibilityAccumulator = null;
 
-    private final boolean makeIsochrones;
-
     private final boolean calculateAccessibility;
 
     private final int[] percentileIndexes;
@@ -47,7 +45,11 @@ public class TravelTimeReducer {
     /**
      * @param task task to be performed, which is used to determine how results are summarized at each origin: a single
      *             cumulative opportunity accessibility value per origin, or selected percentiles of travel times to
-     *             all destinations.
+     *             all destinations. If the task is a RegionalTask and does not include an originPointSetKey or a
+     *             value of true for the makeTauiSite flag, travel times will be reduced to an accessibility value
+     *             per origin. If a RegionalTask includes an originPointSetKey, travel times from the origins to the
+     *             destinations of the destinationPointSetKey will be retained. Accessibility values for freeform
+     *             origin pointsets are not yet saved; this is marked as a to-do below.
      *
      *             The task is also used to determine the number of timesPerDestination, which depends on whether the
      *             task specifies an inRoutingFareCalculator. A non-null inRoutingFareCalculator is used as a flag
@@ -70,7 +72,7 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        makeIsochrones = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
+        boolean makeIsochrones = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
         if (makeIsochrones) {
             travelTimes = new TimeGrid(task);
         }
@@ -157,7 +159,7 @@ public class TravelTimeReducer {
     }
 
     /**
-     * Given a list of travel times of the expected length, store the extracted percentiles of travel time and/or
+     * Given a list of travel times of the expected length, store the extracted percentiles of travel time (if a and/or
      * accessibility values.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */

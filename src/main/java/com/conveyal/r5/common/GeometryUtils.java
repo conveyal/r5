@@ -95,6 +95,9 @@ public class GeometryUtils {
     /**
      * Convert a org.geojson.Xxxx geometry to a JTS geometry. Copied from same-named class in OTP.
      * Only support Point, Polygon and MultiPolygon for now.
+     *
+     * Re-introduced to support PointFeature, FreeFormPointSet classes. Not currently used or tested.
+     *
      * @param geoJsonGeom
      * @return The equivalent JTS geometry.
      * @throws UnsupportedGeometryException

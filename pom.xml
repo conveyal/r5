@@ -48,7 +48,10 @@
 
     <!-- Define some variables to be used elsewhere in the build. -->
     <properties>
-        <geotools.version>14.0</geotools.version>
+        <!-- Upgrading to Geotools 20 or above will require significant package name migrations for JTS. -->
+        <!-- https://docs.geotools.org/latest/userguide/welcome/upgrade.html -->
+        <!-- https://github.com/locationtech/jts/blob/master/MIGRATION.md -->
+        <geotools.version>19.3</geotools.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -81,18 +84,29 @@
         </resources>
 
         <plugins>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.3</version>
+                <version>3.8.1</version>
                 <configuration>
-                    <!-- use Java 8 -->
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <!-- use Java 11 -->
+                    <release>11</release>
                 </configuration>
             </plugin>
-
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.1.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!-- For Java 11 Modules, specify a module name. Do not create module-info.java until all
+                                 our dependencies specify a module name. -->
+                            <Automatic-Module-Name>com.conveyal.r5</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>pl.project13.maven</groupId>
                 <artifactId>git-commit-id-plugin</artifactId>
@@ -116,11 +130,10 @@
                     </gitDescribe>
                 </configuration>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>2.2</version>
+                <version>3.2.1</version>
                 <!-- Create a version of the JAR that includes all dependencies.
                      We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
                 <executions>
@@ -170,12 +183,11 @@
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <!-- Recommended way to deploy to OSSRH -->
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.7</version>
+                <version>1.6.8</version>
                 <extensions>true</extensions>
                 <configuration>
                     <serverId>ossrh</serverId>
@@ -184,15 +196,14 @@
                     <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
-
             <plugin>
                 <!-- Allow attaching Javadoc during releases -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.4</version>
+                <version>3.1.1</version>
                 <configuration>
-                    <!-- Turn off Java 8 strict Javadoc checking -->
-                    <additionalparam>-Xdoclint:none</additionalparam>
+                    <!-- Turn off strict Javadoc checking -->
+                    <doclint>none</doclint>
                     <tags>
                         <tag>
                             <name>notnull</name>
@@ -216,11 +227,11 @@
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <!-- Include zipped source code in releases -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -230,11 +241,10 @@
                     </execution>
                 </executions>
             </plugin>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.5</version>
+                <version>1.6</version>
                 <executions>
                     <execution>
                         <id>sign-artifacts</id>
@@ -293,6 +303,12 @@
             <artifactId>jackson-core</artifactId>
             <version>2.6.1</version>
         </dependency>
+        <!-- Provides annotations like XmlElement indicating how classes should be serialized -->
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.3.1</version>
+        </dependency>
         <!-- JTS does 2D geometry and topology. Recently moved from vividsolutions to locationtech.
           We could update R5 to use the new locationtech class names and its built-in GeoJSON support.
           However, Geotools still depends on vividsolution JTS so this might be complicated. -->
@@ -314,12 +330,12 @@
         <!-- GeoTools is a free software GIS toolkit. -->
         <dependency>
             <groupId>org.geotools</groupId>
-            <artifactId>gt-opengis</artifactId>
+            <artifactId>gt-api</artifactId>
             <version>${geotools.version}</version>
         </dependency>
         <dependency>
             <groupId>org.geotools</groupId>
-            <artifactId>gt-api</artifactId>
+            <artifactId>gt-opengis</artifactId>
             <version>${geotools.version}</version>
         </dependency>
         <dependency>

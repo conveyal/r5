@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.OneOriginContainer;
+import com.conveyal.r5.OneOriginResult;
 
 /**
  * Model class used for serialized travel times and accessibility indicators  sent over HTTP to the backend/broker.
@@ -44,7 +44,7 @@ public class CombinedWorkResult {
     /**
      * Construct a result for one origin from new R5 versions.
      */
-    public CombinedWorkResult(OneOriginContainer container) {
+    public CombinedWorkResult(OneOriginResult container) {
         this.jobId = container.jobId;
         this.taskId = container.taskId;
         this.travelTimeValues = container.travelTimes == null ? null : container.travelTimes.values;

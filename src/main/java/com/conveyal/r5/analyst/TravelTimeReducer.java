@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.OneOriginContainer;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
@@ -214,8 +214,8 @@ public class TravelTimeReducer {
      * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around
      * routing and propagation when the origin point is not connected to the street network.
      */
-    public OneOriginContainer finish () {
-        return new OneOriginContainer(travelTimes, accessibilityAccumulator);
+    public OneOriginResult finish () {
+        return new OneOriginResult(travelTimes, accessibilityAccumulator);
     }
 
 }

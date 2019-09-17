@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.OneOriginContainer;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.common.R5Version;
 import com.fasterxml.jackson.annotation.JsonIgnore;

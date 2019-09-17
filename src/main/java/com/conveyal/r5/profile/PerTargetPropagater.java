@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.OneOriginContainer;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
@@ -143,7 +143,7 @@ public class PerTargetPropagater {
      * After constructing a propagator and setting any additional options or optional fields,
      * call this method to actually perform the travel time propagation.
      */
-    public OneOriginContainer propagate () {
+    public OneOriginResult propagate () {
 
         long startTimeMillis = System.currentTimeMillis();
 

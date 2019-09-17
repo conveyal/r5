@@ -25,8 +25,8 @@ public class LittleEndianIntOutputStream extends FilterOutputStream {
     }
 
     /** Write an ASCII string as bytes, generally used as a header */
-    public void writeAscii(String header) throws IOException {
-        byte[] bytes = header.getBytes(Charset.forName("ASCII"));
+    public void writeAscii(String string) throws IOException {
+        byte[] bytes = string.getBytes(Charset.forName("ASCII"));
         out.write(bytes);
     }
 }

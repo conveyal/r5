@@ -110,31 +110,7 @@ public class Grid extends PointSet {
     double MAX_FEATURE_AREA_SQ_DEG = 2;
 
     /**
-     * @param zoom web mercator zoom level for the grid.
-     * @param north latitude in decimal degrees of the north edge of this grid.
-     * @param east longitude in decimal degrees of the east edge of this grid.
-     * @param south latitude in decimal degrees of the south edge of this grid.
-     * @param west longitude in decimal degrees of the west edge of this grid.
-     */
-    public Grid (int zoom, double north, double east, double south, double west) {
-        this.zoom = zoom;
-        this.north = latToPixel(north, zoom);
-        /**
-         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
-         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
-         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
-         *
-         * So we add 1 to the height and width when a grid is created in this manner.
-         */
-        this.height = (latToPixel(south, zoom) - this.north) + 1; // minimum height is 1
-        this.west = lonToPixel(west, zoom);
-        this.width = (lonToPixel(east, zoom) - this.west) + 1; // minimum width is 1
-        this.grid = new double[width][height];
-    }
-
-    /**
      * Used when reading a saved grid.
-     * FIXME we have two constructors with five numeric parameters, differentiated only by int/double type.
      */
     public Grid (int zoom, int width, int height, int north, int west) {
         this.zoom = zoom;
@@ -149,8 +125,25 @@ public class Grid extends PointSet {
         this(extents.zoom, extents.width, extents.height, extents.north, extents.west);
     }
 
-    Grid (int zoom, Envelope envelope) {
-        this(zoom, envelope.getMaxY(), envelope.getMaxX(), envelope.getMinY(), envelope.getMinX());
+    /**
+     *
+     * @param zoom Web Mercator zoom level
+     * @param envelope Envelope of grid, in absolute lat/lon coordinates
+     */
+    public Grid (int zoom, Envelope envelope) {
+        this.zoom = zoom;
+        this.north = latToPixel(envelope.getMaxY(), zoom);
+        /**
+         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
+         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
+         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
+         *
+         * So we add 1 to the height and width when a grid is created in this manner.
+         */
+        this.height = (latToPixel(envelope.getMinY(), zoom) - this.north) + 1; // minimum height is 1
+        this.west = lonToPixel(envelope.getMinX(), zoom);
+        this.width = (lonToPixel(envelope.getMaxX(), zoom) - this.west) + 1; // minimum width is 1
+        this.grid = new double[width][height];
     }
 
     public static class PixelWeight {
@@ -576,7 +569,7 @@ public class Grid extends PointSet {
                 .collect(
                         Collectors.toMap(
                                 c -> c,
-                                c -> new Grid(zoom,envelope)
+                                c -> new Grid(zoom, envelope)
                         ));
 
         Grid countGrid = new Grid(zoom, envelope);
@@ -657,13 +650,7 @@ public class Grid extends PointSet {
                 String attributeName = p.getName().getLocalPart();
 
                 if (!grids.containsKey(attributeName)) {
-                    grids.put(attributeName, new Grid(
-                            zoom,
-                            envelope.getMaxY(),
-                            envelope.getMaxX(),
-                            envelope.getMinY(),
-                            envelope.getMinX()
-                    ));
+                    grids.put(attributeName, new Grid(zoom, envelope));
                 }
 
                 Grid grid = grids.get(attributeName);

@@ -93,15 +93,6 @@ public class AnalystWorker implements Runnable {
     /** The port on which the worker will listen for single point tasks forwarded from the backend. */
     public static final int WORKER_LISTEN_PORT = 7080;
 
-    /**
-     * The number of threads the worker will use to receive HTTP connections. This crudely limits memory consumption
-     * from the worker handling single point requests.
-     * Unfortunately we can't set this very low. We get a message saying we need at least 10 threads:
-     * max=2 < needed(acceptors=1 + selectors=8 + request=1)
-     * TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-     */
-    public static final int WORKER_SINGLE_POINT_THREADS = 10;
-
     // TODO make non-static and make implementations swappable
     // This is very ugly because it's static but initialized at class instantiation.
     public static FilePersistence filePersistence;
@@ -331,12 +322,16 @@ public class AnalystWorker implements Runnable {
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // When testing cluster functionality, e.g. task redelivery, many  workers run on the same machine. In that
-        // case, this HTTP server is distabled on all workers but one to avoid port conflicts.
+        // case, this HTTP server is disabled on all workers but one to avoid port conflicts.
+        // Ideally we would limit the number of threads the worker will use to handle HTTP connections, in order to
+        // crudely limit memory consumption and load from simultaneous single point requests. Unfortunately we can't
+        // call sparkHttpService.threadPool(NTHREADS) because we get an error message saying we need over 10 threads:
+        // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
+        // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
+        // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
         if (listenForSinglePointRequests) {
-            // Trying out the new Spark syntax for non-static configuration.
-            sparkHttpService = spark.Service.ignite()
-                    .port(WORKER_LISTEN_PORT)
-                    .threadPool(WORKER_SINGLE_POINT_THREADS);
+            // Use the newer non-static Spark framework syntax.
+            sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
         }
 

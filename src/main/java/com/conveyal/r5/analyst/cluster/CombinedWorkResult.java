@@ -3,8 +3,9 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.r5.OneOriginResult;
 
 /**
- * Model class used for serialized travel times and accessibility indicators  sent over HTTP to the backend/broker.
- * Similar to OneOriginContainer, but with arrays for results (instead of more descriptive objects) for compactness.
+ * Model class used for serialized travel times and accessibility indicators for a multi-origin (regional) analysis,
+ * sent over HTTP to the backend/broker. Similar to OneOriginContainer, but with arrays for results (instead of more
+ * descriptive objects) for compactness.
  */
 public class CombinedWorkResult {
 
@@ -28,9 +29,9 @@ public class CombinedWorkResult {
      */
     public int[][][] accessibilityValues; // TODO Should this be floating point?
 
-    /** Trivial no-arg constructor for deserialization. */
-    public CombinedWorkResult() {};
-
+    /** Trivial no-arg constructor for deserialization. Private to prevent usage outside deserialization. */
+    private CombinedWorkResult() {};
+    
     /**
      * Construct a result for one origin from old R5 versions that use the deprecated RegionalWorkResult class
      */

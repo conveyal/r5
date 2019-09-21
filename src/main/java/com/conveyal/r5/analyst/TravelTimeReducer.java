@@ -28,6 +28,8 @@ public class TravelTimeReducer {
      * after results have been calculated) */
     private int maxTripDurationMinutes;
 
+    private boolean retainTravelTimes;
+
     /** Reduced travel time results. May be null if we're only recording accessibility. */
     private TravelTimeResult travelTimes = null;
 
@@ -43,20 +45,23 @@ public class TravelTimeReducer {
 
 
     /**
-     * @param task task to be performed, which is used to determine how results are summarized at each origin: a single
-     *             cumulative opportunity accessibility value per origin, or selected percentiles of travel times to
-     *             all destinations. If the task is a RegionalTask and does not include an originPointSetKey or a
-     *             value of true for the makeTauiSite flag, travel times will be reduced to an accessibility value
-     *             per origin. If a RegionalTask includes an originPointSetKey, travel times from the origins to the
-     *             destinations of the destinationPointSetKey will be retained. Accessibility values for freeform
-     *             origin pointsets are not yet saved; this is marked as a to-do below.
+     * Reduce travel time values to requested summary outputs for each origin. The type of output (a single
+     * cumulative opportunity accessibility value per origin, or selected percentiles of travel times to all
+     * destinations) is determined based on the provided task.
      *
-     *             The task is also used to determine the number of timesPerDestination, which depends on whether the
-     *             task specifies an inRoutingFareCalculator. A non-null inRoutingFareCalculator is used as a flag
-     *             for the multi-criteria McRaptor router, which is relatively slow, so it relies on sampling (using
-     *             a number of departure times specified by task.monteCarloDraws). FastRaptorworker is fast enough to
-     *             run Monte Carlo draws within departure minutes, so it uses the monteCarloDraws parameter in a way
-     *             that's consistent with its name.
+     * If the task is a RegionalTask and does not include an originPointSetKey or a value of true for the
+     * makeTauiSite flag, travel times will be reduced to an accessibility value per origin. If a RegionalTask
+     * includes an originPointSetKey, travel times from the origins to the destinations of the destinationPointSetKey
+     * will be retained. Accessibility values for freeform origin pointsets are not yet saved; this is marked as a
+     * to-do below.
+     *
+     * The task is also used to determine the number of timesPerDestination, which depends on whether the  task
+     * specifies an inRoutingFareCalculator. A non-null inRoutingFareCalculator is used as a flag for the
+     * multi-criteria McRaptor router, which is relatively slow, so it relies on sampling (using a number of
+     * departure times specified by task.monteCarloDraws). FastRaptorworker is fast enough to run Monte Carlo draws
+     * within departure minutes, so it uses the monteCarloDraws parameter in a way that's consistent with its name.
+     *
+     * @param task task to be performed.
      */
     public TravelTimeReducer (AnalysisTask task) {
 
@@ -72,8 +77,8 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        boolean makeIsochrones = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
-        if (makeIsochrones) {
+        retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
+        if (retainTravelTimes) {
             travelTimes = new TimeGrid(task);
         }
 
@@ -82,7 +87,8 @@ public class TravelTimeReducer {
         if (task instanceof RegionalTask) {
             RegionalTask regionalTask = (RegionalTask) task;
             if (regionalTask.originPointSetKey == null) {
-                // No origins specified explicitly, use grid
+                // The user did not supply a freeform pointset key, so calculate accessibility using each cell from
+                // the grid extents in the analysis task as an origin
                 if (regionalTask.destinationPointSet != null) {
                     // Destinations specified, calculate cumulative accessibility indicators to them
                     calcAccessibility = true;
@@ -168,7 +174,7 @@ public class TravelTimeReducer {
             throw new ParameterException(percentileTravelTimesMinutes.length + " percentile values supplied; expected" +
                     " " + nPercentiles);
         }
-        if (travelTimes != null) {
+        if (retainTravelTimes) {
             travelTimes.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {

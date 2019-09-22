@@ -97,6 +97,7 @@ public class TravelTimeReducer {
             } else {
                 // Origins specified explicitly, calculate times for them
                 travelTimes = new TravelTimeResult(regionalTask);
+                retainTravelTimes = true;
                 // TODO options for calculating accessibility from freeform points
             }
         }

@@ -77,7 +77,6 @@ public class PerTargetPropagater {
     /**
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
      * transit stop. May be null, only needs to be set if we're recording paths, as in a static site.
-     * TODO Is this superseded by perIterationPaths below?
      */
     public List<Path[]> pathsToStopsForIteration = null;
 
@@ -164,7 +163,7 @@ public class PerTargetPropagater {
                 // NB task.taskId is integer index (set when Broker makes task for job); task.id is origin id in supplied
                 // freeform pointset
                 startTarget = ((FreeFormPointSet) linkedTargets.get(0).pointSet).getIndexForFeature(originId);
-                endTarget = 1;
+                endTarget = startTarget + 1;
             } else {
                 LOG.error("One-to-one travel time analysis requested, but no matched origin-destination pair found.");
             }
@@ -208,7 +207,7 @@ public class PerTargetPropagater {
             }
         }
         LOG.info("Propagating {} iterations from {} stops to {} target points took {}s",
-                nIterations, nStops, endTarget, (System.currentTimeMillis() - startTimeMillis) / 1000d
+                nIterations, nStops, endTarget - startTarget, (System.currentTimeMillis() - startTimeMillis) / 1000d
         );
         if (pathWriter != null) {
             pathWriter.finishAndStorePaths();

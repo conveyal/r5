@@ -31,7 +31,7 @@ public class CombinedWorkResult {
 
     /** Trivial no-arg constructor for deserialization. Private to prevent usage outside deserialization. */
     private CombinedWorkResult() {};
-    
+
     /**
      * Construct a result for one origin from old R5 versions that use the deprecated RegionalWorkResult class
      */

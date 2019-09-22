@@ -152,7 +152,7 @@ public class AnalystWorker implements Runnable {
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
-    private List<CombinedWorkResult> workResults = new ArrayList<>();
+    private List<RegionalWorkResult> workResults = new ArrayList<>();
 
     /** The last time (in milliseconds since the epoch) that we polled for work. */
     private long lastPollingTime;
@@ -578,7 +578,7 @@ public class AnalystWorker implements Runnable {
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {
-            workerStatus.combinedResults = new ArrayList<>(workResults);
+            workerStatus.results = new ArrayList<>(workResults);
             workResults.clear();
         }
 
@@ -620,7 +620,7 @@ public class AnalystWorker implements Runnable {
         // for later re-delivery, safely interleaving with new results that may be coming from other worker threads.
         synchronized (workResults) {
             // TODO check here that results are not piling up too much?
-            workResults.addAll(workerStatus.combinedResults);
+            workResults.addAll(workerStatus.results);
         }
         return null;
     }

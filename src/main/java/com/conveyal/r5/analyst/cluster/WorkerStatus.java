@@ -48,8 +48,7 @@ public class WorkerStatus {
     public String jvmVendor;
     public String jvmVersion;
     public String ipAddress;
-    @Deprecated public List<RegionalWorkResult> results;
-    public List<CombinedWorkResult> combinedResults;
+    public List<RegionalWorkResult> results;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }

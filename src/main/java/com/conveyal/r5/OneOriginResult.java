@@ -2,7 +2,7 @@ package com.conveyal.r5;
 
 import com.conveyal.r5.analyst.AccessibilityAccumulator;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.CombinedWorkResult;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**
@@ -36,8 +36,8 @@ public class OneOriginResult {
         this.accessibility = new AccessibilityAccumulator();
     }
 
-    public CombinedWorkResult toResult() {
-        return new CombinedWorkResult(this);
+    public RegionalWorkResult toResult() {
+        return new RegionalWorkResult(this);
     }
 
     public OneOriginResult setJobAndTaskIds(AnalysisTask task) {

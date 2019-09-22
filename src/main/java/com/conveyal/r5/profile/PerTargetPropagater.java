@@ -83,6 +83,10 @@ public class PerTargetPropagater {
     /** Whether to break travel times down into walk, wait, and ride time. */
     private boolean calculateComponents;
 
+    /** Whether to propagate only to one target that corresponds to the origin (e.g. in a travel time savings
+     * calculation) */
+    private boolean matchedTargets = false;
+
     public static final int SECONDS_PER_MINUTE = 60;
     public static final int MM_PER_METER = 1000;
 
@@ -121,6 +125,8 @@ public class PerTargetPropagater {
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeTauiSite;
 
+        if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) matchedTargets = true;
+
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
@@ -157,7 +163,7 @@ public class PerTargetPropagater {
 
         // One-to-one task assumes each origin in a freeform pointset corresponds to one destination (the point in the
         // destination pointset with the same id)
-        if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) {
+        if (matchedTargets) {
             String originId = ((RegionalTask) request).id;
             if (originId != null) {
                 // NB task.taskId is integer index (set when Broker makes task for job); task.id is origin id in supplied
@@ -195,7 +201,8 @@ public class PerTargetPropagater {
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
-            int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetIdx, perIterationTravelTimes);
+            int targetToWrite = matchedTargets ? 0 : targetIdx;
+            int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetToWrite, perIterationTravelTimes);
 
             if (calculateComponents) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.

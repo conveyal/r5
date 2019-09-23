@@ -238,7 +238,7 @@ public class TravelTimeComputer {
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
             worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-            if (request.makeTauiSite) {
+            if (request.computePaths || request.computeTravelTimeBreakdown) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
                 worker.retainPaths = true;
@@ -280,7 +280,7 @@ public class TravelTimeComputer {
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
         // When building a static site, perform some additional initialization causing the propagator to do extra work.
-        if (request.makeTauiSite) {
+        if (request.computePaths || request.computeTravelTimeBreakdown) {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
             perTargetPropagater.pathWriter = new PathWriter(request);
         }

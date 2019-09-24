@@ -91,7 +91,7 @@ public class TravelTimeComputer {
         PointSet destinations;
 
         // For now, use logic in the NetworkPreloader to return null extents if the request is not for a single-point
-        // (travel time surface), which implies the destination pointset is a grid.  This could be cleaned up.
+        // (travel time surface), which implies the destination pointset is a grid. This should be cleaned up.
         WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
         if (destinationGridExtents != null) {
             // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)

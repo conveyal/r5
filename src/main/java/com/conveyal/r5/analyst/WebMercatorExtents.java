@@ -34,6 +34,10 @@ public class WebMercatorExtents {
             Grid grid = (Grid) pointSet;
             return new WebMercatorExtents(grid.west, grid.north, grid.width, grid.height, grid.zoom);
         } else {
+            // Temporary way to bypass network preloading while freeform pointset functionality is being
+            // developed. For now, the null return value is used in TravelTimeComputer to signal that the worker
+            // should use a provided freeform pointset, rather than creating a WebMercatorGridPointSet based on the
+            // parameters of the request.
             return null;
         }
 

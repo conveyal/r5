@@ -19,7 +19,7 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      * times from that origin. // TODO replace with list
      */
     public String destinationPointSetKey;
-    
+
     /**
      * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the
      * worker.
@@ -27,21 +27,31 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public transient PointSet destinationPointSet;
 
     /**
-     * Key for pointset (e.g. regionId/datasetId.pointset) to use as origins.
+     * Key for pointset (e.g. regionId/datasetId.pointset) from which to calculate travel times or accessibility
      */
     public String originPointSetKey;
 
     /**
-     * Is explicitly when freeform pointset supplied as origin; otherwise 0
+     * Whether to calculate travel time from each origin to one corresponding destination (the destination at the
+     * same position in the destionationPointSet). If false, travel time calculations will be many-to-many (between
+     * all origin points and all destination points).
      */
-    public int nTravelTimeTargetsPerOrigin;
+    public boolean oneToOne = false;
 
     /**
-     * Whether to calculate travel times from each origin to the one destination with matching id. If false, travel
-     * time results will be an array of travel times to all destinations. Not yet tested; implementation will also
-     * need to set this based on an incoming AnalysisRequest.
+     * Whether to record travel times between origins and destinations
      */
-    public boolean oneToOne;
+    public boolean recordTimes;
+
+    /**
+     * Whether to record cumulative opportunity accessibility indicators for each origin
+     */
+    public boolean recordAccessibility;
+
+    /**
+     * Is set explicitly when freeform pointset supplied as origin; otherwise 0
+     */
+    public int nTravelTimeTargetsPerOrigin;
 
     @Override
     public Type getType() {

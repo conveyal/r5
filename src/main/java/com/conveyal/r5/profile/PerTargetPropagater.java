@@ -161,18 +161,11 @@ public class PerTargetPropagater {
         int startTarget = 0;
         int endTarget = nTargets;
 
-        // One-to-one task assumes each origin in a freeform pointset corresponds to one destination (the point in the
-        // destination pointset with the same id)
+        // One-to-one task assumes each origin in a freeform pointset corresponds to the destination at the same
+        // position
         if (matchedTargets) {
-            String originId = ((RegionalTask) request).id;
-            if (originId != null) {
-                // NB task.taskId is integer index (set when Broker makes task for job); task.id is origin id in supplied
-                // freeform pointset
-                startTarget = ((FreeFormPointSet) linkedTargets.get(0).pointSet).getIndexForFeature(originId);
-                endTarget = startTarget + 1;
-            } else {
-                LOG.error("One-to-one travel time analysis requested, but no matched origin-destination pair found.");
-            }
+            startTarget = ((RegionalTask) request).taskId;
+            endTarget = startTarget + 1;
         }
 
         for (int targetIdx = startTarget; targetIdx < endTarget; targetIdx++) {

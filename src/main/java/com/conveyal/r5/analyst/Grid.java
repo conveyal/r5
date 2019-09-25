@@ -603,8 +603,8 @@ public class Grid extends PointSet {
                 }
 
                 grids.get(field).incrementPoint(lat, lon, val);
-                countGrid.incrementPoint(lat, lon, 1);
             }
+            countGrid.incrementPoint(lat, lon, 1);
         }
 
         reader.close();

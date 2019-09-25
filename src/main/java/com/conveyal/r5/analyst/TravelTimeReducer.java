@@ -184,7 +184,7 @@ public class TravelTimeReducer {
             } else if (accessibilityAccumulator.destinationPointSets[0] instanceof FreeFormPointSet) {
                 amount = 1; // FIXME configurable property (not just count)
             } else {
-                throw new UnsupportedOperationException("Unrecognized point set format");
+                throw new UnsupportedOperationException("Unrecognized pointset format for destination");
             }
 
             for (int p = 0; p < nPercentiles; p++) {

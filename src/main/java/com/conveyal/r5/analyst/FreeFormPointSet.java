@@ -261,6 +261,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     public void write (OutputStream outputStream) throws IOException {
         DataOutputStream out = new DataOutputStream(outputStream);
         // Header
+        // TODO add identifier / version for future sanity checking?
         out.writeUTF(description);
         out.writeUTF(label);
         out.writeInt(ids.length);

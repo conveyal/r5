@@ -28,14 +28,14 @@ public class TravelTimeReducer {
      * after results have been calculated) */
     private int maxTripDurationMinutes;
 
-    private boolean retainTravelTimes;
+    private boolean calculateAccessibility;
 
-    /** Reduced travel time results. May be null if we're only recording accessibility. */
-    private TravelTimeResult travelTimes = null;
+    private boolean calculateTravelTimes;
 
     private AccessibilityAccumulator accessibilityAccumulator = null;
 
-    private final boolean calculateAccessibility;
+    /** Reduced (e.g. at one percentile) travel time results. May be null if we're only recording accessibility. */
+    private TravelTimeResult travelTimes = null;
 
     private final int[] percentileIndexes;
 
@@ -77,8 +77,8 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
-        if (retainTravelTimes) {
+        calculateTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
+        if (calculateTravelTimes) {
             travelTimes = new TimeGrid(task);
         }
 
@@ -86,19 +86,13 @@ public class TravelTimeReducer {
         boolean calcAccessibility = false;
         if (task instanceof RegionalTask) {
             RegionalTask regionalTask = (RegionalTask) task;
-            if (regionalTask.originPointSetKey == null) {
-                // The user did not supply a freeform pointset key, so calculate accessibility using each cell from
-                // the grid extents in the analysis task as an origin
-                if (regionalTask.destinationPointSet != null) {
-                    // Destinations specified, calculate cumulative accessibility indicators to them
-                    calcAccessibility = true;
-                    accessibilityAccumulator = new AccessibilityAccumulator(task);
-                }
-            } else {
-                // Origins specified explicitly, calculate times for them
+            if (regionalTask.recordAccessibility) {
+                calcAccessibility = true;
+                accessibilityAccumulator = new AccessibilityAccumulator(task);
+            }
+            if (regionalTask.recordTimes) {
                 travelTimes = new TravelTimeResult(regionalTask);
-                retainTravelTimes = true;
-                // TODO options for calculating accessibility from freeform points
+                calculateTravelTimes = true;
             }
         }
         this.calculateAccessibility = calcAccessibility;
@@ -175,16 +169,24 @@ public class TravelTimeReducer {
             throw new ParameterException(percentileTravelTimesMinutes.length + " percentile values supplied; expected" +
                     " " + nPercentiles);
         }
-        if (retainTravelTimes) {
+        if (calculateTravelTimes) {
             travelTimes.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
             // needs to be made absolute to handle multiple different extents.
-            Grid grid = (Grid) accessibilityAccumulator.destinationPointSets[0]; // TODO handle freeform pointsets
-            int x = target % grid.width;
-            int y = target / grid.width;
-            double amount = grid.grid[x][y];
+            double amount;
+            if (accessibilityAccumulator.destinationPointSets[0] instanceof Grid) {
+                Grid grid = (Grid) accessibilityAccumulator.destinationPointSets[0];
+                int x = target % grid.width;
+                int y = target / grid.width;
+                amount = grid.grid[x][y];
+            } else if (accessibilityAccumulator.destinationPointSets[0] instanceof FreeFormPointSet) {
+                amount = 1; // FIXME configurable property (not just count)
+            } else {
+                throw new UnsupportedOperationException("Unrecognized point set format");
+            }
+
             for (int p = 0; p < nPercentiles; p++) {
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
                     accessibilityAccumulator.incrementAccessibility(0, 0, p, amount);

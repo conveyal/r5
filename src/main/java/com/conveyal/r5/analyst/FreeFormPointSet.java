@@ -69,7 +69,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /** A detailed textual description of this FreeFormPointSet */
     public String description;
 
-    public Map<String, int[]> properties = new HashMap<String, int[]>();
+    public Map<String, double[]> properties = new HashMap<String, double[]>();
 
     public int capacity = 0; // The total number of features this FreeFormPointSet holds.
 
@@ -93,12 +93,13 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     protected Polygon[] polygons; // TODO what do we do when there are no polygons?
 
     /**
-     * Rather than trying to load anything and everything, we stick to a strict format and rely on other tools to get
-     * the data into the correct format.
-     * This includes headers and coordinates in WGS84. Comment lines are allowed in these input files, and begin with
-     * a #.
+     * Create a FreeFormPointset from a csv file, which must have latitude and longitude columns with the values of
+     * latField and lonField in the header row. If idField is supplied, its column will be used to supply id values
+     * for the points; if not, row numbers will be used as the ids.
+     *
+     * Comment lines are allowed in these input files, and begin with a #.
      */
-    public static FreeFormPointSet fromCsv(File filename) throws IOException {
+    public static FreeFormPointSet fromCsv(File filename, String latField, String lonField, String idField) throws IOException {
         /* First, scan through the file to count lines and check for errors. */
         CsvReader reader = new CsvReader(filename.getAbsolutePath(), ',', Charset.forName("UTF8"));
         reader.readHeaders();
@@ -131,34 +132,31 @@ public class FreeFormPointSet extends PointSet implements Serializable {
 
         // An array of property magnitudes corresponding to each column in the input.
         // Some of these will remain null (specifically, the lat and lon columns which do not contain magnitudes)
-        int[][] properties = new int[nCols + 1][ret.capacity];
+        double[][] properties = new double[nCols + 1][ret.capacity];
         for (int c = 0; c < nCols; c++) {
             String header = reader.getHeader(c);
-            if (header.equalsIgnoreCase("lat") || header.equalsIgnoreCase("latitude")) {
+            if (header.equals(latField)) {
                 latCol = c;
-            } else if (header.equalsIgnoreCase("lon") || header.equalsIgnoreCase("longitude")) {
+            } else if (header.equalsIgnoreCase(lonField)) {
                 lonCol = c;
-            } else if (header.equalsIgnoreCase("Point") || header.equalsIgnoreCase("id")) {
+            } else if (header.equalsIgnoreCase(idField)) {
                 idCol = c;
             } else {
                 propertyNames[c] = header;
-                properties[c] = new int[ret.capacity];
+                properties[c] = new double[ret.capacity];
             }
         }
         if (latCol < 0 || lonCol < 0) {
             LOG.error("CSV file did not contain a latitude or longitude column.");
             throw new IOException();
         }
-        if (idCol < 0) {
-            LOG.error("CSV file did not contain an ID column.");
-            throw new IOException();
-        }
+
         ret.ids = new String[nRecs];
         ret.lats = new double[nRecs];
         ret.lons = new double[nRecs];
 
         propertyNames[nCols] = "Count";
-        properties[nCols] = new int[ret.capacity];
+        properties[nCols] = new double[ret.capacity];
 
         while (reader.readRecord()) {
             int rec = (int) reader.getCurrentRecord();
@@ -167,11 +165,12 @@ public class FreeFormPointSet extends PointSet implements Serializable {
                 if(c==latCol || c==lonCol || c == idCol){
                     continue;
                 }
-                int[] prop = properties[c];
-                int mag = Integer.parseInt(reader.get(c));
+                double[] prop = properties[c];
+                double mag = Double.parseDouble(reader.get(c));
                 prop[rec] = mag;
             }
-            ret.ids[rec] = reader.get(idCol);
+            // If ID column was found, use it; otherwise, use record number
+            ret.ids[rec] = idCol < 0 ? String.valueOf(rec) : reader.get(idCol);
             ret.lats[rec] = Double.parseDouble(reader.get(latCol));
             ret.lons[rec] = Double.parseDouble(reader.get(lonCol));
         }

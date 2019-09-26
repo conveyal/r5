@@ -433,7 +433,7 @@ public class AnalystWorker implements Runnable {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.
             // TODO eventually reuse same code path as static site time grid saving
-            oneOriginResult.travelTimes.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            ((TimeGrid) oneOriginResult.travelTimes).writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -503,7 +503,8 @@ public class AnalystWorker implements Runnable {
                 // non-default contents, as a way to save storage and bandwidth.
                 // TODO eventually carry out actions based on what's present in the result, not on the request type.
                 if (oneOriginResult.travelTimes.anyCellReached()) {
-                    PersistenceBuffer persistenceBuffer = oneOriginResult.travelTimes.writeToPersistenceBuffer();
+                    PersistenceBuffer persistenceBuffer =
+                            ((TimeGrid) oneOriginResult.travelTimes).writeToPersistenceBuffer();
                     String timesFileName = task.taskId + "_times.dat";
                     filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
                 } else {

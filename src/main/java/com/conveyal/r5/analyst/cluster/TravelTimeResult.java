@@ -66,19 +66,4 @@ public class TravelTimeResult {
         return Arrays.stream(values).anyMatch(vals -> Arrays.stream(vals).anyMatch(v -> v != FastRaptorWorker.UNREACHED));
     }
 
-    public void writeToDataOutput(DataOutput dataOutput) {
-
-    }
-
-    /**
-     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save
-     * it to a local or remote storage location.
-     */
-    public PersistenceBuffer writeToPersistenceBuffer() {
-        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
-        this.writeToDataOutput(persistenceBuffer.getDataOutput());
-        persistenceBuffer.doneWriting();
-        return persistenceBuffer;
-    }
-
 }

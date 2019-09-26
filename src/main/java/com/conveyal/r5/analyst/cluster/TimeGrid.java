@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -72,7 +73,6 @@ public class TimeGrid extends TravelTimeResult{
      * Write the grid to an object implementing the DataOutput interface.
      * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
      */
-    @Override
     public void writeToDataOutput(DataOutput dataOutput) {
         int sizeInBytes = nSamplesPerPoint * nPoints * Integer.BYTES + HEADER_SIZE;
         LOG.info("Writing travel time surface with uncompressed size {} kiB", sizeInBytes / 1024);
@@ -100,6 +100,17 @@ public class TimeGrid extends TravelTimeResult{
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save
+     * it to a local or remote storage location.
+     */
+    public PersistenceBuffer writeToPersistenceBuffer() {
+        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+        this.writeToDataOutput(persistenceBuffer.getDataOutput());
+        persistenceBuffer.doneWriting();
+        return persistenceBuffer;
     }
 
     /**

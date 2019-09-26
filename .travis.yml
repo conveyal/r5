@@ -15,7 +15,7 @@ install: true
 # Decrypt and import the artifact signing certificate before running the build
 before_install: |
   # only install signing keys under the same circumstances we do a mvn deploy later
-  if [[$TRAVIS_SECURE_ENV_VARS=true]]; then
+  if [[$TRAVIS_SECURE_ENV_VARS = true]]; then
     openssl aes-256-cbc -K $encrypted_e5d28768eb0e_key -iv $encrypted_e5d28768eb0e_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
     gpg --import --batch maven-artifact-signing-key.asc
   fi
@@ -29,7 +29,7 @@ before_script:
 # Run all Maven phases at once up through verify, install, and deploy.
 script: |
   # only (attempt to) deploy non-pull request commits to the master branch or to tags
-  if [[$TRAVIS_SECURE_ENV_VARS=true]]; then
+  if [[$TRAVIS_SECURE_ENV_VARS = true]]; then
     mvn clean deploy --settings maven-settings.xml
   else
     # Otherwise, just run all the way up to verify, the last phase before installing and deploying.

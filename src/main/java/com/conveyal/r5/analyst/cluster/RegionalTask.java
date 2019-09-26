@@ -13,12 +13,15 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public int x = -1, y = -1;
 
     /**
-     * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. If this is not blank, the default
-     * TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set
-     * to false; and the returned results will be an accessibility value per origin, rather than a grid of travel
-     * times from that origin. // TODO replace with list
+     * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. Still named grid (instead of
+     * destinationPointSetKey for backward compatibility, namely the ability to start regional jobs on old worker
+     * versions).
+     *
+     * If this is not blank, the default TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes,
+     * returnWaitTimes, and returnPaths will be set to false; and the returned results will be an accessibility value
+     * per origin, rather than a grid of travel times from that origin. // TODO replace with list
      */
-    public String destinationPointSetKey;
+    public String grid;
 
     /**
      * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the

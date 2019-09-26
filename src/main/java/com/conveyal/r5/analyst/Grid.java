@@ -507,12 +507,14 @@ public class Grid extends PointSet {
         });
     }
 
-    /** Create grids from a CSV file */
-    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom) throws IOException {
-        return fromCsv(csvFile, latField, lonField, zoom, null);
-    }
-
-    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException {
+    public static Map<String,Grid> fromCsv(File csvFile,
+                                           String latField,
+                                           String lonField,
+                                           String idField,
+                                           String latField1,
+                                           String lonField1,
+                                           int zoom,
+                                           BiConsumer<Integer, Integer> statusListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
         // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
@@ -537,6 +539,9 @@ public class Grid extends PointSet {
         Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
         numericColumns.remove(latField);
         numericColumns.remove(lonField);
+        if (idField != null) numericColumns.remove(idField);
+        if (latField1 != null) numericColumns.remove(latField1);
+        if (lonField1 != null) numericColumns.remove(lonField1);
 
         // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
         int total = 0;

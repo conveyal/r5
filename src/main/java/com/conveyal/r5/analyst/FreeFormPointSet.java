@@ -99,7 +99,12 @@ public class FreeFormPointSet extends PointSet implements Serializable {
      *
      * Comment lines are allowed in these input files, and begin with a #.
      */
-    public static FreeFormPointSet fromCsv(File filename, String latField, String lonField, String idField) throws IOException {
+    public static FreeFormPointSet fromCsv(File filename,
+                                           String latField,
+                                           String lonField,
+                                           String latField1,
+                                           String lonField1,
+                                           String idField) throws IOException {
         /* First, scan through the file to count lines and check for errors. */
         CsvReader reader = new CsvReader(filename.getAbsolutePath(), ',', Charset.forName("UTF8"));
         reader.readHeaders();
@@ -141,6 +146,8 @@ public class FreeFormPointSet extends PointSet implements Serializable {
                 lonCol = c;
             } else if (header.equalsIgnoreCase(idField)) {
                 idCol = c;
+            } else if (header.equalsIgnoreCase(latField1) || header.equalsIgnoreCase(lonField1)) {
+                // ignore secondary latitude/longitude columns
             } else {
                 propertyNames[c] = header;
                 properties[c] = new double[ret.capacity];

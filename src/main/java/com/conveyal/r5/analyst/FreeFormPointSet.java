@@ -42,11 +42,13 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * PointSets serve as groups of destinations or origins. They were a key resource in the legacy web analyst
@@ -60,6 +62,9 @@ public class FreeFormPointSet extends PointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FreeFormPointSet.class);
 
+    /** The file extension we use when persisting freeform pointsets to files. */
+    public static final String fileExtension = ".freeform";
+
     /** A server-unique identifier for this FreeFormPointSet */
     public String id;
 
@@ -69,7 +74,7 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     /** A detailed textual description of this FreeFormPointSet */
     public String description;
 
-    public Map<String, double[]> properties = new HashMap<String, double[]>();
+    public Map<String, double[]> properties = new HashMap<>();
 
     public int capacity = 0; // The total number of features this FreeFormPointSet holds.
 
@@ -93,18 +98,18 @@ public class FreeFormPointSet extends PointSet implements Serializable {
     protected Polygon[] polygons; // TODO what do we do when there are no polygons?
 
     /**
-     * Create a FreeFormPointset from a csv file, which must have latitude and longitude columns with the values of
+     * Create a FreeFormPointset from a CSV file, which must have latitude and longitude columns with the values of
      * latField and lonField in the header row. If idField is supplied, its column will be used to supply id values
      * for the points; if not, row numbers will be used as the ids.
-     *
-     * Comment lines are allowed in these input files, and begin with a #.
+     * Comment lines are allowed in these input files, and begin with a #. TODO verify that this is in fact true.
+     * @param ignoreFields
      */
     public static FreeFormPointSet fromCsv(File filename,
                                            String latField,
                                            String lonField,
-                                           String latField1,
-                                           String lonField1,
-                                           String idField) throws IOException {
+                                           String idField,
+                                           Collection<String> ignoreFields) throws IOException {
+
         /* First, scan through the file to count lines and check for errors. */
         CsvReader reader = new CsvReader(filename.getAbsolutePath(), ',', Charset.forName("UTF8"));
         reader.readHeaders();
@@ -132,29 +137,35 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         int latCol = -1;
         int lonCol = -1;
 
-        // Map columns to property names by position in this array. Extra column for "count"
+        // This array maps columns in the CSV to property names. Some columns we don't want to load will remain null.
+        // An extra column is added (called "count") to allow counting reachable points - it is filled with 1s.
         String[] propertyNames = new String[nCols + 1];
 
-        // An array of property magnitudes corresponding to each column in the input.
-        // Some of these will remain null (specifically, the lat and lon columns which do not contain magnitudes)
+        // An array of property magnitudes corresponding to each numeric column in the CSV input.
+        // Some of these will remain null (specifically, the lat and lon columns which do not contain magnitudes).
         double[][] properties = new double[nCols + 1][ret.capacity];
         for (int c = 0; c < nCols; c++) {
             String header = reader.getHeader(c);
+            if (ignoreFields != null) {
+                for (String field : ignoreFields) {
+                    if (header.equalsIgnoreCase(field)) {
+                        continue;
+                    }
+                }
+            }
             if (header.equals(latField)) {
                 latCol = c;
             } else if (header.equalsIgnoreCase(lonField)) {
                 lonCol = c;
             } else if (header.equalsIgnoreCase(idField)) {
                 idCol = c;
-            } else if (header.equalsIgnoreCase(latField1) || header.equalsIgnoreCase(lonField1)) {
-                // ignore secondary latitude/longitude columns
             } else {
                 propertyNames[c] = header;
                 properties[c] = new double[ret.capacity];
             }
         }
         if (latCol < 0 || lonCol < 0) {
-            LOG.error("CSV file did not contain a latitude or longitude column.");
+            LOG.error("CSV file did not contain the specified latitude or longitude column.");
             throw new IOException();
         }
 
@@ -162,14 +173,15 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         ret.lats = new double[nRecs];
         ret.lons = new double[nRecs];
 
+        // A virtual column of all 1s, to allow counting reachable points rather than summing their magnitudes.
         propertyNames[nCols] = "Count";
         properties[nCols] = new double[ret.capacity];
 
         while (reader.readRecord()) {
             int rec = (int) reader.getCurrentRecord();
-            properties[nCols][rec] = 1; // count column has value 1 for each record
+            properties[nCols][rec] = 1; // The count column has value 1 for every record.
             for (int c = 0; c < nCols; c++) {
-                if(c==latCol || c==lonCol || c == idCol){
+                if(c == latCol || c == lonCol || c == idCol){
                     continue;
                 }
                 double[] prop = properties[c];

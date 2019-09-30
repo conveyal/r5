@@ -25,12 +25,21 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 /**
  * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
  * accessibility analysis. Legacy Transport Analyst used freeform pointsets; early versions of Conveyal Analysis
- * instead favored regular grids in the web mercator projection.  This abstraction handles both.
+ * instead favored regular grids in the web mercator projection.  This abstraction encompasses both.
  */
 public abstract class PointSet {
 
+    /**
+     * It seems like fighting Java typing to store type codes in JSON.
+     * But at least by using some symbolic constants and Java identifiers things are well cross-referenced.
+     */
     public enum Format {
-        CSV, POINTSET, GRID, PNG, TIFF
+        FREEFORM (FreeFormPointSet.fileExtension),
+        GRID (Grid.fileExtension);
+        public final String fileExtension;
+        Format(String fileExtension) {
+            this.fileExtension = fileExtension;
+        }
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
@@ -144,10 +153,22 @@ public abstract class PointSet {
         }
     }
 
+    /**
+     * @return the latitude of point i in the PointSet. In the general case, all PointSets (even those on grids) are
+     *         treated as flattened one-dimensional arrays.
+     */
     public abstract double getLat(int i);
 
+    /**
+     * @return the longitude of point i in the PointSet. In the general case, all PointSets (even those on grids) are
+     *         treated as flattened one-dimensional arrays.
+     */
     public abstract double getLon(int i);
 
+    /**
+     * @return the total number of points in the PointSet. In the general case, all PointSets (even those on grids) are
+     *         treated as flattened one-dimensional arrays, so a gridded PointSet has points 1 through (width * height).
+     */
     public abstract int featureCount();
 
     /**

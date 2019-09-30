@@ -19,7 +19,7 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      *
      * If this is not blank, the default TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes,
      * returnWaitTimes, and returnPaths will be set to false; and the returned results will be an accessibility value
-     * per origin, rather than a grid of travel times from that origin. // TODO replace with list
+     * per origin, rather than a grid of travel times from that origin. // TODO revise and improve this explanation
      */
     public String grid;
 

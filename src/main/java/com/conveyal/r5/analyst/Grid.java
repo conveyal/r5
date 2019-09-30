@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.util.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
@@ -51,6 +52,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
@@ -79,6 +81,9 @@ import static org.apache.commons.math3.util.FastMath.tan;
 public class Grid extends PointSet {
 
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
+
+    /** The file extension we use when persisting gridded pointsets to files. */
+    public static final String fileExtension = ".grid";
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;
@@ -507,14 +512,16 @@ public class Grid extends PointSet {
         });
     }
 
+    /**
+     * @param ignoreFields if this is non-null, the fields with these names will not be considered when looking for
+     *                     numeric opportunity count fields. Null strings in the collection are ignored.
+     */
     public static Map<String,Grid> fromCsv(File csvFile,
                                            String latField,
                                            String lonField,
-                                           String idField,
-                                           String latField1,
-                                           String lonField1,
+                                           Collection<String> ignoreFields,
                                            int zoom,
-                                           BiConsumer<Integer, Integer> statusListener) throws IOException {
+                                           ProgressListener progressListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
         // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
@@ -535,15 +542,19 @@ public class Grid extends PointSet {
 
         Envelope envelope = new Envelope();
 
-        // Keep track of which fields contain numeric values
+        // A set to track fields that contain only numeric values, which are candidate opportunity density fields.
         Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
         numericColumns.remove(latField);
         numericColumns.remove(lonField);
-        if (idField != null) numericColumns.remove(idField);
-        if (latField1 != null) numericColumns.remove(latField1);
-        if (lonField1 != null) numericColumns.remove(lonField1);
+        if (ignoreFields != null) {
+            for (String fieldName : ignoreFields) {
+                if (fieldName != null) {
+                    numericColumns.remove(fieldName);
+                }
+            }
+        }
 
-        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
+        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields.
         int total = 0;
         while (reader.readRecord()) {
             if (++total % 10000 == 0) LOG.info("{} records", human(total));
@@ -566,7 +577,9 @@ public class Grid extends PointSet {
 
         reader.close();
 
-        if (statusListener != null) statusListener.accept(0, total);
+        if (progressListener != null) {
+            progressListener.setTotalItems(total);
+        }
 
         // We now have an envelope and know which columns are numeric
         // Make a grid for each numeric column
@@ -591,7 +604,9 @@ public class Grid extends PointSet {
                 LOG.info("{} records", human(i));
             }
 
-            if (statusListener != null) statusListener.accept(i, total);
+            if (progressListener != null) {
+                progressListener.setCompletedItems(i);
+            }
 
             double lat = parseDouble(reader.get(latField));
             double lon = parseDouble(reader.get(lonField));

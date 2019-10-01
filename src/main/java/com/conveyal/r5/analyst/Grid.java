@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
@@ -14,7 +15,6 @@ import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
-import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -45,13 +45,12 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,9 +60,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static java.lang.Double.parseDouble;
@@ -112,7 +108,7 @@ public class Grid extends PointSet {
     private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
 
     /** Maximum area allowed for features in a shapefile upload */
-    double MAX_FEATURE_AREA_SQ_DEG = 2;
+    private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
 
     /**
      * Used when reading a saved grid.
@@ -138,12 +134,11 @@ public class Grid extends PointSet {
     public Grid (int zoom, Envelope envelope) {
         this.zoom = zoom;
         this.north = latToPixel(envelope.getMaxY(), zoom);
-        /**
-         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
-         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
-         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
-         *
-         * So we add 1 to the height and width when a grid is created in this manner.
+        /*
+          The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
+          down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
+          the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
+          So we add 1 to the height and width when a grid is created in this manner.
          */
         this.height = (latToPixel(envelope.getMinY(), zoom) - this.north) + 1; // minimum height is 1
         this.west = lonToPixel(envelope.getMinX(), zoom);
@@ -252,11 +247,9 @@ public class Grid extends PointSet {
         incrementFromPixelWeights(getPixelWeights(geometry), value);
     }
 
-    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
-    public void incrementFromPixelWeights (List weights, double value) {
-        Iterator<PixelWeight> pixelWeightIterator = weights.iterator();
-        while(pixelWeightIterator.hasNext()) {
-            PixelWeight pix = pixelWeightIterator.next();
+    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid. */
+    public void incrementFromPixelWeights (List<PixelWeight> weights, double value) {
+        for (PixelWeight pix : weights) {
             grid[pix.x][pix.y] += pix.weight * value;
         }
     }
@@ -516,7 +509,7 @@ public class Grid extends PointSet {
      * @param ignoreFields if this is non-null, the fields with these names will not be considered when looking for
      *                     numeric opportunity count fields. Null strings in the collection are ignored.
      */
-    public static List<Grid> fromCsv(File csvFile,
+    public static List<Grid> fromCsv(InputStreamProvider csvInputStreamProvider,
                                      String latField,
                                      String lonField,
                                      Collection<String> ignoreFields,
@@ -524,18 +517,15 @@ public class Grid extends PointSet {
                                      ProgressListener progressListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
-        // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
-        // often add one anyway.
-        InputStream csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
-        CsvReader reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
+        CsvReader reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
         reader.readHeaders();
-        String[] headers = reader.getHeaders();
-        if (!Stream.of(headers).anyMatch(h -> h.equals(latField))) {
+        List<String> headers = Arrays.asList(reader.getHeaders());
+        if (!headers.contains(latField)) {
             LOG.info("Lat field not found!");
             throw new IOException("Latitude field not found in CSV.");
         }
 
-        if (!Stream.of(headers).anyMatch(h -> h.equals(lonField))) {
+        if (!headers.contains(lonField)) {
             LOG.info("Lon field not found!");
             throw new IOException("Longitude field not found in CSV.");
         }
@@ -543,7 +533,7 @@ public class Grid extends PointSet {
         Envelope envelope = new Envelope();
 
         // A set to track fields that contain only numeric values, which are candidate opportunity density fields.
-        Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
+        Set<String> numericColumns = new HashSet<>(headers);
         numericColumns.remove(latField);
         numericColumns.remove(lonField);
         if (ignoreFields != null) {
@@ -575,6 +565,7 @@ public class Grid extends PointSet {
             }
         }
 
+        // This will also close the InputStreams.
         reader.close();
 
         if (progressListener != null) {
@@ -582,23 +573,22 @@ public class Grid extends PointSet {
         }
 
         // We now have an envelope and know which columns are numeric. Make a grid for each numeric column.
-        List<Grid> grids = new ArrayList<>();
+        Map<String, Grid> grids = new HashMap<>();
         for (String columnName : numericColumns) {
             Grid grid = new Grid(zoom, envelope);
             grid.name = columnName;
-            grids.add(grid);
+            grids.put(grid.name, grid);
         }
 
         // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
-        // FIXME this will overwrite any column called "count" in the source file.
+        // FIXME this will overwrite any column called "Count" in the source file.
         Grid countGrid = new Grid(zoom, envelope);
         countGrid.name = "Count";
-        grids.add(countGrid);
+        grids.put(countGrid.name, countGrid);
 
         // The first read through the CSV just established its structure (e.g. which fields were numeric).
         // Now, re-read the CSV from the beginning to load the values and populate the grids.
-        csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
-        reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
+        reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
         reader.readHeaders();
 
         // FIXME this whole thing does not tolerate files with multiple columns having the same name. Detect or handle that case.
@@ -631,17 +621,20 @@ public class Grid extends PointSet {
             countGrid.incrementPoint(lat, lon, 1);
         }
 
+        // This will also close the InputStreams.
         reader.close();
 
-        return grids;
+        return new ArrayList<>(grids.values());
     }
 
     public static List<Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
         return fromShapefile(shapefile, zoom, null);
     }
 
-    public static List<Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
-        List<Grid> grids = new ArrayList<>();
+    public static List<Grid> fromShapefile (File shapefile, int zoom, ProgressListener progressListener)
+            throws IOException, FactoryException, TransformException {
+
+        Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
         // TODO looks like this calculates square km in web mercator, which is heavily distorted away from the equator.
@@ -655,7 +648,9 @@ public class Grid extends PointSet {
         Envelope envelope = reader.wgs84Bounds();
         int total = reader.getFeatureCount();
 
-        if (statusListener != null) statusListener.accept(0, total);
+        if (progressListener != null) {
+            progressListener.setTotalItems(total);
+        }
 
         AtomicInteger count = new AtomicInteger(0);
 
@@ -665,17 +660,19 @@ public class Grid extends PointSet {
             for (Property p : feat.getProperties()) {
                 Object val = p.getValue();
 
-                if (val == null || !Number.class.isInstance(val)) continue;
+                if (!(val instanceof Number)) continue;
                 double numericVal = ((Number) val).doubleValue();
                 if (numericVal == 0) continue;
 
                 String attributeName = p.getName().getLocalPart();
 
-                if (!grids.containsKey(attributeName)) {
-                    grids.put(attributeName, new Grid(zoom, envelope));
-                }
-
+                // TODO this is assuming that each attribute name can only exist once. Shapefiles can contain duplicate attribute names. Validate to catch this.
                 Grid grid = grids.get(attributeName);
+                if (grid == null) {
+                    grid = new Grid(zoom, envelope);
+                    grid.name = attributeName;
+                    grids.put(attributeName, grid);
+                }
 
                 if (geom instanceof Point) {
                     Point point = (Point) geom;
@@ -689,24 +686,23 @@ public class Grid extends PointSet {
             }
 
             int currentCount = count.incrementAndGet();
-
-            if (statusListener != null) statusListener.accept(currentCount, total);
-
+            if (progressListener != null) {
+                progressListener.setCompletedItems(currentCount);
+            }
             if (currentCount % 10000 == 0) {
                 LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });
-
         reader.close();
-        return grids;
+        return new ArrayList<>(grids.values());
     }
 
     @Override
     public double sumTotalOpportunities() {
         double totalOpportunities = 0;
-        for (int i = 0; i < this.grid.length; i++) {
-            for (int j = 0; j < this.grid[i].length; j++) {
-                totalOpportunities += this.grid[i][j];
+        for (double[] values : this.grid) {
+            for (double n : values) {
+                totalOpportunities += n;
             }
         }
         return totalOpportunities;

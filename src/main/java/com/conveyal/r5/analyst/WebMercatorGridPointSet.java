@@ -89,6 +89,11 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     @Override
+    public double sumTotalOpportunities () {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public double getLat(int i) {
         long y = i / this.width + this.north;
         return pixelToLat(y);

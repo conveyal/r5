@@ -516,12 +516,12 @@ public class Grid extends PointSet {
      * @param ignoreFields if this is non-null, the fields with these names will not be considered when looking for
      *                     numeric opportunity count fields. Null strings in the collection are ignored.
      */
-    public static Map<String,Grid> fromCsv(File csvFile,
-                                           String latField,
-                                           String lonField,
-                                           Collection<String> ignoreFields,
-                                           int zoom,
-                                           ProgressListener progressListener) throws IOException {
+    public static List<Grid> fromCsv(File csvFile,
+                                     String latField,
+                                     String lonField,
+                                     Collection<String> ignoreFields,
+                                     int zoom,
+                                     ProgressListener progressListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
         // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
@@ -581,16 +581,19 @@ public class Grid extends PointSet {
             progressListener.setTotalItems(total);
         }
 
-        // We now have an envelope and know which columns are numeric
-        // Make a grid for each numeric column
-        Map<String, Grid> grids = numericColumns.stream()
-                .collect(
-                        Collectors.toMap(
-                                c -> c,
-                                c -> new Grid(zoom, envelope)
-                        ));
+        // We now have an envelope and know which columns are numeric. Make a grid for each numeric column.
+        List<Grid> grids = new ArrayList<>();
+        for (String columnName : numericColumns) {
+            Grid grid = new Grid(zoom, envelope);
+            grid.name = columnName;
+            grids.add(grid);
+        }
 
+        // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
+        // FIXME this will overwrite any column called "count" in the source file.
         Grid countGrid = new Grid(zoom, envelope);
+        countGrid.name = "Count";
+        grids.add(countGrid);
 
         // The first read through the CSV just established its structure (e.g. which fields were numeric).
         // Now, re-read the CSV from the beginning to load the values and populate the grids.
@@ -598,6 +601,7 @@ public class Grid extends PointSet {
         reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
         reader.readHeaders();
 
+        // FIXME this whole thing does not tolerate files with multiple columns having the same name. Detect or handle that case.
         int i = 0;
         while (reader.readRecord()) {
             if (++i % 1000 == 0) {
@@ -629,17 +633,15 @@ public class Grid extends PointSet {
 
         reader.close();
 
-        grids.put("Count", countGrid);
-
         return grids;
     }
 
-    public static Map<String, Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
+    public static List<Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
         return fromShapefile(shapefile, zoom, null);
     }
 
-    public static Map<String, Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
-        Map<String, Grid> grids = new HashMap<>();
+    public static List<Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
+        List<Grid> grids = new ArrayList<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
         // TODO looks like this calculates square km in web mercator, which is heavily distorted away from the equator.
@@ -698,4 +700,16 @@ public class Grid extends PointSet {
         reader.close();
         return grids;
     }
+
+    @Override
+    public double sumTotalOpportunities() {
+        double totalOpportunities = 0;
+        for (int i = 0; i < this.grid.length; i++) {
+            for (int j = 0; j < this.grid[i].length; j++) {
+                totalOpportunities += this.grid[i][j];
+            }
+        }
+        return totalOpportunities;
+    }
+
 }

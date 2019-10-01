@@ -52,6 +52,9 @@ public abstract class PointSet {
      */
     public static int LINKAGE_CACHE_SIZE = 9;
 
+    /** Human readable name. Unfortunately this is lost when persisting Grids, to maintain backward compatibility. */
+    public transient String name;
+
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
      * later reuse. Different linkages are produced for different street networks and for different on-street modes
@@ -170,6 +173,11 @@ public abstract class PointSet {
      *         treated as flattened one-dimensional arrays, so a gridded PointSet has points 1 through (width * height).
      */
     public abstract int featureCount();
+
+    /**
+     * @return the sum of the opportunity counts at all points in this PointSet.
+     */
+    public abstract double sumTotalOpportunities();
 
     /**
      * Returns a new coordinate object for the feature at the given index in this set, or its centroid,

@@ -179,6 +179,8 @@ public class Grid {
      * false.
      *
      * This used to return a map from int arrays containing the coordinates to the weight.
+     *
+     * @param geometry The polygon to intersect with grid cells. Its coordinates must be in WGS84.
      */
     public List<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
@@ -194,7 +196,7 @@ public class Grid {
         }
 
         if (area > MAX_FEATURE_AREA_SQ_DEG) {
-            throw new IllegalArgumentException("Feature geometry is too large");
+            throw new IllegalArgumentException("Feature geometry is too large.");
         }
 
         PreparedGeometry preparedGeom = pgFact.create(geometry);
@@ -613,6 +615,7 @@ public class Grid {
         Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
+        // TODO looks like this calculates square km in web mercator, which is heavily distorted away from the equator.
         double boundingBoxAreaSqKm = reader.getAreaSqKm();
 
         if (boundingBoxAreaSqKm > MAX_BOUNDING_BOX_AREA_SQ_KM){

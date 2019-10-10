@@ -59,8 +59,22 @@ public class TravelTimeReducer {
     public TravelTimeReducer (AnalysisTask task) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = task.inRoutingFareCalculator == null ? task.getMonteCarloDrawsPerMinute
-                () * task.getTimeWindowLengthMinutes() : task.monteCarloDraws;
+
+        // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
+        if (task.inRoutingFareCalculator == null) {
+            if (task.monteCarloDraws > 0) {
+                // Use Monte Carlo draws within departure minutes
+                this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
+            } else {
+                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per destination (no
+                // variability)
+                this.timesPerDestination = 1;
+            }
+        } else {
+            // McRaptor router is slow, so sample at different departure minutes.
+            this.timesPerDestination = task.monteCarloDraws;
+        }
+
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.

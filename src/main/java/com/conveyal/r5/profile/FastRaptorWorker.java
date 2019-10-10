@@ -184,7 +184,8 @@ public class FastRaptorWorker {
 
         // Initialize result storage.
         // Results are one arrival time at each stop, for every raptor iteration.
-        int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes * monteCarloDrawsPerMinute][];
+        int nDraws = monteCarloDrawsPerMinute == 0 ? 1 : monteCarloDrawsPerMinute * nMinutes;
+        int[][] arrivalTimesAtStopsPerIteration = new int[nDraws][];
         if (retainPaths) pathsPerIteration = new ArrayList<>();
         int currentIteration = 0;
 
@@ -300,6 +301,10 @@ public class FastRaptorWorker {
      */
     private int[][] runRaptorForMinute (int departureTime, int iterationsPerMinute) {
         advanceScheduledSearchToPreviousMinute(departureTime);
+
+        // A monteCarloDrawsPerMinute value of 0 triggers the HALF_HEADWAY boarding assumption, which will lead one
+        // iteration per minute to be returned.
+        if (iterationsPerMinute == 0 ) iterationsPerMinute = 1;
 
         // Run a Raptor search for only the scheduled routes (not the frequency-based routes).
         // The initial round 0 holds the results of the street search: the travel times to transit stops from the origin

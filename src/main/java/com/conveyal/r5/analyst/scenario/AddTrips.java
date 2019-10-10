@@ -81,7 +81,7 @@ public class AddTrips extends Modification {
 
         // TODO lots more to fill in here, need to have a way to just specify all needed info in scenario editor.
         RouteInfo info = new RouteInfo();
-        info.route_short_name = "";
+        info.route_short_name = this.comment;
         info.route_long_name = this.comment;
         info.route_id = this.routeId;
         info.route_type = this.mode;

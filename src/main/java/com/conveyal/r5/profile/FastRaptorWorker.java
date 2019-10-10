@@ -329,7 +329,11 @@ public class FastRaptorWorker {
                 // total travel time. Each randomized schedule will improve on these travel times.
                 if (transit.hasFrequencies) {
                     long frequencyStartTime = System.nanoTime();
-                    doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], UPPER_BOUND);
+                    if (monteCarloDrawsPerMinute > 0) {
+                        doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], UPPER_BOUND);
+                    } else {
+                        doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], HALF_HEADWAY);
+                    }
                     timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
                 }
 
@@ -344,7 +348,7 @@ public class FastRaptorWorker {
         // and the worst-case boarding time of all frequency routes as an upper bound on the frequency search, so we are
         // copying the arrival times from the just completed search. This is our key innovation, described in
         // Conway, Byrd, and van der Linden 2017.
-        if (transit.hasFrequencies) {
+        if (transit.hasFrequencies && monteCarloDrawsPerMinute > 0) {
             long startTime = System.nanoTime();
             int[][] result = new int[iterationsPerMinute][];
             // Each iteration is a fresh Monte Carlo draw (randomization of frequency route offsets).

@@ -53,6 +53,8 @@ public class AddTrips extends Modification {
     /** unique ID for transitive */
     private String routeId = UUID.randomUUID().toString();
 
+    public String color = "4444FF";
+
     private int routeIndex;
 
     @Override
@@ -85,7 +87,7 @@ public class AddTrips extends Modification {
         info.route_long_name = this.comment;
         info.route_id = this.routeId;
         info.route_type = this.mode;
-        info.color = "4444FF";
+        info.color = this.color;
         this.routeIndex = transitLayer.routes.size();
         // No protective copy is made here because TransportNetwork.scenarioCopy already deep-copies certain collections.
         transitLayer.routes.add(info);

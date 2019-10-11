@@ -66,9 +66,9 @@ public class TravelTimeReducer {
                 // Use Monte Carlo draws within departure minutes
                 this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
             } else {
-                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per destination (no
-                // variability)
-                this.timesPerDestination = 1;
+                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure
+                // minute per destination
+                this.timesPerDestination = task.getTimeWindowLengthMinutes();
             }
         } else {
             // McRaptor router is slow, so sample at different departure minutes.

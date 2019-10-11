@@ -739,7 +739,7 @@ public class FastRaptorWorker {
             return -1;
         }
 
-        int boardTime = schedule.startTimes[frequencyEntryIdx] + travelTimeFromStartOfTrip + halfHeadway;
+        int boardTime = earliestTime + halfHeadway;
         return boardTime;
     }
 

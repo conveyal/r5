@@ -17,28 +17,6 @@
         </license>
     </licenses>
 
-    <!-- Developer entries are provided for primary developers.
-   For other contributors, see https://github.com/conveyal/r5/graphs/contributors -->
-    <developers>
-        <developer>
-            <name>Matt Conway</name>
-            <email>mconway@conveyal.com</email>
-            <organization>Conveyal</organization>
-            <organizationUrl>http://conveyal.com/</organizationUrl>
-        </developer>
-        <developer>
-            <name>Andrew Byrd</name>
-            <email>abyrd@conveyal.com</email>
-            <organization>Conveyal</organization>
-            <organizationUrl>http://conveyal.com/</organizationUrl>
-        </developer>
-        <developer>
-            <name>Marko Burjek</name>
-            <email></email>
-            <organization>Kodanta</organization>
-        </developer>
-    </developers>
-
     <!-- Define where the source code for this project lives -->
     <scm>
         <connection>scm:git:https://github.com/conveyal/r5.git</connection>
@@ -48,7 +26,7 @@
 
     <!-- Define some variables to be used elsewhere in the build. -->
     <properties>
-        <geotools.version>14.0</geotools.version>
+        <geotools.version>21.2</geotools.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -63,7 +41,6 @@
     </distributionManagement>
 
     <build>
-
         <resources>
             <resource>
                 <!-- Filtering means Maven will substitute some variables into files in the resources directory before
@@ -79,17 +56,28 @@
                 </includes>
             </resource>
         </resources>
-
         <plugins>
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.3</version>
+                <version>3.8.1</version>
                 <configuration>
-                    <!-- use Java 8 -->
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <release>11</release>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.1.2</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!-- For Java 11 Modules, specify a module name. Do not create module-info.java until all
+                                 our dependencies specify a module name. -->
+                            <Automatic-Module-Name>com.conveyal.r5</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
 
@@ -118,9 +106,35 @@
             </plugin>
 
             <plugin>
+                <!-- Plugin for running unit tests -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.19.1</version>
+                <configuration>
+                    <!-- we have to fork the JVM during tests so that the argLine is passed along -->
+                    <forkCount>3</forkCount>
+                    <!-- enable the restricted reflection under Java 11 so that the ObjectDiffer works -->
+                    <argLine>
+                        -Xmx2G
+                        -Dfile.encoding=UTF-8
+                        --illegal-access=permit
+                        --add-opens java.base/java.lang.module=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.reflect=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.misc=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.loader=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.ref=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.util=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.util.jar=ALL-UNNAMED
+                        --add-opens java.base/jdk.internal.module=ALL-UNNAMED
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                    </argLine>
+                </configuration>
+            </plugin>
+
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>2.2</version>
+                <version>3.2.1</version>
                 <!-- Create a version of the JAR that includes all dependencies.
                      We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
                 <executions>
@@ -189,10 +203,10 @@
                 <!-- Allow attaching Javadoc during releases -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.4</version>
+                <version>3.1.1</version>
                 <configuration>
                     <!-- Turn off Java 8 strict Javadoc checking -->
-                    <additionalparam>-Xdoclint:none</additionalparam>
+                    <doclint>none</doclint>
                     <tags>
                         <tag>
                             <name>notnull</name>
@@ -207,7 +221,8 @@
                     </tags>
                 </configuration>
                 <executions>
-                    <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
+                    <!-- Compress Javadoc into JAR and include that JAR when deploying.
+                         This is required for deployments to Maven Central. -->
                     <execution>
                         <id>attach-javadocs</id>
                         <goals>
@@ -218,9 +233,10 @@
             </plugin>
 
             <plugin>
-                <!-- Include zipped source code in releases -->
+                <!-- Include zipped source code in releases. -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
+                <version>3.1.0</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -293,14 +309,6 @@
             <artifactId>jackson-core</artifactId>
             <version>2.6.1</version>
         </dependency>
-        <!-- JTS does 2D geometry and topology. Recently moved from vividsolutions to locationtech.
-          We could update R5 to use the new locationtech class names and its built-in GeoJSON support.
-          However, Geotools still depends on vividsolution JTS so this might be complicated. -->
-        <dependency>
-            <groupId>com.vividsolutions</groupId>
-            <artifactId>jts</artifactId>
-            <version>1.13</version>
-        </dependency>
         <dependency>
             <groupId>de.grundid.opendatalab</groupId>
             <artifactId>geojson-jackson</artifactId>
@@ -312,31 +320,6 @@
             <version>2.0</version>
         </dependency>
         <!-- GeoTools is a free software GIS toolkit. -->
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-opengis</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-api</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-shapefile</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-epsg-hsql</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-referencing</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
         <dependency>
             <groupId>org.geotools</groupId>
             <artifactId>gt-coverage</artifactId>
@@ -352,6 +335,32 @@
             <artifactId>gt-geotiff</artifactId>
             <version>${geotools.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-epsg-hsql</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-main</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-opengis</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-referencing</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-shapefile</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-math3</artifactId>
@@ -400,7 +409,7 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>kryo-tools</artifactId>
-            <version>1.2.0</version>
+            <version>1.3.0</version>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>
@@ -427,6 +436,11 @@
             <groupId>com.axiomalaska</groupId>
             <artifactId>polyline-encoder</artifactId>
             <version>0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.3.1</version>
         </dependency>
     </dependencies>
 </project>

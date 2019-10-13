@@ -1,17 +1,11 @@
 package com.conveyal.r5.common;
 
-import com.conveyal.r5.analyst.error.UnsupportedGeometryException;
 import com.conveyal.r5.streets.VertexStore;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.LineSegment;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.LinearRing;
-import com.vividsolutions.jts.geom.Polygon;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineSegment;
 import org.apache.commons.math3.util.FastMath;
-import org.geojson.GeoJsonObject;
 import org.geojson.LngLatAlt;
 
 import java.util.List;

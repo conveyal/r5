@@ -5,22 +5,25 @@ import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.measure.converter.UnitConverter;
+import javax.measure.UnitConverter;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static javax.measure.unit.NonSI.KILOMETERS_PER_HOUR;
-import static javax.measure.unit.NonSI.KNOT;
-import static javax.measure.unit.NonSI.MILES_PER_HOUR;
-import static javax.measure.unit.SI.METERS_PER_SECOND;
+import static tec.uom.se.unit.Units.METRE_PER_SECOND;
+import static tec.uom.se.unit.Units.KILOMETRE_PER_HOUR;
+import static systems.uom.common.USCustomary.KNOT;
+import static systems.uom.common.USCustomary.MILE_PER_HOUR;
 
 /**
  * Gets information about max speeds based on highway tags from build-config
  * And for each way reads maxspeed tags and returns max speeds.
  * If maxspeed isn't specified then uses highway tags. Otherwise returns default max speed.
+ *
+ * NOTE this seems to be using the 1.0 version of the measure API, which is transitively imported by Geotools.
+ * This library has since moved to a version 2.0, whose reference implementation seems to be tec.units:unit-ri
  */
 public class SpeedLabeler {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedLabeler.class);
@@ -37,13 +40,13 @@ public class SpeedLabeler {
         //TODO: move this to SpeedConfig?
         switch (speedConfig.units) {
         case KMH:
-            unitConverter = KILOMETERS_PER_HOUR.getConverterTo(METERS_PER_SECOND);
+            unitConverter = KILOMETRE_PER_HOUR.getConverterTo(METRE_PER_SECOND);
             break;
         case MPH:
-            unitConverter = MILES_PER_HOUR.getConverterTo(METERS_PER_SECOND);
+            unitConverter = MILE_PER_HOUR.getConverterTo(METRE_PER_SECOND);
             break;
         case KNOTS:
-            unitConverter = KNOT.getConverterTo(METERS_PER_SECOND);
+            unitConverter = KNOT.getConverterTo(METRE_PER_SECOND);
             break;
         }
         highwaySpeedMap = new HashMap<>(speedConfig.values.size());

@@ -1,9 +1,9 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.common.DirectionUtils;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.io.ParseException;
-import com.vividsolutions.jts.io.WKTReader;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
 import org.junit.Assert;
 import org.junit.runner.RunWith;
 import org.junit.BeforeClass;

@@ -2,12 +2,12 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.common.DirectionUtils;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 
 import java.util.*;
 
@@ -54,7 +54,7 @@ public class StreetSegment {
         duration = path.getDuration();
         distance = path.getDistance();
         streetEdges = new LinkedList<>();
-        List<com.vividsolutions.jts.geom.Coordinate> coordinates = new LinkedList<>();
+        List<org.locationtech.jts.geom.Coordinate> coordinates = new LinkedList<>();
 
         for (Integer edgeIdx : path.getEdges()) {
             EdgeStore.Edge edge = path.getEdge(edgeIdx);

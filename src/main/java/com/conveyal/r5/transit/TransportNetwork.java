@@ -14,7 +14,7 @@ import com.google.common.hash.Hashing;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import com.conveyal.r5.streets.StreetLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

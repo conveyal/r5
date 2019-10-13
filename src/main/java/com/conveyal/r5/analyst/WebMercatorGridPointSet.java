@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;

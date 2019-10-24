@@ -6,12 +6,15 @@ import com.amazonaws.event.ProgressListener;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.TransferProgress;
 import com.amazonaws.services.s3.transfer.Upload;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.InputStream;
 
 import static com.conveyal.r5.common.Util.human;
 
@@ -34,23 +37,32 @@ public class S3FilePersistence extends FilePersistence {
 
     public static final Logger LOG = LoggerFactory.getLogger(S3FilePersistence.class);
 
+    /**
+     * The common prefix of all accessed buckets.
+     * Example: if baseBucket is "analysis-staging", files of type POLYGON will be in bucket "analysis-staging-polygons".
+     * NOTE: For now this only applies to reading files using S3FilePersistence, not writing them.
+     * TODO if this works well, extend to all other bucket names and file loading / saving.
+     */
+    private final String baseBucket;
+
     /** Manage transfers to S3 in the background, so we can continue calculating while uploading. */
-    private TransferManager transferManager;
+    private final TransferManager transferManager;
 
     // Low-level client, for now we're trying the high-level TransferManager TODO maybe use this so we don't have to shut down the transferManager
-    private AmazonS3 amazonS3;
+    private final AmazonS3 amazonS3;
 
-    public S3FilePersistence (String region) {
+    public S3FilePersistence (String region, String baseBucket) {
 
-        amazonS3 = AmazonS3ClientBuilder.standard()
+        this.amazonS3 = AmazonS3ClientBuilder.standard()
                 // .enableAccelerateMode() // this fails looking up s3-accelerate.amazonaws.com
                 .withRegion(region)
                 .build();
 
-        transferManager = TransferManagerBuilder.standard()
+        this.transferManager = TransferManagerBuilder.standard()
                 .withS3Client(amazonS3)
                 .build();
 
+        this.baseBucket = baseBucket;
     }
 
     @Override
@@ -73,12 +85,29 @@ public class S3FilePersistence extends FilePersistence {
         }
     }
 
+    @Override
+    public InputStream getData(FileCategory category, String name) {
+        String fullBucketName = getFullBucketName(category);
+        LOG.info("Fetching {} with name {} from S3 bucket {}.", category, name, fullBucketName);
+        S3Object s3Object = amazonS3.getObject(fullBucketName, name);
+        // TODO progress reporting, cacheing in local file using getObject(GetObjectRequest getObjectRequest, File destinationFile) or TransferManager.download()
+        InputStream inputStream = s3Object.getObjectContent();
+        return inputStream;
+    }
+
+    /**
+     * Example: for baseBucket "analysis-staging" and file type POLYGON, returns "analysis-staging-polygons".
+     */
+    private String getFullBucketName (FileCategory category) {
+        return baseBucket + "-" + category.name().toLowerCase() + "s";
+    }
 
     @Override
     public void shutdown() {
         transferManager.shutdownNow();
     }
 
+    // TODO wire this up to our r5/analysis progress and task system
     private static class UploadProgressLogger implements ProgressListener {
 
         private static final int LOG_INTERVAL_SECONDS = 5;

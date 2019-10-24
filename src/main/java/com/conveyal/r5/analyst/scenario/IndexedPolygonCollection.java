@@ -1,8 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.conveyal.r5.analyst.FileCategory;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygonal;
@@ -33,8 +32,6 @@ import java.util.zip.GZIPInputStream;
 public class IndexedPolygonCollection {
 
     private static final Logger LOG = LoggerFactory.getLogger(IndexedPolygonCollection.class);
-
-    private static final String POLYGON_BUCKET = "analysis-staging-polygons";
 
     /** The identifier of the polygon layer containing the speed data. */
     public final String polygonLayer;
@@ -90,9 +87,7 @@ public class IndexedPolygonCollection {
     }
 
     public void loadFromS3GeoJson() throws Exception {
-        LOG.info("Fetching polygon layer '{}' from S3 bucket '{}'...", polygonLayer, POLYGON_BUCKET);
-        AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(Regions.EU_WEST_1).build();
-        InputStream s3InputStream = s3.getObject(POLYGON_BUCKET, polygonLayer).getObjectContent();
+        InputStream s3InputStream = AnalystWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
         // To test on local files:
         //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
         if (polygonLayer.endsWith(".gz")) {

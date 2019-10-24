@@ -1,8 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.conveyal.r5.analyst.FileCategory;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -74,8 +73,6 @@ public class RoadCongestion extends Modification {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoadCongestion.class);
 
-    private static final String POLYGON_BUCKET = "analysis-staging-polygons";
-
     // Public Parameters deserialized from JSON
 
     /** The identifier of the polygon layer containing the speed data. */
@@ -112,11 +109,10 @@ public class RoadCongestion extends Modification {
         // this.features = polygonLayerCache.getPolygonFeatureCollection(this.polygonLayer);
         // Note: Newer JTS now has GeoJsonReader
         try {
-            LOG.info("Fetching polygon layer from S3...");
-            AmazonS3 s3 = AmazonS3ClientBuilder.standard().withRegion(Regions.EU_WEST_1).build();
-            InputStream s3InputStream = s3.getObject(POLYGON_BUCKET, polygonLayer).getObjectContent();
+            InputStream s3InputStream = AnalystWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
             // To test on local files:
             //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
+            // TODO handle gzip decompression in FilePersistence base class.
             if (polygonLayer.endsWith(".gz")) {
                 s3InputStream = new GZIPInputStream(s3InputStream);
             }

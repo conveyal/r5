@@ -384,6 +384,7 @@ public class FastRaptorWorker {
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
                     doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], mode);
+
                     timeInFrequencySearchFrequency += System.nanoTime() - frequencyStart;
 
                     long transferStart = System.nanoTime();
@@ -738,6 +739,7 @@ public class FastRaptorWorker {
         }
 
         int boardTime = earliestTime + halfHeadway;
+
         return boardTime;
     }
 

@@ -61,18 +61,18 @@ public class TravelTimeReducer {
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
-        if (task.inRoutingFareCalculator == null) {
-            if (task.monteCarloDraws > 0) {
-                // Use Monte Carlo draws within departure minutes
-                this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
-            } else {
-                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure
-                // minute per destination
-                this.timesPerDestination = task.getTimeWindowLengthMinutes();
-            }
-        } else {
-            // McRaptor router is slow, so sample at different departure minutes.
+        if (task.inRoutingFareCalculator != null) {
+            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different departure
+            // times (rather than sampling multiple draws per minute).
             this.timesPerDestination = task.monteCarloDraws;
+        } else {
+            if (task.monteCarloDraws == 0) {
+                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure minute per
+                // destination.
+                this.timesPerDestination = task.getTimeWindowLengthMinutes();
+            } else {
+                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+            }
         }
 
         this.nPercentiles = task.percentiles.length;

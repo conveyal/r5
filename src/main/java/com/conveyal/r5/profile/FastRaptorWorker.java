@@ -381,11 +381,13 @@ public class FastRaptorWorker {
                     long frequencyStart = System.nanoTime();
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
+
                     if (monteCarloDrawsPerMinute > 0) {
                         doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], MONTE_CARLO);
                     } else {
                         doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], HALF_HEADWAY);
                     }
+
                     timeInFrequencySearchFrequency += System.nanoTime() - frequencyStart;
 
                     long transferStart = System.nanoTime();
@@ -740,6 +742,7 @@ public class FastRaptorWorker {
         }
 
         int boardTime = earliestTime + halfHeadway;
+
         return boardTime;
     }
 

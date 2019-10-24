@@ -82,13 +82,13 @@ public class FastRaptorWorker {
     /** The width of the departure time window in minutes. */
     public final int nMinutes;
 
-    /** The number of different randomized schedules to create at each departure minute for frequency-based routes.
-     *
+    /**
+     * The number of different randomized schedules to create at each departure minute for frequency-based routes.
      * When frequency routes (non-scheduled routes) are present, we perform multiple searches per departure minute
      * using different randomly-offset schedules (a Monte Carlo exploration of all possible schedules). This field
      * controls how many such randomly offset schedules are generated. A value of 0 is a special case that triggers
      * the HALF_HEADWAY boarding assumption, which will lead one iteration per minute to be returned.
-     * */
+     */
     public final int monteCarloDrawsPerMinute;
 
     // Variables to track calculation time spent, all in nanoseconds (some of the operations we're timing are
@@ -146,6 +146,12 @@ public class FastRaptorWorker {
      */
     private final RaptorState[] scheduleState;
 
+    /**
+     * This should be either HALF_HEADWAY or MONTE_CARLO.
+     * The othe value UPPER_BOUND is only used within a sub-search of MONTE_CARLO.
+     */
+    private final FrequencyBoardingMode boardingMode;
+
     /** Set to true to save path details for all optimal paths. */
     public boolean retainPaths = false;
 
@@ -164,7 +170,9 @@ public class FastRaptorWorker {
                             request.maxTripDurationMinutes * SECONDS_PER_MINUTE))
                 .toArray(RaptorState[]::new);
 
-        for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
+        for (int i = 1; i < this.scheduleState.length; i++) {
+            this.scheduleState[i].previous = this.scheduleState[i - 1];
+        }
 
         offsets = new FrequencyRandomOffsets(transitLayer);
 
@@ -173,6 +181,9 @@ public class FastRaptorWorker {
 
         // how many monte carlo draws per minute of scheduled search to get desired total iterations?
         monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
+
+        // Zero Monte Carlo draws means use half-headway instead of Monte Carlo randomization.
+        boardingMode = (monteCarloDrawsPerMinute == 0) ? HALF_HEADWAY : MONTE_CARLO;
     }
 
     /**
@@ -185,12 +196,18 @@ public class FastRaptorWorker {
 
         startClockTime = System.nanoTime();
         prefilterPatterns();
-        LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
-                nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
         // Initialize result storage.
         // Results are one arrival time at each stop, for every raptor iteration.
-        int nIterations = monteCarloDrawsPerMinute == 0 ? nMinutes : monteCarloDrawsPerMinute * nMinutes;
+        int nIterations;
+        if (boardingMode == HALF_HEADWAY) {
+            nIterations = nMinutes;
+            LOG.info("Performing {} scheduled iterations using half-headway for frequency routes.");
+        } else {
+            nIterations = monteCarloDrawsPerMinute * nMinutes;
+            LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations.",
+                    nMinutes, monteCarloDrawsPerMinute, nIterations);
+        }
         int[][] arrivalTimesAtStopsPerIteration = new int[nIterations][];
         if (retainPaths) pathsPerIteration = new ArrayList<>();
         int currentIteration = 0;
@@ -304,9 +321,7 @@ public class FastRaptorWorker {
     private int[][] runRaptorForMinute (int departureTime) {
         advanceScheduledSearchToPreviousMinute(departureTime);
 
-        FrequencyBoardingMode mode = monteCarloDrawsPerMinute > 0 ? MONTE_CARLO : HALF_HEADWAY;
-
-        int iterationsPerMinute = mode == MONTE_CARLO ? monteCarloDrawsPerMinute : 1;
+        int iterationsPerMinute = (boardingMode == MONTE_CARLO) ? monteCarloDrawsPerMinute : 1;
 
         // Run a Raptor search for only the scheduled routes (not the frequency-based routes).
         // The initial round 0 holds the results of the street search: the travel times to transit stops from the origin
@@ -334,7 +349,9 @@ public class FastRaptorWorker {
                 // If there are frequency routes, we will be randomizing the offsets of those routes.
                 // First perform a frequency search using worst-case boarding time to provide a tighter upper bound on
                 // total travel time. Each randomized schedule will improve on these travel times.
-                if (transit.hasFrequencies) {
+                // This is only helpful for Monte Carlo, not half-headway. Even in Monte Carlo mode,
+                // perhaps we should only do it when iterationsPerMinute is high (2 or more?).
+                if (transit.hasFrequencies && boardingMode == MONTE_CARLO) {
                     long frequencyStartTime = System.nanoTime();
                     doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], UPPER_BOUND);
                     timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
@@ -355,6 +372,7 @@ public class FastRaptorWorker {
             long startTime = System.nanoTime();
             int[][] result = new int[iterationsPerMinute][];
             // Each iteration is a fresh Monte Carlo draw (randomization of frequency route offsets).
+            // In half-headway mode, only one iteration will happen with no randomization.
             for (int iteration = 0; iteration < iterationsPerMinute; iteration++) {
                 // At each iteration, we make a copy of the upper bound state.
                 RaptorState[] frequencyState = Stream.of(scheduleState).map((s) -> s.copy()).toArray(RaptorState[]::new);
@@ -362,7 +380,7 @@ public class FastRaptorWorker {
                     frequencyState[i].previous = frequencyState[i - 1];
                 }
 
-                if (mode == MONTE_CARLO) {
+                if (boardingMode == MONTE_CARLO) {
                     // Take a new Monte Carlo draw if requested (i.e. if boarding assumption is not half-headway): for
                     // each frequency-based route, choose how long after service starts the first vehicle leaves (the
                     // route's "phase"). We run all Raptor rounds with one draw before proceeding to the next draw.
@@ -383,7 +401,7 @@ public class FastRaptorWorker {
                     long frequencyStart = System.nanoTime();
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
-                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], mode);
+                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], boardingMode);
 
                     timeInFrequencySearchFrequency += System.nanoTime() - frequencyStart;
 
@@ -732,7 +750,7 @@ public class FastRaptorWorker {
         // Not strictly correct, should be revised: the last vehicle could leave the terminal as early as headwaySeconds
         // before the end of the frequency entry. We might want to take the minimum or average of waiting for the
         // current entry, and waiting for the next entry. We need to exclude entries that have ended, but not entries
-        // that have not yet started (because you can wait for them to start).
+        // that have not yet started (because you can wait for them to start). See issue #122
         int frequencyEndsAtThisStop = schedule.endTimes[frequencyEntryIdx] + travelTimeFromStartOfTrip;
         if (frequencyEndsAtThisStop < earliestTime) {
             return -1;

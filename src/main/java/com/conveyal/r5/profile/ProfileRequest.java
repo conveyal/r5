@@ -148,7 +148,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * The maximum duration of any trip found by this search.
      */
-    public int maxTripDurationMinutes = 2 * 60;
+    public final int maxTripDurationMinutes = 2 * 60;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.

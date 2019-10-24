@@ -202,7 +202,7 @@ public class FastRaptorWorker {
         int nIterations;
         if (boardingMode == HALF_HEADWAY) {
             nIterations = nMinutes;
-            LOG.info("Performing {} scheduled iterations using half-headway for frequency routes.");
+            LOG.info("Performing {} scheduled iterations using half-headway for frequency routes.", nMinutes);
         } else {
             nIterations = monteCarloDrawsPerMinute * nMinutes;
             LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations.",

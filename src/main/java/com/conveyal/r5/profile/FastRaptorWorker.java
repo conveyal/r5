@@ -82,7 +82,13 @@ public class FastRaptorWorker {
     /** The width of the departure time window in minutes. */
     public final int nMinutes;
 
-    /** The number of different randomized schedules to create at each departure minute for frequency-based routes. */
+    /** The number of different randomized schedules to create at each departure minute for frequency-based routes.
+     *
+     * When frequency routes (non-scheduled routes) are present, we perform multiple searches per departure minute
+     * using different randomly-offset schedules (a Monte Carlo exploration of all possible schedules). This field
+     * controls how many such randomly offset schedules are generated. A value of 0 is a special case that triggers
+     * the HALF_HEADWAY boarding assumption, which will lead one iteration per minute to be returned.
+     * */
     public final int monteCarloDrawsPerMinute;
 
     // Variables to track calculation time spent, all in nanoseconds (some of the operations we're timing are
@@ -184,7 +190,8 @@ public class FastRaptorWorker {
 
         // Initialize result storage.
         // Results are one arrival time at each stop, for every raptor iteration.
-        int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes * monteCarloDrawsPerMinute][];
+        int nIterations = monteCarloDrawsPerMinute == 0 ? nMinutes : monteCarloDrawsPerMinute * nMinutes;
+        int[][] arrivalTimesAtStopsPerIteration = new int[nIterations][];
         if (retainPaths) pathsPerIteration = new ArrayList<>();
         int currentIteration = 0;
 
@@ -197,7 +204,7 @@ public class FastRaptorWorker {
 
             // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
             // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
-            int[][] resultsForMinute = runRaptorForMinute(departureTime, monteCarloDrawsPerMinute);
+            int[][] resultsForMinute = runRaptorForMinute(departureTime);
 
             // Bypass Java's "effectively final" nonsense.
             // FIXME we could avoid this "final" weirdness by just using non-stream explicit loop syntax over the stops.
@@ -291,15 +298,15 @@ public class FastRaptorWorker {
      * window toward its beginning, and reusing state between searches as an optimization.
      *
      * @param departureTime       When this search departs.
-     * @param iterationsPerMinute When frequency routes (non-scheduled routes) are present, we perform multiple searches
-     *                            per departure minute using different randomly-offset schedules (a Monte Carlo
-     *                            exploration of all possible schedules). This parameter controls how many such randomly
-     *                            offset schedules are generated.
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each
      * iteration.
      */
-    private int[][] runRaptorForMinute (int departureTime, int iterationsPerMinute) {
+    private int[][] runRaptorForMinute (int departureTime) {
         advanceScheduledSearchToPreviousMinute(departureTime);
+
+        FrequencyBoardingMode mode = monteCarloDrawsPerMinute > 0 ? MONTE_CARLO : HALF_HEADWAY;
+
+        int iterationsPerMinute = mode == MONTE_CARLO ? monteCarloDrawsPerMinute : 1;
 
         // Run a Raptor search for only the scheduled routes (not the frequency-based routes).
         // The initial round 0 holds the results of the street search: the travel times to transit stops from the origin
@@ -354,10 +361,14 @@ public class FastRaptorWorker {
                 for (int i = 1; i < frequencyState.length; i++) {
                     frequencyState[i].previous = frequencyState[i - 1];
                 }
-                // Take a new Monte Carlo draw: for each frequency-based route, choose how long after service starts the
-                // first vehicle leaves (the route's "phase"). We run all Raptor rounds with one draw before proceeding
-                // to the next draw.
-                offsets.randomize();
+
+                if (mode == MONTE_CARLO) {
+                    // Take a new Monte Carlo draw if requested (i.e. if boarding assumption is not half-headway): for
+                    // each frequency-based route, choose how long after service starts the first vehicle leaves (the
+                    // route's "phase"). We run all Raptor rounds with one draw before proceeding to the next draw.
+                    offsets.randomize();
+                }
+
                 for (int round = 1; round <= request.maxRides; round++) {
                     frequencyState[round].min(frequencyState[round - 1]);
 
@@ -372,7 +383,8 @@ public class FastRaptorWorker {
                     long frequencyStart = System.nanoTime();
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
-                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], MONTE_CARLO);
+                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], mode);
+
                     timeInFrequencySearchFrequency += System.nanoTime() - frequencyStart;
 
                     long transferStart = System.nanoTime();
@@ -403,7 +415,7 @@ public class FastRaptorWorker {
             // We have to be careful here that creating these paths does not modify the state, and makes
             // protective copies of any information we want to retain.
             Path[] paths = retainPaths ? pathToEachStop(finalRoundState) : null;
-            for (int iteration = 0; iteration < monteCarloDrawsPerMinute; iteration++) {
+            for (int iteration = 0; iteration < iterationsPerMinute; iteration++) {
                 result[iteration] = finalRoundState.bestNonTransferTimes;
                 if (retainPaths) {
                     pathsPerIteration.add(paths);
@@ -726,7 +738,8 @@ public class FastRaptorWorker {
             return -1;
         }
 
-        int boardTime = schedule.startTimes[frequencyEntryIdx] + travelTimeFromStartOfTrip + halfHeadway;
+        int boardTime = earliestTime + halfHeadway;
+
         return boardTime;
     }
 

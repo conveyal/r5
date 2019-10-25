@@ -90,7 +90,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public double sumTotalOpportunities () {
-        throw new UnsupportedOperationException();
+        // For now we are counting each point as 1 opportunity.
+        // TODO merge this class with Grids that have opportunity counts.
+        return featureCount();
     }
 
     @Override
@@ -132,5 +134,12 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         double tile = y / 256d;
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
     }
+
+    @Override
+    public double getOpportunityCount (int i) {
+        // FIXME just counting the points for now, return counts
+        return 1D;
+    }
+
 
 }

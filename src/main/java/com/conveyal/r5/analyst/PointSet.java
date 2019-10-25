@@ -180,6 +180,12 @@ public abstract class PointSet {
     public abstract double sumTotalOpportunities();
 
     /**
+     * @param i the one-dimensional index into the list of points.
+     * @return the quantity or magnitude of opportunities at that point (e.g. jobs, people)
+     */
+    public abstract double getOpportunityCount(int i);
+
+    /**
      * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
      * in FIXED POINT DEGREES.
      */

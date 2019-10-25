@@ -304,5 +304,10 @@ public class FreeFormPointSet extends PointSet implements Serializable {
 
     }
 
+    @Override
+    public double getOpportunityCount (int i) {
+        // FIXME just counting the points for now, return counts
+        return 1D;
+    }
 
 }

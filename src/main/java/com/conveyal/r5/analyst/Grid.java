@@ -723,4 +723,11 @@ public class Grid extends PointSet {
         return totalOpportunities;
     }
 
+    @Override
+    public double getOpportunityCount (int i) {
+        int x = i % this.width;
+        int y = i / this.width;
+        return grid[x][y];
+    }
+
 }

@@ -173,20 +173,9 @@ public class TravelTimeReducer {
             travelTimes.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {
-            // This x/y addressing can only work with one grid at a time,
-            // needs to be made absolute to handle multiple different extents.
-            double amount;
-            if (accessibilityAccumulator.destinationPointSets[0] instanceof Grid) {
-                Grid grid = (Grid) accessibilityAccumulator.destinationPointSets[0];
-                int x = target % grid.width;
-                int y = target / grid.width;
-                amount = grid.grid[x][y];
-            } else if (accessibilityAccumulator.destinationPointSets[0] instanceof FreeFormPointSet) {
-                amount = 1; // FIXME configurable property (not just count)
-            } else {
-                throw new UnsupportedOperationException("Unrecognized pointset format for destination");
-            }
-
+            // This is only handling one grid at a time, needs to be adapted to handle multiple different extents.
+            PointSet pointSet = accessibilityAccumulator.destinationPointSets[0];
+            double amount = pointSet.getOpportunityCount(target);
             for (int p = 0; p < nPercentiles; p++) {
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
                     accessibilityAccumulator.incrementAccessibility(0, 0, p, amount);

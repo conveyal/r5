@@ -730,4 +730,11 @@ public class Grid extends PointSet {
         return grid[x][y];
     }
 
+    @Override
+    public String getPointId (int i) {
+        int y = i / this.width;
+        int x = i % this.width;
+        return x + "," + y;
+    }
+
 }

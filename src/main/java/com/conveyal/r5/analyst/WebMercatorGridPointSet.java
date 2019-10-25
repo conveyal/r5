@@ -141,5 +141,11 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return 1D;
     }
 
+    @Override
+    public String getPointId (int i) {
+        int y = i / this.width;
+        int x = i % this.width;
+        return x + "," + y;
+    }
 
 }

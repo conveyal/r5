@@ -446,9 +446,23 @@ public class Grid extends PointSet {
         return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
     }
 
-    public double getLat(int i) { return pixelToCenterLat(i, zoom); }
+    /**
+     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
+     * @return the WGS84 latitude of the center of the corresponding pixel in the grid
+     */
+    public double getLat(int i) {
+        int y = i / width;
+        return pixelToCenterLat(north + y, zoom);
+    }
 
-    public double getLon(int i) { return pixelToCenterLon(i, zoom); }
+    /**
+     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
+     * @return the WGS84 longitude of the center of the corresponding pixel in the grid
+     */
+    public double getLon(int i) {
+        int x = i % width;
+        return pixelToCenterLon(west + x, zoom);
+    }
 
     public int featureCount() { return width * height; }
 

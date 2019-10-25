@@ -22,16 +22,18 @@ public class TravelTimeReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
-    /** Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
+    /**
+     * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
      * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
      * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
-     * after results have been calculated) */
-    private int maxTripDurationMinutes;
+     * after results have been calculated)
+     */
+    private final int maxTripDurationMinutes;
 
     /** Travel time results for a whole grid of destinations. May be null if we're only recording accessibility. */
-    private TimeGrid timeGrid = null;
+    private final TimeGrid timeGrid;
 
-    private AccessibilityResult accessibilityResult = null;
+    private final AccessibilityResult accessibilityResult;
 
     private final boolean retainTravelTimes;
 
@@ -41,8 +43,11 @@ public class TravelTimeReducer {
 
     private final int nPercentiles;
 
+    /**
+     * The number of travel times we will record at each destination.
+     * This is affected by the number of Monte Carlo draws requested and the departure time window.
+     */
     private final int timesPerDestination;
-
 
     /**
      * @param task task to be performed, which is used to determine how results are summarized at each origin: a single
@@ -59,8 +64,22 @@ public class TravelTimeReducer {
     public TravelTimeReducer (AnalysisTask task) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = task.inRoutingFareCalculator == null ? task.getMonteCarloDrawsPerMinute
-                () * task.getTimeWindowLengthMinutes() : task.monteCarloDraws;
+
+        // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
+        if (task.inRoutingFareCalculator != null) {
+            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different departure
+            // times (rather than sampling multiple draws per minute).
+            this.timesPerDestination = task.monteCarloDraws;
+        } else {
+            if (task.monteCarloDraws == 0) {
+                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure minute per
+                // destination.
+                this.timesPerDestination = task.getTimeWindowLengthMinutes();
+            } else {
+                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+            }
+        }
+
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
@@ -73,6 +92,8 @@ public class TravelTimeReducer {
         retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeStaticSite;
         if (retainTravelTimes) {
             timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+        } else {
+            timeGrid = null;
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
@@ -83,6 +104,8 @@ public class TravelTimeReducer {
                 new int[]{task.maxTripDurationMinutes},
                 task.percentiles
             );
+        } else {
+            accessibilityResult = null;
         }
     }
 

@@ -157,20 +157,20 @@ public abstract class PointSet {
     }
 
     /**
-     * @return the latitude of point i in the PointSet. In the general case, all PointSets (even those on grids) are
-     *         treated as flattened one-dimensional arrays.
+     * @return the WGS84 latitude of point i in the PointSet. In the general case, all PointSets (even those on grids)
+     *         are treated as flattened one-dimensional arrays.
      */
     public abstract double getLat(int i);
 
     /**
-     * @return the longitude of point i in the PointSet. In the general case, all PointSets (even those on grids) are
-     *         treated as flattened one-dimensional arrays.
+     * @return the WGS84 longitude of point i in the PointSet. In the general case, all PointSets (even those on grids)
+     *         are treated as flattened one-dimensional arrays.
      */
     public abstract double getLon(int i);
 
     /**
      * @return the total number of points in the PointSet. In the general case, all PointSets (even those on grids) are
-     *         treated as flattened one-dimensional arrays, so a gridded PointSet has points 1 through (width * height).
+     *         treated as flattened one-dimensional arrays, so a gridded PointSet has (width * height) points.
      */
     public abstract int featureCount();
 

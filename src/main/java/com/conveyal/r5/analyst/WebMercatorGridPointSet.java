@@ -19,16 +19,16 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     /** web mercator zoom level */
     public final int zoom;
 
-    /** westernmost pixel */
+    /** westernmost pixel  */
     public final int west;
 
     /** northernmost pixel */
     public final int north;
 
-    /** width */
+    /** The number of pixels across this grid in the east-west direction. */
     public final int width;
 
-    /** height */
+    /** The number of pixels from top to bottom of this grid in the north-south direction. */
     public final int height;
 
     /** Base pointset; linkages will be shared with this pointset */
@@ -113,7 +113,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
-    /** convert latitude to pixel value */
+    /**
+     * Convert latitude to pixel value.
+     * This could be static if zoom level was a parameter. And/or could be moved to WebMercatorExtents.
+     */
     public int latToPixel (double lat) {
         double invCos = 1 / Math.cos(Math.toRadians(lat));
         double tan = Math.tan(Math.toRadians(lat));

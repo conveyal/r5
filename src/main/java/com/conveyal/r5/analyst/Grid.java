@@ -101,7 +101,9 @@ public class Grid extends PointSet {
     /** The height of the grid in web Mercator pixels. */
     public final int height;
 
-    /** The data values for each pixel within this grid. */
+    /**
+     * The data values for each pixel within this grid. Dimension order is (x, y), with range [0, width) and [0, height).
+     */
     public final double[][] grid;
 
     /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
@@ -127,7 +129,6 @@ public class Grid extends PointSet {
     }
 
     /**
-     *
      * @param zoom Web Mercator zoom level
      * @param envelope Envelope of grid, in absolute lat/lon coordinates
      */

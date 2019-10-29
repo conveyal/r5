@@ -19,16 +19,16 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     /** web mercator zoom level */
     public final int zoom;
 
-    /** westernmost pixel */
+    /** westernmost pixel  */
     public final int west;
 
     /** northernmost pixel */
     public final int north;
 
-    /** width */
+    /** The number of pixels across this grid in the east-west direction. */
     public final int width;
 
-    /** height */
+    /** The number of pixels from top to bottom of this grid in the north-south direction. */
     public final int height;
 
     /** Base pointset; linkages will be shared with this pointset */
@@ -89,6 +89,13 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     @Override
+    public double sumTotalOpportunities () {
+        // For now we are counting each point as 1 opportunity.
+        // TODO merge this class with Grids that have opportunity counts.
+        return featureCount();
+    }
+
+    @Override
     public double getLat(int i) {
         long y = i / this.width + this.north;
         return pixelToLat(y);
@@ -108,7 +115,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
-    /** convert latitude to pixel value */
+    /**
+     * Convert latitude to pixel value.
+     * This could be static if zoom level was a parameter. And/or could be moved to WebMercatorExtents.
+     */
     public int latToPixel (double lat) {
         double invCos = 1 / Math.cos(Math.toRadians(lat));
         double tan = Math.tan(Math.toRadians(lat));
@@ -123,6 +133,19 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     public double pixelToLat (double y) {
         double tile = y / 256d;
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
+    }
+
+    @Override
+    public double getOpportunityCount (int i) {
+        // FIXME just counting the points for now, return counts
+        return 1D;
+    }
+
+    @Override
+    public String getPointId (int i) {
+        int y = i / this.width;
+        int x = i % this.width;
+        return x + "," + y;
     }
 
 }

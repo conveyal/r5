@@ -25,14 +25,14 @@ import java.util.zip.GZIPInputStream;
 public class PointSetCache {
     private static final Logger LOG = LoggerFactory.getLogger(PointSetCache.class);
 
-    private AmazonS3 s3 = null;
-
     /** How large the cache should be. Should be large enough to fit all field of a project */
     private static final int CACHE_SIZE = 200;
 
+    private final AmazonS3 s3;
+
     private LoadingCache<String, PointSet> cache = CacheBuilder.newBuilder()
                 .maximumSize(CACHE_SIZE)
-                // lambdas not legal here for whatever reason
+                // Lambdas functions cannot be used here because CacheLoader has multiple overrideable methods.
                 .build(new CacheLoader<String, PointSet>() {
                     @Override
                     public PointSet load(String s) throws Exception {
@@ -51,21 +51,17 @@ public class PointSetCache {
 
     private PointSet loadPointSet(String key) throws IOException {
         S3Object obj = s3.getObject(bucket, key);
-        // no need to check if it exists; if it doesn't getObject will throw an exception which will be caught in the
-        // get function below
-        // Grids are gzipped on S3
+        // No need to check if the object exists on S3.
+        // If it doesn't, getObject will throw an exception which will be caught in the PointSetCache.get method.
+        // Grids are gzipped on S3.
         InputStream is = new GZIPInputStream(new BufferedInputStream(obj.getObjectContent()));
-
-        String extension = key.substring(key.lastIndexOf(".") + 1);
-
-        if (PointSet.Format.GRID.toString().equalsIgnoreCase(extension)) {
+        if (key.endsWith(Grid.fileExtension)) {
             return Grid.read(is);
-        } else if (PointSet.Format.POINTSET.toString().equalsIgnoreCase(extension)) {
+        } else if (key.endsWith(FreeFormPointSet.fileExtension)) {
             return new FreeFormPointSet(is);
-        } else { // TODO CSV, GEOJSON support?
-            throw new UnsupportedOperationException("Unsupported pointset format");
+        } else {
+            throw new RuntimeException("Unrecognized file extension in object key: " + key);
         }
-
 
     }
 

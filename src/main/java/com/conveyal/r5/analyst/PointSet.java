@@ -25,12 +25,21 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 /**
  * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
  * accessibility analysis. Legacy Transport Analyst used freeform pointsets; early versions of Conveyal Analysis
- * instead favored regular grids in the web mercator projection.  This abstraction handles both.
+ * instead favored regular grids in the web mercator projection.  This abstraction encompasses both.
  */
 public abstract class PointSet {
 
+    /**
+     * It seems like fighting Java typing to store type codes in JSON.
+     * But at least by using some symbolic constants and Java identifiers things are well cross-referenced.
+     */
     public enum Format {
-        CSV, POINTSET, GRID, PNG, TIFF
+        FREEFORM (FreeFormPointSet.fileExtension),
+        GRID (Grid.fileExtension);
+        public final String fileExtension;
+        Format(String fileExtension) {
+            this.fileExtension = fileExtension;
+        }
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
@@ -42,6 +51,9 @@ public abstract class PointSet {
      * for 2 scenarios plus the baseline at once.
      */
     public static int LINKAGE_CACHE_SIZE = 9;
+
+    /** Human readable name. Unfortunately this is lost when persisting Grids, to maintain backward compatibility. */
+    public transient String name;
 
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
@@ -144,11 +156,40 @@ public abstract class PointSet {
         }
     }
 
+    /**
+     * @return the WGS84 latitude of point i in the PointSet. In the general case, all PointSets (even those on grids)
+     *         are treated as flattened one-dimensional arrays.
+     */
     public abstract double getLat(int i);
 
+    /**
+     * @return the WGS84 longitude of point i in the PointSet. In the general case, all PointSets (even those on grids)
+     *         are treated as flattened one-dimensional arrays.
+     */
     public abstract double getLon(int i);
 
+    /**
+     * @return the total number of points in the PointSet. In the general case, all PointSets (even those on grids) are
+     *         treated as flattened one-dimensional arrays, so a gridded PointSet has (width * height) points.
+     */
     public abstract int featureCount();
+
+    /**
+     * @return the sum of the opportunity counts at all points in this PointSet.
+     */
+    public abstract double sumTotalOpportunities();
+
+    /**
+     * @param i the one-dimensional index into the list of points.
+     * @return the quantity or magnitude of opportunities at that point (e.g. jobs, people)
+     */
+    public abstract double getOpportunityCount(int i);
+
+    /**
+     * @param i the one-dimensional index into the list of points.
+     * @return a String uniquely identifying the specified point among the points in this set
+     */
+    public abstract String getPointId(int i);
 
     /**
      * Returns a new coordinate object for the feature at the given index in this set, or its centroid,

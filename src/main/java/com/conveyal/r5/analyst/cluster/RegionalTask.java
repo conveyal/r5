@@ -8,11 +8,6 @@ import com.conveyal.r5.analyst.PointSet;
 public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /**
-     * Coordinates of origin cell in grid defined in AnalysisTask.
-     */
-    public int x = -1, y = -1;
-
-    /**
      * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. Still named grid (instead of
      * destinationPointSetKey for backward compatibility, namely the ability to start regional jobs on old worker
      * versions).
@@ -76,8 +71,6 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
         return "RegionalTask{" +
                 "jobId=" + jobId +
                 ", task=" + taskId +
-                ", x=" + x +
-                ", y=" + y +
                 '}';
     }
 

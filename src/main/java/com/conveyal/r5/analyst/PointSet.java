@@ -186,12 +186,6 @@ public abstract class PointSet {
     public abstract double getOpportunityCount(int i);
 
     /**
-     * @param i the one-dimensional index into the list of points.
-     * @return a String uniquely identifying the specified point among the points in this set
-     */
-    public abstract String getPointId(int i);
-
-    /**
      * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
      * in FIXED POINT DEGREES.
      */

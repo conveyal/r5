@@ -43,7 +43,7 @@ public abstract class AnalysisTask extends ProfileRequest {
     public String jobId;
 
     /** The id of this particular origin. */
-    public String id;
+    public String originId;
 
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;

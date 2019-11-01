@@ -310,7 +310,6 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return 1D;
     }
 
-    @Override
     public String getPointId (int i) {
         return ids[i];
     }

@@ -741,7 +741,7 @@ public class FastRaptorWorker {
      *
      * TODO account for possible dwell time?
      *
-     * @param earliestTime earliestTime the time at or after which to find a departure time (i.e. when a passenger is
+     * @param earliestTime the time at or after which to find a departure time (i.e. when a passenger is
      *                    ready to board).
      *
      * @return clock time at which a passenger boards this frequency entry at this stop
@@ -766,7 +766,7 @@ public class FastRaptorWorker {
 
         int headway = schedule.headwaySeconds[frequencyEntryIdx];
         int halfHeadway = headway / 2;
-        
+
         return halfHeadway + (Math.max(earliestTime, frequencyStartsAtThisStop));
 
     }

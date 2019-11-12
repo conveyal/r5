@@ -733,7 +733,18 @@ public class FastRaptorWorker {
     }
 
     /**
-     * For half-headway (non-monte-carlo) evaluation of frequency-based routes.
+     * For half-headway (non-monte-carlo) evaluation of frequency-based routes. The caller should be looping through
+     * all frequency entries (e.g. to allow a passenger to wait at a stop for a subsequent frequency entry to start).
+     *
+     * The departure time is assumed to be half-headway after the later (maximum) of the passenger's earliest possible
+     * boarding time at the stop or the frequency entry's earliest possible arrival at the stop.
+     *
+     * TODO account for possible dwell time?
+     *
+     * @param earliestTime the time at or after which to find a departure time (i.e. when a passenger is
+     *                    ready to board).
+     *
+     * @return clock time at which a passenger boards this frequency entry at this stop
      */
     public static int getAverageCaseFrequencyDepartureTime (
             TripSchedule schedule,
@@ -741,24 +752,23 @@ public class FastRaptorWorker {
             int frequencyEntryIdx,
             int earliestTime
     ) {
-        int headway = schedule.headwaySeconds[frequencyEntryIdx];
-        int halfHeadway = headway / 2;
-
-        // Ensure the schedule is still running.
         int travelTimeFromStartOfTrip = schedule.departures[stopPositionInPattern];
 
-        // Not strictly correct, should be revised: the last vehicle could leave the terminal as early as headwaySeconds
-        // before the end of the frequency entry. We might want to take the minimum or average of waiting for the
-        // current entry, and waiting for the next entry. We need to exclude entries that have ended, but not entries
-        // that have not yet started (because you can wait for them to start). See issue #122
+        // Ensure the schedule has not ceased at this stop. Note that this approach assumes no trip for this frequency
+        // entry leaves the first stop of the pattern after end_time, which is different from the assumption in the
+        // approaches above. See discussion in issue #122
         int frequencyEndsAtThisStop = schedule.endTimes[frequencyEntryIdx] + travelTimeFromStartOfTrip;
         if (frequencyEndsAtThisStop < earliestTime) {
             return -1;
         }
 
-        int boardTime = earliestTime + halfHeadway;
+        int frequencyStartsAtThisStop = schedule.startTimes[frequencyEntryIdx] + travelTimeFromStartOfTrip;
 
-        return boardTime;
+        int headway = schedule.headwaySeconds[frequencyEntryIdx];
+        int halfHeadway = headway / 2;
+
+        return halfHeadway + (Math.max(earliestTime, frequencyStartsAtThisStop));
+
     }
 
     private void doTransfers (RaptorState state) {

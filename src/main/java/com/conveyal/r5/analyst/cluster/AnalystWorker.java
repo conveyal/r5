@@ -154,7 +154,7 @@ public class AnalystWorker implements Runnable {
      * Preparing networks or linking grids will take longer, but those cases are now handled with
      * WorkerNotReadyException.
      */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 45;
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.

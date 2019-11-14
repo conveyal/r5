@@ -116,19 +116,14 @@ public class TravelTimeReducer {
      * That is to say, the percentile will be found at an integer-valued index into the sorted array of elements.
      * The definition of a non-interpolated percentile is as follows: the smallest value in the list such that no more
      * than P percent of the data is strictly less than the value and at least P percent of the data is less than or
-     * equal to that value. The 100th percentile is defined as the largest value in the list.
+     * equal to that value. By this definition, the 100th percentile is the largest value in the list.
      * See https://en.wikipedia.org/wiki/Percentile#Definitions
      *
-     * We scale the interval between the beginning and end elements of the array (the min and max values).
-     * In an array with N values this interval is N-1 elements. We should be scaling N-1, which makes the result
-     * always defined even when using a high percentile and low number of elements. Previously, this caused
-     * an error when requesting the 95th percentile when times.length = 1 (or any length less than 10).
+     * The formula given on Wikipedia next to definition cited above uses ceiling for one-based indexes.
+     * It is tempting to just truncate to ints instead of ceiling but this gives different results on integer boundaries.
      */
     private static int findPercentileIndex(int nElements, double percentile) {
-        // The definition uses ceiling for one-based indexes but we use zero-based indexes so we can truncate.
-        // FIXME truncate rather than rounding.
-        // TODO check the difference in results caused by using the revised formula in both single and regional analyses.
-        return (int) Math.round(percentile / 100 * nElements);
+        return (int)(Math.ceil(percentile / 100 * nElements) - 1);
     }
 
     /**
@@ -171,7 +166,9 @@ public class TravelTimeReducer {
             int y = target / grid.width;
             double amount = grid.grid[x][y];
             for (int p = 0; p < nPercentiles; p++) {
-                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
+                // Use of < here (as opposed to <=) matches the definition in JS front end,
+                // and works well when truncating seconds to minutes.
+                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
                     accessibilityResult.incrementAccessibility(0, 0, p, amount);
                 }
             }

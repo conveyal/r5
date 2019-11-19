@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+
 /**
  * Given a bunch of travel times from an origin to a single destination grid cell, this collapses that long list into a
  * limited number of percentiles, then optionally accumulates that destination's opportunity count into the appropriate
@@ -131,7 +133,7 @@ public class TravelTimeReducer {
      * percentiles or the resulting accessibility values (or both) are then stored.
      * WARNING: this method destructively sorts the supplied times in place.
      * Their positions in the array will no longer correspond to the raptor iterations that produced them.
-     * @param timesSeconds which will be destructively sorted in place to extract percentiles.
+     * @param timesSeconds from which we will extract percentiles.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
     public int[] recordTravelTimesForTarget (int target, int[] timesSeconds) {
@@ -144,13 +146,37 @@ public class TravelTimeReducer {
             int travelTimeSeconds = timesSeconds[0];
             Arrays.fill(percentileTravelTimesMinutes, convertToMinutes(travelTimeSeconds));
         } else if (timesSeconds.length == timesPerDestination) {
-            // Instead of general purpose sort this could be done by performing a counting sort on the times,
-            // converting them to minutes in the process and reusing the small histogram array (120 elements) which
-            // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
-            Arrays.sort(timesSeconds);
-            for (int p = 0; p < nPercentiles; p++) {
-                int timeSeconds = timesSeconds[percentileIndexes[p]];
-                percentileTravelTimesMinutes[p] = convertToMinutes(timeSeconds);
+            // Instead of a general purpose sort we perform a counting sort on the times. This is efficient because
+            // the number of possible values (120) can be much smaller than the number of iterations, and should easily
+            // fit in very fast processor cache. This performs a lot of division on numbers that we don't actually use.
+            // But in profiling it was slower to have a larger array indexed in seconds and only convert the extracted
+            // percentiles to minutes. Pre-division does keep the array very small. The counting sort is only partially
+            // completed, then we read off the percentiles without reordering the original values.
+            // This array tracks the number of times each travel duration (in minutes) appears in the input array.
+            // Anything 120 minutes and up (including UNREACHED) is mapped to 120, then 120 mapped back to UNREACHED.
+            int[] counts = new int[121];
+            for (int timeSeconds : timesSeconds) {
+                int timeMinutes = convertToMinutes(timeSeconds);
+                if (timeMinutes >= 120) {
+                    timeMinutes = 120;
+                }
+                counts[timeMinutes] += 1;
+            }
+            // NOTE: These percentile indexes must be in increasing order,
+            // which means task.percentiles must be in ascending order.
+            // TODO state and check this prerequisite somewhere outside this tight inner loop.
+            int minute = 0;
+            int cumulativeCount = counts[0];
+            for (int pi = 0; pi < percentileIndexes.length; pi++) {
+                int percentileIndex = percentileIndexes[pi];
+                while (cumulativeCount <= percentileIndex) {
+                    minute += 1;
+                    cumulativeCount += counts[minute];
+                }
+                if (minute == 120) {
+                    minute = UNREACHED;
+                }
+                percentileTravelTimesMinutes[pi] = minute;
             }
         } else {
             throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
@@ -188,12 +214,12 @@ public class TravelTimeReducer {
      * end could in principle receive a more general purpose format using wider or variable width integers.
      */
     private int convertToMinutes (int timeSeconds) {
-        if (timeSeconds == FastRaptorWorker.UNREACHED) return FastRaptorWorker.UNREACHED;
+        if (timeSeconds == UNREACHED) return UNREACHED;
         int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
         if (timeMinutes < maxTripDurationMinutes) {
             return timeMinutes;
         } else {
-            return FastRaptorWorker.UNREACHED;
+            return UNREACHED;
         }
     }
 

@@ -4,6 +4,7 @@ import com.conveyal.r5.analyst.PointSet;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
+ * Instances are serialized and sent from the backend to workers when processing regional analyses.
  */
 public class RegionalTask extends AnalysisTask implements Cloneable {
 

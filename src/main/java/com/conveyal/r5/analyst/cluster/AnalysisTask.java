@@ -9,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 /**
  * Describes an analysis task to be performed.
- *
+ * Instances are serialized and sent from the backend to workers when processing regional analyses.
  * By default, the task will be a travelTimeSurfaceTask for one origin.
  * This task is completed by returning a grid of total travel times from that origin to all destinations.
  */

@@ -3,9 +3,10 @@ package com.conveyal.r5.analyst.cluster;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * Represents a single point, interactive task coming from the Analysis UI and returning a surface of travel
- * times to each destination (several travel times to each destination are returned, representing the percentiles
- * of travel time from the chosen origin to that destination.
+ * Instances are serialized and sent from the backend to workers processing single point,
+ * interactive tasks usually originating from the Analysis UI, and returning a surface of travel
+ * times to each destination. Several travel times to each destination are returned, representing
+ * selected percentiles of all travel times from the chosen origin to that destination.
  */
 public class TravelTimeSurfaceTask extends AnalysisTask {
 

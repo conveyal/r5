@@ -218,7 +218,9 @@ public class PerTargetPropagater {
 
     /**
      * Transpose the travel times to stops array in order to provide better memory locality in the tight loop below.
-     * We have confirmed that this provides a significant speedup. TODO quantify that speedup and record here in comment.
+     * We have confirmed that this provides a significant speedup.
+     * TODO quantify that speedup and record here in comment.
+     *      This takes something like 800msec for a large 6000-iteration search
      * This speedup is expected because Java represents multidimensional arrays as an array of references to arrays.
      * This means that each row is stored in a separate chunk of address space, and may not be contiguous with
      * other rows. The CPU and cache probably can't efficiently predict and prefetch the values we need next.
@@ -291,38 +293,27 @@ public class PerTargetPropagater {
                 (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
                 (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
 
-        // Determine an egress limit in the same units as the egress cost tables in the linked point set.
-        int egressLimit;
-        if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
-            egressLimit = egressLegTimeLimitSeconds;
-        } else if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
-            egressLimit = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
-        } else {
-            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
-        }
-
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
         if (pointToStopLinkageCostTable != null) {
+            // Propagate all iterations from each relevant alighting stop out to this target.
             pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
-                if (linkageCost < egressLimit){
+                int secondsFromStopToTarget;
+                if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                    secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                    secondsFromStopToTarget = linkageCost;
+                } else {
+                    throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                }
+                if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
                         if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
                             // Skip propagation if all resulting times will be greater than the cutoff and
                             // cannot improve on the best known time at this iteration. Also avoids overflow.
                             continue;
-                        }
-                        // Propagate from the current stop out to the target.
-                        int secondsFromStopToTarget;
-
-                        if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
-                            secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
-                        } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
-                            secondsFromStopToTarget = linkageCost;
-                        } else {
-                            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                         }
 
                         // Account for any additional delay waiting for taxi or autonomous vehicle.

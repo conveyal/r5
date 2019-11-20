@@ -22,11 +22,13 @@ public class TravelTimeReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
-    /** Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
+    /**
+     * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
      * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
      * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
-     * after results have been calculated) */
-    private int maxTripDurationMinutes;
+     * after results have been calculated)
+     */
+    private final int maxTripDurationMinutes;
 
     private boolean calculateAccessibility;
 
@@ -41,8 +43,11 @@ public class TravelTimeReducer {
 
     private final int nPercentiles;
 
+    /**
+     * The number of travel times we will record at each destination.
+     * This is affected by the number of Monte Carlo draws requested and the departure time window.
+     */
     private final int timesPerDestination;
-
 
     /**
      * Reduce travel time values to requested summary outputs for each origin. The type of output (a single
@@ -66,8 +71,22 @@ public class TravelTimeReducer {
     public TravelTimeReducer (AnalysisTask task) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = task.inRoutingFareCalculator == null ? task.getMonteCarloDrawsPerMinute
-                () * task.getTimeWindowLengthMinutes() : task.monteCarloDraws;
+
+        // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
+        if (task.inRoutingFareCalculator != null) {
+            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different departure
+            // times (rather than sampling multiple draws per minute).
+            this.timesPerDestination = task.monteCarloDraws;
+        } else {
+            if (task.monteCarloDraws == 0) {
+                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure minute per
+                // destination.
+                this.timesPerDestination = task.getTimeWindowLengthMinutes();
+            } else {
+                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+            }
+        }
+
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
@@ -83,11 +102,11 @@ public class TravelTimeReducer {
         }
 
         // Decide what we want to calculate
-        boolean calcAccessibility = false;
+        calculateAccessibility = false;
         if (task instanceof RegionalTask) {
             RegionalTask regionalTask = (RegionalTask) task;
             if (regionalTask.recordAccessibility) {
-                calcAccessibility = true;
+                calculateAccessibility = true;
                 accessibilityAccumulator = new AccessibilityAccumulator(task);
             }
             if (regionalTask.recordTimes) {
@@ -95,7 +114,6 @@ public class TravelTimeReducer {
                 calculateTravelTimes = true;
             }
         }
-        this.calculateAccessibility = calcAccessibility;
     }
 
 
@@ -105,19 +123,14 @@ public class TravelTimeReducer {
      * That is to say, the percentile will be found at an integer-valued index into the sorted array of elements.
      * The definition of a non-interpolated percentile is as follows: the smallest value in the list such that no more
      * than P percent of the data is strictly less than the value and at least P percent of the data is less than or
-     * equal to that value. The 100th percentile is defined as the largest value in the list.
+     * equal to that value. By this definition, the 100th percentile is the largest value in the list.
      * See https://en.wikipedia.org/wiki/Percentile#Definitions
      *
-     * We scale the interval between the beginning and end elements of the array (the min and max values).
-     * In an array with N values this interval is N-1 elements. We should be scaling N-1, which makes the result
-     * always defined even when using a high percentile and low number of elements. Previously, this caused
-     * an error when requesting the 95th percentile when times.length = 1 (or any length less than 10).
+     * The formula given on Wikipedia next to definition cited above uses ceiling for one-based indexes.
+     * It is tempting to just truncate to ints instead of ceiling but this gives different results on integer boundaries.
      */
     private static int findPercentileIndex(int nElements, double percentile) {
-        // The definition uses ceiling for one-based indexes but we use zero-based indexes so we can truncate.
-        // FIXME truncate rather than rounding.
-        // TODO check the difference in results caused by using the revised formula in both single and regional analyses.
-        return (int) Math.round(percentile / 100 * nElements);
+        return (int)(Math.ceil(percentile / 100 * nElements) - 1);
     }
 
     /**
@@ -177,7 +190,9 @@ public class TravelTimeReducer {
             PointSet pointSet = accessibilityAccumulator.destinationPointSets[0];
             double amount = pointSet.getOpportunityCount(target);
             for (int p = 0; p < nPercentiles; p++) {
-                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
+                // Use of < here (as opposed to <=) matches the definition in JS front end,
+                // and works well when truncating seconds to minutes.
+                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
                     accessibilityAccumulator.incrementAccessibility(0, 0, p, amount);
                 }
             }

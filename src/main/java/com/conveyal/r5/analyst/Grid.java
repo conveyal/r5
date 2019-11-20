@@ -73,6 +73,8 @@ import static org.apache.commons.math3.util.FastMath.tan;
  * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
  * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset from
  * the edges of the world.
+ *
+ * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
  */
 public class Grid extends PointSet {
 
@@ -270,7 +272,10 @@ public class Grid extends PointSet {
         }
     }
 
-    /** Write this grid out in R5 binary grid format. */
+    /**
+     * Write this grid out in R5 binary grid format.
+     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+     */
     public void write (OutputStream outputStream) throws IOException {
         // Java's DataOutputStream only outputs big-endian format ("network byte order").
         // These grids will be read out of Javascript typed arrays which use the machine's native byte order.
@@ -357,6 +362,9 @@ public class Grid extends PointSet {
         }
     }
 
+    /**
+     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+     */
     public static Grid read (InputStream inputStream) throws  IOException {
         LittleEndianDataInputStream data = new LittleEndianDataInputStream(inputStream);
         int zoom = data.readInt();

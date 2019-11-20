@@ -30,14 +30,16 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues; // TODO Should this be floating point?
 
     /** Trivial no-arg constructor for deserialization. Private to prevent usage outside deserialization. */
-    private RegionalWorkResult() {};
+    private RegionalWorkResult() { };
 
     /**
-     * Construct a result containing the same information as the supplied internal OneOriginResult.
+     * Convert the supplied internal R5 OneOriginResult into this more compact form intended for serialization
+     * and transfer from the worker back to the backend. The job and task ID are copied from the supplied task
+     * to show which task these results are for.
      */
-    public RegionalWorkResult(OneOriginResult result) {
-        this.jobId = result.jobId;
-        this.taskId = result.taskId;
+    public RegionalWorkResult(OneOriginResult result, RegionalTask task) {
+        this.jobId = task.jobId;
+        this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
     }

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.PointSetCache;
@@ -517,7 +518,7 @@ public class AnalystWorker implements Runnable {
             // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
             // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
             synchronized (workResults) {
-                workResults.add(oneOriginResult.setJobAndTaskIds(task).toRegionalWorkResult());
+                workResults.add(new RegionalWorkResult(oneOriginResult, task));
             }
             throughputTracker.recordTaskCompletion(task.jobId);
         } catch (Exception ex) {
@@ -538,9 +539,9 @@ public class AnalystWorker implements Runnable {
             e.printStackTrace();
         }
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            OneOriginResult emptyContainer = new OneOriginResult(task);
+            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult());
             synchronized (workResults) {
-                workResults.add(emptyContainer.toRegionalWorkResult());
+                workResults.add(new RegionalWorkResult(emptyContainer, task));
             }
         } else {
             LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);

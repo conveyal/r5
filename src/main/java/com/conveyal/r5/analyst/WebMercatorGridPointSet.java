@@ -90,8 +90,8 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public double sumTotalOpportunities () {
-        // For now we are counting each point as 1 opportunity.
-        // TODO merge this class with Grids that have opportunity counts.
+        // For now we are counting each point as 1 opportunity because this class does not have opportunity counts.
+        // TODO merge this class with Grid, which does have opportunity counts.
         return featureCount();
     }
 
@@ -109,7 +109,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
 
-    /** convert longitude to pixel value */
+    /** Convert longitude to pixel value. */
     public int lonToPixel (double lon) {
         // factor of 256 is to get a pixel value not a tile number
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);

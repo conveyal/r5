@@ -33,7 +33,7 @@ public class RegionalWorkResult {
     private RegionalWorkResult() {};
 
     /**
-     * Construct a result for one origin
+     * Construct a result containing the same information as the supplied internal OneOriginResult.
      */
     public RegionalWorkResult(OneOriginResult result) {
         this.jobId = result.jobId;

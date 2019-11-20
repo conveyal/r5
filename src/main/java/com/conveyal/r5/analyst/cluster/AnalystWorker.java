@@ -517,7 +517,7 @@ public class AnalystWorker implements Runnable {
             // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
             // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
             synchronized (workResults) {
-                workResults.add(oneOriginResult.setJobAndTaskIds(task).toResult());
+                workResults.add(oneOriginResult.setJobAndTaskIds(task).toRegionalWorkResult());
             }
             throughputTracker.recordTaskCompletion(task.jobId);
         } catch (Exception ex) {
@@ -540,7 +540,7 @@ public class AnalystWorker implements Runnable {
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
             OneOriginResult emptyContainer = new OneOriginResult(task);
             synchronized (workResults) {
-                workResults.add(emptyContainer.toResult());
+                workResults.add(emptyContainer.toRegionalWorkResult());
             }
         } else {
             LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);

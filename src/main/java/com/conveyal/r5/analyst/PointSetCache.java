@@ -19,8 +19,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Cache opportunity density grids on S3, with a local cache for performance when reusing the same grids. Each instance
- * works with a single S3 bucket.
+ * A local in-memory cache for PointSets, which are loaded from persistent storage on S3.
+ * It will load either gridded or freeform pointsets, depending on the file extension of the S3 key.
+ * Each instance of PointSetCache reads from a single S3 bucket specified at construction.
  */
 public class PointSetCache {
     private static final Logger LOG = LoggerFactory.getLogger(PointSetCache.class);
@@ -32,7 +33,7 @@ public class PointSetCache {
 
     private LoadingCache<String, PointSet> cache = CacheBuilder.newBuilder()
                 .maximumSize(CACHE_SIZE)
-                // Lambdas functions cannot be used here because CacheLoader has multiple overrideable methods.
+                // Lambda functions cannot be used here because CacheLoader has multiple overrideable methods.
                 .build(new CacheLoader<String, PointSet>() {
                     @Override
                     public PointSet load(String s) throws Exception {
@@ -51,9 +52,8 @@ public class PointSetCache {
 
     private PointSet loadPointSet(String key) throws IOException {
         S3Object obj = s3.getObject(bucket, key);
-        // No need to check if the object exists on S3.
-        // If it doesn't, getObject will throw an exception which will be caught in the PointSetCache.get method.
-        // Grids are gzipped on S3.
+        // If the object does not exist on S3, getObject will throw an exception which will be caught in the
+        // PointSetCache.get method. Grids are gzipped on S3.
         InputStream is = new GZIPInputStream(new BufferedInputStream(obj.getObjectContent()));
         if (key.endsWith(Grid.fileExtension)) {
             return Grid.read(is);
@@ -62,7 +62,6 @@ public class PointSetCache {
         } else {
             throw new RuntimeException("Unrecognized file extension in object key: " + key);
         }
-
     }
 
     public PointSet get (String key) {

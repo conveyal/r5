@@ -29,10 +29,11 @@ import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
- * flattened 3D array, with each pixel of a 2D grid containing the different percentiles of travel time requested by
- * the frontend. This is called the "access grid" format and is distinct from the "destination grid" format in that
- * holds multiple values per pixel and has no inter-cell delta coding. It also has JSON concatenated on the end with any
- * scenario application warnings.
+ * flattened 3D array, with each pixel of a 2D grid containing the different percentiles of travel time requested
+ * by the frontend. This is called the "access grid" format and is distinct from the "destination grid" format in
+ * that holds multiple values per pixel and has no inter-cell delta coding. It also has JSON concatenated on the
+ * end with any scenario application warnings.
+ *
  * TODO: we should merge these grid formats and update the spec to allow JSON errors at the end.
  * TODO: try to decouple the internal representation of the results from how they're serialized to the API.
  */
@@ -42,10 +43,7 @@ public class TravelTimeComputer {
     private final AnalysisTask request;
     private final TransportNetwork network;
 
-    /**
-     * Constructor.
-     */
-
+    /** Constructor. */
     public TravelTimeComputer (AnalysisTask request, TransportNetwork network) {
         this.request = request;
         this.network = network;
@@ -53,8 +51,8 @@ public class TravelTimeComputer {
     }
 
     /**
-     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending on
-     * what's in the task it's given. TODO factor out each major step of this process into private methods.
+     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending
+     * on what's in the task it's given. TODO factor out each major step of this process into private methods.
      */
     public OneOriginResult computeTravelTimes() {
 
@@ -226,7 +224,7 @@ public class TravelTimeComputer {
             for (int target = 0; target < nonTransitTravelTimesToDestinations.size(); target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
-                travelTimeReducer.replicateTravelTimesAndRecord(target, travelTimeSeconds);
+                travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);
             }
             return travelTimeReducer.finish();
         }

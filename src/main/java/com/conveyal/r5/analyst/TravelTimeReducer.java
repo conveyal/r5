@@ -15,8 +15,8 @@ import java.util.Arrays;
 
 /**
  * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
- * limited number of percentiles, then optionally accumulates that destination's opportunity count into the appropriate
- * cumulative opportunities accessibility indicators at that origin.
+ * limited number of percentiles, then optionally accumulates that destination's opportunity count into the
+ * appropriate cumulative opportunities accessibility indicators at that origin.
  */
 public class TravelTimeReducer {
 
@@ -26,7 +26,7 @@ public class TravelTimeReducer {
      * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
      * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
      * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
-     * after results have been calculated)
+     * after results have been calculated).
      */
     private final int maxTripDurationMinutes;
 
@@ -34,10 +34,14 @@ public class TravelTimeReducer {
 
     private boolean calculateTravelTimes;
 
-    private AccessibilityAccumulator accessibilityAccumulator = null;
+    /**
+     * Cumulative opportunities accessibility at this one particular origin.
+     * May be null if we're only recording travel times.
+     */
+    private AccessibilityResult accessibilityResult = null;
 
     /** Reduced (e.g. at one percentile) travel time results. May be null if we're only recording accessibility. */
-    private TravelTimeResult travelTimes = null;
+    private TravelTimeResult travelTimeResult = null;
 
     private final int[] percentileIndexes;
 
@@ -74,15 +78,15 @@ public class TravelTimeReducer {
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
         if (task.inRoutingFareCalculator != null) {
-            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different departure
-            // times (rather than sampling multiple draws per minute).
+            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different
+            // departure times (rather than sampling multiple draws at every minute in the departure time window).
             this.timesPerDestination = task.monteCarloDraws;
         } else {
             if (task.monteCarloDraws == 0) {
-                // Use HALF_HEADWAY boarding assumption, which returns a single travel time per departure minute per
-                // destination.
+                // HALF_HEADWAY boarding, returning a single travel time per departure minute per destination.
                 this.timesPerDestination = task.getTimeWindowLengthMinutes();
             } else {
+                // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
                 this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
             }
         }
@@ -98,7 +102,7 @@ public class TravelTimeReducer {
         // Decide whether we want to retain travel times to all destinations for this origin.
         calculateTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
         if (calculateTravelTimes) {
-            travelTimes = new TimeGrid(task);
+            travelTimeResult = new TimeGrid(task);
         }
 
         // Decide what we want to calculate
@@ -107,10 +111,10 @@ public class TravelTimeReducer {
             RegionalTask regionalTask = (RegionalTask) task;
             if (regionalTask.recordAccessibility) {
                 calculateAccessibility = true;
-                accessibilityAccumulator = new AccessibilityAccumulator(task);
+                accessibilityResult = new AccessibilityResult(task);
             }
             if (regionalTask.recordTimes) {
-                travelTimes = new TravelTimeResult(regionalTask);
+                travelTimeResult = new TravelTimeResult(regionalTask);
                 calculateTravelTimes = true;
             }
         }
@@ -118,29 +122,30 @@ public class TravelTimeReducer {
 
 
     /**
-     * Compute the index into a sorted list of N elements at which a particular percentile will be found.
-     * Our method does not interpolate, it always reports a value actually appearing in the list of elements.
-     * That is to say, the percentile will be found at an integer-valued index into the sorted array of elements.
-     * The definition of a non-interpolated percentile is as follows: the smallest value in the list such that no more
-     * than P percent of the data is strictly less than the value and at least P percent of the data is less than or
-     * equal to that value. By this definition, the 100th percentile is the largest value in the list.
-     * See https://en.wikipedia.org/wiki/Percentile#Definitions
-     *
-     * The formula given on Wikipedia next to definition cited above uses ceiling for one-based indexes.
-     * It is tempting to just truncate to ints instead of ceiling but this gives different results on integer boundaries.
+     * Compute the index into a sorted list of N elements at which a particular percentile will be found. Our
+     * method does not interpolate, it always reports a value actually appearing in the list of elements. That is
+     * to say, the percentile will be found at an integer-valued index into the sorted array of elements. The
+     * definition of a non-interpolated percentile is as follows: the smallest value in the list such that no more
+     * than P percent of the data is strictly less than the value and at least P percent of the data is less than
+     * or equal to that value. By this definition, the 100th percentile is the largest value in the list. See
+     * https://en.wikipedia.org/wiki/Percentile#Definitions
+     * <p>
+     * The formula given on Wikipedia next to definition cited above uses ceiling for one-based indexes. It is
+     * tempting to just truncate to ints instead of ceiling but this gives different results on integer
+     * boundaries.
      */
     private static int findPercentileIndex(int nElements, double percentile) {
         return (int)(Math.ceil(percentile / 100 * nElements) - 1);
     }
 
     /**
-     * Given a single travel time, replicate it to match the expected number of percentiles, then record value for
-     * target.
+     * Given a single unvarying travel time to a destination, replicate it to match the expected number of
+     * percentiles, then record those n identical percentiles at the target.
      *
      * @param timeSeconds Single travel time, for results with no variation, e.g. from walking, biking, or driving.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] replicateTravelTimesAndRecord (int target, int timeSeconds){
+    public int[] recordUnvaryingTravelTimeAtTarget (int target, int timeSeconds){
         int[] travelTimesMinutes = new int[nPercentiles];
         Arrays.fill(travelTimesMinutes, convertToMinutes(timeSeconds));
         return recordTravelTimesForTarget(target, travelTimesMinutes);
@@ -183,17 +188,17 @@ public class TravelTimeReducer {
                     " " + nPercentiles);
         }
         if (calculateTravelTimes) {
-            travelTimes.setTarget(target, percentileTravelTimesMinutes);
+            travelTimeResult.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {
             // This is only handling one grid at a time, needs to be adapted to handle multiple different extents.
-            PointSet pointSet = accessibilityAccumulator.destinationPointSets[0];
+            PointSet pointSet = accessibilityResult.destinationPointSets[0];
             double amount = pointSet.getOpportunityCount(target);
             for (int p = 0; p < nPercentiles; p++) {
                 // Use of < here (as opposed to <=) matches the definition in JS front end,
                 // and works well when truncating seconds to minutes.
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
-                    accessibilityAccumulator.incrementAccessibility(0, 0, p, amount);
+                    accessibilityResult.incrementAccessibility(0, 0, p, amount);
                 }
             }
         }
@@ -228,7 +233,7 @@ public class TravelTimeReducer {
      * routing and propagation when the origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(travelTimes, accessibilityAccumulator);
+        return new OneOriginResult(travelTimeResult, accessibilityResult);
     }
 
 }

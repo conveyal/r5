@@ -1,6 +1,6 @@
 package com.conveyal.r5;
 
-import com.conveyal.r5.analyst.AccessibilityAccumulator;
+import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
@@ -18,9 +18,9 @@ public class OneOriginResult {
 
     public final TravelTimeResult travelTimes;
 
-    public final AccessibilityAccumulator accessibility;
+    public final AccessibilityResult accessibility;
 
-    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityAccumulator accessibility) {
+    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility) {
         this.travelTimes = travelTimes;
         this.accessibility = accessibility;
     }
@@ -33,10 +33,14 @@ public class OneOriginResult {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
         this.travelTimes = null;
-        this.accessibility = new AccessibilityAccumulator();
+        this.accessibility = new AccessibilityResult();
     }
 
-    public RegionalWorkResult toResult() {
+    /**
+     * Convert this internal R5 result into a more compact form intended for serialization and transfer from
+     * the worker back to the backend.
+     */
+    public RegionalWorkResult toRegionalWorkResult () {
         return new RegionalWorkResult(this);
     }
 

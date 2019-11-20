@@ -89,7 +89,12 @@ public class TravelTimeReducer {
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
-        // TODO check that indexes are increasing here.
+        // Check precondition: The percentiles in the request must be in ascending order.
+        for (int i = 1; i < task.percentiles.length; i++) {
+            if (task.percentiles[i] < task.percentiles[i - 1]) {
+                throw new ParameterException("The percentiles in the request must be in ascending order.");
+            }
+        }
         this.percentileIndexes = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
             percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles[p]);

@@ -116,7 +116,7 @@ public class TimeGridWriter {
             // Write values, delta coded
             for (int i = 0; i < travelTimeResult.nSamplesPerPoint; i++) {
                 int prev = 0; // delta code within each percentile grid
-                for (int j = 0; j < extents.getArea(); j++) {
+                for (int j = 0; j < travelTimeResult.nPoints; j++) {
                     int curr = travelTimeResult.values[i][j];
                     // TODO try not delta-coding the "unreachable" value, and retaining the previous value across
                     //  unreachable areas of the grid.

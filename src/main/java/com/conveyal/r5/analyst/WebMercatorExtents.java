@@ -2,12 +2,16 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
  * Really we should be embedding one of these in the tasks, grids, etc. to factor out all the common fields.
  * Equals and hashcode are semantic, for use as or within hashtable keys.
- * Created by abyrd on 2018-09-21
+ *
+ * TODO may want to distinguish between WebMercatorExtents, WebMercatorGrid (adds lat/lon conversion functions),
+ *      and OpportunityGrid (AKA Grid) which adds opportunity counts. These can compose, not necessarily subclass.
+ *      Of course they could all be one class, with the opportunity grid nulled out when there is no density.
  */
 public class WebMercatorExtents {
 
@@ -17,7 +21,7 @@ public class WebMercatorExtents {
     public final int height;
     public final int zoom;
 
-    public WebMercatorExtents(int west, int north, int width, int height, int zoom) {
+    public WebMercatorExtents (int west, int north, int width, int height, int zoom) {
         this.west = west;
         this.north = north;
         this.width = width;
@@ -43,25 +47,21 @@ public class WebMercatorExtents {
 
     }
 
-    public int getArea() {
-        return width * height;
-    }
-
     @Override
-    public boolean equals(Object o) {
+    public boolean equals (Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         WebMercatorExtents extents = (WebMercatorExtents) o;
-        return west == extents.west &&
-                north == extents.north &&
-                width == extents.width &&
-                height == extents.height &&
-                zoom == extents.zoom;
+        return west == extents.west && north == extents.north && width == extents.width && height == extents.height && zoom == extents.zoom;
     }
 
     @Override
-    public int hashCode() {
-        return Objects.hash(west, north, width, height, zoom);
+    public int hashCode () {
+        return hashCode(west, north, width, height, zoom);
+    }
+
+    private static int hashCode (int... ints) {
+        return Arrays.hashCode(ints);
     }
 
 }

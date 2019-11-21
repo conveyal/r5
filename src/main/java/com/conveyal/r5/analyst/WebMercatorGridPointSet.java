@@ -1,10 +1,15 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.transit.TransportNetwork;
+import com.vividsolutions.jts.geom.Envelope;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * A pointset that represents a grid of pixels from the web mercator projection.
@@ -91,6 +96,31 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     public double getLon(int i) {
         long x = i % this.width + this.west;
         return pixelToLon(x);
+    }
+
+    @Override
+    public TIntList getPointsInEnvelope (Envelope envelope) {
+        // This is not very DRY since we do something very similar in the constructor and elsewhere.
+        int west = lonToPixel(fixedDegreesToFloating(envelope.getMinX()));
+        int east = lonToPixel(fixedDegreesToFloating(envelope.getMaxX()));
+        int north = latToPixel(fixedDegreesToFloating(envelope.getMaxY()));
+        int south = latToPixel(fixedDegreesToFloating(envelope.getMinY()));
+        // Adjust for edges of this WebMercatorGridPointSet
+        west -= this.west;
+        east -= this.west;
+        north -= this.north;
+        south -= this.north;
+        TIntList pointsInEnvelope = new TIntArrayList();
+        // Pixels are truncated toward zero, and coords increase toward East and South in web Mercator, so <= south/east.
+        for (int y = north; y <= south; y++) {
+            if (y < 0 || y >= this.width) continue;
+            for (int x = west; x <= east; x++) {
+                if (x < 0 || x >= this.height) continue;
+                int pointIndex = y * this.width + x;
+                pointsInEnvelope.add(pointIndex);
+            }
+        }
+        return pointsInEnvelope;
     }
 
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics

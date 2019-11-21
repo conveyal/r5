@@ -181,11 +181,6 @@ public class EgressCostTable implements Serializable {
         }
 
         LOG.info("Creating EgressCostTables from each transit stop to PointSet points.");
-        // FIXME using a spatial index is wasting a lot of memory and not needed for gridded pointsets - overload for
-        //        gridded and freeform PointSets. We could just do this in the method that uses the pointset spatial
-        //        index (extendDistanceTableToPoints) but that's called in a tight loop.
-        linkedPointSet.pointSet.createSpatialIndexAsNeeded();
-
         if (rebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }

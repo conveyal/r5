@@ -417,19 +417,19 @@ public class LinkedPointSet implements Serializable {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
-        // TODO we don't really need a spatial index on a gridded point set.
         // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
-        TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
-        // FIXME this is not correcting for the fact that HashGrid returns false positives. It's returning every point in the bounding box. But it is also sensitive to which vertices are passed in.
+        TIntList relevantPoints = pointSet.getPointsInEnvelope(distanceTableZone);
+        // This is not correcting for the fact that the method returns false positives, but that should be harmless.
+        // It's returning every point in the bounding box. But it is also sensitive to which vertices are in the map.
         relevantPoints.forEach(p -> {
             // An edge index of -1 for a particular point indicates that this point is unlinked.
             if (edges[p] == -1) {
                 return true; // Continue to next iteration.
             }
             edge.seek(edges[p]);
-            int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
+            int t1 = Integer.MAX_VALUE;
+            int t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
-
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p] + distancesToEdge_mm[p];
             }

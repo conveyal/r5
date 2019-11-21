@@ -10,8 +10,11 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /**
      * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. Still named grid (instead of
-     * destinationPointSetKey for backward compatibility, namely the ability to start regional jobs on old worker
+     * destinationPointSetId for backward compatibility, namely the ability to start regional jobs on old worker
      * versions).
+     * Overloaded to specify a set of destination points which may or may not have densities attached.
+     * In fact this ID is taken from a field called "opportunityDatasetId" in the request coming from the UI. So we've
+     * got several slightly conflicting names and concepts.
      *
      * If this is not blank, the default TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes,
      * returnWaitTimes, and returnPaths will be set to false; and the returned results will be an accessibility value

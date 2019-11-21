@@ -102,6 +102,9 @@ public class TravelTimeReducer {
         // Decide whether we want to retain travel times to all destinations for this origin.
         calculateTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
         if (calculateTravelTimes) {
+            // TimeGrid extends TravelTimeResult, adding grid writing functionality.
+            // We should probably pull the grid/1D writing functionality out into other classes and have a single
+            // TravelTimeResult class.
             travelTimeResult = new TimeGrid(task);
         }
 
@@ -114,6 +117,10 @@ public class TravelTimeReducer {
                 accessibilityResult = new AccessibilityResult(task);
             }
             if (regionalTask.recordTimes) {
+                // This is currently only used with regional tasks when origins are freeform pointsets.
+                // This base TravelTimeResult class (as opposed to its subclass TimeGrid) does not have grid writing
+                // capabilities, which are not needed or relevant in non-Taui regional analyses as they report directly
+                // back to the broker in JSON.
                 travelTimeResult = new TravelTimeResult(regionalTask);
                 calculateTravelTimes = true;
             }

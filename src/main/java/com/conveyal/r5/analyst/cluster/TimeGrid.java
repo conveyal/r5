@@ -25,6 +25,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
+ *
+ * NOTE: TimeGrid now extends TravelTimeResult, the two used to be one big class TimeGrid.
+ * Maybe instead of being a subclass, this should just be a gridded TravelTimeResult writer.
+ *
  * Grid for recording travel times, which can be written to flat binary output
  *
  * This is similar to com.conveyal.r5.analyst.Grid, but it uses ints for the pixel values, and allows multiple values
@@ -42,7 +46,7 @@ import java.io.OutputStream;
  * (4 byte int) number of values per pixel
  * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
  */
-public class TimeGrid extends TravelTimeResult{
+public class TimeGrid extends TravelTimeResult {
 
     public static final Logger LOG = LoggerFactory.getLogger(TimeGrid.class);
 

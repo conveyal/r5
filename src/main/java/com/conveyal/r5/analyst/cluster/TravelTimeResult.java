@@ -14,7 +14,8 @@ import java.util.Arrays;
 
 public class TravelTimeResult {
 
-    // used to be stored as longs, but can probably still use with impunity without fear of overflow
+    // In the past, when doing large numbers of bootstrapping samples, this used to be a long
+    // but now it should never be so huge and should fit in an int without fear of overflow.
     public final int nSamplesPerPoint;
 
     public final int nPoints;

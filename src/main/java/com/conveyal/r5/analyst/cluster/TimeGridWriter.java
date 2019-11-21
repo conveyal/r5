@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
@@ -25,30 +26,37 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
+ * This writes travel times from one origin to NxM gridded destinations out to a binary grid file.
+ * For each destination, it saves one or more percentiles of the travel time distribution.
  *
- * NOTE: TimeGrid now extends TravelTimeResult, the two used to be one big class TimeGrid.
- * Maybe instead of being a subclass, this should just be a gridded TravelTimeResult writer.
+ * This format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel values,
+ * and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
+ * now says ACCESSGR instead of TIMEGRID.
  *
- * Grid for recording travel times, which can be written to flat binary output
+ * TODO Unify this class with GridResultWriter in the backend, as they both write the same format now.
+ *      We should be able to remove GridResultWriter from the backend and use this class imported from R5.
+ *      We may eventually also be able to store opportunities in the same format.
+ *      Prefiltering could aid compression (delta coding, skipping over or not delta coding UNREACHED values).
  *
- * This is similar to com.conveyal.r5.analyst.Grid, but it uses ints for the pixel values, and allows multiple values
- * per pixel.
- *
- *  * Time grids look like this:
- * Header (ASCII text "TIMEGRID") (note that this header is eight bytes, so the full grid can be mapped into a
- *   Javascript typed array if desired)
- * Version, 4-byte integer
- * (4 byte int) Web mercator zoom level
- * (4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world
- * (4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top edge of the world
- * (4 byte int) width of the grid in pixels
- * (4 byte int) height of the grid in pixels
- * (4 byte int) number of values per pixel
- * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
+ * Time grids look like this:
+ * <ol>
+ * <li>Header (ASCII text "ACCESSGR", note that this header is eight bytes, so the full grid can be
+       mapped into a Javascript typed array of 4-byte integers if desired)</li>
+ * <li>(4 byte int) File format version</li>
+ * <li>(4 byte int) Web mercator zoom level</li>
+ * <li>(4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world</li>
+ * <li>(4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top edge of the world</li>
+ * <li>(4 byte int) width of the grid in pixels</li>
+ * <li>(4 byte int) height of the grid in pixels</li>
+ * <li>(4 byte int) number of values (channels) per pixel</li>
+ * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).
+ *     Values are not delta-coded.</li>
+ * </ol>
+ * NOTE: All integers are little-endian and the same width, to facilitate reading grids as Javascript typed arrays.
  */
-public class TimeGrid extends TravelTimeResult {
+public class TimeGridWriter {
 
-    public static final Logger LOG = LoggerFactory.getLogger(TimeGrid.class);
+    public static final Logger LOG = LoggerFactory.getLogger(TimeGridWriter.class);
 
     /** 8 bytes long to maintain integer alignment. */
     private static final String gridType = "ACCESSGR";
@@ -58,28 +66,43 @@ public class TimeGrid extends TravelTimeResult {
 
     private static final int version = 0;
 
+    private final TravelTimeResult travelTimeResult;
+
+    private final AnalysisTask analysisTask;
+
     private final WebMercatorExtents extents;
 
-    /**
-     * Create a new in-memory access grid writer for a width x height x nValuesPerPixel 3D array.
-     */
-    public TimeGrid(AnalysisTask task) {
-        super(task);
-        extents = WebMercatorExtents.forTask(task);
+    private final long nIntegersInOuput;
 
-        long nBytes = ((long) nSamplesPerPoint * nPoints) * Integer.BYTES + HEADER_SIZE;
-        if (nBytes > Integer.MAX_VALUE) {
+    private final long nBytesInOutput;
+
+    /**
+     * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is interpreted as a
+     * rectangular grid matching the supplied WebMercatorExtents.
+     */
+    public TimeGridWriter (TravelTimeResult travelTimeResult, AnalysisTask analysisTask) {
+        this.travelTimeResult = travelTimeResult;
+        this.analysisTask = analysisTask;
+        this.extents = WebMercatorExtents.forTask(analysisTask);
+        if (travelTimeResult.nPoints != extents.width * extents.height) {
+            throw new ParameterException("Travel time cannot be for a grid of this dimension.");
+        }
+        nIntegersInOuput = (long) travelTimeResult.nSamplesPerPoint * travelTimeResult.nPoints;
+        nBytesInOutput = nIntegersInOuput * Integer.BYTES + HEADER_SIZE;
+        if (nBytesInOutput > Integer.MAX_VALUE) {
             throw new RuntimeException("Grid size in bytes exceeds 31-bit addressable space.");
         }
     }
 
     /**
-     * Write the grid to an object implementing the DataOutput interface.
+     * Write the grid to an object implementing the DataOutput interface. Note that the endianness of the integers
+     * in the output will be dependent on the DataOutput implementation supplied. To fit our file format
+     * specification the DataOutput should be little-endian.
+     *
      * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
      */
     public void writeToDataOutput(DataOutput dataOutput) {
-        int sizeInBytes = nSamplesPerPoint * nPoints * Integer.BYTES + HEADER_SIZE;
-        LOG.info("Writing travel time surface with uncompressed size {} kiB", sizeInBytes / 1024);
+        LOG.info("Writing travel time surface with uncompressed size {} kiB", nBytesInOutput / 1024);
         try {
             // Write header
             dataOutput.write(gridType.getBytes());
@@ -89,13 +112,14 @@ public class TimeGrid extends TravelTimeResult {
             dataOutput.writeInt(extents.north);
             dataOutput.writeInt(extents.width);
             dataOutput.writeInt(extents.height);
-            dataOutput.writeInt(nSamplesPerPoint);
+            dataOutput.writeInt(travelTimeResult.nSamplesPerPoint);
             // Write values, delta coded
-            for (int i = 0; i < nSamplesPerPoint; i++) {
+            for (int i = 0; i < travelTimeResult.nSamplesPerPoint; i++) {
                 int prev = 0; // delta code within each percentile grid
                 for (int j = 0; j < extents.getArea(); j++) {
-                    int curr = values[i][j];
-                    // TODO try not delta-coding the "unreachable" value, and retaining the prev value across unreachable areas.
+                    int curr = travelTimeResult.values[i][j];
+                    // TODO try not delta-coding the "unreachable" value, and retaining the previous value across
+                    //  unreachable areas of the grid.
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);
                     prev = curr;
@@ -107,8 +131,9 @@ public class TimeGrid extends TravelTimeResult {
     }
 
     /**
-     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save
-     * it to a local or remote storage location.
+     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to
+     * save it to a local or remote storage location. Note that the PersistenceBuffer's dataOutput is
+     * little-endian.
      */
     public PersistenceBuffer writeToPersistenceBuffer() {
         PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
@@ -121,20 +146,22 @@ public class TimeGrid extends TravelTimeResult {
      * Write this grid out in GeoTIFF format.
      * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.
      */
-    public void writeGeotiff (OutputStream out, AnalysisTask request) {
+    public void writeGeotiff (OutputStream out) {
         LOG.info("Writing GeoTIFF file");
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
-            final WritableRaster raster =
-                    RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, extents.width, extents.height,
-                            nSamplesPerPoint, null);
+            final WritableRaster raster = RasterFactory.createBandedRaster(
+                DataBuffer.TYPE_INT,
+                extents.width,
+                extents.height,
+                travelTimeResult.nSamplesPerPoint,
+                null
+            );
 
-            int val;
-
-            for (int y = 0; y < extents.height; y ++) {
-                for (int x = 0; x < extents.width; x ++) {
-                    for (int n = 0; n < nSamplesPerPoint; n ++) {
-                        val = values[n][(y * extents.width + x)];
+            for (int y = 0, val; y < extents.height; y++) {
+                for (int x = 0; x < extents.width; x++) {
+                    for (int n = 0; n < travelTimeResult.nSamplesPerPoint; n++) {
+                        val = travelTimeResult.values[n][(y * extents.width + x)];
                         if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
                     }
                 }
@@ -154,8 +181,8 @@ public class TimeGrid extends TravelTimeResult {
             GeoTiffWriter writer = new GeoTiffWriter(out);
 
             // If the request that produced this TimeGrid was supplied, write scenario metadata into the GeoTIFF
-            if (request != null) {
-                AnalysisTask clonedRequest = request.clone();
+            if (analysisTask != null) {
+                AnalysisTask clonedRequest = analysisTask.clone();
                 // Save the scenario ID rather than the full scenario, to avoid making metadata too large. We're not
                 // losing information here, the scenario id used here is qualified with the CRC and is thus immutable
                 // and available from S3.

@@ -9,6 +9,7 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -428,13 +429,14 @@ public class AnalystWorker implements Runnable {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
+        TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
         if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-            ((TimeGrid) oneOriginResult.travelTimes).writeGeotiff(byteArrayOutputStream, task);
+            timeGridWriter.writeGeotiff(byteArrayOutputStream);
         } else {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.
             // TODO eventually reuse same code path as static site time grid saving
-            ((TimeGrid) oneOriginResult.travelTimes).writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -504,8 +506,8 @@ public class AnalystWorker implements Runnable {
                 // non-default contents, as a way to save storage and bandwidth.
                 // TODO eventually carry out actions based on what's present in the result, not on the request type.
                 if (oneOriginResult.travelTimes.anyCellReached()) {
-                    PersistenceBuffer persistenceBuffer =
-                            ((TimeGrid) oneOriginResult.travelTimes).writeToPersistenceBuffer();
+                    TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
+                    PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
                     String timesFileName = task.taskId + "_times.dat";
                     filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
                 } else {

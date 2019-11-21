@@ -4,7 +4,7 @@ import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.TimeGrid;
+import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -100,30 +100,32 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        calculateTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
-        if (calculateTravelTimes) {
-            // TimeGrid extends TravelTimeResult, adding grid writing functionality.
-            // We should probably pull the grid/1D writing functionality out into other classes and have a single
-            // TravelTimeResult class.
-            travelTimeResult = new TimeGrid(task);
-        }
+        // This is currently only used with regional tasks when origins are freeform pointsets.
+        // This base TravelTimeResult class (as opposed to its subclass TimeGrid) does not have grid writing
+        // capabilities, which are not needed or relevant in non-Taui regional analyses as they report directly
+        // back to the broker in JSON.
 
-        // Decide what we want to calculate
-        calculateAccessibility = false;
-        if (task instanceof RegionalTask) {
+        // Decide which elements we'll be calculating, retaining, and returning.
+        calculateAccessibility = calculateTravelTimes = false;
+        if (task instanceof TravelTimeSurfaceTask) {
+            calculateTravelTimes = true;
+        } else {
             RegionalTask regionalTask = (RegionalTask) task;
             if (regionalTask.recordAccessibility) {
                 calculateAccessibility = true;
-                accessibilityResult = new AccessibilityResult(task);
             }
-            if (regionalTask.recordTimes) {
-                // This is currently only used with regional tasks when origins are freeform pointsets.
-                // This base TravelTimeResult class (as opposed to its subclass TimeGrid) does not have grid writing
-                // capabilities, which are not needed or relevant in non-Taui regional analyses as they report directly
-                // back to the broker in JSON.
-                travelTimeResult = new TravelTimeResult(regionalTask);
+            if (regionalTask.recordTimes || regionalTask.makeTauiSite) {
                 calculateTravelTimes = true;
             }
+        }
+
+        // Instantiate and initialize objects to accumulate the kinds of results we expect to produce.
+        // These are conditionally instantiated because they can consume a lot of memory.
+        if (calculateAccessibility) {
+            accessibilityResult = new AccessibilityResult(task);
+        }
+        if (calculateTravelTimes) {
+            travelTimeResult = new TravelTimeResult(task);
         }
     }
 

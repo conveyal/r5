@@ -70,11 +70,13 @@ import static org.apache.commons.math3.util.FastMath.sinh;
 import static org.apache.commons.math3.util.FastMath.tan;
 
 /**
- * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
- * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset from
- * the edges of the world.
+ * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
+ * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset
+ * from the edges of the world. This is quite close to implementing a PointSet interface, but PointSet currently
+ * includes linkage cache functionality which Grid does not need.
  *
  * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+ * TODO functionality to write and read grids should probably be in a separate class from the main Grid class.
  */
 public class Grid extends PointSet {
 

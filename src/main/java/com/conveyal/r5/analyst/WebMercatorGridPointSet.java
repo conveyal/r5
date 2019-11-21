@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,43 +31,30 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     public final int height;
 
     /** Base pointset; linkages will be shared with this pointset */
-    public final WebMercatorGridPointSet base;
+    public final WebMercatorGridPointSet basePointSet;
 
-    /** Create a new WebMercatorGridPointSet with no base pointset */
-    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height) {
-        this(zoom, west, north, width, height, null);
-    }
-
-    /** Create a new WebMercatorGridPointSet with a base pointset from which linkages will be shared */
-    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height, WebMercatorGridPointSet base) {
+    /**
+     * Create a new WebMercatorGridPointSet.
+     *
+     * @oaram basePointSet the super-grid pointset from which linkages will be copied or shared, or null if no
+     *        such grid exists.
+     */
+    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height, WebMercatorGridPointSet basePointSet) {
         this.zoom = zoom;
         this.west = west;
         this.north = north;
         this.width = width;
         this.height = height;
-        this.base = base;
-        // Copy subsets of linkages already cached in the base linkage into to this point set. A walking linkage is
-        // pre-built for the full geographic extent transport network, and linkages for other modes may already exist.
-        // We can re-use the data in these linkages instead of re-computing them from scratch for the new extents.
-        // LinkedPointSet now handles the case where the new grid is not completely contained by the base grid.
-        // Since this generally happens when there are points beyond the transit network's extents, marking the points
-        // that are not contained by the base linkage as unlinked (and logging a warning if all points are beyond
-        // the network) is sufficient as you will not be able to reach these locations anyhow.
-        // TODO don't copy, just have a cache that wraps the base pointset and can read through to the original linkages
-        // TODO maybe put all the linkages into the cache (none in the map) when building upon a base
-        if (base != null) {
-            base.linkageMap.forEach(
-                    (key, baseLinkage) -> this.linkageMap.put(key, new LinkedPointSet(baseLinkage, this)));
-            base.linkageCache.asMap().forEach(
-                    (key, baseLinkage) -> this.linkageCache.put(key, new LinkedPointSet(baseLinkage, this)));
-        }
+        this.basePointSet = basePointSet;
     }
 
     /**
      * Constructs a grid point set that covers the entire extent of the supplied transport network's street network.
+     * This usually serves as the base supergrid pointset for other smaller grids in the same region.
      */
-    public WebMercatorGridPointSet(TransportNetwork transportNetwork) {
-        LOG.info("Creating web mercator pointset for transport network with extents {}", transportNetwork.streetLayer.envelope);
+    public WebMercatorGridPointSet (TransportNetwork transportNetwork) {
+        LOG.info("Creating web mercator pointset for transport network with extents {}",
+                transportNetwork.streetLayer.envelope);
 
         this.zoom = DEFAULT_ZOOM;
         int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
@@ -80,7 +66,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         this.north = north;
         this.height = south - north;
         this.width = east - west;
-        this.base = null;
+        this.basePointSet = null;
     }
 
     @Override
@@ -142,10 +128,16 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     //@Override
+    // TODO add this to the PointSet interface
     public String getPointId (int i) {
         int y = i / this.width;
         int x = i % this.width;
         return x + "," + y;
+    }
+
+    @Override
+    public String toString () {
+        return "WebMercatorGridPointSet{" + "zoom=" + zoom + ", west=" + west + ", north=" + north + ", width=" + width + ", height=" + height + ", basePointSet=" + basePointSet + '}';
     }
 
 }

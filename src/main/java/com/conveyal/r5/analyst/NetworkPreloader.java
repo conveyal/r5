@@ -73,7 +73,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
     private static final Logger LOG = LoggerFactory.getLogger(NetworkPreloader.class);
 
-    /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
+    /** Keeps one or more TransportNetworks around, lazy-loading or lazy-building them. */
     public final TransportNetworkCache transportNetworkCache;
 
     public NetworkPreloader(TransportNetworkCache transportNetworkCache) {
@@ -95,22 +95,24 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         setProgress(key, 0, "Building network...");
         TransportNetwork scenarioNetwork = transportNetworkCache.getNetworkForScenario(key.networkId, key.scenarioId);
 
-        // Get the set of points to which we are measuring travel time. TODO handle multiple destination grids.
+        // Get the set of points to which we are measuring travel time. Any smaller sub-grids created here will
+        // reference the scenarioNetwork's built-in full-extent pointset, so can reuse its linkage.
+        // TODO handle multiple destination grids.
         setProgress(key, 0, "Fetching gridded point set...");
-        PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.webMercatorExtents, scenarioNetwork.gridPointSet);
+        PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.destinationGridExtents, scenarioNetwork.fullExtentGridPointSet);
 
-        // Then rebuild grid linkages as needed.
-        // One linkage per mode, and one cost table per egress mode. Cost tables are slow to compute and not needed for
-        // access or direct legs.
-        // Note that we're able to pass a progress listener down into the EgressCostTable contruction process, but not
-        // into the linkage process, because the latter is encapsulated as a Google/Caffeine LoadingCache. We'll need
-        // some way to get LoadingCache's per-key locking, while still allowing a progress listener specific to the
-        // single request. Perhaps this will mean registering 0..N progressListeners per key in the cache. It may be a
-        // good idea to keep progressListener objects in fields on Factory classes rather than passing them as parameters
-        // into constructors or factory methods.
+        // Now rebuild grid linkages as needed. One linkage per mode, and one cost table per egress mode.
+        // Cost tables are slow to compute and not needed for access or direct legs, only egress modes.
+        // Note that we're able to pass a progress listener down into the EgressCostTable contruction process,
+        // but not into the linkage process, because the latter is encapsulated as a Google/Caffeine
+        // LoadingCache. We'll need some way to get LoadingCache's per-key locking, while still allowing a
+        // progress listener specific to the single request. Perhaps this will mean registering 0..N
+        // progressListeners per key in the cache. It may be a good idea to keep progressListener objects in
+        // fields on Factory classes rather than passing them as parameters into constructors or factory methods.
         for (StreetMode mode : key.allModes) {
             setProgress(key, 0, "Linking destination grid to streets for " + mode + "...");
-            LinkedPointSet linkedPointSet = pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
+            LinkedPointSet linkedPointSet = scenarioNetwork.linkageCache
+                    .getLinkage(pointSet, scenarioNetwork.streetLayer, mode);
             if (key.egressModes.contains(mode)) {
                 ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
                 linkedPointSet.getEgressCostTable(progressListener);
@@ -121,24 +123,24 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
     }
 
     /**
-     * The items that uniquely identify which set of data is needed to perform an analysis.
-     * Namely: the network ID, the scenario ID, the extents of the grid, and the modes of transport.
+     * A compound key containing all items uniquely identifying the set of data is needed to perform an analysis.
+     * Namely: the network ID, the scenario ID, the extents of the grid, and the modes of on-street transport.
+     * A final key element could be the destination density grids, but those are relatively quick to load.
      */
     public static class Key {
 
         public final String networkId;
         public final String scenarioId;
-        public final WebMercatorExtents webMercatorExtents; // rename to destination grid extents
+        public final WebMercatorExtents destinationGridExtents;
         public final EnumSet<StreetMode> allModes;
         public final EnumSet<StreetMode> egressModes;
-        // Final key element is the destination density grids? Those are relatively quick to load though.
 
         /**
          * If a destination opportunity grid is present in the request - not a grid ID but the actual grid object,
-         * then the destination extents will be taken from that grid. This should only be the case for non-static-site
-         * regional tasks. The grid ID should have been resolved to a grid object before calling this method.
-         * If no grid object is present, then the destination extents will be taken from the task.
-         * FIXME should we really be injecting Java objects into a class that is otherwise deserialized straight from JSON?
+         * then the destination extents should be taken from that grid. This should only be the case for
+         * non-static-site regional tasks. The grid ID should have been resolved to a grid object before calling
+         * this constructor. If no grid object is present, then the destination extents should be taken from the
+         * task.
          *
          * This follows our intended behavior: regional tasks that compute accessibility indicators find paths to all
          * the points in some specified opportunity density grid. All other requests (single-point time surfaces and
@@ -147,13 +149,21 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
          * That is to say, the extents specified in the task are the destination points of a single point request,
          * are both the origin and destination points of a static site, and are only the origins of a regional
          * accessibility task, where the destinations are given by the specified opportunity grid.
+         *
+         * Travel time results (single point or static sites) may be combined with any number of different grids,
+         * so we don't want to limit their geographic extent to that of any one grid. Instead we use the extents
+         * supplied in the request. The UI only sends these if the user has changed them to something other than
+         * "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
+         * the region.
+         *
+         * FIXME but should we really be injecting Grid objects into a class deserialized straight from JSON?
          */
         public Key (AnalysisTask task) {
             this.networkId = task.graphId;
             // A supplied scenario ID will always override any full scenario that is present.
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
-            // We need to link for all of access modes, egress modes, and direct modes (depending on whether transit is used).
-            // See code in TravelTimeComputer for when each is used.
+            // We need to link for all of access modes, egress modes, and direct modes (depending on whether
+            // transit is used). See code in TravelTimeComputer for when each is used.
             // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
             this.egressModes = LegMode.toStreetModeSet(task.egressModes);
@@ -164,36 +174,12 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                 // High Priority is an obsolete term for "single point task".
                 // For single point tasks and static sites, there is no opportunity grid. The grid of destinations is
                 // the extents given in the task, which for static sites is also the grid of origins.
-                this.webMercatorExtents = WebMercatorExtents.forTask(task);
+                this.destinationGridExtents = WebMercatorExtents.forTask(task);
             } else {
                 // A non-static-site regional task. We expect a valid grid of opportunities to be specified as the
                 // destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
-                this.webMercatorExtents = WebMercatorExtents.forGrid(((RegionalTask)task).destinationPointSet);
+                this.destinationGridExtents = WebMercatorExtents.forGrid(((RegionalTask)task).destinationPointSet);
             }
-
-            // Some accumulated comments on destination grid size (current and future):
-            //
-            // Travel time results (single point or static sites) may be combined with any number of different grids,
-            // so we don't want to limit their geographic extent to that of any one grid. Instead we use the extents
-            // supplied in the request. The UI only sends these if the user has changed them to something other than
-            // "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
-            // the region.
-            //
-            // FIXME: the request bounds indicate either origin bounds or destination bounds depending on the request type.
-            // We need to specify these separately as we merge all the request types.
-            // Reuse linkages in the base gridPointSet stored in the TransportNetwork as to avoid relinking
-            // Regional analyses use the extents of the destination opportunity grids as their destination extents.
-            //
-            // We don't want to enqueue duplicate tasks with the same destination pointset extents (or where some
-            // requests' extents are a subset of others). It is more efficient to compute the travel times to a given
-            // destination only once, then accumulate multiple accessibility values for multiple opportunities at that
-            // destination.
-            //
-            // In the special case where we're making a static site, a regional task is producing travel time grids.
-            // This is unlike the usual case where regional tasks produce accessibility indicator values.
-            // Because the time grids are not intended for one particular set of destinations,
-            // they should cover the whole analysis region. This RegionalTask has its own bounds, which are the bounds
-            // of the origin grid.
         }
 
         public static Key forTask(AnalysisTask task) {
@@ -207,29 +193,30 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             Key other = (Key) o;
             return Objects.equals(networkId, other.networkId) &&
                     Objects.equals(scenarioId, other.scenarioId) &&
-                    Objects.equals(webMercatorExtents, other.webMercatorExtents) &&
+                    Objects.equals(destinationGridExtents, other.destinationGridExtents) &&
                     Objects.equals(allModes, other.allModes) &&
                     Objects.equals(egressModes, other.egressModes);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(networkId, scenarioId, webMercatorExtents, allModes, egressModes);
+            return Objects.hash(networkId, scenarioId, destinationGridExtents, allModes, egressModes);
         }
     }
 
     /**
-     * All the data items needed to perform an analysis. The value associated with a Key.
-     * This ensures we have references to them all at once, they aren't going to be evicted from some cache once we
+     * All the data items needed to perform an analysis. This should eventually be the value associated with a Key,
+     * ensuring we have references to them all at once and they aren't going to be evicted from some cache once we
      * have them in hand.
-     * TODO we should cache this (flatter) instead of just the TransportNetwork, but that's a later refactor.
+     * TODO we should cache this instead of just the TransportNetwork.
+     *      i.e. this class should extend AsyncLoader<NetworkPreloader.Key, PreloadedData>
      */
     public static class PreloadedData {
         /** Network with the requested scenario applied and stop-to-vertex distance tables built. */
         public final TransportNetwork network;
         public final Grid grid;
         public final LinkedPointSet linkedPointSet;
-        public PreloadedData(TransportNetwork network, Grid grid, LinkedPointSet linkedPointSet) {
+        public PreloadedData (TransportNetwork network, Grid grid, LinkedPointSet linkedPointSet) {
             this.network = network;
             this.grid = grid;
             this.linkedPointSet = linkedPointSet;

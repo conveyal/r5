@@ -44,6 +44,9 @@ import java.util.zip.ZipInputStream;
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
  * local filesystem and on S3 for later re-use.
+ * Currently this holds only one base (non-scenario) network, and evicts it when a new network is requested.
+ * However there may be many scenario networks derived from that base network, which  are stored in the scenarios
+ * field of the baseNetwork.
  */
 public class TransportNetworkCache {
 

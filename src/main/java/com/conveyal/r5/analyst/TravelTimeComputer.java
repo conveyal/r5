@@ -90,10 +90,10 @@ public class TravelTimeComputer {
 
         // For now, use logic in the NetworkPreloader to return null extents if the request is not for a single-point
         // (travel time surface), which implies the destination pointset is a grid. This should be cleaned up.
-        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
+        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).destinationGridExtents;
         if (destinationGridExtents != null) {
             // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
-            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
+            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
         } else {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = ((RegionalTask) request).destinationPointSet;
@@ -174,7 +174,8 @@ public class TravelTimeComputer {
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
 
-            LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
+            LinkedPointSet linkedDestinations = network.linkageCache
+                    .getLinkage(destinations, network.streetLayer, accessMode);
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);

@@ -44,7 +44,6 @@ public class WebMercatorExtents {
             // parameters of the request.
             return null;
         }
-
     }
 
     @Override

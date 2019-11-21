@@ -11,7 +11,9 @@ public class WebMercatorGridPointSetTest extends TestCase {
     @Test
     public static void testLatLonPixelConversions () {
         // offsets and width/height not needed for calculations
-        WebMercatorGridPointSet ps = new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM, 0, 0, 100, 100);
+        WebMercatorGridPointSet ps = new WebMercatorGridPointSet(
+            WebMercatorGridPointSet.DEFAULT_ZOOM, 0,0, 100, 100, null
+        );
 
         for (double lat : new double [] { -75, -25, 0, 25, 75 }) {
             assertEquals(lat, ps.pixelToLat(ps.latToPixel(lat)), 1e-2);

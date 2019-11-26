@@ -83,7 +83,7 @@ public class Grid extends PointSet {
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
     /** The file extension we use when persisting gridded pointsets to files. */
-    public static final String fileExtension = ".grid";
+    public static final String FILE_EXTENSION = ".grid";
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;

@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
@@ -83,9 +82,11 @@ public class PerTargetPropagater {
     /** Whether to break travel times down into walk, wait, and ride time. */
     private boolean calculateComponents;
 
-    /** Whether to propagate only to one target that corresponds to the origin (e.g. in a travel time savings
-     * calculation) */
-    private boolean matchedTargets = false;
+    /**
+     * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
+     * calculation).
+     */
+    private final boolean oneToOne;
 
     public static final int SECONDS_PER_MINUTE = 60;
     public static final int MM_PER_METER = 1000;
@@ -125,7 +126,7 @@ public class PerTargetPropagater {
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeTauiSite;
 
-        if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) matchedTargets = true;
+        oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
 
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -159,12 +160,13 @@ public class PerTargetPropagater {
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
         perIterationPaths = calculateComponents ? new Path[nIterations] : null;
 
+        // In most tasks, we want to propagate travel times for each origin out to all the destinations.
         int startTarget = 0;
         int endTarget = nTargets;
 
-        // One-to-one task assumes each origin in a freeform pointset corresponds to the destination at the same
-        // position
-        if (matchedTargets) {
+        // However, in one-to-one tasks, each origin in a freeform pointset corresponds to a single destination at
+        // the same position in the destinations pointset. So our target range is restricted to only one target.
+        if (oneToOne) {
             startTarget = ((RegionalTask) request).taskId;
             endTarget = startTarget + 1;
         }
@@ -195,7 +197,7 @@ public class PerTargetPropagater {
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
-            int targetToWrite = matchedTargets ? 0 : targetIdx;
+            int targetToWrite = oneToOne ? 0 : targetIdx;
             int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetToWrite, perIterationTravelTimes);
 
             if (calculateComponents) {

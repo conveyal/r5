@@ -13,9 +13,9 @@ public class RegionalWorkResult {
     public int taskId;
 
     /**
-     * Values from a travelTimeResult, keyed on percentile of total travel time and target index. FIXME Note that the
-     * broker's polling system was not designed to handle large amounts of data; travel time results are currently
-     * an experimental feature and large numbers of targets may overwhelm the system.
+     * Values from a travelTimeResult, keyed on percentile of total travel time and target index.
+     * FIXME Note that the broker's polling system was not designed to handle large amounts of data; travel time
+     *       results are currently an experimental feature and large numbers of targets may overwhelm the system.
      */
     public int[][] travelTimeValues;
 

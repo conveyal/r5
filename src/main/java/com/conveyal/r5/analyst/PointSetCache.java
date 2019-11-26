@@ -10,11 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutionException;
 import java.util.zip.GZIPInputStream;
 
@@ -55,9 +52,9 @@ public class PointSetCache {
         // If the object does not exist on S3, getObject will throw an exception which will be caught in the
         // PointSetCache.get method. Grids are gzipped on S3.
         InputStream is = new GZIPInputStream(new BufferedInputStream(obj.getObjectContent()));
-        if (key.endsWith(Grid.fileExtension)) {
+        if (key.endsWith(Grid.FILE_EXTENSION)) {
             return Grid.read(is);
-        } else if (key.endsWith(FreeFormPointSet.fileExtension)) {
+        } else if (key.endsWith(FreeFormPointSet.FILE_EXTENSION)) {
             return new FreeFormPointSet(is);
         } else {
             throw new RuntimeException("Unrecognized file extension in object key: " + key);

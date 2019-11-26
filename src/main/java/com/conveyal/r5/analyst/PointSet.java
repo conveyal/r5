@@ -1,39 +1,38 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.common.GeometryUtils;
-import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 /**
  * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
  * accessibility analysis. Legacy Transport Analyst used freeform pointsets; early versions of Conveyal Analysis
  * instead favored regular grids in the web mercator projection.  This abstraction encompasses both.
- * In a future refactor, PointSet should probably become an interface to hide all this spatial indexing and such.
+ * TODO PointSet should probably become an interface to hide all this spatial indexing and such.
  */
 public abstract class PointSet {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
 
     /**
      * It seems like fighting Java typing to store type codes in JSON.
      * But at least by using some symbolic constants and Java identifiers things are well cross-referenced.
+     * This is mostly used to store metadata for both grids and freeform points in the same Mongo collection.
      */
     public enum Format {
-        FREEFORM (FreeFormPointSet.fileExtension),
-        GRID (Grid.fileExtension);
+        FREEFORM (FreeFormPointSet.FILE_EXTENSION),
+        GRID (Grid.FILE_EXTENSION);
         public final String fileExtension;
         Format(String fileExtension) {
             this.fileExtension = fileExtension;
         }
     }
 
-    private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
-
-    /** Human readable name. Unfortunately this is lost when persisting Grids, to maintain backward compatibility. */
+    /**
+     * Human readable name. Unfortunately this is lost when persisting Grids, to maintain backward compatibility.
+     * TODO make this a method
+     */
     public transient String name;
 
     /**
@@ -78,19 +77,11 @@ public abstract class PointSet {
     public abstract double getOpportunityCount(int i);
 
     /**
-     * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
-     * in FIXED POINT DEGREES.
+     * @param i the one-dimensional index into the list of points.
+     * @return a unique ID string for this particular point within the scope of this pointset.
      */
-    public Coordinate getCoordinateFixed(int index) {
-        return new Coordinate(floatingDegreesToFixed(getLon(index)), floatingDegreesToFixed(getLat(index)));
-    }
-
-    /**
-     * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
-     * in FIXED POINT DEGREES.
-     */
-    public Point getJTSPointFixed(int index) {
-        return GeometryUtils.geometryFactory.createPoint(getCoordinateFixed(index));
+    public String getId (int i) {
+        return Integer.toString(i);
     }
 
 }

@@ -27,6 +27,11 @@ public abstract class AnalysisTask extends ProfileRequest {
      */
     public static final WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
 
+    // Extents of a web Mercator grid. Unfortunately this grid serves different purposes in different requests.
+    // In the single-origin TravelTimeSurfaceTasks, the grid points are the destinations.
+    // In regional multi-origin tasks, the grid points are the origins, with destinations determined by the selected
+    // opportunity dataset.
+    // In regional Taui (static site) tasks the grid points serve as both the origins and the destinations.
     public int zoom;
     public int west;
     public int north;
@@ -122,5 +127,10 @@ public abstract class AnalysisTask extends ProfileRequest {
         // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
         return (AnalysisTask) super.clone();
     }
+
+    /**
+     * @return the expected number of destination points for this particular kind of task.
+     */
+    public abstract int nTargetsPerOrigin();
 
 }

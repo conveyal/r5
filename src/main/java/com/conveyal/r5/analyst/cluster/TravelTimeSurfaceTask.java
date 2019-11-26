@@ -43,4 +43,10 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
         return format;
     }
 
+    @Override
+    public int nTargetsPerOrigin () {
+        // In TravelTimeSurfaceTasks, the set of destinations is always determined by the web mercator extents.
+        return width * height;
+    }
+
 }

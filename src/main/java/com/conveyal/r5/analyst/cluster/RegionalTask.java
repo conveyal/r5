@@ -50,11 +50,6 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      */
     public boolean recordAccessibility;
 
-    /**
-     * Is set explicitly when freeform pointset supplied as origin; otherwise 0
-     */
-    public int nTravelTimeTargetsPerOrigin;
-
     @Override
     public Type getType() {
         return Type.REGIONAL_ANALYSIS;
@@ -76,6 +71,18 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
                 "jobId=" + jobId +
                 ", task=" + taskId +
                 '}';
+    }
+
+    @Override
+    public int nTargetsPerOrigin () {
+        // In multi-origin regional tasks, the set of destinations may be determined by the exact kind of task
+        if (oneToOne) {
+            return 1;
+        }  else if (makeTauiSite) {
+            return width * height;
+        } else {
+            return destinationPointSet.featureCount();
+        }
     }
 
 }

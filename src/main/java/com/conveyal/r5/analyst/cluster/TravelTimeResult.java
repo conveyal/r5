@@ -24,16 +24,8 @@ public class TravelTimeResult {
     int[][] values;
 
     public TravelTimeResult(AnalysisTask task) {
+        nPoints = task.nTargetsPerOrigin();
         nSamplesPerPoint = task.percentiles.length;
-
-        if (task instanceof RegionalTask && ((RegionalTask) task).nTravelTimeTargetsPerOrigin != 0) {
-            // Number of destination targets specified explicitly in task
-            nPoints = ((RegionalTask) task).nTravelTimeTargetsPerOrigin;
-        } else {
-            // Number of destination targets not specified explicitly, so infer from grid
-            nPoints = task.width * task.height;
-        }
-
         // Initialization: Fill the values array the default unreachable value.
         // This way the grid is valid even if we don't write anything into it
         // (rather than saying everything is reachable in zero minutes).

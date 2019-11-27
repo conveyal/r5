@@ -271,8 +271,15 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Write this grid out in R5 binary grid format.
-     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+     * Write this opportunity density grid out in R5 binary format.
+     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional
+     * doubles. This can lead to some strange effects. If you rasterize two polygons into the grid, one with 0.49
+     * opportunities in each cell and the other with 0.51, only one polygon will survive. If one has 1.2 per cell and
+     * the other 0.4 per cell, one polygon will survive as well as the overlap of the two (which will round to 2) but
+     * not the second polygon alone. Maybe we should be truncating instead of rounding to avoid this weirdness.
+     *
+     * Also note that this is a different format than "access grids" and "time grids". Maybe someday they should all be
+     * the same format with a couple of options for compression or number of channels.
      */
     public void write (OutputStream outputStream) throws IOException {
         // Java's DataOutputStream only outputs big-endian format ("network byte order").

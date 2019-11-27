@@ -603,9 +603,9 @@ public class Grid extends PointSet {
         }
 
         // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
-        // FIXME this will overwrite any column called "Count" in the source file.
+        // FIXME this will overwrite any column called "[COUNT]" in the source file, which is hopefully rare.
         Grid countGrid = new Grid(zoom, envelope);
-        countGrid.name = "Count";
+        countGrid.name = "[COUNT]";
         grids.put(countGrid.name, countGrid);
 
         // The first read through the CSV just established its structure (e.g. which fields were numeric).

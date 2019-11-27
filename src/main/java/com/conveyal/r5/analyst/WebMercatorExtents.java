@@ -1,9 +1,13 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.vividsolutions.jts.geom.Envelope;
 
 import java.util.Arrays;
 import java.util.Objects;
+
+import static com.conveyal.r5.analyst.Grid.latToPixel;
+import static com.conveyal.r5.analyst.Grid.lonToPixel;
 
 /**
  * Really we should be embedding one of these in the tasks, grids, etc. to factor out all the common fields.
@@ -44,6 +48,25 @@ public class WebMercatorExtents {
             // parameters of the request.
             return null;
         }
+    }
+
+    public static WebMercatorExtents forWgsEnvelope (Envelope wgsEnvelope, int zoom) {
+        /*
+          The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
+          down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally truncate down, which is
+          the correct behavior for binning points into cells but means the grid is (almost) always 1 row too
+          narrow/short, so we add 1 to the height and width when a grid is created in this manner. The exception is
+          when the envelope edge lies exactly on a pixel boundary. For this reason we should probably not produce WGS
+          Envelopes that exactly align with pixel edges, but they should instead surround the points at pixel centers.
+          Note also that web Mercator coordinates increase from north to south, so minimum latitude is maximum y.
+          TODO maybe use this method when constructing Grids. Grid (int zoom, Envelope envelope)
+         */
+        int north = latToPixel(wgsEnvelope.getMaxY(), zoom);
+        int west = lonToPixel(wgsEnvelope.getMinX(), zoom);
+        int height = (latToPixel(wgsEnvelope.getMinY(), zoom) - north) + 1; // minimum height is 1
+        int width = (lonToPixel(wgsEnvelope.getMaxX(), zoom) - west) + 1; // minimum width is 1
+        WebMercatorExtents webMercatorExtents = new WebMercatorExtents(west, north, width, height, zoom);
+        return webMercatorExtents;
     }
 
     @Override

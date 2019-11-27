@@ -170,4 +170,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return "WebMercatorGridPointSet{" + "zoom=" + zoom + ", west=" + west + ", north=" + north + ", width=" + width + ", height=" + height + ", basePointSet=" + basePointSet + '}';
     }
 
+    @Override
+    public Envelope getWgsEnvelope () {
+        throw new UnsupportedOperationException();
+    }
+
 }

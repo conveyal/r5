@@ -3,24 +3,17 @@ package com.conveyal.r5.analyst;
 import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
-import com.vividsolutions.jts.geom.Polygon;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import org.apache.commons.io.input.BOMInputStream;
+import com.vividsolutions.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
 
 /**
  * These are points serving as origins or destinations in an accessibility analysis which are not constrained to
@@ -32,7 +25,7 @@ public class FreeFormPointSet extends PointSet {
     private static final Logger LOG = LoggerFactory.getLogger(FreeFormPointSet.class);
 
     /** The file extension we use when persisting freeform pointsets to files. */
-    public static final String FILE_EXTENSION = ".freeform";
+    public static final String FILE_EXTENSION = "freeform";
 
     /** A unique identifier for each feature. */
     private final String[] ids;
@@ -113,6 +106,7 @@ public class FreeFormPointSet extends PointSet {
         try (InputStream csvInputStream = csvInputStreamProvider.getInputStream()) {
             CsvReader reader = new CsvReader(csvInputStream, ',', StandardCharsets.UTF_8);
             FreeFormPointSet ret = new FreeFormPointSet(nRecs);
+            ret.name = countField != null ? countField : "[COUNT]";
             reader.readHeaders();
             while (reader.readRecord()) {
                 rec = (int) reader.getCurrentRecord();
@@ -222,6 +216,20 @@ public class FreeFormPointSet extends PointSet {
     @Override
     public String getId (int i) {
         return ids[i];
+    }
+
+    @Override
+    public Envelope getWgsEnvelope () {
+        if (lats.length == 1 || lons.length == 0) {
+            LOG.error("Attempt to create envelope from empty lat/lon array.");
+            return null;
+        }
+        double minLat = Arrays.stream(lats).min().getAsDouble();
+        double minLon = Arrays.stream(lons).min().getAsDouble();
+        double maxLat = Arrays.stream(lats).max().getAsDouble();
+        double maxLon = Arrays.stream(lons).max().getAsDouble();
+        Envelope envelope = new Envelope(minLon, maxLon, minLat, maxLat);
+        return envelope;
     }
 
 }

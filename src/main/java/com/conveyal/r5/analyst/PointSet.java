@@ -9,25 +9,11 @@ import org.slf4j.LoggerFactory;
  * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
  * accessibility analysis. Legacy Transport Analyst used freeform pointsets; early versions of Conveyal Analysis
  * instead favored regular grids in the web mercator projection.  This abstraction encompasses both.
- * TODO PointSet should probably become an interface to hide all this spatial indexing and such.
+ * TODO PointSet should probably become an interface, or at least better encapsulate all this spatial indexing and such.
  */
 public abstract class PointSet {
 
     private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
-
-    /**
-     * It seems like fighting Java typing to store type codes in JSON.
-     * But at least by using some symbolic constants and Java identifiers things are well cross-referenced.
-     * This is mostly used to store metadata for both grids and freeform points in the same Mongo collection.
-     */
-    public enum Format {
-        FREEFORM (FreeFormPointSet.FILE_EXTENSION),
-        GRID (Grid.FILE_EXTENSION);
-        public final String fileExtension;
-        Format(String fileExtension) {
-            this.fileExtension = fileExtension;
-        }
-    }
 
     /**
      * Human readable name. Unfortunately this is lost when persisting Grids, to maintain backward compatibility.
@@ -83,5 +69,11 @@ public abstract class PointSet {
     public String getId (int i) {
         return Integer.toString(i);
     }
+
+    /**
+     * TODO should we also have getWebMercatorExtents on all PointSets?
+     * @return the minimum-size envelope that contains all points in this PointSet.
+     */
+    public abstract Envelope getWgsEnvelope();
 
 }

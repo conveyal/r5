@@ -83,7 +83,7 @@ public class Grid extends PointSet {
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
     /** The file extension we use when persisting gridded pointsets to files. */
-    public static final String FILE_EXTENSION = ".grid";
+    public static final String FILE_EXTENSION = "grid";
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;
@@ -134,20 +134,16 @@ public class Grid extends PointSet {
 
     /**
      * @param zoom Web Mercator zoom level
-     * @param envelope Envelope of grid, in absolute lat/lon coordinates
+     * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
-    public Grid (int zoom, Envelope envelope) {
-        this.zoom = zoom;
-        this.north = latToPixel(envelope.getMaxY(), zoom);
-        /*
-          The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
-          down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
-          the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
-          So we add 1 to the height and width when a grid is created in this manner.
-         */
-        this.height = (latToPixel(envelope.getMinY(), zoom) - this.north) + 1; // minimum height is 1
-        this.west = lonToPixel(envelope.getMinX(), zoom);
-        this.width = (lonToPixel(envelope.getMaxX(), zoom) - this.west) + 1; // minimum width is 1
+    public Grid (int zoom, Envelope wgsEnvelope) {
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        // TODO actually store a reference to an immutable WebMercatorExtents instead of inlining the fields in Grid.
+        this.zoom = webMercatorExtents.zoom;
+        this.west = webMercatorExtents.west;
+        this.north = webMercatorExtents.north;
+        this.width = webMercatorExtents.width;
+        this.height = webMercatorExtents.height;
         this.grid = new double[width][height];
     }
 
@@ -542,6 +538,7 @@ public class Grid extends PointSet {
                                      ProgressListener progressListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
+        // TODO factor out this logic for all CSV loading, reuse for freeform and grids, set progress properly.
         CsvReader reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
         reader.readHeaders();
         List<String> headers = Arrays.asList(reader.getHeaders());
@@ -738,6 +735,29 @@ public class Grid extends PointSet {
         int x = i % this.width;
         int y = i / this.width;
         return grid[x][y];
+    }
+
+    /**
+     * Rasterize a FreeFormFointSet into a Grid.
+     * Currently intended only for UI display of FreeFormPointSets, or possibly for previews of accessibility results
+     * during
+     */
+    public static Grid fromFreeForm (FreeFormPointSet freeForm, int zoom) {
+        // TODO make and us a strongly typed WgsEnvelope class here and in various places
+        Envelope wgsEnvelope = freeForm.getWgsEnvelope();
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        Grid grid = new Grid(webMercatorExtents);
+        grid.name = freeForm.name;
+        for (int f = 0; f < freeForm.featureCount(); f++) {
+            grid.incrementPoint(freeForm.getLat(f), freeForm.getLon(f), freeForm.getOpportunityCount(f));
+        }
+        return grid;
+    }
+
+    @Override
+    public Envelope getWgsEnvelope () {
+        // This should encompass the grid center points but not the grid cells, to fit the method contract.
+        throw new UnsupportedOperationException();
     }
 
 }

@@ -175,4 +175,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         throw new UnsupportedOperationException();
     }
 
+    @Override
+    public WebMercatorExtents getWebMercatorExtents () {
+        throw new UnsupportedOperationException();
+    }
+
 }

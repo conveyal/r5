@@ -277,6 +277,7 @@ public class Grid extends PointSet {
      * opportunities in each cell and the other with 0.51, only one polygon will survive. If one has 1.2 per cell and
      * the other 0.4 per cell, one polygon will survive as well as the overlap of the two (which will round to 2) but
      * not the second polygon alone. Maybe we should be truncating instead of rounding to avoid this weirdness.
+     * TODO conversion to integers should happen as separate method, not during writing, and should be better, #566
      *
      * Also note that this is a different format than "access grids" and "time grids". Maybe someday they should all be
      * the same format with a couple of options for compression or number of channels.
@@ -765,6 +766,11 @@ public class Grid extends PointSet {
     public Envelope getWgsEnvelope () {
         // This should encompass the grid center points but not the grid cells, to fit the method contract.
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public WebMercatorExtents getWebMercatorExtents () {
+        return new WebMercatorExtents(this.west, this.north, this.width, this.height, this.zoom);
     }
 
 }

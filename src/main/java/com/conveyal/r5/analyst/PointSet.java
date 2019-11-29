@@ -71,9 +71,16 @@ public abstract class PointSet {
     }
 
     /**
-     * TODO should we also have getWebMercatorExtents on all PointSets?
+     * Note that implementations of this method may not be constant-time (may iterate over all points).
+     * The value should not change once the PointSet is created, so hoist the call out of any tight loops.
      * @return the minimum-size envelope that contains all points in this PointSet.
      */
     public abstract Envelope getWgsEnvelope();
 
+    /**
+     * Note that implementations of this method may not be constant-time (may iterate over all points).
+     * The value should not change once the PointSet is created, so hoist the call out of any tight loops.
+     * @return the minimum-size WebMercatorExtents that contains all points in this PointSet.
+     */
+    public abstract WebMercatorExtents getWebMercatorExtents();
 }

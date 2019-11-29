@@ -232,4 +232,12 @@ public class FreeFormPointSet extends PointSet {
         return envelope;
     }
 
+    @Override
+    public WebMercatorExtents getWebMercatorExtents () {
+        final int DEFAULT_ZOOM = 9;
+        Envelope wgsEnvelope = this.getWgsEnvelope();
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, DEFAULT_ZOOM);
+        return webMercatorExtents;
+    }
+
 }

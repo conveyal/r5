@@ -62,6 +62,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
+import static java.lang.Double.doubleToLongBits;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -598,6 +599,8 @@ public class Grid extends PointSet {
         // This will also close the InputStreams.
         reader.close();
 
+        checkWgsEnvelopeSize(envelope);
+
         if (progressListener != null) {
             progressListener.setTotalItems(total);
         }
@@ -667,16 +670,11 @@ public class Grid extends PointSet {
         Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
-        // TODO looks like this calculates square km in web mercator, which is heavily distorted away from the equator.
-        double boundingBoxAreaSqKm = reader.getAreaSqKm();
-
-        if (boundingBoxAreaSqKm > MAX_BOUNDING_BOX_AREA_SQ_KM){
-            throw new IllegalArgumentException("Shapefile extent (" + boundingBoxAreaSqKm + " sq. km.) exceeds limit (" +
-                    MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
-        }
 
         Envelope envelope = reader.wgs84Bounds();
         int total = reader.getFeatureCount();
+
+        checkWgsEnvelopeSize(envelope);
 
         if (progressListener != null) {
             progressListener.setTotalItems(total);
@@ -771,6 +769,35 @@ public class Grid extends PointSet {
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
         return new WebMercatorExtents(this.west, this.north, this.width, this.height, this.zoom);
+    }
+
+    /**
+     * @return the approximate area of an Envelope in WGS84 lat/lon coordinates, in square kilometers.
+     */
+    public static double roughWgsEnvelopeArea (Envelope wgsEnvelope) {
+        double lon0 = wgsEnvelope.getMinX();
+        double lon1 = wgsEnvelope.getMaxX();
+        double lat0 = wgsEnvelope.getMinY();
+        double lat1 = wgsEnvelope.getMaxY();
+        double height = lat1 - lat0;
+        double width = lon1 - lon0;
+        final double KM_PER_DEGREE_LAT = 111.133;
+        // Scale the x direction as if the Earth was a sphere.
+        // Error above the middle latitude should approximately cancel out error below that latitude.
+        double averageLat = (lat0 + lat1) / 2;
+        double xScale = FastMath.cos(FastMath.toRadians(averageLat));
+        double area = (height * KM_PER_DEGREE_LAT) * (width * KM_PER_DEGREE_LAT * xScale);
+        return area;
+    }
+
+    /**
+     * Throw an exception if the provided envelope is too big for a reasonable destination grid.
+     */
+    public static void checkWgsEnvelopeSize (Envelope envelope) {
+        if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
+            throw new IllegalArgumentException("Shapefile extent (" + roughWgsEnvelopeArea(envelope) + " sq. km.) " +
+                    "exceeds limit (" + MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+        }
     }
 
 }

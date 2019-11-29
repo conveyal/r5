@@ -117,6 +117,7 @@ public class FreeFormPointSet extends PointSet {
                 // If count column was specified and present, use it. Otherwise, one opportunity per point.
                 ret.counts[rec] = countCol < 0 ? 1D : Double.parseDouble(reader.get(countCol));
             }
+            Grid.checkWgsEnvelopeSize(ret.getWgsEnvelope());
             return ret;
         } catch (NumberFormatException nfe) {
             throw new ParameterException(

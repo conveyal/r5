@@ -22,10 +22,12 @@ import java.util.stream.IntStream;
 
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
- * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
- * edge (like a Splice or a Sample in OTP).
+ * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of
+ * that edge.
  *
- * FIXME I'm not sure LinkedPointSet should be serializable... or why EgressCostTable has a transient field.
+ * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network.
+ *
+ * FIXME a LinkedPointSet is not a PointSet, it's associated with a PointSet. It should be called PointSetLinkage.
  */
 public class LinkedPointSet implements Serializable {
 
@@ -58,7 +60,7 @@ public class LinkedPointSet implements Serializable {
     public final StreetMode streetMode;
 
     // FIELDS CONTAINING LINKAGE INFORMATION
-    // for each point, the distance to each end of the nearest edge.
+    // For each point, we store the distance to each end of the nearest edge.
 
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
@@ -87,9 +89,9 @@ public class LinkedPointSet implements Serializable {
      * LinkedPointSets and their EgressCostTables are often copied from existing ones.
      * This field holds a reference to the source linkage from which the copy was made.
      * But there are two different ways linkages and cost tables can be based on existing ones:
-     * Sometimes we perform a simple crop to a smaller geographic area; other times we recompute linkages and tables
-     * for a scenario that was built on top of a baseline network. By current design, we never do both at once. They
-     * would be done as two successive operations yielding new objects each time. TODO verify that fact.
+     * Sometimes we perform a simple crop to a smaller geographic area; other times we recompute linkages and
+     * tables for a scenario that was built on top of a baseline network. By current design, we never do both at
+     * once. They would be done as two successive operations yielding new objects each time. TODO verify that fact.
      */
     public final LinkedPointSet baseLinkage;
 
@@ -113,8 +115,8 @@ public class LinkedPointSet implements Serializable {
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides they are useful for later processing of LinkedPointSets. However once we start evicting
-     * TransportNetworks, we have to make sure we're not holding references to entire StreetLayers in LinkedPointSets
-     * (memory leak).
+     * TransportNetworks, we have to make sure we're not holding references to entire StreetLayers in
+     * LinkedPointSets. FIXME: memory leak?
      * When building a linkage for a scenario, the linkage for the baseline on which the scenario is built can be
      * supplied as an optimization. We will reuse linkages and cost tables from that baseline as much as possible.
      *
@@ -185,7 +187,6 @@ public class LinkedPointSet implements Serializable {
      * @param subGrid       the grid for which to create a linkage
      */
     public LinkedPointSet (LinkedPointSet sourceLinkage, WebMercatorGridPointSet subGrid) {
-
         if (!(sourceLinkage.pointSet instanceof WebMercatorGridPointSet)) {
             throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
         }
@@ -416,19 +417,19 @@ public class LinkedPointSet implements Serializable {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
-        // TODO we don't really need a spatial index on a gridded point set.
         // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
-        TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
-        // FIXME this is not correcting for the fact that HashGrid returns false positives. It's returning every point in the bounding box. But it is also sensitive to which vertices are passed in.
+        TIntList relevantPoints = pointSet.getPointsInEnvelope(distanceTableZone);
+        // This is not correcting for the fact that the method returns false positives, but that should be harmless.
+        // It's returning every point in the bounding box. But it is also sensitive to which vertices are in the map.
         relevantPoints.forEach(p -> {
             // An edge index of -1 for a particular point indicates that this point is unlinked.
             if (edges[p] == -1) {
                 return true; // Continue to next iteration.
             }
             edge.seek(edges[p]);
-            int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
+            int t1 = Integer.MAX_VALUE;
+            int t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
-
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p] + distancesToEdge_mm[p];
             }

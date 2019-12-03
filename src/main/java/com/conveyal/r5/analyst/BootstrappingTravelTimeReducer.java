@@ -1,11 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.profile.PerTargetPropagater;
-
-import java.util.Base64;
 
 /**
  * Computes an accessibility indicator at a single origin cell in a Web Mercator grid, using destination densities from

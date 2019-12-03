@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
@@ -21,7 +22,6 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.function.IntFunction;
 
@@ -29,31 +29,30 @@ import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
- * flattened 3D array, with each pixel of a 2D grid containing the different percentiles of travel time requested by
- * the frontend. This is called the "access grid" format and is distinct from the "destination grid" format in that
- * holds multiple values per pixel and has no inter-cell delta coding. It also has JSON concatenated on the end with any
- * scenario application warnings.
+ * flattened 3D array, with each pixel of a 2D grid containing the different percentiles of travel time requested
+ * by the frontend. This is called the "access grid" format and is distinct from the "destination grid" format in
+ * that holds multiple values per pixel and has no inter-cell delta coding. It also has JSON concatenated on the
+ * end with any scenario application warnings.
+ *
  * TODO: we should merge these grid formats and update the spec to allow JSON errors at the end.
  * TODO: try to decouple the internal representation of the results from how they're serialized to the API.
  */
 public class TravelTimeComputer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
-
     private final AnalysisTask request;
     private final TransportNetwork network;
 
-    /**
-     * Constructor.
-     */
+    /** Constructor. */
     public TravelTimeComputer (AnalysisTask request, TransportNetwork network) {
         this.request = request;
         this.network = network;
+
     }
 
     /**
-     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending on
-     * what's in the task it's given. TODO factor out each major step of this process into private methods.
+     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending
+     * on what's in the task it's given. TODO factor out each major step of this process into private methods.
      */
     public OneOriginResult computeTravelTimes() {
 
@@ -79,15 +78,26 @@ public class TravelTimeComputer {
         // Only find this time when cars are in use, as it requires potentially slow geometry operations.
         // Negative values mean no car service is available at the origin location.
         final int carPickupDelaySeconds = (request.accessModes.contains(LegMode.CAR)) ?
-            network.streetLayer.getWaitTime(request.fromLat, request.fromLon) : 0;
+                network.streetLayer.getWaitTime(request.fromLat, request.fromLon) : 0;
 
-        // Find the set of destinations for a one-to-many travel time calculation, not yet linked to the street network.
-        // By finding the extents and destinations up front, we ensure the exact same grid is used for all steps below.
+        // Find the set of destinations for a travel time calculation, not yet linked to the street network.
+        // By finding the extents and destinations up front, we ensure the exact same destination pointset is used for
+        // all steps below.
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         // TODO merge multiple destination pointsets from a regional request into a single supergrid?
-        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
-        PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
+        PointSet destinations;
+
+        // For now, use logic in the NetworkPreloader to return null extents if the request is not for a single-point
+        // (travel time surface), which implies the destination pointset is a grid. This should be cleaned up.
+        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).destinationGridExtents;
+        if (destinationGridExtents != null) {
+            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
+            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
+        } else {
+            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
+            destinations = ((RegionalTask) request).destinationPointSet;
+        }
 
         // I. Access to transit (or direct non-transit travel to destination) ==========================================
         // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel
@@ -164,7 +174,8 @@ public class TravelTimeComputer {
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
 
-            LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
+            LinkedPointSet linkedDestinations = network.linkageCache
+                    .getLinkage(destinations, network.streetLayer, accessMode);
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
@@ -214,7 +225,7 @@ public class TravelTimeComputer {
             for (int target = 0; target < nonTransitTravelTimesToDestinations.size(); target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
-                travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
+                travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);
             }
             return travelTimeReducer.finish();
         }
@@ -226,7 +237,7 @@ public class TravelTimeComputer {
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
             worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-            if (request.returnPaths || request.travelTimeBreakdown) {
+            if (request.computePaths || request.computeTravelTimeBreakdown) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
                 worker.retainPaths = true;
@@ -268,7 +279,7 @@ public class TravelTimeComputer {
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
         // When building a static site, perform some additional initialization causing the propagator to do extra work.
-        if (request.returnPaths || request.travelTimeBreakdown) {
+        if (request.computePaths || request.computeTravelTimeBreakdown) {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
             perTargetPropagater.pathWriter = new PathWriter(request);
         }
@@ -276,6 +287,7 @@ public class TravelTimeComputer {
         return perTargetPropagater.propagate();
 
     }
+
 
     /**
      * Utility method. Merges two Trove int-int maps, keeping the minimum value when keys collide.

@@ -1,45 +1,54 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.Grid;
-import java.util.List;
+import com.conveyal.r5.analyst.PointSet;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
+ * Instances are serialized and sent from the backend to workers when processing regional analyses.
  */
 public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /**
-     * Coordinates of origin cell in grid defined in AnalysisTask.
+     * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. Still named grid (instead of
+     * destinationPointSetId for backward compatibility, namely the ability to start regional jobs on old worker
+     * versions).
+     * Overloaded to specify a set of destination points which may or may not have densities attached.
+     * In fact this ID is taken from a field called "opportunityDatasetId" in the request coming from the UI. So we've
+     * got several slightly conflicting names and concepts.
      *
-     * Note that these do not override fromLat and fromLon; those must still be set separately. This is for future use
-     * to allow use of arbitrary origin points.
-     */
-    public int x = -1, y = -1;
-
-    /**
-     * The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
-     * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
-     * will be an accessibility value per origin, rather than a grid of travel times from that origin.
+     * If this is not blank, the default TravelTimeSurfaceTask  will be overridden; returnInVehicleTimes,
+     * returnWaitTimes, and returnPaths will be set to false; and the returned results will be an accessibility value
+     * per origin, rather than a grid of travel times from that origin. // TODO revise and improve this explanation
      */
     public String grid;
 
     /**
-     * An array of grid keys on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
-     * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
-     * will be an accessibility value per origin for each destination grid, rather than a grid of travel times from
-     * that origin.
-     * NOT YET IMPLEMENTED AND TESTED
+     * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the
+     * worker.
      */
-    public List <String> grids;
-
-    /** Where should output of this job be saved */
-    public String outputQueue;
+    public transient PointSet destinationPointSet;
 
     /**
-     * The grid we are calculating accessibility to. This is not serialized int the request, it's looked up by the worker.
-     * TODO use distinct terms for grid extents and gridded opportunity density data.
+     * Key for pointset (e.g. regionId/datasetId.pointset) from which to calculate travel times or accessibility
      */
-    public transient Grid gridData;
+    public String originPointSetKey;
+
+    /**
+     * Whether to calculate travel time from each origin to one corresponding destination (the destination at the
+     * same position in the destionationPointSet). If false, travel time calculations will be many-to-many (between
+     * all origin points and all destination points).
+     */
+    public boolean oneToOne = false;
+
+    /**
+     * Whether to record travel times between origins and destinations
+     */
+    public boolean recordTimes;
+
+    /**
+     * Whether to record cumulative opportunity accessibility indicators for each origin
+     */
+    public boolean recordAccessibility;
 
     @Override
     public Type getType() {
@@ -61,9 +70,19 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
         return "RegionalTask{" +
                 "jobId=" + jobId +
                 ", task=" + taskId +
-                ", x=" + x +
-                ", y=" + y +
                 '}';
+    }
+
+    @Override
+    public int nTargetsPerOrigin () {
+        // In multi-origin regional tasks, the set of destinations may be determined by the exact kind of task
+        if (oneToOne) {
+            return 1;
+        }  else if (makeTauiSite) {
+            return width * height;
+        } else {
+            return destinationPointSet.featureCount();
+        }
     }
 
 }

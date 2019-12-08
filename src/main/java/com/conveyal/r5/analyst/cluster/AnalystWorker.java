@@ -2,12 +2,14 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
-import com.conveyal.r5.analyst.GridCache;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -93,15 +95,6 @@ public class AnalystWorker implements Runnable {
     /** The port on which the worker will listen for single point tasks forwarded from the backend. */
     public static final int WORKER_LISTEN_PORT = 7080;
 
-    /**
-     * The number of threads the worker will use to receive HTTP connections. This crudely limits memory consumption
-     * from the worker handling single point requests.
-     * Unfortunately we can't set this very low. We get a message saying we need at least 10 threads:
-     * max=2 < needed(acceptors=1 + selectors=8 + request=1)
-     * TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-     */
-    public static final int WORKER_SINGLE_POINT_THREADS = 10;
-
     // TODO make non-static and make implementations swappable
     // This is very ugly because it's static but initialized at class instantiation.
     public static FilePersistence filePersistence;
@@ -151,10 +144,10 @@ public class AnalystWorker implements Runnable {
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.
-     * Of course when linking a large grid, a worker could take much longer. We're just going to have to accept
-     * timeouts in those situations until we implement fail-fast 202 responses from workers for long lived operations.
+     * Preparing networks or linking grids will take longer, but those cases are now handled with
+     * WorkerNotReadyException.
      */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 30;
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
@@ -196,7 +189,7 @@ public class AnalystWorker implements Runnable {
      * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
      * TODO use the WebMercatorGridExtents in these Grids.
      */
-    GridCache gridCache;
+    PointSetCache pointSetCache;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String networkId = null;
@@ -240,7 +233,9 @@ public class AnalystWorker implements Runnable {
         testTaskRedelivery = Boolean.parseBoolean(config.getProperty("test-task-redelivery", "false"));
 
         // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
-        filePersistence = new S3FilePersistence(config.getProperty("aws-region"));
+        // TODO Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
+        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
+        filePersistence = new S3FilePersistence(config.getProperty("aws-region"), config.getProperty("base-bucket", "analysis-staging"));
 
         // First, check whether we are running Analyst offline.
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
@@ -260,7 +255,7 @@ public class AnalystWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.getProperty("initial-graph-id");
 
-        this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
+        this.pointSetCache = new PointSetCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
         this.listenForSinglePointRequests = Boolean.parseBoolean(config.getProperty("listen-for-single-point", "true"));
@@ -329,12 +324,16 @@ public class AnalystWorker implements Runnable {
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // When testing cluster functionality, e.g. task redelivery, many  workers run on the same machine. In that
-        // case, this HTTP server is distabled on all workers but one to avoid port conflicts.
+        // case, this HTTP server is disabled on all workers but one to avoid port conflicts.
+        // Ideally we would limit the number of threads the worker will use to handle HTTP connections, in order to
+        // crudely limit memory consumption and load from simultaneous single point requests. Unfortunately we can't
+        // call sparkHttpService.threadPool(NTHREADS) because we get an error message saying we need over 10 threads:
+        // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
+        // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
+        // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
         if (listenForSinglePointRequests) {
-            // Trying out the new Spark syntax for non-static configuration.
-            sparkHttpService = spark.Service.ignite()
-                    .port(WORKER_LISTEN_PORT)
-                    .threadPool(WORKER_SINGLE_POINT_THREADS);
+            // Use the newer non-static Spark framework syntax.
+            sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
         }
 
@@ -430,13 +429,14 @@ public class AnalystWorker implements Runnable {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
+        TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
         if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-            oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream, task);
+            timeGridWriter.writeGeotiff(byteArrayOutputStream);
         } else {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.
             // TODO eventually reuse same code path as static site time grid saving
-            oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -466,13 +466,13 @@ public class AnalystWorker implements Runnable {
 
         try {
             // Having a non-null opportunity density grid in the task triggers the computation of accessibility values.
-            // The gridData should not be set on static site tasks (or single-point tasks which don't even have the field).
+            // The pointSet should not be set on static site tasks (or single-point tasks which don't even have the field).
             // Resolve the grid ID to an actual grid - this is important to determine the grid extents for the key.
             // Fetching data grids should be relatively fast so we can do it synchronously.
             // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
             // TODO move this after the asynchronous loading of the rest of the necessary data?
-            if (!task.makeStaticSite) {
-                task.gridData = gridCache.get(task.grid);
+            if (!task.makeTauiSite) {
+                task.destinationPointSet = pointSetCache.get(task.grid);
             }
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
@@ -488,7 +488,7 @@ public class AnalystWorker implements Runnable {
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
-            if (task.makeStaticSite && task.taskId == 0) {
+            if (task.makeTauiSite && task.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
                 saveStaticSiteMetadata(task, transportNetwork);
             }
@@ -500,13 +500,14 @@ public class AnalystWorker implements Runnable {
             TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
-            if (task.makeStaticSite) {
+            if (task.makeTauiSite) {
                 // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
                 // value because we're generating a set of time grids for a static site. We only save a file if it has
                 // non-default contents, as a way to save storage and bandwidth.
                 // TODO eventually carry out actions based on what's present in the result, not on the request type.
-                if (oneOriginResult.timeGrid.anyCellReached()) {
-                    PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                if (oneOriginResult.travelTimes.anyCellReached()) {
+                    TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
+                    PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
                     String timesFileName = task.taskId + "_times.dat";
                     filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
                 } else {
@@ -519,7 +520,7 @@ public class AnalystWorker implements Runnable {
             // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
             // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
             synchronized (workResults) {
-                workResults.add(oneOriginResult.toRegionalWorkResult(task));
+                workResults.add(new RegionalWorkResult(oneOriginResult, task));
             }
             throughputTracker.recordTaskCompletion(task.jobId);
         } catch (Exception ex) {
@@ -540,9 +541,9 @@ public class AnalystWorker implements Runnable {
             e.printStackTrace();
         }
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            RegionalWorkResult workResult = new RegionalWorkResult(task.jobId, task.taskId, 1, 1, 1);
+            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult());
             synchronized (workResults) {
-                workResults.add(workResult);
+                workResults.add(new RegionalWorkResult(emptyContainer, task));
             }
         } else {
             LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);

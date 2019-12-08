@@ -1,20 +1,15 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.GridCache;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import java.util.List;
-
 /**
  * Describes an analysis task to be performed.
- *
+ * Instances are serialized and sent from the backend to workers when processing regional analyses.
  * By default, the task will be a travelTimeSurfaceTask for one origin.
  * This task is completed by returning a grid of total travel times from that origin to all destinations.
  */
@@ -32,6 +27,11 @@ public abstract class AnalysisTask extends ProfileRequest {
      */
     public static final WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
 
+    // Extents of a web Mercator grid. Unfortunately this grid serves different purposes in different requests.
+    // In the single-origin TravelTimeSurfaceTasks, the grid points are the destinations.
+    // In regional multi-origin tasks, the grid points are the origins, with destinations determined by the selected
+    // opportunity dataset.
+    // In regional Taui (static site) tasks the grid points serve as both the origins and the destinations.
     public int zoom;
     public int west;
     public int north;
@@ -48,7 +48,7 @@ public abstract class AnalysisTask extends ProfileRequest {
     public String jobId;
 
     /** The id of this particular origin. */
-    public String id;
+    public String originId;
 
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;
@@ -56,20 +56,21 @@ public abstract class AnalysisTask extends ProfileRequest {
     /**
      * Whether to save results on S3.
      * If false, the results will only be sent back to the broker or UI.
-     * If true, travel time surfaces will be saved to S3
+     * If true, travel time surfaces and paths will be saved to S3
      * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
      * accessibility indicator values.
-     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information in the request.
-     * The intent is in the future to make all these options separate - we can make either travel time surfaces or
-     * accessibility indicators or both, and they may or may not be saved to S3.
+     * FIXME in practice this currently implies computeTravelTimeBreakdown and computePaths, so we've got redundant and
+     * potentially incoherent information in the request. The intent is in the future to make all these options
+     * separate - we can make either travel time surfaces or accessibility indicators or both, and they may or may
+     * not be saved to S3.
      */
-    public boolean makeStaticSite = false;
+    public boolean makeTauiSite = false;
 
     /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
-    public boolean travelTimeBreakdown = false;
+    public boolean computeTravelTimeBreakdown = false;
 
     /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
-    public boolean returnPaths = false;
+    public boolean computePaths = false;
 
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };
@@ -118,7 +119,7 @@ public abstract class AnalysisTask extends ProfileRequest {
          */
         /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
         TRAVEL_TIME_SURFACE,
-        /** Bootstrapped accessibility results for multiple origins, returned over SQS by default. */
+        /** Cumulative opportunity accessibility values for all cells in a grid, returned to broker for assembly*/
         REGIONAL_ANALYSIS
     }
 
@@ -126,5 +127,10 @@ public abstract class AnalysisTask extends ProfileRequest {
         // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
         return (AnalysisTask) super.clone();
     }
+
+    /**
+     * @return the expected number of destination points for this particular kind of task.
+     */
+    public abstract int nTargetsPerOrigin();
 
 }

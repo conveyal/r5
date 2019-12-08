@@ -1,23 +1,24 @@
 package com.conveyal.r5.analyst;
 
-import com.google.common.cache.LoadingCache;
-
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Cache Web Mercator Grid Pointsets so that they are not recreated and relinked on every regional analysis task.
+ * Cache WebMercatorGridPointsets so that they are not recreated and relinked for every regional analysis task.
  * The cache does not have expiration, which is fine, because it exists on the workers which are short-lived.
- * This is a loading cache, that will compute values when they are absent: the values are not explicitly added by the
- * caller.
+ * This is a loading cache, that will compute values when they are absent: the values are not explicitly added by
+ * the caller.
  *
- * The WebMercatorGridPointSets are very small and fetching one doesn't include linking.
- * We cache these objects because once they are linked,they contain the linkages, and creating the linkages takes a
- * lot of time.
+ * The WebMercatorGridPointSets are very small and fetching one doesn't include linking or building egress tables.
+ * We cache these objects because linkages are associated with them, and creating those linkages takes a lot of
+ * time. So this  essentially serves to resolve a given WebMercatorExtents (semantically) to a particular
+ * persistent, reused WebMercatorGridPointSet instance. This allows reuse of the linkages for that PointSet in
+ * subsequent tasks.
  *
- * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
- * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
+ * Alternatively PointSets could have semantic equality, but current design is that just the keys and extents do.
+ *
+ * This cache is not serialized anywhere. For now it's created fresh when the worker starts up and held in a
+ * static field for the life of the worker. It is primed upon receiving the first request.
  */
 public class WebMercatorGridPointSetCache {
 
@@ -32,8 +33,8 @@ public class WebMercatorGridPointSetCache {
         key.height = height;
         key.base = base;
 
-        // this works even in a multithreaded environment; ConcurrentHashMap's contract specifies that this will be called
-        // at most once per key
+        // This works even in a multithreaded environment; ConcurrentHashMap's contract specifies that this will
+        // be called at most once per key. So ConcurrentHashMap could probably replace a lot of our LoadingCaches.
         return cache.computeIfAbsent(key, GridKey::toPointset);
     }
 
@@ -41,7 +42,9 @@ public class WebMercatorGridPointSetCache {
         return get(extents.zoom, extents.west, extents.north, extents.width, extents.height, base);
     }
 
-    // TODO make this a subclass of WebMercatorGridExtents
+    /**
+     * TODO make this GridKey a subclass of WebMercatorGridExtents or compose them.
+     */
     private static class GridKey {
         public int zoom;
         public int west;

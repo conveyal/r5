@@ -100,12 +100,14 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public TIntList getPointsInEnvelope (Envelope envelope) {
+        // Convert fixed-degree envelope to floating, then to world-scale web Mercator pixels at this grid's zoom level.
         // This is not very DRY since we do something very similar in the constructor and elsewhere.
         int west = lonToPixel(fixedDegreesToFloating(envelope.getMinX()));
         int east = lonToPixel(fixedDegreesToFloating(envelope.getMaxX()));
         int north = latToPixel(fixedDegreesToFloating(envelope.getMaxY()));
         int south = latToPixel(fixedDegreesToFloating(envelope.getMinY()));
-        // Adjust for edges of this WebMercatorGridPointSet
+        // Make the envelope's pixel values relative to the edges of this WebMercatorGridPointSet, rather than
+        // absolute world-scale coordinates at this zoom level.
         west -= this.west;
         east -= this.west;
         north -= this.north;
@@ -116,6 +118,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
             if (y < 0 || y >= this.width) continue;
             for (int x = west; x <= east; x++) {
                 if (x < 0 || x >= this.height) continue;
+                // Calculate the 1D (flattened) index into this pointset for the grid cell at (x,y).
                 int pointIndex = y * this.width + x;
                 pointsInEnvelope.add(pointIndex);
             }

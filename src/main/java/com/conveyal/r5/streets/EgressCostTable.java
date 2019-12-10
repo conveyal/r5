@@ -244,7 +244,6 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
-
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);

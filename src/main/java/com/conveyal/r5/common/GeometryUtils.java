@@ -6,9 +6,6 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineSegment;
 import org.apache.commons.math3.util.FastMath;
-import org.geojson.LngLatAlt;
-
-import java.util.List;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
@@ -20,15 +17,6 @@ public class GeometryUtils {
 
     // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
-
-    private static Coordinate[] convertPath(List<LngLatAlt> path) {
-        Coordinate[] coords = new Coordinate[path.size()];
-        int i = 0;
-        for (LngLatAlt p : path) {
-            coords[i++] = new Coordinate(p.getLatitude(), p.getLongitude());
-        }
-        return coords;
-    }
 
     /**
      * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this

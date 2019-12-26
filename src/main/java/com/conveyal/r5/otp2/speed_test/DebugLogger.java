@@ -1,6 +1,5 @@
 package com.conveyal.r5.otp2.speed_test;
 
-
 import com.conveyal.r5.otp2.api.debug.DebugEvent;
 import com.conveyal.r5.otp2.api.debug.DebugTopic;
 import com.conveyal.r5.otp2.api.path.Path;
@@ -9,7 +8,7 @@ import com.conveyal.r5.otp2.api.view.ArrivalView;
 import com.conveyal.r5.otp2.util.IntUtils;
 import com.conveyal.r5.otp2.util.PathStringBuilder;
 import com.conveyal.r5.otp2.util.TimeUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import static com.conveyal.r5.otp2.util.TimeUtils.timeToStrCompact;
 

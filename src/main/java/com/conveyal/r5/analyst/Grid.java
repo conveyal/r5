@@ -13,8 +13,9 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.Polygonal;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
-import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import com.vividsolutions.jts.geom.prep.PreparedPolygon;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -168,10 +169,6 @@ public class Grid extends PointSet {
         return getPixelWeights(geometry, false);
     }
 
-    // PreparedGeometry is often faster for small numbers of vertices;
-    // see https://github.com/chrisbennight/intersection-test
-    private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
-
     /**
      * Get the proportions of an input polygon feature that overlap each grid cell, for use in lists of PixelWeights.
      * These lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
@@ -202,7 +199,11 @@ public class Grid extends PointSet {
             throw new IllegalArgumentException("Feature geometry is too large.");
         }
 
-        PreparedGeometry preparedGeom = pgFact.create(geometry);
+        // PreparedGeometry is often faster for small numbers of vertices;
+        // see https://github.com/chrisbennight/intersection-test
+        // We know this is a polygon so don't need flexible PreparedGeometryFactory, which I'd rather not use because
+        // its only method seems inherently static but is implemented in a way that requires instantiating the factory.
+        PreparedGeometry preparedGeom = new PreparedPolygon((Polygonal) geometry);
 
         Envelope env = geometry.getEnvelopeInternal();
 

@@ -121,7 +121,9 @@ public class RoadCongestion extends Modification {
             LOG.info("Validating features and creating spatial index...");
             polygonSpatialIndex = new STRtree();
             FeatureType featureType = featureCollection.getSchema();
-            // Check CRS:
+            // Check CRS. If none is present, according to GeoJSON spec it is in WGS84.
+            // Unfortunately our version of Geotools cannot understand the common urn:ogc:def:crs:OGC:1.3:CRS84
+            // so it's better to just remove the CRS from all input files.
             CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
             if (crs != null && !DefaultGeographicCRS.WGS84.equals(crs) && !CRS.decode("CRS:84").equals(crs)) {
                 errors.add("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +

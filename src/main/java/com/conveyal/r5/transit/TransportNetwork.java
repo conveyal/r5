@@ -120,6 +120,7 @@ public class TransportNetwork implements Serializable {
         TransportNetwork transportNetwork = new TransportNetwork();
 
         // Load OSM data into MapDB
+        // The mapdb file is placed alongside the source OSM file to allow faster load next time.
         OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
@@ -129,6 +130,8 @@ public class TransportNetwork implements Serializable {
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
+        // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
+        // We should probably try to delete the file when exceptions occur.
         osm.close();
 
         // The street index is needed for associating transit stops with the street network

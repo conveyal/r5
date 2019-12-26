@@ -52,8 +52,7 @@ public class SpeedLabeler {
         highwaySpeedMap = new HashMap<>(speedConfig.values.size());
         //TODO: add validation so that this could assume correct tags
         for (Map.Entry<String, Integer> highwaySpeed: speedConfig.values.entrySet()) {
-            highwaySpeedMap.put(highwaySpeed.getKey(),
-                (float) unitConverter.convert(highwaySpeed.getValue()));
+            highwaySpeedMap.put(highwaySpeed.getKey(), unitConverter.convert(highwaySpeed.getValue()).floatValue());
         }
         defaultSpeed = (float) unitConverter.convert(speedConfig.defaultSpeed);
     }

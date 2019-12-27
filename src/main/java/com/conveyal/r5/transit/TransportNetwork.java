@@ -121,7 +121,9 @@ public class TransportNetwork implements Serializable {
 
         // Load OSM data into MapDB
         // The mapdb file is placed alongside the source OSM file to allow faster load next time.
-        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+        // OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+        // Always use a temp file; for some reason MapDB is complaining db is not closed during tests.
+        OSM osm = new OSM(null);
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 

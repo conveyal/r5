@@ -2,7 +2,7 @@ package com.conveyal.r5.otp2.rangeraptor.transit;
 
 
 import com.conveyal.r5.otp2.rangeraptor.RoundProvider;
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 
 /**
  * Round tracker to keep track of round index and when to stop exploring new rounds.

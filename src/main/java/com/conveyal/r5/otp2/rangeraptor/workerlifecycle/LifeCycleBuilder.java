@@ -1,7 +1,5 @@
 package com.conveyal.r5.otp2.rangeraptor.workerlifecycle;
 
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;

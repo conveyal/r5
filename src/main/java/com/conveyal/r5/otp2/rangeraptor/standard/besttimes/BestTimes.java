@@ -1,6 +1,6 @@
 package com.conveyal.r5.otp2.rangeraptor.standard.besttimes;
 
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 import com.conveyal.r5.otp2.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.otp2.util.BitSetIterator;
 

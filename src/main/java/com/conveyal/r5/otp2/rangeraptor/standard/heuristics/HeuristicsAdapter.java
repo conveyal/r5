@@ -2,7 +2,7 @@ package com.conveyal.r5.otp2.rangeraptor.standard.heuristics;
 
 import com.conveyal.r5.otp2.api.transit.TransferLeg;
 import com.conveyal.r5.otp2.api.view.Heuristics;
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 import com.conveyal.r5.otp2.rangeraptor.standard.BestNumberOfTransfers;
 import com.conveyal.r5.otp2.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.otp2.rangeraptor.transit.TransitCalculator;

@@ -16,7 +16,6 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import org.locationtech.jts.geom.*;
@@ -24,9 +23,6 @@ import org.locationtech.jts.operation.buffer.BufferParameters;
 import org.locationtech.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
-import graphql.ExecutionResult;
-import graphql.GraphQL;
-import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,10 +131,6 @@ public class PointToPointRouterServer {
         staticFileLocation("debug-plan");
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
 
-        //TODO: executor strategies
-        // TODO Clarify why this is generating the GraphQL schema as a function of a point to point query, this is bizarre.
-        // And why is that parameter called "profileResponse" in the GraphQLSchema constructor?
-        GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
 
@@ -935,43 +927,6 @@ public class PointToPointRouterServer {
             return content;
 
         }, JsonUtilities.objectMapper::writeValueAsString);
-
-        post("/otp/routers/default/index/graphql", ((request, response) -> {
-            response.type("application/json");
-
-            HashMap<String, Object> content = new HashMap<>();
-            try {
-                GraphQlRequest graphQlRequest = graphQlRequestReader
-                    .readValue(request.body());
-
-                //TODO: deserialize variables map automatically in GraphQLRequest object
-                //FIXME: here only flat variables are supported. For example directModes:[CAR, WALK] is unsupported for now since it can't be deserialized
-                Map<String, Object> variables = graphQlRequest.variables==null ? new HashMap<>() : mapReader.readValue(graphQlRequest.variables);
-                ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
-                response.status(200);
-
-                if (!executionResult.getErrors().isEmpty()) {
-                    response.status(500);
-                    content.put("errors", executionResult.getErrors());
-                }
-                if (executionResult.getData() != null) {
-                    content.put("data", executionResult.getData());
-                }
-            } catch (JsonParseException jpe) {
-                response.status(400);
-                content.put("errors", "Problem parsing query: " + jpe.getMessage());
-            } catch (GraphQLException ql) {
-                response.status(500);
-                content.put("errors", ql.getMessage());
-                LOG.error("GraphQL problem:", ql);
-            } catch (Exception e) {
-                response.status(500);
-                content.put("errors", e.getMessage());
-                LOG.error("Unknown error:", e);
-            }
-            return content;
-
-        }), JsonUtilities.objectMapper::writeValueAsString);
 
     }
 

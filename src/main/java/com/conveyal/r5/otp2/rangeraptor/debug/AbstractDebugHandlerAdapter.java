@@ -2,7 +2,7 @@ package com.conveyal.r5.otp2.rangeraptor.debug;
 
 import com.conveyal.r5.otp2.api.debug.DebugEvent;
 import com.conveyal.r5.otp2.api.request.DebugRequest;
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 import com.conveyal.r5.otp2.rangeraptor.view.DebugHandler;
 
 import java.util.Iterator;

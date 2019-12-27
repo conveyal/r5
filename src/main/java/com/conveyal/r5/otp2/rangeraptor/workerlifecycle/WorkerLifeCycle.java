@@ -1,4 +1,4 @@
-package com.conveyal.r5.otp2.rangeraptor;
+package com.conveyal.r5.otp2.rangeraptor.workerlifecycle;
 
 
 import java.util.function.Consumer;

@@ -1,6 +1,6 @@
 package com.conveyal.r5.otp2.rangeraptor.transit;
 
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 import org.junit.Test;
 
 import java.util.function.Consumer;

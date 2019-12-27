@@ -2,7 +2,7 @@ package com.conveyal.r5.otp2.rangeraptor.standard.stoparrivals.path;
 
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
 import com.conveyal.r5.otp2.api.view.ArrivalView;
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 import com.conveyal.r5.otp2.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.otp2.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.otp2.rangeraptor.standard.ArrivedAtDestinationCheck;

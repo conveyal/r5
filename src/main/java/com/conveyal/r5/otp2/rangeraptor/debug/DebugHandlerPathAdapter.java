@@ -3,7 +3,7 @@ package com.conveyal.r5.otp2.rangeraptor.debug;
 import com.conveyal.r5.otp2.api.path.Path;
 import com.conveyal.r5.otp2.api.request.DebugRequest;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
-import com.conveyal.r5.otp2.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.otp2.rangeraptor.workerlifecycle.WorkerLifeCycle;
 
 import java.util.List;
 

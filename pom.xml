@@ -369,7 +369,8 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
-            <version>3.0.8-SNAPSHOT</version>
+            <!-- Maintenance v3.0.8 updated for Java 11. -->
+            <version>3.0.8</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>

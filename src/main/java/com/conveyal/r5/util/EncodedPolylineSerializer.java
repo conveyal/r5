@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.vividsolutions.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineString;
 
 import java.io.IOException;
@@ -24,24 +23,11 @@ public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
     @Override
     public void serialize(LineString lineString, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
         try {
-            String points = PolylineEncoder.encode(toLegacyLineString(lineString)).getPoints();
+            String points = PolylineEncoder.encode(lineString).getPoints();
             jsonGenerator.writeString(points);
         } catch (UnsupportedGeometryTypeException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static com.vividsolutions.jts.geom.LineString toLegacyLineString (LineString lineString) {
-        com.vividsolutions.jts.geom.Coordinate[] legacyCoordinateArray =
-                new com.vividsolutions.jts.geom.Coordinate[lineString.getNumPoints()];
-        for (int i = 0; i < lineString.getNumPoints(); i++) {
-            Coordinate coordinate = lineString.getCoordinateN(i);
-            legacyCoordinateArray[i] = new com.vividsolutions.jts.geom.Coordinate(
-                coordinate.x,
-                coordinate.y
-            );
-        }
-        return legacyGeometryFactory.createLineString(legacyCoordinateArray);
     }
 
 }

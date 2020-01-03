@@ -6,7 +6,6 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import com.vividsolutions.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineString;
 
 import java.io.IOException;
@@ -17,8 +16,6 @@ import java.io.IOException;
  * so is pulling in extra dependencies and requiring conversions (toLegacyLineString).
  */
 public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
-
-    private static final GeometryFactory legacyGeometryFactory = new GeometryFactory();
 
     @Override
     public void serialize(LineString lineString, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {

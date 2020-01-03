@@ -416,9 +416,10 @@
             </exclusions>
         </dependency>
         <dependency>
+            <!-- TODO eliminate custom Conveyal geojson library, use Geotools? -->
             <groupId>com.conveyal</groupId>
             <artifactId>jackson2-geojson</artifactId>
-            <version>0.8</version>
+            <version>0.9</version>
         </dependency>
         <!-- This is the only thing still depending on old JTS with the old vividsolutions package name. -->
         <!-- Unfortunately this polyline encoder library has not been updated to newer JTS. -->

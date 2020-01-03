@@ -1,8 +1,7 @@
 language: java
 
-# Oracle JDK is EOL, use OpenJDK 8
 jdk:
-- openjdk8
+- openjdk11
 
 # Maven semantic-release uses v10 now
 node_js:

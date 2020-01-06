@@ -80,7 +80,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      */
     public int[] stopSequences;
 
-    /** static factory so we can return null */
+    /**
+     * Static factory method, allowing us to return null for invalid inputs (unlike the constructor).
+     * This is used when building a TransitLayer from GTFS, or when applying an AddTrips modification.
+     */
     public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
         for (int i = 0; i < arrivals.length; i++) {
@@ -88,20 +91,17 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 LOG.error("Trip {} departs stop before it arrives, excluding this trip.", trip.trip_id);
                 return null;
             }
-
             if (i > 0 && arrivals[i] < departures[i - 1]) {
                 LOG.error("Trip {} arrives at a stop before departing the previous stop, excluding this trip.", trip.trip_id);
                 return null;
             }
         }
-
         if (frequencies != null && !frequencies.isEmpty()) {
             if (frequencies.stream().allMatch(f -> f.end_time < f.start_time)) {
                 LOG.error("All frequency entries on trip {} have end time before start time, excluding this trip.", trip.trip_id);
                 return null;
             }
         }
-
         return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
 

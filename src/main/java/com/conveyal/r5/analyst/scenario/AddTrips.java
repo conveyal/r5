@@ -351,23 +351,28 @@ public class AddTrips extends Modification {
                     t += timetable.hopTimes[s];
                 }
             }
-
-            TripSchedule sched;
-
+            Collection<Frequency> frequencies;
             if (frequency) {
-                // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
+                // Create an R5 frequency entry that will be attached to the new TripSchedule
                 Frequency freq = new Frequency();
                 freq.start_time = timetable.startTime;
                 freq.end_time = timetable.endTime;
                 freq.headway_secs = timetable.headwaySecs;
-                sched =
-                        TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
-
-                timetable.applyPhasing(sched);
+                frequencies = Lists.newArrayList(freq);
             } else {
-                sched = TripSchedule.create(trip, arrivals, departures, Collections.emptyList(), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+                frequencies = Collections.emptyList();
             }
-
+            TripSchedule sched = TripSchedule.create(
+                    trip,
+                    arrivals,
+                    departures,
+                    frequencies,
+                    IntStream.range(0, arrivals.length).toArray(),
+                    serviceCode
+            );
+            if (frequency) {
+                timetable.applyPhasing(sched);
+            }
             return sched;
         }).collect(Collectors.toList());
     }

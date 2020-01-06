@@ -17,6 +17,7 @@ import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -38,7 +39,10 @@ public class AddTrips extends Modification {
     /** A list of stops on the new trip pattern. These may be existing or completely new stops. */
     public List<StopSpec> stops;
 
-    /** The timetables for this trip pattern */
+    /**
+     * The timetables for this trip pattern. Note that these may be out of temporal order, it's up to the
+     * consumer to get trips in order as required by the routing algorithm.
+     */
     public Collection<PatternTimetable> frequencies;
 
     /** GTFS mode (route_type), see constants in com.conveyal.gtfs.model.Route */
@@ -128,7 +132,9 @@ public class AddTrips extends Modification {
             if (timetable.firstDepartures == null) transitLayer.hasFrequencies = true;
             else transitLayer.hasSchedules = true;
         }
-
+        // Ensure that generated trips are ordered as expected by R5, in case firstDepartures was not ordered.
+        // Validation in resolve() ensures there are at least two stops, so at least one departure per trip.
+        pattern.tripSchedules.sort(Comparator.comparing(ts -> ts.departures[0]));
         pattern.routeIndex = this.routeIndex;
         pattern.routeId = this.routeId;
 
@@ -163,7 +169,9 @@ public class AddTrips extends Modification {
         /**
          * Times in seconds after midnight when trips will begin. If this field is non-null the newly added
          * trips will be scheduled trips rather than frequency-based, and you must not provide the startTime,
-         * endTime, or headwaySecs fields.
+         * endTime, or headwaySecs fields. These departure times are not necessarily sorted in ascending temporal
+         * order, it's up to the modification application process to sort the resulting trip objects that are
+         * generated, as required for routing.
          */
         public int[] firstDepartures;
 

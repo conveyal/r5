@@ -301,13 +301,13 @@ public class AddTrips extends Modification {
         calendar.saturday  = timetable.saturday  ? 1 : 0;
         calendar.sunday    = timetable.sunday    ? 1 : 0;
         StringBuilder nameBuilder = new StringBuilder("MOD-");
-        nameBuilder.append(timetable.monday ? 'M' : 'x');
-        nameBuilder.append(timetable.monday ? 'T' : 'x');
-        nameBuilder.append(timetable.monday ? 'W' : 'x');
-        nameBuilder.append(timetable.monday ? 'T' : 'x');
-        nameBuilder.append(timetable.monday ? 'F' : 'x');
-        nameBuilder.append(timetable.monday ? 'S' : 'x');
-        nameBuilder.append(timetable.monday ? 'S' : 'x');
+        nameBuilder.append(timetable.monday     ? 'M' : 'x');
+        nameBuilder.append(timetable.tuesday    ? 'T' : 'x');
+        nameBuilder.append(timetable.wednesday  ? 'W' : 'x');
+        nameBuilder.append(timetable.thursday   ? 'T' : 'x');
+        nameBuilder.append(timetable.friday     ? 'F' : 'x');
+        nameBuilder.append(timetable.saturday   ? 'S' : 'x');
+        nameBuilder.append(timetable.sunday     ? 'S' : 'x');
         Service service = new Service(nameBuilder.toString());
         // Very long date range from the year 1850 to 2200 should be sufficient.
         calendar.start_date = 18500101;

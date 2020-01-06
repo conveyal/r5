@@ -105,7 +105,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
 
-    // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
+    // Maybe make a TripSchedule.Factory class so we don't have to pass in serviceCode or map.
     private TripSchedule(Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
         this.tripId = scopedTripId;
@@ -126,16 +126,14 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
             // filter to valid frequencies
             // TODO some trips may have no service after this filter is applied
-            frequencies = frequencies.stream()
-                    .filter(f -> {
-                        if (f.start_time > f.end_time) {
-                            LOG.warn("Frequency entry for trip {} has end time before start time; it will not be used. Perhaps this is an issue with overnight service?", trip.trip_id);
-                            return false;
-                        }
-
-                        return true;
-                    })
-                    .collect(Collectors.toList());
+            frequencies = frequencies.stream().filter(f -> {
+                boolean valid = f.start_time <= f.end_time;
+                if (!valid) {
+                    LOG.warn("Frequency entry for trip {} has end time before start time; it will not be used. " +
+                            "Perhaps this is an issue with overnight service?", trip.trip_id);
+                }
+                return valid;
+            }).collect(Collectors.toList());
 
             if (!frequencies.isEmpty()) {
                 // this is a frequency-based trip
@@ -143,35 +141,27 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 this.startTimes = new int[frequencies.size()];
                 this.endTimes = new int[frequencies.size()];
                 this.frequencyEntryIds = new String[frequencies.size()];
-
-                // reset everything to zero-based on frequency-based trips
+                // Shift all arrival and departure times to be zero-based on frequency-based trips
                 if (arrivals.length > 0) {
                     int firstArrival = arrivals[0];
-
                     for (int i = 0; i < arrivals.length; i++) {
                         arrivals[i] -= firstArrival;
                     }
-
                     for (int i = 0; i < departures.length; i++) {
                         departures[i] -= firstArrival;
                     }
                 }
-
-                // TODO: should we sort frequency entries?
-
+                // TODO: Verify whether is is necessary or advantageous to sort frequency entries.
                 int fidx = 0;
-
                 for (Frequency f : frequencies) {
                     if (f.exact_times == 1) {
                         LOG.warn("Exact times frequency trips not supported, treating as inexact!");
                     }
-
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;
                     this.startTimes[fidx] = f.start_time;
                     // feed scope frequency IDs
                     this.frequencyEntryIds[fidx] = String.join(":", trip.feed_id, f.getId());
-
                     fidx++;
                 }
             }

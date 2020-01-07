@@ -8,7 +8,8 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>4.7.2-SNAPSHOT</version>
+    <!-- v5 targets Java 11 runtime environment -->
+    <version>5.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>

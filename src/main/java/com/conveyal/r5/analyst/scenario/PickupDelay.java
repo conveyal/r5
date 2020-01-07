@@ -38,6 +38,22 @@ public class PickupDelay extends Modification {
     public String nameAttribute = "name";
 
     /**
+     * Name of the attribute (array) containing GTFS stop IDs. If any stop_id is specified for a polygon, service is
+     * only allowed between the polygon and the stops (i.e. no direct trips). If no stop_ids are specified,
+     * passengers boarding an on-demand service in a pick-up zone should be able to alight anywhere.
+     *
+     * TODO not yet implemented
+     */
+    public String linkedStopsAttribute = "linkedStops";
+
+    /**
+     * LegMode that for which this set of pickup delays applies
+     *
+     * TODO not yet implemented
+     */
+    public String legMode = "CAR";
+
+    /**
      * The default waiting time (floating point, in minutes) when no polygon is found. Negative numbers mean the area
      * is not served at all.
      */

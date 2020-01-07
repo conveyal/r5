@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -83,6 +82,9 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     /**
      * Static factory method, allowing us to return null for invalid inputs (unlike the constructor).
      * This is used when building a TransitLayer from GTFS, or when applying an AddTrips modification.
+     *
+     * @param frequencies "pure" frequency entries - the exact_times field is currently ignored, and exact_times
+     *                    frequency expansion must be done before creating the TripSchedule.
      */
     public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
@@ -101,11 +103,19 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 LOG.error("All frequency entries on trip {} have end time before start time, excluding this trip.", trip.trip_id);
                 return null;
             }
+            if (frequencies.stream().anyMatch(f -> f.exact_times == 1)) {
+                LOG.error("Frequency entries on trip {} use exact_times, excluding this trip.", trip.trip_id);
+                return null;
+            }
         }
         return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
 
-    // Maybe make a TripSchedule.Factory class so we don't have to pass in serviceCode or map.
+    /**
+     * TODO handle exact_times frequency entries from GTFS
+     * @param frequencies "pure" frequency entries - the exact_times field is currently ignored, and exact_times
+     *                    frequency expansion must be done before creating the TripSchedule.
+     */
     private TripSchedule(Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
         this.tripId = scopedTripId;
@@ -119,8 +129,6 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         this.departures = departures;
         this.stopSequences = stopSequences;
         this.serviceCode = serviceCode;
-
-        // TODO handle exact times!
 
         if (frequencies != null && !frequencies.isEmpty()) {
 
@@ -155,7 +163,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 int fidx = 0;
                 for (Frequency f : frequencies) {
                     if (f.exact_times == 1) {
-                        LOG.warn("Exact times frequency trips not supported, treating as inexact!");
+                        throw new RuntimeException("Frequency trips with exact_times are not supported.");
                     }
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;

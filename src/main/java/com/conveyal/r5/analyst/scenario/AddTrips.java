@@ -343,7 +343,10 @@ public class AddTrips extends Modification {
 
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).
+        // Note that frequency here means "pure" unscheduled frequencies handled by Monte Carlo; firstDepartures, like
+        // exact_times in GTFS, are just a compact representation of exactly scheduled trips.
         final boolean frequency = timetable.firstDepartures == null;
+
         // if we are making one frequency trip, use 0 as its departure time
         int[] firstDepartures = frequency ? new int[] { 0 } : timetable.firstDepartures;
 

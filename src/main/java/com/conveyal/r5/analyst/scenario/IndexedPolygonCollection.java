@@ -139,9 +139,9 @@ public class IndexedPolygonCollection {
             if (indexThisFeature) {
                 polygonSpatialIndex.insert(geometry.getEnvelopeInternal(), new ModificationPolygon(
                         (Polygonal) geometry,
-                        (String)name,
-                        ((Number)data).doubleValue(),
-                        ((Number)priority).doubleValue()));
+                        (String) name,
+                        ((Number) data).doubleValue(),
+                        ((Number) priority).doubleValue()));
             }
         }
         // Finalize construction of the STR tree

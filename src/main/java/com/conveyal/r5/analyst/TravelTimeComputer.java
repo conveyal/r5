@@ -75,17 +75,6 @@ public class TravelTimeComputer {
         // TODO Create and encapsulate this object within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
 
-        // Look up pick-up delay time for the access leg, which is generally specified in a scenario modification.
-        // Only find this time if CAR or BICYCLE_RENT is an access mode, as this lookup requires potentially slow
-        // geometry operations. Negative values mean no pickup service is available at the origin location.
-        final int pickupDelaySeconds;
-
-        if (request.accessModes.contains(LegMode.CAR) || request.accessModes.contains(LegMode.BICYCLE_RENT)){
-            pickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon);
-        } else {
-            pickupDelaySeconds = 0;
-        }
-
         // Find the set of destinations for a travel time calculation, not yet linked to the street network.
         // By finding the extents and destinations up front, we ensure the exact same destination pointset is used for
         // all steps below.
@@ -124,16 +113,17 @@ public class TravelTimeComputer {
         for (LegMode legMode : request.accessModes) {
             LOG.info("Performing street search for mode: {}", legMode);
 
-            boolean delayAtPickup = false;
+            // Look up pick-up delay time for an access leg. Negative values mean no pickup service is available at
+            // the origin location.
+            int pickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon, legMode);
 
-            if (legMode == LegMode.CAR || legMode == LegMode.BICYCLE_RENT) {
-                if (pickupDelaySeconds < 0) {
-                    LOG.info("Pick-up service is not available at this location, continuing to next access mode (if any).");
-                    continue;
-                } else {
-                    delayAtPickup = true;
-                }
+            if (pickupDelaySeconds < 0) {
+                LOG.info("On-demand {} service is not available at this location, continuing to next access mode (if " +
+                        "any).", legMode);
+                continue;
             }
+
+            boolean delayAtPickup = pickupDelaySeconds > 0;
 
             // Convert from profile routing qualified mode to internal mode
             StreetMode accessMode = toStreetMode(legMode);
@@ -179,6 +169,7 @@ public class TravelTimeComputer {
 
             if (request.hasTransit()) {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
+                // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
                 if (delayAtPickup) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
@@ -190,6 +181,9 @@ public class TravelTimeComputer {
 
             LinkedPointSet linkedDestinations = network.linkageCache
                     .getLinkage(destinations, network.streetLayer, accessMode);
+
+            // Direct times (i.e. using just a street mode, and not transit)
+            // TODO add logic here to disallow direct travel if linkedStops are specified in pickupDelay?
 
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,

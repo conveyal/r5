@@ -9,6 +9,7 @@ import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
 import com.conveyal.r5.analyst.scenario.ModificationPolygon;
 import com.conveyal.r5.api.util.BikeRentalStation;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
@@ -1545,27 +1546,21 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
+     * We currently only support one LegMode per pickup delay polygon collection. If the supplied set of modes (e.g.
+     * access modes) contains the wait time polygons' leg mode, return the pickup delay. Otherwise, return a 0 second
+     * delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
-     * @return the waiting time in seconds to begin driving on the street network (waiting to be picked up by a car)
+     * @return the waiting time in seconds to begin traversing the street network (e.g. waiting to be picked up by a
+     * car, or -1 if no car service is available)
      */
-    public int getWaitTime (double lat, double lon) {
-        if (waitTimePolygons == null) {
-            return 0;
-        } else {
-            // TODO verify x, y order in coordinate
+    public int getWaitTime (double lat, double lon, LegMode mode) {
+        if (waitTimePolygons != null && waitTimePolygons.legMode == mode) {
             Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-            return getWaitTime(point);
-        }
-    }
-
-    public int getWaitTime (Point point) {
-        if (waitTimePolygons == null) {
-            return 0;
-        } else {
             ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
-            // Convert minutes to seconds
             return (int)(polygon.data * 60);
+        } else {
+            return 0;
         }
     }
 

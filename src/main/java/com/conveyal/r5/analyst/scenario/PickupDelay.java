@@ -1,33 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Polygonal;
-import com.vividsolutions.jts.index.strtree.STRtree;
-import gnu.trove.list.TShortList;
-import gnu.trove.list.array.TShortArrayList;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import org.geotools.feature.FeatureCollection;
-import org.geotools.feature.FeatureIterator;
-import org.geotools.geojson.feature.FeatureJSON;
-import org.geotools.referencing.CRS;
-import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.type.FeatureType;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.InputStream;
-import java.util.List;
-import java.util.zip.GZIPInputStream;
 
 /**
  * This Modification type configures the amount of time a passenger must wait to be picked up by a ride-hailing service.
@@ -60,6 +36,22 @@ public class PickupDelay extends Modification {
      * This is only used for logging.
      */
     public String nameAttribute = "name";
+
+    /**
+     * Name of the attribute (array) containing GTFS stop IDs. If any stop_id is specified for a polygon, service is
+     * only allowed between the polygon and the stops (i.e. no direct trips). If no stop_ids are specified,
+     * passengers boarding an on-demand service in a pick-up zone should be able to alight anywhere.
+     *
+     * TODO not yet implemented
+     */
+    public String linkedStopsAttribute = "linkedStops";
+
+    /**
+     * LegMode that for which this set of pickup delays applies
+     *
+     * TODO not yet implemented
+     */
+    public String legMode = "CAR";
 
     /**
      * The default waiting time (floating point, in minutes) when no polygon is found. Negative numbers mean the area

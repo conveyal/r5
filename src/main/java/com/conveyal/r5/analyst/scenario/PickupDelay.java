@@ -47,7 +47,7 @@ public class PickupDelay extends Modification {
     public String linkedStopsAttribute = "linkedStops";
 
     /**
-     * LegMode that for which this set of pickup delays applies
+     * LegMode for which this set of pickup delays applies
      *
      * TODO not yet implemented
      */

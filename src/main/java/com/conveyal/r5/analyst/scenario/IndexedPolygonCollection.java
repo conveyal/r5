@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.analyst.FileCategory;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygonal;
@@ -57,10 +58,9 @@ public class IndexedPolygonCollection {
 
     /**
      * LegMode for which the modifications tied to this polygon apply
-     *
-     * TODO not yet implemented; set from pickup delay?
+     * TODO not yet set anywhere -- set from pickup delay modification.
      */
-    public LegMode legMode = LegMode.CAR;
+    public StreetMode streetMode = StreetMode.CAR;
 
     // Internal (private) fields.
     // These are set by the feature loading and indexing process, and have getters to ensure that they are immutable.

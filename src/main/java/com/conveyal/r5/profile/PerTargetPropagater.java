@@ -50,8 +50,9 @@ public class PerTargetPropagater {
     private PointSet targets;
 
     /** All modes for which we want to perform egress propagation through the street network. */
-    public final Set<LegMode> modes;
+    public final EnumSet<StreetMode> modes;
 
+    /** One linkage for each street mode for which we want to extend travel times out from transit to destinations. */
     private final List<LinkedPointSet> linkedTargets;
 
     /** the profilerequest (used for walk speed etc.) */
@@ -114,7 +115,7 @@ public class PerTargetPropagater {
     public PerTargetPropagater(
             PointSet targets,
             StreetLayer streetLayer,
-            EnumSet<LegMode> modes,
+            EnumSet<StreetMode> modes,
             AnalysisTask task,
             int[][] travelTimesToStopsForIteration,
             int[] nonTransitTravelTimesToTargets
@@ -139,8 +140,7 @@ public class PerTargetPropagater {
         }
         linkedTargets = new ArrayList<>(modes.size());
 
-        for (LegMode mode : modes) {
-            StreetMode streetMode = LegMode.toStreetMode(mode);
+        for (StreetMode streetMode : modes) {
             LinkedPointSet linkedTargetsForMode = streetLayer.parentNetwork.linkageCache
                     .getLinkage(targets, streetLayer, streetMode);
             // Transpose the cost table for propagation. Some tables are never used for propagation (like the
@@ -322,6 +322,12 @@ public class PerTargetPropagater {
                             // cannot improve on the best known time at this iteration. Also avoids overflow.
                             continue;
                         }
+
+                        // TODO shouldn't all the below egress delays be baked into linkedTargets.getEgressCostTable()
+                        //  .getCostTableForPoint(targetIndex)? At the end of the EgressCostTable constructor, we can
+                        //  see via linkedPointSet.streetLayer.waitTimePolygons (or a new wrapper class
+                        //  AccessEgressWaitTimes) whether each stop has an egress delay and add it in to all stops.
+                        //  Applying the pickup delay modification creates a new street layer, so a new linkage.
 
                         // Account for any additional delay waiting for pickup at the egress stop.
                         // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been

@@ -24,10 +24,12 @@ import java.util.stream.IntStream;
 
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
- * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of
- * that edge.
+ * For each feature in the PointSet, we record the closest edge useable by the specified StreetMode, and the distance
+ * to the vertices at the ends of that edge. There should be a mapping (PointSet, StreetLayer, StreetMode) ==>
+ * LinkedPointSet.
  *
- * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network.
+ * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network to speed
+ * up the time to first response on this common mode. We might want to also store linkages for other common modes.
  *
  * FIXME a LinkedPointSet is not a PointSet, it's associated with a PointSet. It should be called PointSetLinkage.
  */
@@ -85,7 +87,7 @@ public class LinkedPointSet implements Serializable {
      * For each point, distance from the end vertex of the edge geometry up to the split point (closest point on the
      * edge to the point to be linked)
      */
-    public int[] distances1_mm;
+    public final int[] distances1_mm;
 
     /**
      * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,

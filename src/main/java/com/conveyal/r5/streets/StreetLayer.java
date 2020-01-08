@@ -9,7 +9,6 @@ import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
 import com.conveyal.r5.analyst.scenario.ModificationPolygon;
 import com.conveyal.r5.api.util.BikeRentalStation;
-import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
@@ -184,6 +183,7 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * This set of polygons specifies a spatially varying wait time to use a ride hailing service. Negative wait times
      * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
+     * Note that this is a single field, rather than a collection: we only support one set of polygons for one mode.
      */
     public IndexedPolygonCollection waitTimePolygons;
 
@@ -1552,13 +1552,17 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
      * @return the waiting time in seconds to begin traversing the street network (e.g. waiting to be picked up by a
-     * car, or -1 if no car service is available)
+     *         car, or -1 if no car service is available)
      */
-    public int getWaitTime (double lat, double lon, LegMode mode) {
-        if (waitTimePolygons != null && waitTimePolygons.legMode == mode) {
+    public int getWaitTime (double lat, double lon, StreetMode streetMode) {
+        if (waitTimePolygons != null && waitTimePolygons.streetMode == streetMode) {
             Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
             ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
-            return (int)(polygon.data * 60);
+            if (polygon == null || polygon.data == -1) {
+                return -1;
+            } else {
+                return (int)(polygon.data * 60);
+            }
         } else {
             return 0;
         }

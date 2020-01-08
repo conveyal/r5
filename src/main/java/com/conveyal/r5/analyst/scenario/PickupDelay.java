@@ -1,9 +1,12 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.conveyal.r5.profile.StreetMode.CAR;
 
 /**
  * This Modification type configures the amount of time a passenger must wait to be picked up by a ride-hailing service.
@@ -51,7 +54,7 @@ public class PickupDelay extends Modification {
      *
      * TODO not yet implemented
      */
-    public String legMode = "CAR";
+    public StreetMode streetMode = CAR;
 
     /**
      * The default waiting time (floating point, in minutes) when no polygon is found. Negative numbers mean the area
@@ -91,7 +94,11 @@ public class PickupDelay extends Modification {
     public boolean apply (TransportNetwork network) {
         // network.streetLayer is already a protective copy made by method Scenario.applyToTransportNetwork.
         // The polygons have already been validated in the resolve method, we just need to record them in the network.
-        network.streetLayer.waitTimePolygons = polygons;
+        if (network.streetLayer.waitTimePolygons != null) {
+            errors.add("Multiple pickup delay modifications cannot be applied to a single network.");
+        } else {
+            network.streetLayer.waitTimePolygons = polygons;
+        }
         return errors.size() > 0;
     }
 

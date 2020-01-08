@@ -48,7 +48,6 @@ public class TravelTimeComputer {
     public TravelTimeComputer (AnalysisTask request, TransportNetwork network) {
         this.request = request;
         this.network = network;
-
     }
 
     /**
@@ -109,24 +108,23 @@ public class TravelTimeComputer {
         // This tracks whether any of those searches (for any mode) were successfully connected to the street network.
         boolean foundAnyOriginPoint = false;
 
+        // Convert from profile routing qualified modes to internal modes. This also ensures we don't route on
+        // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
+        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
+
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
-        for (LegMode legMode : request.accessModes) {
-            LOG.info("Performing street search for mode: {}", legMode);
+        for (StreetMode accessMode : accessModes) {
+            LOG.info("Performing street search for mode: {}", accessMode);
 
-            // Look up pick-up delay time for an access leg. Negative values mean no pickup service is available at
-            // the origin location.
-            int pickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon, legMode);
-
+            // Look up pick-up delay time for an access leg. The time may be zero.
+            // Negative values mean pickup service is defined, but is not available at this origin location.
+            int pickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon, accessMode);
             if (pickupDelaySeconds < 0) {
-                LOG.info("On-demand {} service is not available at this location, continuing to next access mode (if " +
-                        "any).", legMode);
+                LOG.info("On-demand {} service is not available at this location, " +
+                        "continuing to next access mode (if any).", accessMode);
                 continue;
             }
-
-            boolean delayAtPickup = pickupDelaySeconds > 0;
-
-            // Convert from profile routing qualified mode to internal mode
-            StreetMode accessMode = toStreetMode(legMode);
+            boolean delayPickup = pickupDelaySeconds > 0;
 
             int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
             if (streetSpeedMillimetersPerSecond <= 0){
@@ -171,9 +169,9 @@ public class TravelTimeComputer {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
-                if (delayAtPickup) {
+                if (delayPickup) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
-                            pickupDelaySeconds, legMode);
+                            pickupDelaySeconds, accessMode);
                     travelTimesToStopsSeconds.transformValues(i -> i + pickupDelaySeconds);
                 }
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
@@ -182,16 +180,17 @@ public class TravelTimeComputer {
             LinkedPointSet linkedDestinations = network.linkageCache
                     .getLinkage(destinations, network.streetLayer, accessMode);
 
-            // Direct times (i.e. using just a street mode, and not transit)
-            // TODO add logic here to disallow direct travel if linkedStops are specified in pickupDelay?
+            // Determine the direct times (i.e. using just a street mode, without transit)
+            // TODO add logic to disallow direct travel to destination if pickupDelay zones are associated with stops?
 
-            // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
+            // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access
+            //       times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (delayAtPickup) {
-                LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).", pickupDelaySeconds,
-                        legMode);
+            if (delayPickup) {
+                LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
+                        pickupDelaySeconds, accessMode);
                 pointSetTimes.incrementAllReachable(pickupDelaySeconds);
             }
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
@@ -272,14 +271,18 @@ public class TravelTimeComputer {
         // III. Egress Propagation ======================================================================================
         // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
 
+        // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
+        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
+
         // This propagator will link the destinations to the street layer for all modes as needed.
         PerTargetPropagater perTargetPropagater = new PerTargetPropagater(
                 destinations,
                 network.streetLayer,
-                request.egressModes,
+                egressStreetModes,
                 request,
                 transitTravelTimesToStops,
-                nonTransitTravelTimesToDestinations.travelTimes);
+                nonTransitTravelTimesToDestinations.travelTimes
+        );
 
         // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
         // because in the non-transit case we call the reducer directly (see above).

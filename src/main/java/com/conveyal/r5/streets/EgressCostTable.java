@@ -41,6 +41,10 @@ import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
  *
  * Note that these cost tables are only needed for egress from public transit. They are not needed for a particular
  * mode if that mode is only being used for access to transit or direct travel to the destination points.
+ *
+ * EgressCostTables are derived from data in a specific LinkedPointSet, and can be thought of as memoized or cached
+ * results from computations on that LinkedPointSet. Therefore there is a one-to-one relationship between
+ * LinkedPointSet instances and EgressCostTable instances.
  */
 public class EgressCostTable implements Serializable {
 
@@ -56,7 +60,11 @@ public class EgressCostTable implements Serializable {
 
     // FIELDS
 
-    /** The linkage from which these cost tables were built. */
+    /**
+     * The linkage from which these cost tables were built. There is a one-to-one relationship between LinkedPointSet
+     * instances and EgressCostTable instances, with the latter being memoized or cached results from computations on
+     * one particular LinkedPointSet.
+     */
     public final LinkedPointSet linkedPointSet;
 
     /**

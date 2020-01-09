@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -65,7 +66,7 @@ public class IndexedPolygonCollection {
 
     private STRtree polygonSpatialIndex = new STRtree();
 
-    private Map<String, ModificationPolygon> polygonsById;
+    private Map<String, ModificationPolygon> polygonsById = new HashMap<>();
 
     private int featureCount = 0;
 

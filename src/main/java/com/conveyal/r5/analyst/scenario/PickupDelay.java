@@ -79,7 +79,7 @@ public class PickupDelay extends Modification {
      * The default waiting time (floating point, in minutes) when no polygon is found. Negative numbers mean the area
      * is not served at all.
      */
-    public double defaultWait = 0;
+    public double defaultWait = -1;
 
     // Internal (private and transient) fields used in applying the modification to the network
 
@@ -121,7 +121,11 @@ public class PickupDelay extends Modification {
                     if (zonePolygon == null) {
                         errors.add("Could not find zone polygon with ID: " + zonePolygonId);
                     }
-                    TIntList stopNumbers = stopNumbersForZonePolygon.getOrDefault(zonePolygonId, new TIntArrayList());
+                    TIntList stopNumbers = stopNumbersForZonePolygon.get(zonePolygon);
+                    if (stopNumbers == null) {
+                        stopNumbers = new TIntArrayList();
+                        stopNumbersForZonePolygon.put(zonePolygon, stopNumbers);
+                    }
                     for (String stopPolygonId : stopPolygonIds) {
                         ModificationPolygon stopPolygon = polygons.getById(stopPolygonId);
                         if (stopPolygon == null) {
@@ -157,7 +161,8 @@ public class PickupDelay extends Modification {
 
     @Override
     public int getSortOrder () {
-        // TODO Decide where this and other experiemental modification types should appear in the ordering
+        // TODO Decide where this and other experiemental modification types should appear in the ordering.
+        //      Note that it does need to be applied after any stops are created and added by other modifications.
         return 97;
     }
 

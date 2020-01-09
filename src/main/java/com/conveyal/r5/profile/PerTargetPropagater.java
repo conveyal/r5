@@ -296,9 +296,7 @@ public class PerTargetPropagater {
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
         // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
-        final int waitingTimeSeconds =
-                (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
-                (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
+        // FIXME ensure this ^ is baked into the PickupDelay class
 
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to

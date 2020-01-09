@@ -8,6 +8,7 @@ import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
 import com.conveyal.r5.analyst.scenario.ModificationPolygon;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -185,7 +186,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
      * Note that this is a single field, rather than a collection: we only support one set of polygons for one mode.
      */
-    public IndexedPolygonCollection waitTimePolygons;
+    public PickupWaitTimes pickupWaitTimes;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -1546,23 +1547,16 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * We currently only support one LegMode per pickup delay polygon collection. If the supplied set of modes (e.g.
-     * access modes) contains the wait time polygons' leg mode, return the pickup delay. Otherwise, return a 0 second
-     * delay.
+     * We currently only support one StreetMode per pickup delay polygon collection. If the supplied mode matches the
+     * wait time polygons' mode, return the pickup delay (or -1). Otherwise, return a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
      * @return the waiting time in seconds to begin traversing the street network (e.g. waiting to be picked up by a
      *         car, or -1 if no car service is available)
      */
     public int getWaitTime (double lat, double lon, StreetMode streetMode) {
-        if (waitTimePolygons != null && waitTimePolygons.streetMode == streetMode) {
-            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-            ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
-            if (polygon == null || polygon.data == -1) {
-                return -1;
-            } else {
-                return (int)(polygon.data * 60);
-            }
+        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
+            return pickupWaitTimes.getWaitTime(lat, lon);
         } else {
             return 0;
         }

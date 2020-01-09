@@ -10,12 +10,20 @@ import com.vividsolutions.jts.geom.Polygonal;
 public class ModificationPolygon {
 
     public final Geometry polygonal;
+    public final String id;
     public final String name;
     public final double data;
     public final double priority;
 
-    public ModificationPolygon (Polygonal polygonal, String name, double data, double priority) {
+    public ModificationPolygon (
+        Polygonal polygonal,
+        String id,
+        String name,
+        double data,
+        double priority
+    ) {
         this.polygonal = (Geometry) polygonal;
+        this.id = id;
         this.name = name;
         this.data = data;
         this.priority = priority;

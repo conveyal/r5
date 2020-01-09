@@ -496,7 +496,7 @@ public class PointToPointRouterServer {
             Map<String, Object> featureCollection = new HashMap<>(2);
             featureCollection.put("type", "FeatureCollection");
 
-            Collection<Stop> stops = transportNetwork.transitLayer.findStopsInEnvelope(env);
+            Collection<Stop> stops = transportNetwork.transitLayer.findApiStopsInEnvelope(env);
             List<GeoJsonFeature> features = new ArrayList<>(stops.size());
 
             stops.forEach(stop -> {

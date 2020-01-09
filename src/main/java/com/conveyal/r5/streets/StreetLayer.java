@@ -1106,6 +1106,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * We return the unfiltered results including false positives because calculating the true distance to each edge
      * is quite a slow operation. The caller must post-filter the set of edges if more distance information is needed,
      * including knowledge of whether an edge passes inside the query envelope at all.
+     * @param envelope FIXME IN WHAT UNITS, FIXED OR FLOATING?
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);

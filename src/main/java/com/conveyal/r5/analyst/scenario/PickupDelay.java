@@ -1,18 +1,16 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -129,17 +127,11 @@ public class PickupDelay extends Modification {
                         if (stopPolygon == null) {
                             errors.add("Could not find stop polygon with ID: " + stopPolygonId);
                         }
-                        Envelope stopPolygonEnvelope = stopPolygon.polygonal.getEnvelopeInternal();
-                        Collection<Stop> stops = network.transitLayer.findStopsInEnvelope(stopPolygonEnvelope);
+                        TIntSet stops = network.transitLayer.findStopsInGeometry(stopPolygon.polygonal);
                         if (stops.isEmpty()) {
                             errors.add("Stop polygon did not contain any stops: " + stopPolygonId);
                         }
-                        for (Stop stop : stops) {
-                            // FIXME Need to pull out method to iterate over internal stops, not API objects.
-                            // Method must also find stops that were added in the scenario, so are not in index!
-                            int stopNumber = 0; // stop.number
-                            stopNumbers.add(stopNumber);
-                        }
+                        stopNumbers.addAll(stops);
                     }
                 });
             }

@@ -148,6 +148,11 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
+    /**
+     * The spatial index can and will return false positives, but should not produce false negatives.
+     * We return the unfiltered results including false positives. That is, this overselects and MUST BE FILTERED.
+     * @return all indexed objects within the envelope, and then some.
+     */
     public final TIntSet query(Envelope envelope) {
         final TIntSet ret = new TIntHashSet();
         visit(envelope, false, (bin, mapKey) -> {

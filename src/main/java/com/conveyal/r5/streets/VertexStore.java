@@ -1,8 +1,11 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.CoordinateFilter;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TByteList;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
@@ -114,6 +117,14 @@ public class VertexStore implements Serializable {
 
         public int getFixedLon() {
             return fixedLons.get(index);
+        }
+
+        public Point getJTSPointFloating () {
+            return GeometryUtils.geometryFactory.createPoint(getJTSCoordinateFloating());
+        }
+
+        public Coordinate getJTSCoordinateFloating () {
+            return new Coordinate(getLon(), getLat());
         }
 
     }

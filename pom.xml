@@ -284,6 +284,12 @@
             <name>bintray</name>
             <url>https://dl.bintray.com/andimarek/graphql-java</url>
         </repository>
+        <!-- axiomalaska polyline-encoder 0.1 available here -->
+        <repository>
+            <id>oba-public</id>
+            <name>One Bus Away Public</name>
+            <url>http://nexus.onebusaway.org/nexus/content/repositories/public/</url>
+        </repository>
     </repositories>
 
     <dependencies>

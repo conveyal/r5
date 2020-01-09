@@ -6,8 +6,6 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
-import com.conveyal.r5.analyst.scenario.ModificationPolygon;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
@@ -1548,18 +1546,20 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * We currently only support one StreetMode per pickup delay polygon collection. If the supplied mode matches the
-     * wait time polygons' mode, return the pickup delay (or -1). Otherwise, return a 0 second delay.
+     * For the given location and mode of travel, get an object representing the available on-demand mobility service,
+     * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
+     * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
+     * (or -1). Otherwise, return a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
      * @return the waiting time in seconds to begin traversing the street network (e.g. waiting to be picked up by a
-     *         car, or -1 if no car service is available)
+     *         car, or -1 if no car service is available) TODO rephrase for AccessService or null.
      */
-    public int getWaitTime (double lat, double lon, StreetMode streetMode) {
+    public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
         if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
-            return pickupWaitTimes.getWaitTime(lat, lon);
+            return pickupWaitTimes.getAccessService(lat, lon);
         } else {
-            return 0;
+            return null;
         }
     }
 

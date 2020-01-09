@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.DominatingList;
@@ -25,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import java.util.EnumSet;
 import java.util.function.IntFunction;
 
+import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
+import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.api.util.LegMode.toStreetMode;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
@@ -116,15 +119,16 @@ public class TravelTimeComputer {
         for (StreetMode accessMode : accessModes) {
             LOG.info("Performing street search for mode: {}", accessMode);
 
-            // Look up pick-up delay time for an access leg. The time may be zero.
-            // Negative values mean pickup service is defined, but is not available at this origin location.
-            int pickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon, accessMode);
-            if (pickupDelaySeconds < 0) {
+            // Look up pick-up service for an access leg.
+            PickupWaitTimes.AccessService accessService =
+                    network.streetLayer.getAccessService(request.fromLat, request.fromLon, accessMode);
+
+            // When an on-demand mobility service is defined, it may not be available at this particular location.
+            if (accessService == NO_SERVICE_HERE) {
                 LOG.info("On-demand {} service is not available at this location, " +
                         "continuing to next access mode (if any).", accessMode);
                 continue;
             }
-            boolean delayPickup = pickupDelaySeconds > 0;
 
             int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
             if (streetSpeedMillimetersPerSecond <= 0){
@@ -169,10 +173,13 @@ public class TravelTimeComputer {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
-                if (delayPickup) {
+                if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
-                            pickupDelaySeconds, accessMode);
-                    travelTimesToStopsSeconds.transformValues(i -> i + pickupDelaySeconds);
+                            accessService.waitTimeSeconds, accessMode);
+                    if (accessService.stopsReachable != null) {
+                        travelTimesToStopsSeconds.retainEntries((k, v) -> accessService.stopsReachable.contains(k));
+                    }
+                    travelTimesToStopsSeconds.transformValues(i -> i + accessService.waitTimeSeconds);
                 }
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
@@ -188,10 +195,10 @@ public class TravelTimeComputer {
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (delayPickup) {
+            if (accessService != NO_WAIT_ALL_STOPS) {
                 LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
-                        pickupDelaySeconds, accessMode);
-                pointSetTimes.incrementAllReachable(pickupDelaySeconds);
+                        accessService.waitTimeSeconds, accessMode);
+                pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
             }
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
         }

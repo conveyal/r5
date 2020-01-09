@@ -7,6 +7,7 @@ import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +22,8 @@ import static com.conveyal.r5.profile.StreetMode.CAR;
  * This waiting time may vary spatially, and is specified with a set of polygons like the RoadCongestion modification.
  * See the documentation on that class for discussions on polygon priority. Eventually all the polygon priority and
  * indexing should be moved to a reusable class.
+ *
+ * TODO add a parameter for on-demand service slowdown factor? Rename to on-demand-feeder?
  */
 public class PickupDelay extends Modification {
 
@@ -111,7 +114,7 @@ public class PickupDelay extends Modification {
             // Collect any errors from the IndexedPolygonCollection construction, so they can be seen in the UI.
             errors.addAll(polygons.getErrors());
             // Iterate over all zone-stop mappings (if any) and resolve them against the network.
-            final Map<ModificationPolygon, TIntList> stopNumbersForZonePolygon = new HashMap<>();
+            final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon = new HashMap<>();
             if (stopsForZone != null) {
                 if (stopsForZone.isEmpty()) {
                     errors.add("If stopsForZone is specified, it must be non-empty.");
@@ -121,9 +124,9 @@ public class PickupDelay extends Modification {
                     if (zonePolygon == null) {
                         errors.add("Could not find zone polygon with ID: " + zonePolygonId);
                     }
-                    TIntList stopNumbers = stopNumbersForZonePolygon.get(zonePolygon);
+                    TIntSet stopNumbers = stopNumbersForZonePolygon.get(zonePolygon);
                     if (stopNumbers == null) {
-                        stopNumbers = new TIntArrayList();
+                        stopNumbers = new TIntHashSet();
                         stopNumbersForZonePolygon.put(zonePolygon, stopNumbers);
                     }
                     for (String stopPolygonId : stopPolygonIds) {
@@ -139,6 +142,7 @@ public class PickupDelay extends Modification {
                     }
                 });
             }
+            // TODO filter out polygons that aren't keys in stopsForZone using new IndexedPolygonCollection constructor
             this.pickupWaitTimes = new PickupWaitTimes(polygons, stopNumbersForZonePolygon,  this.streetMode);
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.

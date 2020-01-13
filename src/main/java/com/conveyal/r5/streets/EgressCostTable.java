@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -308,6 +309,44 @@ public class EgressCostTable implements Serializable {
         }).collect(Collectors.toList());
         computeCounter.done();
         copyCounter.done();
+
+        // Now that we have a full set of tables, filter and transform them to reflect on-demand egress service.
+        // TODO optimization: we could return null immediately above for all stops not served by the on-demand egress:
+        // if (onDemandEgressService != null && ! onDemandEgressService.allows(stopIndex)) return null;
+        // We could also integrate the geographic filtering into that same loop and extendDistanceTableToPoints.
+        // In fact this is a major optimization since building car tables is very slow, and we might only need a few.
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
+        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
+        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
+            if (streetMode != StreetMode.CAR) {
+                // FIXME only cars have egress cost tables in seconds. Others will need a constant time offset field.
+                throw new RuntimeException("Only car egress tables can have a baked in time delay.");
+            }
+            for (int s = 0; s < stopToPointLinkageCostTables.size(); s++) {
+                PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(s);
+                if (egressService == null || egressService.waitTimeSeconds < 0) {
+                    stopToPointLinkageCostTables.set(s, null);
+                    continue;
+                }
+                int[] costs = stopToPointLinkageCostTables.get(s);
+                TIntList filteredCosts = new TIntArrayList();
+                for (int i = 0; i < costs.length; i += 2) {
+                    int point = costs[i];
+                    int cost = costs[i]; // TODO normalize names, these are not just times they may be distances
+                    // TODO linkedPointSet.pointSet.getPointsInGeometry(), and pointInsideGeometry? default defs.
+                    double lat = linkedPointSet.pointSet.getLat(point);
+                    double lon = linkedPointSet.pointSet.getLat(point);
+                    if (GeometryUtils.containsPoint(egressService.serviceArea, lon, lat)) {
+                        filteredCosts.add(point);
+                        filteredCosts.add(cost + egressService.waitTimeSeconds);
+                    }
+                }
+                if (filteredCosts.isEmpty()) {
+                    filteredCosts = null;
+                }
+                stopToPointLinkageCostTables.set(s, filteredCosts.toArray());
+            }
+        }
     }
 
     /**

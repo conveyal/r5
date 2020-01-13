@@ -5,16 +5,13 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.util.LambdaCounter;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.streets.EdgeStore.Edge;
-import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -419,6 +416,7 @@ public class LinkedPointSet implements Serializable {
      *
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
+     * TODO clarify that this can use times or distances, depending on units of the table?
      * @param distanceTableToVertices a map from integer vertex IDs to distances TODO in what units?
      * @param distanceTableZone TODO clarify: in fixed or floating degrees etc.
      * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.

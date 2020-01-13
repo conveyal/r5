@@ -28,7 +28,6 @@ import java.util.function.IntFunction;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
-import static com.conveyal.r5.api.util.LegMode.toStreetMode;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
@@ -188,23 +187,26 @@ public class TravelTimeComputer {
                     .getLinkage(destinations, network.streetLayer, accessMode);
 
             // Determine the direct times (i.e. using just a street mode, without transit)
-            // TODO add logic to disallow direct travel to destination if pickupDelay zones are associated with stops?
 
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access
             //       times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
+
             if (accessService != NO_WAIT_ALL_STOPS) {
                 LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
                         accessService.waitTimeSeconds, accessMode);
-                pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                //pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                // TODO add logic to disallow direct travel to destination if pickupDelay zones are associated with stops?
+                pointSetTimes = PointSetTimes.allUnreached(destinations);
             }
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
         }
 
         // Handle park+ride, a mode represented in the request LegMode but not in the internal StreetMode.
         // FIXME this special case for CAR_PARK currently overwrites any results from other access modes.
+        //       That means computation is completely wasted and maybe duplicated.
         // This is pretty ugly, and should be integrated into the mode loop above.
         if (request.accessModes.contains(LegMode.CAR_PARK)) {
             // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds

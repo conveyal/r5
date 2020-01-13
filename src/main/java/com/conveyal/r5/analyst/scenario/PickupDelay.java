@@ -3,9 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.vividsolutions.jts.geom.Envelope;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
+import com.vividsolutions.jts.geom.Geometry;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -114,7 +112,10 @@ public class PickupDelay extends Modification {
             // Collect any errors from the IndexedPolygonCollection construction, so they can be seen in the UI.
             errors.addAll(polygons.getErrors());
             // Iterate over all zone-stop mappings (if any) and resolve them against the network.
+            // TODO For "Java reasons" they need to be final; deal with the case where they are not supplied in JSON.
             final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon = new HashMap<>();
+            final Map<ModificationPolygon, PickupWaitTimes.EgressService> egressServices = new HashMap<>();
+            // Handle service to stop mapping if supplied in the modification JSON.
             if (stopsForZone != null) {
                 if (stopsForZone.isEmpty()) {
                     errors.add("If stopsForZone is specified, it must be non-empty.");
@@ -139,11 +140,31 @@ public class PickupDelay extends Modification {
                             errors.add("Stop polygon did not contain any stops: " + stopPolygonId);
                         }
                         stopNumbers.addAll(stops);
+                        // Derive egress services from this pair of polygons
+                        double egressWaitMinutes = stopPolygon.data;
+                        if (egressWaitMinutes >= 0) {
+                            // This stop polygon can be used on the egress end of a trip.
+                            int egressWaitSeconds = (int) (egressWaitMinutes / 60);
+                            Geometry serviceArea = zonePolygon.polygonal;
+                            PickupWaitTimes.EgressService egressService = egressServices.get(stopPolygon);
+                            if (egressService != null) {
+                                // Merge service are with any other service polygons associated with this stop polygon.
+                                serviceArea = serviceArea.union(egressService.serviceArea);
+                            }
+                            egressService = new PickupWaitTimes.EgressService(egressWaitSeconds, stops, serviceArea);
+                            egressServices.put(stopPolygon, egressService);
+                        }
                     }
                 });
             }
             // TODO filter out polygons that aren't keys in stopsForZone using new IndexedPolygonCollection constructor
-            this.pickupWaitTimes = new PickupWaitTimes(polygons, stopNumbersForZonePolygon,  this.streetMode);
+            // egress wait times for stop numbers
+            this.pickupWaitTimes = new PickupWaitTimes(
+                    polygons,
+                    stopNumbersForZonePolygon,
+                    egressServices.values(),
+                    this.streetMode
+            );
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.
             errors.add(ExceptionUtils.asString(e));

@@ -52,8 +52,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -1549,17 +1549,16 @@ public class StreetLayer implements Serializable, Cloneable {
      * For the given location and mode of travel, get an object representing the available on-demand mobility service,
      * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
      * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
-     * (or -1). Otherwise, return a 0 second delay.
+     * (or -1). Otherwise, return an object representing a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
-     * @return the waiting time in seconds to begin traversing the street network (e.g. waiting to be picked up by a
-     *         car, or -1 if no car service is available) TODO rephrase for AccessService or null.
+     * @return object with pick-up time and stops served
      */
     public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
         if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
             return pickupWaitTimes.getAccessService(lat, lon);
         } else {
-            return null;
+            return NO_WAIT_ALL_STOPS;
         }
     }
 

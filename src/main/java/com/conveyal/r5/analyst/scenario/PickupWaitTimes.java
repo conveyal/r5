@@ -8,6 +8,7 @@ import com.vividsolutions.jts.geom.Point;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 
 import java.util.Collection;
 import java.util.Map;
@@ -28,7 +29,8 @@ public class PickupWaitTimes {
      * On the access leg, someone picked up in the key zone can be dropped off at any of the transit stops that are
      * values for that key. On the egress end, this is reversed. Because this map is used on both the access and egress
      * ends, it should contain even polygons whose wait time data is negative (indicating they can't be used on access)
-     * because they may still be used for egress.
+     * because they may still be used for egress. TODO Clarify -- this implies stop zones should have delay = -1? But
+     * that's not congruent with egressWaitMinutes >= 0 in PickupDelay.
      * If the Map is not present (null) then all the zones allow access to any stop in the network.
      */
     private final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon;
@@ -78,8 +80,20 @@ public class PickupWaitTimes {
             return NO_SERVICE_HERE;
         } else {
             int waitTimeSeconds = (int) (polygon.data * 60);
+            if (stopNumbersForZonePolygon == null) {
+                // Pickup zone polygons are not tied to specific stop polygons; signal an access service that
+                // provides access to all stops from this pickup zone.
+                return new AccessService(waitTimeSeconds, null);
+            }
             TIntSet stopsReachable = stopNumbersForZonePolygon.get(polygon);
-            return new AccessService(waitTimeSeconds, stopsReachable);
+            if (stopsReachable == null) {
+                // No stops reachable from this polygon (e.g. it is a stop polygon, which provides egress service to
+                // a zone); return an AccessService with empty stopsReachable (not null, because null signals all
+                // stops reachable).
+                return new AccessService(waitTimeSeconds, new TIntHashSet());
+            } else {
+                return new AccessService(waitTimeSeconds, stopsReachable);
+            }
         }
     }
 

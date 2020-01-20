@@ -332,7 +332,7 @@ public class EgressCostTable implements Serializable {
                 TIntList filteredCosts = new TIntArrayList();
                 for (int i = 0; i < costs.length; i += 2) {
                     int point = costs[i];
-                    int cost = costs[i]; // TODO normalize names, these are not just times they may be distances
+                    int cost = costs[i + 1]; // TODO normalize names, these are not just times they may be distances
                     // TODO linkedPointSet.pointSet.getPointsInGeometry(), and pointInsideGeometry? default defs.
                     double lat = linkedPointSet.pointSet.getLat(point);
                     double lon = linkedPointSet.pointSet.getLat(point);
@@ -342,9 +342,10 @@ public class EgressCostTable implements Serializable {
                     }
                 }
                 if (filteredCosts.isEmpty()) {
-                    filteredCosts = null;
+                    stopToPointLinkageCostTables.set(s, null);
+                } else {
+                    stopToPointLinkageCostTables.set(s, filteredCosts.toArray());
                 }
-                stopToPointLinkageCostTables.set(s, filteredCosts.toArray());
             }
         }
     }

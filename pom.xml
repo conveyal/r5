@@ -8,7 +8,8 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>4.7.2-SNAPSHOT</version>
+    <!-- R5 v4.8+ targets Java 11 runtime environment -->
+    <version>4.8.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>
@@ -283,9 +284,14 @@
             <url>https://maven.conveyal.com</url>
         </repository>
         <repository>
-            <id>conveyal-ossrh</id>
+            <id>ossrh-releases</id>
             <name>releases on sonatype, which may not yet have been synced with central</name>
             <url>https://oss.sonatype.org/content/repositories/releases/</url>
+        </repository>
+        <repository>
+            <id>ossrh-snapshots</id>
+            <name>releases on sonatype, which may not yet have been synced with central</name>
+            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
         </repository>
         <repository>
             <id>osgeo</id>
@@ -375,8 +381,8 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
-            <!-- Maintenance v3.0.8 updated for Java 11. -->
-            <version>3.0.8</version>
+            <!-- gtfs-lib maintenance v3.0.9+ updated for Java 11, with new "v2" extensions on MapDB files. -->
+            <version>3.0.10-20200121.095416-4</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>

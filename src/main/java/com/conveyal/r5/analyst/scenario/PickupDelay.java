@@ -144,7 +144,7 @@ public class PickupDelay extends Modification {
                         double egressWaitMinutes = stopPolygon.data;
                         if (egressWaitMinutes >= 0) {
                             // This stop polygon can be used on the egress end of a trip.
-                            int egressWaitSeconds = (int) (egressWaitMinutes / 60);
+                            int egressWaitSeconds = (int) (egressWaitMinutes * 60);
                             Geometry serviceArea = zonePolygon.polygonal;
                             PickupWaitTimes.EgressService egressService = egressServices.get(stopPolygon);
                             if (egressService != null) {

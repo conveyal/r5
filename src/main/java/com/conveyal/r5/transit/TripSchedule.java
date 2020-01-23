@@ -103,10 +103,6 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 LOG.error("All frequency entries on trip {} have end time before start time, excluding this trip.", trip.trip_id);
                 return null;
             }
-            if (frequencies.stream().anyMatch(f -> f.exact_times == 1)) {
-                LOG.error("Frequency entries on trip {} use exact_times, excluding this trip.", trip.trip_id);
-                return null;
-            }
         }
         return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
@@ -163,7 +159,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 int fidx = 0;
                 for (Frequency f : frequencies) {
                     if (f.exact_times == 1) {
-                        throw new RuntimeException("Frequency trips with exact_times are not supported.");
+                        LOG.warn("GTFS frequency entries with exact_times are not supported, treating as inexact!");
                     }
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;

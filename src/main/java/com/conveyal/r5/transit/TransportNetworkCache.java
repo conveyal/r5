@@ -41,7 +41,7 @@ import java.util.zip.ZipInputStream;
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
  * local filesystem and on S3 for later re-use.
- * Currently this holds only one base (non-scenario) network, and evicts it when a new network is requested.
+ * Currently this holds ONLY ONE base (non-scenario) network, and evicts that network when a new network is requested.
  * However there may be many scenario networks derived from that base network, which  are stored in the scenarios
  * field of the baseNetwork.
  */
@@ -55,10 +55,14 @@ public class TransportNetworkCache {
 
     private final String bucket;
 
+    /** Cache size is currently limited to one, i.e. the worker holds on to only one network at a time. */
     private static final int DEFAULT_CACHE_SIZE = 1;
 
-    private final LoadingCache<String, TransportNetwork> cache; // TODO change all other caches from Guava to Caffeine caches
+    // TODO change all other caches from Guava to Caffeine caches. This one is already a Caffeine cache.
+    private final LoadingCache<String, TransportNetwork> cache;
+
     private final BaseGTFSCache gtfsCache;
+
     private final OSMCache osmCache;
 
     /**
@@ -77,6 +81,7 @@ public class TransportNetworkCache {
         this.s3 = (bucket == null) ? null : AmazonS3ClientBuilder.defaultClient();
     }
 
+    // TODO remove unused constructor?
     public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;

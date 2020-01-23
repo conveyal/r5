@@ -58,15 +58,20 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      * This usually serves as the base supergrid pointset for other smaller grids in the same region.
      */
     public WebMercatorGridPointSet (TransportNetwork transportNetwork) {
-        LOG.info("Creating web mercator pointset for transport network with extents {}",
-                transportNetwork.streetLayer.envelope);
+        this(transportNetwork.streetLayer.envelope);
+    }
 
+    /**
+     * TODO specific data types for Web Mercator and WGS84 floating point envelopes
+     * @param wgsEnvelope an envelope in floating-point WGS84 degrees
+     */
+    public WebMercatorGridPointSet (Envelope wgsEnvelope) {
+        LOG.info("Creating WebMercatorGridPointSet with WGS84 extents {}", wgsEnvelope);
         this.zoom = DEFAULT_ZOOM;
-        int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
-        int east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX());
-        int north = latToPixel(transportNetwork.streetLayer.envelope.getMaxY());
-        int south = latToPixel(transportNetwork.streetLayer.envelope.getMinY());
-
+        int west = lonToPixel(wgsEnvelope.getMinX());
+        int east = lonToPixel(wgsEnvelope.getMaxX());
+        int north = latToPixel(wgsEnvelope.getMaxY());
+        int south = latToPixel(wgsEnvelope.getMinY());
         this.west = west;
         this.north = north;
         this.height = south - north;
@@ -149,6 +154,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return x / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
+    // TODO add Javadoc - these are absolute pixels right? They don't seem to be relative to the PointSet edge.
     public double pixelToLat (double y) {
         double tile = y / 256d;
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));

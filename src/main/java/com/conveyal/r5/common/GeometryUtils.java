@@ -1,13 +1,14 @@
 package com.conveyal.r5.common;
 
 import com.conveyal.r5.streets.VertexStore;
+import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineSegment;
-import org.apache.commons.math3.util.FastMath;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 /**
  * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
@@ -72,6 +73,14 @@ public class GeometryUtils {
             throw new AssertionError("Buffer distance in geographic units is negative!");
         }
         envelope.expandBy(xExpansion, yExpansion);
+    }
+
+    public static Envelope floatingWgsEnvelopeToFixed (Envelope floatingWgsEnvelope) {
+        double fixedMinX = floatingDegreesToFixed(floatingWgsEnvelope.getMinX());
+        double fixedMaxX = floatingDegreesToFixed(floatingWgsEnvelope.getMaxX());
+        double fixedMinY = floatingDegreesToFixed(floatingWgsEnvelope.getMinY());
+        double fixedMaxY = floatingDegreesToFixed(floatingWgsEnvelope.getMaxY());
+        return new Envelope(fixedMinX, fixedMaxX, fixedMinY, fixedMaxY);
     }
 
 }

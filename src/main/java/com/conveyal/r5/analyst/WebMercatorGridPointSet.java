@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.transit.TransportNetwork;
-import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,13 +99,13 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     @Override
-    public TIntList getPointsInEnvelope (Envelope envelope) {
+    public TIntList getPointsInEnvelope (Envelope envelopeFixedDegrees) {
         // Convert fixed-degree envelope to floating, then to world-scale web Mercator pixels at this grid's zoom level.
         // This is not very DRY since we do something very similar in the constructor and elsewhere.
-        int west = lonToPixel(fixedDegreesToFloating(envelope.getMinX()));
-        int east = lonToPixel(fixedDegreesToFloating(envelope.getMaxX()));
-        int north = latToPixel(fixedDegreesToFloating(envelope.getMaxY()));
-        int south = latToPixel(fixedDegreesToFloating(envelope.getMinY()));
+        int west = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinX()));
+        int east = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxX()));
+        int north = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxY()));
+        int south = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinY()));
         // Make the envelope's pixel values relative to the edges of this WebMercatorGridPointSet, rather than
         // absolute world-scale coordinates at this zoom level.
         west -= this.west;
@@ -115,9 +115,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         TIntList pointsInEnvelope = new TIntArrayList();
         // Pixels are truncated toward zero, and coords increase toward East and South in web Mercator, so <= south/east.
         for (int y = north; y <= south; y++) {
-            if (y < 0 || y >= this.width) continue;
+            if (y < 0 || y >= this.height) continue;
             for (int x = west; x <= east; x++) {
-                if (x < 0 || x >= this.height) continue;
+                if (x < 0 || x >= this.width) continue;
                 // Calculate the 1D (flattened) index into this pointset for the grid cell at (x,y).
                 int pointIndex = y * this.width + x;
                 pointsInEnvelope.add(pointIndex);

@@ -69,32 +69,30 @@ public class PickupWaitTimes {
     }
 
     /**
-     * This represents the PickupWaitTimes evaluated at a particular departure location.
-     * One zone polygon will be chosen representing a particular service.
-     * @return the wait time to be picked up at the given point, or -1 if no service is available.
+     * Given a particular departure location, get a description of the on-demand pickup service available there.
+     * Currently this chooses just one "best" zone polygon based on location and priority values in the polygons.
+     * @return an AccessService with the wait time to be picked up, and any restrictions on reachable stops.
      */
     public AccessService getAccessService (double lat, double lon) {
         Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
         ModificationPolygon polygon = polygons.getWinningPolygon(point);
         if (polygon == null || polygon.data == -1) {
             return NO_SERVICE_HERE;
-        } else {
-            int waitTimeSeconds = (int) (polygon.data * 60);
-            if (stopNumbersForZonePolygon == null) {
-                // Pickup zone polygons are not tied to specific stop polygons; signal an access service that
-                // provides access to all stops from this pickup zone.
-                return new AccessService(waitTimeSeconds, null);
-            }
-            TIntSet stopsReachable = stopNumbersForZonePolygon.get(polygon);
+        }
+        // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
+        // By default all stops can be reached (null means no restrictions applied).
+        int waitTimeSeconds = (int) (polygon.data * 60);
+        TIntSet stopsReachable = null;
+        // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
+        if (stopNumbersForZonePolygon != null) {
+            stopsReachable = stopNumbersForZonePolygon.get(polygon);
             if (stopsReachable == null) {
-                // No stops reachable from this polygon (e.g. it is a stop polygon, which provides egress service to
-                // a zone); return an AccessService with empty stopsReachable (not null, because null signals all
-                // stops reachable).
-                return new AccessService(waitTimeSeconds, new TIntHashSet());
-            } else {
-                return new AccessService(waitTimeSeconds, stopsReachable);
+                // No stops were associated with the winning polygon (e.g. it is itself a stop polygon).
+                // stopsReachable should be empty, since null signals "no filtering" (all stops reachable).
+                stopsReachable = new TIntHashSet();
             }
         }
+        return new AccessService(waitTimeSeconds, stopsReachable);
     }
 
     /**
@@ -113,15 +111,25 @@ public class PickupWaitTimes {
     /** Special instance representing no on-demand service defined, so we can access all stops with no wait. */
     public static final AccessService NO_WAIT_ALL_STOPS = new AccessService(0, null);
 
-    // Alternatively instead of defining this data-holder class we could allow passing a travel time map into a method
-    // on this class, and have this class transform it.
+    /**
+     * This represents an on-demand service available at a particular departure location.
+     * This is the result of evaluating the PickupWaitTimes at a particular place.
+     * Alternatively instead of defining this data-holder class we could allow passing a travel time map into a method
+     * on this class, and have this class transform it.
+     */
     public static class AccessService {
+
+        /**
+         * The amount of time you have to wait at this location (in seconds) to be picked up on demand. Zero if you can
+         * be picked up immediately (e.g. a taxi stand outside a station), -1 if no service is available at all.
+         */
         public final int waitTimeSeconds;
 
         /**
-         * The transit stops one is allowed to access using this service.
-         * If null, all stops are reachable and no filtering should happen.
-         * TODO we could instead return a TIntIntMap from stop indexes to wait times, reflecting multiple services.
+         * If a limitation is placed on the transit stops one is allowed to access using this service, this is the
+         * set of allowed stops. This is null if all stops are reachable and no filtering should happen.
+         * If we eventually want to reflect multiple services with different waits, we could instead return a
+         * TIntIntMap from allowed stop indexes to wait times.
          */
         public final TIntSet stopsReachable;
 

@@ -1549,7 +1549,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * For the given location and mode of travel, get an object representing the available on-demand mobility service,
      * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
      * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
-     * (or -1). Otherwise, return an object representing a 0 second delay.
+     * (or -1 for no service). Otherwise, return an object representing a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
      * @return object with pick-up time and stops served

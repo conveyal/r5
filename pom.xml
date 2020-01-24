@@ -382,7 +382,7 @@
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
             <!-- gtfs-lib maintenance v3.0.9+ updated for Java 11, but able to use existing MapDB files. -->
-            <version>3.0.10-20200122.130840-6</version>
+            <version>3.0.10-20200124.084317-7</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>

@@ -5,7 +5,6 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
-import com.conveyal.gtfs.BaseGTFSCache;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
@@ -61,7 +60,7 @@ public class TransportNetworkCache {
     // TODO change all other caches from Guava to Caffeine caches. This one is already a Caffeine cache.
     private final LoadingCache<String, TransportNetwork> cache;
 
-    private final BaseGTFSCache gtfsCache;
+    private final GTFSCache gtfsCache;
 
     private final OSMCache osmCache;
 
@@ -82,7 +81,7 @@ public class TransportNetworkCache {
     }
 
     // TODO remove unused constructor?
-    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache) {
+    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
@@ -344,7 +343,7 @@ public class TransportNetworkCache {
         network.transitLayer = new TransitLayer();
 
         manifest.gtfsIds.stream()
-                .map(id -> gtfsCache.getFeed(id))
+                .map(id -> gtfsCache.get(id))
                 .forEach(network.transitLayer::loadFromGtfs);
 
         network.transitLayer.parentNetwork = network;

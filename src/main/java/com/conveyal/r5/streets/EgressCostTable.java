@@ -336,7 +336,7 @@ public class EgressCostTable implements Serializable {
                     // TODO normalize variable names (to costs?), these are not just times they may be distances.
                     // TODO linkedPointSet.pointSet.getPointsInGeometry(), and pointInsideGeometry? default defs.
                     double lat = linkedPointSet.pointSet.getLat(point);
-                    double lon = linkedPointSet.pointSet.getLat(point);
+                    double lon = linkedPointSet.pointSet.getLon(point);
                     if (GeometryUtils.containsPoint(egressService.serviceArea, lon, lat)) {
                         filteredCosts.add(point);
                         filteredCosts.add(cost + egressService.waitTimeSeconds);

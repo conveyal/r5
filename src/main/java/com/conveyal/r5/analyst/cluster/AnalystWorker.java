@@ -114,7 +114,7 @@ public class AnalystWorker implements Runnable {
 
     /** The amount of time (in minutes) a worker will stay alive after starting certain work */
     static final int PRELOAD_KEEPALIVE_MINUTES = 90;
-    static final int REGIONAL_KEEPALIVE_MINUTES = 2;
+    static final int REGIONAL_KEEPALIVE_MINUTES = 5;
     static final int SINGLE_KEEPALIVE_MINUTES = 60;
 
     /** Clock time (milliseconds since epoch) at which the worker should be considered idle */

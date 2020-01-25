@@ -2,13 +2,15 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
-
-import java.time.*;
-
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.model.json_serialization.*;
+import com.conveyal.r5.model.json_serialization.LegModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.LegModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -17,8 +19,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.EnumSet;
 
 /**
@@ -146,6 +151,8 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * The maximum duration of any trip found by this search.
+     * Defaults to 2 hours, the highest accessibility cutoffs allowed by our UI (which computes accessibility itself).
+     * Will be lowered to the maximum requested cutoff in regional analyses, where cutoffs are known in advance.
      */
     public int maxTripDurationMinutes = 2 * 60;
 

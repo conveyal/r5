@@ -3,13 +3,12 @@ package com.conveyal.r5.analyst.cluster;
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
-import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -41,6 +40,7 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -474,6 +474,12 @@ public class AnalystWorker implements Runnable {
             if (!task.makeTauiSite) {
                 task.destinationPointSet = pointSetCache.get(task.grid);
             }
+
+            // Set the maximum trip dureation just high enough to compute accessibility for the highest cutoff.
+            // TODO (re)validate percentle and cutoff parameters - validation is currently in TravelTimeReducer.
+            // Is there any time we don't want to raise/lower the limit in this way? What about TAUI sites?
+            int maxCutoffMinutes = Arrays.stream(task.cutoffs).max().getAsInt();
+            task.maxTripDurationMinutes = maxCutoffMinutes;
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will

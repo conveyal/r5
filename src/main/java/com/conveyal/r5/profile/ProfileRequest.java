@@ -153,6 +153,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * The maximum duration of any trip found by this search.
      * Defaults to 2 hours, the highest accessibility cutoffs allowed by our UI (which computes accessibility itself).
      * Will be lowered to the maximum requested cutoff in regional analyses, where cutoffs are known in advance.
+     * TODO it seems like this should be set on each request without relying on hard wired defaults
      */
     public int maxTripDurationMinutes = 2 * 60;
 

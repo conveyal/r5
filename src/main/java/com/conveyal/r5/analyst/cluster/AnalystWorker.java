@@ -477,6 +477,7 @@ public class AnalystWorker implements Runnable {
 
             // Set the maximum trip dureation just high enough to compute accessibility for the highest cutoff.
             // TODO (re)validate percentle and cutoff parameters - validation is currently in TravelTimeReducer.
+            // FIXME this is repeating logic now in the backend controller - convert to a pure validation.
             // Is there any time we don't want to raise/lower the limit in this way? What about TAUI sites?
             int maxCutoffMinutes = Arrays.stream(task.cutoffs).max().getAsInt();
             task.maxTripDurationMinutes = maxCutoffMinutes;

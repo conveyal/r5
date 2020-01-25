@@ -27,12 +27,6 @@ public abstract class AnalysisTask extends ProfileRequest {
      */
     public static final WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
 
-    /**
-     * Until regional analysis config supplies cutoffs in the request, hard-wire cutoffs in 15-minute increments.
-     * The highest one is half our absolute upper limit of 120 minutes, which should by default save compute time.
-     */
-    public static final int[] DEFAULT_CUTOFFS = new int[] {15, 30, 45, 60};
-
     // Extents of a web Mercator grid. Unfortunately this grid serves different purposes in different requests.
     // In the single-origin TravelTimeSurfaceTasks, the grid points are the destinations.
     // In regional multi-origin tasks, the grid points are the origins, with destinations determined by the selected
@@ -79,14 +73,16 @@ public abstract class AnalysisTask extends ProfileRequest {
     public boolean computePaths = false;
 
     /** Which percentiles of travel time to calculate. These should probably just be integers. */
-    public double[] percentiles = new double[] { 50 };
+    public double[] percentiles;
 
     /**
      * The travel time cutoffs in minutes for regional accessibility analysis. Hard-wired 15 minute increments for now.
      * A single cutoff was previously determined by superclass field ProfileRequest.maxTripDurationMinutes.
      * That field still cuts off the travel search at a certain number of minutes, so it is set to the highest cutoff.
+     * Note this will only be set for accessibility calculation tasks, not for travel time surfaces.
+     * TODO move it to the regional task subclass?
      */
-    public int[] cutoffs = DEFAULT_CUTOFFS;
+    public int[] cutoffs;
 
     /**
      * When recording paths as in a static site, how many distinct paths should be saved to each destination?

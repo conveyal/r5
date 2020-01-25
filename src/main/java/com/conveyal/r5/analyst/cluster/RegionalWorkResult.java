@@ -44,4 +44,6 @@ public class RegionalWorkResult {
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
     }
 
+    // TODO checkTravelTimeInvariants, checkAccessibilityInvariants
+
 }

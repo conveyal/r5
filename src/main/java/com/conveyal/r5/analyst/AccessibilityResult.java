@@ -4,36 +4,37 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 
 /**
- * This holds and accumulates multiple accessibility values for a single origin as they are computed.
- * The different accessibility values are for different destination point sets, travel time cutoffs, and
- * percentiles of travel time.
+ * This holds and accumulates multiple accessibility indicator values for a single origin as they are computed.
+ * The different accessibility indicator values are for different opportunity PointSets, different percentiles of travel
+ * time, and different travel time cutoffs.
  *
- * This should be used internally by R5 workers; values are kept as doubles while accumulating results, and related
- * fields are included for convenience. Once accumulation is done and results are ready for use elsewhere (e.g.
- * assembling multiple results in the broker), the getIntValues method returns an array of rounded integers.
+ * This should only be used internally by R5 workers. Values are kept as doubles while accumulating results.
+ * Once accumulation is done and results are ready for use elsewhere (e.g. assembling multiple results in the broker)
+ * the getIntValues method returns an array of rounded integers.
  */
 public class AccessibilityResult {
 
-    public final PointSet[] destinationPointSets;
-    public final double[] percentiles;
-    public final int[] cutoffs;
+    private final int nPointSets;
+    private final int nPercentiles;
+    private final int nCutoffs;
 
-    private double[][][] values;
+    private final double[][][] cumulativeOpportunities;
 
+    /** Construct an AccessibilityResult of the appropriate dimensions for the specified AnalysisTask. */
     public AccessibilityResult (AnalysisTask task) {
-        this.destinationPointSets = new PointSet[] {((RegionalTask)task).destinationPointSet};
-        this.percentiles = task.percentiles;
-        this.cutoffs =  new int[]{task.maxTripDurationMinutes};
-        values = new double[destinationPointSets.length][percentiles.length][cutoffs.length];
+        this.nPointSets = 1;
+        this.nPercentiles = task.percentiles.length;
+        this.nCutoffs = task.cutoffs.length;
+        cumulativeOpportunities = new double[nPointSets][nPercentiles][nCutoffs];
     }
 
+    /** Constructor for empty results, for use in testing only. */
     public AccessibilityResult () {
-        this.destinationPointSets = null;
-        this.percentiles = null;
-        this.cutoffs = null;
-        this.values = new double[1][1][1];
+        this.nPointSets = 0;
+        this.nPercentiles = 0;
+        this.nCutoffs = 0;
+        this.cumulativeOpportunities = new double[0][0][0];
     }
-
 
     /**
      * Increment the accessibility indicator value for the given grid, cutoff, and percentile
@@ -41,20 +42,23 @@ public class AccessibilityResult {
      * destinations into different indicator values.
      */
     public void incrementAccessibility (int gridIndex, int percentileIndex, int cutoffIndex, double amount) {
-        values[gridIndex][percentileIndex][cutoffIndex] += amount;
+        cumulativeOpportunities[gridIndex][percentileIndex][cutoffIndex] += amount;
     }
 
+    /**
+     * Opportunity counts may be fractional because they were disaggregated from polygons, or because a weighting or
+     * rolloff function was applied to them. After accumulating many such potentially fractional opportunity counts,
+     * we round them off to whole numbers for reporting as final results.
+     */
     public int[][][] getIntValues () {
-        int[][][] result = new int[destinationPointSets.length][percentiles.length][cutoffs.length];
-        for (int i = 0; i < values.length; i++) {
-            double[][] gridResult = values[i];
-            for (int j = 0; j < gridResult.length; j++) {
-                double[] cutoffResult = gridResult[j];
-                for (int k = 0; k < cutoffResult.length; k++) {
-                    result[i][j][k] = (int) Math.round(values[i][j][k]);
+        int[][][] intAccessibility = new int[nPointSets][nPercentiles][nCutoffs];
+        for (int d = 0; d < nPointSets; d++) {
+            for (int p = 0; p < nPercentiles; p++) {
+                for (int c = 0; c < nCutoffs; c++) {
+                    intAccessibility[d][p][c] = (int) Math.round(cumulativeOpportunities[d][p][c]);
                 }
             }
         }
-        return  result;
+        return  intAccessibility;
     }
 }

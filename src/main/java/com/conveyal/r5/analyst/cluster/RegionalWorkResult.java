@@ -25,12 +25,12 @@ public class RegionalWorkResult {
      * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
      * So the rows are the percentiles, and the columns are the accessibility values for particular cutoffs of that percentile of travel time.
      * There are also more cutoffs than percentiles, so given Java's 2D array representation this is more efficient.
-     * A particular result value should be keyed on (destinationGrid, percentile, cutoff).
+     * These are the truncated integer accessibility results for each [destinationGrid, percentile, cutoff].
      */
     public int[][][] accessibilityValues; // TODO Should this be floating point?
 
     /** Trivial no-arg constructor for deserialization. Private to prevent usage outside deserialization. */
-    private RegionalWorkResult() { };
+    private RegionalWorkResult() { }
 
     /**
      * Convert the supplied internal R5 OneOriginResult into this more compact form intended for serialization

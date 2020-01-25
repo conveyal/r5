@@ -99,7 +99,7 @@ public class GridResultAssembler {
             data.writeInt(request.north);
             data.writeInt(request.width);
             data.writeInt(request.height);
-            data.writeInt(1); // Hard-wired to one bootstrap replication
+            data.writeInt(1); // Hard-wired to one bootstrap replication TODO one value per cutoff
             data.close();
 
             // We used to fill the file with zeros here, to "overwrite anything that might be in the file already"
@@ -108,6 +108,7 @@ public class GridResultAssembler {
             // processing incoming results.
             // This is a newly created temp file, so setting it to a larger size should just create a sparse file
             // full of blocks of zeros (at least on Linux, I don't know what it does on Windows).
+            // TODO FileChannel / NIO?
             this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
             randomAccessFile.setLength(outputFileSizeBytes);
             LOG.info("Created temporary file of {} to accumulate results from workers.", human(randomAccessFile.length(), "B"));
@@ -158,7 +159,7 @@ public class GridResultAssembler {
         }
     }
 
-
+    // FIXME can't we use some kind of little-endian NIO buffer?
     public static byte[] intToLittleEndianByteArray (int i) {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
         byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -170,6 +171,7 @@ public class GridResultAssembler {
     // The randomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
     // The origins we receive have 2d coordinates.
     // Flatten them to compute file offsets and for the origin checklist.
+    // TODO add parameter for cutoff number, or write an array of values for all cutoff numbers at once
     private void writeOneValue (int x, int y, int value) throws IOException {
         int index1d = y * request.width + x;
         long offset = HEADER_LENGTH_BYTES + index1d * Integer.BYTES;

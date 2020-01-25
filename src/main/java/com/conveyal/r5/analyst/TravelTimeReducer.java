@@ -207,6 +207,7 @@ public class TravelTimeReducer {
                 // Use of < here (as opposed to <=) matches the definition in JS front end,
                 // and works well when truncating seconds to minutes.
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
+                    // FIXME second parameter should be third - permute
                     accessibilityResult.incrementAccessibility(0, 0, p, amount);
                 }
             }

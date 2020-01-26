@@ -1,14 +1,18 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.DecayFunction;
+import com.conveyal.r5.analyst.LinearDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
-
-import java.time.*;
-
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.model.json_serialization.*;
+import com.conveyal.r5.model.json_serialization.LegModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.LegModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -17,8 +21,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.EnumSet;
 
 /**
@@ -164,6 +171,12 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public String scenarioId;
 
+    /**
+     * The distance decay function applied to make more distant opportunities
+     * Deserialized into various subtypes from JSON.
+     */
+    public DecayFunction decayFunction;
+
     @JsonSerialize(using=ZoneIdSerializer.class)
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
@@ -215,6 +228,13 @@ public class ProfileRequest implements Serializable, Cloneable {
      * with exactly this number of departure times is generated.
      */
     public int monteCarloDraws = 220;
+
+    public ProfileRequest () {
+        // TEMPORARY inject a decay function until they are supplied in JSON
+        LinearDecayFunction ldf = new LinearDecayFunction();
+        ldf.widthMinutes = 10;
+        this.decayFunction = ldf;
+    }
 
     public ProfileRequest clone () {
         try {

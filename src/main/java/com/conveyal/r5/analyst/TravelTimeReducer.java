@@ -56,9 +56,9 @@ public class TravelTimeReducer {
 
     private final int nPercentiles;
 
-    private final int[] cutoffsMinutes;
+    private int[] cutoffsMinutes;
 
-    private final int nCutoffs;
+    private int nCutoffs;
 
     /**
      * The number of travel times we will record at each destination.
@@ -118,26 +118,6 @@ public class TravelTimeReducer {
             }
         }
 
-        // Validate and copy the travel time cutoffs.
-        // Validation should probably happen earlier when making or handling incoming tasks.
-        this.nCutoffs = task.cutoffs.length;
-        if (nCutoffs > MAX_CUTOFFS) {
-            throw new IllegalArgumentException("Maximum number of cutoffs allowed is " + MAX_CUTOFFS);
-        }
-        this.cutoffsMinutes = Arrays.copyOf(task.cutoffs, nCutoffs);
-        Arrays.sort(this.cutoffsMinutes);
-        if (! Arrays.equals(this.cutoffsMinutes, task.cutoffs)) {
-            throw new IllegalArgumentException("Cutoffs must be in ascending order.");
-        }
-        for (int cutoffMinutes : this.cutoffsMinutes) {
-            if (cutoffMinutes < 1 || cutoffMinutes > 120) {
-                throw new IllegalArgumentException("Accessibility time cutoffs must be in the range 1 to 120 minutes.");
-            }
-        }
-        if (maxTripDurationMinutes < this.cutoffsMinutes[nCutoffs - 1]) {
-            throw new IllegalArgumentException("Max trip duration must be at least as large as highest cutoff.");
-        }
-
         // Decide whether we want to retain travel times to all destinations for this origin.
         // This is currently only used with regional tasks when origins are freeform pointsets.
         // This base TravelTimeResult class (as opposed to its subclass TimeGrid) does not have grid writing
@@ -167,6 +147,29 @@ public class TravelTimeReducer {
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
         }
+
+        // Validate and copy the travel time cutoffs, which only makes sense when calculating accessibility.
+        // Validation should probably happen earlier when making or handling incoming tasks.
+        if (calculateAccessibility) {
+            this.nCutoffs = task.cutoffs.length;
+            if (nCutoffs > MAX_CUTOFFS) {
+                throw new IllegalArgumentException("Maximum number of cutoffs allowed is " + MAX_CUTOFFS);
+            }
+            this.cutoffsMinutes = Arrays.copyOf(task.cutoffs, nCutoffs);
+            Arrays.sort(this.cutoffsMinutes);
+            if (! Arrays.equals(this.cutoffsMinutes, task.cutoffs)) {
+                throw new IllegalArgumentException("Cutoffs must be in ascending order.");
+            }
+            for (int cutoffMinutes : this.cutoffsMinutes) {
+                if (cutoffMinutes < 1 || cutoffMinutes > 120) {
+                    throw new IllegalArgumentException("Accessibility time cutoffs must be in the range 1 to 120 minutes.");
+                }
+            }
+            if (maxTripDurationMinutes < this.cutoffsMinutes[nCutoffs - 1]) {
+                throw new IllegalArgumentException("Max trip duration must be at least as large as highest cutoff.");
+            }
+        }
+
     }
 
 

@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public class LinearDecayFunction extends DecayFunction {
 
     /** The public parameter. */
@@ -20,7 +22,13 @@ public class LinearDecayFunction extends DecayFunction {
     }
 
     @Override
-    public void validateAndPrecompute () {
+    protected void validateParameters () {
+        checkArgument(widthMinutes > 0, "Linear decay width parameter must be positive.");
+        checkArgument(widthMinutes < 60, "Linear decay width parameter must be under one hour.");
+    }
+
+    @Override
+    public void precompute () {
         widthSeconds = widthMinutes * 60;
         halfWidthSeconds = widthSeconds / 2;
         weightTable = new double[widthSeconds];

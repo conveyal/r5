@@ -3,6 +3,8 @@ package com.conveyal.r5.analyst;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * A family of monotonically decreasing functions from travel times to weight factors in the range [0...1].
  * This determines how much an opportunity at a given travel time is weighted when included in an accessibility value.
@@ -24,77 +26,84 @@ public abstract class DecayFunction {
     private static final double EPSILON = 0.01;
 
     /**
-     * Returns the minimum number of seconds at and above which this function will always return zero, i.e. the point
-     * at which the decreasing weight curve has reached zero. Some functions approach zero asymptotically, so even with
-     * a cutoff parameter of one hour they will still return tiny fractional weights all the way out to two hours
-     * (or infinity). This can lead to a lot of unnecessary computation, since we need to search all the way out to 2
-     * hours. It is advised to truncate the curve when the weight falls below some threshold, so we get a travel time
-     * above which we can consider all opportunities unreachable.
+     * For a given cutoff, returns the minimum travel time at or beyong which this function will always return a zero
+     * weight, i.e. the point at which the decreasing weight curve has reached zero. Some functions approach zero
+     * asymptotically, so they will still return tiny fractional weights all the way out to two hours (or infinity).
+     * This can lead to a lot of unnecessary computation, causing us to search all the way out to 2 hours. It is
+     * advisable for decay function implemetations truncate the curve when the weight falls below some threshold, so we
+     * get a small finite travel time above which we can consider all opportunities unreachable.
      *
      * Contract:
-     * Return units: seconds.
-     * Return range: [0...7200].
-     * Return null: no.
-     * Side effects: no.
-     * Idempotent: yes.
-     * FIXME add "for a given cutoff"
+     * Input units: seconds
+     * Input range: [0...7200]
+     * Return units: seconds
+     * Return range: [0...7200]
+     * Idempotent, no side effects.
      */
     public abstract int reachesZeroAt (int cutoffSeconds);
 
+    /**
+     * The DelayFunction subclasses should supply implementations of this method to return the weight factor for
+     * opportunities situated at a given travel time away from the origin, for a given cutoff parameter.
+     *
+     * Contract:
+     * Input units: seconds (for both inputs)
+     * Input range: [0...7200]
+     * Return units: opportunities
+     * Return range: [0...1]
+     * Idempotent, no side effects.
+     * Invariant: for any fixed cutoff, increasing travel time decreases output weight (monotonically decrteasing)
+     */
     public abstract double computeWeight (int cutoffSeconds, int travelTimeSeconds);
 
+    /**
+     * Call this method on a deserialized DecayFunction to prepare it for use.
+     */
     public final void prepare () {
-        validateAndPrecompute();
+        validateParameters();
+        precompute();
         checkInvariants();
     }
 
     /**
-     * This method should validate any parameters supplied. Then if your function has some more efficient way of
-     * generating values (e.g. precomputed tables) then it can override this method.
-     * We could create a StepDecayFunction rather than treat it as a special case, in which case it would be a
-     * little inefficient to generate a large array of all ones, then all zeros.
-     * Likewise for linear decay, it's more memory efficient to generate a table only for the decay portion, and
-     * generate the zeros and ones from . The creation of lookup tables is then left up to the implementation.
+     * This method is supplied by the concrete DecayFunction subtype.
+     * It should validate any parameters supplied via JSON into instance fields.
      */
-    protected void validateAndPrecompute () { }
+    protected void validateParameters () { }
+
 
     /**
-     * Verify that the function has the required characteristics.
+     * If a DecayFunction implementation has some more efficient way of generating values (e.g. precomputed tables)
+     * then it can do any required precomputation in this method.
+     */
+    protected void precompute () { }
+
+    /**
+     * Verify that the function has the expected characteristics.
      * We could also find the zero point here by iterating but it's simpler to just have the functions declare one.
      */
-    private final void checkInvariants () {
-        int cutoffSeconds = 60 * 30; // single test value, could iterate.
-        int zero = reachesZeroAt(cutoffSeconds);
-        if (zero < 0 || zero > TWO_HOURS_IN_SECONDS) {
-            throw new AssertionError("Function provided a zero point outside 2-hour input range.");
-        }
-        if (Math.abs(computeWeight(cutoffSeconds, zero)) < EPSILON) {
-            throw new AssertionError("Function provided a zero point that is not close to zero.");
-        }
-        double prevWeight = Double.POSITIVE_INFINITY;
-        for (int s = 0; s <= TWO_HOURS_IN_SECONDS; s += 1) {
-            double weight = computeWeight(cutoffSeconds, s);
-            if (weight < 0 || weight > 1) {
-                throw new AssertionError("Output range is outside [0...1].");
+    private void checkInvariants () {
+        // Try a few values, iterating over all 7200 would be too slow.
+        for (int cutoffMinutes : new int[] {9, 34, 61}) {
+            int cutoffSeconds = cutoffMinutes * 60;
+            int zero = reachesZeroAt(cutoffSeconds);
+            // Maybe it should not be the responsibility of the function to clamp outputs, negative values are OK
+            checkState(zero > 0, "Decay function zero point must be positive.");
+            checkState(zero < TWO_HOURS_IN_SECONDS, "Decay function zero point must be two hours or less.");
+            checkState(zero >= cutoffMinutes, "Zero point should be at or above cutoff.");
+            double zeroValue = Math.abs(computeWeight(cutoffSeconds, zero));
+            checkState(zeroValue < EPSILON, "Decay function output for zero point must be close to zero.");
+            double almostZeroValue = Math.abs(computeWeight(cutoffSeconds, zero - 1));
+            checkState(almostZeroValue >= EPSILON, "Zero point must be the smallest input whose output is close to zero.");
+            double prevWeight = Double.POSITIVE_INFINITY;
+            for (int s = 0; s <= TWO_HOURS_IN_SECONDS; s += 1) {
+                double weight = computeWeight(cutoffSeconds, s);
+                checkState(weight >= 0, "Weight output must be non-negative.");
+                checkState(weight <= 1, "Weight output must not exceed one.");
+                checkState(weight >= prevWeight, "Weight function must be monotonically decreasing.");
+                prevWeight = weight;
             }
-            if (weight < prevWeight) {
-                throw new AssertionError("Weight function is not monotonically decreasing.");
-            }
-            prevWeight = weight;
         }
     }
 
-    /**
-     * An array of doubles, one per minute, exactly centered on the cutoff index.
-     * This allows the UI to draw the approximate shape of the rolloff curve onto the cumulative opportunities chart.
-     * It assumes that the function does not change shape as the cutoff is moved, which is not the case for all
-     * functions. If this returns null, the cutoff should just be displayed as a single vertical line.
-     * Displaying the rolloff curve implies that the UI will display accessibility with that curve applied; that means
-     * the worker has to send back the accessibility. That means no more switching opportunity sets without re-running
-     * accessibility calculations, but that's not a big problem.
-     */
-    public double[] moveableWindowForDisplay() {
-        return new double[10];
-    }
-    
 }

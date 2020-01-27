@@ -84,4 +84,17 @@ public abstract class DecayFunction {
         }
     }
 
+    /**
+     * An array of doubles, one per minute, exactly centered on the cutoff index.
+     * This allows the UI to draw the approximate shape of the rolloff curve onto the cumulative opportunities chart.
+     * It assumes that the function does not change shape as the cutoff is moved, which is not the case for all
+     * functions. If this returns null, the cutoff should just be displayed as a single vertical line.
+     * Displaying the rolloff curve implies that the UI will display accessibility with that curve applied; that means
+     * the worker has to send back the accessibility. That means no more switching opportunity sets without re-running
+     * accessibility calculations, but that's not a big problem.
+     */
+    public double[] moveableWindowForDisplay() {
+        return new double[10];
+    }
+    
 }

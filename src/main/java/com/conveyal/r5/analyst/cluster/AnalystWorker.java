@@ -3,13 +3,12 @@ package com.conveyal.r5.analyst.cluster;
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
-import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -462,6 +461,13 @@ public class AnalystWorker implements Runnable {
         if (testTaskRedelivery) {
             pretendToDoWork(task);
             return;
+        }
+
+        // Bump the max trip duration up to find opportunities past the cutoff when using wide decay functions.
+        if (task.maxTripDurationMinutes < 120) {
+            int newMaxSeconds = task.decayFunction.reachesZeroAt(task.maxTripDurationMinutes * 60);
+            int newMaxMinutes = (int)(Math.ceil(newMaxSeconds / 60D));
+            task.maxTripDurationMinutes = newMaxMinutes;
         }
 
         try {

@@ -53,6 +53,8 @@ public class TravelTimeReducer {
      */
     private final int timesPerDestination;
 
+    public final DecayFunction decayFunction;
+
     /**
      * Reduce travel time values to requested summary outputs for each origin. The type of output (a single
      * cumulative opportunity accessibility value per origin, or selected percentiles of travel times to all
@@ -73,6 +75,8 @@ public class TravelTimeReducer {
      * @param task task to be performed.
      */
     public TravelTimeReducer (AnalysisTask task) {
+
+        this.decayFunction = task.decayFunction;
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
 
@@ -206,6 +210,7 @@ public class TravelTimeReducer {
             for (int p = 0; p < nPercentiles; p++) {
                 // Use of < here (as opposed to <=) matches the definition in JS front end,
                 // and works well when truncating seconds to minutes.
+                int travelTime = percentileTravelTimesMinutes[p];
                 if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
                     accessibilityResult.incrementAccessibility(0, 0, p, amount);
                 }

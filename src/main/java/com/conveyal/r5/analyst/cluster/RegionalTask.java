@@ -8,6 +8,10 @@ import com.conveyal.r5.analyst.PointSet;
  */
 public class RegionalTask extends AnalysisTask implements Cloneable {
 
+    // TEMPORARILY needed to store the cutoff, as distinct from the max trip duration during the search.
+    // Will be replaced by the array of cutoffs when multi-cutoff branch is merged.
+    public int cutoffMinutes;
+
     /**
      * The pointset key (e.g. regionId/datasetId.grid) on S3 to compute access to. Still named grid (instead of
      * destinationPointSetId for backward compatibility, namely the ability to start regional jobs on old worker

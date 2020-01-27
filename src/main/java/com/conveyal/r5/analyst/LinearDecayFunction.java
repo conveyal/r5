@@ -34,7 +34,7 @@ public class LinearDecayFunction extends DecayFunction {
         weightTable = new double[widthSeconds];
         for (int s = 0; s < widthSeconds; s++) {
             // All opportunities at second s are on average halfway between s and s+1 due to int truncation.
-            weightTable[s] = (s + 0.5) / widthSeconds;
+            weightTable[s] = 1 - ((s + 0.5) / widthSeconds);
         }
     }
 

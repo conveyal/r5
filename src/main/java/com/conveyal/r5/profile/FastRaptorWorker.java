@@ -235,15 +235,15 @@ public class FastRaptorWorker {
             }
         }
 
-        LOG.info("Search completed in {}s", (System.nanoTime() - startClockTime) / 1e9d);
-        LOG.info("Scheduled/bounds search: {}s", timeInScheduledSearch / 1e9d);
-        LOG.info("  - Scheduled search: {}s", timeInScheduledSearchTransit / 1e9d);
-        LOG.info("  - Frequency upper bounds: {}s", timeInScheduledSearchFrequencyBounds / 1e9d);
-        LOG.info("  - Transfers: {}s", timeInScheduledSearchTransfers / 1e9d);
-        LOG.info("Frequency search: {}s", timeInFrequencySearch / 1e9d);
-        LOG.info("  - Frequency component: {}s", timeInFrequencySearchFrequency / 1e9d);
-        LOG.info("  - Resulting updates to scheduled component: {}s", timeInFrequencySearchScheduled / 1e9d);
-        LOG.info("  - Transfers: {}s", timeInFrequencySearchTransfers / 1e9d);
+//        LOG.info("Search completed in {}s", (System.nanoTime() - startClockTime) / 1e9d);
+//        LOG.info("Scheduled/bounds search: {}s", timeInScheduledSearch / 1e9d);
+//        LOG.info("  - Scheduled search: {}s", timeInScheduledSearchTransit / 1e9d);
+//        LOG.info("  - Frequency upper bounds: {}s", timeInScheduledSearchFrequencyBounds / 1e9d);
+//        LOG.info("  - Transfers: {}s", timeInScheduledSearchTransfers / 1e9d);
+//        LOG.info("Frequency search: {}s", timeInFrequencySearch / 1e9d);
+//        LOG.info("  - Frequency component: {}s", timeInFrequencySearchFrequency / 1e9d);
+//        LOG.info("  - Resulting updates to scheduled component: {}s", timeInFrequencySearchScheduled / 1e9d);
+//        LOG.info("  - Transfers: {}s", timeInFrequencySearchTransfers / 1e9d);
 
         return arrivalTimesAtStopsPerIteration;
     }

@@ -464,11 +464,14 @@ public class AnalystWorker implements Runnable {
         }
 
         // Bump the max trip duration up to find opportunities past the cutoff when using wide decay functions.
-        if (task.maxTripDurationMinutes < 120) {
-            int newMaxSeconds = task.decayFunction.reachesZeroAt(task.maxTripDurationMinutes * 60);
+        // Save the existing hard-cutoff value which is used when saving travel times.
+        {
+            task.cutoffMinutes = task.maxTripDurationMinutes;
+            int newMaxSeconds = task.decayFunction.reachesZeroAt(task.cutoffMinutes * 60);
             int newMaxMinutes = (int)(Math.ceil(newMaxSeconds / 60D));
             task.maxTripDurationMinutes = newMaxMinutes;
         }
+        task.decayFunction.prepare();
 
         try {
             // Having a non-null opportunity density grid in the task triggers the computation of accessibility values.

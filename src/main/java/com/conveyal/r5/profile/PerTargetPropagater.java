@@ -38,9 +38,13 @@ public class PerTargetPropagater {
 
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
+    public static final int SECONDS_PER_MINUTE = 60;
+    public static final int MM_PER_METER = 1000;
+
     /**
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
      * many seconds from the origin are just considered unreachable.
+     * FIXME this is not being set anywhere but in fact it looks like it's supposed to be a variable!
      */
     public int cutoffSeconds = 120 * SECONDS_PER_MINUTE;
 
@@ -87,9 +91,6 @@ public class PerTargetPropagater {
      * calculation).
      */
     private final boolean oneToOne;
-
-    public static final int SECONDS_PER_MINUTE = 60;
-    public static final int MM_PER_METER = 1000;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -198,14 +199,13 @@ public class PerTargetPropagater {
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
             int targetToWrite = oneToOne ? 0 : targetIdx;
-            int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetToWrite, perIterationTravelTimes);
+            travelTimeReducer.extractTravelTimesAndRecord(targetToWrite, perIterationTravelTimes);
 
             if (calculateComponents) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
-                // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] *
-                        SECONDS_PER_MINUTE);
+                // NOTE this is currently using only the first (lowest) travel time.
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

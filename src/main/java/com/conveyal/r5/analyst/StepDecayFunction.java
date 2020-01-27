@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 /**
- * Simple cliff-edge weight function.
+ * Simple cliff-edge weight function. No parameters to set or validate.
  */
 public class StepDecayFunction extends DecayFunction {
 

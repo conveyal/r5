@@ -23,7 +23,7 @@ public abstract class DecayFunction {
 
     public static final int TWO_HOURS_IN_SECONDS = 2 * 60 * 60;
 
-    private static final double EPSILON = 0.01;
+    private static final double EPSILON = 0.0001;
 
     /**
      * For a given cutoff, returns the minimum travel time at or beyong which this function will always return a zero
@@ -100,7 +100,7 @@ public abstract class DecayFunction {
                 double weight = computeWeight(cutoffSeconds, s);
                 checkState(weight >= 0, "Weight output must be non-negative.");
                 checkState(weight <= 1, "Weight output must not exceed one.");
-                checkState(weight >= prevWeight, "Weight function must be monotonically decreasing.");
+                checkState(weight <= prevWeight, "Weight function must be monotonically decreasing.");
                 prevWeight = weight;
             }
         }

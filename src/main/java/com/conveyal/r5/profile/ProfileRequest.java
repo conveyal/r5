@@ -230,10 +230,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int monteCarloDraws = 220;
 
     public ProfileRequest () {
-        // TEMPORARY inject a decay function until they are supplied in JSON
-        LinearDecayFunction ldf = new LinearDecayFunction();
-        ldf.widthMinutes = 10;
-        this.decayFunction = ldf;
+         // TEMPORARY inject a decay function until they are supplied in JSON
+         LinearDecayFunction decayFunction = new LinearDecayFunction();
+         decayFunction.widthMinutes = 10;
+         this.decayFunction = decayFunction;
+         // this.decayFunction = new StepDecayFunction();
     }
 
     public ProfileRequest clone () {

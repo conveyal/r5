@@ -28,7 +28,7 @@
     <!-- Define some variables to be used elsewhere in the build. -->
     <properties>
         <geotools.version>21.2</geotools.version>
-        <jackson.version>2.6.1</jackson.version>
+        <jackson.version>2.10.2</jackson.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 

@@ -17,6 +17,7 @@ import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
@@ -38,7 +39,10 @@ public class AddTrips extends Modification {
     /** A list of stops on the new trip pattern. These may be existing or completely new stops. */
     public List<StopSpec> stops;
 
-    /** The timetables for this trip pattern */
+    /**
+     * The timetables for this trip pattern. Note that these may be out of temporal order, it's up to the
+     * consumer to get trips in order as required by the routing algorithm.
+     */
     public Collection<PatternTimetable> frequencies;
 
     /** GTFS mode (route_type), see constants in com.conveyal.gtfs.model.Route */
@@ -128,7 +132,9 @@ public class AddTrips extends Modification {
             if (timetable.firstDepartures == null) transitLayer.hasFrequencies = true;
             else transitLayer.hasSchedules = true;
         }
-
+        // Ensure that generated trips are ordered as expected by R5, in case firstDepartures was not ordered.
+        // Validation in resolve() ensures there are at least two stops, so at least one departure per trip.
+        pattern.tripSchedules.sort(Comparator.comparing(ts -> ts.departures[0]));
         pattern.routeIndex = this.routeIndex;
         pattern.routeId = this.routeId;
 
@@ -163,7 +169,9 @@ public class AddTrips extends Modification {
         /**
          * Times in seconds after midnight when trips will begin. If this field is non-null the newly added
          * trips will be scheduled trips rather than frequency-based, and you must not provide the startTime,
-         * endTime, or headwaySecs fields.
+         * endTime, or headwaySecs fields. These departure times are not necessarily sorted in ascending temporal
+         * order, it's up to the modification application process to sort the resulting trip objects that are
+         * generated, as required for routing.
          */
         public int[] firstDepartures;
 
@@ -301,13 +309,13 @@ public class AddTrips extends Modification {
         calendar.saturday  = timetable.saturday  ? 1 : 0;
         calendar.sunday    = timetable.sunday    ? 1 : 0;
         StringBuilder nameBuilder = new StringBuilder("MOD-");
-        nameBuilder.append(timetable.monday ? 'M' : 'x');
-        nameBuilder.append(timetable.monday ? 'T' : 'x');
-        nameBuilder.append(timetable.monday ? 'W' : 'x');
-        nameBuilder.append(timetable.monday ? 'T' : 'x');
-        nameBuilder.append(timetable.monday ? 'F' : 'x');
-        nameBuilder.append(timetable.monday ? 'S' : 'x');
-        nameBuilder.append(timetable.monday ? 'S' : 'x');
+        nameBuilder.append(timetable.monday     ? 'M' : 'x');
+        nameBuilder.append(timetable.tuesday    ? 'T' : 'x');
+        nameBuilder.append(timetable.wednesday  ? 'W' : 'x');
+        nameBuilder.append(timetable.thursday   ? 'T' : 'x');
+        nameBuilder.append(timetable.friday     ? 'F' : 'x');
+        nameBuilder.append(timetable.saturday   ? 'S' : 'x');
+        nameBuilder.append(timetable.sunday     ? 'S' : 'x');
         Service service = new Service(nameBuilder.toString());
         // Very long date range from the year 1850 to 2200 should be sufficient.
         calendar.start_date = 18500101;
@@ -335,7 +343,10 @@ public class AddTrips extends Modification {
 
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).
+        // Note that frequency here means "pure" unscheduled frequencies handled by Monte Carlo; firstDepartures, like
+        // exact_times in GTFS, are just a compact representation of exactly scheduled trips.
         final boolean frequency = timetable.firstDepartures == null;
+
         // if we are making one frequency trip, use 0 as its departure time
         int[] firstDepartures = frequency ? new int[] { 0 } : timetable.firstDepartures;
 
@@ -351,23 +362,28 @@ public class AddTrips extends Modification {
                     t += timetable.hopTimes[s];
                 }
             }
-
-            TripSchedule sched;
-
+            Collection<Frequency> frequencies;
             if (frequency) {
-                // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
+                // Create an R5 frequency entry that will be attached to the new TripSchedule
                 Frequency freq = new Frequency();
                 freq.start_time = timetable.startTime;
                 freq.end_time = timetable.endTime;
                 freq.headway_secs = timetable.headwaySecs;
-                sched =
-                        TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
-
-                timetable.applyPhasing(sched);
+                frequencies = Lists.newArrayList(freq);
             } else {
-                sched = TripSchedule.create(trip, arrivals, departures, Collections.emptyList(), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+                frequencies = Collections.emptyList();
             }
-
+            TripSchedule sched = TripSchedule.create(
+                    trip,
+                    arrivals,
+                    departures,
+                    frequencies,
+                    IntStream.range(0, arrivals.length).toArray(),
+                    serviceCode
+            );
+            if (frequency) {
+                timetable.applyPhasing(sched);
+            }
             return sched;
         }).collect(Collectors.toList());
     }

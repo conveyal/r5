@@ -1,18 +1,19 @@
 package com.conveyal.r5.util;
 
-import com.axiomalaska.polylineencoder.EncodedPolyline;
 import com.axiomalaska.polylineencoder.PolylineEncoder;
 import com.axiomalaska.polylineencoder.UnsupportedGeometryTypeException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.LineString;
 
 import java.io.IOException;
 
 /**
  * Serialize to Google encoded polyline.
+ * Hopefully we can get rid of this - it's the only thing still using JTS objects under the vividsolutions package name
+ * so is pulling in extra dependencies and requiring conversions (toLegacyLineString).
  */
 public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
 
@@ -25,4 +26,5 @@ public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
             throw new RuntimeException(e);
         }
     }
+
 }

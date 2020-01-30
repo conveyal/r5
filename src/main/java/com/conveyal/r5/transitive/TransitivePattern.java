@@ -2,7 +2,7 @@ package com.conveyal.r5.transitive;
 
 import com.conveyal.r5.util.EncodedPolylineSerializer;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.LineString;
 
 import java.util.List;
 

@@ -1,22 +1,14 @@
 package com.conveyal.r5.common;
 
-import com.conveyal.r5.analyst.error.UnsupportedGeometryException;
 import com.conveyal.r5.streets.VertexStore;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.LineSegment;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.LinearRing;
-import com.vividsolutions.jts.geom.Polygon;
 import org.apache.commons.math3.util.FastMath;
-import org.geojson.GeoJsonObject;
-import org.geojson.LngLatAlt;
-
-import java.util.List;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineSegment;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 /**
  * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
@@ -26,15 +18,6 @@ public class GeometryUtils {
 
     // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
-
-    private static Coordinate[] convertPath(List<LngLatAlt> path) {
-        Coordinate[] coords = new Coordinate[path.size()];
-        int i = 0;
-        for (LngLatAlt p : path) {
-            coords[i++] = new Coordinate(p.getLatitude(), p.getLongitude());
-        }
-        return coords;
-    }
 
     /**
      * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this
@@ -90,6 +73,14 @@ public class GeometryUtils {
             throw new AssertionError("Buffer distance in geographic units is negative!");
         }
         envelope.expandBy(xExpansion, yExpansion);
+    }
+
+    public static Envelope floatingWgsEnvelopeToFixed (Envelope floatingWgsEnvelope) {
+        double fixedMinX = floatingDegreesToFixed(floatingWgsEnvelope.getMinX());
+        double fixedMaxX = floatingDegreesToFixed(floatingWgsEnvelope.getMaxX());
+        double fixedMinY = floatingDegreesToFixed(floatingWgsEnvelope.getMinY());
+        double fixedMaxY = floatingDegreesToFixed(floatingWgsEnvelope.getMaxY());
+        return new Envelope(fixedMinX, fixedMaxX, fixedMinY, fixedMaxY);
     }
 
 }

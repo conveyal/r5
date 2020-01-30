@@ -4,7 +4,7 @@ import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.set.TIntSet;
 import org.glassfish.grizzly.http.server.*;
 import org.glassfish.grizzly.http.util.HttpStatus;

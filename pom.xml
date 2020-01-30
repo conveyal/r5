@@ -114,7 +114,7 @@
                 <version>2.19.1</version>
                 <configuration>
                     <!-- we have to fork the JVM during tests so that the argLine is passed along -->
-                    <forkCount>3</forkCount>
+                    <forkCount>2</forkCount>
                     <!-- enable the restricted reflection under Java 11 so that the ObjectDiffer works -->
                     <argLine>
                         -Xmx2G
@@ -427,8 +427,7 @@
             <artifactId>jackson2-geojson</artifactId>
             <version>0.9</version>
         </dependency>
-        <!-- This is the only thing still depending on old JTS with the old vividsolutions package name. -->
-        <!-- Unfortunately this polyline encoder library has not been updated to newer JTS. -->
+        <!--Maintainer has updated this polyline library to match our dependencies (newer JTS). -->
         <dependency>
             <groupId>com.axiomalaska</groupId>
             <artifactId>polyline-encoder</artifactId>

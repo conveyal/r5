@@ -24,7 +24,7 @@ public class TravelTimeReducer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
     /** The largest number of cutoffs we'll accept in a task. Too many cutoffs can create very large output files. */
-    public static final int MAX_CUTOFFS = 10;
+    public static final int MAX_CUTOFFS = 12;
 
     /**
      * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in

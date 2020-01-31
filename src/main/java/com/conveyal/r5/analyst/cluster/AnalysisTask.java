@@ -80,7 +80,7 @@ public abstract class AnalysisTask extends ProfileRequest {
      * A single cutoff was previously determined by superclass field ProfileRequest.maxTripDurationMinutes.
      * That field still cuts off the travel search at a certain number of minutes, so it is set to the highest cutoff.
      * Note this will only be set for accessibility calculation tasks, not for travel time surfaces.
-     * TODO move it to the regional task subclass?
+     * TODO move it to the regional task subclass? Should this be called cutoffsMinutes as elsewhere?
      */
     public int[] cutoffs;
 

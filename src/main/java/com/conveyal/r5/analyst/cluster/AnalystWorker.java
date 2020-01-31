@@ -40,7 +40,6 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +51,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.common.base.Preconditions.checkElementIndex;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * This is a main class run by worker machines in our Analysis computation cluster.
@@ -475,12 +477,13 @@ public class AnalystWorker implements Runnable {
                 task.destinationPointSet = pointSetCache.get(task.grid);
             }
 
-            // Set the maximum trip dureation just high enough to compute accessibility for the highest cutoff.
-            // TODO (re)validate percentle and cutoff parameters - validation is currently in TravelTimeReducer.
-            // FIXME this is repeating logic now in the backend controller - convert to a pure validation.
-            // Is there any time we don't want to raise/lower the limit in this way? What about TAUI sites?
-            int maxCutoffMinutes = Arrays.stream(task.cutoffs).max().getAsInt();
-            task.maxTripDurationMinutes = maxCutoffMinutes;
+            // TODO (re)validate multi-percentle and multi-cutoff parameters. Validation currently in TravelTimeReducer.
+            //  This version should require both arrays to be present, and single values to be missing.
+            // Using a newer backend, the task should have been normalized to use arrays not single values.
+            checkNotNull(task.cutoffs, "This worker requires an array of cutoffs (rather than a single value).");
+            checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
+            checkElementIndex(0, task.cutoffs.length, "Regional task must specify at least one cutoff.");
+            checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will

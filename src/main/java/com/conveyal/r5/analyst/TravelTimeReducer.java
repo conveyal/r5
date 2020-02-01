@@ -151,13 +151,13 @@ public class TravelTimeReducer {
         // Validate and copy the travel time cutoffs, which only makes sense when calculating accessibility.
         // Validation should probably happen earlier when making or handling incoming tasks.
         if (calculateAccessibility) {
-            this.nCutoffs = task.cutoffs.length;
+            this.nCutoffs = task.cutoffsMinutes.length;
             if (nCutoffs > MAX_CUTOFFS) {
                 throw new IllegalArgumentException("Maximum number of cutoffs allowed is " + MAX_CUTOFFS);
             }
-            this.cutoffsMinutes = Arrays.copyOf(task.cutoffs, nCutoffs);
+            this.cutoffsMinutes = Arrays.copyOf(task.cutoffsMinutes, nCutoffs);
             Arrays.sort(this.cutoffsMinutes);
-            if (! Arrays.equals(this.cutoffsMinutes, task.cutoffs)) {
+            if (! Arrays.equals(this.cutoffsMinutes, task.cutoffsMinutes)) {
                 throw new IllegalArgumentException("Cutoffs must be in ascending order.");
             }
             for (int cutoffMinutes : this.cutoffsMinutes) {

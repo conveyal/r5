@@ -23,7 +23,7 @@ public class AccessibilityResult {
     public AccessibilityResult (AnalysisTask task) {
         this.nPointSets = 1;
         this.nPercentiles = task.percentiles.length;
-        this.nCutoffs = task.cutoffs.length;
+        this.nCutoffs = task.cutoffsMinutes.length;
         cumulativeOpportunities = new double[nPointSets][nPercentiles][nCutoffs];
     }
 

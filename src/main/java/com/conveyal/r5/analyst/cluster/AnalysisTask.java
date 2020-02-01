@@ -72,17 +72,20 @@ public abstract class AnalysisTask extends ProfileRequest {
     /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
     public boolean computePaths = false;
 
-    /** Which percentiles of travel time to calculate. These should probably just be integers. */
+    /**
+     * Which percentiles of travel time to calculate.
+     * These should probably just be integers, but there are already a lot of them in Mongo as floats.
+     */
     public double[] percentiles;
 
     /**
-     * The travel time cutoffs in minutes for regional accessibility analysis. Hard-wired 15 minute increments for now.
+     * The travel time cutoffs in minutes for regional accessibility analysis.
      * A single cutoff was previously determined by superclass field ProfileRequest.maxTripDurationMinutes.
      * That field still cuts off the travel search at a certain number of minutes, so it is set to the highest cutoff.
      * Note this will only be set for accessibility calculation tasks, not for travel time surfaces.
      * TODO move it to the regional task subclass? Should this be called cutoffsMinutes as elsewhere?
      */
-    public int[] cutoffs;
+    public int[] cutoffsMinutes;
 
     /**
      * When recording paths as in a static site, how many distinct paths should be saved to each destination?

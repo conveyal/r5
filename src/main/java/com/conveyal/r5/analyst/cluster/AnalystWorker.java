@@ -480,9 +480,9 @@ public class AnalystWorker implements Runnable {
             // TODO (re)validate multi-percentle and multi-cutoff parameters. Validation currently in TravelTimeReducer.
             //  This version should require both arrays to be present, and single values to be missing.
             // Using a newer backend, the task should have been normalized to use arrays not single values.
-            checkNotNull(task.cutoffs, "This worker requires an array of cutoffs (rather than a single value).");
+            checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
             checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
-            checkElementIndex(0, task.cutoffs.length, "Regional task must specify at least one cutoff.");
+            checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
             checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.

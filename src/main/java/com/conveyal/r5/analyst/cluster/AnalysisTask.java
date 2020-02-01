@@ -76,7 +76,7 @@ public abstract class AnalysisTask extends ProfileRequest {
      * Which percentiles of travel time to calculate.
      * These should probably just be integers, but there are already a lot of them in Mongo as floats.
      */
-    public double[] percentiles;
+    public int[] percentiles;
 
     /**
      * The travel time cutoffs in minutes for regional accessibility analysis.

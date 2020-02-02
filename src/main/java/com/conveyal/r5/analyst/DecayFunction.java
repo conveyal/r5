@@ -11,13 +11,13 @@ import static com.google.common.base.Preconditions.checkState;
  * It has at least one parameter, the "cutoff" which is the midpoint of the decrease from one to zero.
  * Some subclasses will have an additional parameter that essentially adjusts the width of the transition region.
  * Like modifications, these are deserialized from JSON and then actually used in the computations.
+ * TODO redefine so that cutoff is supplied at construction, if precomputation is too slow?
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
     @JsonSubTypes.Type(name="step", value=StepDecayFunction.class),
     @JsonSubTypes.Type(name="linear", value=LinearDecayFunction.class),
-    @JsonSubTypes.Type(name="exponential", value= ExponentialDecayFunction.class),
-    @JsonSubTypes.Type(name="sigmoid", value=SigmoidDecayFunction.class),
+    @JsonSubTypes.Type(name="logistic", value=LogisticDecayFunction.class),
 })
 public abstract class DecayFunction {
 
@@ -89,12 +89,12 @@ public abstract class DecayFunction {
             int zero = reachesZeroAt(cutoffSeconds);
             // Maybe it should not be the responsibility of the function to clamp outputs, negative values are OK
             checkState(zero > 0, "Decay function zero point must be positive.");
-            checkState(zero < TWO_HOURS_IN_SECONDS, "Decay function zero point must be two hours or less.");
+            checkState(zero <= TWO_HOURS_IN_SECONDS, "Decay function zero point must be two hours or less.");
             checkState(zero >= cutoffMinutes, "Zero point should be at or above cutoff.");
-            double zeroValue = Math.abs(computeWeight(cutoffSeconds, zero));
-            checkState(zeroValue < EPSILON, "Decay function output for zero point must be close to zero.");
-            double almostZeroValue = Math.abs(computeWeight(cutoffSeconds, zero - 1));
-            checkState(almostZeroValue >= EPSILON, "Zero point must be the smallest input whose output is close to zero.");
+//            double zeroValue = Math.abs(computeWeight(cutoffSeconds, zero));
+//            checkState(zeroValue < EPSILON, "Decay function output for zero point must be close to zero.");
+//            double almostZeroValue = Math.abs(computeWeight(cutoffSeconds, zero - 1));
+//            checkState(almostZeroValue >= EPSILON, "Zero point must be the smallest input whose output is close to zero.");
             double prevWeight = Double.POSITIVE_INFINITY;
             for (int s = 0; s <= TWO_HOURS_IN_SECONDS; s += 1) {
                 double weight = computeWeight(cutoffSeconds, s);

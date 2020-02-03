@@ -2,6 +2,10 @@ package com.conveyal.r5.analyst;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+/**
+ * It's debatable whether the precomputation of a lookup table will speed up calculations. The tables get pretty big and
+ * calculation may be faster than memory churn. We should try to measure with and without that optimization.
+ */
 public class LinearDecayFunction extends DecayFunction {
 
     /** The public parameter. */
@@ -23,7 +27,7 @@ public class LinearDecayFunction extends DecayFunction {
 
     @Override
     protected void validateParameters () {
-        checkArgument(widthMinutes > 0, "Linear decay width parameter must be positive.");
+        checkArgument(widthMinutes >= 0, "Linear decay width parameter must be non-negative.");
         checkArgument(widthMinutes < 60, "Linear decay width parameter must be under one hour.");
     }
 

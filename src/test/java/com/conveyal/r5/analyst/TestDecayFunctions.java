@@ -22,7 +22,7 @@ public class TestDecayFunctions {
     public void testLogisticDecay () {
         for (int standardDeviationMinutes = 1; standardDeviationMinutes < 20; standardDeviationMinutes++) {
             LogisticDecayFunction function = new LogisticDecayFunction();
-            function.standardDeviationSeconds = standardDeviationMinutes * 60;
+            function.standardDeviationMinutes = standardDeviationMinutes;
             testFunctionCharacteristics(function);
         }
     }

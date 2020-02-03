@@ -6,6 +6,11 @@ package com.conveyal.r5.analyst;
 public class StepDecayFunction extends DecayFunction {
 
     @Override
+    public void prepare () {
+        // Nothing to validate or prepare.
+    }
+
+    @Override
     public int reachesZeroAt (int cutoffSeconds) {
         return cutoffSeconds;
     }

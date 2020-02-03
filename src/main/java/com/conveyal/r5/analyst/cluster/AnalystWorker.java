@@ -469,6 +469,9 @@ public class AnalystWorker implements Runnable {
             task.cutoffMinutes = task.maxTripDurationMinutes;
             int newMaxSeconds = task.decayFunction.reachesZeroAt(task.cutoffMinutes * 60);
             int newMaxMinutes = (int)(Math.ceil(newMaxSeconds / 60D));
+            if (task.maxTripDurationMinutes > 120) {
+                throw new IllegalArgumentException("Distance decay function must reach zero before 120 minutes.");
+            }
             task.maxTripDurationMinutes = newMaxMinutes;
         }
         task.decayFunction.prepare();

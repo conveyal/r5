@@ -26,13 +26,11 @@ public class LinearDecayFunction extends DecayFunction {
     }
 
     @Override
-    protected void validateParameters () {
+    public void prepare () {
+        // Validate
         checkArgument(widthMinutes >= 0, "Linear decay width parameter must be non-negative.");
         checkArgument(widthMinutes < 60, "Linear decay width parameter must be under one hour.");
-    }
-
-    @Override
-    public void precompute () {
+        // Precompute
         widthSeconds = widthMinutes * 60;
         halfWidthSeconds = widthSeconds / 2;
         weightTable = new double[widthSeconds];

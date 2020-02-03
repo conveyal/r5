@@ -16,10 +16,14 @@ public class LogisticDecayFunction extends DecayFunction {
 
     private static final double SQRT3 = sqrt(3);
 
-    public int standardDeviationSeconds;
+    public double standardDeviationMinutes;
+
+    private double standardDeviationSeconds;
 
     @Override
-    protected void validateParameters () {
+    public void prepare () {
+        // Derive and validate paramters.
+        standardDeviationSeconds = standardDeviationMinutes * 60;
         checkArgument(standardDeviationSeconds > 0, "Standard deviation must be positive.");
         checkArgument(standardDeviationSeconds < TWO_HOURS_IN_SECONDS, "Standard deviation must be less than 2 hours.");
     }

@@ -60,24 +60,11 @@ public abstract class DecayFunction {
 
     /**
      * Call this method on a deserialized DecayFunction to prepare it for use.
-     */
-    public final void prepare () {
-        validateParameters();
-        precompute();
-    }
-
-    /**
-     * This method is supplied by the concrete DecayFunction subtype.
      * It should validate any parameters supplied via JSON into instance fields.
-     */
-    protected void validateParameters () { }
-
-
-    /**
      * If a DecayFunction implementation has some more efficient way of generating values (e.g. precomputed tables)
-     * then it can do any required precomputation in this method.
+     * then it can also do any required precomputation in this method.
      */
-    protected void precompute () { }
+    public abstract void prepare ();
 
     /**
      * For functions without a simple analytic solution, find the effective zero point by bisection.

@@ -23,10 +23,10 @@ jobs:
       run: |
         # Only (attempt to) deploy when safe (when we're building a non-third-party commit so secrets are defined)
         if [ -n $GPG_KEY_NAME ]; then
+          gpg --version
           echo  "$GPG_PRIVATE_KEY" | base64 -d > maven-artifact-signing-key.asc
           gpg --import --batch maven-artifact-signing-key.asc
           rm maven-artifact-signing-key.asc
-          export GPG_TTY=$(tty)
           mvn clean deploy --settings maven-settings.xml
         else
           # Otherwise, just run all the way up to verify, the last phase before installing and deploying.
@@ -38,7 +38,7 @@ jobs:
         OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_JIRA_PASSWORD }}
         GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         GPG_KEY_NAME: ${{ secrets.GPG_KEY_NAME }}
-        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE }}"
     - name: Upload shaded JAR to S3
       run: aws s3 cp --recursive --exclude "*" --include "v*.jar" /home/travis/build/conveyal/r5/target s3://r5-builds
       env:

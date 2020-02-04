@@ -26,6 +26,7 @@ jobs:
           echo  "$GPG_PRIVATE_KEY" | base64 -d > maven-artifact-signing-key.asc
           gpg --import --batch maven-artifact-signing-key.asc
           rm maven-artifact-signing-key.asc
+          export GPG_TTY=$(tty)
           mvn clean deploy --settings maven-settings.xml
         else
           # Otherwise, just run all the way up to verify, the last phase before installing and deploying.

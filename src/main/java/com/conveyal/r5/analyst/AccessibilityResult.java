@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * This holds and accumulates multiple accessibility indicator values for a single origin as they are computed.
  * The different accessibility indicator values are for different opportunity PointSets, different percentiles of travel
@@ -45,19 +47,21 @@ public class AccessibilityResult {
     }
 
     /**
-     * As travel time cutoff increases, accessibility should increase.
-     * As percentile increases, travel time should decrease, and accessibility should decrease.
+     * As travel time cutoff increases, accessibility should increase (or at least remain the same).
+     * As percentile increases, travel time should decrease, so accessibility should decrease.
      * If one of these invariants does not hold, there is something wrong with the calculations.
      */
     private void checkInvariants () {
         for (int d = 0; d < nPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
                 for (int c = 0; c < nCutoffs; c++) {
-                    if (c > 0 && cumulativeOpportunities[d][p][c] < cumulativeOpportunities[d][p][c - 1]) {
-                        throw new AssertionError("Increasing travel time decreased accessibility.");
+                    if (c > 0) {
+                        checkState(cumulativeOpportunities[d][p][c] >= cumulativeOpportunities[d][p][c - 1],
+                                "As travel time increases, accessibility should increase or remain the same.");
                     }
-                    if (p > 0 && cumulativeOpportunities[d][p][c] > cumulativeOpportunities[d][p - 1][c]) {
-                        throw new AssertionError("Increasing percentile increased accessibility.");
+                    if (p > 0) {
+                        checkState(cumulativeOpportunities[d][p][c] <= cumulativeOpportunities[d][p - 1][c],
+                                "As percentile increases, accessibility should decrease or remain the same.");
                     }
                 }
             }

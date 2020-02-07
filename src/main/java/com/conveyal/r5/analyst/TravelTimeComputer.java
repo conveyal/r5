@@ -277,6 +277,8 @@ public class TravelTimeComputer {
         // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
         // because in the non-transit case we call the reducer directly (see above).
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
+        // Limit propagation to places that can affect accessibility.
+        perTargetPropagater.cutoffSeconds = request.maxTripDurationMinutes * 60;
 
         // When building a static site, perform some additional initialization causing the propagator to do extra work.
         if (request.computePaths || request.computeTravelTimeBreakdown) {

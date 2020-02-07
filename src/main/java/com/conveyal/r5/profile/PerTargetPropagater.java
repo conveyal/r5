@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * Given minimum travel times from a single origin point to all transit stops, this class finds minimum travel times to
  * a grid of destinations ("targets") by walking or biking or driving from the transit stops to the targets.
@@ -313,7 +315,7 @@ public class PerTargetPropagater {
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
-                        if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
+                        if (timeAtStop >= cutoffSeconds || timeAtStop >= perIterationTravelTimes[iteration]) {
                             // Skip propagation if all resulting times will be greater than the cutoff and
                             // cannot improve on the best known time at this iteration. Also avoids overflow.
                             continue;
@@ -321,15 +323,19 @@ public class PerTargetPropagater {
 
                         // Account for any additional delay waiting for taxi or autonomous vehicle.
                         secondsFromStopToTarget += waitingTimeSeconds;
-
+                        checkState(secondsFromStopToTarget > 0);
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                        if (timeAtTarget < cutoffSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {
-                            // To reach this target, alighting at this stop is faster than any previously checked stop.
-                            perIterationTravelTimes[iteration] = timeAtTarget;
-                            if (calculateComponents) {
-                                Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
-                                perIterationPaths[iteration] = pathsToStops[stop];
-                            }
+                        checkState(timeAtTarget > 0);
+
+                        if (timeAtTarget >= cutoffSeconds || timeAtTarget >= perIterationTravelTimes[iteration]) {
+                            // Similar to above, but skip propagation if propagated time is not an improvement.
+                            continue;
+                        }
+                        // To reach this target, alighting at this stop is faster than any previously checked stop.
+                        perIterationTravelTimes[iteration] = timeAtTarget;
+                        if (calculateComponents) {
+                            Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
+                            perIterationPaths[iteration] = pathsToStops[stop];
                         }
                     }
                 }

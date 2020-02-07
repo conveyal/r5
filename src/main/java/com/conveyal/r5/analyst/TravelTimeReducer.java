@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -13,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
@@ -210,19 +211,17 @@ public class TravelTimeReducer {
      * @param timesSeconds which will be destructively sorted in place to extract percentiles.
      */
     public void extractTravelTimePercentilesAndRecord (int target, int[] timesSeconds) {
+        checkArgument(timesSeconds.length == timesPerDestination, "{} iterations supplied, but expected {}",
+                timesSeconds.length, timesPerDestination);
         // Sort the times at each target and extract percentiles at the pre-calculated indexes.
         int[] travelTimePercentilesMinutes = new int[nPercentiles];
-        if (timesSeconds.length == timesPerDestination) {
-            // Instead of general purpose sort this could be done by performing a counting sort on the times,
-            // converting them to minutes in the process and reusing the small histogram array (120 elements) which
-            // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
-            Arrays.sort(timesSeconds);
-            for (int p = 0; p < nPercentiles; p++) {
-                int timeSeconds = timesSeconds[percentileIndexes[p]];
-                travelTimePercentilesMinutes[p] = convertToMinutes(timeSeconds);
-            }
-        } else {
-            throw new ParameterException(timesSeconds.length + " iterations supplied; expected " + timesPerDestination);
+        // Instead of general purpose sort this could be done by performing a counting sort on the times,
+        // converting them to minutes in the process and reusing the small histogram array (120 elements) which
+        // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
+        Arrays.sort(timesSeconds);
+        for (int p = 0; p < nPercentiles; p++) {
+            int timeSeconds = timesSeconds[percentileIndexes[p]];
+            travelTimePercentilesMinutes[p] = convertToMinutes(timeSeconds);
         }
         recordTravelTimePercentilesForTarget(target, travelTimePercentilesMinutes);
     }
@@ -247,6 +246,7 @@ public class TravelTimeReducer {
                 final double opportunityCountAtTarget = destinationPointSets[d].getOpportunityCount(target);
                 for (int p = 0; p < nPercentiles; p++) {
                     final int travelTimeMinutes = travelTimePercentilesMinutes[p];
+                    checkState(travelTimeMinutes >= 0, "Travel time less than zero. This is probably overflow.");
                     if (travelTimeMinutes == UNREACHED) {
                         // Percentiles should be sorted. If one is UNREACHED the rest will also be.
                         break;
@@ -281,6 +281,7 @@ public class TravelTimeReducer {
      * end could in principle receive a more general purpose format using wider or variable width integers.
      */
     private int convertToMinutes (int timeSeconds) {
+        checkState(timeSeconds >= 0, "Travel time less than zero. This is probably overflow.");
         if (timeSeconds == UNREACHED) return UNREACHED;
         int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
         if (timeMinutes < maxTripDurationMinutes) {

@@ -9,7 +9,7 @@
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
     <!-- R5 v4.8+ targets Java 11 runtime environment -->
-    <version>4.8.0-SNAPSHOT</version>
+    <version>4.8.0</version>
     <packaging>jar</packaging>
     <licenses>
         <license>
@@ -24,6 +24,22 @@
         <developerConnection>scm:git:https://github.com/conveyal/r5.git</developerConnection>
         <url>https://github.com/conveyal/r5</url>
     </scm>
+
+    <!-- Developer entries are provided for current developers and maintainers.
+    For other past contributors, see https://github.com/conveyal/r5/graphs/contributors -->
+    <developers>
+        <developer>
+            <name>Andrew Byrd</name>
+            <email>abyrd@conveyal.com</email>
+            <organization>Conveyal</organization>
+            <organizationUrl>http://conveyal.com/</organizationUrl>
+        </developer>
+        <developer>
+            <name>Anson Stewart</name>
+            <email>astewart@conveyal.com</email>
+            <organization>Conveyal</organization>
+        </developer>
+    </developers>
 
     <!-- Define some variables to be used elsewhere in the build. -->
     <properties>

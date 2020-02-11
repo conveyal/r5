@@ -5,10 +5,10 @@ import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Polygonal;
-import com.vividsolutions.jts.index.strtree.STRtree;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.index.strtree.STRtree;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.map.TObjectIntMap;
@@ -121,7 +121,9 @@ public class RoadCongestion extends Modification {
             LOG.info("Validating features and creating spatial index...");
             polygonSpatialIndex = new STRtree();
             FeatureType featureType = featureCollection.getSchema();
-            // Check CRS:
+            // Check CRS. If none is present, according to GeoJSON spec it is in WGS84.
+            // Unfortunately our version of Geotools cannot understand the common urn:ogc:def:crs:OGC:1.3:CRS84
+            // so it's better to just remove the CRS from all input files.
             CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
             if (crs != null && !DefaultGeographicCRS.WGS84.equals(crs) && !CRS.decode("CRS:84").equals(crs)) {
                 errors.add("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +

@@ -6,7 +6,7 @@ import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.Geometry;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

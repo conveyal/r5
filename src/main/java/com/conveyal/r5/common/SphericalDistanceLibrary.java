@@ -1,6 +1,6 @@
 package com.conveyal.r5.common;
 
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 import org.apache.commons.math3.util.FastMath;
 
 /**

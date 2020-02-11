@@ -6,9 +6,9 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.LambdaCounter;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Point;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -180,12 +180,7 @@ public class EgressCostTable implements Serializable {
             linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
         }
 
-         LOG.info("Creating linkage cost tables from each transit stop to PointSet points.");
-         // FIXME using a spatial index is wasting a lot of memory and not needed for gridded pointsets - overload for
-        //        gridded and freeform PointSets. We could just do this in the method that uses the pointset spatial
-        //        index (extendDistanceTableToPoints) but that's called in a tight loop.
-         linkedPointSet.pointSet.createSpatialIndexAsNeeded();
-
+        LOG.info("Creating EgressCostTables from each transit stop to PointSet points.");
         if (rebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
@@ -249,7 +244,6 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
-
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);

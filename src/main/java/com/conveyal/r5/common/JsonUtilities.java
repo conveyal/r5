@@ -1,20 +1,13 @@
 package com.conveyal.r5.common;
 
 import com.conveyal.geojson.GeoJsonModule;
-import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.model.json_serialization.BitSetSerializer;
 import com.conveyal.r5.model.json_serialization.JavaLocalDateSerializer;
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.entity.ByteArrayEntity;
-import org.glassfish.grizzly.http.server.Request;
-
-import java.io.IOException;
-import java.io.InputStream;
 
 /**
  * A library containing static methods for working with JSON.

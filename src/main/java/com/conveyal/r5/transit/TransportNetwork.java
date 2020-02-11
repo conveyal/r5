@@ -2,26 +2,36 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
-import com.vividsolutions.jts.geom.Envelope;
-import com.conveyal.r5.streets.StreetLayer;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.Serializable;
 import java.time.ZoneId;
-import java.util.*;
-import java.util.zip.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -31,6 +41,15 @@ import java.util.zip.*;
 public class TransportNetwork implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
+
+    /**
+     * Serializing this cache serializes its settings, but only its "unevictable" contents. This is intentional.
+     * TransportNetwork might not really be the right place for this though, it's part of the routing machinery.
+     * When we make a scenario copy of the network, it seems wrong that this TransportNetwork-level field is
+     * cloned. We could have fullExtentPointSet and fullExtentWalkLinkage fields which go into a worker-wide cache.
+     * However it's also convenient to have this cache garbage collected when the TransportNetwork is GC'ed.
+     */
+    public LinkageCache linkageCache = new LinkageCache();
 
     public StreetLayer streetLayer;
 
@@ -48,14 +67,13 @@ public class TransportNetwork implements Serializable {
     public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
     /**
-     * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages
-     * to street networks (the baseline street network, or ones with various scenarios applied). If they have been
-     * created, this point set and its linkage to the street network are serialized along with the network, which makes
-     * startup much faster. Note that there's a linkage cache with references to StreetLayers in this GridPointSet,
-     * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
-     * the baseline linkage. This unlinked GridPointSet is not specific to any mode of travel, it's just a set of points.
+     * A grid point set that covers the full extent of this transport network.
+     * This unlinked GridPointSet is not specific to any mode of travel, it's just a set of points.
+     * Once created, this point set is serialized along with the network, and its WALK linkage to the street
+     * network and associated cost tables are serialized and reloaded via the unevictable map in the LinkageCache.
+     * This makes startup much faster.
      */
-    public WebMercatorGridPointSet gridPointSet;
+    public WebMercatorGridPointSet fullExtentGridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
@@ -105,13 +123,12 @@ public class TransportNetwork implements Serializable {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
-        File dir = new File(osmSourceFile).getParentFile();
 
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
         // Load OSM data into MapDB
-        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+        OSM osm = new OSM(osmSourceFile + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 
@@ -120,6 +137,8 @@ public class TransportNetwork implements Serializable {
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
+        // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
+        // We should probably try to delete the file when exceptions occur.
         osm.close();
 
         // The street index is needed for associating transit stops with the street network
@@ -288,12 +307,12 @@ public class TransportNetwork implements Serializable {
      * as a subset of this one since it includes every potentially accessible point.
      */
     public void rebuildLinkedGridPointSet(StreetMode... modes) {
-        if (gridPointSet != null) {
+        if (fullExtentGridPointSet != null) {
             throw new RuntimeException("Linked grid pointset was built more than once.");
         }
-        gridPointSet = new WebMercatorGridPointSet(this);
+        fullExtentGridPointSet = new WebMercatorGridPointSet(this);
         for (StreetMode mode : modes) {
-            gridPointSet.buildUnevictableLinkage(streetLayer, mode);
+            linkageCache.buildUnevictableLinkage(fullExtentGridPointSet, streetLayer, mode);
         }
     }
 
@@ -354,10 +373,11 @@ public class TransportNetwork implements Serializable {
         TransportNetwork copy = new TransportNetwork();
         // It is important to set this before making the clones of the street and transit layers below.
         copy.scenarioId = scenario.id;
-        copy.gridPointSet = this.gridPointSet;
+        copy.fullExtentGridPointSet = this.fullExtentGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;
+        copy.linkageCache = this.linkageCache; // <-- weirdness, TODO get this out of the TransportNetwork
         return copy;
     }
 

@@ -1,0 +1,46 @@
+name: Java CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+      # How many commits to clone, need to catch most recent tag for git describe.
+      with:
+        fetch-depth: 150
+    - name: Set up JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+    - name: Cache local Maven repo
+      uses: actions/cache@v1
+      id: cache
+      with:
+        path: ~/.m2/repository
+        key: maven-repo
+    - name: Build with Maven
+      run: |
+        # Only (attempt to) deploy when safe (when we're building a non-third-party commit so secrets are defined)
+        if [ -n $GPG_KEY_NAME ]; then
+          gpg --version
+          echo  "$GPG_PRIVATE_KEY" | base64 -d > maven-artifact-signing-key.asc
+          gpg --import --batch maven-artifact-signing-key.asc
+          rm maven-artifact-signing-key.asc
+          mvn clean deploy --settings maven-settings.xml
+        else
+          # Otherwise, just run all the way up to verify, the last phase before installing and deploying.
+          # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
+          mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
+        fi
+      env:
+        OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_JIRA_USERNAME }}
+        OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_JIRA_PASSWORD }}
+        GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        GPG_KEY_NAME: ${{ secrets.GPG_KEY_NAME }}
+        GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE }}"
+    - name: Upload shaded JAR to S3
+      run: aws s3 cp --recursive --exclude "*" --include "v*.jar" ./target/ s3://r5-builds
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

@@ -1,19 +1,20 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.util.InputStreamProvider;
+import com.conveyal.r5.util.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.MultiPolygon;
-import com.vividsolutions.jts.geom.Point;
-import com.vividsolutions.jts.geom.Polygon;
-import com.vividsolutions.jts.geom.prep.PreparedGeometry;
-import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
-import org.apache.commons.io.input.BOMInputStream;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -30,6 +31,7 @@ import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -44,13 +46,13 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
@@ -59,9 +61,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static java.lang.Double.parseDouble;
@@ -72,13 +71,20 @@ import static org.apache.commons.math3.util.FastMath.sinh;
 import static org.apache.commons.math3.util.FastMath.tan;
 
 /**
- * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
- * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset from
- * the edges of the world.
+ * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
+ * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset
+ * from the edges of the world. This is quite close to implementing a PointSet interface, but PointSet currently
+ * includes linkage cache functionality which Grid does not need.
+ *
+ * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+ * TODO functionality to write and read grids should probably be in a separate class from the main Grid class.
  */
-public class Grid {
+public class Grid extends PointSet {
 
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
+
+    /** The file extension we use when persisting gridded pointsets to files. */
+    public static final String FILE_EXTENSION = "grid";
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;
@@ -100,41 +106,19 @@ public class Grid {
     /** The height of the grid in web Mercator pixels. */
     public final int height;
 
-    /** The data values for each pixel within this grid. */
+    /**
+     * The data values for each pixel within this grid. Dimension order is (x, y), with range [0, width) and [0, height).
+     */
     public final double[][] grid;
 
     /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
     private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
 
     /** Maximum area allowed for features in a shapefile upload */
-    double MAX_FEATURE_AREA_SQ_DEG = 2;
-
-    /**
-     * @param zoom web mercator zoom level for the grid.
-     * @param north latitude in decimal degrees of the north edge of this grid.
-     * @param east longitude in decimal degrees of the east edge of this grid.
-     * @param south latitude in decimal degrees of the south edge of this grid.
-     * @param west longitude in decimal degrees of the west edge of this grid.
-     */
-    public Grid (int zoom, double north, double east, double south, double west) {
-        this.zoom = zoom;
-        this.north = latToPixel(north, zoom);
-        /**
-         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
-         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
-         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
-         *
-         * So we add 1 to the height and width when a grid is created in this manner.
-         */
-        this.height = (latToPixel(south, zoom) - this.north) + 1; // minimum height is 1
-        this.west = lonToPixel(west, zoom);
-        this.width = (lonToPixel(east, zoom) - this.west) + 1; // minimum width is 1
-        this.grid = new double[width][height];
-    }
+    private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
 
     /**
      * Used when reading a saved grid.
-     * FIXME we have two constructors with five numeric parameters, differentiated only by int/double type.
      */
     public Grid (int zoom, int width, int height, int north, int west) {
         this.zoom = zoom;
@@ -142,6 +126,25 @@ public class Grid {
         this.height = height;
         this.north = north;
         this.west = west;
+        this.grid = new double[width][height];
+    }
+
+    public Grid (WebMercatorExtents extents) {
+        this(extents.zoom, extents.width, extents.height, extents.north, extents.west);
+    }
+
+    /**
+     * @param zoom Web Mercator zoom level
+     * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
+     */
+    public Grid (int zoom, Envelope wgsEnvelope) {
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        // TODO actually store a reference to an immutable WebMercatorExtents instead of inlining the fields in Grid.
+        this.zoom = webMercatorExtents.zoom;
+        this.west = webMercatorExtents.west;
+        this.north = webMercatorExtents.north;
+        this.width = webMercatorExtents.width;
+        this.height = webMercatorExtents.height;
         this.grid = new double[width][height];
     }
 
@@ -164,10 +167,6 @@ public class Grid {
     public List<PixelWeight> getPixelWeights (Geometry geometry) {
         return getPixelWeights(geometry, false);
     }
-
-    // PreparedGeometry is often faster for small numbers of vertices;
-    // see https://github.com/chrisbennight/intersection-test
-    private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
 
     /**
      * Get the proportions of an input polygon feature that overlap each grid cell, for use in lists of PixelWeights.
@@ -199,7 +198,11 @@ public class Grid {
             throw new IllegalArgumentException("Feature geometry is too large.");
         }
 
-        PreparedGeometry preparedGeom = pgFact.create(geometry);
+        // PreparedGeometry is often faster for small numbers of vertices;
+        // see https://github.com/chrisbennight/intersection-test
+        // We know this is a polygon so don't need flexible PreparedGeometryFactory, which I'd rather not use because
+        // its only method seems inherently static but is implemented in a way that requires instantiating the factory.
+        PreparedGeometry preparedGeom = new PreparedPolygon((Polygonal) geometry);
 
         Envelope env = geometry.getEnvelopeInternal();
 
@@ -246,11 +249,9 @@ public class Grid {
         incrementFromPixelWeights(getPixelWeights(geometry), value);
     }
 
-    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
-    public void incrementFromPixelWeights (List weights, double value) {
-        Iterator<PixelWeight> pixelWeightIterator = weights.iterator();
-        while(pixelWeightIterator.hasNext()) {
-            PixelWeight pix = pixelWeightIterator.next();
+    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid. */
+    public void incrementFromPixelWeights (List<PixelWeight> weights, double value) {
+        for (PixelWeight pix : weights) {
             grid[pix.x][pix.y] += pix.weight * value;
         }
     }
@@ -270,7 +271,18 @@ public class Grid {
         }
     }
 
-    /** Write this grid out in R5 binary grid format. */
+    /**
+     * Write this opportunity density grid out in R5 binary format.
+     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional
+     * doubles. This can lead to some strange effects. If you rasterize two polygons into the grid, one with 0.49
+     * opportunities in each cell and the other with 0.51, only one polygon will survive. If one has 1.2 per cell and
+     * the other 0.4 per cell, one polygon will survive as well as the overlap of the two (which will round to 2) but
+     * not the second polygon alone. Maybe we should be truncating instead of rounding to avoid this weirdness.
+     * TODO conversion to integers should happen as separate method, not during writing, and should be better, #566
+     *
+     * Also note that this is a different format than "access grids" and "time grids". Maybe someday they should all be
+     * the same format with a couple of options for compression or number of channels.
+     */
     public void write (OutputStream outputStream) throws IOException {
         // Java's DataOutputStream only outputs big-endian format ("network byte order").
         // These grids will be read out of Javascript typed arrays which use the machine's native byte order.
@@ -357,6 +369,9 @@ public class Grid {
         }
     }
 
+    /**
+     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional doubles.
+     */
     public static Grid read (InputStream inputStream) throws  IOException {
         LittleEndianDataInputStream data = new LittleEndianDataInputStream(inputStream);
         int zoom = data.readInt();
@@ -446,6 +461,26 @@ public class Grid {
         return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
     }
 
+    /**
+     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
+     * @return the WGS84 latitude of the center of the corresponding pixel in the grid
+     */
+    public double getLat(int i) {
+        int y = i / width;
+        return pixelToCenterLat(north + y, zoom);
+    }
+
+    /**
+     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
+     * @return the WGS84 longitude of the center of the corresponding pixel in the grid
+     */
+    public double getLon(int i) {
+        int x = i % width;
+        return pixelToCenterLon(west + x, zoom);
+    }
+
+    public int featureCount() { return width * height; }
+
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
     /** Return the pixel the given longitude falls within */
@@ -500,38 +535,47 @@ public class Grid {
         });
     }
 
-    /** Create grids from a CSV file */
-    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom) throws IOException {
-        return fromCsv(csvFile, latField, lonField, zoom, null);
-    }
-
-    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException {
+    /**
+     * @param ignoreFields if this is non-null, the fields with these names will not be considered when looking for
+     *                     numeric opportunity count fields. Null strings in the collection are ignored.
+     */
+    public static List<Grid> fromCsv(InputStreamProvider csvInputStreamProvider,
+                                     String latField,
+                                     String lonField,
+                                     Collection<String> ignoreFields,
+                                     int zoom,
+                                     ProgressListener progressListener) throws IOException {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
-        // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
-        // often add one anyway.
-        InputStream csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
-        CsvReader reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
+        // TODO factor out this logic for all CSV loading, reuse for freeform and grids, set progress properly.
+        CsvReader reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
         reader.readHeaders();
-        String[] headers = reader.getHeaders();
-        if (!Stream.of(headers).anyMatch(h -> h.equals(latField))) {
+        List<String> headers = Arrays.asList(reader.getHeaders());
+        if (!headers.contains(latField)) {
             LOG.info("Lat field not found!");
             throw new IOException("Latitude field not found in CSV.");
         }
 
-        if (!Stream.of(headers).anyMatch(h -> h.equals(lonField))) {
+        if (!headers.contains(lonField)) {
             LOG.info("Lon field not found!");
             throw new IOException("Longitude field not found in CSV.");
         }
 
         Envelope envelope = new Envelope();
 
-        // Keep track of which fields contain numeric values
-        Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
+        // A set to track fields that contain only numeric values, which are candidate opportunity density fields.
+        Set<String> numericColumns = new HashSet<>(headers);
         numericColumns.remove(latField);
         numericColumns.remove(lonField);
+        if (ignoreFields != null) {
+            for (String fieldName : ignoreFields) {
+                if (fieldName != null) {
+                    numericColumns.remove(fieldName);
+                }
+            }
+        }
 
-        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
+        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields.
         int total = 0;
         while (reader.readRecord()) {
             if (++total % 10000 == 0) LOG.info("{} records", human(total));
@@ -552,37 +596,44 @@ public class Grid {
             }
         }
 
+        // This will also close the InputStreams.
         reader.close();
 
-        if (statusListener != null) statusListener.accept(0, total);
+        checkWgsEnvelopeSize(envelope);
 
-        // We now have an envelope and know which columns are numeric
-        // Make a grid for each numeric column
-        Map<String, Grid> grids = numericColumns.stream()
-                .collect(
-                        Collectors.toMap(
-                                c -> c,
-                                c -> new Grid(
-                                        zoom,
-                                        envelope.getMaxY(),
-                                        envelope.getMaxX(),
-                                        envelope.getMinY(),
-                                        envelope.getMinX()
-                                )));
+        if (progressListener != null) {
+            progressListener.setTotalItems(total);
+        }
+
+        // We now have an envelope and know which columns are numeric. Make a grid for each numeric column.
+        Map<String, Grid> grids = new HashMap<>();
+        for (String columnName : numericColumns) {
+            Grid grid = new Grid(zoom, envelope);
+            grid.name = columnName;
+            grids.put(grid.name, grid);
+        }
+
+        // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
+        // FIXME this will overwrite any column called "[COUNT]" in the source file, which is hopefully rare.
+        Grid countGrid = new Grid(zoom, envelope);
+        countGrid.name = "[COUNT]";
+        grids.put(countGrid.name, countGrid);
 
         // The first read through the CSV just established its structure (e.g. which fields were numeric).
         // Now, re-read the CSV from the beginning to load the values and populate the grids.
-        csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
-        reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
+        reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
         reader.readHeaders();
 
+        // FIXME this whole thing does not tolerate files with multiple columns having the same name. Detect or handle that case.
         int i = 0;
         while (reader.readRecord()) {
             if (++i % 1000 == 0) {
                 LOG.info("{} records", human(i));
             }
 
-            if (statusListener != null) statusListener.accept(i, total);
+            if (progressListener != null) {
+                progressListener.setCompletedItems(i);
+            }
 
             double lat = parseDouble(reader.get(latField));
             double lon = parseDouble(reader.get(lonField));
@@ -600,33 +651,34 @@ public class Grid {
 
                 grids.get(field).incrementPoint(lat, lon, val);
             }
+            countGrid.incrementPoint(lat, lon, 1);
         }
 
+        // This will also close the InputStreams.
         reader.close();
 
-        return grids;
+        return new ArrayList<>(grids.values());
     }
 
-    public static Map<String, Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
+    public static List<Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
         return fromShapefile(shapefile, zoom, null);
     }
 
-    public static Map<String, Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
+    public static List<Grid> fromShapefile (File shapefile, int zoom, ProgressListener progressListener)
+            throws IOException, FactoryException, TransformException {
+
         Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
-        // TODO looks like this calculates square km in web mercator, which is heavily distorted away from the equator.
-        double boundingBoxAreaSqKm = reader.getAreaSqKm();
-
-        if (boundingBoxAreaSqKm > MAX_BOUNDING_BOX_AREA_SQ_KM){
-            throw new IllegalArgumentException("Shapefile extent (" + boundingBoxAreaSqKm + " sq. km.) exceeds limit (" +
-                    MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
-        }
 
         Envelope envelope = reader.wgs84Bounds();
         int total = reader.getFeatureCount();
 
-        if (statusListener != null) statusListener.accept(0, total);
+        checkWgsEnvelopeSize(envelope);
+
+        if (progressListener != null) {
+            progressListener.setTotalItems(total);
+        }
 
         AtomicInteger count = new AtomicInteger(0);
 
@@ -636,23 +688,19 @@ public class Grid {
             for (Property p : feat.getProperties()) {
                 Object val = p.getValue();
 
-                if (val == null || !Number.class.isInstance(val)) continue;
+                if (!(val instanceof Number)) continue;
                 double numericVal = ((Number) val).doubleValue();
                 if (numericVal == 0) continue;
 
                 String attributeName = p.getName().getLocalPart();
 
-                if (!grids.containsKey(attributeName)) {
-                    grids.put(attributeName, new Grid(
-                            zoom,
-                            envelope.getMaxY(),
-                            envelope.getMaxX(),
-                            envelope.getMinY(),
-                            envelope.getMinX()
-                    ));
-                }
-
+                // TODO this is assuming that each attribute name can only exist once. Shapefiles can contain duplicate attribute names. Validate to catch this.
                 Grid grid = grids.get(attributeName);
+                if (grid == null) {
+                    grid = new Grid(zoom, envelope);
+                    grid.name = attributeName;
+                    grids.put(attributeName, grid);
+                }
 
                 if (geom instanceof Point) {
                     Point point = (Point) geom;
@@ -666,15 +714,90 @@ public class Grid {
             }
 
             int currentCount = count.incrementAndGet();
-
-            if (statusListener != null) statusListener.accept(currentCount, total);
-
+            if (progressListener != null) {
+                progressListener.setCompletedItems(currentCount);
+            }
             if (currentCount % 10000 == 0) {
                 LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });
-
         reader.close();
-        return grids;
+        return new ArrayList<>(grids.values());
     }
+
+    @Override
+    public double sumTotalOpportunities() {
+        double totalOpportunities = 0;
+        for (double[] values : this.grid) {
+            for (double n : values) {
+                totalOpportunities += n;
+            }
+        }
+        return totalOpportunities;
+    }
+
+    @Override
+    public double getOpportunityCount (int i) {
+        int x = i % this.width;
+        int y = i / this.width;
+        return grid[x][y];
+    }
+
+    /**
+     * Rasterize a FreeFormFointSet into a Grid.
+     * Currently intended only for UI display of FreeFormPointSets, or possibly for previews of accessibility results
+     * during
+     */
+    public static Grid fromFreeForm (FreeFormPointSet freeForm, int zoom) {
+        // TODO make and us a strongly typed WgsEnvelope class here and in various places
+        Envelope wgsEnvelope = freeForm.getWgsEnvelope();
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        Grid grid = new Grid(webMercatorExtents);
+        grid.name = freeForm.name;
+        for (int f = 0; f < freeForm.featureCount(); f++) {
+            grid.incrementPoint(freeForm.getLat(f), freeForm.getLon(f), freeForm.getOpportunityCount(f));
+        }
+        return grid;
+    }
+
+    @Override
+    public Envelope getWgsEnvelope () {
+        // This should encompass the grid center points but not the grid cells, to fit the method contract.
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public WebMercatorExtents getWebMercatorExtents () {
+        return new WebMercatorExtents(this.west, this.north, this.width, this.height, this.zoom);
+    }
+
+    /**
+     * @return the approximate area of an Envelope in WGS84 lat/lon coordinates, in square kilometers.
+     */
+    public static double roughWgsEnvelopeArea (Envelope wgsEnvelope) {
+        double lon0 = wgsEnvelope.getMinX();
+        double lon1 = wgsEnvelope.getMaxX();
+        double lat0 = wgsEnvelope.getMinY();
+        double lat1 = wgsEnvelope.getMaxY();
+        double height = lat1 - lat0;
+        double width = lon1 - lon0;
+        final double KM_PER_DEGREE_LAT = 111.133;
+        // Scale the x direction as if the Earth was a sphere.
+        // Error above the middle latitude should approximately cancel out error below that latitude.
+        double averageLat = (lat0 + lat1) / 2;
+        double xScale = FastMath.cos(FastMath.toRadians(averageLat));
+        double area = (height * KM_PER_DEGREE_LAT) * (width * KM_PER_DEGREE_LAT * xScale);
+        return area;
+    }
+
+    /**
+     * Throw an exception if the provided envelope is too big for a reasonable destination grid.
+     */
+    public static void checkWgsEnvelopeSize (Envelope envelope) {
+        if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
+            throw new IllegalArgumentException("Shapefile extent (" + roughWgsEnvelopeArea(envelope) + " sq. km.) " +
+                    "exceeds limit (" + MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+        }
+    }
+
 }

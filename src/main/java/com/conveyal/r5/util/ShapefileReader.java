@@ -1,7 +1,7 @@
 package com.conveyal.r5.util;
 
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -66,7 +66,14 @@ public class ShapefileReader {
 
             @Override
             public boolean hasNext() {
-                return wrapped.hasNext();
+                boolean hasNext = wrapped.hasNext();
+                if (!hasNext) {
+                    // Prevent keeping a lock on the shapefile.
+                    // This doesn't help though when iteration is not completed. Ideally we need to keep a set of any
+                    // open iterators and close them all in the close method on the ShapefileReader.
+                    wrapped.close();
+                }
+                return hasNext;
             }
 
             @Override
@@ -107,8 +114,11 @@ public class ShapefileReader {
         return JTS.transform(getBounds(), transform);
     }
 
-
+    /**
+     * Failure to call this will leave the shapefile locked, which may mess with future attempts to use it.
+     */
     public void close () {
+        // Note that you also have to close the iterator, see iterator wrapper code above.
         store.dispose();
     }
 

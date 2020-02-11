@@ -70,7 +70,7 @@ public class JobSimulator {
             request.graphId = graphId;
             request.jobId = jobId;
             request.workerVersion = workerVersion;
-            request.id = Integer.toString(i);
+            request.originId = Integer.toString(i);
             requests.add(request);
         });
 

@@ -2,10 +2,10 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.analyst.FileCategory;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Polygonal;
-import com.vividsolutions.jts.index.strtree.STRtree;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geojson.feature.FeatureJSON;

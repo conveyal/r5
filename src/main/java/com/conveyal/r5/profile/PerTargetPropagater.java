@@ -6,6 +6,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -14,7 +15,10 @@ import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Given minimum travel times from a single origin point to all transit stops, this class finds minimum travel times to
@@ -78,6 +82,12 @@ public class PerTargetPropagater {
     /** Whether to break travel times down into walk, wait, and ride time. */
     private boolean calculateComponents;
 
+    /**
+     * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
+     * calculation).
+     */
+    private final boolean oneToOne;
+
     public static final int SECONDS_PER_MINUTE = 60;
     public static final int MM_PER_METER = 1000;
 
@@ -114,7 +124,10 @@ public class PerTargetPropagater {
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        this.calculateComponents = task.makeStaticSite;
+        this.calculateComponents = task.makeTauiSite;
+
+        oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
@@ -124,7 +137,8 @@ public class PerTargetPropagater {
         }
         linkedTargets = new ArrayList<>(modes.size());
         for (StreetMode mode : modes) {
-            LinkedPointSet linkedTargetsForMode = targets.getLinkage(streetLayer, mode);
+            LinkedPointSet linkedTargetsForMode = streetLayer.parentNetwork.linkageCache
+                    .getLinkage(targets, streetLayer, mode);
             // Transpose the cost table for propagation. Some tables are never used for propagation (like the
             // region-wide baseline). Transposing them only when needed should save a lot of memory.
             linkedTargetsForMode.getEgressCostTable().destructivelyTransposeForPropagationAsNeeded();
@@ -146,7 +160,18 @@ public class PerTargetPropagater {
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
         perIterationPaths = calculateComponents ? new Path[nIterations] : null;
 
-        for (int targetIdx = 0; targetIdx < nTargets; targetIdx++) {
+        // In most tasks, we want to propagate travel times for each origin out to all the destinations.
+        int startTarget = 0;
+        int endTarget = nTargets;
+
+        // However, in one-to-one tasks, each origin in a freeform pointset corresponds to a single destination at
+        // the same position in the destinations pointset. So our target range is restricted to only one target.
+        if (oneToOne) {
+            startTarget = ((RegionalTask) request).taskId;
+            endTarget = startTarget + 1;
+        }
+
+        for (int targetIdx = startTarget; targetIdx < endTarget; targetIdx++) {
 
             // Initialize the travel times to that achieved without transit (if any).
             // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
@@ -172,19 +197,20 @@ public class PerTargetPropagater {
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
-            int[] percentilesMinutes = travelTimeReducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
+            int targetToWrite = oneToOne ? 0 : targetIdx;
+            travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
 
             if (calculateComponents) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
-                // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] *
-                        SECONDS_PER_MINUTE);
+                // NOTE this is currently using only the fastest travel time.
+                // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }
         LOG.info("Propagating {} iterations from {} stops to {} target points took {}s",
-                nIterations, nStops, nTargets, (System.currentTimeMillis() - startTimeMillis) / 1000d
+                nIterations, nStops, endTarget - startTarget, (System.currentTimeMillis() - startTimeMillis) / 1000d
         );
         if (pathWriter != null) {
             pathWriter.finishAndStorePaths();
@@ -195,7 +221,9 @@ public class PerTargetPropagater {
 
     /**
      * Transpose the travel times to stops array in order to provide better memory locality in the tight loop below.
-     * We have confirmed that this provides a significant speedup. TODO quantify that speedup and record here in comment.
+     * We have confirmed that this provides a significant speedup.
+     * TODO quantify that speedup and record here in comment.
+     *      This takes something like 800msec for a large 6000-iteration search
      * This speedup is expected because Java represents multidimensional arrays as an array of references to arrays.
      * This means that each row is stored in a separate chunk of address space, and may not be contiguous with
      * other rows. The CPU and cache probably can't efficiently predict and prefetch the values we need next.
@@ -268,38 +296,27 @@ public class PerTargetPropagater {
                 (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
                 (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
 
-        // Determine an egress limit in the same units as the egress cost tables in the linked point set.
-        int egressLimit;
-        if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
-            egressLimit = egressLegTimeLimitSeconds;
-        } else if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
-            egressLimit = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
-        } else {
-            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
-        }
-
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
         if (pointToStopLinkageCostTable != null) {
+            // Propagate all iterations from each relevant alighting stop out to this target.
             pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
-                if (linkageCost < egressLimit){
+                int secondsFromStopToTarget;
+                if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                    secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                    secondsFromStopToTarget = linkageCost;
+                } else {
+                    throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                }
+                if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
                         if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
                             // Skip propagation if all resulting times will be greater than the cutoff and
                             // cannot improve on the best known time at this iteration. Also avoids overflow.
                             continue;
-                        }
-                        // Propagate from the current stop out to the target.
-                        int secondsFromStopToTarget;
-
-                        if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
-                            secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
-                        } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
-                            secondsFromStopToTarget = linkageCost;
-                        } else {
-                            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                         }
 
                         // Account for any additional delay waiting for taxi or autonomous vehicle.

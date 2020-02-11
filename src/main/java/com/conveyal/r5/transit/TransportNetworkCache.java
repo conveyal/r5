@@ -5,9 +5,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
-import com.conveyal.gtfs.BaseGTFSCache;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -15,7 +13,6 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
@@ -32,7 +29,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Set;
@@ -44,6 +40,9 @@ import java.util.zip.ZipInputStream;
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
  * local filesystem and on S3 for later re-use.
+ * Currently this holds ONLY ONE base (non-scenario) network, and evicts that network when a new network is requested.
+ * However there may be many scenario networks derived from that base network, which  are stored in the scenarios
+ * field of the baseNetwork.
  */
 public class TransportNetworkCache {
 
@@ -55,10 +54,14 @@ public class TransportNetworkCache {
 
     private final String bucket;
 
+    /** Cache size is currently limited to one, i.e. the worker holds on to only one network at a time. */
     private static final int DEFAULT_CACHE_SIZE = 1;
 
-    private final LoadingCache<String, TransportNetwork> cache; // TODO change all other caches from Guava to Caffeine caches
-    private final BaseGTFSCache gtfsCache;
+    // TODO change all other caches from Guava to Caffeine caches. This one is already a Caffeine cache.
+    private final LoadingCache<String, TransportNetwork> cache;
+
+    private final GTFSCache gtfsCache;
+
     private final OSMCache osmCache;
 
     /**
@@ -72,12 +75,13 @@ public class TransportNetworkCache {
         this.cacheDir = cacheDir;
         this.bucket = bucket;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
-        this.gtfsCache = new GTFSCache(region, bucket, null, cacheDir);
+        this.gtfsCache = new GTFSCache(region, bucket, cacheDir);
         this.osmCache = new OSMCache(bucket, cacheDir);
         this.s3 = (bucket == null) ? null : AmazonS3ClientBuilder.defaultClient();
     }
 
-    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache) {
+    // TODO remove unused constructor?
+    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
@@ -339,7 +343,7 @@ public class TransportNetworkCache {
         network.transitLayer = new TransitLayer();
 
         manifest.gtfsIds.stream()
-                .map(id -> gtfsCache.getFeed(id))
+                .map(id -> gtfsCache.get(id))
                 .forEach(network.transitLayer::loadFromGtfs);
 
         network.transitLayer.parentNetwork = network;

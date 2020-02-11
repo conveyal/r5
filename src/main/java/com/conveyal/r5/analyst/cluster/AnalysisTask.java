@@ -72,8 +72,20 @@ public abstract class AnalysisTask extends ProfileRequest {
     /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
     public boolean computePaths = false;
 
-    /** Which percentiles of travel time to calculate. */
-    public double[] percentiles = new double[] { 50 };
+    /**
+     * Which percentiles of travel time to calculate.
+     * These should probably just be integers, but there are already a lot of them in Mongo as floats.
+     */
+    public int[] percentiles;
+
+    /**
+     * The travel time cutoffs in minutes for regional accessibility analysis.
+     * A single cutoff was previously determined by superclass field ProfileRequest.maxTripDurationMinutes.
+     * That field still cuts off the travel search at a certain number of minutes, so it is set to the highest cutoff.
+     * Note this will only be set for accessibility calculation tasks, not for travel time surfaces.
+     * TODO move it to the regional task subclass? Should this be called cutoffsMinutes as elsewhere?
+     */
+    public int[] cutoffsMinutes;
 
     /**
      * When recording paths as in a static site, how many distinct paths should be saved to each destination?
@@ -90,8 +102,8 @@ public abstract class AnalysisTask extends ProfileRequest {
     public boolean logRequest = false;
 
     /**
-     * Is this a task that should return a binary travel time surface or compute accessibility and return it via SQS
-     * to be saved in a regional analysis grid file?
+     * Is this a single point or regional request? Needed to encode types in JSON serialization. Can that type field be
+     * added automatically with a serializer annotation instead of by defining a getter method and two dummy methods?
      */
     public abstract Type getType();
 
@@ -101,7 +113,7 @@ public abstract class AnalysisTask extends ProfileRequest {
 
     /**
      * Whether this task is high priority and should jump in front of other work.
-     * TODO eliminate and use polymorphism, this is only used in one place.
+     * TODO eliminate and use polymorphism (e.g. task.getWebMercatorExtents()), this is only used in one place.
      */
     @JsonIgnore
     public abstract boolean isHighPriority();
@@ -112,7 +124,9 @@ public abstract class AnalysisTask extends ProfileRequest {
     }
 
     public enum Type {
-        /* TODO these could be changed, to SINGLE_POINT and MULTI_POINT. The type of results requested (i.e. a grid of
+        /*
+           TODO we should not need this enum - this should be handled automatically by JSON serializer annotations.
+           These could also be changed to SINGLE_POINT and MULTI_POINT. The type of results requested (i.e. a grid of
            travel times per origin vs. an accessibility value per origin) can be inferred based on whether grids are
            specified in the profile request.  If travel time results are requested, flags can specify whether components
            of travel time (e.g. waiting) and paths should also be returned.

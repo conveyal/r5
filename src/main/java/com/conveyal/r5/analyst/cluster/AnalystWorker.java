@@ -3,13 +3,12 @@ package com.conveyal.r5.analyst.cluster;
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
-import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -52,6 +51,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import static com.google.common.base.Preconditions.checkElementIndex;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * This is a main class run by worker machines in our Analysis computation cluster.
@@ -114,7 +116,7 @@ public class AnalystWorker implements Runnable {
 
     /** The amount of time (in minutes) a worker will stay alive after starting certain work */
     static final int PRELOAD_KEEPALIVE_MINUTES = 90;
-    static final int REGIONAL_KEEPALIVE_MINUTES = 2;
+    static final int REGIONAL_KEEPALIVE_MINUTES = 5;
     static final int SINGLE_KEEPALIVE_MINUTES = 60;
 
     /** Clock time (milliseconds since epoch) at which the worker should be considered idle */
@@ -474,6 +476,14 @@ public class AnalystWorker implements Runnable {
             if (!task.makeTauiSite) {
                 task.destinationPointSet = pointSetCache.get(task.grid);
             }
+
+            // TODO (re)validate multi-percentle and multi-cutoff parameters. Validation currently in TravelTimeReducer.
+            //  This version should require both arrays to be present, and single values to be missing.
+            // Using a newer backend, the task should have been normalized to use arrays not single values.
+            checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
+            checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
+            checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
+            checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will

@@ -198,14 +198,14 @@ public class PerTargetPropagater {
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
             int targetToWrite = oneToOne ? 0 : targetIdx;
-            int[] percentilesMinutes = travelTimeReducer.extractTravelTimesAndRecord(targetToWrite, perIterationTravelTimes);
+            travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
 
             if (calculateComponents) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
-                // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] *
-                        SECONDS_PER_MINUTE);
+                // NOTE this is currently using only the fastest travel time.
+                // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

@@ -252,7 +252,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.5</version>
+                <version>1.6</version>
                 <executions>
                     <execution>
                         <id>sign-artifacts</id>
@@ -262,6 +262,12 @@
                         <goals>
                             <goal>sign</goal>
                         </goals>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -376,7 +382,7 @@
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
             <!-- gtfs-lib maintenance v3.0.9+ updated for Java 11, but able to use existing MapDB files. -->
-            <version>3.0.10-20200124.132646-8</version>
+            <version>3.0.10</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>

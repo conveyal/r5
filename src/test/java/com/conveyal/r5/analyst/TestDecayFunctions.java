@@ -33,9 +33,14 @@ public class TestDecayFunctions {
             LinearDecayFunction function = new LinearDecayFunction();
             function.widthMinutes = widthMinutes;
             testFunctionCharacteristics(function);
-            // System.out.println("Linear, width in minutes: " + widthMinutes);
-            // printFunctionValues(function);
         }
+    }
+
+    @Test
+    public void testExponentialDecay () {
+        ExponentialDecayFunction function = new ExponentialDecayFunction();
+        testFunctionCharacteristics(function);
+        // printFunctionValues(function);
     }
 
     /**
@@ -43,7 +48,7 @@ public class TestDecayFunctions {
      * as a visual sanity check.
      */
     public void printFunctionValues(DecayFunction function) {
-        for (int cutoffMinutes = 10; cutoffMinutes <= 120; cutoffMinutes += 10) {
+        for (int cutoffMinutes = 5; cutoffMinutes <= 25; cutoffMinutes += 5) {
             TDoubleList row = new TDoubleArrayList();
             row.add(cutoffMinutes);
             int cutoffSeconds = cutoffMinutes * 60;

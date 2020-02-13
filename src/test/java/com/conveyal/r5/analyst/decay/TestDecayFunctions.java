@@ -12,7 +12,9 @@ import static com.conveyal.r5.analyst.decay.DecayFunction.TWO_HOURS_IN_SECONDS;
 import static com.conveyal.r5.analyst.decay.DecayFunction.ZERO_EPSILON;
 import static com.google.common.base.Preconditions.checkState;
 
-public class TestDecayFunctions {
+public class TestDecayFunctions extends TestCase {
+
+    private static final int TEN_MINUTES_IN_SECONDS = 10 * 60;
 
     @Test
     public void testStepFunction () {
@@ -40,9 +42,22 @@ public class TestDecayFunctions {
 
     @Test
     public void testExponentialDecay () {
-        ExponentialDecayFunction function = new ExponentialDecayFunction();
-        testFunctionCharacteristics(function);
-        // printFunctionValues(function);
+        ExponentialDecayFunction movableFunction = new ExponentialDecayFunction();
+        testFunctionCharacteristics(movableFunction);
+        // printFunctionValues(movableFunction);
+        FixedExponentialDecayFunction fixedFunction = new FixedExponentialDecayFunction();
+        // Set constant for a half life of 10 minutes (in seconds)
+        fixedFunction.decayConstant = FastMath.log(0.5) / TEN_MINUTES_IN_SECONDS;
+        testFunctionCharacteristics(fixedFunction);
+        for (int t = 0; t < 120; t++) {
+            int travelTimeSeconds = t * 60;
+            assertEquals(
+                    "Fixed function should produce values identical to those for a half-life of 10 minutes.",
+                     movableFunction.computeWeight(TEN_MINUTES_IN_SECONDS, travelTimeSeconds),
+                     fixedFunction.computeWeight(0, travelTimeSeconds),
+                    0.0001
+            );
+        }
     }
 
     /**

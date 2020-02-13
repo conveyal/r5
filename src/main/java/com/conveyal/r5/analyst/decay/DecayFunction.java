@@ -16,6 +16,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(name="step", value= StepDecayFunction.class),
     @JsonSubTypes.Type(name="linear", value=LinearDecayFunction.class),
     @JsonSubTypes.Type(name="logistic", value=LogisticDecayFunction.class),
+    @JsonSubTypes.Type(name="exponential", value=ExponentialDecayFunction.class),
+    @JsonSubTypes.Type(name="fixed-exponential", value=FixedExponentialDecayFunction.class)
 })
 public abstract class DecayFunction {
 

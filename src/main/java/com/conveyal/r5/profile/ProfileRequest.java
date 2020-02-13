@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.decay.DecayFunction;
-import com.conveyal.r5.analyst.decay.StepDecayFunction;
+import com.conveyal.r5.analyst.decay.FixedExponentialDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
@@ -234,7 +234,12 @@ public class ProfileRequest implements Serializable, Cloneable {
 //         LogisticDecayFunction decayFunction = new LogisticDecayFunction();
 //         decayFunction.standardDeviationMinutes = 8;
 //         this.decayFunction = decayFunction;
-          this.decayFunction = new StepDecayFunction();
+//         this.decayFunction = new StepDecayFunction();
+         FixedExponentialDecayFunction decayFunction = new FixedExponentialDecayFunction();
+         decayFunction.decayConstant = -0.034/60;
+         this.decayFunction = decayFunction;
+//        DecayFunction decayFunction = new StepDecayFunction();
+//        this.decayFunction = decayFunction;
     }
 
     public ProfileRequest clone () {

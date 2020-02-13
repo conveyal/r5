@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.DecayFunction;
-import com.conveyal.r5.analyst.StepDecayFunction;
+import com.conveyal.r5.analyst.decay.DecayFunction;
+import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;

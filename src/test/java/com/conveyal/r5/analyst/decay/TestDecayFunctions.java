@@ -1,13 +1,15 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.r5.analyst.decay;
 
 import com.google.common.primitives.Doubles;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.array.TDoubleArrayList;
+import junit.framework.TestCase;
+import org.apache.commons.math3.util.FastMath;
 import org.junit.Test;
 
-import static com.conveyal.r5.analyst.DecayFunction.FOUR_HOURS_IN_SECONDS;
-import static com.conveyal.r5.analyst.DecayFunction.TWO_HOURS_IN_SECONDS;
-import static com.conveyal.r5.analyst.DecayFunction.ZERO_EPSILON;
+import static com.conveyal.r5.analyst.decay.DecayFunction.FOUR_HOURS_IN_SECONDS;
+import static com.conveyal.r5.analyst.decay.DecayFunction.TWO_HOURS_IN_SECONDS;
+import static com.conveyal.r5.analyst.decay.DecayFunction.ZERO_EPSILON;
 import static com.google.common.base.Preconditions.checkState;
 
 public class TestDecayFunctions {

@@ -1,4 +1,4 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.r5.analyst.decay;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.commons.math3.util.FastMath.PI;

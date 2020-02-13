@@ -1,4 +1,4 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.r5.analyst.decay;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -13,7 +13,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
-    @JsonSubTypes.Type(name="step", value=StepDecayFunction.class),
+    @JsonSubTypes.Type(name="step", value= StepDecayFunction.class),
     @JsonSubTypes.Type(name="linear", value=LinearDecayFunction.class),
     @JsonSubTypes.Type(name="logistic", value=LogisticDecayFunction.class),
 })

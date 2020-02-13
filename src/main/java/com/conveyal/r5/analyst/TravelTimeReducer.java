@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
+import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.r5.analyst.decay;
 
 /**
  * Simple cliff-edge weight function. No parameters to set or validate.

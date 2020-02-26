@@ -378,7 +378,7 @@ public class AnalystWorker implements Runnable {
     /**
      * Bypass idiotic java checked exceptions.
      */
-    public void sleepSeconds (int seconds) {
+    public static void sleepSeconds (int seconds) {
         try {
             Thread.sleep(seconds * 1000);
         } catch (InterruptedException e) {

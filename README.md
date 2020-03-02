@@ -2,7 +2,7 @@
 
 R<sup>5</sup> is a routing engine for multimodal (transit/bike/walk/car) networks, with attention given to speed and efficient use of resources. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opportunities accessibility indicators) but it also has basic support for point-to-point journey planning which may expand over time.
 
-We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. There's more information on our thinking on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures), [in this TRB article](https://doi.org/10.3141/2653-06), and in [this JTLU article](https://www.jtlu.org/index.php/jtlu/article/view/1074), which we encourage you to cite if you use R5 in research publications.
+We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. There's more information on our thinking on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures), [in this TRR article](https://repository.asu.edu/items/54162), and in [this JTLU article](https://www.jtlu.org/index.php/jtlu/article/view/1074), which we encourage you to cite if you use R5 in research publications.
 
 We say "Real-world and Reimagined" networks because R5's networks are built from widely available open GTFS data describing existing transit service, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
 
@@ -29,7 +29,7 @@ Releases are automatically generated using [maven-semantic-release](https://gith
 
 We use structured commit messages to allow automated tools to determine release version numbers and generate changelogs.
 
-The first line of these messages is in the following format: `<type>(<scope>): <summary>` 
+The first line of these messages is in the following format: `<type>(<scope>): <summary>`
 
 The `(<scope>)` is optional. The `<summary>` should be in the present tense. The type should be one of the following:
 

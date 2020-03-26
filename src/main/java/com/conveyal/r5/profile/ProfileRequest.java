@@ -233,7 +233,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public ProfileRequest () {
          // TEMPORARY inject a decay function until they are supplied in JSON
         FixedExponentialDecayFunction decayFunction = new FixedExponentialDecayFunction();
-        decayFunction.decayConstant = Math.log(0.5)/(20*60);
+        decayFunction.decayConstant =  -0.07 / 60;
         this.decayFunction = decayFunction;
     }
 

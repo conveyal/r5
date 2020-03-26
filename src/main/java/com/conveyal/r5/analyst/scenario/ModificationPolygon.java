@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Polygonal;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygonal;
 
 /**
  * This associates a single Polygonal Geometry with a name, numerical data, and a priority relative to other polygons

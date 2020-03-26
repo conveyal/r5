@@ -106,7 +106,8 @@ public class AdjustFrequency extends Modification {
         Set<PatternTimetable> unmatchedEntries = new HashSet<>(entries);
         unmatchedEntries.removeAll(entriesMatched);
         for (PatternTimetable entry : unmatchedEntries) {
-            errors.add("Trip not found for ID " + entry.sourceTrip);
+            errors.add("Trip not found for ID " + entry.sourceTrip + ". Ensure a trip pattern has been selected in " +
+                    "this modification.");
         }
         LOG.info("Cleared {} patterns, creating {} new trip schedules.", nPatternsCleared, nTripSchedulesCreated);
 

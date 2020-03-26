@@ -3,7 +3,7 @@ package com.conveyal.r5.analyst;
 import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

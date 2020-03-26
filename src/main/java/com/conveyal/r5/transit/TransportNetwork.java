@@ -5,24 +5,33 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
-import com.vividsolutions.jts.geom.Envelope;
-import com.conveyal.r5.streets.StreetLayer;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.Serializable;
 import java.time.ZoneId;
-import java.util.*;
-import java.util.zip.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -114,13 +123,12 @@ public class TransportNetwork implements Serializable {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
-        File dir = new File(osmSourceFile).getParentFile();
 
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
         // Load OSM data into MapDB
-        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+        OSM osm = new OSM(osmSourceFile + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 
@@ -129,6 +137,8 @@ public class TransportNetwork implements Serializable {
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
+        // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
+        // We should probably try to delete the file when exceptions occur.
         osm.close();
 
         // The street index is needed for associating transit stops with the street network

@@ -3,12 +3,12 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.common.GeometryUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import com.vividsolutions.jts.geom.*;
-import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
-import com.vividsolutions.jts.io.WKTWriter;
-import com.vividsolutions.jts.operation.union.UnaryUnionOp;
-import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
-import com.vividsolutions.jts.simplify.TopologyPreservingSimplifier;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.impl.PackedCoordinateSequence;
+import org.locationtech.jts.io.WKTWriter;
+import org.locationtech.jts.operation.union.UnaryUnionOp;
+import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
+import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

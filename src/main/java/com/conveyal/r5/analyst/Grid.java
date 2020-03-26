@@ -7,14 +7,14 @@ import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.MultiPolygon;
-import com.vividsolutions.jts.geom.Point;
-import com.vividsolutions.jts.geom.Polygon;
-import com.vividsolutions.jts.geom.prep.PreparedGeometry;
-import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -31,6 +31,7 @@ import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -62,7 +63,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
-import static java.lang.Double.doubleToLongBits;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -168,10 +168,6 @@ public class Grid extends PointSet {
         return getPixelWeights(geometry, false);
     }
 
-    // PreparedGeometry is often faster for small numbers of vertices;
-    // see https://github.com/chrisbennight/intersection-test
-    private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
-
     /**
      * Get the proportions of an input polygon feature that overlap each grid cell, for use in lists of PixelWeights.
      * These lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
@@ -202,7 +198,11 @@ public class Grid extends PointSet {
             throw new IllegalArgumentException("Feature geometry is too large.");
         }
 
-        PreparedGeometry preparedGeom = pgFact.create(geometry);
+        // PreparedGeometry is often faster for small numbers of vertices;
+        // see https://github.com/chrisbennight/intersection-test
+        // We know this is a polygon so don't need flexible PreparedGeometryFactory, which I'd rather not use because
+        // its only method seems inherently static but is implemented in a way that requires instantiating the factory.
+        PreparedGeometry preparedGeom = new PreparedPolygon((Polygonal) geometry);
 
         Envelope env = geometry.getEnvelopeInternal();
 

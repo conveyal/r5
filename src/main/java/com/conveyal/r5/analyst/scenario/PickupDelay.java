@@ -3,9 +3,9 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.vividsolutions.jts.geom.Geometry;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

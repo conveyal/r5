@@ -2,20 +2,17 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.CoordinateFilter;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Point;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateFilter;
+import org.locationtech.jts.geom.Geometry;
 import gnu.trove.list.TByteList;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Point;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
 
 /**
  * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.

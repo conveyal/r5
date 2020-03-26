@@ -2,24 +2,28 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
-
-import java.time.*;
-
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.model.json_serialization.*;
+import com.conveyal.r5.model.json_serialization.LegModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.LegModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.TransitModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import graphql.schema.DataFetchingEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.EnumSet;
 
 /**
@@ -147,6 +151,9 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * The maximum duration of any trip found by this search.
+     * Defaults to 2 hours, the highest accessibility cutoffs allowed by our UI (which computes accessibility itself).
+     * Will be lowered to the maximum requested cutoff in regional analyses, where cutoffs are known in advance.
+     * TODO it seems like this should be set on each request without relying on hard wired defaults
      */
     public int maxTripDurationMinutes = 2 * 60;
 
@@ -297,84 +304,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public boolean hasTransit() {
         return this.transitModes != null && !this.transitModes.isEmpty();
-    }
-
-    /**
-     * Factory method to create a profile request with query parameters from a GraphQL request
-     */
-    public static ProfileRequest fromGraphqlEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
-        ProfileRequest profileRequest = new ProfileRequest();
-        profileRequest.zoneId = timezone;
-
-        String operation = environment.getFields().get(0).getName();
-        //ZonedDatetime is used to fill fromTime/toTime and date
-        //we need to have a network Timezone for that so that all the times are in network own timezone
-        profileRequest.fromZonedDateTime = environment.getArgument("fromTime");
-        profileRequest.toZonedDateTime = environment.getArgument("toTime");
-        profileRequest.setTime();
-
-        profileRequest.wheelchair = environment.getArgument("wheelchair");
-        if (operation.equals("plan")) {
-            profileRequest.searchType = environment.getArgument("searchType");
-        }
-        //FIXME: if any of those three values is integer not float it gets converted to java integer instead of Double (So why did we even specify type)?
-        // this is needed since walkSpeed/bikeSpeed/carSpeed are GraphQLFloats which are converted to java Doubles
-        double walkSpeed = environment.getArgument("walkSpeed");
-        profileRequest.walkSpeed = (float) walkSpeed;
-        double bikeSpeed = environment.getArgument("bikeSpeed");
-        profileRequest.bikeSpeed = (float) bikeSpeed;
-        double carSpeed = environment.getArgument("carSpeed");
-        profileRequest.carSpeed = (float) carSpeed;
-        profileRequest.streetTime = environment.getArgument("streetTime");
-        profileRequest.maxWalkTime = environment.getArgument("maxWalkTime");
-        profileRequest.maxBikeTime = environment.getArgument("maxBikeTime");
-        profileRequest.maxCarTime = environment.getArgument("maxCarTime");
-        profileRequest.minBikeTime = environment.getArgument("minBikeTime");
-        profileRequest.minCarTime = environment.getArgument("minCarTime");
-        profileRequest.limit = environment.getArgument("limit");
-
-        profileRequest.suboptimalMinutes = environment.getArgument("suboptimalMinutes");
-        profileRequest.bikeTrafficStress = environment.getArgument("bikeTrafficStress");
-        //Bike traffic stress needs to be between 1 and 4
-        if (profileRequest.bikeTrafficStress > 4) {
-            profileRequest.bikeTrafficStress = 4;
-        } else if (profileRequest.bikeTrafficStress < 1) {
-            profileRequest.bikeTrafficStress = 1;
-        }
-
-
-        //This is always set otherwise GraphQL validation fails
-
-        profileRequest.fromLat = environment.getArgument("fromLat");
-        profileRequest.fromLon = environment.getArgument("fromLon");
-
-        profileRequest.toLat = environment.getArgument("toLat");
-        profileRequest.toLon = environment.getArgument("toLon");
-
-
-        //Transit modes can be empty if searching for path without transit is requested
-        Collection<TransitModes> transitModes = environment.getArgument("transitModes");
-        if (!transitModes.isEmpty()) {
-            //If there is TRANSIT mode in transit modes all of transit modes need to be added.
-            if (transitModes.contains(TransitModes.TRANSIT)) {
-                profileRequest.transitModes = EnumSet.allOf(TransitModes.class);
-            } else {
-                //Otherwise only requested modes are copied
-                profileRequest.transitModes = EnumSet.copyOf(transitModes);
-            }
-        }
-        profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
-        profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
-
-        Collection<LegMode> directModes = environment.getArgument("directModes");
-        //directModes can be empty if we only want transit searches
-        if (!directModes.isEmpty()) {
-            profileRequest.directModes = EnumSet.copyOf(directModes);
-        } else {
-            profileRequest.directModes = EnumSet.noneOf(LegMode.class);
-        }
-
-        return profileRequest;
     }
 
     /**

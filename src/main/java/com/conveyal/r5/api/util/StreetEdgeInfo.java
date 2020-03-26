@@ -2,8 +2,8 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.vividsolutions.jts.geom.*;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Coordinate;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -128,11 +128,11 @@ public class StreetEdgeInfo {
     void add(StreetEdgeInfo streetEdgeInfo) {
         distance+=streetEdgeInfo.distance;
 
-        List<com.vividsolutions.jts.geom.Coordinate> coordinates = new LinkedList<>();
+        List<org.locationtech.jts.geom.Coordinate> coordinates = new LinkedList<>();
         Collections.addAll(coordinates, geometry.getCoordinates());
 
         coordinates.addAll(Arrays.asList(streetEdgeInfo.geometry.getCoordinates()).subList(1, streetEdgeInfo.geometry.getNumPoints())); // Avoid duplications
-        com.vividsolutions.jts.geom.Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
+        org.locationtech.jts.geom.Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
         //FIXME: copy from list to array
         coordinatesArray = coordinates.toArray(coordinatesArray);
         //FIXME: copy from array to coordinates sequence

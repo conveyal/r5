@@ -7,7 +7,7 @@ import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.util.LambdaCounter;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;

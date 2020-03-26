@@ -4,7 +4,6 @@ import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -12,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
  * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
@@ -22,11 +23,16 @@ public class TravelTimeReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
+    /** The largest number of cutoffs we'll accept in a task. Too many cutoffs can create very large output files. */
+    public static final int MAX_CUTOFFS = 12;
+
     /**
      * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
      * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
      * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
      * after results have been calculated).
+     *
+     * CHANGING: this now just needs to be larger than the highest cutoff, or should be set to the max cutoff.
      */
     private final int maxTripDurationMinutes;
 
@@ -43,9 +49,16 @@ public class TravelTimeReducer {
     /** Reduced (e.g. at one percentile) travel time results. May be null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
 
+    /** If we are calculating accessibility, the PointSets containing opportunities. */
+    private final PointSet[] destinationPointSets = new PointSet[1];
+
     private final int[] percentileIndexes;
 
     private final int nPercentiles;
+
+    private int[] cutoffsMinutes;
+
+    private int nCutoffs;
 
     /**
      * The number of travel times we will record at each destination.
@@ -74,6 +87,7 @@ public class TravelTimeReducer {
      */
     public TravelTimeReducer (AnalysisTask task) {
 
+        // Before regional analysis tasks are handled, their max trip duration is forced to the highest cutoff.
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
@@ -91,12 +105,17 @@ public class TravelTimeReducer {
             }
         }
 
-        this.nPercentiles = task.percentiles.length;
-
+        // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
+        this.nPercentiles = task.percentiles.length;
         this.percentileIndexes = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
             percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles[p]);
+        }
+        for (int p = 1; p < nPercentiles; p++) {
+            if (task.percentiles[p] < task.percentiles[p-1]) {
+                throw new IllegalArgumentException("Percentiles must be in ascending order.");
+            }
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
@@ -113,6 +132,7 @@ public class TravelTimeReducer {
             RegionalTask regionalTask = (RegionalTask) task;
             if (regionalTask.recordAccessibility) {
                 calculateAccessibility = true;
+                this.destinationPointSets[0] = regionalTask.destinationPointSet;
             }
             if (regionalTask.recordTimes || regionalTask.makeTauiSite) {
                 calculateTravelTimes = true;
@@ -127,6 +147,29 @@ public class TravelTimeReducer {
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
         }
+
+        // Validate and copy the travel time cutoffs, which only makes sense when calculating accessibility.
+        // Validation should probably happen earlier when making or handling incoming tasks.
+        if (calculateAccessibility) {
+            this.nCutoffs = task.cutoffsMinutes.length;
+            if (nCutoffs > MAX_CUTOFFS) {
+                throw new IllegalArgumentException("Maximum number of cutoffs allowed is " + MAX_CUTOFFS);
+            }
+            this.cutoffsMinutes = Arrays.copyOf(task.cutoffsMinutes, nCutoffs);
+            Arrays.sort(this.cutoffsMinutes);
+            if (! Arrays.equals(this.cutoffsMinutes, task.cutoffsMinutes)) {
+                throw new IllegalArgumentException("Cutoffs must be in ascending order.");
+            }
+            for (int cutoffMinutes : this.cutoffsMinutes) {
+                if (cutoffMinutes < 1 || cutoffMinutes > 120) {
+                    throw new IllegalArgumentException("Accessibility time cutoffs must be in the range 1 to 120 minutes.");
+                }
+            }
+            if (maxTripDurationMinutes < this.cutoffsMinutes[nCutoffs - 1]) {
+                throw new IllegalArgumentException("Max trip duration must be at least as large as highest cutoff.");
+            }
+        }
+
     }
 
 
@@ -152,25 +195,23 @@ public class TravelTimeReducer {
      * percentiles, then record those n identical percentiles at the target.
      *
      * @param timeSeconds Single travel time, for results with no variation, e.g. from walking, biking, or driving.
-     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] recordUnvaryingTravelTimeAtTarget (int target, int timeSeconds){
+    public void recordUnvaryingTravelTimeAtTarget (int target, int timeSeconds){
         int[] travelTimesMinutes = new int[nPercentiles];
         Arrays.fill(travelTimesMinutes, convertToMinutes(timeSeconds));
-        return recordTravelTimesForTarget(target, travelTimesMinutes);
+        recordTravelTimePercentilesForTarget(target, travelTimesMinutes);
     }
 
     /**
-     * Given a list of travel times of the expected length, extract the requested percentiles, then record value for
-     * target.
-     * WARNING: this method destructively sorts the supplied times in place.
+     * Given a list of travel times of the expected length, extract the requested percentiles, then record those values
+     * at the specified target. WARNING: this method destructively sorts the supplied times travel in place.
      * Their positions in the array will no longer correspond to the raptor iterations that produced them.
+     *
      * @param timesSeconds which will be destructively sorted in place to extract percentiles.
-     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] extractTravelTimesAndRecord (int target, int[] timesSeconds) {
+    public void extractTravelTimePercentilesAndRecord (int target, int[] timesSeconds) {
         // Sort the times at each target and extract percentiles at the pre-calculated indexes.
-        int[] percentileTravelTimesMinutes = new int[nPercentiles];
+        int[] travelTimePercentilesMinutes = new int[nPercentiles];
         if (timesSeconds.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
             // converting them to minutes in the process and reusing the small histogram array (120 elements) which
@@ -178,40 +219,54 @@ public class TravelTimeReducer {
             Arrays.sort(timesSeconds);
             for (int p = 0; p < nPercentiles; p++) {
                 int timeSeconds = timesSeconds[percentileIndexes[p]];
-                percentileTravelTimesMinutes[p] = convertToMinutes(timeSeconds);
+                travelTimePercentilesMinutes[p] = convertToMinutes(timeSeconds);
             }
         } else {
             throw new ParameterException(timesSeconds.length + " iterations supplied; expected " + timesPerDestination);
         }
-        return recordTravelTimesForTarget(target, percentileTravelTimesMinutes);
+        recordTravelTimePercentilesForTarget(target, travelTimePercentilesMinutes);
     }
 
     /**
      * Given a list of travel times of the expected length, store the extracted percentiles of travel time (if a and/or
      * accessibility values.
-     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
+     * NOTE we will actually receive 5 percentiles here in single point analysis since we request all 5 at once.
      */
-    private int[] recordTravelTimesForTarget (int target, int[] percentileTravelTimesMinutes) {
-        if (percentileTravelTimesMinutes.length != nPercentiles) {
-            throw new ParameterException(percentileTravelTimesMinutes.length + " percentile values supplied; expected" +
-                    " " + nPercentiles);
+    private void recordTravelTimePercentilesForTarget (int target, int[] travelTimePercentilesMinutes) {
+        if (travelTimePercentilesMinutes.length != nPercentiles) {
+            throw new IllegalArgumentException("Supplied number of travel times did not match percentile count.");
         }
         if (calculateTravelTimes) {
-            travelTimeResult.setTarget(target, percentileTravelTimesMinutes);
+            travelTimeResult.setTarget(target, travelTimePercentilesMinutes);
         }
         if (calculateAccessibility) {
-            // This is only handling one grid at a time, needs to be adapted to handle multiple different extents.
-            PointSet pointSet = accessibilityResult.destinationPointSets[0];
-            double amount = pointSet.getOpportunityCount(target);
-            for (int p = 0; p < nPercentiles; p++) {
-                // Use of < here (as opposed to <=) matches the definition in JS front end,
-                // and works well when truncating seconds to minutes.
-                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) {
-                    accessibilityResult.incrementAccessibility(0, 0, p, amount);
+            // We only handle one grid at a time for now, because handling more than one grid will require transforming
+            // indexes between multiple grids possibly of different sizes (a GridIndexTransform class?). If these are
+            // for reads only, into a single super-grid, they will only need to add a single number to the width and y.
+            for (int d = 0; d < 1; d++) {
+                final double opportunityCountAtTarget = destinationPointSets[d].getOpportunityCount(target);
+                for (int p = 0; p < nPercentiles; p++) {
+                    final int travelTimeMinutes = travelTimePercentilesMinutes[p];
+                    if (travelTimeMinutes == UNREACHED) {
+                        // Percentiles should be sorted. If one is UNREACHED the rest will also be.
+                        break;
+                    }
+                    // Iterate backward through sorted cutoffs, to allow early bail-out when travel time exceeds cutoff.
+                    for (int c = nCutoffs - 1; c >= 0; c--) {
+                        final int cutoffMinutes = cutoffsMinutes[c];
+                        // Use of < here (as opposed to <=) matches the definition in JS front end, and works well when
+                        // truncating seconds to minutes. This used to use TravelTimeReducer.maxTripDurationMinutes as
+                        // the cutoff, now that's really the max travel time (which should be the max of all cutoffs).
+                        // Might be more efficient to pass in all cutoffs at once to avoid repeated pointer math.
+                        if (travelTimeMinutes < cutoffMinutes) {
+                            accessibilityResult.incrementAccessibility(d, p, c, opportunityCountAtTarget);
+                        } else {
+                            break;
+                        }
+                    }
                 }
             }
         }
-        return percentileTravelTimesMinutes;
     }
 
     /**
@@ -226,12 +281,12 @@ public class TravelTimeReducer {
      * end could in principle receive a more general purpose format using wider or variable width integers.
      */
     private int convertToMinutes (int timeSeconds) {
-        if (timeSeconds == FastRaptorWorker.UNREACHED) return FastRaptorWorker.UNREACHED;
+        if (timeSeconds == UNREACHED) return UNREACHED;
         int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
         if (timeMinutes < maxTripDurationMinutes) {
             return timeMinutes;
         } else {
-            return FastRaptorWorker.UNREACHED;
+            return UNREACHED;
         }
     }
 

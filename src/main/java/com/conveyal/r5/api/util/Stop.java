@@ -4,7 +4,7 @@ import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.vividsolutions.jts.geom.*;
+import org.locationtech.jts.geom.*;
 
 /**
  * Transit stop
@@ -48,7 +48,7 @@ public class Stop {
         VertexStore.Vertex vertex = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
         vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
         if (jitterCoordinates) {
-            com.vividsolutions.jts.geom.Coordinate jitteredCoordinates = PointToPointRouterServer.jitter(vertex);
+            org.locationtech.jts.geom.Coordinate jitteredCoordinates = PointToPointRouterServer.jitter(vertex);
             lat = (float) jitteredCoordinates.y;
             lon = (float) jitteredCoordinates.x;
         } else if (vertex.index > -1) {

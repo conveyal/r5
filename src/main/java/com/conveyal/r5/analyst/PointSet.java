@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +22,9 @@ public abstract class PointSet {
     public transient String name;
 
     /**
-     * Returns a list of indexes for all points in the PointSet that are at least partially inside the envelope.
-     * This may overselect or contain duplicate point indexes (though implementations should minimize those effects).
-     * TODO: Add tests for implementation(s).
+     * Returns a list of indexes for all points in the PointSet that are inside the envelope. This may overselect or
+     * contain duplicate point indexes, though implementations should try to minimize those effects.
+     * TODO: Add tests for implementation(s). Create envelope of a certain size, get points, check distances.
      *
      * @param envelope the envelope in FIXED POINT DEGREES within which we want to find all points.
      * @return a list of indexes for all points in the PointSet at least partially inside the envelope.

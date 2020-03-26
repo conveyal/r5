@@ -7,9 +7,9 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.LambdaCounter;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Point;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -253,7 +253,6 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
-
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);

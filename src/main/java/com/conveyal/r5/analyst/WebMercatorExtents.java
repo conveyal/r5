@@ -1,10 +1,9 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 
 import java.util.Arrays;
-import java.util.Objects;
 
 import static com.conveyal.r5.analyst.Grid.latToPixel;
 import static com.conveyal.r5.analyst.Grid.lonToPixel;

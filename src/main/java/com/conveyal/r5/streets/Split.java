@@ -2,7 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.TIntCollection;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.referencing.GeodeticCalculator;

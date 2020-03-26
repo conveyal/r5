@@ -1,8 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.StreetMode;
-import com.vividsolutions.jts.algorithm.Angle;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.algorithm.Angle;
+import org.locationtech.jts.geom.Coordinate;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

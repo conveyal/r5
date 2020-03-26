@@ -5,12 +5,12 @@ import com.conveyal.r5.trove.TIntAugmentedList;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Geometry;
-import gnu.trove.list.TByteList;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Point;
+import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
-import org.locationtech.jts.geom.Point;
 
 import java.io.Serializable;
 

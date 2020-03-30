@@ -658,23 +658,33 @@ public class EdgeStore implements Serializable {
             }
 
             int roundedTime = (int) Math.ceil(time);
-
-            // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
             int turnCost = 0;
-            if (s0.backEdge >= 0) {
-                if (req.reverseSearch) {
-                    turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
-                } else {
-                    turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);
+
+            // TODO pluggable weight & time computer modules
+            if (generalizedCosts != null) {
+                // Generalized costs supplied, they override everything else.
+                // Perhaps for clarity they should be supplied by a new implementation of the turn cost calculator.
+                weight = (float) generalizedCosts.getGeneralizedCost(getEdgeIndex(), s0.backEdge, streetMode);
+            } else {
+                // No generalized costs, compute
+                // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
+                if (s0.backEdge >= 0) {
+                    if (req.reverseSearch) {
+                        turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
+                    } else {
+                        turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);
+                    }
                 }
             }
 
             // TODO add checks for negative increment values to these functions.
+            // TODO do we really want to be incrementing time and weight by the same amount?
             s1.incrementTimeInSeconds(roundedTime + turnCost);
             s1.incrementWeight(weight + turnCost);
             s1.distance += getLengthMm();
 
-            // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
+            // Make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
+            // TODO review this: it should never cause problems or even happen. Maybe better to add an assertion.
             if (s1.weight == s0.weight) s1.weight += 1;
             if (s1.durationSeconds == s0.durationSeconds) s1.incrementTimeInSeconds(1);
             if (s1.distance == s0.distance) s1.distance += 1;

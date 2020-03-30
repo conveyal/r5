@@ -271,9 +271,9 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /** Load OSM, optionally removing floating subgraphs (recommended) */
     void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
-        if (!osm.intersectionDetection)
+        if (!osm.intersectionDetection) {
             throw new IllegalArgumentException("Intersection detection not enabled on OSM source");
-
+        }
         LOG.info("Making street edges from OSM ways...");
         this.osm = osm;
 
@@ -282,10 +282,9 @@ public class StreetLayer implements Serializable, Cloneable {
 
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
-
-            if (way.hasTag("park_ride", "yes"))
+            if (way.hasTag("park_ride", "yes")) {
                 parkAndRideWays.add(way);
-
+            }
             if (!isWayRoutable(way)) {
                 continue;
             }
@@ -1422,8 +1421,11 @@ public class StreetLayer implements Serializable, Cloneable {
         if (numAddedStations > 0) {
             this.bikeSharing = true;
         }
-        LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
-
+        LOG.info("Added {} out of {} stations ratio:{}",
+            numAddedStations,
+            bikeRentalStations.size(),
+            numAddedStations/bikeRentalStations.size()
+        );
     }
 
     public StreetLayer clone () {
@@ -1539,7 +1541,6 @@ public class StreetLayer implements Serializable, Cloneable {
                 //}
                 return true;
             });
-
         }
         return bikeRentalStations;
     }

@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
@@ -156,6 +157,12 @@ public class EdgeStore implements Serializable {
 
     /** Turn restrictions for turning _into_ each edge */
     public TIntIntMultimap turnRestrictionsReverse;
+
+    /**
+     * Arbitrary per-edge costs specified in input data. This field will usually be null (when no such data are
+     * supplied). We could eventually also derive generalized costs from standard OSM tags available everywhere.
+     */
+    public GeneralizedCosts generalizedCosts;
 
     /** The street layer of a transport network that the edges in this edgestore make up. */
     public StreetLayer layer;
@@ -1191,6 +1198,18 @@ public class EdgeStore implements Serializable {
         public float getTravelTimeSeconds(Edge edge, int durationSeconds, StreetMode streetMode, ProfileRequest req) {
             float speedms = edge.calculateSpeed(req, streetMode);
             return (float) (edge.getLengthM() / speedms);
+        }
+    }
+
+    /**
+     * Called during TransportNetwork building. If generalized costs are being recorded for this StreetLayer, add values
+     * for one forward and one backward edge from the given OSM Way. This will cause the lists to grow by two elements,
+     * just like all the other parallel arrays being extended edge by edge. For the time being, all edges derived from
+     * a single Way will have the same generalized costs, so this may be called several times in a row with the same Way.
+     */
+    public void setGeneralizedCosts (Way way) {
+        if (generalizedCosts != null) {
+            generalizedCosts.addFromWay(way);
         }
     }
 

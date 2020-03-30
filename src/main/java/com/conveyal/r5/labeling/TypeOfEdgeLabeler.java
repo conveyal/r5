@@ -95,7 +95,8 @@ public class TypeOfEdgeLabeler {
     }
 
     /**
-     * Adds Stairs, bike path, sidewalk and crossing flags to ways
+     * Adds Stairs, bike path, sidewalk and crossing flags to ways.
+     * This sets flags (passed in as the second and third parameters) from the tags on the OSM Way (first parameter).
      */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         if (way.hasTag("highway", "steps")) {

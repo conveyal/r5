@@ -280,6 +280,9 @@ public class StreetLayer implements Serializable, Cloneable {
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
+        // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
+        // we are loading them. Eventually this should be done based on configuration settings.
+        this.edgeStore.generalizedCosts = new GeneralizedCosts();
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
             if (way.hasTag("park_ride", "yes")) {
@@ -1067,8 +1070,8 @@ public class StreetLayer implements Serializable, Cloneable {
             return;
         }
 
+        // Set forward and backward edge flags from OSM Way tags. The flags will later be stored in the EdgeStore.
         stressLabeler.label(way, forwardFlags, backFlags);
-
         typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
 
         Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, osmID);
@@ -1081,6 +1084,9 @@ public class StreetLayer implements Serializable, Cloneable {
         newEdge.advance();
         newEdge.setFlags(backFlags);
         newEdge.setSpeed(backwardSpeed);
+
+        // If we are loading them, extend generalized cost lists by two elements, for forward and backward edges.
+        edgeStore.setGeneralizedCosts(way);
     }
 
     public void indexStreets () {

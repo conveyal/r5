@@ -282,7 +282,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
         // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
         // we are loading them. Eventually this should be done based on configuration settings.
-        this.edgeStore.generalizedCosts = new GeneralizedCosts();
+        this.edgeStore.generalizedCosts = new GeneralizedCosts(this.edgeStore);
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
             if (way.hasTag("park_ride", "yes")) {

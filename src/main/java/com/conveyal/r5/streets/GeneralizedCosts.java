@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TDoubleArrayList;
@@ -17,6 +18,9 @@ import gnu.trove.list.array.TIntArrayList;
  */
 public class GeneralizedCosts {
 
+    // This GeneralizedCosts augments this EdgeStore with additional information about the same edges.
+    private final EdgeStore edgeStore;
+
     TDoubleList walkStraight = new TDoubleArrayList();
     TDoubleList walkLeft = new TDoubleArrayList();
     TDoubleList walkRight = new TDoubleArrayList();
@@ -29,6 +33,10 @@ public class GeneralizedCosts {
     TDoubleList speedOffPeak = new TDoubleArrayList();
 
     TDoubleList aadt = new TDoubleArrayList(); // What is this? It appears in the RSG README.
+
+    public GeneralizedCosts (EdgeStore edgeStore) {
+        this.edgeStore = edgeStore;
+    }
 
     /**
      * Called during TransportNetwork building. Extend all the parallel lists by two elements, one for the forward and
@@ -76,6 +84,76 @@ public class GeneralizedCosts {
             return generalizedCost;
         } catch (NumberFormatException nfe) {
             throw new RuntimeException("Could not parse generalized cost tag as a number: " + tagValue);
+        }
+    }
+
+    /**
+     * Note that this matches the implicit interface of TurnCostCalculator.
+     * Perhaps GeneralizedCosts can be split out into a custom TurnCostCalculator and WeightCalculator.
+     */
+    public double getGeneralizedCost (int currentEdge, int previousEdge, StreetMode mode) {
+        EdgeStore.Edge e = edgeStore.getCursor();
+        e.seek(previousEdge);
+        int outAngle = e.getOutAngle();
+        e.seek(currentEdge);
+        int inAngle = e.getInAngle();
+        TurnDirection turnDirection = TurnDirection.betweenAnglesDegrees(inAngle, outAngle);
+        double turnCost;
+        if (mode == StreetMode.WALK) {
+            switch (turnDirection) {
+                case STRAIGHT:
+                    turnCost = walkStraight.get(previousEdge);
+                    break;
+                case LEFT:
+                    turnCost = walkLeft.get(previousEdge);
+                    break;
+                case RIGHT:
+                    turnCost = walkRight.get(previousEdge);
+                    break;
+                default:
+                    throw new RuntimeException("No costs are specified for u-turns.");
+            }
+        } else if (mode == StreetMode.BICYCLE) {
+            switch (turnDirection) {
+                case STRAIGHT:
+                    turnCost = bikeStraight.get(previousEdge);
+                    break;
+                case LEFT:
+                    turnCost = bikeLeft.get(previousEdge);
+                    break;
+                case RIGHT:
+                    turnCost = bikeRight.get(previousEdge);
+                    break;
+                default:
+                    throw new RuntimeException("No costs are specified for u-turns.");
+            }
+        } else {
+            throw new RuntimeException("Generalized cost not supported for mode: " + mode);
+        }
+        return turnCost;
+    }
+
+    private enum TurnDirection {
+        STRAIGHT, RIGHT, LEFT, UTURN;
+        public static TurnDirection forAngleDegrees (double angleDegrees) {
+            if (angleDegrees < 27) {
+                return STRAIGHT;
+            } else if (angleDegrees < 153) {
+                return RIGHT;
+            } else if (angleDegrees < 207) {
+                return UTURN;
+            } else if (angleDegrees < 333) {
+                return LEFT;
+            } else {
+                return STRAIGHT;
+            }
+        }
+        public static TurnDirection betweenAnglesDegrees (int inAngle, int outAngle) {
+            if (inAngle < outAngle) {
+                inAngle += 360;
+            }
+            int turnAngle = inAngle - outAngle;
+            return TurnDirection.forAngleDegrees(turnAngle);
         }
     }
 

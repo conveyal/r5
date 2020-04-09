@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -112,11 +113,12 @@ public abstract class AnalysisTask extends ProfileRequest {
     public void setTypes (String type) {};
 
     /**
-     * Whether this task is high priority and should jump in front of other work.
-     * TODO eliminate and use polymorphism (e.g. task.getWebMercatorExtents()), this is only used in one place.
+     * @return extents for the appropriate destination grid, derived from task's bounds and zoom (for Taui site tasks
+     * and single-point travel time surface tasks) or destination pointset (for standard regional accessibility
+     * analysis tasks)
      */
     @JsonIgnore
-    public abstract boolean isHighPriority();
+    public abstract WebMercatorExtents getWebMercatorExtents();
 
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {

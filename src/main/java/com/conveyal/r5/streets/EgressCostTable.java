@@ -285,7 +285,8 @@ public class EgressCostTable implements Serializable {
                     PointSetTimes driveTimesToAllPoints = linkedPointSet.eval(
                             sr::getTravelTimeToVertex,
                             null,
-                            LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND
+                            LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND,
+                            null
                     );
                     // TODO optimization: should we make spatial index visit() method public to avoid copying results?
                     TIntList packedDriveTimes = new TIntArrayList();

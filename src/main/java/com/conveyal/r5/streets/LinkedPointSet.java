@@ -233,8 +233,8 @@ public class LinkedPointSet implements Serializable {
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
                 if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height) { //point is outside super-grid
-                    //Set the edge value to -1 to indicate no linkage.
-                    //Distances should never be read downstream, so they don't need to be set here.
+                    // Set the edge value to -1 to indicate no linkage.
+                    // Distances should never be read downstream, so they don't need to be set here.
                     edges[pixel] = -1;
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
@@ -357,7 +357,7 @@ public class LinkedPointSet implements Serializable {
     public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
-        return eval(travelTimeForVertex, 1000, 1000);
+        return eval(travelTimeForVertex, 1000, 1000, null);
     }
 
     /**
@@ -370,12 +370,18 @@ public class LinkedPointSet implements Serializable {
      * @return wrapped int[] of travel times (in seconds) to reach the pointset points
      */
 
-    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
+    public PointSetTimes eval (
+                TravelTimeFunction travelTimeForVertex,
+                Integer onStreetSpeed,
+                int offStreetSpeed,
+                Split origin
+            ) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {
+                // Target point is unlinked.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -384,6 +390,7 @@ public class LinkedPointSet implements Serializable {
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
             if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
+                // The target point lies along an edge with vertices that the street router could not reach.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -395,6 +402,14 @@ public class LinkedPointSet implements Serializable {
             // If a null onStreetSpeed is supplied, look up the speed for cars
             if (onStreetSpeed == null) {
                 onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            }
+
+            if (origin != null && origin.edge == edges[i]) {
+                // The target point lies along the same edge as the origin
+                int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
+                offstreetTime += origin.distanceToEdge_mm / offStreetSpeed;
+                travelTimes[i] = onStreetDistance_mm / onStreetSpeed + offstreetTime;
+                continue;
             }
 
             if (time0 != Integer.MAX_VALUE) {

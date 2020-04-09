@@ -167,19 +167,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
             this.egressModes = LegMode.toStreetModeSet(task.egressModes);
-
-            if (task.isHighPriority() || task.makeTauiSite) {
-                // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.
-                //      And generally remove the term "high priority" from the whole system.
-                // High Priority is an obsolete term for "single point task".
-                // For single point tasks and static sites, there is no opportunity grid. The grid of destinations is
-                // the extents given in the task, which for static sites is also the grid of origins.
-                this.destinationGridExtents = WebMercatorExtents.forTask(task);
-            } else {
-                // A non-static-site regional task. We expect a valid grid of opportunities to be specified as the
-                // destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
-                this.destinationGridExtents = WebMercatorExtents.forGrid(((RegionalTask)task).destinationPointSet);
-            }
+            this.destinationGridExtents = task.getWebMercatorExtents();
         }
 
         public static Key forTask(AnalysisTask task) {

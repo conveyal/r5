@@ -16,6 +16,7 @@ import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
+import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
@@ -186,13 +187,18 @@ public class TravelTimeComputer {
             LinkedPointSet linkedDestinations = network.linkageCache
                     .getLinkage(destinations, network.streetLayer, accessMode);
 
-            // Determine the direct times (i.e. using just a street mode, without transit)
+            // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
+            // We could construct a sub-grid that's an envelope around sr.originSplit's lat/lon, then iterate over the
+            // points in that sub-grid.
 
-            // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access
-            //       times around the origin.
-            PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
-                    streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
+            Split origin = sr.getOriginSplit();
 
+            PointSetTimes pointSetTimes = linkedDestinations.eval(
+                    sr::getTravelTimeToVertex,
+                    streetSpeedMillimetersPerSecond,
+                    walkSpeedMillimetersPerSecond,
+                    origin
+            );
 
             if (accessService != NO_WAIT_ALL_STOPS) {
                 LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",

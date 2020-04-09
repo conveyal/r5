@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
@@ -55,9 +56,20 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
         return Type.REGIONAL_ANALYSIS;
     }
 
+    /**
+     * For Taui sites, there is no opportunity grid. The grid of destinations is the extents given in the task,
+     * which for static sites is also the grid of origins.
+     *
+     * For standard, non-Taui regional analyses, we expect a valid grid of opportunities to be specified as the
+     * destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
+     */
     @Override
-    public boolean isHighPriority() {
-        return false; // regional analysis tasks are not high priority
+    public WebMercatorExtents getWebMercatorExtents() {
+        if (makeTauiSite) {
+            return WebMercatorExtents.forTask(this);
+        } else {
+            return WebMercatorExtents.forGrid(this.destinationPointSet);
+        }
     }
 
     public RegionalTask clone () {

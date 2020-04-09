@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -15,11 +16,6 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
     @Override
     public Type getType() {
         return Type.TRAVEL_TIME_SURFACE;
-    }
-
-    @Override
-    public boolean isHighPriority() {
-        return true;
     }
 
     @JsonIgnoreProperties(ignoreUnknown=true)
@@ -41,6 +37,11 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
 
     public Format getFormat(){
         return format;
+    }
+
+    @Override
+    public WebMercatorExtents getWebMercatorExtents() {
+        return WebMercatorExtents.forTask(this);
     }
 
     @Override

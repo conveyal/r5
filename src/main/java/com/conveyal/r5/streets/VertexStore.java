@@ -1,18 +1,18 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Geometry;
-import gnu.trove.list.TByteList;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Point;
+import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
 
 /**
  * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.
@@ -114,6 +114,14 @@ public class VertexStore implements Serializable {
 
         public int getFixedLon() {
             return fixedLons.get(index);
+        }
+
+        public Point getJTSPointFloating () {
+            return GeometryUtils.geometryFactory.createPoint(getJTSCoordinateFloating());
+        }
+
+        public Coordinate getJTSCoordinateFloating () {
+            return new Coordinate(getLon(), getLat());
         }
 
     }

@@ -5,14 +5,13 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.util.LambdaCounter;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.streets.EdgeStore.Edge;
-import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,10 +21,12 @@ import java.util.stream.IntStream;
 
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
- * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of
- * that edge.
+ * For each feature in the PointSet, we record the closest edge useable by the specified StreetMode, and the distance
+ * to the vertices at the ends of that edge. There should be a mapping (PointSet, StreetLayer, StreetMode) ==>
+ * LinkedPointSet.
  *
- * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network.
+ * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network to speed
+ * up the time to first response on this common mode. We might want to also store linkages for other common modes.
  *
  * FIXME a LinkedPointSet is not a PointSet, it's associated with a PointSet. It should be called PointSetLinkage.
  */
@@ -84,6 +85,12 @@ public class LinkedPointSet implements Serializable {
      * edge to the point to be linked)
      */
     public final int[] distances1_mm;
+
+    /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,
+     * scooter pickup, etc.)
+     */
+    public int[] egressStopDelaysSeconds;
 
     /**
      * LinkedPointSets and their EgressCostTables are often copied from existing ones.
@@ -424,6 +431,7 @@ public class LinkedPointSet implements Serializable {
      *
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
+     * TODO clarify that this can use times or distances, depending on units of the table?
      * @param distanceTableToVertices a map from integer vertex IDs to distances TODO in what units?
      * @param distanceTableZone TODO clarify: in fixed or floating degrees etc.
      * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.

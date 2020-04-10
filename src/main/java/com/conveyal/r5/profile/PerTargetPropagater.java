@@ -7,6 +7,7 @@ import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -17,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -48,8 +50,9 @@ public class PerTargetPropagater {
     private PointSet targets;
 
     /** All modes for which we want to perform egress propagation through the street network. */
-    public final Set<StreetMode> modes;
+    public final EnumSet<StreetMode> modes;
 
+    /** One linkage for each street mode for which we want to extend travel times out from transit to destinations. */
     private final List<LinkedPointSet> linkedTargets;
 
     /** the profilerequest (used for walk speed etc.) */
@@ -110,12 +113,12 @@ public class PerTargetPropagater {
      * Constructor.
      */
     public PerTargetPropagater(
-                PointSet targets,
-                StreetLayer streetLayer,
-                Set<StreetMode> modes,
-                AnalysisTask task,
-                int[][] travelTimesToStopsForIteration,
-                int[] nonTransitTravelTimesToTargets
+            PointSet targets,
+            StreetLayer streetLayer,
+            EnumSet<StreetMode> modes,
+            AnalysisTask task,
+            int[][] travelTimesToStopsForIteration,
+            int[] nonTransitTravelTimesToTargets
     ) {
         this.targets = targets;
         this.modes = modes;
@@ -136,9 +139,10 @@ public class PerTargetPropagater {
             throw new IllegalArgumentException("Non-transit travel times must have the same number of entries as there are points.");
         }
         linkedTargets = new ArrayList<>(modes.size());
-        for (StreetMode mode : modes) {
+
+        for (StreetMode streetMode : modes) {
             LinkedPointSet linkedTargetsForMode = streetLayer.parentNetwork.linkageCache
-                    .getLinkage(targets, streetLayer, mode);
+                    .getLinkage(targets, streetLayer, streetMode);
             // Transpose the cost table for propagation. Some tables are never used for propagation (like the
             // region-wide baseline). Transposing them only when needed should save a lot of memory.
             linkedTargetsForMode.getEgressCostTable().destructivelyTransposeForPropagationAsNeeded();
@@ -292,9 +296,7 @@ public class PerTargetPropagater {
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
         // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
-        final int waitingTimeSeconds =
-                (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
-                (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
+        // FIXME ensure this ^ is baked into the PickupDelay class
 
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
@@ -319,8 +321,28 @@ public class PerTargetPropagater {
                             continue;
                         }
 
-                        // Account for any additional delay waiting for taxi or autonomous vehicle.
-                        secondsFromStopToTarget += waitingTimeSeconds;
+                        // TODO shouldn't all the below egress delays be baked into linkedTargets.getEgressCostTable()
+                        //  .getCostTableForPoint(targetIndex)? At the end of the EgressCostTable constructor, we can
+                        //  see via linkedPointSet.streetLayer.waitTimePolygons (or a new wrapper class
+                        //  AccessEgressWaitTimes) whether each stop has an egress delay and add it in to all stops.
+                        //  Applying the pickup delay modification creates a new street layer, so a new linkage.
+
+                        // Account for any additional delay waiting for pickup at the egress stop.
+                        // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been
+                        //  requested (triggering the building of egressStopDelayTables above, which leads to
+                        //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
+                        //  be ignored when running a scenario without pickup delay modifications.
+                        if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
+                                && linkedTargets.egressStopDelaysSeconds != null) {
+                                    int delayAtEgress = linkedTargets.egressStopDelaysSeconds[stop];
+                                    if (delayAtEgress < 0) {
+                                        // Pickup for this mode not allowed at this stop, so trove iteration should
+                                        // continue
+                                        return true;
+                                    } else {
+                                        secondsFromStopToTarget += delayAtEgress;
+                                    }
+                        }
 
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;
                         if (timeAtTarget < cutoffSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {

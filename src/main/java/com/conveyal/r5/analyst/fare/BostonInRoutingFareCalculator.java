@@ -318,14 +318,34 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             TransferRuleGroup issuing = transferAllowance.transferRuleGroup;
             TransferRuleGroup receiving = fareGroups.get(fare.fare_id);
 
-            // servicesConnectedBehindFareGates contains an implicit bounds check that ride >= 1
-            if (servicesConnectedBehindFareGates(issuing, receiving)) {
-                int fromStopIndex = alightStops.get(ride - 1);
-                String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
-                // if the previous alighting stop and this boarding stop are connected behind fare
-                // gates (and without riding a vehicle!), continue to the next ride. There is no CharlieCard tap
-                // and thus for fare purposes these are a single ride.
-                if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) continue;
+            // Check if there was actually a fare interaction 
+            if (ride > 0) {
+                int prevPattern = patterns.get(ride - 1);
+                RouteInfo prevRoute = transitLayer.routes.get(transitLayer.tripPatterns.get(prevPattern).routeIndex);
+
+                // board stop for this ride
+                int prevBoardStopIndex = boardStops.get(ride - 1);
+                String prevBoardStation = transitLayer.parentStationIdForStop.get(prevBoardStopIndex);
+                String prevBoardStopZoneId = transitLayer.fareZoneForStop.get(prevBoardStopIndex);
+
+                // alight stop for this ride
+                int prevAlightStopIndex = alightStops.get(ride - 1);
+                String prevAlightStopZoneId = transitLayer.fareZoneForStop.get(prevAlightStopIndex);
+
+                Fare prevFare = fares.getFareOrDefault(getRouteId(prevRoute), prevBoardStopZoneId, prevAlightStopZoneId);
+                TransferRuleGroup previous = fareGroups.get(prevFare.fare_id);
+
+                // servicesConnectedBehindFareGates contains an implicit bounds check that ride >= 1
+                // this is actually not right, as issuing service could be bus with a free transfer to subway
+                // Previous is not always the same as issuing, e.g. when there was a previous bus -> subway transfer
+                if (servicesConnectedBehindFareGates(previous, receiving)) {
+                    int fromStopIndex = alightStops.get(ride - 1);
+                    String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+                    // if the previous alighting stop and this boarding stop are connected behind fare
+                    // gates (and without riding a vehicle!), continue to the next ride. There is no CharlieCard tap
+                    // and thus for fare purposes these are a single ride.
+                    if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) continue;
+                }
             }
 
             // Check for transferValue expiration

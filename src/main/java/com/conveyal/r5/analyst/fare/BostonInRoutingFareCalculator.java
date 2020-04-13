@@ -42,6 +42,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Map<String, TransferRuleGroup> fareGroups = new HashMap<String, TransferRuleGroup>() {
         {put(LOCAL_BUS_FARE_ID, TransferRuleGroup.LOCAL_BUS); }
         {put(SUBWAY_FARE_ID, TransferRuleGroup.SUBWAY); }
+        // okay for inner and outer express buses to use same rule group, as they have the same
+        // transfer privileges
         {put("innerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
         {put("outerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
         {put("slairport", TransferRuleGroup.SL_AIRPORT); }
@@ -50,15 +52,21 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Set<List<TransferRuleGroup>> transferEligibleSequencePairs = new HashSet<>(
             Arrays.asList(
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.LOCAL_BUS),
-                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SUBWAY),
+                    // Subway -> Subway only eligible if within fare gates, which is handled separately
+                    // since it does not require a fare interaction
+                    //Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.LOCAL_BUS),
                     Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.EXPRESS_BUS),
                     Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.LOCAL_BUS),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.EXPRESS_BUS),
-                    Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.SUBWAY),
+                    // see comment about SUBWAY, SUBWAY
+                    //Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.LOCAL_BUS)
+
+                    // No need to include the OUT_OF_SUBWAY group here, as it is only used for the last state in the
+                    // chain and is never built upon.
             )
     );
 

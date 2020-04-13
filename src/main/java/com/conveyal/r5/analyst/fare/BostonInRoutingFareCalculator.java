@@ -33,7 +33,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     // Some fares may confer different transfer allowance values, but have the same issuing and acceptance rules.
     // For example, in Boston, the transfer allowances from inner and outer express bus fares have different values,
     // but they are issued and accepted under the same circumstances.
-    private enum TransferRuleGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, SL_AIRPORT, LOCAL_BUS_TO_SUBWAY, OUT_OF_SUBWAY,
+    private enum TransferRuleGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, SL_FREE, LOCAL_BUS_TO_SUBWAY,
         OTHER, NONE}
 
     // Map fare_id values from GTFS fare_attributes.txt to these transfer rule groups
@@ -46,7 +46,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         // transfer privileges
         {put("innerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
         {put("outerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
-        {put("slairport", TransferRuleGroup.SL_AIRPORT); }
+        {put("slairport", TransferRuleGroup.SL_FREE); }
     };
 
     private static final Set<List<TransferRuleGroup>> transferEligibleSequencePairs = new HashSet<>(
@@ -65,10 +65,11 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     //Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.LOCAL_BUS)
 
-                    // No need to include the OUT_OF_SUBWAY group here, as it is only used for the last state in the
-                    // chain and is never built upon.
+                    // No free transfers from SL_FREE, except behind gates in the subway handled elsewhere
             )
     );
+
+    private static final Set<TransferRuleGroup> modesWithBehindGateTransfers = new HashSet<>(Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SL_FREE));
 
     private static final String DEFAULT_FARE_ID = LOCAL_BUS_FARE_ID;
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
@@ -115,11 +116,20 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         private final TransferRuleGroup transferRuleGroup;
 
         /**
+         * Once the subway is ridden, if you leave the subway, you can't get back on for free.
+         *
+         * This does not matter during the fare calculation loop, only when partial fares are compared, so we only
+         * bother to set it then.
+         */
+        private final boolean behindGates;
+
+        /**
          * No transfer allowance
          */
         private BostonTransferAllowance () {
             super();
             this.transferRuleGroup = TransferRuleGroup.NONE;
+            this.behindGates = false;
         }
 
         /**
@@ -135,6 +145,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     fare.fare_attribute.transfers,
                     startTime + fare.fare_attribute.transfer_duration);
             this.transferRuleGroup = transferRuleGroup;
+            this.behindGates = false;
         }
 
         /**
@@ -148,6 +159,15 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     priceToInt(Math.min(fares.byId.get(SUBWAY_FARE_ID).fare_attribute.price, fare.fare_attribute.price)),
                     startTime + fare.fare_attribute.transfer_duration);
             this.transferRuleGroup = fareGroups.get(fare.fare_id);
+            this.behindGates = false;
+        }
+
+        /** Used to set whether the rider is still behind the fare gates, and to tighten expiration times */
+        private BostonTransferAllowance(int value, int number, int expirationTime, TransferRuleGroup transferRuleGroup,
+                                        boolean behindGates) {
+            super(value, number, expirationTime);
+            this.transferRuleGroup = transferRuleGroup;
+            this.behindGates = behindGates;
         }
 
         /**
@@ -160,22 +180,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 // journeyStages
                 return new BostonTransferAllowance(fare, clockTime);
             } else {
-                // We have boarded a service that does not provide a transfer allowance, preserve the previous transfer
-                // allowance UNLESS we are coming from the subway, in which case any other service will require the user to
-                // leave the paid area.
-                if (this.transferRuleGroup == TransferRuleGroup.SUBWAY) {
-                    // if we've gone from subway to a fare that does not allow transfers (e.g. Commuter Rail, Ferry), we
-                    // could still transfer to a bus, but boarding the subway again would require full fare payment.
-                    // This example arises in Boston for travel between Back Bay and South Station.  If you make this
-                    // trip using Orange Line -> Red Line, you have full subway transfer privileges at South Station
-                    // (e.g. to Silver Line 1 behind fare gates or Silver Line 4 on the surface).  But if you make it
-                    // using Commuter Rail, you would need to pay full subway fare again to pass through the fare
-                    // gates to access the SL1, though you'd still have a free transfer to the SL4.
-                    return new BostonTransferAllowance(TransferRuleGroup.OUT_OF_SUBWAY,
-                            fares.byId.get(SUBWAY_FARE_ID),
-                            expirationTime);
-                }
-                //otherwise return the previous transfer privilege.
+                //otherwise return the previous transfer privilege, which the user can hold on to to use later.
                 return this;
             }
         }
@@ -187,28 +192,25 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             return new BostonTransferAllowance(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, fare, expirationTime);
         }
 
-        private BostonTransferAllowance checkForSubwayExit(int fromStopIndex, McRaptorSuboptimalPathProfileRouter
-                .McRaptorState state, TransitLayer transitLayer){
-            String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
-            int toStopIndex = state.stop;
-            String toStation = transitLayer.parentStationIdForStop.get(toStopIndex);
-            if (platformsConnected(fromStopIndex, fromStation, toStopIndex, toStation)) {
-                // Have not exited subway through fare gates; maintain transfer privilege
-                return this;
-            } else {
-                // exited subway through fare gates; value can still be used for transfers to bus, but a subsequent
-                // subway boarding requires payment of full subway fare.
-                Fare fare = fares.byId.get(SUBWAY_FARE_ID);
-                // Expiration time should be from original transfer allowance, not updated
-                int expirationTime = this.expirationTime;
-                return new BostonTransferAllowance(TransferRuleGroup.OUT_OF_SUBWAY, fare, expirationTime);
-            }
+        /** called at the end of the fare calc loop to record whether the last state is behind gates or not. */
+        private BostonTransferAllowance setBehindGates (boolean behindGates) {
+            if (behindGates == this.behindGates) return this;
+            else return new BostonTransferAllowance(this.value, this.number, this.expirationTime, this.transferRuleGroup, behindGates);
         }
 
         @Override
         public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other) {
             return super.atLeastAsGoodForAllFutureRedemptions(other) &&
-                    this.transferRuleGroup == ((BostonTransferAllowance) other).transferRuleGroup;
+                    this.transferRuleGroup == ((BostonTransferAllowance) other).transferRuleGroup &&
+                    // if this is behind gates, or other is not behind gates, they are comparable
+                    // if other is behind gates and this is not, it could possibly be better.
+                    (this.behindGates || !((BostonTransferAllowance) other).behindGates);
+        }
+
+        public BostonTransferAllowance tightenExpiration (int maxClockTime) {
+            // copied from TransferAllowance but need to override so that everything stays a BostonTransferAllowance
+            int expirationTime = Math.min(this.expirationTime, maxClockTime);
+            return new BostonTransferAllowance(this.value, this.number, expirationTime, this.transferRuleGroup, this.behindGates);
         }
 
     }
@@ -227,8 +229,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
      * where both services share a station and can be transferred between without leaving the paid area).
      */
     private static boolean servicesConnectedBehindFareGates(TransferRuleGroup issuing, TransferRuleGroup receiving){
-        return ((issuing == TransferRuleGroup.SUBWAY || issuing == TransferRuleGroup.SL_AIRPORT) &&
-                (receiving == TransferRuleGroup.SUBWAY || receiving == TransferRuleGroup.SL_AIRPORT));
+        return ((issuing == TransferRuleGroup.SUBWAY || issuing == TransferRuleGroup.SL_FREE) &&
+                (receiving == TransferRuleGroup.SUBWAY || receiving == TransferRuleGroup.SL_FREE));
     }
 
     private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation){
@@ -413,9 +415,34 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         // platforms are connected) to another subway stop, we do not know the next ride, but know that it cannot be a
         // free boarding to the subway. MBTA doesn't have designated free transfer stops, although it would be a good
         // idea e.g. between the platforms of Copley, Charles/MGH and Bowdoin, or Cleveland Circle and Reservoir.
-        if (transferAllowance.transferRuleGroup == TransferRuleGroup.SUBWAY){
-            transferAllowance = transferAllowance.checkForSubwayExit(alightStopIndex, state, transitLayer);
+        if (patterns.size() > 0) {
+            int prevPattern = patterns.get(patterns.size() - 1);
+            RouteInfo prevRoute = transitLayer.routes.get(transitLayer.tripPatterns.get(prevPattern).routeIndex);
+
+            // board stop for this ride
+            int prevBoardStopIndex = boardStops.get(boardStops.size() - 1);
+            String prevBoardStopZoneId = transitLayer.fareZoneForStop.get(prevBoardStopIndex);
+
+            // alight stop for this ride
+            int prevAlightStopIndex = alightStops.get(alightStops.size() - 1);
+            String prevAlightStation = transitLayer.parentStationIdForStop.get(prevAlightStopIndex);
+            String prevAlightStopZoneId = transitLayer.fareZoneForStop.get(prevAlightStopIndex);
+
+            Fare prevFare = fares.getFareOrDefault(getRouteId(prevRoute), prevBoardStopZoneId, prevAlightStopZoneId);
+            TransferRuleGroup previous = fareGroups.get(prevFare.fare_id);
+
+            if (modesWithBehindGateTransfers.contains(previous)) {
+                // it is possible that we are inside fare gates, because the last vehicle we rode would have left us there
+                String currentStation = transitLayer.parentStationIdForStop.get(state.stop);
+                boolean behindGates = platformsConnected(prevAlightStopIndex, prevAlightStation, state.stop, currentStation);
+                transferAllowance = transferAllowance.setBehindGates(behindGates);
+            } else {
+                transferAllowance = transferAllowance.setBehindGates(false);
+            }
+        } else {
+            transferAllowance = transferAllowance.setBehindGates(false);
         }
+
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
     }

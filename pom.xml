@@ -166,7 +166,7 @@
                                  run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
                                  deployments because this will cause it to be renamed to the standard timestamped name and sorted
                                  into a Maven repo directory by version number. -->
-                            <finalName>${git.commit.id.describe}</finalName>
+                            <finalName>${git.commit.id.describe}-shaded</finalName>
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">

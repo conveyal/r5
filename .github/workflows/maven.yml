@@ -42,5 +42,5 @@ jobs:
     - name: Upload shaded JAR to S3
       run: aws s3 cp --recursive --exclude "*" --include "*-shaded.jar" ./target/ s3://r5-builds
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_ACCESS_KEY_ID: "${{ secrets.AWS_ACCESS_KEY_ID }}"
         AWS_SECRET_ACCESS_KEY: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"

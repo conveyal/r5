@@ -34,13 +34,13 @@ jobs:
           mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
         fi
       env:
-        OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_JIRA_USERNAME }}
-        OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_JIRA_PASSWORD }}
-        GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-        GPG_KEY_NAME: ${{ secrets.GPG_KEY_NAME }}
+        OSSRH_JIRA_USERNAME: "${{ secrets.OSSRH_JIRA_USERNAME }}"
+        OSSRH_JIRA_PASSWORD: "${{ secrets.OSSRH_JIRA_PASSWORD }}"
+        GPG_PRIVATE_KEY: "${{ secrets.GPG_PRIVATE_KEY }}"
+        GPG_KEY_NAME: "${{ secrets.GPG_KEY_NAME }}"
         GPG_PASSPHRASE: "${{ secrets.GPG_PASSPHRASE }}"
     - name: Upload shaded JAR to S3
       run: aws s3 cp --recursive --exclude "*" --include "*-shaded.jar" ./target/ s3://r5-builds
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_ACCESS_KEY_ID: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+        AWS_SECRET_ACCESS_KEY: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"

@@ -85,15 +85,13 @@ public class TravelTimeComputer {
         // TODO merge multiple destination pointsets from a regional request into a single supergrid?
         PointSet destinations;
 
-        // For now, use logic in the NetworkPreloader to return null extents if the request is not for a single-point
-        // (travel time surface), which implies the destination pointset is a grid. This should be cleaned up.
-        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).destinationGridExtents;
-        if (destinationGridExtents != null) {
-            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
-            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
-        } else {
+        if (request instanceof  RegionalTask && ((RegionalTask) request).destinationPointSet instanceof FreeFormPointSet) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = ((RegionalTask) request).destinationPointSet;
+        } else {
+            WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
+            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
+            destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
         }
 
         // I. Access to transit (or direct non-transit travel to destination) ==========================================

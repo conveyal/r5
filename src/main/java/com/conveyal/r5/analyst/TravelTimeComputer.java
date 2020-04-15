@@ -246,7 +246,9 @@ public class TravelTimeComputer {
         // were reached, return the non-transit grid as the final result.
         if (request.transitModes.isEmpty() || accessTimes.isEmpty()) {
             LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
-            for (int target = 0; target < nonTransitTravelTimesToDestinations.size(); target++) {
+            int nTargets =  nonTransitTravelTimesToDestinations.size();
+            if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
+            for (int target = 0; target < nTargets; target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
                 travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);

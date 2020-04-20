@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.decay.DecayFunction;
-import com.conveyal.r5.analyst.decay.ExponentialDecayFunction;
 import com.conveyal.r5.analyst.decay.FixedExponentialDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -233,7 +232,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public ProfileRequest () {
          // TEMPORARY inject a decay function until they are supplied in JSON
         FixedExponentialDecayFunction decayFunction = new FixedExponentialDecayFunction();
-        decayFunction.decayConstant =  -0.07 / 60;
+        decayFunction.decayConstant =  -0.03 / 60;
         this.decayFunction = decayFunction;
     }
 

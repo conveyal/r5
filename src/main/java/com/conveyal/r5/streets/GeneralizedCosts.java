@@ -110,45 +110,58 @@ public class GeneralizedCosts {
      * Perhaps GeneralizedCosts can be split out into a custom TurnCostCalculator and WeightCalculator.
      */
     public double getGeneralizedCost (int currentEdge, int previousEdge, StreetMode mode) {
-        EdgeStore.Edge e = edgeStore.getCursor();
-        e.seek(previousEdge);
-        int outAngle = e.getOutAngle();
-        e.seek(currentEdge);
-        int inAngle = e.getInAngle();
-        TurnDirection turnDirection = TurnDirection.betweenAnglesDegrees(inAngle, outAngle);
-        double turnCost;
+
+        double linkCost;
         if (mode == StreetMode.WALK) {
-            switch (turnDirection) {
-                case STRAIGHT:
-                    turnCost = walkStraight.get(previousEdge);
-                    break;
-                case LEFT:
-                    turnCost = walkLeft.get(previousEdge);
-                    break;
-                case RIGHT:
-                    turnCost = walkRight.get(previousEdge);
-                    break;
-                default:
-                    throw new RuntimeException("No costs are specified for u-turns.");
-            }
+            linkCost = walkLink.get(currentEdge);
         } else if (mode == StreetMode.BICYCLE) {
-            switch (turnDirection) {
-                case STRAIGHT:
-                    turnCost = bikeStraight.get(previousEdge);
-                    break;
-                case LEFT:
-                    turnCost = bikeLeft.get(previousEdge);
-                    break;
-                case RIGHT:
-                    turnCost = bikeRight.get(previousEdge);
-                    break;
-                default:
-                    throw new RuntimeException("No costs are specified for u-turns.");
-            }
+            linkCost = bikeLink.get(currentEdge);
         } else {
             throw new RuntimeException("Generalized cost not supported for mode: " + mode);
         }
-        return turnCost;
+
+        double turnCost = 0;
+        // Only find nonzero turn cost if there is a previous edge (not on the first edge transition)
+        if (previousEdge >= 0) {
+            EdgeStore.Edge e = edgeStore.getCursor();
+            e.seek(currentEdge);
+            int inAngle = e.getInAngle();
+            e.seek(previousEdge);
+            int outAngle = e.getOutAngle();
+            TurnDirection turnDirection = TurnDirection.betweenAnglesDegrees(inAngle, outAngle);
+            if (mode == StreetMode.WALK) {
+                switch (turnDirection) {
+                    case STRAIGHT:
+                        turnCost = walkStraight.get(previousEdge);
+                        break;
+                    case LEFT:
+                        turnCost = walkLeft.get(previousEdge);
+                        break;
+                    case RIGHT:
+                        turnCost = walkRight.get(previousEdge);
+                        break;
+                    default:
+                        throw new RuntimeException("No costs are specified for u-turns.");
+                }
+            } else if (mode == StreetMode.BICYCLE) {
+                switch (turnDirection) {
+                    case STRAIGHT:
+                        turnCost = bikeStraight.get(previousEdge);
+                        break;
+                    case LEFT:
+                        turnCost = bikeLeft.get(previousEdge);
+                        break;
+                    case RIGHT:
+                        turnCost = bikeRight.get(previousEdge);
+                        break;
+                    default:
+                        throw new RuntimeException("No costs are specified for u-turns.");
+                }
+            } else {
+                throw new RuntimeException("Generalized cost not supported for mode: " + mode);
+            }
+        }
+        return linkCost + turnCost;
     }
 
     private enum TurnDirection {

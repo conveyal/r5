@@ -21,14 +21,20 @@ public class GeneralizedCosts {
     // This GeneralizedCosts augments this EdgeStore with additional information about the same edges.
     private final EdgeStore edgeStore;
 
+    // For the walk mode, we store the cost of traversing the edge,
+    // as well as the cost of continuing through the intersection and turning left or right.
+    TDoubleList walkLink = new TDoubleArrayList();
     TDoubleList walkStraight = new TDoubleArrayList();
     TDoubleList walkLeft = new TDoubleArrayList();
     TDoubleList walkRight = new TDoubleArrayList();
 
+    // For the bike mode we store the same set of costs as for the walk mode
+    TDoubleList bikeLink = new TDoubleArrayList();
     TDoubleList bikeStraight = new TDoubleArrayList();
     TDoubleList bikeLeft = new TDoubleArrayList();
     TDoubleList bikeRight = new TDoubleArrayList();
 
+    // Speeds
     TDoubleList speedPeak = new TDoubleArrayList();
     TDoubleList speedOffPeak = new TDoubleArrayList();
 
@@ -46,27 +52,39 @@ public class GeneralizedCosts {
      */
     public void addFromWay (Way way) {
 
-        // Forward edge
+        // Forward edge, walking
+        walkLink    .add(parseTag(way,"gen_cost_ped:forward:link"));
         walkStraight.add(parseTag(way,"gen_cost_ped:forward:straight"));
-        walkLeft.add(parseTag(way,"gen_cost_ped:forward:left"));
-        walkRight.add(parseTag(way,"gen_cost_ped:forward:right"));
-        bikeStraight.add(parseTag(way,"gen_cost_bike:forward:straight"));
-        bikeLeft.add(parseTag(way,"gen_cost_bike:forward:left"));
-        bikeRight.add(parseTag(way,"gen_cost_bike:forward:right"));
-        speedPeak.add(parseTag(way,"speed_peak:forward"));
-        speedOffPeak.add(parseTag(way,"speed_offpeak:forward"));
-        aadt.add(parseTag(way,"aadt"));
+        walkLeft    .add(parseTag(way,"gen_cost_ped:forward:left"));
+        walkRight   .add(parseTag(way,"gen_cost_ped:forward:right"));
 
-        // Backward edge
+        // Forward edge, walking
+        bikeLink    .add(parseTag(way,"gen_cost_bike:forward:link"));
+        bikeStraight.add(parseTag(way,"gen_cost_bike:forward:straight"));
+        bikeLeft    .add(parseTag(way,"gen_cost_bike:forward:left"));
+        bikeRight   .add(parseTag(way,"gen_cost_bike:forward:right"));
+
+        // Forward edge, speeds
+        speedPeak   .add(parseTag(way,"speed_peak:forward"));
+        speedOffPeak.add(parseTag(way,"speed_offpeak:forward"));
+        aadt        .add(parseTag(way,"aadt"));
+
+        // Backward edge, walking
+        walkLink    .add(parseTag(way,"gen_cost_ped:backward:link"));
         walkStraight.add(parseTag(way,"gen_cost_ped:backward:straight"));
-        walkLeft.add(parseTag(way,"gen_cost_ped:backward:left"));
-        walkRight.add(parseTag(way,"gen_cost_ped:backward:right"));
+        walkLeft    .add(parseTag(way,"gen_cost_ped:backward:left"));
+        walkRight   .add(parseTag(way,"gen_cost_ped:backward:right"));
+
+        // Backward edge, biking
+        bikeLink    .add(parseTag(way,"gen_cost_bike:backward:link"));
         bikeStraight.add(parseTag(way,"gen_cost_bike:backward:straight"));
-        bikeLeft.add(parseTag(way,"gen_cost_bike:backward:left"));
-        bikeRight.add(parseTag(way,"gen_cost_bike:backward:right"));
-        speedPeak.add(parseTag(way,"speed_peak:backward"));
+        bikeLeft    .add(parseTag(way,"gen_cost_bike:backward:left"));
+        bikeRight   .add(parseTag(way,"gen_cost_bike:backward:right"));
+
+        // Backward edge, speeds
+        speedPeak   .add(parseTag(way,"speed_peak:backward"));
         speedOffPeak.add(parseTag(way,"speed_offpeak:backward"));
-        aadt.add(parseTag(way,"aadt"));
+        aadt        .add(parseTag(way,"aadt"));
 
     }
 

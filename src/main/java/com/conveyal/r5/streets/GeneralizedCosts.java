@@ -44,6 +44,11 @@ public class GeneralizedCosts {
         this.edgeStore = edgeStore;
     }
 
+    public int size() {
+        // All lists should be the same length by design, so any one of them tells us how many edges are covered.
+        return walkLink.size();
+    }
+
     /**
      * Called during TransportNetwork building. Extend all the parallel lists by two elements, one for the forward and
      * one for the backward edge derived from a single intersection-to-intersection segment of an OSM Way. For the time
@@ -114,19 +119,24 @@ public class GeneralizedCosts {
      * Perhaps GeneralizedCosts can be split out into a custom TurnCostCalculator and WeightCalculator.
      */
     public double getGeneralizedCost (int currentEdge, int previousEdge, StreetMode mode) {
-
         double linkCost;
-        if (mode == StreetMode.WALK) {
-            linkCost = walkLink.get(currentEdge);
-        } else if (mode == StreetMode.BICYCLE) {
-            linkCost = bikeLink.get(currentEdge);
+        if (currentEdge < this.size()) {
+            if (mode == StreetMode.WALK) {
+                linkCost = walkLink.get(currentEdge);
+            } else if (mode == StreetMode.BICYCLE) {
+                linkCost = bikeLink.get(currentEdge);
+            } else {
+                throw new RuntimeException("Generalized cost not supported for mode: " + mode);
+            }
         } else {
-            throw new RuntimeException("Generalized cost not supported for mode: " + mode);
+            // Return unweighted length for edges that not appearing in this table, currently including split edges.
+            return edgeStore.getCursor(currentEdge).getLengthM();
         }
 
         double turnCost = 0;
-        // Only find nonzero turn cost if there is a previous edge (not on the first edge transition)
-        if (previousEdge >= 0) {
+        // Only find nonzero turn cost if there is a previous edge (we are not on the first edge transition)
+        // and if the edge appears within this generalized cost table.
+        if (previousEdge >= 0 && previousEdge < this.size()) {
             EdgeStore.Edge e = edgeStore.getCursor();
             e.seek(currentEdge);
             int inAngle = e.getInAngle();

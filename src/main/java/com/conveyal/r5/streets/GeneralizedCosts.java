@@ -183,10 +183,8 @@ public class GeneralizedCosts {
         public static TurnDirection forAngleDegrees (double angleDegrees) {
             if (angleDegrees < 27) {
                 return STRAIGHT;
-            } else if (angleDegrees < 153) {
+            } else if (angleDegrees < 180) {
                 return RIGHT;
-            } else if (angleDegrees < 207) {
-                return UTURN;
             } else if (angleDegrees < 333) {
                 return LEFT;
             } else {

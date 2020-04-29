@@ -664,7 +664,8 @@ public class EdgeStore implements Serializable {
             if (generalizedCosts != null) {
                 // Generalized costs supplied in OSM tags, they override everything else.
                 // Perhaps for clarity they should be supplied by a new implementation of the turn cost calculator.
-                weight = (float) generalizedCosts.getGeneralizedCost(getEdgeIndex(), s0.backEdge, streetMode);
+                // weight = (float) generalizedCosts.getGeneralizedCost(getEdgeIndex(), s0.backEdge, streetMode);
+                weight = (float) getLengthM();
             } else {
                 // No generalized costs, compute them.
                 // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).

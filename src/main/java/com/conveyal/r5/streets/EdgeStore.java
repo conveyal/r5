@@ -662,11 +662,11 @@ public class EdgeStore implements Serializable {
 
             // TODO pluggable weight & time computer modules
             if (generalizedCosts != null) {
-                // Generalized costs supplied, they override everything else.
+                // Generalized costs supplied in OSM tags, they override everything else.
                 // Perhaps for clarity they should be supplied by a new implementation of the turn cost calculator.
                 weight = (float) generalizedCosts.getGeneralizedCost(getEdgeIndex(), s0.backEdge, streetMode);
             } else {
-                // No generalized costs, compute
+                // No generalized costs, compute them.
                 // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
                 if (s0.backEdge >= 0) {
                     if (req.reverseSearch) {

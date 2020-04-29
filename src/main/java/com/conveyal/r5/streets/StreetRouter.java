@@ -1042,7 +1042,10 @@ public class StreetRouter {
             /** Time, in seconds */
             DURATION_SECONDS,
 
-            /** Weight/generalized cost (this is what is actually used to find paths) */
+            /**
+             * Weight/generalized cost (this is what is actually used to find paths)
+             * FIXME what does this comment mean by "actually used"?
+             */
             WEIGHT,
 
             /** Distance, in millimeters */

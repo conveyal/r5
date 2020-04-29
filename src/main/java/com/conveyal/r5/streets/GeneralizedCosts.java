@@ -97,6 +97,10 @@ public class GeneralizedCosts {
         if (tagValue == null) {
             throw new RuntimeException("All ways are expected to have generalized cost tags. Missing: " + tagKey);
         }
+        // Our inputs contain nan rather than the NaN expected by Double.parseDouble.
+        if ("NaN".equalsIgnoreCase(tagValue)) {
+            return Double.NaN;
+        }
         try {
             double generalizedCost = Double.parseDouble(tagValue);
             return generalizedCost;

@@ -155,7 +155,14 @@ public class TravelTimeComputer {
             } else {
                 sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
             }
-            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            // If generalized cost tags were present on the input data, minimize generalized cost not travel time.
+            // TODO this causes the sr.getReachedStops() call below to return generalized cost units, not seconds.
+            // The travel times to the destination point set are still fetched in seconds.
+            if (network.streetLayer.edgeStore.generalizedCosts != null) {
+                sr.quantityToMinimize = StreetRouter.State.RoutingVariable.WEIGHT;
+            } else {
+                sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            }
             sr.route();
             // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
             // This implies you are dropped off or have a very easy parking spot for your vehicle.
@@ -174,8 +181,11 @@ public class TravelTimeComputer {
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
 
-            LinkedPointSet linkedDestinations = network.linkageCache
-                    .getLinkage(destinations, network.streetLayer, accessMode);
+            LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
+                    destinations,
+                    network.streetLayer,
+                    accessMode
+            );
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);

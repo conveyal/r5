@@ -1219,7 +1219,12 @@ public class EdgeStore implements Serializable {
      */
     public void setGeneralizedCosts (Way way) {
         if (generalizedCosts != null) {
-            generalizedCosts.addFromWay(way);
+            try {
+                generalizedCosts.addFromWay(way);
+            } catch (Exception ex) {
+                LOG.error("Continuing to load but ignoring generalized costs due to exception: {}", ex.toString());
+                generalizedCosts = null;
+            }
         }
     }
 

@@ -6,8 +6,7 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
-import com.conveyal.r5.analyst.scenario.ModificationPolygon;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -53,8 +52,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -183,8 +182,9 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * This set of polygons specifies a spatially varying wait time to use a ride hailing service. Negative wait times
      * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
+     * Note that this is a single field, rather than a collection: we only support one set of polygons for one mode.
      */
-    public IndexedPolygonCollection waitTimePolygons;
+    public PickupWaitTimes pickupWaitTimes;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -1109,6 +1109,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * We return the unfiltered results including false positives because calculating the true distance to each edge
      * is quite a slow operation. The caller must post-filter the set of edges if more distance information is needed,
      * including knowledge of whether an edge passes inside the query envelope at all.
+     * @param envelope FIXME IN WHAT UNITS, FIXED OR FLOATING?
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);
@@ -1552,19 +1553,19 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
+     * For the given location and mode of travel, get an object representing the available on-demand mobility service,
+     * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
+     * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
+     * (or -1 for no service). Otherwise, return an object representing a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
-     * @return the waiting time in seconds to begin driving on the street network (waiting to be picked up by a car)
+     * @return object with pick-up time and stops served
      */
-    public int getWaitTime (double lat, double lon) {
-        if (waitTimePolygons == null) {
-            return 0;
+    public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
+        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
+            return pickupWaitTimes.getAccessService(lat, lon);
         } else {
-            // TODO verify x, y order in coordinate
-            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-            ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
-            // Convert minutes to seconds
-            return (int)(polygon.data * 60);
+            return NO_WAIT_ALL_STOPS;
         }
     }
 

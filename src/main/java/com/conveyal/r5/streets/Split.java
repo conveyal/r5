@@ -13,9 +13,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Represents a potential split point along an existing edge, retaining some geometric calculation state so that
  * once the best candidate is found more detailed calculations can continue.
- * We don't yet handle initial and final Splits on the same edge. This can be a problem for Analysis if your
- * starting point is on a long road without intersections. Travel times to other points along that road would be
- * measured by going to the end of the road and back.
  */
 public class Split {
 

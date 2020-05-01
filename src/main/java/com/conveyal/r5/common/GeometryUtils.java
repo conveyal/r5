@@ -4,6 +4,7 @@ import com.conveyal.r5.streets.VertexStore;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineSegment;
 
@@ -73,6 +74,10 @@ public class GeometryUtils {
             throw new AssertionError("Buffer distance in geographic units is negative!");
         }
         envelope.expandBy(xExpansion, yExpansion);
+    }
+
+    public static boolean containsPoint(Geometry geometry, double x, double y) {
+        return geometry.contains(geometryFactory.createPoint(new Coordinate(x, y)));
     }
 
     public static Envelope floatingWgsEnvelopeToFixed (Envelope floatingWgsEnvelope) {

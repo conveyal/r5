@@ -19,15 +19,15 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
  * This is an abstraction for the polygons used to configure the road congestion modification type and the ride hailing
  * wait time modification type. Currently it's only used by the ride hailing wait time modification but should
  * eventually also be used by road congestion.
- *
- * Created by abyrd on 2019-03-28
  */
 public class IndexedPolygonCollection {
 
@@ -40,25 +40,31 @@ public class IndexedPolygonCollection {
     public final String dataAttribute;
 
     /**
-     * The name of the attribute (text) within the polygon layer that contains the polygon names.
-     * This is only used for logging.
+     * The name of the attribute (text) within the polygon layer that contains the polygon names. Only used for logging.
      */
     public final String nameAttribute;
+
+    /**
+     * The name of the attribute (text) within the polygon layer that contains unique polygon identifiers.
+     * IDs will be generated if this attribute is not supplied.
+     */
+    private final String idAttribute;
 
     /**
      * The name of the attribute (numeric) within the polygon layer that contains the polygon priority, for selecting
      * one of several overlapping polygons.
      */
-    public String priorityAttribute = "priority";
+    public final String priorityAttribute;
 
     /** The default data value to return when no polygon is found. */
     public final double defaultData;
-
 
     // Internal (private) fields.
     // These are set by the feature loading and indexing process, and have getters to ensure that they are immutable.
 
     private STRtree polygonSpatialIndex = new STRtree();
+
+    private Map<String, ModificationPolygon> polygonsById = new HashMap<>();
 
     private int featureCount = 0;
 
@@ -66,24 +72,35 @@ public class IndexedPolygonCollection {
 
     private boolean allPolygonsHaveNames = true;
 
+    private boolean allPolygonsHaveIds = true;
+
+    /** This is the polygon that will be returned when no other polygon is found. */
     private ModificationPolygon defaultPolygon;
 
     /**
      * Constructor - arguably this has too many positional parameters.
      * @param polygonLayer the object name on S3 containing (optionally gzipped) GeoJSON
      * @param dataAttribute the name of the polygon attribute that contains the numeric data for a given use case
+     * @param idAttribute the name of the polygon attribute that gives each polygon a unique identifier
      * @param nameAttribute the name of the polygon attribute that gives each polygon a name (for logging only)
      * @param priorityAttribute the name of the attribute which determines which polygon is selected when several overlap
      * @param defaultData the default value returned when a query point doesn't lie within any polygon
      */
-    public IndexedPolygonCollection (String polygonLayer, String dataAttribute, String nameAttribute,
-                                     String priorityAttribute, double defaultData) {
+    public IndexedPolygonCollection (
+        String polygonLayer,
+        String dataAttribute,
+        String idAttribute,
+        String nameAttribute,
+        String priorityAttribute,
+        double defaultData
+    ) {
         this.polygonLayer = polygonLayer;
         this.dataAttribute = dataAttribute;
+        this.idAttribute = idAttribute;
         this.nameAttribute = nameAttribute;
         this.priorityAttribute = priorityAttribute;
         this.defaultData = defaultData;
-        this.defaultPolygon = new ModificationPolygon(null, "DEFAULT", defaultData, -1);
+        this.defaultPolygon = new ModificationPolygon(null, null, "DEFAULT", defaultData, -1);
     }
 
     public void loadFromS3GeoJson() throws Exception {
@@ -108,11 +125,19 @@ public class IndexedPolygonCollection {
             featureNumber += 1;
             SimpleFeature feature = featureIterator.next();
             Geometry geometry = (Geometry) feature.getDefaultGeometry();
-            // NOTE all features must have the same attributes because schema is inferred from the first feature
+            // NOTE all features are expected to have the same attributes; schema is inferred from the first feature.
             Object data = feature.getAttribute(dataAttribute);
+            Object id = feature.getAttribute(idAttribute);
             Object name = feature.getAttribute(nameAttribute);
             Object priority = feature.getAttribute(priorityAttribute);
             boolean indexThisFeature = true;
+            if (id == null) {
+                allPolygonsHaveIds = false;
+            } else if (!(name instanceof String)) {
+                errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
+                        id, idAttribute, featureNumber));
+                indexThisFeature = false;
+            }
             if (name == null) {
                 allPolygonsHaveNames = false;
             } else if (!(name instanceof String)) {
@@ -137,11 +162,17 @@ public class IndexedPolygonCollection {
                 indexThisFeature = false;
             }
             if (indexThisFeature) {
-                polygonSpatialIndex.insert(geometry.getEnvelopeInternal(), new ModificationPolygon(
-                        (Polygonal) geometry,
-                        (String)name,
-                        ((Number)data).doubleValue(),
-                        ((Number)priority).doubleValue()));
+                ModificationPolygon polygon = new ModificationPolygon(
+                    (Polygonal) geometry,
+                    (String) id,
+                    (String) name,
+                    ((Number) data).doubleValue(),
+                    ((Number) priority).doubleValue()
+                );
+                polygonSpatialIndex.insert(geometry.getEnvelopeInternal(), polygon);
+                if (polygon.id != null) {
+                    polygonsById.put(polygon.id, polygon);
+                }
             }
         }
         // Finalize construction of the STR tree
@@ -157,8 +188,8 @@ public class IndexedPolygonCollection {
         return errors;
     }
 
-    public boolean allPolygonsHaveNames () {
-        return allPolygonsHaveNames;
+    public ModificationPolygon getById(String id) {
+        return polygonsById.get(id);
     }
 
     /**

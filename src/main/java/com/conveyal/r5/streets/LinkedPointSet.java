@@ -5,14 +5,13 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.util.LambdaCounter;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.streets.EdgeStore.Edge;
-import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,10 +21,12 @@ import java.util.stream.IntStream;
 
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
- * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of
- * that edge.
+ * For each feature in the PointSet, we record the closest edge useable by the specified StreetMode, and the distance
+ * to the vertices at the ends of that edge. There should be a mapping (PointSet, StreetLayer, StreetMode) ==>
+ * LinkedPointSet.
  *
- * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network.
+ * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network to speed
+ * up the time to first response on this common mode. We might want to also store linkages for other common modes.
  *
  * FIXME a LinkedPointSet is not a PointSet, it's associated with a PointSet. It should be called PointSetLinkage.
  */
@@ -84,6 +85,12 @@ public class LinkedPointSet implements Serializable {
      * edge to the point to be linked)
      */
     public final int[] distances1_mm;
+
+    /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,
+     * scooter pickup, etc.)
+     */
+    public int[] egressStopDelaysSeconds;
 
     /**
      * LinkedPointSets and their EgressCostTables are often copied from existing ones.
@@ -226,8 +233,8 @@ public class LinkedPointSet implements Serializable {
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
                 if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height) { //point is outside super-grid
-                    //Set the edge value to -1 to indicate no linkage.
-                    //Distances should never be read downstream, so they don't need to be set here.
+                    // Set the edge value to -1 to indicate no linkage.
+                    // Distances should never be read downstream, so they don't need to be set here.
                     edges[pixel] = -1;
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
@@ -350,7 +357,7 @@ public class LinkedPointSet implements Serializable {
     public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
-        return eval(travelTimeForVertex, 1000, 1000);
+        return eval(travelTimeForVertex, 1000, 1000, null);
     }
 
     /**
@@ -363,12 +370,18 @@ public class LinkedPointSet implements Serializable {
      * @return wrapped int[] of travel times (in seconds) to reach the pointset points
      */
 
-    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
+    public PointSetTimes eval (
+                TravelTimeFunction travelTimeForVertex,
+                Integer onStreetSpeed,
+                int offStreetSpeed,
+                Split origin
+            ) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {
+                // Target point is unlinked.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -377,6 +390,7 @@ public class LinkedPointSet implements Serializable {
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
             if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
+                // The target point lies along an edge with vertices that the street router could not reach.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -388,6 +402,14 @@ public class LinkedPointSet implements Serializable {
             // If a null onStreetSpeed is supplied, look up the speed for cars
             if (onStreetSpeed == null) {
                 onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            }
+
+            if (origin != null && origin.edge == edges[i]) {
+                // The target point lies along the same edge as the origin
+                int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
+                offstreetTime += origin.distanceToEdge_mm / offStreetSpeed;
+                travelTimes[i] = onStreetDistance_mm / onStreetSpeed + offstreetTime;
+                continue;
             }
 
             if (time0 != Integer.MAX_VALUE) {
@@ -409,6 +431,7 @@ public class LinkedPointSet implements Serializable {
      *
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
+     * TODO clarify that this can use times or distances, depending on units of the table?
      * @param distanceTableToVertices a map from integer vertex IDs to distances TODO in what units?
      * @param distanceTableZone TODO clarify: in fixed or floating degrees etc.
      * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.

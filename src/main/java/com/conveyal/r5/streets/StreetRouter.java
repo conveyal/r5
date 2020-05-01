@@ -816,6 +816,8 @@ public class StreetRouter {
         return destinationSplit;
     }
 
+    public Split getOriginSplit() { return originSplit; }
+
     /**
      * Given the geographic coordinates of a starting point...
      * Returns the State with the smaller weight to vertex0 or vertex1

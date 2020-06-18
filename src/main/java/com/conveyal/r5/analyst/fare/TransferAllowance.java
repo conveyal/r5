@@ -23,6 +23,11 @@ public class TransferAllowance {
     public final int number;
     public final int expirationTime;
 
+    /** Return the class of transfer allowance, for Fareto display */
+    public String getType () {
+        return this.getClass().getSimpleName();
+    }
+    
     /**
      * Constructor used for no transfer allowance
       */
@@ -67,7 +72,7 @@ public class TransferAllowance {
         // cap expiration time of transfer at max clock time of search, so that transfer slips that technically have more time
         // remaining, but that time cannot be used within the constraints of this search, can be pruned.
 
-        // THIS METHOD SHOULD NOT BE USED BECAUSE IT INADVERTNELTY CONVERTS SUBCLASSES INTO REGULAR TRANSFERALLOWANCES
+        // THIS METHOD SHOULD NOT BE USED BECAUSE IT INADVERTENTLY CONVERTS SUBCLASSES INTO REGULAR TRANSFERALLOWANCES
         // CAUSING PATHS THAT SHOULD NOT BE DISCARDED TO BE DISCARDED!
         throw new UnsupportedOperationException("tightenExpiration called unsafely. Override in subclasses.");
 

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Fare;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.random.MersenneTwister;
@@ -26,6 +27,13 @@ import java.util.WeakHashMap;
 public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
     public static final boolean LOG_FARES = false;
+
+    /**
+     * Rather than computing the max transfer allowance on commuter rail (b/c you can change to another train in the same
+     * direction) we just assume that the transfer allowance cannot be larger than the max fare. This will over-retain trips,
+     * but the CR network is small enough that's okay.
+     */
+    public static final int MAX_CR_FARE = 1250;
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
@@ -115,6 +123,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          */
         public final TransferRuleGroup transferRuleGroup;
 
+        public final int commuterRailBoardStop;
+
+        public final int commuterRailRoute;
+
+        public final int commuterRailDirection;
+
         /**
          * Once the subway is ridden, if you leave the subway, you can't get back on for free.
          *
@@ -130,6 +144,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             super();
             this.transferRuleGroup = TransferRuleGroup.NONE;
             this.behindGates = false;
+            commuterRailBoardStop = commuterRailRoute = commuterRailDirection = -1;
         }
 
         /**
@@ -146,6 +161,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     startTime + fare.fare_attribute.transfer_duration);
             this.transferRuleGroup = transferRuleGroup;
             this.behindGates = false;
+            commuterRailBoardStop = commuterRailRoute = commuterRailDirection = -1;
         }
 
         /**
@@ -160,14 +176,18 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     startTime + fare.fare_attribute.transfer_duration);
             this.transferRuleGroup = fareGroups.get(fare.fare_id);
             this.behindGates = false;
+            commuterRailBoardStop = commuterRailRoute = commuterRailDirection = -1;
         }
 
         /** Used to set whether the rider is still behind the fare gates, and to tighten expiration times */
         private BostonTransferAllowance(int value, int number, int expirationTime, TransferRuleGroup transferRuleGroup,
-                                        boolean behindGates) {
+                                        boolean behindGates, int commuterRailBoardStop, int commuterRailRoute, int commuterRailDirection) {
             super(value, number, expirationTime);
             this.transferRuleGroup = transferRuleGroup;
             this.behindGates = behindGates;
+            this.commuterRailBoardStop = commuterRailBoardStop;
+            this.commuterRailRoute = commuterRailRoute;
+            this.commuterRailDirection = commuterRailDirection;
         }
 
         /**
@@ -195,22 +215,50 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         /** called at the end of the fare calc loop to record whether the last state is behind gates or not. */
         private BostonTransferAllowance setBehindGates (boolean behindGates) {
             if (behindGates == this.behindGates) return this;
-            else return new BostonTransferAllowance(this.value, this.number, this.expirationTime, this.transferRuleGroup, behindGates);
+            else return new BostonTransferAllowance(this.value, this.number, this.expirationTime, this.transferRuleGroup,
+                    behindGates, this.commuterRailBoardStop, this.commuterRailRoute, this.commuterRailDirection);
+        }
+
+        /**
+         * While it's not well-documented, you can actually get a discounted transfer on the commuter rail. Consider a
+         * trip from Worcester to West Newton, which costs $5.50. In the morning, this trip requires you to change to a
+         * local train, because the train from Worcester will express past West Newton. This does not require you to buy two
+         * tickets. So there is logic in the fare calculator to allow extending a commuter rail trip as if it were a single trip,
+         * as long as the route and direction match. To get transfer allowances right, we need to include this information
+         * in the transfer allowance.
+         */
+        private BostonTransferAllowance setCommuterRailAllowance (int commuterRailBoardStop, int commuterRailRoute,
+                                                                  int commuterRailDirection, int commuterRailMaxAllowance) {
+            return new BostonTransferAllowance(this.value + commuterRailMaxAllowance, this.number, this.expirationTime, this.transferRuleGroup,
+                    this.behindGates, commuterRailBoardStop, commuterRailRoute, commuterRailDirection);
         }
 
         @Override
         public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other) {
-            return super.atLeastAsGoodForAllFutureRedemptions(other) &&
-                    this.transferRuleGroup == ((BostonTransferAllowance) other).transferRuleGroup &&
-                    // if this is behind gates, or other is not behind gates, they are comparable
-                    // if other is behind gates and this is not, it could possibly be better.
-                    (this.behindGates || !((BostonTransferAllowance) other).behindGates);
+            if (other instanceof BostonTransferAllowance) {
+                BostonTransferAllowance o = (BostonTransferAllowance) other;
+
+                return super.atLeastAsGoodForAllFutureRedemptions(o) &&
+                        this.transferRuleGroup == o.transferRuleGroup &&
+                        // if this is behind gates, or other is not behind gates, they are comparable
+                        // if other is behind gates and this is not, it could possibly be better.
+                        (this.behindGates || !o.behindGates) &&
+                        // there's not check here that commuterRailDirection etc. not be -1 (unset)
+                        // because it's conceivable that you could be better off _not_ having a commuter rail transfer
+                        // allowance, because it might be cheaper to board further down the line.
+                        (this.commuterRailDirection == o.commuterRailDirection) &&
+                        (this.commuterRailRoute == o.commuterRailRoute) &&
+                        (this.commuterRailBoardStop == o.commuterRailBoardStop);
+            } else {
+                throw new IllegalArgumentException("Incomparable transfer allowances!");
+            }
         }
 
         public BostonTransferAllowance tightenExpiration (int maxClockTime) {
             // copied from TransferAllowance but need to override so that everything stays a BostonTransferAllowance
             int expirationTime = Math.min(this.expirationTime, maxClockTime);
-            return new BostonTransferAllowance(this.value, this.number, expirationTime, this.transferRuleGroup, this.behindGates);
+            return new BostonTransferAllowance(this.value, this.number, expirationTime, this.transferRuleGroup, this.behindGates,
+                    this.commuterRailBoardStop, this.commuterRailRoute, this.commuterRailDirection);
         }
 
     }
@@ -280,11 +328,44 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 stateForTraversal = stateForTraversal.back;
                 continue; // on the street, not on transit
             }
-            patterns.add(stateForTraversal.pattern);
-            alightStops.add(stateForTraversal.stop);
-            boardStops.add(transitLayer.tripPatterns.get(stateForTraversal.pattern).stops[stateForTraversal.boardStopPosition]);
-            boardTimes.add(stateForTraversal.boardTime);
-            stateForTraversal = stateForTraversal.back;
+
+            // special handling for commuter rail - merge subsequent trips that use same route and direction together
+            // and treat them as a single ride.
+            TripPattern pat = transitLayer.tripPatterns.get(stateForTraversal.pattern);
+            RouteInfo ri = transitLayer.routes.get(pat.routeIndex);
+            if (ri.route_type == 2) {
+                // not completely correct as the merged ride used multiple patterns, but pattern is only used to look up
+                // route, so it's okay.
+                patterns.add(stateForTraversal.pattern);
+                int commuterRailAlightStop = stateForTraversal.stop;
+                int commuterRailDirection = pat.directionId;
+                int commuterRailRoute = pat.routeIndex;
+                int commuterRailBoardTime = stateForTraversal.boardTime;
+
+                while (stateForTraversal != null) {
+                    if (stateForTraversal.pattern == -1) break; // no on-street transfers with CR
+
+                    pat = transitLayer.tripPatterns.get(stateForTraversal.pattern);
+                    if (pat.directionId != commuterRailDirection) break; // can't change direction on CR for free
+                    if (pat.routeIndex != commuterRailRoute) break; // can't change routes on CR TODO Is this true?
+                    // note that this last condition also enforces route_type == 2 implicitly
+
+                    commuterRailBoardTime = stateForTraversal.boardTime;
+                    stateForTraversal = stateForTraversal.back;
+                }
+
+                int commuterRailBoardStop = stateForTraversal.stop;
+                alightStops.add(commuterRailAlightStop);
+                boardStops.add(commuterRailBoardStop);
+                boardTimes.add(commuterRailBoardTime);
+                // don't increment backwards here - already done in loop above
+            } else {
+                patterns.add(stateForTraversal.pattern);
+                alightStops.add(stateForTraversal.stop);
+                boardStops.add(transitLayer.tripPatterns.get(stateForTraversal.pattern).stops[stateForTraversal.boardStopPosition]);
+                boardTimes.add(stateForTraversal.boardTime);
+                stateForTraversal = stateForTraversal.back;
+            }
         }
 
         // reverse data about the rides so we can step forward through them
@@ -443,6 +524,15 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             transferAllowance = transferAllowance.setBehindGates(false);
         }
 
+        // if we ended on commuter rail, and did not have an on-street transfer, set the commuter rail transfer allowance
+        if (patterns.size() > 0 && state.pattern != -1) {
+            TripPattern lastPattern = transitLayer.tripPatterns.get(patterns.get(patterns.size() - 1));
+            RouteInfo lastRoute = transitLayer.routes.get(lastPattern.routeIndex);
+            if (lastRoute.route_type == 2) {
+                transferAllowance = transferAllowance.setCommuterRailAllowance(boardStops.get(boardStops.size() - 1), lastPattern.routeIndex,
+                        lastPattern.directionId, MAX_CR_FARE);
+            }
+        }
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
     }

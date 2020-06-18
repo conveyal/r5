@@ -113,7 +113,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          * * actually, due to implementation, the transfer allowance from the train is 2.25, vs. 1.70 for the bus, because the algorithm doesn't
          *   know there is no behind the gates transfer to any other train at Cleveland Circle.
          */
-        private final TransferRuleGroup transferRuleGroup;
+        public final TransferRuleGroup transferRuleGroup;
 
         /**
          * Once the subway is ridden, if you leave the subway, you can't get back on for free.
@@ -121,7 +121,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          * This does not matter during the fare calculation loop, only when partial fares are compared, so we only
          * bother to set it then.
          */
-        private final boolean behindGates;
+        public final boolean behindGates;
 
         /**
          * No transfer allowance
@@ -247,7 +247,6 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
-
         // First, load fare data from GTFS
         if (fares == null){
             synchronized (this) {
@@ -415,7 +414,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         // platforms are connected) to another subway stop, we do not know the next ride, but know that it cannot be a
         // free boarding to the subway. MBTA doesn't have designated free transfer stops, although it would be a good
         // idea e.g. between the platforms of Copley, Charles/MGH and Bowdoin, or Cleveland Circle and Reservoir.
-        if (patterns.size() > 0) {
+        // After a transfer to the destination (state.stop == -1) you are by defintion outside the subway.
+        if (patterns.size() > 0 && state.stop != -1) {
             int prevPattern = patterns.get(patterns.size() - 1);
             RouteInfo prevRoute = transitLayer.routes.get(transitLayer.tripPatterns.get(prevPattern).routeIndex);
 

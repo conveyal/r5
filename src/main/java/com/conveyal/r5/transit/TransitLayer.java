@@ -1,30 +1,27 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.Fare;
-import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Shape;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.r5.transit.faresv2.FareLegRuleInfo;
+import com.conveyal.r5.transit.faresv2.FareTransferRuleInfo;
 import com.conveyal.r5.util.LambdaCounter;
 import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -80,6 +77,24 @@ public class TransitLayer implements Serializable, Cloneable {
     public static final int PARKRIDE_DISTANCE_LIMIT_METERS = 500;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
+
+    /**
+     * The offset for fare areas. Since each stop is also a fare area, explicit fare areas are numbered starting with
+     * this to keep them from ever colliding with stop IDs, as long as there are less than 1 billion stops in the network.
+     *
+     * TODO if this were smaller would it speed serialization due to variable-width integer encoding? 1 billion might be
+     * excessive.
+     */
+    public static final int EXPLICIT_FARE_AREA_OFFSET = 1_000_000_000;
+
+    /**
+     * The offset for fare networks. Since each route is also a fare network, explicit fare networks are numbered starting with
+     * this to keep them from ever colliding with stop IDs, as long as there are less than 1 billion stops in the network.
+     */
+    public static final int EXPLICIT_FARE_NETWORK_OFFSET = 1_000_000_000;
+
+    /** Special int value used to indicate a field in GTFS-fares was left blank in the fare indexes */
+    public static final int FARE_ID_BLANK = -1;
 
     /**
      * The time zone in which this TransportNetwork falls. It is read from a GTFS agency.
@@ -163,6 +178,57 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public Map<String, Fare> fares;
 
+    /**
+     * The fare areas for each stop, in GTFS Fares v2.
+     *
+     * This is a list of fare area IDs. Each stop is implicitly a fare area, so the list of fare areas for a stop always
+     * contains the stop ID. Explicit fare area IDs are made unique from stop int IDs by adding a large constant (10 million).
+     */
+    public TIntObjectMap<TIntList> fareAreasForStop = new TIntObjectHashMap<>();
+
+    // TODO Fare Areas for trip, stop_sequence pair
+
+    /**
+     * Is fare network EXPLICIT_FARE_NETWORK_OFFSET + i an as_route fare network (i.e. several legs within the network
+     * should be matched as a single journey?)
+     *
+     * Note that fare networks are offset to keep them distinct from integer route IDs since routes are also implicit
+     * fare networks. It is not recommended to query this directly but instead use getFareNetworkAsRoute(fareNetworkId)
+     * and setFareNetworkAsRoute(fareNetworkId) which handles the integer conversions.
+     */
+    public BitSet fareNetworkAsRoute = new BitSet();
+
+    /**
+     * The fare leg rules for this transport network.
+     * If memory becomes a problem, FareLegRule could be replaced with a proxy class that only contains amount
+     */
+    public List<FareLegRuleInfo> fareLegRules = new ArrayList<>();
+
+    // indices for fare leg rules. Note that each index also contains an entry for key FARE_ID_BLANK which indicates that
+    //the field was left blank
+
+    /** Fare leg rule for fare network ID (either explicit or implicit) */
+    public TIntObjectMap<TIntSet> fareLegRulesForFareNetworkId = new TIntObjectHashMap<>();
+
+    /** Fare leg rule for from area id */
+    public TIntObjectMap<TIntSet> fareLegRulesForFromAreaId = new TIntObjectHashMap<>();
+
+    /** Fare leg rule for to area id */
+    public TIntObjectMap<TIntSet> fareLegRulesForToAreaId = new TIntObjectHashMap<>();
+
+    // TODO contains_area_id, leg_group_id, timeframes
+
+    /**
+     * The fare transfer rules for this transport network.
+     */
+    public List<FareTransferRuleInfo> fareTransferRules = new ArrayList<>();
+
+    /** Fare transfer rule index for from_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty from_leg_group_id */
+    public TIntObjectMap<TIntSet> fareTransferRulesForFromLegGroupId = new TIntObjectHashMap<>();
+
+    /** Fare transfer rule index for to_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty to_leg_group_id */
+    public TIntObjectMap<TIntSet> fareTransferRulesForToLegGroupId = new TIntObjectHashMap<>();
+
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
 
@@ -175,6 +241,19 @@ public class TransitLayer implements Serializable, Cloneable {
      * don't modify the transit network. (This never happens yet, but will when we allow street editing.)
      */
     public String scenarioId;
+
+    /** Does fare_network  (which may be a route index or an explicit fare network index) have as_route set? */
+    public boolean getFareNetworkAsRoute (int fareNetwork) {
+        if (fareNetwork < EXPLICIT_FARE_NETWORK_OFFSET) return false;
+        else return fareNetworkAsRoute.get(fareNetwork - EXPLICIT_FARE_NETWORK_OFFSET);
+    }
+
+    /** Set fare_network as_route */
+    public void setFareNetworkAsRoute (int fareNetwork, boolean as_route) {
+        if (fareNetwork < EXPLICIT_FARE_NETWORK_OFFSET)
+            throw new IllegalArgumentException("attempt to set as_route on implicit fare network.");
+        else fareNetworkAsRoute.set(fareNetwork - EXPLICIT_FARE_NETWORK_OFFSET, as_route);
+    }
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
@@ -466,6 +545,184 @@ public class TransitLayer implements Serializable, Cloneable {
 //            RouteTopology topology = new RouteTopology(routeAndDirection.first, routeAndDirection.second, patternsForRouteDirection.get(routeAndDirection));
 //        }
 
+        try {
+            // we only support a subset of Fares V2, and many exceptions may be thrown if the feed uses more than that
+            // subset. Still allow graph to build without fare information if that is the case.
+            loadFaresV2(gtfs, indexForUnscopedStopId);
+        } catch (Exception e) {
+            LOG.warn("Exception loading GTFS Fares V2, fare routing will not be available", e);
+            clearFaresV2();
+        }
+
+        if (feedChecksums.size() > 1) {
+            LOG.warn("Multiple feeds specified, GTFS-Fares V2 will be unavailable");
+            clearFaresV2();
+        }
+    }
+
+    /** Clear GTFS-Fares V2 information after a load error */
+    private void clearFaresV2 () {
+        fareLegRules.clear();
+        fareTransferRules.clear();
+        fareLegRulesForFromAreaId.clear();
+        fareLegRulesForFareNetworkId.clear();
+        fareLegRulesForToAreaId.clear();
+        fareTransferRulesForFromLegGroupId.clear();
+        fareTransferRulesForToLegGroupId.clear();
+        fareAreasForStop.clear();
+        fareNetworkAsRoute.clear();
+    }
+
+    /** Load GTFS-Fares V2 information from a feed */
+    private void loadFaresV2 (GTFSFeed feed, TObjectIntMap<String> indexForUnscopedStopId) {
+        LOG.info("Loading GTFS-Fares V2");
+
+        TObjectIntMap<String> fareLegRuleForLegGroupId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> fareNetworkForId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> fareAreaForId = new TObjectIntHashMap<>();
+
+        LOG.info("Loading fare areas");
+        for (int i = 0; i < stopIdForIndex.size(); i++) {
+            fareAreasForStop.put(i, new TIntArrayList());
+            fareAreasForStop.get(i).add(i); // every stop is a fare area
+            fareAreaForId.put(stopIdForIndex.get(i), i);
+        }
+
+        // TODO this will not work if there are multiple feeds
+        int fareAreaIdx = EXPLICIT_FARE_AREA_OFFSET;
+        for (FareArea fareArea : feed.fare_areas.values()) {
+            for (FareArea.FareAreaMember member : fareArea.members) {
+                if (member.trip_id != null)
+                    throw new IllegalArgumentException("Trip-based fare area membership not supported!");
+
+                int stopIndex = indexForUnscopedStopId.get(member.stop_id);
+                fareAreasForStop.get(stopIndex).add(fareAreaIdx);
+            }
+            fareAreaForId.put(fareArea.fare_area_id, fareAreaIdx);
+            fareAreaIdx++;
+        }
+
+        LOG.info("Loaded {} fare areas", fareAreaForId.size());
+
+        LOG.info("Loading fare networks");
+        for (int i = 0; i < routes.size(); i++) {
+            fareNetworkForId.put(routes.get(i).route_id, i);
+        }
+
+        // TODO this will not work if there are multiple feeds
+        int fareNetworkIdx = EXPLICIT_FARE_NETWORK_OFFSET;
+        for (FareNetwork fareNetwork : feed.fare_networks.values()) {
+            fareNetworkForId.put(fareNetwork.fare_network_id, fareNetworkIdx);
+            setFareNetworkAsRoute(fareNetworkIdx, fareNetwork.as_route == 1);
+            fareNetworkIdx++;
+        }
+
+        LOG.info("Loaded {} fare networks", fareNetworkForId.size());
+
+        LOG.info("Loading fare leg rules");
+        int fareLegRuleIdx = 0;
+        for (FareLegRule rule : feed.fare_leg_rules) {
+            fareLegRules.add(new FareLegRuleInfo(rule));
+            if (rule.leg_group_id != null) fareLegRuleForLegGroupId.put(rule.leg_group_id, fareLegRuleIdx);
+
+            // build indices
+            int fareNetworkId;
+            if (rule.fare_network_id != null) {
+                if (!fareNetworkForId.containsKey(rule.fare_network_id)) {
+                    throw new IllegalArgumentException("Fare network ID referenced in fare_leg_rules not present: " +
+                            rule.fare_network_id);
+                }
+
+                fareNetworkId = fareNetworkForId.get(rule.fare_network_id);
+            } else fareNetworkId = FARE_ID_BLANK;
+
+            if (!fareLegRulesForFareNetworkId.containsKey(fareNetworkId))
+                fareLegRulesForFareNetworkId.put(fareNetworkId, new TIntHashSet());
+            fareLegRulesForFareNetworkId.get(fareNetworkId).add(fareLegRuleIdx);
+
+            int fromAreaIdx;
+            if (rule.from_area_id != null) {
+                if (!fareAreaForId.containsKey(rule.from_area_id)) {
+                    throw new IllegalArgumentException("Fare area ID referenced in fare_leg_rules not present: " +
+                            rule.from_area_id);
+                }
+                fromAreaIdx = fareAreaForId.get(rule.from_area_id);
+            } else fromAreaIdx = FARE_ID_BLANK;
+
+            if (!fareLegRulesForFromAreaId.containsKey(fromAreaIdx)) {
+                fareLegRulesForFromAreaId.put(fromAreaIdx, new TIntHashSet());
+            }
+            fareLegRulesForFromAreaId.get(fromAreaIdx).add(fareLegRuleIdx);
+
+            int toAreaIdx;
+            if (rule.to_area_id != null) {
+                if (!fareAreaForId.containsKey(rule.to_area_id)) {
+                    throw new IllegalArgumentException("Fare area ID referenced in fare_leg_rules not present: " +
+                            rule.to_area_id);
+                }
+                toAreaIdx = fareAreaForId.get(rule.to_area_id);
+            } else toAreaIdx = FARE_ID_BLANK;
+
+            if (!fareLegRulesForToAreaId.containsKey(toAreaIdx)) {
+                fareLegRulesForToAreaId.put(toAreaIdx, new TIntHashSet());
+            }
+            fareLegRulesForToAreaId.get(toAreaIdx).add(fareLegRuleIdx);
+
+            if (rule.is_symmetrical == 1) {
+                // add the same rule backwards
+                fareLegRulesForFromAreaId.get(toAreaIdx).add(fareLegRuleIdx);
+                fareLegRulesForToAreaId.get(fromAreaIdx).add(fareLegRuleIdx);
+            }
+
+            if (rule.service_id != null) throw new IllegalArgumentException("Service IDs not supported in fare_leg_rules");
+            if (rule.contains_area_id != null) throw new IllegalArgumentException("contains_area_id not supported in fare_leg_rules");
+            if (rule.to_timeframe_id != null || rule.from_timeframe_id != null)
+                throw new IllegalArgumentException("timeframes not supported in fare_leg_rules");
+            if (!Double.isNaN(rule.min_fare_distance) || !Double.isNaN(rule.max_fare_distance))
+                throw new IllegalArgumentException("Fare distances not supported in fare_leg_rules");
+
+            fareLegRuleIdx++;
+        }
+
+        LOG.info("Loaded {} fare leg rules", fareLegRuleIdx);
+
+        LOG.info("Loading fare transfer rules");
+        int fareTransferRuleIdx = 0;
+        for (FareTransferRule rule : feed.fare_transfer_rules) {
+            fareTransferRules.add(new FareTransferRuleInfo(rule));
+
+            int fromLegIdx;
+            if (rule.from_leg_group_id != null) {
+                if (!fareLegRuleForLegGroupId.containsKey(rule.from_leg_group_id)) {
+                    throw new IllegalArgumentException("Fare leg group ID referenced in fare_transfer_rules not present: " +
+                            rule.from_leg_group_id);
+                }
+                fromLegIdx = fareLegRuleForLegGroupId.get(rule.from_leg_group_id);
+            } else fromLegIdx = FARE_ID_BLANK;
+
+            if (!fareTransferRulesForFromLegGroupId.containsKey(fromLegIdx)) {
+                fareTransferRulesForFromLegGroupId.put(fromLegIdx, new TIntHashSet());
+            }
+            fareTransferRulesForFromLegGroupId.get(fromLegIdx).add(fareTransferRuleIdx);
+
+            int toLegIdx;
+            if (rule.to_leg_group_id != null) {
+                if (!fareLegRuleForLegGroupId.containsKey(rule.to_leg_group_id)) {
+                    throw new IllegalArgumentException("Fare leg group ID referenced in fare_transfer_rules not present: " +
+                            rule.to_leg_group_id);
+                }
+                toLegIdx = fareLegRuleForLegGroupId.get(rule.to_leg_group_id);
+            } else toLegIdx = FARE_ID_BLANK;
+
+            if (!fareTransferRulesForToLegGroupId.containsKey(toLegIdx)) {
+                fareTransferRulesForToLegGroupId.put(toLegIdx, new TIntHashSet());
+            }
+            fareTransferRulesForToLegGroupId.get(toLegIdx).add(fareTransferRuleIdx);
+
+            fareTransferRuleIdx++;
+        }
+
+        LOG.info("Loaded {} fare transfer rules", fareTransferRuleIdx);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

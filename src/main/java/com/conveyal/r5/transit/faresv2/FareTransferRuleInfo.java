@@ -17,6 +17,10 @@ public class FareTransferRuleInfo implements Serializable {
     public FareTransferType fare_transfer_type;
     public int amount;
 
+    // saved to be presented in Fareto debug interface
+    public String from_leg_group_id;
+    public String to_leg_group_id;
+
     public FareTransferRuleInfo (FareTransferRule rule) {
         if (!Currency.scalarForCurrency.containsKey(rule.currency))
             throw new IllegalStateException("No scalar value specified in scalarForCurrency for currency " + rule.currency);
@@ -29,6 +33,8 @@ public class FareTransferRuleInfo implements Serializable {
         duration_limit = rule.duration_limit;
         duration_limit_type = DurationLimitType.forGtfs(rule.duration_limit_type);
         fare_transfer_type = FareTransferType.forGtfs(rule.fare_transfer_type);
+        from_leg_group_id = rule.from_leg_group_id;
+        to_leg_group_id = rule.to_leg_group_id;
     }
 
     public static enum DurationLimitType {

@@ -14,6 +14,7 @@ import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -187,6 +188,9 @@ public class TransitLayer implements Serializable, Cloneable {
     public TIntObjectMap<TIntList> fareAreasForStop = new TIntObjectHashMap<>();
 
     // TODO Fare Areas for trip, stop_sequence pair
+
+    /** Fare networks for each route */
+    public TIntObjectMap<TIntSet> fareNetworksForRoute = new TIntObjectHashMap<>();
 
     /**
      * Is fare network EXPLICIT_FARE_NETWORK_OFFSET + i an as_route fare network (i.e. several legs within the network
@@ -548,7 +552,7 @@ public class TransitLayer implements Serializable, Cloneable {
         try {
             // we only support a subset of Fares V2, and many exceptions may be thrown if the feed uses more than that
             // subset. Still allow graph to build without fare information if that is the case.
-            loadFaresV2(gtfs, indexForUnscopedStopId);
+            loadFaresV2(gtfs, indexForUnscopedStopId, routeIndexForRoute);
         } catch (Exception e) {
             LOG.warn("Exception loading GTFS Fares V2, fare routing will not be available", e);
             clearFaresV2();
@@ -571,10 +575,12 @@ public class TransitLayer implements Serializable, Cloneable {
         fareTransferRulesForToLegGroupId.clear();
         fareAreasForStop.clear();
         fareNetworkAsRoute.clear();
+        fareNetworksForRoute.clear();
     }
 
     /** Load GTFS-Fares V2 information from a feed */
-    private void loadFaresV2 (GTFSFeed feed, TObjectIntMap<String> indexForUnscopedStopId) {
+    private void loadFaresV2 (GTFSFeed feed, TObjectIntMap<String> indexForUnscopedStopId,
+                              TObjectIntMap<String> indexForUnscopedRouteId) {
         LOG.info("Loading GTFS-Fares V2");
 
         TObjectIntMap<String> fareLegRuleForLegGroupId = new TObjectIntHashMap<>();
@@ -605,8 +611,11 @@ public class TransitLayer implements Serializable, Cloneable {
         LOG.info("Loaded {} fare areas", fareAreaForId.size());
 
         LOG.info("Loading fare networks");
+        // TODO will not work if there are multiple feeds
         for (int i = 0; i < routes.size(); i++) {
             fareNetworkForId.put(routes.get(i).route_id, i);
+            fareNetworksForRoute.put(i, new TIntHashSet());
+            fareNetworksForRoute.get(i).add(i); // every route is an implicit fare network
         }
 
         // TODO this will not work if there are multiple feeds
@@ -614,6 +623,12 @@ public class TransitLayer implements Serializable, Cloneable {
         for (FareNetwork fareNetwork : feed.fare_networks.values()) {
             fareNetworkForId.put(fareNetwork.fare_network_id, fareNetworkIdx);
             setFareNetworkAsRoute(fareNetworkIdx, fareNetwork.as_route == 1);
+
+            for (String routeId : fareNetwork.route_ids) {
+                int routeIdx = indexForUnscopedRouteId.get(routeId);
+                fareNetworksForRoute.get(routeIdx).add(fareNetworkIdx);
+            }
+
             fareNetworkIdx++;
         }
 

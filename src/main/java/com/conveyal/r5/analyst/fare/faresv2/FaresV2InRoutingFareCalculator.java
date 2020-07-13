@@ -15,6 +15,8 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +51,12 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             stateForTraversal = stateForTraversal.back;
         }
 
+        patterns.reverse();
+        boardStops.reverse();
+        alightStops.reverse();
+        boardTimes.reverse();
+        alightTimes.reverse();
+
         int prevFareLegRuleIdx = -1;
         int cumulativeFare = 0;
 
@@ -61,20 +69,23 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
             // CHECK FOR AS_ROUTE FARE NETWORK
             // NB this is applied greedily, if it is cheaper to buy separate tickets that will not be found
-            TIntSet fareNetworks = getFareNetworksForPattern(pattern);
-            TIntSet asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
-            if (asRouteFareNetworks.size() > 0) {
+            RoaringBitmap fareNetworks = getFareNetworksForPattern(pattern);
+            RoaringBitmap asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
+            if (asRouteFareNetworks.getCardinality() > 0) {
                 for (int j = i + 1; j < patterns.size(); j++) {
-                    TIntSet nextAsRouteFareNetworks = getAsRouteFareNetworksForPattern(patterns.get(j));
-                    asRouteFareNetworks.retainAll(nextAsRouteFareNetworks);
+                    RoaringBitmap nextAsRouteFareNetworks = getAsRouteFareNetworksForPattern(patterns.get(j));
+                    // can't modify asRouteFareNetworks in-place as it may have already been set as fareNetworks below
+                    asRouteFareNetworks = RoaringBitmap.and(asRouteFareNetworks, nextAsRouteFareNetworks);
 
-                    if (asRouteFareNetworks.size() > 0) {
+                    if (asRouteFareNetworks.getCardinality() > 0) {
                         // extend ride
                         alightStop = alightStops.get(j);
                         alightTime = alightTimes.get(j);
                         // these are the fare networks actually in use, other fare leg rules should not match
                         fareNetworks = asRouteFareNetworks;
-                        i++; // don't process this ride again
+                        i = j; // don't process this ride again
+                    } else {
+                        break;
                     }
                 }
             }
@@ -95,7 +106,10 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                         if (transferRule.amount > 0) {
                             LOG.warn("Negatively discounted transfer");
                         }
-                        cumulativeFare += fareLegRule.amount + transferRule.amount;
+                        int fareIncrement = fareLegRule.amount + transferRule.amount;
+                        if (fareIncrement < 0)
+                            LOG.warn("Fare increment is negative!");
+                        cumulativeFare += fareIncrement;
                     } else if (FareTransferType.FIRST_LEG_PLUS_AMOUNT.equals(transferRule.fare_transfer_type)) {
                         cumulativeFare += transferRule.amount;
                     } else {
@@ -114,17 +128,15 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     /** Get the as_route fare networks for a pattern (used to merge with later rides) */
-    private TIntSet getAsRouteFareNetworksForPattern (int patIdx) {
-        TIntSet fareNetworks = getFareNetworksForPattern(patIdx);
-        TIntSet asRouteFareNetworks = new TIntHashSet();
-        for (TIntIterator it = fareNetworks.iterator(); it.hasNext();) {
-            int fareNetwork = it.next();
-            if (transitLayer.getFareNetworkAsRoute(fareNetwork)) asRouteFareNetworks.add(fareNetwork);
-        }
-        return asRouteFareNetworks;
+    private RoaringBitmap getAsRouteFareNetworksForPattern (int patIdx) {
+        RoaringBitmap fareNetworks = new RoaringBitmap();
+        // protective copy
+        fareNetworks.or(getFareNetworksForPattern(patIdx));
+        fareNetworks.and(transitLayer.fareNetworkAsRoute);
+        return fareNetworks;
     }
 
-    private TIntSet getFareNetworksForPattern (int patIdx) {
+    private RoaringBitmap getFareNetworksForPattern (int patIdx) {
         int routeIdx = transitLayer.tripPatterns.get(patIdx).routeIndex;
         return transitLayer.fareNetworksForRoute.get(routeIdx);
     }
@@ -133,34 +145,36 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
      * Get the fare leg rule for a leg. If there is more than one, which one is returned is undefined and a warning is logged.
      * TODO handle multiple fare leg rules
      */
-    private int getFareLegRuleForLeg (int boardStop, int alightStop, TIntSet fareNetworks) {
+    private int getFareLegRuleForLeg (int boardStop, int alightStop, RoaringBitmap fareNetworks) {
         // find leg rules that match the board stop
         TIntList boardAreas = transitLayer.fareAreasForStop.get(boardStop);
-        TIntSet boardAreaMatch = getMatching(transitLayer.fareLegRulesForFromAreaId, boardAreas);
+        RoaringBitmap boardAreaMatch = getMatching(transitLayer.fareLegRulesForFromAreaId, boardAreas);
 
         // find leg rules that match the alight stop
         TIntList alightAreas = transitLayer.fareAreasForStop.get(alightStop);
-        TIntSet alightAreaMatch = getMatching(transitLayer.fareLegRulesForToAreaId, alightAreas);
+        RoaringBitmap alightAreaMatch = getMatching(transitLayer.fareLegRulesForToAreaId, alightAreas);
 
         // NB is_symmetrical is handled by network build process which materializes the reverse rule
 
         // find leg rules that match the fare network
-        TIntSet fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
+        RoaringBitmap fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
 
         // AND board area match with alight area match and fare network match
-        boardAreaMatch.retainAll(alightAreaMatch);
-        boardAreaMatch.retainAll(fareNetworkMatch);
+        boardAreaMatch.and(alightAreaMatch);
+        boardAreaMatch.and(fareNetworkMatch);
         // boardAreaMatch now contains only rules that match _all_ criteria
 
-        if (boardAreaMatch.size() == 0) {
-            throw new IllegalStateException("no fare leg rule found for leg!");
-        } else if (boardAreaMatch.size() == 1) {
+        if (boardAreaMatch.getCardinality() == 0) {
+            String fromStopId = transitLayer.stopIdForIndex.get(boardStop);
+            String toStopId = transitLayer.stopIdForIndex.get(alightStop);
+            throw new IllegalStateException("no fare leg rule found for leg from " + fromStopId + " to " + toStopId + "!");
+        } else if (boardAreaMatch.getCardinality() == 1) {
             return boardAreaMatch.iterator().next();
         } else {
             // figure out what matches, first finding the lowest order
             int lowestOrder = Integer.MAX_VALUE;
             TIntList rulesWithLowestOrder = new TIntArrayList();
-            for (TIntIterator it = boardAreaMatch.iterator(); it.hasNext();) {
+            for (PeekableIntIterator it = boardAreaMatch.getIntIterator(); it.hasNext();) {
                 int ruleIdx = it.next();
                 int order = transitLayer.fareLegRules.get(ruleIdx).order;
                 if (order < lowestOrder) {
@@ -181,17 +195,17 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
     /** get a fare transfer rule, if one exists, between fromLegRule and toLegRule */
     public int getFareTransferRule (int fromLegRule, int toLegRule) {
-        TIntSet fromLegMatch = getMatching(transitLayer.fareTransferRulesForFromLegGroupId, fromLegRule);
-        TIntSet toLegMatch = getMatching(transitLayer.fareTransferRulesForToLegGroupId, toLegRule);
+        RoaringBitmap fromLegMatch = getMatching(transitLayer.fareTransferRulesForFromLegGroupId, fromLegRule);
+        RoaringBitmap toLegMatch = getMatching(transitLayer.fareTransferRulesForToLegGroupId, toLegRule);
 
-        fromLegMatch.retainAll(toLegMatch);
+        fromLegMatch.and(toLegMatch);
 
-        if (fromLegMatch.size() == 0) return -1; // no discounted transfer
-        else if (fromLegMatch.size() == 1) return fromLegMatch.iterator().next();
+        if (fromLegMatch.getCardinality() == 0) return -1; // no discounted transfer
+        else if (fromLegMatch.getCardinality() == 1) return fromLegMatch.iterator().next();
         else {
             int lowestOrder = Integer.MAX_VALUE;
             TIntList rulesWithLowestOrder = new TIntArrayList();
-            for (TIntIterator it = fromLegMatch.iterator(); it.hasNext();) {
+            for (PeekableIntIterator it = fromLegMatch.getIntIterator(); it.hasNext();) {
                 int ruleIdx = it.next();
                 int order = transitLayer.fareTransferRules.get(ruleIdx).order;
                 if (order < lowestOrder) {
@@ -211,21 +225,32 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     /** Get all rules that match indices, either directly or because that field was left blank */
-    public static TIntSet getMatching (TIntObjectMap<TIntSet> rules, TIntCollection indices) {
-        TIntSet ret = new TIntHashSet();
+    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, TIntCollection indices) {
+        RoaringBitmap ret = new RoaringBitmap();
         for (TIntIterator it = indices.iterator(); it.hasNext();) {
             int index = it.next();
-            if (rules.containsKey(index)) ret.addAll(rules.get(index));
+            if (rules.containsKey(index)) ret.or(rules.get(index));
         }
-        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.addAll(rules.get(TransitLayer.FARE_ID_BLANK));
+        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
+        return ret;
+    }
+
+    /** Get all rules that match indices, either directly or because that field was left blank */
+    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, RoaringBitmap indices) {
+        RoaringBitmap ret = new RoaringBitmap();
+        for (PeekableIntIterator it = indices.getIntIterator(); it.hasNext();) {
+            int index = it.next();
+            if (rules.containsKey(index)) ret.or(rules.get(index));
+        }
+        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
         return ret;
     }
 
     /** Get all rules that match index, either directly or because that field was left blank */
-    public static TIntSet getMatching (TIntObjectMap<TIntSet> rules, int index) {
-        TIntSet ret = new TIntHashSet();
-        if (rules.containsKey(index)) ret.addAll(rules.get(index));
-        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.addAll(rules.get(TransitLayer.FARE_ID_BLANK));
+    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, int index) {
+        RoaringBitmap ret = new RoaringBitmap();
+        if (rules.containsKey(index)) ret.or(rules.get(index));
+        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
         return ret;
     }
 

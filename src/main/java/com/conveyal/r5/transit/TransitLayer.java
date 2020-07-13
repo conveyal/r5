@@ -31,6 +31,7 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.linearref.LinearLocation;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -190,7 +191,7 @@ public class TransitLayer implements Serializable, Cloneable {
     // TODO Fare Areas for trip, stop_sequence pair
 
     /** Fare networks for each route */
-    public TIntObjectMap<TIntSet> fareNetworksForRoute = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareNetworksForRoute = new TIntObjectHashMap<>();
 
     /**
      * Is fare network EXPLICIT_FARE_NETWORK_OFFSET + i an as_route fare network (i.e. several legs within the network
@@ -200,7 +201,7 @@ public class TransitLayer implements Serializable, Cloneable {
      * fare networks. It is not recommended to query this directly but instead use getFareNetworkAsRoute(fareNetworkId)
      * and setFareNetworkAsRoute(fareNetworkId) which handles the integer conversions.
      */
-    public BitSet fareNetworkAsRoute = new BitSet();
+    public RoaringBitmap fareNetworkAsRoute = new RoaringBitmap();
 
     /**
      * The fare leg rules for this transport network.
@@ -212,13 +213,13 @@ public class TransitLayer implements Serializable, Cloneable {
     //the field was left blank
 
     /** Fare leg rule for fare network ID (either explicit or implicit) */
-    public TIntObjectMap<TIntSet> fareLegRulesForFareNetworkId = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareLegRulesForFareNetworkId = new TIntObjectHashMap<>();
 
     /** Fare leg rule for from area id */
-    public TIntObjectMap<TIntSet> fareLegRulesForFromAreaId = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareLegRulesForFromAreaId = new TIntObjectHashMap<>();
 
     /** Fare leg rule for to area id */
-    public TIntObjectMap<TIntSet> fareLegRulesForToAreaId = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareLegRulesForToAreaId = new TIntObjectHashMap<>();
 
     // TODO contains_area_id, leg_group_id, timeframes
 
@@ -228,10 +229,10 @@ public class TransitLayer implements Serializable, Cloneable {
     public List<FareTransferRuleInfo> fareTransferRules = new ArrayList<>();
 
     /** Fare transfer rule index for from_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty from_leg_group_id */
-    public TIntObjectMap<TIntSet> fareTransferRulesForFromLegGroupId = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareTransferRulesForFromLegGroupId = new TIntObjectHashMap<>();
 
     /** Fare transfer rule index for to_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty to_leg_group_id */
-    public TIntObjectMap<TIntSet> fareTransferRulesForToLegGroupId = new TIntObjectHashMap<>();
+    public TIntObjectMap<RoaringBitmap> fareTransferRulesForToLegGroupId = new TIntObjectHashMap<>();
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
@@ -245,19 +246,6 @@ public class TransitLayer implements Serializable, Cloneable {
      * don't modify the transit network. (This never happens yet, but will when we allow street editing.)
      */
     public String scenarioId;
-
-    /** Does fare_network  (which may be a route index or an explicit fare network index) have as_route set? */
-    public boolean getFareNetworkAsRoute (int fareNetwork) {
-        if (fareNetwork < EXPLICIT_FARE_NETWORK_OFFSET) return false;
-        else return fareNetworkAsRoute.get(fareNetwork - EXPLICIT_FARE_NETWORK_OFFSET);
-    }
-
-    /** Set fare_network as_route */
-    public void setFareNetworkAsRoute (int fareNetwork, boolean as_route) {
-        if (fareNetwork < EXPLICIT_FARE_NETWORK_OFFSET)
-            throw new IllegalArgumentException("attempt to set as_route on implicit fare network.");
-        else fareNetworkAsRoute.set(fareNetwork - EXPLICIT_FARE_NETWORK_OFFSET, as_route);
-    }
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
@@ -591,7 +579,7 @@ public class TransitLayer implements Serializable, Cloneable {
         for (int i = 0; i < stopIdForIndex.size(); i++) {
             fareAreasForStop.put(i, new TIntArrayList());
             fareAreasForStop.get(i).add(i); // every stop is a fare area
-            fareAreaForId.put(stopIdForIndex.get(i), i);
+            fareAreaForId.put(stopForIndex.get(i).stop_id, i); // need to get unscoped id
         }
 
         // TODO this will not work if there are multiple feeds
@@ -614,7 +602,7 @@ public class TransitLayer implements Serializable, Cloneable {
         // TODO will not work if there are multiple feeds
         for (int i = 0; i < routes.size(); i++) {
             fareNetworkForId.put(routes.get(i).route_id, i);
-            fareNetworksForRoute.put(i, new TIntHashSet());
+            fareNetworksForRoute.put(i, new RoaringBitmap());
             fareNetworksForRoute.get(i).add(i); // every route is an implicit fare network
         }
 
@@ -622,7 +610,7 @@ public class TransitLayer implements Serializable, Cloneable {
         int fareNetworkIdx = EXPLICIT_FARE_NETWORK_OFFSET;
         for (FareNetwork fareNetwork : feed.fare_networks.values()) {
             fareNetworkForId.put(fareNetwork.fare_network_id, fareNetworkIdx);
-            setFareNetworkAsRoute(fareNetworkIdx, fareNetwork.as_route == 1);
+            if (fareNetwork.as_route == 1) fareNetworkAsRoute.add(fareNetworkIdx);
 
             for (String routeId : fareNetwork.route_ids) {
                 int routeIdx = indexForUnscopedRouteId.get(routeId);
@@ -652,7 +640,7 @@ public class TransitLayer implements Serializable, Cloneable {
             } else fareNetworkId = FARE_ID_BLANK;
 
             if (!fareLegRulesForFareNetworkId.containsKey(fareNetworkId))
-                fareLegRulesForFareNetworkId.put(fareNetworkId, new TIntHashSet());
+                fareLegRulesForFareNetworkId.put(fareNetworkId, new RoaringBitmap());
             fareLegRulesForFareNetworkId.get(fareNetworkId).add(fareLegRuleIdx);
 
             int fromAreaIdx;
@@ -665,7 +653,7 @@ public class TransitLayer implements Serializable, Cloneable {
             } else fromAreaIdx = FARE_ID_BLANK;
 
             if (!fareLegRulesForFromAreaId.containsKey(fromAreaIdx)) {
-                fareLegRulesForFromAreaId.put(fromAreaIdx, new TIntHashSet());
+                fareLegRulesForFromAreaId.put(fromAreaIdx, new RoaringBitmap());
             }
             fareLegRulesForFromAreaId.get(fromAreaIdx).add(fareLegRuleIdx);
 
@@ -679,7 +667,7 @@ public class TransitLayer implements Serializable, Cloneable {
             } else toAreaIdx = FARE_ID_BLANK;
 
             if (!fareLegRulesForToAreaId.containsKey(toAreaIdx)) {
-                fareLegRulesForToAreaId.put(toAreaIdx, new TIntHashSet());
+                fareLegRulesForToAreaId.put(toAreaIdx, new RoaringBitmap());
             }
             fareLegRulesForToAreaId.get(toAreaIdx).add(fareLegRuleIdx);
 
@@ -716,7 +704,7 @@ public class TransitLayer implements Serializable, Cloneable {
             } else fromLegIdx = FARE_ID_BLANK;
 
             if (!fareTransferRulesForFromLegGroupId.containsKey(fromLegIdx)) {
-                fareTransferRulesForFromLegGroupId.put(fromLegIdx, new TIntHashSet());
+                fareTransferRulesForFromLegGroupId.put(fromLegIdx, new RoaringBitmap());
             }
             fareTransferRulesForFromLegGroupId.get(fromLegIdx).add(fareTransferRuleIdx);
 
@@ -730,7 +718,7 @@ public class TransitLayer implements Serializable, Cloneable {
             } else toLegIdx = FARE_ID_BLANK;
 
             if (!fareTransferRulesForToLegGroupId.containsKey(toLegIdx)) {
-                fareTransferRulesForToLegGroupId.put(toLegIdx, new TIntHashSet());
+                fareTransferRulesForToLegGroupId.put(toLegIdx, new RoaringBitmap());
             }
             fareTransferRulesForToLegGroupId.get(toLegIdx).add(fareTransferRuleIdx);
 

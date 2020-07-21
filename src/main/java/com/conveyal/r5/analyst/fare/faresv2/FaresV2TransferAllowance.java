@@ -9,10 +9,7 @@ import gnu.trove.set.hash.TIntHashSet;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 /**
  * Transfer allowance for Fares V2.
@@ -24,10 +21,26 @@ public class FaresV2TransferAllowance extends TransferAllowance {
     /** need to hold on to a ref to this so that getTransferRuleSummary works - but make sure it's not accidentally serialized */
     private transient TransitLayer transitLayer;
 
-    public FaresV2TransferAllowance (int prevFareLegRuleIdx, TransitLayer transitLayer) {
+    /** as_route fare networks we are currently in, that could have routes extended */
+    public int[] asRouteFareNetworks;
+
+    /** Where we boarded the as_route fare networks */
+    public int asRouteFareNetworksBoardStop = -1;
+
+    /**
+     * 
+     * @param prevFareLegRuleIdx
+     * @param asRouteFareNetworks The as route fare networks this leg is in. Must be sorted.
+     * @param asRouteFareNetworksBoardStop
+     * @param transitLayer
+     */
+    public FaresV2TransferAllowance (int prevFareLegRuleIdx, int[] asRouteFareNetworks, int asRouteFareNetworksBoardStop, TransitLayer transitLayer) {
         // the value is really high to effectively disable Theorem 3.1 for now, so we don't have to actually calculate
         // the max value, at the cost of some performance.
         super(10_000_000_00, 0, 0);
+
+        this.asRouteFareNetworks = asRouteFareNetworks;
+        this.asRouteFareNetworksBoardStop = asRouteFareNetworksBoardStop;
 
         if (prevFareLegRuleIdx != -1) {
             // not at start of trip, so we may have transfers available
@@ -44,8 +57,25 @@ public class FaresV2TransferAllowance extends TransferAllowance {
     @Override
     public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other) {
         if (other instanceof FaresV2TransferAllowance) {
+            FaresV2TransferAllowance o = (FaresV2TransferAllowance) other;
+            boolean exactlyOneHasAsRoute = asRouteFareNetworks == null && o.asRouteFareNetworks != null ||
+                        asRouteFareNetworks != null && o.asRouteFareNetworks == null;
+            // either could be better, one is in as_route network. Could assume that being in an as_route network is always
+            // better than not, conditional on same potentialTransferRules, but this is not always the case.
+            // see bullet 4 at https://indicatrix.org/post/regular-2-for-you-3-when-is-a-discount-not-a-discount/
+            if (exactlyOneHasAsRoute) return false;
+
+            // if both have as route, only comparable if they have the same as route networks and same board stop.
+            boolean bothHaveAsRoute = asRouteFareNetworks != null && o.asRouteFareNetworks != null;
+            if (bothHaveAsRoute) {
+                // asRouteFareNetworks is always sorted since it comes from RoaringBitset.toArray, so simple equality
+                // comparison is fine.
+                if (asRouteFareNetworksBoardStop != o.asRouteFareNetworksBoardStop ||
+                        !Arrays.equals(asRouteFareNetworks, o.asRouteFareNetworks)) return false;
+            }
+
             // at least as good if it provides a superset of the transfers the other does
-            return potentialTransferRules.contains(((FaresV2TransferAllowance) other).potentialTransferRules);
+            return potentialTransferRules.contains(o.potentialTransferRules);
         } else {
             throw new IllegalArgumentException("mixing of transfer allowance types!");
         }

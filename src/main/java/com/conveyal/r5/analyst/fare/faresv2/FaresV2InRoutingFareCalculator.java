@@ -61,6 +61,8 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         int prevFareLegRuleIdx = -1;
         int cumulativeFare = 0;
 
+        RoaringBitmap asRouteFareNetworks = null;
+        int asRouteBoardStop = -1;
         for (int i = 0; i < patterns.size(); i++) {
             int pattern = patterns.get(i);
             int boardStop = boardStops.get(i);
@@ -71,8 +73,9 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             // CHECK FOR AS_ROUTE FARE NETWORK
             // NB this is applied greedily, if it is cheaper to buy separate tickets that will not be found
             RoaringBitmap fareNetworks = getFareNetworksForPattern(pattern);
-            RoaringBitmap asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
+            asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
             if (asRouteFareNetworks.getCardinality() > 0) {
+                asRouteBoardStop = boardStop;
                 for (int j = i + 1; j < patterns.size(); j++) {
                     RoaringBitmap nextAsRouteFareNetworks = getAsRouteFareNetworksForPattern(patterns.get(j));
                     // can't modify asRouteFareNetworks in-place as it may have already been set as fareNetworks below
@@ -89,6 +92,9 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                         break;
                     }
                 }
+            } else {
+                // reset as-route board stop if this leg is not a part of any as-route fare networks
+                asRouteBoardStop = -1;
             }
 
             // FIND THE FARE LEG RULE
@@ -125,7 +131,21 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             prevFareLegRuleIdx = fareLegRuleIdx;
         }
 
-        return new FareBounds(cumulativeFare, new FaresV2TransferAllowance(prevFareLegRuleIdx, transitLayer));
+        FaresV2TransferAllowance allowance;
+        // asRouteFareNetworks contains the as route fare networks that the last leg was a part of. If multiple rides
+        // have been spliced together, these will be the as-route fare networks that can be used to splice those rides,
+        // even if there are additional as_route fare networks that apply to later legs of the splice; we apply as_route
+        // fare networks greedily.
+        if (asRouteFareNetworks != null && asRouteFareNetworks.getCardinality() > 0) {
+            if (asRouteBoardStop == -1)
+                throw new IllegalStateException("as route board stop not set even though there are as route fare networks.");
+            // NB it is important the second argument here be sorted. This is guaranteed by RoaringBitmap.toArray()
+            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, asRouteFareNetworks.toArray(), asRouteBoardStop, transitLayer);
+        } else {
+            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, null, -1, transitLayer);
+        }
+
+        return new FareBounds(cumulativeFare, allowance);
     }
 
     /** Get the as_route fare networks for a pattern (used to merge with later rides) */

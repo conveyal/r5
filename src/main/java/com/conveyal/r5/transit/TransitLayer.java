@@ -571,7 +571,8 @@ public class TransitLayer implements Serializable, Cloneable {
                               TObjectIntMap<String> indexForUnscopedRouteId) {
         LOG.info("Loading GTFS-Fares V2");
 
-        TObjectIntMap<String> fareLegRuleForLegGroupId = new TObjectIntHashMap<>();
+        // due to symmetrical fare legs, one fare leg rule ID can match multiple fare leg rules
+        Map<String, TIntList> fareLegRuleForLegGroupId = new HashMap<>();
         TObjectIntMap<String> fareNetworkForId = new TObjectIntHashMap<>();
         TObjectIntMap<String> fareAreaForId = new TObjectIntHashMap<>();
 
@@ -623,10 +624,16 @@ public class TransitLayer implements Serializable, Cloneable {
         LOG.info("Loaded {} fare networks", fareNetworkForId.size());
 
         LOG.info("Loading fare leg rules");
-        int fareLegRuleIdx = 0;
         for (FareLegRule rule : feed.fare_leg_rules) {
             fareLegRules.add(new FareLegRuleInfo(rule));
-            if (rule.leg_group_id != null) fareLegRuleForLegGroupId.put(rule.leg_group_id, fareLegRuleIdx);
+            int fareLegRuleIdx = fareLegRules.size() - 1;
+            if (rule.leg_group_id != null) {
+                if (fareLegRuleForLegGroupId.containsKey(rule.leg_group_id)) {
+                    throw new IllegalArgumentException("Fare leg group ID " + rule.leg_group_id + " is duplicated");
+                }
+                fareLegRuleForLegGroupId.put(rule.leg_group_id, new TIntArrayList());
+                fareLegRuleForLegGroupId.get(rule.leg_group_id).add(fareLegRuleIdx);
+            }
 
             // build indices
             int fareNetworkId;
@@ -671,12 +678,6 @@ public class TransitLayer implements Serializable, Cloneable {
             }
             fareLegRulesForToAreaId.get(toAreaIdx).add(fareLegRuleIdx);
 
-            if (rule.is_symmetrical == 1) {
-                // add the same rule backwards
-                fareLegRulesForFromAreaId.get(toAreaIdx).add(fareLegRuleIdx);
-                fareLegRulesForToAreaId.get(fromAreaIdx).add(fareLegRuleIdx);
-            }
-
             if (rule.service_id != null) throw new IllegalArgumentException("Service IDs not supported in fare_leg_rules");
             if (rule.contains_area_id != null) throw new IllegalArgumentException("contains_area_id not supported in fare_leg_rules");
             if (rule.to_timeframe_id != null || rule.from_timeframe_id != null)
@@ -684,48 +685,81 @@ public class TransitLayer implements Serializable, Cloneable {
             if (!Double.isNaN(rule.min_fare_distance) || !Double.isNaN(rule.max_fare_distance))
                 throw new IllegalArgumentException("Fare distances not supported in fare_leg_rules");
 
-            fareLegRuleIdx++;
+            if (rule.is_symmetrical == 1) {
+                // Can't just add the same rule backwards, because of how the matching works. Consider a rule for travel
+                // from Zone A to Zone B that is symmetrical. If we add the same rule index to both directions, the rule
+                // will also match trips from A to A or B to B.
+                fareLegRules.add(new FareLegRuleInfo(rule));
+                fareLegRuleIdx = fareLegRules.size() -1;
+                if (rule.leg_group_id != null)
+                    // no contains check needed, forward rule already added above
+                    fareLegRuleForLegGroupId.get(rule.leg_group_id).add(fareLegRuleIdx);
+
+                // no contains check needed for same reason
+                fareLegRulesForFareNetworkId.get(fareNetworkId).add(fareLegRuleIdx);
+
+                if (!fareLegRulesForFromAreaId.containsKey(toAreaIdx)) {
+                    fareLegRulesForFromAreaId.put(toAreaIdx, new RoaringBitmap());
+                }
+                fareLegRulesForFromAreaId.get(toAreaIdx).add(fareLegRuleIdx);
+
+                if (!fareLegRulesForToAreaId.containsKey(fromAreaIdx)) {
+                    fareLegRulesForToAreaId.put(fromAreaIdx, new RoaringBitmap());
+                }
+                fareLegRulesForToAreaId.get(fromAreaIdx).add(fareLegRuleIdx);
+            }
         }
 
-        LOG.info("Loaded {} fare leg rules", fareLegRuleIdx);
+        LOG.info("Loaded {} fare leg rules", fareLegRules.size());
 
         LOG.info("Loading fare transfer rules");
-        int fareTransferRuleIdx = 0;
+        TIntList blankFareList = new TIntArrayList();
+        blankFareList.add(FARE_ID_BLANK);
         for (FareTransferRule rule : feed.fare_transfer_rules) {
             fareTransferRules.add(new FareTransferRuleInfo(rule));
+            int fareTransferRuleIdx = fareTransferRules.size() - 1;
 
-            int fromLegIdx;
+            TIntList fromLegIdxs;
             if (rule.from_leg_group_id != null) {
                 if (!fareLegRuleForLegGroupId.containsKey(rule.from_leg_group_id)) {
                     throw new IllegalArgumentException("Fare leg group ID referenced in fare_transfer_rules not present: " +
                             rule.from_leg_group_id);
                 }
-                fromLegIdx = fareLegRuleForLegGroupId.get(rule.from_leg_group_id);
-            } else fromLegIdx = FARE_ID_BLANK;
+                fromLegIdxs = fareLegRuleForLegGroupId.get(rule.from_leg_group_id);
+            } else fromLegIdxs = blankFareList;
 
-            if (!fareTransferRulesForFromLegGroupId.containsKey(fromLegIdx)) {
-                fareTransferRulesForFromLegGroupId.put(fromLegIdx, new RoaringBitmap());
+
+            for (TIntIterator it = fromLegIdxs.iterator(); it.hasNext(); ) {
+                int fromLegIdx = it.next();
+                if (!fareTransferRulesForFromLegGroupId.containsKey(fromLegIdx)) {
+                    fareTransferRulesForFromLegGroupId.put(fromLegIdx, new RoaringBitmap());
+                }
+                fareTransferRulesForFromLegGroupId.get(fromLegIdx).add(fareTransferRuleIdx);
             }
-            fareTransferRulesForFromLegGroupId.get(fromLegIdx).add(fareTransferRuleIdx);
 
-            int toLegIdx;
+            TIntList toLegIdxs;
             if (rule.to_leg_group_id != null) {
                 if (!fareLegRuleForLegGroupId.containsKey(rule.to_leg_group_id)) {
                     throw new IllegalArgumentException("Fare leg group ID referenced in fare_transfer_rules not present: " +
                             rule.to_leg_group_id);
                 }
-                toLegIdx = fareLegRuleForLegGroupId.get(rule.to_leg_group_id);
-            } else toLegIdx = FARE_ID_BLANK;
+                toLegIdxs = fareLegRuleForLegGroupId.get(rule.to_leg_group_id);
+            } else toLegIdxs = blankFareList;
 
-            if (!fareTransferRulesForToLegGroupId.containsKey(toLegIdx)) {
-                fareTransferRulesForToLegGroupId.put(toLegIdx, new RoaringBitmap());
+            for (TIntIterator it = toLegIdxs.iterator(); it.hasNext(); ) {
+                int toLegIdx = it.next();
+                if (!fareTransferRulesForToLegGroupId.containsKey(toLegIdx)) {
+                    fareTransferRulesForToLegGroupId.put(toLegIdx, new RoaringBitmap());
+                }
+                fareTransferRulesForToLegGroupId.get(toLegIdx).add(fareTransferRuleIdx);
             }
-            fareTransferRulesForToLegGroupId.get(toLegIdx).add(fareTransferRuleIdx);
 
-            fareTransferRuleIdx++;
+            if (rule.is_symmetrical == 1) {
+                throw new UnsupportedOperationException("is_symmetrical not yet supported for fare_transfer_rules");
+            }
         }
 
-        LOG.info("Loaded {} fare transfer rules", fareTransferRuleIdx);
+        LOG.info("Loaded {} fare transfer rules", fareTransferRules.size());
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

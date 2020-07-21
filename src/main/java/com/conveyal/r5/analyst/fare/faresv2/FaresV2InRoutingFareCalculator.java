@@ -187,7 +187,7 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             }
 
             if (rulesWithLowestOrder.size() > 1)
-                LOG.warn("Found multiple matching fare_leg_rules, results may be unstable or not find the lowest fare path!");
+                LOG.warn("Found multiple matching fare_leg_rules with same order, results may be unstable or not find the lowest fare path!");
 
             return rulesWithLowestOrder.get(0);
         }
@@ -218,7 +218,7 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             }
 
             if (rulesWithLowestOrder.size() > 1)
-                LOG.warn("Found multiple matching fare_leg_rules, results may be unstable or not find the lowest fare path!");
+                LOG.warn("Found multiple matching fare_leg_rules with same order, results may be unstable or not find the lowest fare path!");
 
             return rulesWithLowestOrder.get(0);
         }

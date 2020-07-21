@@ -19,6 +19,7 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static com.conveyal.r5.analyst.fare.faresv2.IndexUtils.getMatching;
 
 /**
  * A fare calculator for feeds compliant with the GTFS Fares V2 standard (https://bit.ly/gtfs-fares)
@@ -146,35 +147,25 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
      * TODO handle multiple fare leg rules
      */
     private int getFareLegRuleForLeg (int boardStop, int alightStop, RoaringBitmap fareNetworks) {
-        // find leg rules that match the board stop
-        TIntList boardAreas = transitLayer.fareAreasForStop.get(boardStop);
-        RoaringBitmap boardAreaMatch = getMatching(transitLayer.fareLegRulesForFromAreaId, boardAreas);
-
-        // find leg rules that match the alight stop
-        TIntList alightAreas = transitLayer.fareAreasForStop.get(alightStop);
-        RoaringBitmap alightAreaMatch = getMatching(transitLayer.fareLegRulesForToAreaId, alightAreas);
-
-        // NB is_symmetrical is handled by network build process which materializes the reverse rule
-
         // find leg rules that match the fare network
+        // getMatching returns a new RoaringBitmap so okay to modify
         RoaringBitmap fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
+        fareNetworkMatch.and(transitLayer.fareLegRulesForFromStopId.get(boardStop));
+        fareNetworkMatch.and(transitLayer.fareLegRulesForToStopId.get(alightStop));
 
-        // AND board area match with alight area match and fare network match
-        boardAreaMatch.and(alightAreaMatch);
-        boardAreaMatch.and(fareNetworkMatch);
         // boardAreaMatch now contains only rules that match _all_ criteria
 
-        if (boardAreaMatch.getCardinality() == 0) {
+        if (fareNetworkMatch.getCardinality() == 0) {
             String fromStopId = transitLayer.stopIdForIndex.get(boardStop);
             String toStopId = transitLayer.stopIdForIndex.get(alightStop);
             throw new IllegalStateException("no fare leg rule found for leg from " + fromStopId + " to " + toStopId + "!");
-        } else if (boardAreaMatch.getCardinality() == 1) {
-            return boardAreaMatch.iterator().next();
+        } else if (fareNetworkMatch.getCardinality() == 1) {
+            return fareNetworkMatch.iterator().next();
         } else {
             // figure out what matches, first finding the lowest order
             int lowestOrder = Integer.MAX_VALUE;
             TIntList rulesWithLowestOrder = new TIntArrayList();
-            for (PeekableIntIterator it = boardAreaMatch.getIntIterator(); it.hasNext();) {
+            for (PeekableIntIterator it = fareNetworkMatch.getIntIterator(); it.hasNext();) {
                 int ruleIdx = it.next();
                 int order = transitLayer.fareLegRules.get(ruleIdx).order;
                 if (order < lowestOrder) {
@@ -222,36 +213,6 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
             return rulesWithLowestOrder.get(0);
         }
-    }
-
-    /** Get all rules that match indices, either directly or because that field was left blank */
-    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, TIntCollection indices) {
-        RoaringBitmap ret = new RoaringBitmap();
-        for (TIntIterator it = indices.iterator(); it.hasNext();) {
-            int index = it.next();
-            if (rules.containsKey(index)) ret.or(rules.get(index));
-        }
-        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
-        return ret;
-    }
-
-    /** Get all rules that match indices, either directly or because that field was left blank */
-    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, RoaringBitmap indices) {
-        RoaringBitmap ret = new RoaringBitmap();
-        for (PeekableIntIterator it = indices.getIntIterator(); it.hasNext();) {
-            int index = it.next();
-            if (rules.containsKey(index)) ret.or(rules.get(index));
-        }
-        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
-        return ret;
-    }
-
-    /** Get all rules that match index, either directly or because that field was left blank */
-    public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, int index) {
-        RoaringBitmap ret = new RoaringBitmap();
-        if (rules.containsKey(index)) ret.or(rules.get(index));
-        if (rules.containsKey(TransitLayer.FARE_ID_BLANK)) ret.or(rules.get(TransitLayer.FARE_ID_BLANK));
-        return ret;
     }
 
     @Override

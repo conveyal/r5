@@ -32,7 +32,7 @@ public class FaresV2TransferAllowance extends TransferAllowance {
         if (prevFareLegRuleIdx != -1) {
             // not at start of trip, so we may have transfers available
             // TODO this will all have to change once we properly handle chains of multiple transfers
-            potentialTransferRules = FaresV2InRoutingFareCalculator.getMatching(
+            potentialTransferRules = IndexUtils.getMatching(
                     transitLayer.fareTransferRulesForFromLegGroupId, prevFareLegRuleIdx);
         } else {
             potentialTransferRules = new RoaringBitmap();

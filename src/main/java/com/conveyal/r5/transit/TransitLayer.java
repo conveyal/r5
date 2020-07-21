@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.analyst.fare.faresv2.IndexUtils;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
@@ -218,8 +219,20 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Fare leg rule for from area id */
     public TIntObjectMap<RoaringBitmap> fareLegRulesForFromAreaId = new TIntObjectHashMap<>();
 
+    /**
+     * Fare leg rules for from stop ID. This is computed based on fareAreasForStopId and fareLegRulesForFromAreaId, and
+     * cached for higher performance.
+     */
+    public transient TIntObjectMap<RoaringBitmap> fareLegRulesForFromStopId;
+
     /** Fare leg rule for to area id */
     public TIntObjectMap<RoaringBitmap> fareLegRulesForToAreaId = new TIntObjectHashMap<>();
+
+    /**
+     * Fare leg rules for to stop ID. This is computed based on fareAreasForStopId and fareLegRulesForToAreaId, and
+     * cached for higher performance.
+     */
+    public transient TIntObjectMap<RoaringBitmap> fareLegRulesForToStopId;
 
     // TODO contains_area_id, leg_group_id, timeframes
 
@@ -825,7 +838,31 @@ public class TransitLayer implements Serializable, Cloneable {
             }
         }
 
+        if (!fareLegRules.isEmpty()) rebuildFaresV2TransientIndices();
+
         LOG.info("Done rebuilding transient indices.");
+    }
+
+    /**
+     * Rebuild transient indices used in Fares V2 routing
+     */
+    private void rebuildFaresV2TransientIndices () {
+        fareLegRulesForFromStopId = indexFareLegRulesForStops(fareLegRulesForFromAreaId);
+        fareLegRulesForToStopId = indexFareLegRulesForStops(fareLegRulesForToAreaId);
+    }
+
+    /** Build an index for which fare leg rules are applicable for trips at each stop. Used for both from and to stops
+     * by passing in fareLegRulesForFromAreaId or fareLegRulesForToAreaId, respectively.
+     */
+    private TIntObjectMap<RoaringBitmap> indexFareLegRulesForStops(TIntObjectMap<RoaringBitmap> fareLegRulesForFareAreaId) {
+        TIntObjectMap<RoaringBitmap> forStops = new TIntObjectHashMap<>();
+        Map<RoaringBitmap, RoaringBitmap> bitmaps = new HashMap<>();
+        for (int stop = 0; stop < stopIdForIndex.size(); stop++) {
+            TIntList fareAreas = fareAreasForStop.get(stop);
+            // TODO could intern these RoaringBitmaps to save some memory if it becomes a problem
+            forStops.put(stop, IndexUtils.getMatching(fareLegRulesForFareAreaId, fareAreas));
+        }
+        return forStops;
     }
 
     /**

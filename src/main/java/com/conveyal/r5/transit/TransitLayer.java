@@ -16,6 +16,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import gnu.trove.iterator.TIntIterator;
+import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -241,10 +242,16 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public List<FareTransferRuleInfo> fareTransferRules = new ArrayList<>();
 
-    /** Fare transfer rule index for from_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty from_leg_group_id */
+    /**
+     * Fare transfer rule index for from_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty from_leg_group_id
+     * All rules from FARE_ID_BLANK are also included in rules for specific fare IDs.
+     */
     public TIntObjectMap<RoaringBitmap> fareTransferRulesForFromLegGroupId = new TIntObjectHashMap<>();
 
-    /** Fare transfer rule index for to_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty to_leg_group_id */
+    /**
+     * Fare transfer rule index for to_leg_group_id, with key for FARE_ID_BLANK containing fare transfer rules with empty to_leg_group_id
+     * All rules from FARE_ID_BLANK are also included in rules for specific fare IDs.
+     */
     public TIntObjectMap<RoaringBitmap> fareTransferRulesForToLegGroupId = new TIntObjectHashMap<>();
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
@@ -769,6 +776,24 @@ public class TransitLayer implements Serializable, Cloneable {
 
             if (rule.is_symmetrical == 1) {
                 throw new UnsupportedOperationException("is_symmetrical not yet supported for fare_transfer_rules");
+            }
+        }
+
+        // OR all FARE_ID_BLANK rules into fareTransferRulesForToLegGroupId, so it does not have to be done at
+        // runtime. FARE_ID_BLANK matches all fare transfer rules
+        if (fareTransferRulesForFromLegGroupId.containsKey(FARE_ID_BLANK)) {
+            RoaringBitmap wildcardRules = fareTransferRulesForFromLegGroupId.get(FARE_ID_BLANK);
+            for (TIntObjectIterator<RoaringBitmap> it = fareTransferRulesForFromLegGroupId.iterator(); it.hasNext();) {
+                it.advance();
+                it.value().or(wildcardRules);
+            }
+        }
+
+        if (fareTransferRulesForToLegGroupId.containsKey(FARE_ID_BLANK)) {
+            RoaringBitmap wildcardRules = fareTransferRulesForToLegGroupId.get(FARE_ID_BLANK);
+            for (TIntObjectIterator<RoaringBitmap> it = fareTransferRulesForToLegGroupId.iterator(); it.hasNext();) {
+                it.advance();
+                it.value().or(wildcardRules);
             }
         }
 

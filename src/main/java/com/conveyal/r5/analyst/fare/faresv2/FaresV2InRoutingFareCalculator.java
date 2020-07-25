@@ -206,17 +206,35 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
     /** get a fare transfer rule, if one exists, between fromLegRule and toLegRule */
     public int getFareTransferRule (int fromLegRule, int toLegRule) {
-        RoaringBitmap fromLegMatch = getMatching(transitLayer.fareTransferRulesForFromLegGroupId, fromLegRule);
-        RoaringBitmap toLegMatch = getMatching(transitLayer.fareTransferRulesForToLegGroupId, toLegRule);
+        RoaringBitmap fromLegMatch;
+        if (transitLayer.fareTransferRulesForFromLegGroupId.containsKey(fromLegRule))
+            // this is OR'ed with rules for fare_id_blank at build time
+            fromLegMatch = transitLayer.fareTransferRulesForFromLegGroupId.get(fromLegRule);
+        else if (transitLayer.fareTransferRulesForFromLegGroupId.containsKey(TransitLayer.FARE_ID_BLANK))
+            // no explicit match, use implicit matches
+            fromLegMatch = transitLayer.fareTransferRulesForFromLegGroupId.get(TransitLayer.FARE_ID_BLANK);
+        else
+            return -1;
 
-        fromLegMatch.and(toLegMatch);
+        RoaringBitmap toLegMatch;
+        if (transitLayer.fareTransferRulesForToLegGroupId.containsKey(toLegRule))
+            // this is OR'ed with rules for fare_id_blank at build time
+            toLegMatch = transitLayer.fareTransferRulesForToLegGroupId.get(toLegRule);
+        else if (transitLayer.fareTransferRulesForToLegGroupId.containsKey(TransitLayer.FARE_ID_BLANK))
+            // no explicit match, use implicit matches
+            toLegMatch = transitLayer.fareTransferRulesForToLegGroupId.get(TransitLayer.FARE_ID_BLANK);
+        else
+            return -1;
 
-        if (fromLegMatch.getCardinality() == 0) return -1; // no discounted transfer
-        else if (fromLegMatch.getCardinality() == 1) return fromLegMatch.iterator().next();
+        // use static and to create a new RoaringBitmap, don't destruct transitlayer values.
+        RoaringBitmap bothMatch = RoaringBitmap.and(fromLegMatch, toLegMatch);
+
+        if (bothMatch.getCardinality() == 0) return -1; // no discounted transfer
+        else if (bothMatch.getCardinality() == 1) return bothMatch.iterator().next();
         else {
             int lowestOrder = Integer.MAX_VALUE;
             TIntList rulesWithLowestOrder = new TIntArrayList();
-            for (PeekableIntIterator it = fromLegMatch.getIntIterator(); it.hasNext();) {
+            for (PeekableIntIterator it = bothMatch.getIntIterator(); it.hasNext();) {
                 int ruleIdx = it.next();
                 int order = transitLayer.fareTransferRules.get(ruleIdx).order;
                 if (order < lowestOrder) {

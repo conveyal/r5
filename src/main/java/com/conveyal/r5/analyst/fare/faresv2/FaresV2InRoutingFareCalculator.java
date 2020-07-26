@@ -166,11 +166,8 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
     /** Get the as_route fare networks for a pattern (used to merge with later rides) */
     private RoaringBitmap getAsRouteFareNetworksForPattern (int patIdx) {
-        RoaringBitmap fareNetworks = new RoaringBitmap();
-        // protective copy
-        fareNetworks.or(getFareNetworksForPattern(patIdx));
-        fareNetworks.and(transitLayer.fareNetworkAsRoute);
-        return fareNetworks;
+        // static so we do not modify underlying bitmaps
+        return RoaringBitmap.and(getFareNetworksForPattern(patIdx), transitLayer.fareNetworkAsRoute);
     }
 
     private RoaringBitmap getFareNetworksForPattern (int patIdx) {

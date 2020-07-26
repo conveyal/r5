@@ -7,6 +7,9 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.faresv2.FareLegRuleInfo;
 import com.conveyal.r5.transit.faresv2.FareTransferRuleInfo;
 import com.conveyal.r5.transit.faresv2.FareTransferRuleInfo.FareTransferType;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -19,6 +22,10 @@ import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+
 import static com.conveyal.r5.analyst.fare.faresv2.IndexUtils.getMatching;
 
 /**
@@ -28,6 +35,15 @@ import static com.conveyal.r5.analyst.fare.faresv2.IndexUtils.getMatching;
  */
 public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Logger LOG = LoggerFactory.getLogger(FaresV2InRoutingFareCalculator.class);
+
+    private transient LoadingCache<FareTransferRuleKey, Integer> fareTransferRuleCache = CacheBuilder.newBuilder()
+            .maximumSize(1000)
+            .build(new CacheLoader<>() {
+                @Override
+                public Integer load(FareTransferRuleKey fareTransferRuleKey) {
+                    return searchFareTransferRule(fareTransferRuleKey);
+                }
+            });
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
@@ -204,8 +220,24 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         }
     }
 
-    /** get a fare transfer rule, if one exists, between fromLegRule and toLegRule */
+    /**
+     * get a fare transfer rule, if one exists, between fromLegRule and toLegRule
+     *
+     * This uses an LRU cache, because often we will be searching for the same fromLegRule and toLegRule repeatedly
+     * (e.g. transfers from a Toronto bus to many other possible Toronto buses you could transfer to.)
+     */
     public int getFareTransferRule (int fromLegRule, int toLegRule) {
+        try {
+            return fareTransferRuleCache.get(new FareTransferRuleKey(fromLegRule, toLegRule));
+        } catch (ExecutionException e) {
+            // should not happen. if it does, catch and re-throw.
+            throw new RuntimeException(e);
+        }
+    }
+
+    private int searchFareTransferRule (FareTransferRuleKey key) {
+        int fromLegRule = key.fromLegGroupId;
+        int toLegRule = key.toLegGroupId;
         RoaringBitmap fromLegMatch;
         if (transitLayer.fareTransferRulesForFromLegGroupId.containsKey(fromLegRule))
             // this is OR'ed with rules for fare_id_blank at build time
@@ -250,6 +282,31 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                 LOG.warn("Found multiple matching fare_leg_rules with same order, results may be unstable or not find the lowest fare path!");
 
             return rulesWithLowestOrder.get(0);
+        }
+    }
+
+    /** Used as a key into the LRU cache for fare transfer rules */
+    private static class FareTransferRuleKey {
+        int fromLegGroupId;
+        int toLegGroupId;
+
+        public FareTransferRuleKey (int fromLegGroupId, int toLegGroupId) {
+            this.fromLegGroupId = fromLegGroupId;
+            this.toLegGroupId = toLegGroupId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            FareTransferRuleKey that = (FareTransferRuleKey) o;
+            return fromLegGroupId == that.fromLegGroupId &&
+                    toLegGroupId == that.toLegGroupId;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(fromLegGroupId, toLegGroupId);
         }
     }
 

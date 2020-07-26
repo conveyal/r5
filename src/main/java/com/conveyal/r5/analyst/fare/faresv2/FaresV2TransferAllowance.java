@@ -42,11 +42,9 @@ public class FaresV2TransferAllowance extends TransferAllowance {
         this.asRouteFareNetworks = asRouteFareNetworks;
         this.asRouteFareNetworksBoardStop = asRouteFareNetworksBoardStop;
 
-        if (prevFareLegRuleIdx != -1) {
+        if (prevFareLegRuleIdx != -1 && transitLayer.fareTransferRulesForFromLegGroupId.containsKey(prevFareLegRuleIdx)) {
             // not at start of trip, so we may have transfers available
-            // TODO this will all have to change once we properly handle chains of multiple transfers
-            potentialTransferRules = IndexUtils.getMatching(
-                    transitLayer.fareTransferRulesForFromLegGroupId, prevFareLegRuleIdx);
+            potentialTransferRules = transitLayer.fareTransferRulesForFromLegGroupId.get(prevFareLegRuleIdx);
         } else {
             potentialTransferRules = new RoaringBitmap();
         }
@@ -68,7 +66,7 @@ public class FaresV2TransferAllowance extends TransferAllowance {
             // if both have as route, only comparable if they have the same as route networks and same board stop.
             boolean bothHaveAsRoute = asRouteFareNetworks != null && o.asRouteFareNetworks != null;
             if (bothHaveAsRoute) {
-                // asRouteFareNetworks is always sorted since it comes from RoaringBitset.toArray, so simple equality
+                // asRouteFareNetworks is always sorted since it comes from RoaringBitset.toArray, so simple Arrays.equal
                 // comparison is fine.
                 if (asRouteFareNetworksBoardStop != o.asRouteFareNetworksBoardStop ||
                         !Arrays.equals(asRouteFareNetworks, o.asRouteFareNetworks)) return false;

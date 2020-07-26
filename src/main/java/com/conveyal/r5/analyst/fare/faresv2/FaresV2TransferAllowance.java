@@ -27,6 +27,13 @@ public class FaresV2TransferAllowance extends TransferAllowance {
     /** Where we boarded the as_route fare networks */
     public int asRouteFareNetworksBoardStop = -1;
 
+    /** When useAllStopsWhenCalculatingAsRouteFareNetwork = true in FaresV2InRoutingFareCalculator, we need to
+     * differentiate trips inside as_route fare networks by all the stops they use, not just the board stop.
+     */
+    private TIntSet allAsRouteFromStops;
+
+    private TIntSet allAsRouteToStops;
+
     /**
      * 
      * @param prevFareLegRuleIdx
@@ -34,13 +41,16 @@ public class FaresV2TransferAllowance extends TransferAllowance {
      * @param asRouteFareNetworksBoardStop
      * @param transitLayer
      */
-    public FaresV2TransferAllowance (int prevFareLegRuleIdx, int[] asRouteFareNetworks, int asRouteFareNetworksBoardStop, TransitLayer transitLayer) {
+    public FaresV2TransferAllowance (int prevFareLegRuleIdx, int[] asRouteFareNetworks, int asRouteFareNetworksBoardStop,
+                                     TIntSet allAsRouteFromStops, TIntSet allAsRouteToStops, TransitLayer transitLayer) {
         // the value is really high to effectively disable Theorem 3.1 for now, so we don't have to actually calculate
         // the max value, at the cost of some performance.
         super(10_000_000_00, 0, 0);
 
         this.asRouteFareNetworks = asRouteFareNetworks;
         this.asRouteFareNetworksBoardStop = asRouteFareNetworksBoardStop;
+        this.allAsRouteFromStops = allAsRouteFromStops;
+        this.allAsRouteToStops = allAsRouteToStops;
 
         if (prevFareLegRuleIdx != -1 && transitLayer.fareTransferRulesForFromLegGroupId.containsKey(prevFareLegRuleIdx)) {
             // not at start of trip, so we may have transfers available
@@ -69,6 +79,10 @@ public class FaresV2TransferAllowance extends TransferAllowance {
                 // asRouteFareNetworks is always sorted since it comes from RoaringBitset.toArray, so simple Arrays.equal
                 // comparison is fine.
                 if (asRouteFareNetworksBoardStop != o.asRouteFareNetworksBoardStop ||
+                        // both will be null if useAllStopsWhenCalculatingAsRouteFareNetwork is false, so Objects.equals
+                        // will return true and these conditions will be a no-op.
+                        !Objects.equals(allAsRouteFromStops, o.allAsRouteFromStops) ||
+                        !Objects.equals(allAsRouteToStops, o.allAsRouteToStops) ||
                         !Arrays.equals(asRouteFareNetworks, o.asRouteFareNetworks)) return false;
             }
 
@@ -102,5 +116,16 @@ public class FaresV2TransferAllowance extends TransferAllowance {
         transfers.sort(Comparator.naturalOrder());
 
         return String.join("\n", transfers);
+    }
+
+    /** better JSON serialization for the TIntSets */
+    public int[] getAllAsRouteFromStops () {
+        if (allAsRouteFromStops == null) return null;
+        else return allAsRouteFromStops.toArray();
+    }
+
+    public int[] getAllAsRouteToStops () {
+        if (allAsRouteToStops == null) return null;
+        else return allAsRouteToStops.toArray();
     }
 }

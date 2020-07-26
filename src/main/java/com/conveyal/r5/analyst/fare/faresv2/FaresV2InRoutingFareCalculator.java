@@ -10,12 +10,9 @@ import com.conveyal.r5.transit.faresv2.FareTransferRuleInfo.FareTransferType;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.TObjectIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.roaringbitmap.PeekableIntIterator;
@@ -44,6 +41,31 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                     return searchFareTransferRule(fareTransferRuleKey);
                 }
             });
+
+    /**
+     * This is hack to address a situation where GTFS-Fares V2 is not (as of this writing) able to correctly represent
+     * the GO fare system. The GO fare chart _appears_ to be a simple from-station-A-to-station-B chart, a la WMATA etc.,
+     * but it's more nuanced - because of one little word in the fare bylaws
+     * (https://www.gotransit.com/static_files/gotransit/assets/pdf/Policies/By-Law_No2A.pdf): "Tariff of Fares attached
+     * hereto, setting out the amount to be paid for single one-way travel on the transit system _within the
+     * enumerated zones_" - within, not from or to. So if you start in Zone B, backtrack to Zone A, and then ride on to
+     * Zone C, you actually owe the A - C fare, not the B - C fare, because you traveled to Zone A. There is currently
+     * active discussion in the GTFS-Fares V2 document for how to address this conundrum, but with deadlines looming I
+     * have implemented this hack. When useAllStopsWhenCalculatingAsRouteFareNetwork is set to true, when evaluating an
+     * as_route fare network, the router will consider rules matching from_area_ids of _any_ stop within the joined
+     * as_route trips except the final alight stop, and to_area_ids of _any_ stop except the first board stop. It is not
+     * only board stops considered for from and alight stops considered for to, because you might do a trip
+     * C - A walk to B - D, and this should cost the A-D fare even though you didn't ever board at A.
+     * By setting the order of rules in the feed to have the most
+     * expensive first, the proper fare will be found (assuming that extending the trip into a new zone always causes a
+     * nonnegative change in the fare).
+     *
+     * This is not a hypothetical concern in Toronto. Consider this trip:
+     * https://projects.indicatrix.org/fareto-examples/?load=broken-yyz-downtown-to-york
+     * The second option here is $6.80 but should be $7.80, because it requires a change at Unionville, and Toronto to
+     * Unionville is 7.80 even though Toronto to Yonge/407 is only $6.80.
+     */
+    public boolean useAllStopsWhenCalculatingAsRouteFareNetwork = false;
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
@@ -77,6 +99,12 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         int prevFareLegRuleIdx = -1;
         int cumulativeFare = 0;
 
+        // these are used to implement the functionality described in the comment above
+        // useAllStopsWhenCalculatingAsRouteFareNetwork
+        // They keep track of _all_ the boarding and alighting stops in a multi-vehicle journey on an as_route fare network.
+        TIntSet allAsRouteFromStops = new TIntHashSet();
+        TIntSet allAsRouteToStops = new TIntHashSet();
+
         RoaringBitmap asRouteFareNetworks = null;
         int asRouteBoardStop = -1;
         for (int i = 0; i < patterns.size(); i++) {
@@ -88,9 +116,19 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
 
             // CHECK FOR AS_ROUTE FARE NETWORK
             // NB this is applied greedily, if it is cheaper to buy separate tickets that will not be found
+
+            // reset anything left over from previous rides
+            // note that if the rides are a part of the same as_route fare network, the ride is extended in the
+            // nested loop below.
+            asRouteBoardStop = -1;
+            allAsRouteFromStops.clear();
+            allAsRouteToStops.clear();
+
             RoaringBitmap fareNetworks = getFareNetworksForPattern(pattern);
             asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
             if (asRouteFareNetworks.getCardinality() > 0) {
+                allAsRouteFromStops.add(boardStop);
+                allAsRouteToStops.add(alightStop);
                 asRouteBoardStop = boardStop;
                 for (int j = i + 1; j < patterns.size(); j++) {
                     RoaringBitmap nextAsRouteFareNetworks = getAsRouteFareNetworksForPattern(patterns.get(j));
@@ -98,23 +136,61 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                     asRouteFareNetworks = RoaringBitmap.and(asRouteFareNetworks, nextAsRouteFareNetworks);
 
                     if (asRouteFareNetworks.getCardinality() > 0) {
+                        // alight stop from previous ride is now a from stop and a to stop, b/c it is in the middle of the ride
+                        // This is true _even if_ there is a transfer rather than another boarding at the alight stop, see
+                        // the example above in the javadoc for useAllStopsWhenCalculatingAsRouteFareNetwork
+                        allAsRouteFromStops.add(alightStop);
+
+                        // board stop for new ride is now both a from and a to stop b/c is middle of ride
+                        allAsRouteFromStops.add(boardStops.get(j));
+                        allAsRouteToStops.add(boardStops.get(j));
+
                         // extend ride
                         alightStop = alightStops.get(j);
                         alightTime = alightTimes.get(j);
+
+                        allAsRouteToStops.add(alightStop);
                         // these are the fare networks actually in use, other fare leg rules should not match
                         fareNetworks = asRouteFareNetworks;
                         i = j; // don't process this ride again
                     } else {
                         break;
+                        // i is now the last ride in the as-route fare network. Process the entire thing as a single ride.
                     }
                 }
-            } else {
-                // reset as-route board stop if this leg is not a part of any as-route fare networks
-                asRouteBoardStop = -1;
             }
 
             // FIND THE FARE LEG RULE
-            int fareLegRuleIdx = getFareLegRuleForLeg(boardStop, alightStop, fareNetworks);
+            int fareLegRuleIdx;
+            if (asRouteBoardStop != -1 && useAllStopsWhenCalculatingAsRouteFareNetwork) {
+                // when useAllStopsWhenCalculatingAsRouteFareNetwork, we find the first fare leg rule that matches
+                // any combination of from and to stops.
+                RoaringBitmap fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
+                RoaringBitmap fromAreaMatch = new RoaringBitmap();
+                for (TIntIterator it = allAsRouteFromStops.iterator(); it.hasNext();) {
+                    // okay to use forFromStopId even though this might be a to stop, because
+                    // we're treating all intermediate stops as "effective from" stops that should match from_area_id.
+                    fromAreaMatch.or(transitLayer.fareLegRulesForFromStopId.get(it.next()));
+                }
+
+                RoaringBitmap toAreaMatch = new RoaringBitmap();
+                for (TIntIterator it = allAsRouteToStops.iterator(); it.hasNext();) {
+                    // okay to use forFromStopId even though this might be a to stop, because
+                    // we're treating all intermediate stops as "effective from" stops that should match from_area_id.
+                    toAreaMatch.or(transitLayer.fareLegRulesForToStopId.get(it.next()));
+                }
+
+                fareNetworkMatch.and(fromAreaMatch);
+                fareNetworkMatch.and(toAreaMatch);
+
+                try {
+                    fareLegRuleIdx = findDominantLegRuleMatch(fareNetworkMatch);
+                } catch (NoFareLegRuleMatch noFareLegRuleMatch) {
+                    throw new IllegalStateException("no leg rule found for as_route network!");
+                }
+            } else {
+                fareLegRuleIdx = getFareLegRuleForLeg(boardStop, alightStop, fareNetworks);
+            }
             FareLegRuleInfo fareLegRule = transitLayer.fareLegRules.get(fareLegRuleIdx);
 
             // CHECK IF THERE ARE ANY TRANSFER DISCOUNTS
@@ -156,9 +232,14 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             if (asRouteBoardStop == -1)
                 throw new IllegalStateException("as route board stop not set even though there are as route fare networks.");
             // NB it is important the second argument here be sorted. This is guaranteed by RoaringBitmap.toArray()
-            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, asRouteFareNetworks.toArray(), asRouteBoardStop, transitLayer);
+            if (!useAllStopsWhenCalculatingAsRouteFareNetwork) {
+                allAsRouteFromStops = null;
+                allAsRouteToStops = null;
+            }
+            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, asRouteFareNetworks.toArray(), asRouteBoardStop,
+                    allAsRouteFromStops, allAsRouteToStops, transitLayer);
         } else {
-            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, null, -1, transitLayer);
+            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, null, -1, null, null, transitLayer);
         }
 
         return new FareBounds(cumulativeFare, allowance);
@@ -186,19 +267,26 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         fareNetworkMatch.and(transitLayer.fareLegRulesForFromStopId.get(boardStop));
         fareNetworkMatch.and(transitLayer.fareLegRulesForToStopId.get(alightStop));
 
-        // boardAreaMatch now contains only rules that match _all_ criteria
-
-        if (fareNetworkMatch.getCardinality() == 0) {
+        try {
+            return findDominantLegRuleMatch(fareNetworkMatch);
+        } catch (NoFareLegRuleMatch noFareLegRuleMatch) {
             String fromStopId = transitLayer.stopIdForIndex.get(boardStop);
             String toStopId = transitLayer.stopIdForIndex.get(alightStop);
             throw new IllegalStateException("no fare leg rule found for leg from " + fromStopId + " to " + toStopId + "!");
-        } else if (fareNetworkMatch.getCardinality() == 1) {
-            return fareNetworkMatch.iterator().next();
+        }
+    }
+
+    /** of all the leg rules in match, which one is dominant (lowest order)? */
+    private int findDominantLegRuleMatch (RoaringBitmap candidateLegRules) throws NoFareLegRuleMatch {
+        if (candidateLegRules.getCardinality() == 0) {
+            throw new NoFareLegRuleMatch();
+        } else if (candidateLegRules.getCardinality() == 1) {
+            return candidateLegRules.iterator().next();
         } else {
             // figure out what matches, first finding the lowest order
             int lowestOrder = Integer.MAX_VALUE;
             TIntList rulesWithLowestOrder = new TIntArrayList();
-            for (PeekableIntIterator it = fareNetworkMatch.getIntIterator(); it.hasNext();) {
+            for (PeekableIntIterator it = candidateLegRules.getIntIterator(); it.hasNext();) {
                 int ruleIdx = it.next();
                 int order = transitLayer.fareLegRules.get(ruleIdx).order;
                 if (order < lowestOrder) {
@@ -310,5 +398,9 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
     @Override
     public String getType() {
         return "fares-v2";
+    }
+
+    private class NoFareLegRuleMatch extends Exception {
+
     }
 }

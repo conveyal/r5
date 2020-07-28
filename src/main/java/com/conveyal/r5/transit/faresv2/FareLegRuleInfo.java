@@ -15,6 +15,9 @@ public class FareLegRuleInfo implements Serializable, Comparable {
     /** the order of this fare leg rule */
     public int order;
 
+    /** leg group ID of this fare leg rule */
+    public String leg_group_id;
+
     public FareLegRuleInfo(FareLegRule rule) {
         if (!Currency.scalarForCurrency.containsKey(rule.currency))
             throw new IllegalStateException("No scalar value specified in scalarForCurrency for currency " + rule.currency);
@@ -23,6 +26,7 @@ public class FareLegRuleInfo implements Serializable, Comparable {
             throw new IllegalArgumentException("Amount missing from fare_leg_rule (min_amount/max_amount not supported!");
         amount = (int) (rule.amount * currencyScalar);
         order = rule.order;
+        leg_group_id = rule.leg_group_id;
     }
 
     @Override

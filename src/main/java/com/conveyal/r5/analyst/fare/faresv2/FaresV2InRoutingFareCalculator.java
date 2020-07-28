@@ -20,6 +20,7 @@ import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
@@ -99,14 +100,13 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         int prevFareLegRuleIdx = -1;
         int cumulativeFare = 0;
 
-        // these are used to implement the functionality described in the comment above
-        // useAllStopsWhenCalculatingAsRouteFareNetwork
-        // They keep track of _all_ the boarding and alighting stops in a multi-vehicle journey on an as_route fare network.
-        TIntSet allAsRouteFromStops = new TIntHashSet();
-        TIntSet allAsRouteToStops = new TIntHashSet();
-
         RoaringBitmap asRouteFareNetworks = null;
         int asRouteBoardStop = -1;
+
+        // What fare leg rules are potentially applicable to a trip in an as_route fare network
+        // used in transfer allowance when useAllStopsWhenCalculatingAsRouteFareNetwork = true.
+        // see comment on same-named variable in transfer allowance for detailed explanation.
+        int[] potentialAsRouteFareLegRules = null;
         for (int i = 0; i < patterns.size(); i++) {
             int pattern = patterns.get(i);
             int boardStop = boardStops.get(i);
@@ -121,8 +121,11 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             // note that if the rides are a part of the same as_route fare network, the ride is extended in the
             // nested loop below.
             asRouteBoardStop = -1;
-            allAsRouteFromStops.clear();
-            allAsRouteToStops.clear();
+            // these are used to implement the functionality described in the comment above
+            // useAllStopsWhenCalculatingAsRouteFareNetwork
+            // They keep track of _all_ the boarding and alighting stops in a multi-vehicle journey on an as_route fare network.
+            TIntSet allAsRouteFromStops = new TIntHashSet();
+            TIntSet allAsRouteToStops = new TIntHashSet();
 
             RoaringBitmap fareNetworks = getFareNetworksForPattern(pattern);
             asRouteFareNetworks = getAsRouteFareNetworksForPattern(pattern);
@@ -161,11 +164,12 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             }
 
             // FIND THE FARE LEG RULE
-            int fareLegRuleIdx;
+            int[] fareLegRules;
             if (asRouteBoardStop != -1 && useAllStopsWhenCalculatingAsRouteFareNetwork) {
                 // when useAllStopsWhenCalculatingAsRouteFareNetwork, we find the first fare leg rule that matches
                 // any combination of from and to stops.
-                RoaringBitmap fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
+                // getMatching returns a new RoaringBitmap, okay for us to mutate
+                RoaringBitmap candidateLegs = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
                 RoaringBitmap fromAreaMatch = new RoaringBitmap();
                 for (TIntIterator it = allAsRouteFromStops.iterator(); it.hasNext();) {
                     // okay to use forFromStopId even though this might be a to stop, because
@@ -180,17 +184,29 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                     toAreaMatch.or(transitLayer.fareLegRulesForToStopId.get(it.next()));
                 }
 
-                fareNetworkMatch.and(fromAreaMatch);
-                fareNetworkMatch.and(toAreaMatch);
+                candidateLegs.and(fromAreaMatch);
+                candidateLegs.and(toAreaMatch);
 
                 try {
-                    fareLegRuleIdx = findDominantLegRuleMatch(fareNetworkMatch);
+                    fareLegRules = findDominantLegRuleMatches(candidateLegs);
+                    Arrays.sort(fareLegRules); // I think they should already be sorted, this may not be necessary.
+                    potentialAsRouteFareLegRules = fareLegRules;
                 } catch (NoFareLegRuleMatch noFareLegRuleMatch) {
                     throw new IllegalStateException("no leg rule found for as_route network!");
                 }
+
+                // it is not unexpected to find multiple matching fare leg rules here, as there may be multiple
+                // fare leg rules that have the same price for different portions of the trip. As long as they provide
+                // the same transfer privileges, this is okay.
             } else {
-                fareLegRuleIdx = getFareLegRuleForLeg(boardStop, alightStop, fareNetworks);
+                fareLegRules = getFareLegRulesForLeg(boardStop, alightStop, fareNetworks);
+
+                if (fareLegRules.length > 1) {
+                    LOG.warn("Found multiple matching fare leg rules - routes and fares may be unstable!");
+                }
             }
+
+            int fareLegRuleIdx = fareLegRules[0];
             FareLegRuleInfo fareLegRule = transitLayer.fareLegRules.get(fareLegRuleIdx);
 
             // CHECK IF THERE ARE ANY TRANSFER DISCOUNTS
@@ -232,14 +248,12 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             if (asRouteBoardStop == -1)
                 throw new IllegalStateException("as route board stop not set even though there are as route fare networks.");
             // NB it is important the second argument here be sorted. This is guaranteed by RoaringBitmap.toArray()
-            if (!useAllStopsWhenCalculatingAsRouteFareNetwork) {
-                allAsRouteFromStops = null;
-                allAsRouteToStops = null;
-            }
+
             allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, asRouteFareNetworks.toArray(), asRouteBoardStop,
-                    allAsRouteFromStops, allAsRouteToStops, transitLayer);
+                    potentialAsRouteFareLegRules, transitLayer);
         } else {
-            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, null, -1, null, null, transitLayer);
+            allowance = new FaresV2TransferAllowance(prevFareLegRuleIdx, null, -1,
+                    null, transitLayer);
         }
 
         return new FareBounds(cumulativeFare, allowance);
@@ -260,7 +274,7 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
      * Get the fare leg rule for a leg. If there is more than one, which one is returned is undefined and a warning is logged.
      * TODO handle multiple fare leg rules
      */
-    private int getFareLegRuleForLeg (int boardStop, int alightStop, RoaringBitmap fareNetworks) {
+    private int[] getFareLegRulesForLeg (int boardStop, int alightStop, RoaringBitmap fareNetworks) {
         // find leg rules that match the fare network
         // getMatching returns a new RoaringBitmap so okay to modify
         RoaringBitmap fareNetworkMatch = getMatching(transitLayer.fareLegRulesForFareNetworkId, fareNetworks);
@@ -268,7 +282,7 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
         fareNetworkMatch.and(transitLayer.fareLegRulesForToStopId.get(alightStop));
 
         try {
-            return findDominantLegRuleMatch(fareNetworkMatch);
+            return findDominantLegRuleMatches(fareNetworkMatch);
         } catch (NoFareLegRuleMatch noFareLegRuleMatch) {
             String fromStopId = transitLayer.stopIdForIndex.get(boardStop);
             String toStopId = transitLayer.stopIdForIndex.get(alightStop);
@@ -277,11 +291,11 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     /** of all the leg rules in match, which one is dominant (lowest order)? */
-    private int findDominantLegRuleMatch (RoaringBitmap candidateLegRules) throws NoFareLegRuleMatch {
+    private int[] findDominantLegRuleMatches (RoaringBitmap candidateLegRules) throws NoFareLegRuleMatch {
         if (candidateLegRules.getCardinality() == 0) {
             throw new NoFareLegRuleMatch();
         } else if (candidateLegRules.getCardinality() == 1) {
-            return candidateLegRules.iterator().next();
+            return new int[] { candidateLegRules.iterator().next() };
         } else {
             // figure out what matches, first finding the lowest order
             int lowestOrder = Integer.MAX_VALUE;
@@ -298,10 +312,7 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
                 }
             }
 
-            if (rulesWithLowestOrder.size() > 1)
-                LOG.warn("Found multiple matching fare_leg_rules with same order, results may be unstable or not find the lowest fare path!");
-
-            return rulesWithLowestOrder.get(0);
+            return rulesWithLowestOrder.toArray();
         }
     }
 

@@ -14,6 +14,8 @@ public class IndexUtils {
      * Combine those rules into a single RoaringBitmap. Used for instance with fareLegRulesForFareAreaId in TransitLayer,
      * passing in a collection fare area indices, and returning a RoaringBitmap of all FareLegRules that match any of those
      * indices.
+     *
+     * Always returns a new bitmap, okay to mutate return value.
      */
     public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, TIntCollection indices) {
         RoaringBitmap ret = new RoaringBitmap();
@@ -25,7 +27,8 @@ public class IndexUtils {
         return ret;
     }
 
-    /** Get all rules that match indices, either directly or because that field was left blank */
+    /** Get all rules that match indices, either directly or because that field was left blank. Always returns
+     * a new bitmap, okay to mutate return value. */
     public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, RoaringBitmap indices) {
         RoaringBitmap ret = new RoaringBitmap();
         for (PeekableIntIterator it = indices.getIntIterator(); it.hasNext();) {
@@ -36,7 +39,8 @@ public class IndexUtils {
         return ret;
     }
 
-    /** Get all rules that match index, either directly or because that field was left blank */
+    /** Get all rules that match index, either directly or because that field was left blank. Always returns
+     * a new bitmap, okay to mutate return value. */
     public static RoaringBitmap getMatching (TIntObjectMap<RoaringBitmap> rules, int index) {
         RoaringBitmap ret = new RoaringBitmap();
         if (rules.containsKey(index)) ret.or(rules.get(index));

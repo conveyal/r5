@@ -27,7 +27,11 @@ public class FareTransferRuleInfo implements Serializable {
         int currencyScalar = Currency.scalarForCurrency.get(rule.currency);
         if (Double.isNaN(rule.amount))
             throw new IllegalArgumentException("Amount missing from fare_leg_rule (min_amount/max_amount not supported!");
-        amount = (int) (rule.amount * currencyScalar);
+
+        // it is important to round here, rather than just cast to int, because though in theory
+        // rule.amount * currencyScalar should always exactly equal an integer, the subleties of floating point math
+        // mean that is not always the case. See extensive comment in FareLegRuleInfo.
+        amount = (int) Math.round(rule.amount * currencyScalar);
         order = rule.order;
         spanning_limit = rule.spanning_limit;
         duration_limit = rule.duration_limit;

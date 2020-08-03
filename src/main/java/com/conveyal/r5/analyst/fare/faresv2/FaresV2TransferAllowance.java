@@ -44,9 +44,10 @@ public class FaresV2TransferAllowance extends TransferAllowance {
      * are in this array, then the same logic should apply - two routes that have the same most expensive fare leg rule(s)
      * cover the same extents.
      *
-     * To keep this tractable, the array only retains the fare leg rules with the lowest order. Thus, the fare leg rule
-     * for the full extent must always have the lowest order in the feed. This is generally true anyways, since the fare
-     * leg rule with the lowest order will be the one returned, but if A-B and A-C are the same price, you might be sloppy
+     * To keep this tractable, the array only retains the fare leg rules with the lowest order
+     * (as set in fare_leg_rules.txt). Thus, the fare leg rulefor the full extent must always have the
+     * lowest order in the feed. This is generally true anyways, since the fare leg rule with the lowest
+     * order will be the one returned, but if A-B and A-C are the same price, you might be sloppy
      * and assign order randomly for these two fare pairs. But to get proper transfer allowance domination logic, A-C
      * must have a lower order or the same order as A-B. If they have the same fare and transfer privileges, routing will
      * not be affected if they have the same order - the A-B fare leg may be used when A-C should really be, but that

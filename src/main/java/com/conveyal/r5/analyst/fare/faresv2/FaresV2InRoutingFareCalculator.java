@@ -44,6 +44,18 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
             });
 
     /**
+     * If true, consider all stops at which an as_route journey boards or alights as potentially triggering a higher
+     * fare (e.g. "via" fares used in London, Toronto), and calculate fares based on the most extensive fare leg rule
+     * for the trip.
+     *
+     * If false, simply use the first boarding and last alighting stop of a journey to calculate the fare.
+     *
+     * This requires setting the order field in fare_leg_rules so that more extensive
+     * fare leg rules have lower order. If the system does not have linear systems of zones, the order can be set based on the
+     * cost of the fare_leg_rule, as long as adding an additional zone to a trip cannot make the fare go down. Fare leg rules
+     * with the same fare must be given the same order for transfer allowances to work correctly; see comments on
+     * FaresV2TransferAllowance.potentialAsRouteFareRules.
+     *
      * This is hack to address a situation where GTFS-Fares V2 is not (as of this writing) able to correctly represent
      * the GO fare system. The GO fare chart _appears_ to be a simple from-station-A-to-station-B chart, a la WMATA etc.,
      * but it's more nuanced - because of one little word in the fare bylaws
@@ -61,8 +73,8 @@ public class FaresV2InRoutingFareCalculator extends InRoutingFareCalculator {
      * expensive first, the proper fare will be found (assuming that extending the trip into a new zone always causes a
      * nonnegative change in the fare).
      *
-     * This is not a hypothetical concern in Toronto. Consider this trip:
-     * https://projects.indicatrix.org/fareto-examples/?load=broken-yyz-downtown-to-york
+     * The need to calculate as_route fares based on the full journey extent is not a hypothetical concern in Toronto.
+     * Consider this trip: https://projects.indicatrix.org/fareto-examples/?load=broken-yyz-downtown-to-york
      * The second option here is $6.80 but should be $7.80, because it requires a change at Unionville, and Toronto to
      * Unionville is 7.80 even though Toronto to Yonge/407 is only $6.80.
      */

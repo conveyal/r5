@@ -37,34 +37,35 @@ public class FaresV2TransferAllowance extends TransferAllowance {
      *
      * potentialAsRouteFareLegRules should contain all the fare leg rules that could apply to the as_route trip. More
      * specifically, two conditions must hold for potentialAsRouteFareLegs: 1) it must include the fare leg rule that
-     * represents the full extent of the trip (e.g. for a B - C - A trip, it must include C - A), and it must _not_ include
+     * represents the full extent of the trip (e.g. for a B - C - A trip, it must include C - A), and 2) it must _not_ include
      * any fare leg rule larger than the full extent of the trip. (Full extent imagines the fare zones as being linear,
      * but in Toronto where this useAllStopsWhenCalculatingAsRouteFareNetwork we are taking "full extent" to mean "most
      * expensive", and though space is two-dimensional, money is one-dimensional.) If the most expensive fare leg rules
-     * are the ones that are in this bitmap, then the same logic should apply - two routes that have the same most
-     * expensive fare leg rule(s) cover the same extents.
+     * are in this array, then the same logic should apply - two routes that have the same most expensive fare leg rule(s)
+     * cover the same extents.
      *
-     * To keep this tractable, the bitmap only retains the fare leg rules with the lowest order. Thus, the fare leg rule
+     * To keep this tractable, the array only retains the fare leg rules with the lowest order. Thus, the fare leg rule
      * for the full extent must always have the lowest order in the feed. This is generally true anyways, since the fare
      * leg rule with the lowest order will be the one returned, but if A-B and A-C are the same price, you might be sloppy
      * and assign order randomly for these two fare pairs. But to get proper transfer allowance domination logic, A-C
      * must have a lower order or the same order as A-B. If they have the same fare and transfer privileges, routing will
      * not be affected if they have the same order - the A-B fare leg may be used when A-C should really be, but that
-     * will not affect the result as the two fare legs are equivalent.
+     * will not affect the result as the two fare legs are equivalent, and A-C will still appear in this array and satisfy
+     * the two conditions above.
      *
-     * The second condition is that all of the fare leg rules in potentialAsRouteFareLegRules must be applicable to the
-     * full as_route journey or subjourneys of it.
+     * If both of these conditions hold, then the two journeys with the same potentialAsRouteFareRules cover the same
+     * territory and can be considered equivalent.
      *
-     * If both of these conditions hold, then the two fare leg rules cover the same territory and can be considered
-     * equivalent. If fare leg rules 1 and 2 are the most expensive ("full extent"), and
-     * B.potentialAsRouteFareLegRules == A.potentialAsRouteFareRules, then A and B cover the same territory.
      * Proof:
-     * 1. By condition 1, if 1 and 2 are the most extensive/expensive fare leg rules for option A, then they must appear in
-     * A.potentialAsRouteFareRules.
-     * 2. By condition 2, no other more expensive/extensive fare leg rules can appear in A.potentialAsRouteFareRules.
-     * 3. If A.potentialAsRouteFareRules == B.potentialAsRouteFareRules, then 1 and 2 are the most expensive/extensive
-     *    fare leg rules for B as well as A.
-     * 4. A and B are thus equally extensive/expensive.
+     * Suppose without loss of generality that fare leg rules 1 and 2 are the most expensive ("full extent") for journey
+     * Q, and R.potentialAsRouteFareLegRules == Q.potentialAsRouteFareRules.
+     *
+     * 1. By condition 1, if 1 and 2 are the most extensive/expensive fare leg rules for journey Q, then they must appear in
+     * Q.potentialAsRouteFareRules.
+     * 2. By condition 2, no other more expensive/extensive fare leg rules can appear in Q.potentialAsRouteFareRules.
+     * 3. If Q.potentialAsRouteFareRules == R.potentialAsRouteFareRules, then 1 and 2 are the most expensive/extensive
+     *    fare leg rules for R as well as Q.
+     * 4. Q and R are thus equally extensive/expensive.
      * Q.E.D.
      */
     private int[] potentialAsRouteFareLegRules;

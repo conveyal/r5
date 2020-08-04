@@ -217,7 +217,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     private final BostonTransferAllowance noTransferAllowance = new BostonTransferAllowance();
 
-    private static int priceToInt(double price) {return (int) (price * 100);} // usd to cents
+    private static int priceToInt(double price) {return (int) Math.round(price * 100);} // usd to cents
 
     private static int payFullFare(Fare fare) {return priceToInt(fare.fare_attribute.price);}
 

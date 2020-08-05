@@ -19,8 +19,8 @@ import java.util.stream.IntStream;
  * Transfer allowance for Fares V2.
  */
 public class FaresV2TransferAllowance extends TransferAllowance {
-    /** The transfer rules that this allowance could be the start of */
-    private RoaringBitmap potentialTransferRules;
+    /** The last fare leg rule used. Two routes are equivalent if they have the same last fare leg rule. */
+    public int lastFareLegRule;
 
     /** need to hold on to a ref to this so that getTransferRuleSummary works - but make sure it's not accidentally serialized */
     private transient TransitLayer transitLayer;
@@ -90,12 +90,13 @@ public class FaresV2TransferAllowance extends TransferAllowance {
         this.asRouteFareNetworksBoardStop = asRouteFareNetworksBoardStop;
         this.potentialAsRouteFareLegRules = potentialAsRouteFareLegRules;
 
-        if (prevFareLegRuleIdx != -1 && transitLayer.fareTransferRulesForFromLegGroupId.containsKey(prevFareLegRuleIdx)) {
-            // not at start of trip, so we may have transfers available
-            potentialTransferRules = transitLayer.fareTransferRulesForFromLegGroupId.get(prevFareLegRuleIdx);
-        } else {
-            potentialTransferRules = new RoaringBitmap();
-        }
+        this.lastFareLegRule = prevFareLegRuleIdx;
+//        if (prevFareLegRuleIdx != -1 && transitLayer.fareTransferRulesForFromLegGroupId.containsKey(prevFareLegRuleIdx)) {
+//            // not at start of trip, so we may have transfers available
+//            potentialTransferRules = transitLayer.fareTransferRulesForFromLegGroupId.get(prevFareLegRuleIdx);
+//        } else {
+//            potentialTransferRules = new RoaringBitmap();
+//        }
 
         this.transitLayer = transitLayer;
     }
@@ -124,8 +125,8 @@ public class FaresV2TransferAllowance extends TransferAllowance {
                         !Arrays.equals(asRouteFareNetworks, o.asRouteFareNetworks)) return false;
             }
 
-            // at least as good if it provides a superset of the transfers the other does
-            return potentialTransferRules.contains(o.potentialTransferRules);
+            // at least as good if it is the same fare leg rule
+            return lastFareLegRule == o.lastFareLegRule;
         } else {
             throw new IllegalArgumentException("mixing of transfer allowance types!");
         }
@@ -140,22 +141,27 @@ public class FaresV2TransferAllowance extends TransferAllowance {
      * Displaying a bunch of ints in the debug interface is going to be impossible to debug. Instead, generate an
      * on the fly string representation. This is not called in routing so performance isn't really an issue.
      */
-    public List<String> getTransferRuleSummary () {
-        if (transitLayer == null) return IntStream.of(potentialTransferRules.toArray())
-                .mapToObj(Integer::toString)
-                .collect(Collectors.toList());
+//    public List<String> getTransferRuleSummary () {
+//        if (transitLayer == null) return IntStream.of(potentialTransferRules.toArray())
+//                .mapToObj(Integer::toString)
+//                .collect(Collectors.toList());
+//
+//        List<String> transfers = new ArrayList<>();
+//
+//        for (PeekableIntIterator it = potentialTransferRules.getIntIterator(); it.hasNext();) {
+//            int transferRuleIdx = it.next();
+//            FareTransferRuleInfo info = transitLayer.fareTransferRules.get(transferRuleIdx);
+//            transfers.add(info.from_leg_group_id + " " + info.to_leg_group_id);
+//        }
+//
+//        transfers.sort(Comparator.naturalOrder());
+//
+//        return transfers;
+//    }
 
-        List<String> transfers = new ArrayList<>();
-
-        for (PeekableIntIterator it = potentialTransferRules.getIntIterator(); it.hasNext();) {
-            int transferRuleIdx = it.next();
-            FareTransferRuleInfo info = transitLayer.fareTransferRules.get(transferRuleIdx);
-            transfers.add(info.from_leg_group_id + " " + info.to_leg_group_id);
-        }
-
-        transfers.sort(Comparator.naturalOrder());
-
-        return transfers;
+    /** For debug interface */
+    public String getLastFareLegGroupId () {
+        return transitLayer.fareLegRules.get(lastFareLegRule).leg_group_id;
     }
 
     public List<String> getPotentialAsRouteFareLegRules () {

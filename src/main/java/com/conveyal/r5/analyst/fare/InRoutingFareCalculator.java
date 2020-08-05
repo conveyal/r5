@@ -13,7 +13,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
-import java.util.function.ToIntFunction;
 
 /**
  * A fare calculator used in Analyst searches. The currency is not important as long as it is integer and constant

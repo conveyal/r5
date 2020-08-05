@@ -180,8 +180,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Map from each trip_id to ID of trip pattern containing that trip. */
     public final Map<String, String> patternForTrip;
 
-    /** Map from
-
     /** Once a GTFSFeed has one feed loaded into it, we set this to true to block loading any additional feeds. */
     private boolean loaded = false;
 

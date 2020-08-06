@@ -84,7 +84,7 @@ public class FaresV2TransferAllowance extends TransferAllowance {
                                      int[] potentialAsRouteFareLegRules, TransitLayer transitLayer) {
         // the value is really high to effectively disable Theorem 3.1 for now, so we don't have to actually calculate
         // the max value, at the cost of some performance.
-        super(10_000_000_00, 0, 0);
+        super(1_000_00, 0, 0);
 
         this.asRouteFareNetworks = asRouteFareNetworks;
         this.asRouteFareNetworksBoardStop = asRouteFareNetworksBoardStop;

@@ -634,8 +634,16 @@ public class TransitLayer implements Serializable, Cloneable {
             if (fareNetwork.as_route == 1) fareNetworkAsRoute.add(fareNetworkIdx);
 
             for (String routeId : fareNetwork.route_ids) {
-                int routeIdx = indexForUnscopedRouteId.get(routeId);
-                fareNetworksForRoute.get(routeIdx).add(fareNetworkIdx);
+                if (indexForUnscopedRouteId.containsKey(routeId)) {
+                    int routeIdx = indexForUnscopedRouteId.get(routeId);
+                    if (!routes.get(routeIdx).route_id.equals(routeId))
+                        throw new IllegalStateException("Route ID mismatch!");
+                    fareNetworksForRoute.get(routeIdx).add(fareNetworkIdx);
+                } else {
+                    // don't error out here, it's not illegal to have a route with no trips, and this can happen when
+                    // GTFS is trimmed
+                    LOG.warn("Route ID {} referenced in fare_networks not in routes, or has no trips!", routeId);
+                }
             }
 
             fareNetworkIdx++;

@@ -443,6 +443,16 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             transferAllowance = transferAllowance.setBehindGates(false);
         }
 
+        // if we ended up behind gates in the subway, we can get a free transfer to the subway. This is not neeed in
+        // fare calculation but is important in dominance. In fact, doing this would cause a problem in fare calculation,
+        // because payDifference uses the value field of the transfer allowance under construction. But once we return
+        // the transfer allowance, payDifference is no longer used.
+        // This is important for the silver line, which can get you behind gates for less than 2.25.
+        int subwayFare = (int) Math.round(fares.byId.get(SUBWAY_FARE_ID).fare_attribute.price * 100);
+        if (transferAllowance.behindGates && transferAllowance.value < subwayFare) {
+            transferAllowance = new BostonTransferAllowance(subwayFare, transferAllowance.number, transferAllowance.expirationTime,
+                    transferAllowance.transferRuleGroup, transferAllowance.behindGates);
+        }
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
     }

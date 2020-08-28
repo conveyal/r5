@@ -900,7 +900,6 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     private TIntObjectMap<RoaringBitmap> indexFareLegRulesForStops(TIntObjectMap<RoaringBitmap> fareLegRulesForFareAreaId) {
         TIntObjectMap<RoaringBitmap> forStops = new TIntObjectHashMap<>();
-        Map<RoaringBitmap, RoaringBitmap> bitmaps = new HashMap<>();
         for (int stop = 0; stop < stopIdForIndex.size(); stop++) {
             TIntList fareAreas = fareAreasForStop.get(stop);
             // TODO could intern these RoaringBitmaps to save some memory if it becomes a problem

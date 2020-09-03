@@ -78,6 +78,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     // transfer. This may be true at other locations/with other SL variants, but it is not documented.
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
             "place-coecl"));
+    // The transfer system at Airport is not entirely clear, but we are assuming that it is treated as a "virtual
+    // behind-gates transfer" where even though there is a fare interaction it is not treated as a transfer. However,
+    // for this to work, you would have had to tap in on another service. So SL1 Airport-SL3-Blue does not provide a free
+    // transfer to the Blue Line because you never tapped in on the SL1 - the system has no way of knowing that you are
+    // transferring from the Silver Line rather than starting a new trip.
+    private static final Set<String> stationsWithVirtualBehindGatesTransfers = new HashSet<>(Arrays.asList("place-aport"));
     private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(new HashSet<>(Arrays.asList(
             "place-dwnxg", "place-pktrm"))));
 
@@ -237,13 +243,16 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 (receiving == TransferRuleGroup.SUBWAY || receiving == TransferRuleGroup.SL_FREE));
     }
 
-    private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation){
+    private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation, TransferRuleGroup boardGroup){
         return (fromStopIndex == toStopIndex ||  // same platform
 
                 // different platforms, same station, in stations with behind-gate transfers between platforms
                 (fromStation != null && fromStation.equals(toStation) &&
                         // e.g. Copley has same parent station, but no behind-the-gate transfers between platforms
-                        !stationsWithoutBehindGateTransfers.contains(toStation)) ||
+                        !stationsWithoutBehindGateTransfers.contains(toStation) &&
+                        // If the original service boarded was SL_FREE, you don't get a free transfer at Airport, because
+                        // the system has no way of knowing that you were "behind gates" to begin with.
+                        (boardGroup != TransferRuleGroup.SL_FREE || !stationsWithVirtualBehindGatesTransfers.contains(toStation))) ||
                 // different stations connected behind faregates
                 // e.g. Park Street and Downtown Crossing are connected by the Winter Street Concourse
                 stationsConnected.contains(new HashSet<>(Arrays.asList(fromStation, toStation))));
@@ -357,7 +366,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     // if the previous alighting stop and this boarding stop are connected behind fare
                     // gates (and without riding a vehicle!), continue to the next ride. There is no CharlieCard tap
                     // and thus for fare purposes these are a single ride.
-                    if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) continue;
+                    if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation, issuing)) continue;
                 }
             }
 
@@ -438,7 +447,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             if (modesWithBehindGateTransfers.contains(previous)) {
                 // it is possible that we are inside fare gates, because the last vehicle we rode would have left us there
                 String currentStation = transitLayer.parentStationIdForStop.get(state.stop);
-                boolean behindGates = platformsConnected(prevAlightStopIndex, prevAlightStation, state.stop, currentStation);
+                boolean behindGates = platformsConnected(prevAlightStopIndex, prevAlightStation, state.stop, currentStation, transferAllowance.transferRuleGroup);
                 transferAllowance = transferAllowance.setBehindGates(behindGates);
             } else {
                 transferAllowance = transferAllowance.setBehindGates(false);

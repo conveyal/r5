@@ -72,8 +72,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Set<TransferRuleGroup> modesWithBehindGateTransfers = new HashSet<>(Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SL_FREE));
 
     private static final String DEFAULT_FARE_ID = LOCAL_BUS_FARE_ID;
+    // place-aport used to be listed here as well, but was removed because it prevented any discounted transfers
+    // _at all_ from the SL3 to the Blue Line at Airport. https://www.mbta.com/fares/transfers says that "SL1, SL2, and
+    // SL3 are subway fares" so we assume that an SL3-Blue Line transfer at Airport is treated the same as a behind gates
+    // transfer. This may be true at other locations/with other SL variants, but it is not documented.
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
-            "place-coecl", "place-aport"));
+            "place-coecl"));
     private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(new HashSet<>(Arrays.asList(
             "place-dwnxg", "place-pktrm"))));
 

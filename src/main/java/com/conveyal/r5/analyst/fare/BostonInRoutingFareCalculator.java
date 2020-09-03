@@ -392,7 +392,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     transferAllowance = transferAllowance.localBusToSubwayTransferAllowance();
                 }
                 // Special case: route prefix is (local bus -> subway)
-                else if (issuing == TransferRuleGroup.LOCAL_BUS_TO_SUBWAY){
+                else if (issuing == TransferRuleGroup.LOCAL_BUS_TO_SUBWAY) {
                     // local bus -> subway -> bus special case
                     if (receiving == TransferRuleGroup.LOCAL_BUS) {
                         //Don't increment cumulativeFarePaid, just clear transferAllowance. Local bus->subway->local bus is a free transfer.
@@ -409,6 +409,17 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
                     transferAllowance = noTransferAllowance;
                 }
+            } else if (receiving == TransferRuleGroup.SL_FREE && issuing != TransferRuleGroup.NONE) {
+                // when boarding SL_FREE, don't wipe out the transfer allowance from a previous ride. Important for a
+                // trip that is bus -> SL_FREE -> bus, because the transfer allowance from the first bus can be used
+                // for the second.
+                // This will not affect behind-gate transfers, as these are always based on the fare from the previous
+                // ride, not the issuing ride.
+                // Example: https://projects.indicatrix.org/fareto-examples/?load=broken-bos-bus-sl-bus&index=1
+                // (uncheck Remove non-Pareto-optimal trips)
+                // Note that this is here and not inside the tryToRedeemTransfer conditional, because SL_FREE is not the
+                // target of any transfers so tryToRedeemTransfer will always be false.
+                /* do nothing */
             } else { // don't try to use transferValue; pay the full fare for this ride
                 cumulativeFarePaid += payFullFare(fare);
                 transferAllowance = transferAllowance.updateTransferAllowance(fare, boardClockTime);

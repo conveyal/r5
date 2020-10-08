@@ -42,7 +42,7 @@ Database configuration variables include:
 ## Building and running
 
 Once you have configured `analysis.properties` and started MongoDB locally, build the application with `gradle build` and 
-start it with `java -Xmx2g -cp target/shaded/vX.Y.Z.jar com.conveyal.analysis.BackendMain`
+start it with `java -Xmx2g -cp build/libs/r5-vX.Y.Z.jar com.conveyal.analysis.BackendMain`
 
 Next, follow the instructions to start the [analysis-ui frontend](https://github.com/conveyal/analysis-ui). Once that 
 is running, you should be able to log in without authentication (using the frontend URL, e.g. http://localhost:3000). 
@@ -53,7 +53,7 @@ In order to do development on the frontend or backend, you'll need to set up a l
 
 ## Structured Commit Messages
 
-We use structured commit messages to allow automated tools to determine release version numbers and generate changelogs.
+We use structured commit messages to help generate changelogs and determine version numbers.
 
 The first line of these messages is in the following format: `<type>(<scope>): <summary>` 
 

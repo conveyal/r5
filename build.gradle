@@ -7,7 +7,7 @@ plugins {
 
 group = 'com.conveyal'
 // set version to `git describe --tags --always --first-parent`, plus '.dirty' if local changes are present.
-version 'v6.0.0'
+version gitVersion()
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11

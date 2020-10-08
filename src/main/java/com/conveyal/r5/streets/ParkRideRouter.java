@@ -2,9 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
-import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;

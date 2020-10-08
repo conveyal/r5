@@ -1,10 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.PersistenceBuffer;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.FastRaptorWorker;
 
-import java.io.DataOutput;
 import java.util.Arrays;
 
 /**
@@ -23,7 +20,7 @@ public class TravelTimeResult {
     // Travel time values, indexed by percentile (sample) and target (grid cell/point)
     int[][] values;
 
-    public TravelTimeResult(AnalysisTask task) {
+    public TravelTimeResult(AnalysisWorkerTask task) {
         nPoints = task.nTargetsPerOrigin();
         nSamplesPerPoint = task.percentiles.length;
         // Initialization: Fill the values array the default unreachable value.

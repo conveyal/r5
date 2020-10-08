@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
-import org.locationtech.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

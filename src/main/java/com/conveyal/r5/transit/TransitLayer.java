@@ -749,18 +749,16 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Finds all the transit stops in given envelope and returns it.
+     * Finds all the transit stops in given envelope and returns it. Stops also have mode which is mode of route in
+     * first pattern that this stop is found in. Stop coordinates are jittered
+     * {@link com.conveyal.r5.point_to_point.PointToPointRouterServer#jitter(VertexStore.Vertex)}. Meaning they are
+     * moved a little from their actual coordinate so that multiple stops at same coordinate can be seen.
      *
-     * Stops also have mode which is mode of route in first pattern that this stop is found in
-     *
-     * Stop coordinates are jittered {@link com.conveyal.r5.point_to_point.PointToPointRouterServer#jitter(VertexStore.Vertex)}. Meaning they are moved a little from their actual coordinate
-     * so that multiple stops at same coordinate can be seen
-     *
+     * This will overselect from the spatial index but this is only used for visualizations.
      *
      * @param env Envelope in float degrees
-     * @return
      */
-    public Collection<com.conveyal.r5.api.util.Stop> findStopsInEnvelope(Envelope env) {
+    public Collection<com.conveyal.r5.api.util.Stop> findApiStopsInEnvelope (Envelope env) {
         List<com.conveyal.r5.api.util.Stop> stops = new ArrayList<>();
         EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
         TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(VertexStore.envelopeToFixed(env));
@@ -777,6 +775,36 @@ public class TransitLayer implements Serializable, Cloneable {
             return true;
         });
 
+        return stops;
+    }
+
+    /**
+     * Find all the transit stops inside the given Geometry. Filtering is performed - this should not overselect.
+     * This should include stops added by the scenario, minus those removed by the scenario.
+     * @param geometry a JTS geometry in floating point WGS84 degrees
+     */
+    public TIntSet findStopsInGeometry (Geometry geometry) {
+        Envelope envelopeFloating = geometry.getEnvelopeInternal();
+        Envelope envelopeFixed = VertexStore.envelopeToFixed(envelopeFloating);
+        // This should get all the edges including ones added by a scenario, minus those removed by a scenario.
+        TIntSet nearbyEdges = this.parentNetwork.streetLayer.findEdgesInEnvelope(envelopeFixed);
+        EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
+        VertexStore.Vertex v = this.parentNetwork.streetLayer.vertexStore.getCursor();
+        final TIntSet stops = new TIntHashSet();
+        nearbyEdges.forEach(eidx -> {
+            e.seek(eidx);
+            if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+                int fromStreetVertex = e.getFromVertex();
+                if (stopForStreetVertex.containsKey(fromStreetVertex)) {
+                    v.seek(fromStreetVertex);
+                    if (geometry.contains(v.getJTSPointFloating())) {
+                        int stopIdx = stopForStreetVertex.get(fromStreetVertex);
+                        stops.add(stopIdx);
+                    }
+                }
+            }
+            return true;
+        });
         return stops;
     }
 

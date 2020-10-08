@@ -1,16 +1,12 @@
 package com.conveyal.r5.util;
 
 import gnu.trove.TIntCollection;
-import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.procedure.TIntProcedure;
 
 import java.io.Serializable;
-import java.util.Collection;
-import java.util.NoSuchElementException;
 
 /**
  * Created by matthewc on 2/19/16.

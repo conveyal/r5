@@ -6,8 +6,7 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
-import com.conveyal.r5.analyst.scenario.ModificationPolygon;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -18,18 +17,11 @@ import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.P2;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.geom.Point;
-import com.conveyal.r5.profile.StreetMode;
-import org.locationtech.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntObjectMap;
@@ -38,6 +30,13 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import org.geotools.geojson.geom.GeometryJSON;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.operation.union.UnaryUnionOp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,8 +52,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -131,11 +130,13 @@ public class StreetLayer implements Serializable, Cloneable {
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
 
     // TODO these are only needed when building the network, should we really be keeping them here in the layer?
+    //      We should instead have a network builder that holds references to this transient state.
     // TODO don't hardwire to US
     private transient TraversalPermissionLabeler permissionLabeler = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedLabeler speedLabeler;
+    // private transient TraversalTimeLabeler traversalTimeLabeler;
     // This is only used when loading from OSM, and is then nulled to save memory.
     transient OSM osm;
 
@@ -183,8 +184,9 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * This set of polygons specifies a spatially varying wait time to use a ride hailing service. Negative wait times
      * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
+     * Note that this is a single field, rather than a collection: we only support one set of polygons for one mode.
      */
-    public IndexedPolygonCollection waitTimePolygons;
+    public PickupWaitTimes pickupWaitTimes;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -271,30 +273,33 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /** Load OSM, optionally removing floating subgraphs (recommended) */
     void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
-        if (!osm.intersectionDetection)
+        if (!osm.intersectionDetection) {
             throw new IllegalArgumentException("Intersection detection not enabled on OSM source");
-
+        }
         LOG.info("Making street edges from OSM ways...");
         this.osm = osm;
 
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
+        // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
+        // we are loading them. Eventually this should be done based on configuration settings.
+        this.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(edgeStore);
+
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
-
-            if (way.hasTag("park_ride", "yes"))
+            if (isParkAndRide(way)) {
                 parkAndRideWays.add(way);
-
+            }
             if (!isWayRoutable(way)) {
                 continue;
             }
             int nEdgesCreated = 0;
             int beginIdx = 0;
-            // Break each OSM way into topological segments between intersections, and make one edge per segment.
+            // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
             for (int n = 1; n < way.nodes.length; n++) {
                 if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
-                    makeEdge(way, beginIdx, n, entry.getKey());
+                    makeEdgePair(way, beginIdx, n, entry.getKey());
                     nEdgesCreated += 1;
                     beginIdx = n;
                 }
@@ -302,7 +307,15 @@ public class StreetLayer implements Serializable, Cloneable {
         }
         stressLabeler.logErrors();
 
-        // summarize LTS statistics
+        if (edgeStore.edgeTraversalTimes != null) {
+            LOG.info("Summarizing per-edge traversal and turn times:");
+            edgeStore.edgeTraversalTimes.summarize();
+        } else {
+            LOG.info("This street layer does not contain per-edge traversal and turn times.");
+        }
+
+        // Summarize LTS statistics
+        // FIXME why is this summary printed before stressLabeler.applyIntersectionCosts below?
         Edge cursor = edgeStore.getCursor();
         cursor.seek(0);
 
@@ -320,9 +333,10 @@ public class StreetLayer implements Serializable, Cloneable {
                 lts1, lts2, lts3, lts4, ltsUnknown);
 
         List<Node> parkAndRideNodes = new ArrayList<>();
-
         for (Node node : osm.nodes.values()) {
-            if (node.hasTag("park_ride", "yes")) parkAndRideNodes.add(node);
+            if (isParkAndRide(node)) {
+                parkAndRideNodes.add(node);
+            }
         }
 
         LOG.info("Done making street edges.");
@@ -354,8 +368,9 @@ public class StreetLayer implements Serializable, Cloneable {
         }
         LOG.info("Made {} P+R vertices", numOfParkAndRides);
 
-        // create turn restrictions.
+        // Create turn restrictions from relations.
         // TODO transit splitting is going to mess this up
+        // TODO handle multipolygon relations that are park and rides (e.g. parking structures with holes)
         osm.relations.entrySet().stream().filter(e -> e.getValue().hasTag("type", "restriction")).forEach(e -> this.applyTurnRestriction(e.getKey(), e.getValue()));
         LOG.info("Created {} turn restrictions", turnRestrictions.size());
 
@@ -366,6 +381,11 @@ public class StreetLayer implements Serializable, Cloneable {
             vertexIndexForOsmNode = null;
 
         osm = null;
+    }
+
+    private boolean isParkAndRide (OSMEntity entity) {
+        String prValue = entity.getTag("park_ride");
+        return prValue != null && ! prValue.equalsIgnoreCase("NO");
     }
 
     /**
@@ -1021,7 +1041,7 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * Make an edge for a sub-section of an OSM way, typically between two intersections or leading up to a dead end.
      */
-    private void makeEdge(Way way, int beginIdx, int endIdx, Long osmID) {
+    private void makeEdgePair (Way way, int beginIdx, int endIdx, Long osmID) {
 
         long beginOsmNodeId = way.nodes[beginIdx];
         long endOsmNodeId = way.nodes[endIdx];
@@ -1068,20 +1088,33 @@ public class StreetLayer implements Serializable, Cloneable {
             return;
         }
 
+        // Set forward and backward edge flags from OSM Way tags. The flags will later be stored in the EdgeStore.
         stressLabeler.label(way, forwardFlags, backFlags);
-
         typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
 
         Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, osmID);
         // newEdge is first pointing to the forward edge in the pair.
         // Geometries apply to both edges in a pair.
         newEdge.setGeometry(nodes);
+        // If per-edge traversal time factors are being recorded for this StreetLayer, store these factors for the
+        // pair of newly created edges based on the current OSM Way.
+        // NOTE the unusual requirement here that each OSM way is exactly one routable network edge.
+        if (edgeStore.edgeTraversalTimes != null) {
+            try {
+                edgeStore.edgeTraversalTimes.setEdgePair(newEdge.edgeIndex, way);
+            } catch (Exception ex) {
+                LOG.error("Continuing to load but ignoring generalized costs due to exception: {}", ex.toString());
+                edgeStore.edgeTraversalTimes = null;
+            }
+        }
+
         newEdge.setFlags(forwardFlags);
         newEdge.setSpeed(forwardSpeed);
         // Step ahead to the backward edge in the same pair.
         newEdge.advance();
         newEdge.setFlags(backFlags);
         newEdge.setSpeed(backwardSpeed);
+
     }
 
     public void indexStreets () {
@@ -1104,6 +1137,9 @@ public class StreetLayer implements Serializable, Cloneable {
      * We return the unfiltered results including false positives because calculating the true distance to each edge
      * is quite a slow operation. The caller must post-filter the set of edges if more distance information is needed,
      * including knowledge of whether an edge passes inside the query envelope at all.
+     * FIXME Document whether we're putting all edges, or just forward edges into this index.
+     *
+     * @param envelope FIXME IN WHAT UNITS, FIXED OR FLOATING?
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);
@@ -1236,6 +1272,13 @@ public class StreetLayer implements Serializable, Cloneable {
 
         // Return the splitter vertex ID
         return newVertexIndex;
+    }
+
+    // By convention we only index the forward edge since both edges in a pair have the same geometry.
+    // TODO expand to handle temp / non-temp automatically? This indexing can't be done at the end to allow re-splitting.
+    // TODO add to index automatically when creating edge pair?
+    public void indexTemporaryEdgePair (Edge tempEdge) {
+        temporaryEdgeIndex.insert(tempEdge.getEnvelope(), tempEdge.edgeIndex);
     }
 
     /**
@@ -1422,8 +1465,11 @@ public class StreetLayer implements Serializable, Cloneable {
         if (numAddedStations > 0) {
             this.bikeSharing = true;
         }
-        LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
-
+        LOG.info("Added {} out of {} stations ratio:{}",
+            numAddedStations,
+            bikeRentalStations.size(),
+            numAddedStations/bikeRentalStations.size()
+        );
     }
 
     public StreetLayer clone () {
@@ -1463,6 +1509,34 @@ public class StreetLayer implements Serializable, Cloneable {
         Geometry result = new UnaryUnionOp(geoms, GeometryUtils.geometryFactory).union();
         // logFixedPointGeometry("Unioned buffered streets", result);
         return result;
+    }
+
+    /**
+     * Create a geometry in FIXED POINT DEGREES containing all the points on all edges created by the scenario that
+     * produced this StreetLayer. Returns null if the resulting geometry would contain no points, to allow
+     * short-circuiting around slow operations that would use the result.
+     */
+    public Geometry addedEdgesBoundingGeometry () {
+        List<Geometry> geoms = new ArrayList<>();
+        Edge edge = edgeStore.getCursor();
+        edgeStore.forEachTemporarilyAddedEdge(e -> {
+            edge.seek(e);
+            // Should we simply only put linkable edges in the temp edge index? We could even name it accordingly.
+            // When iterating all scenario edges for egress cost table rebuilding, we don't use the spatial index.
+            if (edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+                Envelope envelope = edge.getEnvelope();
+                // Note that envelope geometries are not always Polygons:
+                // they can collapse to a linestring if they have no size in one dimension.
+                geoms.add(GeometryUtils.geometryFactory.toGeometry(envelope));
+            }
+        });
+        // The component polygons may not be disjoint, so rather than making a multipolygon compute the union.
+        Geometry result = new UnaryUnionOp(geoms, GeometryUtils.geometryFactory).union();
+        if (result.isEmpty()) {
+            return null;
+        } else {
+            return result;
+        }
     }
 
     /**
@@ -1539,26 +1613,33 @@ public class StreetLayer implements Serializable, Cloneable {
                 //}
                 return true;
             });
-
         }
         return bikeRentalStations;
     }
 
     /**
+     * For the given location and mode of travel, get an object representing the available on-demand mobility service,
+     * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
+     * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
+     * (or -1 for no service). Otherwise, return an object representing a 0 second delay.
      * @param lat latitude of the starting point in floating point degrees
      * @param lon longitude the starting point in floating point degrees
-     * @return the waiting time in seconds to begin driving on the street network (waiting to be picked up by a car)
+     * @return object with pick-up time and stops served
      */
-    public int getWaitTime (double lat, double lon) {
-        if (waitTimePolygons == null) {
-            return 0;
+    public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
+        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
+            return pickupWaitTimes.getAccessService(lat, lon);
         } else {
-            // TODO verify x, y order in coordinate
-            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-            ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
-            // Convert minutes to seconds
-            return (int)(polygon.data * 60);
+            return NO_WAIT_ALL_STOPS;
         }
+    }
+
+    public boolean edgeIsDeletedByScenario (int p) {
+        return edgeStore.temporarilyDeletedEdges != null && edgeStore.temporarilyDeletedEdges.contains(p);
+    }
+
+    public boolean edgeIsAddedByScenario (int p) {
+        return this.isScenarioCopy() && p >= edgeStore.firstModifiableEdge;
     }
 
     @Override

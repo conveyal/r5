@@ -13,10 +13,6 @@
 
 package com.conveyal.r5.streets;
 
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.triangulate.quadedge.Vertex;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
@@ -25,6 +21,9 @@ import gnu.trove.set.TIntSet;
 import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TIntHashSet;
 import gnu.trove.set.hash.TLongHashSet;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,6 +147,11 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
+    /**
+     * The spatial index can and will return false positives, but should not produce false negatives.
+     * We return the unfiltered results including false positives. That is, this overselects and MUST BE FILTERED.
+     * @return all indexed objects within the envelope, and then some.
+     */
     public final TIntSet query(Envelope envelope) {
         final TIntSet ret = new TIntHashSet();
         visit(envelope, false, (bin, mapKey) -> {
@@ -228,7 +232,7 @@ public class IntHashGrid implements Serializable {
 
     public String toString() {
         return String
-                .format("HashGridSpatialIndex %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
+                .format("IntHashGrid %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
                         this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
                         this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects);
     }

@@ -1,0 +1,90 @@
+# This file contains the configuration options for Conveyal Analysis
+
+# Auth0 authentication configuration. The values will be ignored when configuration option offline=true.
+auth0-client-id=X
+auth0-domain=auth.domain.com
+auth0-secret=Y
+
+# Access group for administrators
+admin-access-group=OFFLINE
+
+# The host and port of the remote Mongo server (if any). Comment out for local Mongo instance.
+# database-uri=mongodb://127.0.0.1:27017
+
+# The name of the database in the Mongo instance.
+database-name=analysis-backend-test
+
+# The URL where the frontend is hosted.
+# In production this should point to a cached CDN for speed. e.g. https://d1uqjuy3laovxb.cloudfront.net
+# In staging this should be the underlying S3 URL so files are not cached and you see the most recent deployment.
+frontend-url=https://example.com
+
+# S3 buckets where Analysis inputs and results are stored.
+bundle-bucket=test-bundles
+grid-bucket=test-grids
+results-bucket=test-results
+resources-bucket=test-resources
+
+# The URL from which Analysis can fetch OSM extracts on demand using Conveyal Vanilla Extract.
+vex-url=http://example.com/vex
+
+# The S3 bucket where we can find tiles of the entire US census, built with Conveyal seamless-census.
+seamless-census-bucket=test
+seamless-census-region=us-east-1
+
+# When offline is true, authentication and other services are not used.
+# This is only partially true - regional results will still be saved on S3.
+# This is intended for local testing.
+offline=true
+
+# The AWS region in which the server is running, and in which you want to run worker machines.
+aws-region=eu-west-1
+
+# The port on which the server will listen for connections from clients and workers.
+server-port=7070
+
+# A temporary location to store scratch files. The path can be absolute or relative.
+# This allows you to locate temporary storage on an extra drive in case your main drive does not have enough space.
+# local-cache=/home/ec2-user/cache
+local-cache=cache
+
+# Java threads for lighter async operations
+light-threads=3
+
+# Java threads for heavy operations
+heavy-threads=3
+
+# Max number of instances to start.
+# If there are more than this number running more instances will not be started.
+# This limit doesn't work very well because if you've manually started 200 workers on one graph,
+# the broker then won't start more workers for a completely different job.
+max-workers=8
+
+# IAM role to assign the worker instances. Currently this is the same role assigned to the backend/broker.
+# This is the IAM role whose policy is defined in iam.yml (and is recursively referenced therein).
+worker-iam-role=test-test
+
+# Type of EC2 instance to start up, in the standard AWS format containing a dot as listed on
+# https://aws.amazon.com/ec2/instance-types/
+worker-type=r5.xlarge
+
+# The AWS Cloudwatch log group for worker EC2 instances.
+# Each worker creates its own log stream within this log group at startup.
+worker-log-group=test-test
+
+# The port on which the workers will listen for high priority pushed tasks.
+# This should be different from the server-port if you want to run a worker on the same machine as the server.
+worker-port=7080
+
+# The ID of the AWS VPC subnet where EC2 worker instances will run.
+# Currently this is the same subnet where the backend and broker run.
+# The CIDR mask of this subnet naturally limits the number of workers, providing
+# some level of protection against high EC2 bills should workers accidentally proliferate.
+worker-subnet-id=test-test
+
+# The ID of the EC2 machine image for the workers. We use a stock Amazon Linux instance and perform additional
+#installation and configuration on startup using a user-data script.
+worker-ami-id=test-test
+
+# whether or not we're running in a test environment
+junit-test-environment=true

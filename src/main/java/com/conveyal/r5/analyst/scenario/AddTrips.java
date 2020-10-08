@@ -1,6 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -24,7 +28,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static java.time.DayOfWeek.*;
+import static java.time.DayOfWeek.FRIDAY;
+import static java.time.DayOfWeek.MONDAY;
+import static java.time.DayOfWeek.SATURDAY;
+import static java.time.DayOfWeek.SUNDAY;
+import static java.time.DayOfWeek.THURSDAY;
+import static java.time.DayOfWeek.TUESDAY;
+import static java.time.DayOfWeek.WEDNESDAY;
 
 /**
  * Create a new trip pattern and add some trips to that pattern.
@@ -53,6 +63,9 @@ public class AddTrips extends Modification {
 
     /** A list of the internal integer IDs for the existing or newly created stops. */
     private TIntList intStopIds;
+
+    /** Set a direction ID for this modification */
+    public int directionId = 0;
 
     /** unique ID for transitive */
     private String routeId = UUID.randomUUID().toString();
@@ -96,7 +109,11 @@ public class AddTrips extends Modification {
         // No protective copy is made here because TransportNetwork.scenarioCopy already deep-copies certain collections.
         transitLayer.routes.add(info);
 
-        generatePattern(transitLayer, 0);
+        if (this.directionId != 0 && this.directionId != 1) {
+            throw new IllegalArgumentException("Direction must be 0/1");
+        }
+
+        generatePattern(transitLayer, this.directionId);
         if (bidirectional) {
             // We want to call generatePattern again, but with all stops and stoptimes reversed.
             // Reverse the intStopIds in place. The string stopIds should not be used anymore at this point.
@@ -113,7 +130,7 @@ public class AddTrips extends Modification {
                 dwellList.reverse();
                 ptt.dwellTimes = dwellList.toArray();
             }
-            generatePattern(transitLayer, 1);
+            generatePattern(transitLayer, this.directionId == 0 ? 1 : 0); // other direction ID for bidirection route
         }
         return false;
     }
@@ -137,6 +154,8 @@ public class AddTrips extends Modification {
         pattern.tripSchedules.sort(Comparator.comparing(ts -> ts.departures[0]));
         pattern.routeIndex = this.routeIndex;
         pattern.routeId = this.routeId;
+        // We use the directionId method parameter rather than this.directionId. This allows two patterns to be created with opposite directionIds when bidirectional=true.
+        pattern.directionId = directionId;
 
         transitLayer.tripPatterns.add(pattern);
     }

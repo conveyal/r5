@@ -1,0 +1,233 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '6.0.0'
+    id 'maven-publish'
+    id 'com.palantir.git-version' version '0.12.3'
+}
+
+group = 'com.conveyal'
+// set version to `git describe --tags --always --first-parent`, plus '.dirty' if local changes are present.
+version 'v6.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+jar {
+    // For Java 11 Modules, specify a module name.
+    // Do not create module-info.java until all our dependencies specify a module name.
+    // Main-Class R5Main will start a worker, BackendMain must be specified on JVM command line to start backend.
+    // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.
+    // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
+    manifest {
+        attributes 'Automatic-Module-Name': 'com.conveyal.analysis',
+            'Main-Class': 'com.conveyal.r5.R5Main',
+            'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
+            'Implementation-Title': 'Conveyal Analysis Backend',
+            'Implementation-Vendor': 'Conveyal LLC',
+            'Implementation-Version': project.version
+    }
+}
+
+shadowJar {
+    mergeServiceFiles()
+}
+
+// `gradle publish` will upload both shadow and simple JAR to Github Packages
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/conveyal/analysis-backend")
+            credentials {
+                username = System.getenv("GPR_USERNAME")
+                password = System.getenv("GPR_TOKEN")
+            }
+        }
+    }
+    publications {
+        // The presence of the shadow plugin somehow causes the shadow-jar to also be automatically included in this
+        // publication. Ideally we want to produce the shadow jar and upload it to S3 as a worker, but only publish the
+        // much smaller plain JAR without dependencies to Github Packages. On the other hand, we may want to publish
+        // shadow jars for tagged releases.
+        gpr(MavenPublication) {
+            from(components.java)
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// A task to copy all dependencies of the project into a single directory
+task copyDependencies(type: Copy) {
+    from configurations.default
+    into 'dependencies'
+}
+
+// Create a configuration properties file (by copying the template) before running this task.
+task testShadowJarRunnable(type: JavaExec) {
+    dependsOn(shadowJar)
+    classpath(shadowJar.archiveFile.get())
+    main("com.conveyal.analysis.BackendMain")
+    jvmArgs("-Dconveyal.immediate.shutdown=true")
+}
+
+// Create a properties file so Java code can be aware of its own version. Properties allow exposing multiple values
+// such as the full commit ID and branch name, rather than just the version available in the JAR manifest.
+task createVersionProperties(dependsOn: processResources) {
+    doLast {
+        def details = versionDetails()
+        new File("$buildDir/resources/main/version.properties").withWriter { w ->
+            Properties p = new Properties()
+            p['version'] = project.version.toString()
+            p['commit'] = details.gitHashFull
+            p['branch'] = details.branchName
+            p.store w, null
+        }
+    }
+}
+
+classes {
+    dependsOn createVersionProperties
+}
+
+repositories {
+    // Do not use mavenLocal() which is only for interoperability with Maven, let Gradle manage its own cache.
+    // Put Open Source Geospatial before Maven Central to get JAI core, see https://stackoverflow.com/a/26993223
+    maven { url 'https://repo.osgeo.org/repository/release/' }
+    mavenCentral()
+    // TODO review whether we really need these repositories
+    maven { url 'https://maven.conveyal.com' }
+    // Used for importing java projects from github (why do we need this?)
+    maven { url 'https://jitpack.io' }
+    // For the polyline encoder
+    maven { url 'https://nexus.axiomalaska.com/nexus/content/repositories/public-releases' }
+}
+
+dependencies {
+    // Provides our logging API
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+
+    // Implementation of the logging API
+    implementation 'ch.qos.logback:logback-classic:1.2.3'
+
+    // Spark is an HTTP framework built on Jetty. Its name is the same as several other projects.
+    implementation (group: 'com.sparkjava', name: 'spark-core', version: '2.7.2') {
+        exclude group: 'org.slf4j', module: 'slf4j-simple'
+    }
+
+    // Database driver.
+    implementation 'org.mongodb:mongo-java-driver:3.11.0'
+
+    // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
+    implementation 'org.mongojack:mongojack:2.5.1'
+
+    // JSON serialization and deserialization from and to Java objects
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
+
+    // Parses CSV. GTFS is a set of zipped CSV files, and some of our other inputs are CSV files.
+    implementation 'net.sourceforge.javacsv:javacsv:2.0'
+
+    // Parses command line arguments (including standard switches) to main methods.
+    implementation 'com.beust:jcommander:1.30'
+
+    // GeoTools provides GIS functionality on top of JTS topology suite.
+    def geotoolsVersion = '21.2'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-main'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-opengis'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-referencing'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-shapefile'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-coverage'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojson'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geotiff'
+    // Provides the EPSG coordinate reference system catalog as an HSQL database.
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-epsg-hsql'
+
+    // Legacy JTS with com.vividsolutions package name. Newer Geotools compatible with Java 11 uses a newer version of
+    // JTS with the org.locationtech package name. But our MapDB format includes serialized JTS geometries with the
+    // old package name, and some bugs in the older gtfs-lib that produced those MapDB files are preventing us from
+    // migrating to a newer format. So we import both JTS packages and convert between them.
+    implementation 'com.vividsolutions:jts:1.13'
+
+    // Pure Java database backend providing disk-backed storage that looks like a Java map. 1.0.8 was the second to
+    // last release of 1.x, and use of 2.x was not recommended. We should not bump this unless migrating to 3.x or 4.x.
+    // See changelog at http://www.mapdb.org/changelog/
+    implementation 'org.mapdb:mapdb:1.0.8'
+
+    implementation 'commons-fileupload:commons-fileupload:1.3.1'
+
+    implementation 'commons-codec:commons-codec:1.4'
+
+    // Commons IO gives us BOMInputStream for handling UTF-8 Byte Order Marks.
+    implementation 'commons-io:commons-io:2.6'
+
+    // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
+    implementation 'com.google.guava:guava:28.2-jre'
+
+    // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
+    //capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
+    implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'
+
+    implementation ('org.apache.httpcomponents:httpclient:4.5.6') {
+        because 'Force use of version used by AWS SDK instead of other versions used by our transitive dependencies.'
+        // TODO eventually migrate over to Java's built-in HTTP client.
+    }
+
+    // Persistent storage of files / objects on Amazon S3.
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
+
+    // Old version of GraphQL-Java used by legacy gtfs-api embedded in analysis-backend.
+    // TODO eliminate GraphQL in future API revisions
+    implementation 'com.graphql-java:graphql-java:2.1.0'
+
+    // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
+    implementation 'org.apache.commons:commons-math3:3.0'
+
+    // Provides some shared serializers for Kryo. Introduces transitive dependencies on Guava, Trove, and Kryo.
+    // Also provides classes for testing that a round trip through serialization reproduces the same network.
+    // This is an external dependency (not merged into backend) because it's also used by OTP2.
+    // TODO arguably we should declare non-transitive dependencies on Guava, Trove, and Kryo since we use them directly
+    implementation 'com.conveyal:kryo-tools:1.3.0'
+
+    // Trove supplies very efficient collections of primitive data types for Java.
+    implementation 'net.sf.trove4j:trove4j:3.0.3'
+
+    // TODO eliminate custom Conveyal geojson library, use Geotools?
+    implementation 'com.conveyal:jackson2-geojson:0.9'
+
+    implementation ('com.axiomalaska:polyline-encoder:0.2') {
+        because 'Maintainer has updated this polyline library to match our dependencies (newer locationtech JTS).'
+    }
+
+    implementation 'javax.xml.bind:jaxb-api:2.3.1'
+
+    // Google Protocol Buffers are used in decoding OSM data and seamless census data.
+    implementation 'com.google.protobuf:protobuf-java:2.6.1'
+
+    // OSM PBF format support. Transitive dependency on Protobuf 3.4.0.
+    // TODO investigate any conflict with above
+    implementation 'org.openstreetmap.osmosis:osmosis-osm-binary:0.45'
+
+    // Compressed bitmaps (bitsets) used to track which long OSM IDs have been encountered.
+    implementation 'org.roaringbitmap:RoaringBitmap:0.7.3'
+
+    ////// Test-only dependencies //////
+
+    // Assertion library that "makes testing web APIs easy".
+    testImplementation 'io.rest-assured:rest-assured:3.0.3'
+
+    // Java unit testing framework.
+    testImplementation 'junit:junit:4.12'
+
+    // Assertion library used in a few tests, which prints pretty messages when assertions fail.
+    testImplementation 'org.hamcrest:java-hamcrest:2.0.0.0'
+
+    // Snapshotting library for testing. This looks fragile, we should probably eliminate it.
+    testImplementation 'com.github.conveyal:java-snapshot-matcher:e6a78d3af9d67f6f6240261fcba497d3b50f9399'
+
+}
+

@@ -8,6 +8,8 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,12 @@ public abstract class Modification implements Serializable {
     // TODO this should be transient as well but previously wasn't. R5 modifications are stored in MongoDB in regional
     // analyses, which means that marking it transient causes deserialization headaches.
     public final Set<String> warnings = new HashSet<>();
+
+    /**
+     * As the modification is applied, information can be stored here to allow the end user to confirm its effects.
+     * For example, the number of transit stops affected or streets modified.
+     */
+    public transient final Set<String> info = new HashSet<>();
 
     /**
      * Apply this single modification to a TransportNetwork.
@@ -200,4 +208,22 @@ public abstract class Modification implements Serializable {
 
     }
 
+    /**
+     * Record a warning if a point is not within the region covered by a TransportNetwork.
+     * TODO use this on all other Modification subtypes that handle coordinates.
+     * @param coordinate in decimal degrees, with axis order (lon, lat) corresponding to (x, y).
+     * @param network the TransportNetwork in which the coordinate will be used.
+     */
+    protected void rangeCheckCoordinate (Coordinate coordinate, TransportNetwork network) {
+        // Envelope is precomputed, and is fast to fetch.
+        Envelope envelope = network.getEnvelope();
+        if (!envelope.contains(coordinate)) {
+            String message = String.format(
+                    "Coordinate %s was not within the area covered by the transport network (%s).",
+                    coordinate.toString(),
+                    envelope.toString()
+            );
+            errors.add(message);
+        }
+    }
 }

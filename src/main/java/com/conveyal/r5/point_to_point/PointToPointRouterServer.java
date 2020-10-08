@@ -1,5 +1,6 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.analyst.fare.ParetoServer;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
@@ -11,28 +12,49 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.streets.*;
+import com.conveyal.r5.streets.DebugRoutingVisitor;
+import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Split;
+import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.TurnRestriction;
+import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.operation.buffer.BufferParameters;
-import org.locationtech.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.PrecisionModel;
+import org.locationtech.jts.operation.buffer.BufferParameters;
+import org.locationtech.jts.operation.buffer.OffsetCurveBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
-import static spark.Spark.*;
+import static spark.Spark.before;
+import static spark.Spark.get;
+import static spark.Spark.post;
+import static spark.Spark.options;
+import static spark.Spark.port;
+import static spark.Spark.staticFileLocation;
 
 /**
  * This will represent point to point search server.
@@ -130,6 +152,7 @@ public class PointToPointRouterServer {
         ObjectReader mapReader = mapper.reader(HashMap.class);
         staticFileLocation("debug-plan");
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
+        ParetoServer paretoServer = new ParetoServer(transportNetwork);
 
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
@@ -254,7 +277,6 @@ public class PointToPointRouterServer {
                     VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
                     BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vertexIdx);
                     GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(), bikeShareVertex.getLat());
-                    feature.addProperty("weight", state.weight);
                     if (bikeRentalStation != null) {
                         feature.addProperty("name", bikeRentalStation.name);
                         feature.addProperty("id", bikeRentalStation.id);
@@ -309,7 +331,6 @@ public class PointToPointRouterServer {
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
                     VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
                     GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
-                    feature.addProperty("weight", state.weight);
                     //feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
                     feature.addProperty("type", "park_ride");
                     feature.addProperty("mode", "CAR");
@@ -488,7 +509,7 @@ public class PointToPointRouterServer {
             Map<String, Object> featureCollection = new HashMap<>(2);
             featureCollection.put("type", "FeatureCollection");
 
-            Collection<Stop> stops = transportNetwork.transitLayer.findStopsInEnvelope(env);
+            Collection<Stop> stops = transportNetwork.transitLayer.findApiStopsInEnvelope(env);
             List<GeoJsonFeature> features = new ArrayList<>(stops.size());
 
             stops.forEach(stop -> {
@@ -928,6 +949,7 @@ public class PointToPointRouterServer {
 
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+        post("/pareto", paretoServer::handle);
     }
 
     /**
@@ -1085,7 +1107,6 @@ public class PointToPointRouterServer {
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
                     .getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
-                feature.addProperty("weight", state.weight);
                 feature.addProperty("mode", state.streetMode);
                 feature.addProperty("distance", state.distance/1000);
                 feature.addProperty("idx", stateIdx++);

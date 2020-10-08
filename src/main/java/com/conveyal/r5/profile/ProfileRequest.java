@@ -152,10 +152,12 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * The maximum duration of any trip found by this search.
      * Defaults to 2 hours, the highest accessibility cutoffs allowed by our UI (which computes accessibility itself).
-     * Will be lowered to the maximum requested cutoff in regional analyses, where cutoffs are known in advance.
-     * TODO it seems like this should be set on each request without relying on hard wired defaults
+     * Newer workers will ignore this value for regional tasks, because each worker task infers the maximum travel time
+     * that can affect results based on the highest cutoff and the shape of the distance decay function.
+     * For single-point tasks this default of 2 hours will generally be used, but a lower value could be specified when
+     * performing slow computations such as fare-limited accessibility.
      */
-    public int maxTripDurationMinutes = 2 * 60;
+    public int maxTripDurationMinutes = 120;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.

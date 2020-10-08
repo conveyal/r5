@@ -4,15 +4,15 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 /**
- * Convenience functions for working with exceptions.
+ * Convenience functions for working with exceptions (or more generally throwables).
  */
 public abstract class ExceptionUtils {
 
-    public static String asString(Exception exception) {
+    public static String asString(Throwable throwable) {
         StringWriter sw = new StringWriter();
-        sw.append(exception.getMessage());
+        sw.append(throwable.getMessage());
         sw.append("\n");
-        exception.printStackTrace(new PrintWriter(sw));
+        throwable.printStackTrace(new PrintWriter(sw));
         return sw.toString();
     }
 

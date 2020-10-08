@@ -1,8 +1,8 @@
 package com.conveyal.r5.common;
 
+import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineString;
-import org.apache.commons.math3.util.FastMath;
 
 /**
  * Created by mabu on 4.1.2016.
@@ -109,7 +109,11 @@ public class DirectionUtils {
         return (byte) Math.round(angleRadians * 128 / Math.PI);
     }
 
-    /** Converts binary radians to angle in degrees **/
+    /**
+     * Converts binary radians to angle in degrees
+     * FIXME most of our operations can be done more simply and efficiently directly in brads, exploiting overflow.
+     *       A circle of 256 brads divides into four sections of 64, with 32 on either side of a cardinal direction.
+     */
     public static int bradsToDegree(byte brad) {
         return brad * 180 / 128;
     }

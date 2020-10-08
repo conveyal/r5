@@ -2,9 +2,9 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 import com.conveyal.r5.streets.VertexStore;
-import com.conveyal.r5.transit.*;
+import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.locationtech.jts.geom.*;
 
 /**
  * Transit stop

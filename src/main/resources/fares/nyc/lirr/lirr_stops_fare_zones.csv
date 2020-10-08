@@ -1,0 +1,126 @@
+stop_name,stop_id,fare_area
+Albertson,lirr1,7
+Amagansett,lirr4,14
+Amityville,lirr8,9
+Atlantic Terminal,lirr241,91
+Auburndale,lirr2,3
+Babylon,lirr27,9
+Baldwin,lirr225,7
+Bay Shore,lirr26,10
+Bayside,lirr25,3
+Bellerose,lirr23,4
+Bellmore,lirr16,7
+Bellport,lirr21,12
+Belmont Park,lirr24,4
+Bethpage,lirr20,7
+Brentwood,lirr29,10
+Bridgehampton,lirr13,14
+Broadway,lirr11,3
+Carle Place,lirr39,7
+Cedarhurst,lirr32,4
+Central Islip,lirr33,10
+Centre Avenue,lirr31,7
+Cold Spring Harbor,lirr40,9
+Copiague,lirr38,9
+Country Life Press,lirr36,4
+Deer Park,lirr44,9
+Douglaston,lirr42,3
+East Hampton,lirr48,14
+East New York,lirr50,91
+East Rockaway,lirr51,7
+East Williston,lirr52,4
+Far Rockaway,lirr65,4
+Farmingdale,lirr59,7
+Floral Park,lirr63,4
+Flushing Main Street,lirr56,3
+Forest Hills,lirr55,1
+Freeport,lirr64,7
+Garden City,lirr68,4
+Gibson,lirr66,4
+Glen Cove,lirr67,7
+Glen Head,lirr71,7
+Glen Street,lirr76,7
+Great Neck,lirr72,4
+Great River,lirr74,10
+Greenlawn,lirr78,9
+Greenport,lirr73,14
+Greenvale,lirr77,7
+Hampton Bays,lirr83,14
+Hempstead,lirr84,4
+Hempstead Gardens,lirr85,4
+Hewlett,lirr94,4
+Hicksville,lirr92,7
+Hollis,lirr89,93
+Hunterspoint Avenue,lirr90,1
+Huntington,lirr91,9
+Inwood,lirr101,4
+Island Park,lirr99,7
+Islip,lirr100,10
+Jamaica,lirr102,93
+Kew Gardens,lirr107,1
+Kings Park,lirr111,10
+Lakeview,lirr124,4
+Laurelton,lirr122,93
+Lawrence,lirr114,4
+Lindenhurst,lirr117,9
+Little Neck,lirr120,3
+Locust Manor,lirr119,93
+Locust Valley,lirr123,7
+Long Beach,lirr113,7
+Long Island City,lirr118,1
+Lynbrook,lirr125,4
+Malverne,lirr142,4
+Manhasset,lirr131,4
+Massapequa,lirr136,7
+Massapequa Park,lirr135,7
+Mastic Shirley,lirr140,12
+Mattituck,lirr126,14
+Medford,lirr129,10
+Merillon Avenue,lirr127,4
+Merrick,lirr226,7
+Mets-Willets Point,lirr199,1
+Mineola,lirr132,4
+Montauk,lirr141,14
+Murray Hill,lirr130,3
+Nassau Boulevard,lirr149,4
+New Hyde Park,lirr152,4
+Northport,lirr153,9
+Nostrand Avenue,lirr148,91
+Oakdale,lirr157,10
+Oceanside,lirr155,7
+Oyster Bay,lirr154,7
+Patchogue,lirr163,10
+Penn Station,lirr237,1
+Pinelawn,lirr165,9
+Plandome,lirr162,4
+Port Jefferson,lirr164,10
+Port Washington,lirr171,4
+Queens Village,lirr175,93
+Riverhead,lirr176,14
+Rockville Centre,lirr183,7
+Ronkonkoma,lirr179,10
+Rosedale,lirr180,93
+Roslyn,lirr182,7
+Sayville,lirr204,10
+Sea Cliff,lirr185,7
+Seaford,lirr187,7
+Smithtown,lirr202,10
+Southampton,lirr191,14
+Southold,lirr190,14
+Speonk,lirr198,12
+St. Albans,lirr184,93
+St. James,lirr193,10
+Stewart Manor,lirr195,4
+Stony Brook,lirr14,10
+Syosset,lirr205,7
+Valley Stream,lirr211,4
+Wantagh,lirr215,7
+West Hempstead,lirr216,4
+Westbury,lirr213,7
+Westhampton,lirr233,14
+Westwood,lirr219,4
+Woodmere,lirr217,4
+Woodside,lirr214,1
+Wyandanch,lirr220,9
+Yaphank,lirr223,12
+Elmhurst,lirr_elmhurst,1

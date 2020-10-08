@@ -82,9 +82,7 @@ public class StreetRouter {
      * The reason this is pluggable is to account for left and right hand drive (as well as any other country-specific
      * details you might want to implement)
      */
-    private TurnCostCalculator turnCostCalculator;
-
-    private TravelTimeCalculator travelTimeCalculator;
+    public TraversalTimeCalculator timeCalculator;
 
     // These are used for scaling coordinates in approximate distance calculations.
     // The lon value must be properly scaled to underestimate distances in the region where we're routing.
@@ -102,13 +100,14 @@ public class StreetRouter {
     public int timeLimitSeconds = 0;
 
     /**
-     * What routing variable (weight, distance, etc.) should be used to decide when a path is better than another.
-     * We only ever have one such variable, and it's algorithmically invalid to prune or otherwise discard any path
-     * based on any other characteristic of the path but this one. This is referred to as a "resource limiting"
-     * problem and would require computing pareto-optimal paths, which we don't provide on the street network.
-     * e.g. you should not set a distance limit when the quantityToMinimize is not distance.
+     * What routing variable (time or distance) should be used to decide when a path is better than another.
+     * Only one such variable is optimized in a given search. It's algorithmically invalid to prune or otherwise discard
+     * any path based on any other characteristic of the path but this one, e.g. you should not set a distance limit
+     * when the quantityToMinimize is duration. (Though discarding based on characteristics of the current edge and
+     * search-wide settings is fine). Pruning based on other path characteristics is referred to in the literature as a
+     * "resource limiting" problem and requires computing pareto-optimal paths, which we don't do on the street network.
      */
-    public State.RoutingVariable quantityToMinimize = State.RoutingVariable.WEIGHT;
+    public State.RoutingVariable quantityToMinimize = State.RoutingVariable.DURATION_SECONDS;
 
     /**
      * Store the best state at the end of each edge. Although we think of states being located at vertices, from a
@@ -288,14 +287,13 @@ public class StreetRouter {
     }
 
     public StreetRouter (StreetLayer streetLayer) {
-        this(streetLayer, new EdgeStore.DefaultTravelTimeCalculator());
-    }
-
-    public StreetRouter (StreetLayer streetLayer, TravelTimeCalculator travelTimeCalculator) {
         this.streetLayer = streetLayer;
-        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
-        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
-        this.travelTimeCalculator = travelTimeCalculator;
+        this.timeCalculator = streetLayer.edgeStore.edgeTraversalTimes;
+        // If no per-edge timings were supplied in the network, fall back on simple default timings
+        if (this.timeCalculator == null) {
+            // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+            this.timeCalculator = new BasicTraversalTimeCalculator(streetLayer, true);
+        }
     }
 
 
@@ -332,15 +330,13 @@ public class StreetRouter {
 
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond) + offStreetTime;
-        startState1.durationSeconds = startState1.weight;
+        startState1.durationSeconds = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState1.distance = split.distance1_mm + split.distanceToEdge_mm;
         edge.advance();
 
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond) + offStreetTime;
-        startState0.durationSeconds = startState0.weight;
+        startState0.durationSeconds = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState0.distance = split.distance0_mm + split.distanceToEdge_mm;
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
@@ -399,7 +395,6 @@ public class StreetRouter {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
             State state = new State(vertexIdx, previousState.backEdge, streetMode);
-            state.weight = previousState.weight+switchCost;
             state.durationSeconds = previousState.durationSeconds;
             state.incrementTimeInSeconds(switchTime);
             if (legMode == LegMode.BICYCLE_RENT) {
@@ -541,7 +536,7 @@ public class StreetRouter {
                     lon = (lon + v.getLon()) / 2;
                 }
 
-                debugPrintStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.weight));
+                debugPrintStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.durationSeconds));
             }
 
             // The state coming off the priority queue may have been dominated by some other state that was produced
@@ -589,7 +584,7 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
-                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator, travelTimeCalculator);
+                State s1 = edge.traverse(s0, streetMode, profileRequest, timeCalculator);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -647,9 +642,6 @@ public class StreetRouter {
             // Calculate time in seconds to traverse this distance in a straight line.
             // Weight should always be greater than or equal to time in seconds.
             estimate *= maxSpeedSecondsPerMillimeter;
-        }
-        if (quantityToMinimize == State.RoutingVariable.WEIGHT && streetMode == StreetMode.WALK) {
-            estimate *= EdgeStore.WALK_RELUCTANCE_FACTOR;
         }
         return (int) estimate;
     }
@@ -735,17 +727,18 @@ public class StreetRouter {
     }
 
     /**
-     * Returns state with smaller weight to vertex0 or vertex1
+     * Given a _destination_ split along an edge, return the best state that can be produced by traversing the edge
+     * fragments from the vertices at either end of the edge up to the destination split point.
+     * If no states can be produced return null.
      *
-     * If state to only one vertex exists return that vertex.
-     * If state to none of the vertices exists returns null
-     * @param split
-     * @return
+     * Note that this is only used by the point to point street router, not by LinkedPointSets (which have equivalent
+     * logic in their eval method). The PointSet implementation only needs to produce times, not States. But ideally
+     * some common logic can be factored out.
      */
-    public State getState(Split split) {
-        // get all the states at all the vertices
-        List<State> relevantStates = new ArrayList<>();
+    public State getState (Split split) {
+        List<State> candidateStates = new ArrayList<>();
 
+        // Start on the forward edge of the pair that was split
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
 
         TIntList edgeList;
@@ -754,6 +747,7 @@ public class StreetRouter {
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex0);
         }
+        // TODO change iteration style to imperative
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
@@ -764,20 +758,19 @@ public class StreetRouter {
                         ret.streetMode = s.streetMode;
 
                         // figure out the turn cost
-                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.streetMode);
+                        int turnCost = this.timeCalculator.turnTimeSeconds(s.backEdge, split.edge, s.streetMode);
                         int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
 
                         // TODO length of perpendicular
-                        ret.incrementWeight(turnCost + traversalCost);
                         ret.incrementTimeInSeconds(turnCost + traversalCost);
                         ret.distance += split.distance0_mm;
 
                         return ret;
                     })
-                    .forEach(relevantStates::add);
+                    .forEach(candidateStates::add);
         }
 
-        // advance to back edge
+        // Advance to the backward edge of the pair that was split
         e.advance();
 
         if (profileRequest.reverseSearch) {
@@ -788,26 +781,22 @@ public class StreetRouter {
 
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s), profileRequest.reverseSearch))
-                    .map(s -> {
-                        State ret = new State(-1, split.edge + 1, s);
-                        ret.streetMode = s.streetMode;
-
-                        // figure out the turn cost
-                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.streetMode);
-                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
-                        ret.distance += split.distance1_mm;
-
-                        // TODO length of perpendicular
-                        ret.incrementWeight(turnCost + traversalCost);
-                        ret.incrementTimeInSeconds(turnCost + traversalCost);
-
-                        return ret;
-                    })
-                    .forEach(relevantStates::add);
+            for (State state : states) {
+                if (!e.canTurnFrom(state, new State(-1, split.edge + 1, state), profileRequest.reverseSearch)) {
+                    continue;
+                }
+                State ret = new State(-1, split.edge + 1, state);
+                ret.streetMode = state.streetMode;
+                int turnCost = this.timeCalculator.turnTimeSeconds(state.backEdge, split.edge + 1, state.streetMode);
+                int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, state.streetMode));
+                ret.distance += split.distance1_mm;
+                // TODO length of perpendicular
+                ret.incrementTimeInSeconds(turnCost + traversalCost);
+                candidateStates.add(ret);
+            }
         }
 
-        return relevantStates.stream()
+        return candidateStates.stream()
                 .reduce((s0, s1) -> s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1)
                 .orElse(null);
     }
@@ -815,6 +804,8 @@ public class StreetRouter {
     public Split getDestinationSplit() {
         return destinationSplit;
     }
+
+    public Split getOriginSplit() { return originSplit; }
 
     /**
      * Given the geographic coordinates of a starting point...
@@ -833,12 +824,13 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return null;
         }
+        // FIXME this method being called is intended for destinations not origins!
+        //  Fortunately this is only being called in PointToPointQuery which we are not using.
         return getState(split);
     }
 
     public static class State implements Cloneable,Serializable {
         public int vertex;
-        public int weight;
         public int backEdge;
 
         //In simple search both those variables have same values
@@ -853,7 +845,7 @@ public class StreetRouter {
         public StreetMode streetMode;
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
-        public int heuristic = 0; // Underestimate of remaining weight to the destination.
+        public int heuristic = 0; // Lower bound on remaining weight to the destination.
 
         /**
          * All turn restrictions this state is currently passing through.
@@ -873,7 +865,6 @@ public class StreetRouter {
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
             this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
-            this.weight = backState.weight;
             this.idx = backState.idx+1;
         }
 
@@ -935,7 +926,6 @@ public class StreetRouter {
                     LOG.error("Actual traversal direction does not match traversal direction in TraverseOptions.");
                     //defectiveTraversal = true;
                 }*/
-                child.incrementWeight(orig.weight-orig.backState.weight);
                 child.durationSeconds += orig.durationSeconds - orig.backState.durationSeconds;
                 if (orig.backState != null) {
                     child.distance += Math.abs(orig.distance-orig.backState.distance);
@@ -976,16 +966,12 @@ public class StreetRouter {
             return durationSeconds;
         }
 
-        public void incrementWeight(float weight) {
-            this.weight+=(int)weight;
-        }
-
         public String dump() {
             State state = this;
             StringBuilder out = new StringBuilder();
             out.append("BEGIN PATH DUMP\n");
             while (state != null) {
-                out.append(String.format("%s at %s via %s\n", state.vertex, state.weight, state.backEdge));
+                out.append(String.format("%s via %s\n", state.vertex, state.backEdge));
                 state = state.backState;
             }
             out.append("END PATH DUMP\n");
@@ -1014,7 +1000,6 @@ public class StreetRouter {
         public String toString() {
             final StringBuilder sb = new StringBuilder("State{");
             sb.append("vertex=").append(vertex);
-            sb.append(", weight=").append(weight);
             sb.append(", backEdge=").append(backEdge);
             sb.append(", durationSeconds=").append(durationSeconds);
             sb.append(", distance=").append(distance);
@@ -1024,27 +1009,22 @@ public class StreetRouter {
         }
 
         public int getRoutingVariable (RoutingVariable variable) {
-            if (variable == null) throw new NullPointerException("Routing variable is null");
-
+            if (variable == null) {
+                throw new NullPointerException("Routing variable is null.");
+            }
             switch (variable) {
                 case DURATION_SECONDS:
                     return this.durationSeconds;
-                case WEIGHT:
-                    return this.weight;
                 case DISTANCE_MILLIMETERS:
                     return this.distance;
                 default:
-                    throw new IllegalStateException("Unknown routing variable");
+                    throw new IllegalStateException("Unknown routing variable.");
             }
         }
 
-        public static enum RoutingVariable {
+        public enum RoutingVariable {
             /** Time, in seconds */
             DURATION_SECONDS,
-
-            /** Weight/generalized cost (this is what is actually used to find paths) */
-            WEIGHT,
-
             /** Distance, in millimeters */
             DISTANCE_MILLIMETERS
         }

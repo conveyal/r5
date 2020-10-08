@@ -3,17 +3,19 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.collect.Lists;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.stream.IntStream;
 
-import static org.junit.Assert.*;
-import static com.conveyal.r5.analyst.scenario.FakeGraph.*;
+import static com.conveyal.r5.analyst.scenario.FakeGraph.TransitNetwork;
+import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by matthewc on 4/21/16.

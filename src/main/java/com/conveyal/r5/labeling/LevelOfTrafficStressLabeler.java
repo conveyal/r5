@@ -40,7 +40,10 @@ public class LevelOfTrafficStressLabeler {
 
     Set<String> badLaneValues = new HashSet<>();
 
-    /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
+    /**
+     * Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment).
+     * This sets flags (passed in as the second and third parameters) from the tags on the OSM Way (first parameter).
+     */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
 

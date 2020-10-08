@@ -13,11 +13,9 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * A scenario is an ordered sequence of modifications that will be applied non-destructively on top of a baseline graph.
@@ -29,14 +27,28 @@ public class Scenario implements Serializable {
 
     /**
      * If this ID is non null, this scenario should be identical to all others with the same ID. This enables us to
-     * cache things like linked point sets and modified networks keyed on the scenario that has been applied.
+     * cache things like linked point sets and modified networks keyed on the scenario that has been applied. It also
+     * allows the scenario itself to be stored by the backend, then retrieved and cached by many regional workers.
+     * TODO Should the ID always be non-null?
+     *      Should we make it final and initialize it in a constructor Scenario(modifications)?
+     *
+     * Note that these are not persistent database IDs that remain the same when the modifications composing the
+     * scenario are changed, as scenarios are not directly represented by database records. They are just the set of
+     * all modifications in a project with the same scenario index enabled. For both single point and regional
+     * analyses, this ID is always derived from the contents of the scenario in the manner of a hash, including a CRC
+     * of the modifications themselves.
      */
     public String id;
 
+    /**
+     * By default we are now setting this to be the scenario name at the time of creation.
+     */
     public String description = "no description provided";
 
     public List<Modification> modifications = Lists.newArrayList();
 
+    // TODO We appear to only read this, never write it!
+    //      Do we see "Scenario does not have feed checksums" on every analysis?
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums;
 
@@ -86,7 +98,7 @@ public class Scenario implements Serializable {
 
         long baseNetworkChecksum = 0;
         // Put the modifications in canonical order before applying them.
-        modifications.sort((a, b) -> a.getSortOrder() - b.getSortOrder());
+        modifications.sort(Comparator.comparingInt(Modification::getSortOrder));
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             baseNetworkChecksum = originalNetwork.checksum();
         }
@@ -117,15 +129,18 @@ public class Scenario implements Serializable {
                 // could lead to meaningless errors on subsequent modifications.
                 throw new ScenarioApplicationException(Arrays.asList(modification));
             }
-
-            if (!modification.warnings.isEmpty()) {
-                modificationsWithWarnings.add(modification);
-            }
         }
 
-        copiedNetwork.scenarioApplicationWarnings = modificationsWithWarnings.stream()
-                .map(m -> new TaskError(m, m.warnings))
-                .collect(Collectors.toList());
+        copiedNetwork.scenarioApplicationWarnings = new ArrayList<>();
+        copiedNetwork.scenarioApplicationInfo = new ArrayList<>();
+        for (Modification modification : modifications) {
+            if (!modification.warnings.isEmpty()) {
+                copiedNetwork.scenarioApplicationWarnings.add(new TaskError(modification, modification.warnings));
+            }
+            if (!modification.info.isEmpty()) {
+                copiedNetwork.scenarioApplicationInfo.add(new TaskError(modification, modification.info));
+            }
+        }
 
         // Is it OK that we do this once after all modifications are applied, or do we need to do it after every mod?
         copiedNetwork.transitLayer.rebuildTransientIndexes();

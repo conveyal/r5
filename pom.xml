@@ -1,80 +1,25 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <name>r5</name>
-    <description>Next-generation fast routing library for spatial analysis applications</description>
-    <url>https://github.com/conveyal/r5</url>
+    <!-- NOTE THIS IS SUPERSEDED BY THE GRADLE BUILD. THIS FILE EXISTS ONLY AS A REFERENCE DURING THE TRANSITION. -->
 
     <groupId>com.conveyal</groupId>
-    <artifactId>r5</artifactId>
-    <!-- R5 v4.8+ targets Java 11 runtime environment -->
-    <version>4.9.0-SNAPSHOT</version>
+    <artifactId>analysis</artifactId>
+    <version>5.11.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <licenses>
-        <license>
-            <name>MIT</name>
-            <url>https://opensource.org/licenses/MIT</url>
-        </license>
-    </licenses>
 
-    <!-- Define where the source code for this project lives -->
-    <scm>
-        <connection>scm:git:https://github.com/conveyal/r5.git</connection>
-        <developerConnection>scm:git:https://github.com/conveyal/r5.git</developerConnection>
-        <url>https://github.com/conveyal/r5</url>
-    </scm>
-
-    <!-- Developer entries are provided for current developers and maintainers.
-    For other past contributors, see https://github.com/conveyal/r5/graphs/contributors -->
-    <developers>
-        <developer>
-            <name>Andrew Byrd</name>
-            <email>abyrd@conveyal.com</email>
-            <organization>Conveyal</organization>
-            <organizationUrl>http://conveyal.com/</organizationUrl>
-        </developer>
-        <developer>
-            <name>Anson Stewart</name>
-            <email>astewart@conveyal.com</email>
-            <organization>Conveyal</organization>
-        </developer>
-    </developers>
-
-    <!-- Define some variables to be used elsewhere in the build. -->
     <properties>
         <geotools.version>21.2</geotools.version>
-        <jackson.version>2.6.1</jackson.version>
+        <jackson.version>2.10.3</jackson.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <!-- Define where the artifacts produced by this build will be deployed -->
-    <distributionManagement>
-        <!-- We are using Sonatype Nexus Staging instead of Maven Release plugin.
-             Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-    </distributionManagement>
-
     <build>
-        <resources>
-            <resource>
-                <!-- Filtering means Maven will substitute some variables into files in the resources directory before
-                    including them in the JAR. This allows Maven to substitute build details and version number
-                    into a properties file, making them known to R5 at runtime. Some other files that server other
-                    purposes are also listed for inclusion in the JAR. -->
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-                <includes>
-                    <include>**/*.properties</include>
-                    <include>debug-plan/**</include>
-                    <include>fares/**</include>
-                </includes>
-            </resource>
-        </resources>
         <plugins>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -91,47 +36,79 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <!-- For Java 11 Modules, specify a module name. Do not create module-info.java until all
-                                 our dependencies specify a module name. -->
-                            <Automatic-Module-Name>com.conveyal.r5</Automatic-Module-Name>
+                            <!-- For Java 11 Modules, specify a module name. -->
+                            <!-- Do not create module-info.java until all our dependencies specify a module name. -->
+                            <Automatic-Module-Name>com.conveyal.analysis</Automatic-Module-Name>
                         </manifestEntries>
                     </archive>
                 </configuration>
             </plugin>
 
+            <!-- The shade plugin makes a "fat" standalone jar containing all dependencies. -->
             <plugin>
-                <groupId>pl.project13.maven</groupId>
-                <artifactId>git-commit-id-plugin</artifactId>
-                <version>2.2.1</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.1</version>
+                <configuration>
+                    <!-- Put all shaded JARs into their own subdirectory so they can be  -->
+                    <outputDirectory>target/shaded</outputDirectory>
+                    <transformers>
+                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                            <manifestEntries>
+                                <!-- We use Java ImageIO which is extremely picky about having extra info in the manifest -->
+                                <Specification-Title>Java Advanced Imaging Image I/O Tools</Specification-Title>
+                                <Specification-Version>1.1</Specification-Version>
+                                <Specification-Vendor>Sun Microsystems, Inc.</Specification-Vendor>
+                                <Implementation-Title>com.sun.media.imageio</Implementation-Title>
+                                <Implementation-Version>1.1</Implementation-Version>
+                                <Implementation-Vendor>Sun Microsystems, Inc.</Implementation-Vendor>
+                            </manifestEntries>
+                        </transformer>
+                    </transformers>
+                    <filters>
+                        <filter>
+                            <!-- exclude signatures from merged JAR to avoid invalid signature messages -->
+                            <artifact>*:*</artifact>
+                            <excludes>
+                                <exclude>META-INF/*.SF</exclude>
+                                <exclude>META-INF/*.DSA</exclude>
+                                <exclude>META-INF/*.RSA</exclude>
+                            </excludes>
+                        </filter>
+                    </filters>
+                </configuration>
                 <executions>
                     <execution>
-                        <goals>
-                            <goal>revision</goal>
-                        </goals>
+                        <id>local-or-worker</id>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <finalName>${git.commit.id.describe}</finalName>
+                            <!-- Start R5Main rather than AnalystWorker or BackendMain to behave like legacy R5 JARs -->
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Main-Class>com.conveyal.r5.R5Main</Main-Class>
+                                    </manifestEntries>
+                                </transformer>
+                                <!-- Merge service loader declarations in META-INF/services/, required by GeoTools. -->
+                                <!-- Must be in the two execution configs, fails when in top level shade config. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
-                    <gitDescribe>
-                        <!--
-                        semantic-release appears to create lightweight tags, therefore the tags property here
-                        must be set to true so that the latest lightweight tag is recognized.
-                        See https://github.com/ktoso/maven-git-commit-id-plugin#git-describe-and-a-small-gotcha-with-tags
-                        -->
-                        <tags>true</tags>
-                    </gitDescribe>
-                </configuration>
             </plugin>
 
             <plugin>
                 <!-- Plugin for running unit tests -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.19.1</version>
+                <version>2.22.2</version>
                 <configuration>
-                    <!-- we have to fork the JVM during tests so that the argLine is passed along -->
-                    <forkCount>2</forkCount>
-                    <!-- enable the restricted reflection under Java 11 so that the ObjectDiffer works -->
+                    <!-- We have to fork the JVM during tests so that the argLine is passed along -->
+                    <forkCount>1</forkCount>
+                    <!-- Allow reflection under Java 11+ so that the ObjectDiffer works during tests -->
                     <argLine>
                         -Xmx2G
                         -Dfile.encoding=UTF-8
@@ -149,289 +126,78 @@
                 </configuration>
             </plugin>
 
+            <!-- The git-commit-id-plugin allows us to make a unique build number and access it programmatically.
+                 Also tried the buildnumber plugin, but it requires you to set SCM URLs and tries to do some auto-fetching magic. -->
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>
-                <!-- Create a version of the JAR that includes all dependencies.
-                     We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
+                <groupId>pl.project13.maven</groupId>
+                <artifactId>git-commit-id-plugin</artifactId>
+                <version>3.0.1</version>
                 <executions>
                     <execution>
-                        <phase>package</phase>
                         <goals>
-                            <goal>shade</goal>
+                            <goal>revision</goal>
                         </goals>
-                        <configuration>
-                            <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
-                                 run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
-                                 deployments because this will cause it to be renamed to the standard timestamped name and sorted
-                                 into a Maven repo directory by version number. -->
-                            <finalName>${git.commit.id.describe}</finalName>
-                            <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Main-Class>com.conveyal.r5.R5Main</Main-Class>
-                                        <!-- The ImageIO lines allow some image reader plugins to work see https://stackoverflow.com/questions/7051603/jai-vendorname-null#18495658 -->
-                                        <Specification-Title>Java Advanced Imaging Image I/O Tools</Specification-Title>
-                                        <Specification-Version>1.1</Specification-Version>
-                                        <Specification-Vendor>Sun Microsystems, Inc.</Specification-Vendor>
-                                        <Implementation-Title>com.sun.media.imageio</Implementation-Title>
-                                        <Implementation-Version>1.1</Implementation-Version>
-                                        <Implementation-Vendor>Sun Microsystems, Inc.</Implementation-Vendor>
-                                        <Extension-Name>com.sun.media.imageio</Extension-Name>
-                                    </manifestEntries>
-                                </transformer>
-                                <!-- files overwrite each other and geotools does not function without this.
-                                     http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                            </transformers>
-                            <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
-                            <filters>
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                        </configuration>
                     </execution>
                 </executions>
-            </plugin>
-
-            <plugin>
-                <!-- Recommended way to deploy to OSSRH -->
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.7</version>
-                <extensions>true</extensions>
                 <configuration>
-                    <serverId>ossrh</serverId>
-                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                    <!-- Release versions will be synced to Maven Central automatically. -->
-                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                    <verbose>false</verbose>
+                    <includeOnlyProperties>
+                        <!-- Including only the properties used reduces plugin execution time. -->
+                        <includeOnlyProperty>git.branch</includeOnlyProperty>
+                        <includeOnlyProperty>git.dirty</includeOnlyProperty>
+                        <includeOnlyProperty>git.commit.id</includeOnlyProperty>
+                        <includeOnlyProperty>git.commit.id.describe</includeOnlyProperty>
+                        <includeOnlyProperty>git.commit.time</includeOnlyProperty>
+                        <includeOnlyProperty>git.build.host</includeOnlyProperty>
+                        <includeOnlyProperty>git.build.time</includeOnlyProperty>
+                        <includeOnlyProperty>git.build.version</includeOnlyProperty>
+                        <includeOnlyProperty>project.version</includeOnlyProperty>
+                    </includeOnlyProperties>
+                    <!-- When set to generate the properties file, the variables are still available within Maven. -->
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <generateGitPropertiesFilename>
+                        ${project.build.outputDirectory}/version.properties
+                    </generateGitPropertiesFilename>
+                    <gitDescribe>
+                        <!-- Describe relative to lightweight or annotated tags. One may set a lightweight tag by
+                             accident, and semantic-release also creates lightweight tags (not currently using that). -->
+                        <tags>true</tags>
+                    </gitDescribe>
                 </configuration>
-            </plugin>
-
-            <plugin>
-                <!-- Allow attaching Javadoc during releases -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.1.1</version>
-                <configuration>
-                    <!-- Turn off Java 8 strict Javadoc checking -->
-                    <doclint>none</doclint>
-                    <tags>
-                        <tag>
-                            <name>notnull</name>
-                            <placement>a</placement>
-                            <head>Not null</head>
-                        </tag>
-                        <tag>
-                            <name>default</name>
-                            <placement>a</placement>
-                            <head>Default:</head>
-                        </tag>
-                    </tags>
-                </configuration>
-                <executions>
-                    <!-- Compress Javadoc into JAR and include that JAR when deploying.
-                         This is required for deployments to Maven Central. -->
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals>
-                            <goal>jar</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <!-- Include zipped source code in releases. -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals>
-                            <goal>jar-no-fork</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.6</version>
-                <executions>
-                    <execution>
-                        <id>sign-artifacts</id>
-                        <!-- We sign in the verify phase, which means it will happen before install and deploy (the last two phases)
-                             but not before earlier phases like test or package. -->
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>sign</goal>
-                        </goals>
-                        <configuration>
-                            <gpgArguments>
-                                <arg>--pinentry-mode</arg>
-                                <arg>loopback</arg>
-                            </gpgArguments>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
 
     <repositories>
-        <!-- Hack to force maven to check central first. Maven central is inherited from the superpom,
-             but ends up at the end of the list. Though most of the time the artifact is in central,
-             Maven tries to download from every other repository and fails before checking central.
-             Do not change the id from central2 to central, otherwise the entry will be ignored. -->
-        <repository>
-            <id>central2</id>
-            <name>check central first to avoid a lot of not found warnings</name>
-            <url>https://repo1.maven.org/maven2</url>
-        </repository>
-        <repository>
-            <id>conveyal</id>
-            <name>conveyal</name>
-            <url>https://maven.conveyal.com</url>
-        </repository>
-        <repository>
-            <id>ossrh-releases</id>
-            <name>releases on sonatype, which may not yet have been synced with central</name>
-            <url>https://oss.sonatype.org/content/repositories/releases/</url>
-        </repository>
-        <repository>
-            <id>ossrh-snapshots</id>
-            <name>releases on sonatype, which may not yet have been synced with central</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-        </repository>
         <repository>
             <id>osgeo</id>
-            <name>Open Source Geospatial Foundation Repository</name>
-            <url>https://download.osgeo.org/webdav/geotools/</url>
+            <name>Open Source Geospatial Foundation Release Repository</name>
+            <url>https://repo.osgeo.org/repository/release/</url>
+            <snapshots><enabled>false</enabled></snapshots>
+            <releases><enabled>true</enabled></releases>
+        </repository>
+        <!-- TODO review whether we need these repositories -->
+        <repository>
+            <id>conveyal</id>
+            <name>Conveyal</name>
+            <url>https://maven.conveyal.com</url>
+        </repository>
+        <!-- Used for importing java projects from github (why do we need this?) -->
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
         <!-- For the polyline encoder -->
         <repository>
             <id>axiom-public-releases</id>
             <name>Axiom Releases</name>
-            <url>http://nexus.axiomalaska.com/nexus/content/repositories/public-releases</url>
+            <url>https://nexus.axiomalaska.com/nexus/content/repositories/public-releases</url>
         </repository>
     </repositories>
 
     <dependencies>
-        <!-- Jackson provides fast streaming JSON (de)serialization of Java objects. -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>net.sourceforge.javacsv</groupId>
-            <artifactId>javacsv</artifactId>
-            <version>2.0</version>
-        </dependency>
-        <!-- GeoTools is a free software GIS toolkit. -->
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-coverage</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-geojson</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-geotiff</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-epsg-hsql</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-main</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-opengis</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-referencing</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.geotools</groupId>
-            <artifactId>gt-shapefile</artifactId>
-            <version>${geotools.version}</version>
-        </dependency>
 
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-math3</artifactId>
-            <version>3.0</version>
-        </dependency>
-
-        <!-- Conveyal library for loading and storing GTFS transit data. -->
-        <dependency>
-            <groupId>com.conveyal</groupId>
-            <artifactId>gtfs-lib</artifactId>
-            <!-- gtfs-lib maintenance v3.0.9+ updated for Java 11, but able to use existing MapDB files. -->
-            <version>3.0.11</version>
-        </dependency>
-        <!-- Conveyal library for loading and storing OSM road data. -->
-        <dependency>
-            <groupId>com.conveyal</groupId>
-            <artifactId>osm-lib</artifactId>
-            <version>1.4.0</version>
-        </dependency>
-        <!-- Logging API. -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.30</version>
-        </dependency>
-        <!-- Logging API implementation. -->
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
-        </dependency>
-        <!-- Junit is for unit testing. -->
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- Provides some shared serializers for Kryo. Introduces transitive dependencies on Guava, Trove, and Kryo. -->
-        <!-- Also provides classes for testing that a round trip through serialization reproduces the same network. -->
-        <dependency>
-            <groupId>com.conveyal</groupId>
-            <artifactId>kryo-tools</artifactId>
-            <version>1.3.0</version>
-        </dependency>
+        <!-- Spark is an HTTP framework built on Jetty. Its name is the same as several other projects. -->
         <dependency>
             <groupId>com.sparkjava</groupId>
             <artifactId>spark-core</artifactId>
@@ -443,22 +209,309 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <!-- Logging API. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.30</version>
+        </dependency>
+
+        <!-- Logging API implementation. -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.2.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mongodb</groupId>
+            <artifactId>mongo-java-driver</artifactId>
+            <version>3.11.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mongojack</groupId>
+            <artifactId>mongojack</artifactId>
+            <version>2.5.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- CSV parser. GTFS is a set of zipped CSV files, and some of our other inputs are CSV files. -->
+        <dependency>
+            <groupId>net.sourceforge.javacsv</groupId>
+            <artifactId>javacsv</artifactId>
+            <version>2.0</version>
+        </dependency>
+
+        <!-- JCommander parses command line arguments (including standard switches) to main methods. -->
+        <dependency>
+            <groupId>com.beust</groupId>
+            <artifactId>jcommander</artifactId>
+            <version>1.30</version>
+        </dependency>
+
+        <!-- GeoTools provides GIS functionality on top of JTS topology suite. -->
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-main</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-opengis</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-referencing</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-shapefile</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-coverage</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-geojson</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-geotiff</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <!-- The EPSG coordinate reference system catalog as an HSQL database. -->
+        <dependency>
+            <groupId>org.geotools</groupId>
+            <artifactId>gt-epsg-hsql</artifactId>
+            <version>${geotools.version}</version>
+        </dependency>
+
+        <!-- Legacy JTS with com.vividsolutions package name. Newer Geotools compatible with Java 11 uses a newer version of
+             JTS with the org.locationtech package name. But our MapDB format includes serialized JTS geometries with the
+             old package name, and some bugs in the older gtfs-lib that produced those MapDB files are preventing us from
+             migrating to a newer format. So we import both JTS packages and convert between them. -->
+        <dependency>
+            <groupId>com.vividsolutions</groupId>
+            <artifactId>jts</artifactId>
+            <version>1.13</version>
+        </dependency>
+
+        <!-- MapDB is a pure Java database backend for storing objects out of heap memory.
+             It provides disk-backed storage that looks like a Java map.
+             1.0.8 was the second to last release of 1.x, we should probably not bump this unless absolutely necessary
+             or we're migrating to 3.x or 4.x. See changelog at http://www.mapdb.org/changelog/ -->
+        <dependency>
+            <groupId>org.mapdb</groupId>
+            <artifactId>mapdb</artifactId>
+            <version>1.0.8</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-fileupload</groupId>
+            <artifactId>commons-fileupload</artifactId>
+            <version>1.3.1</version>
+        </dependency>
+
+        <!-- JSON Web Token is an internet standard for creating JSON-based access tokens. -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>3.10.2</version>
+        </dependency>
+
+        <!-- The JSON Web Key Set (JWKS) is a set of keys which contains the public keys used to verify any JSON Web
+             Token (JWT) issued by the authorization server. Recommended to use in the Auth0 Java JWT docs. -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>jwks-rsa</artifactId>
+            <version>0.11.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.4</version>
+        </dependency>
+
+        <!-- Commons IO gives us BOMInputStream for handling UTF-8 BOMs. -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.6</version>
+        </dependency>
+
+        <!-- Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library. -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>28.2-jre</version>
+        </dependency>
+
+        <!-- Caffeine is a Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use
+             the async capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>2.8.1</version>
+        </dependency>
+
+        <!-- httpclient is also used by AWS SDK but it depends on a newer version than the one pulled in by
+             transitive dependencies. So specify the same version used by AWS SDK here to force it.
+             Ideally we'll eventually migrate over to Java's built-in HTTP client. -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.6</version>
+        </dependency>
+
+        <!-- Rest Assured is an assertion library that makes testing web APIs easy. -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>3.0.3</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JUnit is a Java testing framework. -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Hamcrest is an assertion library used in a few tests, which prints pretty messages when assertions fail. -->
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>java-hamcrest</artifactId>
+            <version>2.0.0.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Snapshotting library for testing -->
+        <dependency>
+            <groupId>com.github.conveyal</groupId>
+            <artifactId>java-snapshot-matcher</artifactId>
+            <version>e6a78d3af9d67f6f6240261fcba497d3b50f9399</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Old version of GraphQL-Java used by legacy gtfs-api embedded in analysis-backend -->
+        <dependency>
+            <groupId>com.graphql-java</groupId>
+            <artifactId>graphql-java</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
+        <!-- Commons Math gives us FastMath and MersenneTwister. -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+            <version>3.0</version>
+        </dependency>
+
+        <!-- Provides some shared serializers for Kryo. Introduces transitive dependencies on Guava, Trove, and Kryo.
+             Also provides classes for testing that a round trip through serialization reproduces the same network.
+             This is an external dependency (not merged into backend) because it's also used by OTP2. -->
+        <dependency>
+            <groupId>com.conveyal</groupId>
+            <artifactId>kryo-tools</artifactId>
+            <version>1.3.0</version>
+        </dependency>
+
+        <!-- Very efficient collections of primitive data types for Java. -->
+        <dependency>
+            <groupId>net.sf.trove4j</groupId>
+            <artifactId>trove4j</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
         <dependency>
             <!-- TODO eliminate custom Conveyal geojson library, use Geotools? -->
             <groupId>com.conveyal</groupId>
             <artifactId>jackson2-geojson</artifactId>
             <version>0.9</version>
         </dependency>
+
         <!--Maintainer has updated this polyline library to match our dependencies (newer JTS). -->
         <dependency>
             <groupId>com.axiomalaska</groupId>
             <artifactId>polyline-encoder</artifactId>
             <version>0.2</version>
         </dependency>
+
         <dependency>
             <groupId>javax.xml.bind</groupId>
             <artifactId>jaxb-api</artifactId>
             <version>2.3.1</version>
         </dependency>
+
+        <!-- For uploading / downloading things from Amazon S3. -->
+        <dependency>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-s3</artifactId>
+            <version>1.11.341</version>
+        </dependency>
+
+        <!-- Google Protocol Buffers are used in decoding OSM data and seamless census data. -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>2.6.1</version>
+        </dependency>
+
+        <!-- OSM PBF format support. Transitive dependency on Protobuf 3.4.0. TODO investigate any conflict with above -->
+        <dependency>
+            <groupId>org.openstreetmap.osmosis</groupId>
+            <artifactId>osmosis-osm-binary</artifactId>
+            <version>0.45</version>
+        </dependency>
+
+        <!-- Compressed bitmaps (bitsets) used to track which OSM IDs have been encountered during large operations. -->
+        <dependency>
+            <groupId>org.roaringbitmap</groupId>
+            <artifactId>RoaringBitmap</artifactId>
+            <version>0.7.3</version>
+        </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Import AWS SDK Bill of Materials in case different modules should be at different version numbers. -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>2.6.4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
 </project>

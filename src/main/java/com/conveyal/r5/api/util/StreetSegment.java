@@ -1,15 +1,20 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.common.DirectionUtils;
-import org.locationtech.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.LineString;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * A response object describing a non-transit part of an Option. This is either an access/egress leg of a transit

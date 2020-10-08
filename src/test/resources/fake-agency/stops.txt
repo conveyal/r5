@@ -1,0 +1,3 @@
+stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding
+4u6g,,Laurel Dr,,37.046495,-122.075212,,,0,,,
+johv,,Gushee St,,37.047819,-122.074137,,,0,,,

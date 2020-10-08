@@ -41,7 +41,7 @@ public class GridResultAssembler {
 
     private static final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
-    public final AnalysisTask request;
+    public final AnalysisWorkerTask request;
 
     private File bufferFile;
 
@@ -72,7 +72,7 @@ public class GridResultAssembler {
      * Construct an assembler for a single regional analysis result grid.
      * This also creates the on-disk scratch buffer into which the results from the workers will be accumulated.
      */
-    public GridResultAssembler (AnalysisTask request, String outputBucket) {
+    public GridResultAssembler (AnalysisWorkerTask request, String outputBucket) {
         this.request = request;
         this.outputBucket = outputBucket;
         nTotal = request.width * request.height;

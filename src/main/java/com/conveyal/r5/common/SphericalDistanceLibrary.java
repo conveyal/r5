@@ -1,7 +1,7 @@
 package com.conveyal.r5.common;
 
-import org.locationtech.jts.geom.Coordinate;
 import org.apache.commons.math3.util.FastMath;
+import org.locationtech.jts.geom.Coordinate;
 
 /**
  * Created by matthewc on 10/22/15.

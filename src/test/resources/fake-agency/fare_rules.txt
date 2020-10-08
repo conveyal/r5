@@ -1,0 +1,2 @@
+fare_id,route_id,origin_id,destination_id,contains_id
+route_based_fare,1,,,

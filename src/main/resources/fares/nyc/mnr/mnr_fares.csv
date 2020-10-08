@@ -1,0 +1,2321 @@
+from_station_id,to_station_id,from_stop_id,from_stop_name,to_stop_id,to_stop_name,peak,offpeak
+86,72,86,Katonah,72,Hartsdale,600,600
+18,17,18,Yonkers,17,Ludlow,300,300
+59,55,59,Woodlawn,55,Tremont,300,300
+78,68,78,Valhalla,68,Crestwood,500,500
+97,81,97,Patterson,81,Pleasantville,825,825
+55,84,55,Tremont,84,Mount Kisco,800,800
+19,18,19,Glenwood,18,Yonkers,300,300
+11,14,11,Marble Hill,14,Spuyten Duyvil,300,300
+84,4,84,Mount Kisco,4,Harlem-125th St.,1750,1325
+61,100,61,Wakefield,100,HM Valley-Wingdale,1675,1675
+81,78,81,Pleasantville,78,Valhalla,300,300
+59,176,59,Woodlawn,176,Tenmile River,1800,1800
+622,24,622,Yankees-E153 St.,24,Ardsley-on-Hudson,425,425
+62,101,62,Mt Vernon West,101,Dover Plains,1525,1525
+54,97,54,Melrose,97,Patterson,1450,1450
+14,24,14,Spuyten Duyvil,24,Ardsley-on-Hudson,425,425
+114,111,114,Rye,111,Mamaroneck,375,375
+66,71,66,Tuckahoe,71,Scarsdale,300,300
+85,84,85,Bedford Hills,84,Mount Kisco,300,300
+97,58,97,Patterson,58,Williams Bridge,1450,1450
+49,18,49,New Hamburg,18,Yonkers,1300,1300
+89,54,89,Purdy's,54,Melrose,1150,1150
+55,61,55,Tremont,61,Wakefield,300,300
+1,90,1,Grand Central,90,Croton Falls,2000,1500
+18,30,18,Yonkers,30,Scarborough,500,500
+59,68,59,Woodlawn,68,Crestwood,300,300
+30,4,30,Scarborough,4,Harlem-125th St.,1475,1125
+176,64,176,Tenmile River,64,Fleetwood,1600,1600
+80,90,80,Hawthorne,90,Croton Falls,675,675
+25,11,25,Irvington,11,Marble Hill,425,425
+622,1,622,Yankees-E153 St.,1,Grand Central,975,725
+10,31,10,University Heights,31,Ossining,575,575
+176,100,176,Tenmile River,100,HM Valley-Wingdale,300,300
+62,78,62,Mt Vernon West,78,Valhalla,500,500
+81,91,81,Pleasantville,91,Brewster,675,675
+54,74,54,Melrose,74,White Plains,425,425
+14,1,14,Spuyten Duyvil,1,Grand Central,975,725
+622,37,622,Yankees-E153 St.,37,Cortlandt,800,800
+85,61,85,Bedford Hills,61,Wakefield,800,800
+90,176,90,Croton Falls,176,Tenmile River,750,750
+14,37,14,Spuyten Duyvil,37,Cortlandt,800,800
+66,84,66,Tuckahoe,84,Mount Kisco,725,725
+99,81,99,Appalachian Trail,81,Pleasantville,825,825
+78,58,78,Valhalla,58,Williams Bridge,575,575
+65,88,65,Bronxville,88,Goldens Bridge,725,725
+76,97,76,North White Plains,97,Patterson,1150,1150
+29,22,29,Philipse Manor,22,Hastings-on-Hudson,300,300
+40,31,40,Manitou,31,Ossining,675,675
+11,4,11,Marble Hill,4,Harlem-125th St.,975,725
+112,56,112,Harrison,56,Fordham,425,425
+58,85,58,Williams Bridge,85,Bedford Hills,800,800
+61,90,61,Wakefield,90,Croton Falls,1150,1150
+62,55,62,Mt Vernon West,55,Tremont,300,300
+81,68,81,Pleasantville,68,Crestwood,500,500
+25,24,25,Irvington,24,Ardsley-on-Hudson,300,300
+622,14,622,Yankees-E153 St.,14,Spuyten Duyvil,300,300
+62,91,62,Mt Vernon West,91,Brewster,875,875
+22,18,22,Hastings-on-Hudson,18,Yonkers,300,300
+74,65,74,White Plains,65,Bronxville,300,300
+66,61,66,Tuckahoe,61,Wakefield,300,300
+4,86,4,Harlem-125th St.,86,Katonah,1750,1325
+64,100,64,Fleetwood,100,HM Valley-Wingdale,1525,1525
+17,25,17,Ludlow,25,Irvington,300,300
+62,176,62,Mt Vernon West,176,Tenmile River,1600,1600
+1,80,1,Grand Central,80,Hawthorne,1475,1125
+88,85,88,Goldens Bridge,85,Bedford Hills,300,300
+99,94,99,Appalachian Trail,94,Southeast,425,425
+100,59,100,HM Valley-Wingdale,59,Woodlawn,1675,1675
+65,101,65,Bronxville,101,Dover Plains,1525,1525
+57,97,57,Botanical Garden,97,Patterson,1450,1450
+58,62,58,Williams Bridge,62,Mt Vernon West,300,300
+176,54,176,Tenmile River,54,Melrose,1800,1800
+25,1,25,Irvington,1,Grand Central,1275,975
+58,98,58,Williams Bridge,98,Pawling,1450,1450
+110,108,110,Larchmont,108,New Rochelle,300,300
+62,68,62,Mt Vernon West,68,Crestwood,300,300
+54,64,54,Melrose,64,Fleetwood,300,300
+94,100,94,Southeast,100,HM Valley-Wingdale,650,650
+37,11,37,Cortlandt,11,Marble Hill,800,800
+16,37,16,Riverdale,37,Cortlandt,800,800
+1,57,1,Grand Central,57,Botanical Garden,975,725
+88,62,88,Goldens Bridge,62,Mt Vernon West,725,725
+106,110,106,Pelham,110,Larchmont,300,300
+99,71,99,Appalachian Trail,71,Scarsdale,1150,1150
+4,99,4,Harlem-125th St.,99,Appalachian Trail,2300,1750
+65,78,65,Bronxville,78,Valhalla,500,500
+57,74,57,Botanical Garden,74,White Plains,425,425
+68,83,68,Crestwood,83,Chappaqua,500,500
+88,98,88,Goldens Bridge,98,Pawling,675,675
+80,57,80,Hawthorne,57,Botanical Garden,575,575
+100,72,100,HM Valley-Wingdale,72,Hartsdale,1375,1375
+61,80,61,Wakefield,80,Hawthorne,575,575
+81,58,81,Pleasantville,58,Williams Bridge,575,575
+33,18,33,Croton-Harmon,18,Yonkers,500,500
+25,14,25,Irvington,14,Spuyten Duyvil,425,425
+622,4,622,Yankees-E153 St.,4,Harlem-125th St.,975,725
+43,31,43,Cold Spring,31,Ossining,675,675
+14,4,14,Spuyten Duyvil,4,Harlem-125th St.,975,725
+4,76,4,Harlem-125th St.,76,North White Plains,1275,975
+72,94,72,Hartsdale,94,Southeast,775,775
+64,90,64,Fleetwood,90,Croton Falls,875,875
+65,55,65,Bronxville,55,Tremont,300,300
+56,86,56,Fordham,86,Katonah,800,800
+76,64,76,North White Plains,64,Fleetwood,300,300
+9,11,9,Morris Heights,11,Marble Hill,300,300
+30,622,30,Scarborough,622,Yankees-E153 St.,575,575
+99,84,99,Appalachian Trail,84,Mount Kisco,675,675
+65,91,65,Bronxville,91,Brewster,875,875
+76,100,76,North White Plains,100,HM Valley-Wingdale,1375,1375
+29,25,29,Philipse Manor,25,Irvington,300,300
+61,57,61,Wakefield,57,Botanical Garden,300,300
+91,85,91,Brewster,85,Bedford Hills,300,300
+10,11,10,University Heights,11,Marble Hill,300,300
+83,81,83,Chappaqua,81,Pleasantville,300,300
+62,58,62,Mt Vernon West,58,Williams Bridge,300,300
+94,90,94,Southeast,90,Croton Falls,300,300
+72,71,72,Hartsdale,71,Scarsdale,300,300
+24,31,24,Ardsley-on-Hudson,31,Ossining,300,300
+16,27,16,Riverdale,27,Tarrytown,575,575
+99,61,99,Appalachian Trail,61,Wakefield,1450,1450
+65,68,65,Bronxville,68,Crestwood,300,300
+56,99,56,Fordham,99,Appalachian Trail,1450,1450
+57,64,57,Botanical Garden,64,Fleetwood,300,300
+9,24,9,Morris Heights,24,Ardsley-on-Hudson,425,425
+40,11,40,Manitou,11,Marble Hill,1150,1150
+79,88,79,Mount Pleasant,88,Goldens Bridge,300,300
+58,65,58,Williams Bridge,65,Bronxville,300,300
+30,46,30,Scarborough,46,Beacon,825,825
+98,101,98,Pawling,101,Dover Plains,425,425
+90,97,90,Croton Falls,97,Patterson,425,425
+91,62,91,Brewster,62,Mt Vernon West,875,875
+176,57,176,Tenmile River,57,Botanical Garden,1800,1800
+39,51,39,Peekskill,51,Poughkeepsie,825,825
+4,30,4,Harlem-125th St.,30,Scarborough,1475,1125
+91,98,91,Brewster,98,Pawling,425,425
+51,25,51,Poughkeepsie,25,Irvington,1375,1375
+177,101,177,Wassaic,101,Dover Plains,300,300
+23,43,23,Dobbs Ferry,43,Cold Spring,775,775
+84,59,84,Mount Kisco,59,Woodlawn,800,800
+83,94,83,Chappaqua,94,Southeast,675,675
+1,24,1,Grand Central,24,Ardsley-on-Hudson,1275,975
+4,66,4,Harlem-125th St.,66,Tuckahoe,1150,875
+72,84,72,Hartsdale,84,Mount Kisco,600,600
+64,80,64,Fleetwood,80,Hawthorne,500,500
+16,40,16,Riverdale,40,Manitou,1150,1150
+56,76,56,Fordham,76,North White Plains,425,425
+76,54,76,North White Plains,54,Melrose,425,425
+9,1,9,Morris Heights,1,Grand Central,975,725
+88,65,88,Goldens Bridge,65,Bronxville,725,725
+78,100,78,Valhalla,100,HM Valley-Wingdale,1200,1200
+98,78,98,Pawling,78,Valhalla,825,825
+90,74,90,Croton Falls,74,White Plains,775,775
+101,83,101,Dover Plains,83,Chappaqua,1200,1200
+79,101,79,Mount Pleasant,101,Dover Plains,1200,1200
+11,46,11,Marble Hill,46,Beacon,1450,1450
+71,97,71,Scarsdale,97,Patterson,1150,1150
+31,24,31,Ossining,24,Ardsley-on-Hudson,300,300
+23,20,23,Dobbs Ferry,20,Greystone,300,300
+177,78,177,Wassaic,78,Valhalla,1275,1275
+83,71,83,Chappaqua,71,Scarsdale,300,300
+94,80,94,Southeast,80,Hawthorne,675,675
+20,51,20,Greystone,51,Poughkeepsie,1525,1525
+72,61,72,Hartsdale,61,Wakefield,425,425
+4,43,4,Harlem-125th St.,43,Cold Spring,2000,1500
+64,57,64,Fleetwood,57,Botanical Garden,300,300
+84,72,84,Mount Kisco,72,Hartsdale,600,600
+89,1,89,Purdy's,1,Grand Central,2000,1500
+16,17,16,Riverdale,17,Ludlow,300,300
+1,37,1,Grand Central,37,Cortlandt,1750,1325
+86,81,86,Katonah,81,Pleasantville,300,300
+65,58,65,Bronxville,58,Williams Bridge,300,300
+56,89,56,Fordham,89,Purdy's,1150,1150
+57,54,57,Botanical Garden,54,Melrose,300,300
+97,90,97,Patterson,90,Croton Falls,425,425
+89,86,89,Purdy's,86,Katonah,300,300
+9,14,9,Morris Heights,14,Spuyten Duyvil,300,300
+27,31,27,Tarrytown,31,Ossining,300,300
+59,100,59,Woodlawn,100,HM Valley-Wingdale,1675,1675
+19,27,19,Glenwood,27,Tarrytown,500,500
+79,78,79,Mount Pleasant,78,Valhalla,300,300
+98,91,98,Pawling,91,Brewster,425,425
+71,74,71,Scarsdale,74,White Plains,300,300
+31,1,31,Ossining,1,Grand Central,1475,1125
+94,57,94,Southeast,57,Botanical Garden,1150,1150
+14,622,14,Spuyten Duyvil,622,Yankees-E153 St.,300,300
+112,111,112,Harrison,111,Mamaroneck,300,300
+4,20,4,Harlem-125th St.,20,Greystone,1150,875
+31,37,31,Ossining,37,Cortlandt,300,300
+177,91,177,Wassaic,91,Brewster,750,750
+23,33,23,Dobbs Ferry,33,Croton-Harmon,300,300
+83,84,83,Chappaqua,84,Mount Kisco,300,300
+43,11,43,Cold Spring,11,Marble Hill,1150,1150
+1,14,1,Grand Central,14,Spuyten Duyvil,975,725
+72,74,72,Hartsdale,74,White Plains,300,300
+46,22,46,Beacon,22,Hastings-on-Hudson,1150,1150
+105,108,105,Mt Vernon East ,108,New Rochelle,300,300
+16,30,16,Riverdale,30,Scarborough,575,575
+56,66,56,Fordham,66,Tuckahoe,300,300
+49,27,49,New Hamburg,27,Tarrytown,825,825
+61,1,61,Wakefield,1,Grand Central,975,725
+86,94,86,Katonah,94,Southeast,300,300
+18,39,18,Yonkers,39,Peekskill,725,725
+78,90,78,Valhalla,90,Croton Falls,675,675
+79,55,79,Mount Pleasant,55,Tremont,575,575
+98,68,98,Pawling,68,Crestwood,1300,1300
+89,99,89,Purdy's,99,Appalachian Trail,425,425
+90,64,90,Croton Falls,64,Fleetwood,875,875
+42,24,42,Garrison,24,Ardsley-on-Hudson,775,775
+19,40,19,Glenwood,40,Manitou,875,875
+79,91,79,Mount Pleasant,91,Brewster,675,675
+39,18,39,Peekskill,18,Yonkers,725,725
+30,49,30,Scarborough,49,New Hamburg,825,825
+31,14,31,Ossining,14,Spuyten Duyvil,575,575
+91,65,91,Brewster,65,Bronxville,875,875
+23,10,23,Dobbs Ferry,10,University Heights,425,425
+177,68,177,Wassaic,68,Crestwood,1600,1600
+83,61,83,Chappaqua,61,Wakefield,575,575
+622,46,622,Yankees-E153 St.,46,Beacon,1450,1450
+4,33,4,Harlem-125th St.,33,Croton-Harmon,1475,1125
+79,176,79,Mount Pleasant,176,Tenmile River,1275,1275
+24,11,24,Ardsley-on-Hudson,11,Marble Hill,425,425
+14,46,14,Spuyten Duyvil,46,Beacon,1450,1450
+74,97,74,White Plains,97,Patterson,1150,1150
+86,71,86,Katonah,71,Scarsdale,600,600
+97,80,97,Patterson,80,Hawthorne,825,825
+49,40,49,New Hamburg,40,Manitou,425,425
+89,76,89,Purdy's,76,North White Plains,775,775
+42,1,42,Garrison,1,Grand Central,2000,1500
+55,83,55,Tremont,83,Chappaqua,575,575
+176,1,176,Tenmile River,1,Grand Central,2725,2025
+1,112,1,Grand Central,112,Harrison,1275,975
+59,90,59,Woodlawn,90,Croton Falls,1150,1150
+19,17,19,Glenwood,17,Ludlow,300,300
+79,68,79,Mount Pleasant,68,Crestwood,500,500
+98,81,98,Pawling,81,Pleasantville,825,825
+71,64,71,Scarsdale,64,Fleetwood,300,300
+101,86,101,Dover Plains,86,Katonah,825,825
+16,622,16,Riverdale,622,Yankees-E153 St.,300,300
+20,18,20,Greystone,18,Yonkers,300,300
+11,49,11,Marble Hill,49,New Hamburg,1450,1450
+4,10,4,Harlem-125th St.,10,University Heights,975,725
+177,81,177,Wassaic,81,Pleasantville,1275,1275
+43,1,43,Cold Spring,1,Grand Central,2000,1500
+115,106,115,Port Chester,106,Pelham,400,400
+62,100,62,Mt Vernon West,100,HM Valley-Wingdale,1525,1525
+1,4,1,Grand Central,4,Harlem-125th St.,825,625
+85,83,85,Bedford Hills,83,Chappaqua,300,300
+37,43,37,Cortlandt,43,Cold Spring,300,300
+97,57,97,Patterson,57,Botanical Garden,1450,1450
+49,17,49,New Hamburg,17,Ludlow,1300,1300
+80,4,80,Hawthorne,4,Harlem-125th St.,1475,1125
+86,84,86,Katonah,84,Mount Kisco,300,300
+18,29,18,Yonkers,29,Philipse Manor,500,500
+78,80,78,Valhalla,80,Hawthorne,300,300
+98,58,98,Pawling,58,Williams Bridge,1450,1450
+90,54,90,Croton Falls,54,Melrose,1150,1150
+42,14,42,Garrison,14,Spuyten Duyvil,1150,1150
+19,30,19,Glenwood,30,Scarborough,500,500
+31,4,31,Ossining,4,Harlem-125th St.,1475,1125
+56,177,56,Fordham,177,Wassaic,1800,1800
+177,58,177,Wassaic,58,Williams Bridge,1800,1800
+176,99,176,Tenmile River,99,Appalachian Trail,450,450
+81,90,81,Pleasantville,90,Croton Falls,675,675
+25,46,25,Irvington,46,Beacon,1150,1150
+37,20,37,Cortlandt,20,Greystone,725,725
+22,40,22,Hastings-on-Hudson,40,Manitou,775,775
+66,83,66,Tuckahoe,83,Chappaqua,500,500
+46,25,46,Beacon,25,Irvington,1150,1150
+86,61,86,Katonah,61,Wakefield,800,800
+4,108,4,Harlem-125th St.,108,New Rochelle,1125,850
+78,57,78,Valhalla,57,Botanical Garden,575,575
+91,176,91,Brewster,176,Tenmile River,750,750
+49,30,49,New Hamburg,30,Scarborough,825,825
+89,66,89,Purdy's,66,Tuckahoe,875,875
+61,4,61,Wakefield,4,Harlem-125th St.,975,725
+27,11,27,Tarrytown,11,Marble Hill,575,575
+18,42,18,Yonkers,42,Garrison,875,875
+100,81,100,HM Valley-Wingdale,81,Pleasantville,1200,1200
+59,80,59,Woodlawn,80,Hawthorne,575,575
+79,58,79,Mount Pleasant,58,Williams Bridge,575,575
+30,16,30,Scarborough,16,Riverdale,575,575
+71,54,71,Scarsdale,54,Melrose,425,425
+33,27,33,Croton-Harmon,27,Tarrytown,300,300
+25,23,25,Irvington,23,Dobbs Ferry,300,300
+10,43,10,University Heights,43,Cold Spring,1150,1150
+62,90,62,Mt Vernon West,90,Croton Falls,875,875
+22,17,22,Hastings-on-Hudson,17,Ludlow,300,300
+54,86,54,Melrose,86,Katonah,800,800
+74,64,74,White Plains,64,Fleetwood,300,300
+622,49,622,Yankees-E153 St.,49,New Hamburg,1450,1450
+37,33,37,Cortlandt,33,Croton-Harmon,300,300
+14,49,14,Spuyten Duyvil,49,New Hamburg,1450,1450
+1,79,1,Grand Central,79,Mount Pleasant,1475,1125
+86,74,86,Katonah,74,White Plains,600,600
+59,57,59,Woodlawn,57,Botanical Garden,300,300
+18,19,18,Yonkers,19,Glenwood,300,300
+65,100,65,Bronxville,100,HM Valley-Wingdale,1525,1525
+89,79,89,Purdy's,79,Mount Pleasant,675,675
+42,4,42,Garrison,4,Harlem-125th St.,2000,1500
+55,86,55,Tremont,86,Katonah,800,800
+1,115,1,Grand Central,115,Port Chester,1375,1025
+40,43,40,Manitou,43,Cold Spring,300,300
+100,94,100,HM Valley-Wingdale,94,Southeast,650,650
+11,16,11,Marble Hill,16,Riverdale,300,300
+58,97,58,Williams Bridge,97,Patterson,1450,1450
+10,20,10,University Heights,20,Greystone,300,300
+176,89,176,Tenmile River,89,Purdy's,750,750
+81,80,81,Pleasantville,80,Hawthorne,300,300
+33,40,33,Croton-Harmon,40,Manitou,675,675
+37,10,37,Cortlandt,10,University Heights,800,800
+76,1,76,North White Plains,1,Grand Central,1275,975
+22,30,22,Hastings-on-Hudson,30,Scarborough,300,300
+54,99,54,Melrose,99,Appalachian Trail,1450,1450
+85,86,85,Bedford Hills,86,Katonah,300,300
+4,98,4,Harlem-125th St.,98,Pawling,2300,1750
+89,56,89,Purdy's,56,Fordham,1150,1150
+88,97,88,Goldens Bridge,97,Patterson,675,675
+27,1,27,Tarrytown,1,Grand Central,1475,1125
+40,20,40,Manitou,20,Greystone,875,875
+100,71,100,HM Valley-Wingdale,71,Scarsdale,1375,1375
+58,74,58,Williams Bridge,74,White Plains,425,425
+61,79,61,Wakefield,79,Mount Pleasant,575,575
+176,66,176,Tenmile River,66,Tuckahoe,1600,1600
+81,57,81,Pleasantville,57,Botanical Garden,575,575
+106,1,106,Pelham,1,Grand Central,1125,850
+33,17,33,Croton-Harmon,17,Ludlow,500,500
+1,622,1,Grand Central,622,Yankees-E153 St.,975,725
+64,4,64,Fleetwood,4,Harlem-125th St.,1150,875
+89,177,89,Purdy's,177,Wassaic,750,750
+10,33,10,University Heights,33,Croton-Harmon,575,575
+62,80,62,Mt Vernon West,80,Hawthorne,500,500
+54,76,54,Melrose,76,North White Plains,425,425
+74,54,74,White Plains,54,Melrose,425,425
+37,23,37,Cortlandt,23,Dobbs Ferry,600,600
+57,1,57,Botanical Garden,1,Grand Central,975,725
+88,74,88,Goldens Bridge,74,White Plains,600,600
+18,9,18,Yonkers,9,Morris Heights,300,300
+99,83,99,Appalachian Trail,83,Chappaqua,825,825
+4,111,4,Harlem-125th St.,111,Mamaroneck,1275,975
+65,90,65,Bronxville,90,Croton Falls,875,875
+57,86,57,Botanical Garden,86,Katonah,800,800
+76,99,76,North White Plains,99,Appalachian Trail,1150,1150
+9,46,9,Morris Heights,46,Beacon,1450,1450
+31,622,31,Ossining,622,Yankees-E153 St.,575,575
+29,24,29,Philipse Manor,24,Ardsley-on-Hudson,300,300
+94,4,94,Southeast,4,Harlem-125th St.,2000,1500
+40,33,40,Manitou,33,Croton-Harmon,675,675
+100,84,100,HM Valley-Wingdale,84,Mount Kisco,825,825
+62,57,62,Mt Vernon West,57,Botanical Garden,300,300
+176,79,176,Tenmile River,79,Mount Pleasant,1275,1275
+33,30,33,Croton-Harmon,30,Scarborough,300,300
+622,16,622,Yankees-E153 St.,16,Riverdale,300,300
+84,81,84,Mount Kisco,81,Pleasantville,300,300
+22,20,22,Hastings-on-Hudson,20,Greystone,300,300
+54,89,54,Melrose,89,Purdy's,1150,1150
+14,16,14,Spuyten Duyvil,16,Riverdale,300,300
+4,88,4,Harlem-125th St.,88,Goldens Bridge,1750,1325
+56,98,56,Fordham,98,Pawling,1450,1450
+17,27,17,Ludlow,27,Tarrytown,500,500
+9,23,9,Morris Heights,23,Dobbs Ferry,425,425
+29,1,29,Philipse Manor,1,Grand Central,1475,1125
+40,10,40,Manitou,10,University Heights,1150,1150
+100,61,100,HM Valley-Wingdale,61,Wakefield,1675,1675
+57,99,57,Botanical Garden,99,Appalachian Trail,1450,1450
+58,64,58,Williams Bridge,64,Fleetwood,300,300
+29,37,29,Philipse Manor,37,Cortlandt,300,300
+176,56,176,Tenmile River,56,Fordham,1800,1800
+31,46,31,Ossining,46,Beacon,825,825
+10,23,10,University Heights,23,Dobbs Ferry,425,425
+51,24,51,Poughkeepsie,24,Ardsley-on-Hudson,1375,1375
+91,97,91,Brewster,97,Patterson,425,425
+54,66,54,Melrose,66,Tuckahoe,300,300
+59,1,59,Woodlawn,1,Grand Central,975,725
+4,65,4,Harlem-125th St.,65,Bronxville,1150,875
+72,83,72,Hartsdale,83,Chappaqua,300,300
+24,43,24,Ardsley-on-Hudson,43,Cold Spring,775,775
+84,94,84,Mount Kisco,94,Southeast,300,300
+16,39,16,Riverdale,39,Peekskill,800,800
+176,177,176,Tenmile River,177,Wassaic,300,300
+1,59,1,Grand Central,59,Woodlawn,975,725
+88,64,88,Goldens Bridge,64,Fleetwood,725,725
+106,112,106,Pelham,112,Harrison,300,300
+65,80,65,Bronxville,80,Hawthorne,500,500
+56,111,56,Fordham,111,Mamaroneck,425,425
+17,40,17,Ludlow,40,Manitou,875,875
+57,76,57,Botanical Garden,76,North White Plains,425,425
+76,89,76,North White Plains,89,Purdy's,775,775
+68,85,68,Crestwood,85,Bedford Hills,725,725
+29,14,29,Philipse Manor,14,Spuyten Duyvil,575,575
+40,23,40,Manitou,23,Dobbs Ferry,775,775
+80,59,80,Hawthorne,59,Woodlawn,575,575
+79,100,79,Mount Pleasant,100,HM Valley-Wingdale,1200,1200
+25,16,25,Irvington,16,Riverdale,425,425
+4,42,4,Harlem-125th St.,42,Garrison,2000,1500
+51,37,51,Poughkeepsie,37,Cortlandt,825,825
+24,20,24,Ardsley-on-Hudson,20,Greystone,300,300
+97,4,97,Patterson,4,Harlem-125th St.,2300,1750
+43,33,43,Cold Spring,33,Croton-Harmon,675,675
+84,71,84,Mount Kisco,71,Scarsdale,600,600
+4,78,4,Harlem-125th St.,78,Valhalla,1475,1125
+65,57,65,Bronxville,57,Botanical Garden,300,300
+56,88,56,Fordham,88,Goldens Bridge,800,800
+90,1,90,Croton Falls,1,Grand Central,2000,1500
+76,66,76,North White Plains,66,Tuckahoe,300,300
+68,62,68,Crestwood,62,Mt Vernon West,300,300
+57,89,57,Botanical Garden,89,Purdy's,1150,1150
+58,54,58,Williams Bridge,54,Melrose,300,300
+98,90,98,Pawling,90,Croton Falls,425,425
+68,98,68,Crestwood,98,Pawling,1300,1300
+42,46,42,Garrison,46,Beacon,425,425
+61,59,61,Wakefield,59,Woodlawn,300,300
+80,72,80,Hawthorne,72,Hartsdale,300,300
+20,27,20,Greystone,27,Tarrytown,500,500
+39,40,39,Peekskill,40,Manitou,300,300
+51,14,51,Poughkeepsie,14,Spuyten Duyvil,1675,1675
+43,10,43,Cold Spring,10,University Heights,1150,1150
+54,56,54,Melrose,56,Fordham,300,300
+4,55,4,Harlem-125th St.,55,Tremont,975,725
+78,4,78,Valhalla,4,Harlem-125th St.,1475,1125
+24,33,24,Ardsley-on-Hudson,33,Croton-Harmon,300,300
+43,46,43,Cold Spring,46,Beacon,425,425
+16,29,16,Riverdale,29,Philipse Manor,575,575
+108,112,108,New Rochelle,112,Harrison,300,300
+1,49,1,Grand Central,49,New Hamburg,2300,1750
+88,54,88,Goldens Bridge,54,Melrose,800,800
+56,101,56,Fordham,101,Dover Plains,1675,1675
+17,30,17,Ludlow,30,Scarborough,500,500
+57,66,57,Botanical Garden,66,Tuckahoe,300,300
+76,79,76,North White Plains,79,Mount Pleasant,300,300
+29,4,29,Philipse Manor,4,Harlem-125th St.,1475,1125
+54,177,54,Melrose,177,Wassaic,1800,1800
+27,43,27,Tarrytown,43,Cold Spring,675,675
+4,176,4,Harlem-125th St.,176,Tenmile River,2725,2025
+19,39,19,Glenwood,39,Peekskill,725,725
+79,90,79,Mount Pleasant,90,Croton Falls,675,675
+39,17,39,Peekskill,17,Ludlow,725,725
+71,86,71,Scarsdale,86,Katonah,600,600
+90,99,90,Croton Falls,99,Appalachian Trail,425,425
+91,64,91,Brewster,64,Fleetwood,875,875
+108,4,108,New Rochelle,4,Harlem-125th St.,1125,850
+20,40,20,Greystone,40,Manitou,875,875
+31,49,31,Ossining,49,New Hamburg,825,825
+51,27,51,Poughkeepsie,27,Tarrytown,1200,1200
+24,10,24,Ardsley-on-Hudson,10,University Heights,425,425
+43,23,43,Cold Spring,23,Dobbs Ferry,775,775
+84,61,84,Mount Kisco,61,Wakefield,800,800
+59,4,59,Woodlawn,4,Harlem-125th St.,975,725
+72,86,72,Hartsdale,86,Katonah,600,600
+16,42,16,Riverdale,42,Garrison,1150,1150
+56,78,56,Fordham,78,Valhalla,575,575
+76,56,76,North White Plains,56,Fordham,425,425
+49,39,49,New Hamburg,39,Peekskill,675,675
+18,51,18,Yonkers,51,Poughkeepsie,1525,1525
+98,80,98,Pawling,80,Hawthorne,825,825
+90,76,90,Croton Falls,76,North White Plains,775,775
+101,85,101,Dover Plains,85,Bedford Hills,825,825
+20,17,20,Greystone,17,Ludlow,300,300
+39,30,39,Peekskill,30,Scarborough,300,300
+71,99,71,Scarsdale,99,Appalachian Trail,1150,1150
+23,22,23,Dobbs Ferry,22,Hastings-on-Hudson,300,300
+51,4,51,Poughkeepsie,4,Harlem-125th St.,2575,1925
+177,80,177,Wassaic,80,Hawthorne,1275,1275
+76,177,76,North White Plains,177,Wassaic,1475,1475
+17,622,17,Ludlow,622,Yankees-E153 St.,300,300
+106,56,106,Pelham,56,Fordham,300,300
+24,23,24,Ardsley-on-Hudson,23,Dobbs Ferry,300,300
+64,59,64,Fleetwood,59,Woodlawn,300,300
+56,55,56,Fordham,55,Tremont,300,300
+16,19,16,Riverdale,19,Glenwood,300,300
+1,39,1,Grand Central,39,Peekskill,1750,1325
+86,83,86,Katonah,83,Chappaqua,300,300
+78,79,78,Valhalla,79,Mount Pleasant,300,300
+57,56,57,Botanical Garden,56,Fordham,300,300
+98,57,98,Pawling,57,Botanical Garden,1450,1450
+89,88,89,Purdy's,88,Goldens Bridge,300,300
+9,16,9,Morris Heights,16,Riverdale,300,300
+68,65,68,Crestwood,65,Bronxville,300,300
+101,62,101,Dover Plains,62,Mt Vernon West,1525,1525
+81,4,81,Pleasantville,4,Harlem-125th St.,1475,1125
+27,33,27,Tarrytown,33,Croton-Harmon,300,300
+19,29,19,Glenwood,29,Philipse Manor,500,500
+79,80,79,Mount Pleasant,80,Hawthorne,300,300
+11,25,11,Marble Hill,25,Irvington,425,425
+71,76,71,Scarsdale,76,North White Plains,300,300
+56,176,56,Fordham,176,Tenmile River,1800,1800
+90,89,90,Croton Falls,89,Purdy's,300,300
+91,54,91,Brewster,54,Melrose,1150,1150
+42,49,42,Garrison,49,New Hamburg,425,425
+101,98,101,Dover Plains,98,Pawling,425,425
+94,59,94,Southeast,59,Woodlawn,1150,1150
+74,1,74,White Plains,1,Grand Central,1275,975
+20,30,20,Greystone,30,Scarborough,500,500
+31,39,31,Ossining,39,Peekskill,300,300
+4,22,4,Harlem-125th St.,22,Hastings-on-Hudson,1275,975
+57,177,57,Botanical Garden,177,Wassaic,1800,1800
+1,16,1,Grand Central,16,Riverdale,975,725
+74,86,74,White Plains,86,Katonah,600,600
+46,24,46,Beacon,24,Ardsley-on-Hudson,1150,1150
+105,110,105,Mt Vernon East ,110,Larchmont,300,300
+64,72,64,Fleetwood,72,Hartsdale,300,300
+111,4,111,Mamaroneck,4,Harlem-125th St.,1275,975
+56,68,56,Fordham,68,Crestwood,300,300
+49,29,49,New Hamburg,29,Philipse Manor,825,825
+108,115,108,New Rochelle,115,Port Chester,400,400
+27,10,27,Tarrytown,10,University Heights,575,575
+59,79,59,Woodlawn,79,Mount Pleasant,575,575
+79,57,79,Mount Pleasant,57,Botanical Garden,575,575
+89,101,89,Purdy's,101,Dover Plains,650,650
+90,66,90,Croton Falls,66,Tuckahoe,875,875
+62,4,62,Mt Vernon West,4,Harlem-125th St.,1150,875
+27,46,27,Tarrytown,46,Beacon,825,825
+19,42,19,Glenwood,42,Garrison,875,875
+39,20,39,Peekskill,20,Greystone,725,725
+30,51,30,Scarborough,51,Poughkeepsie,1200,1200
+31,16,31,Ossining,16,Riverdale,575,575
+71,89,71,Scarsdale,89,Purdy's,775,775
+94,72,94,Southeast,72,Hartsdale,775,775
+46,1,46,Beacon,1,Grand Central,2300,1750
+16,9,16,Riverdale,9,Morris Heights,300,300
+74,99,74,White Plains,99,Appalachian Trail,1150,1150
+29,622,29,Philipse Manor,622,Yankees-E153 St.,575,575
+46,37,46,Beacon,37,Cortlandt,675,675
+49,42,49,New Hamburg,42,Garrison,425,425
+89,78,89,Purdy's,78,Valhalla,675,675
+55,85,55,Tremont,85,Bedford Hills,800,800
+1,114,1,Grand Central,114,Rye,1375,1025
+27,23,27,Tarrytown,23,Dobbs Ferry,300,300
+71,66,71,Scarsdale,66,Tuckahoe,300,300
+90,79,90,Croton Falls,79,Mount Pleasant,675,675
+33,39,33,Croton-Harmon,39,Peekskill,300,300
+622,25,622,Yankees-E153 St.,25,Irvington,425,425
+177,83,177,Wassaic,83,Chappaqua,1275,1275
+115,108,115,Port Chester,108,New Rochelle,400,400
+22,29,22,Hastings-on-Hudson,29,Philipse Manor,300,300
+54,98,54,Melrose,98,Pawling,1450,1450
+74,76,74,White Plains,76,North White Plains,300,300
+66,72,66,Tuckahoe,72,Hartsdale,300,300
+46,14,46,Beacon,14,Spuyten Duyvil,1450,1450
+56,58,56,Fordham,58,Williams Bridge,300,300
+97,59,97,Patterson,59,Woodlawn,1450,1450
+49,19,49,New Hamburg,19,Glenwood,1300,1300
+89,55,89,Purdy's,55,Tremont,1150,1150
+55,62,55,Tremont,62,Mt Vernon West,300,300
+18,31,18,Yonkers,31,Ossining,500,500
+89,91,89,Purdy's,91,Brewster,300,300
+90,56,90,Croton Falls,56,Fordham,1150,1150
+42,16,42,Garrison,16,Riverdale,1150,1150
+55,98,55,Tremont,98,Pawling,1450,1450
+101,65,101,Dover Plains,65,Bronxville,1525,1525
+29,46,29,Philipse Manor,46,Beacon,825,825
+51,622,51,Poughkeepsie,622,Yankees-E153 St.,1675,1675
+114,4,114,Rye,4,Harlem-125th St.,1375,1025
+111,115,111,Mamaroneck,115,Port Chester,375,375
+89,176,89,Purdy's,176,Tenmile River,750,750
+176,101,176,Tenmile River,101,Dover Plains,300,300
+62,79,62,Mt Vernon West,79,Mount Pleasant,500,500
+85,62,85,Bedford Hills,62,Mt Vernon West,725,725
+37,22,37,Cortlandt,22,Hastings-on-Hudson,600,600
+65,4,65,Bronxville,4,Harlem-125th St.,1150,875
+90,177,90,Croton Falls,177,Wassaic,750,750
+22,42,22,Hastings-on-Hudson,42,Garrison,775,775
+74,89,74,White Plains,89,Purdy's,775,775
+66,85,66,Tuckahoe,85,Bedford Hills,725,725
+85,98,85,Bedford Hills,98,Pawling,675,675
+4,110,4,Harlem-125th St.,110,Larchmont,1275,975
+78,59,78,Valhalla,59,Woodlawn,575,575
+97,72,97,Patterson,72,Hartsdale,1150,1150
+58,1,58,Williams Bridge,1,Grand Central,975,725
+89,68,89,Purdy's,68,Crestwood,875,875
+19,9,19,Glenwood,9,Morris Heights,300,300
+100,83,100,HM Valley-Wingdale,83,Chappaqua,1200,1200
+30,18,30,Scarborough,18,Yonkers,500,500
+71,56,71,Scarsdale,56,Fordham,425,425
+58,86,58,Williams Bridge,86,Katonah,800,800
+61,91,61,Wakefield,91,Brewster,1150,1150
+176,78,176,Tenmile River,78,Valhalla,1275,1275
+33,29,33,Croton-Harmon,29,Philipse Manor,300,300
+22,19,22,Hastings-on-Hudson,19,Glenwood,300,300
+54,88,54,Melrose,88,Goldens Bridge,800,800
+88,1,88,Goldens Bridge,1,Grand Central,1750,1325
+74,66,74,White Plains,66,Tuckahoe,300,300
+66,62,66,Tuckahoe,62,Mt Vernon West,300,300
+46,4,46,Beacon,4,Harlem-125th St.,2300,1750
+71,177,71,Scarsdale,177,Wassaic,1475,1475
+49,9,49,New Hamburg,9,Morris Heights,1450,1450
+14,51,14,Spuyten Duyvil,51,Poughkeepsie,1675,1675
+1,81,1,Grand Central,81,Pleasantville,1475,1125
+88,86,88,Goldens Bridge,86,Katonah,300,300
+78,72,78,Valhalla,72,Hartsdale,300,300
+57,98,57,Botanical Garden,98,Pawling,1450,1450
+80,81,80,Hawthorne,81,Pleasantville,300,300
+111,105,111,Mamaroneck,105,Mt Vernon East ,300,300
+58,99,58,Williams Bridge,99,Appalachian Trail,1450,1450
+10,22,10,University Heights,22,Hastings-on-Hudson,425,425
+176,91,176,Tenmile River,91,Brewster,750,750
+54,65,54,Melrose,65,Bronxville,300,300
+33,42,33,Croton-Harmon,42,Garrison,675,675
+101,176,101,Dover Plains,176,Tenmile River,300,300
+54,101,54,Melrose,101,Dover Plains,1675,1675
+114,115,114,Rye,115,Port Chester,300,300
+74,79,74,White Plains,79,Mount Pleasant,300,300
+106,111,106,Pelham,111,Mamaroneck,300,300
+4,100,4,Harlem-125th St.,100,HM Valley-Wingdale,2575,1925
+89,58,89,Purdy's,58,Williams Bridge,1150,1150
+17,39,17,Ludlow,39,Peekskill,725,725
+76,88,76,North White Plains,88,Goldens Bridge,600,600
+110,1,110,Larchmont,1,Grand Central,1275,975
+55,65,55,Tremont,65,Bronxville,300,300
+1,94,1,Grand Central,94,Southeast,2000,1500
+88,99,88,Goldens Bridge,99,Appalachian Trail,675,675
+40,22,40,Manitou,22,Hastings-on-Hudson,775,775
+58,76,58,Williams Bridge,76,North White Plains,425,425
+29,49,29,Philipse Manor,49,New Hamburg,825,825
+61,81,61,Wakefield,81,Pleasantville,575,575
+176,68,176,Tenmile River,68,Crestwood,1600,1600
+80,94,80,Hawthorne,94,Southeast,675,675
+81,59,81,Pleasantville,59,Woodlawn,575,575
+33,19,33,Croton-Harmon,19,Glenwood,500,500
+22,9,22,Hastings-on-Hudson,9,Morris Heights,425,425
+54,78,54,Melrose,78,Valhalla,575,575
+74,56,74,White Plains,56,Fordham,425,425
+85,65,85,Bedford Hills,65,Bronxville,725,725
+98,4,98,Pawling,4,Harlem-125th St.,2300,1750
+16,51,16,Riverdale,51,Poughkeepsie,1675,1675
+1,71,1,Grand Central,71,Scarsdale,1275,975
+88,76,88,Goldens Bridge,76,North White Plains,600,600
+18,11,18,Yonkers,11,Marble Hill,300,300
+99,85,99,Appalachian Trail,85,Bedford Hills,675,675
+57,88,57,Botanical Garden,88,Goldens Bridge,800,800
+91,1,91,Brewster,1,Grand Central,2000,1500
+177,4,177,Wassaic,4,Harlem-125th St.,2725,2025
+76,101,76,North White Plains,101,Dover Plains,1375,1375
+68,97,68,Crestwood,97,Patterson,1300,1300
+74,177,74,White Plains,177,Wassaic,1475,1475
+80,71,80,Hawthorne,71,Scarsdale,300,300
+100,86,100,HM Valley-Wingdale,86,Katonah,825,825
+58,89,58,Williams Bridge,89,Purdy's,1150,1150
+61,94,61,Wakefield,94,Southeast,1150,1150
+62,59,62,Mt Vernon West,59,Woodlawn,300,300
+176,81,176,Tenmile River,81,Pleasantville,1275,1275
+81,72,81,Pleasantville,72,Hartsdale,300,300
+54,55,54,Melrose,55,Tremont,300,300
+622,18,622,Yankees-E153 St.,18,Yonkers,300,300
+51,49,51,Poughkeepsie,49,New Hamburg,425,425
+84,83,84,Mount Kisco,83,Chappaqua,300,300
+14,18,14,Spuyten Duyvil,18,Yonkers,300,300
+114,105,114,Rye,105,Mt Vernon East ,400,400
+99,62,99,Appalachian Trail,62,Mt Vernon West,1300,1300
+4,90,4,Harlem-125th St.,90,Croton Falls,2000,1500
+79,4,79,Mount Pleasant,4,Harlem-125th St.,1475,1125
+56,100,56,Fordham,100,HM Valley-Wingdale,1675,1675
+17,29,17,Ludlow,29,Philipse Manor,500,500
+76,78,76,North White Plains,78,Valhalla,300,300
+9,25,9,Morris Heights,25,Irvington,425,425
+68,74,68,Crestwood,74,White Plains,300,300
+1,84,1,Grand Central,84,Mount Kisco,1750,1325
+54,176,54,Melrose,176,Tenmile River,1800,1800
+88,89,88,Goldens Bridge,89,Purdy's,300,300
+99,98,99,Appalachian Trail,98,Pawling,300,300
+57,101,57,Botanical Garden,101,Dover Plains,1675,1675
+58,66,58,Williams Bridge,66,Tuckahoe,300,300
+61,71,61,Wakefield,71,Scarsdale,425,425
+176,58,176,Tenmile River,58,Williams Bridge,1800,1800
+80,84,80,Hawthorne,84,Mount Kisco,300,300
+33,9,33,Croton-Harmon,9,Morris Heights,575,575
+20,39,20,Greystone,39,Peekskill,725,725
+10,25,10,University Heights,25,Irvington,425,425
+91,99,91,Brewster,99,Appalachian Trail,425,425
+110,112,110,Larchmont,112,Harrison,300,300
+55,176,55,Tremont,176,Tenmile River,1800,1800
+46,622,46,Beacon,622,Yankees-E153 St.,1450,1450
+43,22,43,Cold Spring,22,Hastings-on-Hudson,775,775
+54,68,54,Melrose,68,Crestwood,300,300
+72,85,72,Hartsdale,85,Bedford Hills,600,600
+64,81,64,Fleetwood,81,Pleasantville,500,500
+1,61,1,Grand Central,61,Wakefield,975,725
+88,66,88,Goldens Bridge,66,Tuckahoe,725,725
+17,42,17,Ludlow,42,Garrison,875,875
+57,78,57,Botanical Garden,78,Valhalla,575,575
+76,91,76,North White Plains,91,Brewster,775,775
+29,16,29,Philipse Manor,16,Riverdale,575,575
+40,25,40,Manitou,25,Irvington,775,775
+80,61,80,Hawthorne,61,Wakefield,575,575
+85,176,85,Bedford Hills,176,Tenmile River,1000,1000
+39,29,39,Peekskill,29,Philipse Manor,300,300
+58,79,58,Williams Bridge,79,Mount Pleasant,575,575
+71,98,71,Scarsdale,98,Pawling,1150,1150
+91,76,91,Brewster,76,North White Plains,775,775
+61,84,61,Wakefield,84,Mount Kisco,800,800
+94,81,94,Southeast,81,Pleasantville,675,675
+51,39,51,Poughkeepsie,39,Peekskill,825,825
+24,22,24,Ardsley-on-Hudson,22,Hastings-on-Hudson,300,300
+16,18,16,Riverdale,18,Yonkers,300,300
+4,80,4,Harlem-125th St.,80,Hawthorne,1475,1125
+72,98,72,Hartsdale,98,Pawling,1150,1150
+64,94,64,Fleetwood,94,Southeast,875,875
+65,59,65,Bronxville,59,Woodlawn,300,300
+56,90,56,Fordham,90,Croton Falls,1150,1150
+57,55,57,Botanical Garden,55,Tremont,300,300
+17,19,17,Ludlow,19,Glenwood,300,300
+76,68,76,North White Plains,68,Crestwood,300,300
+49,51,49,New Hamburg,51,Poughkeepsie,425,425
+68,64,68,Crestwood,64,Fleetwood,300,300
+57,91,57,Botanical Garden,91,Brewster,1150,1150
+58,56,58,Williams Bridge,56,Fordham,300,300
+90,88,90,Croton Falls,88,Goldens Bridge,300,300
+101,97,101,Dover Plains,97,Patterson,425,425
+20,29,20,Greystone,29,Philipse Manor,500,500
+39,42,39,Peekskill,42,Garrison,300,300
+57,176,57,Botanical Garden,176,Tenmile River,1800,1800
+91,89,91,Brewster,89,Purdy's,300,300
+51,16,51,Poughkeepsie,16,Riverdale,1675,1675
+83,85,83,Chappaqua,85,Bedford Hills,300,300
+4,57,4,Harlem-125th St.,57,Botanical Garden,975,725
+58,177,58,Williams Bridge,177,Wassaic,1800,1800
+64,71,64,Fleetwood,71,Scarsdale,300,300
+16,31,16,Riverdale,31,Ossining,575,575
+108,114,108,New Rochelle,114,Rye,400,400
+1,51,1,Grand Central,51,Poughkeepsie,2575,1925
+88,56,88,Goldens Bridge,56,Fordham,800,800
+99,65,99,Appalachian Trail,65,Bronxville,1300,1300
+65,72,65,Bronxville,72,Hartsdale,300,300
+112,4,112,Harrison,4,Harlem-125th St.,1275,975
+57,68,57,Botanical Garden,68,Crestwood,300,300
+89,100,89,Purdy's,100,HM Valley-Wingdale,650,650
+42,25,42,Garrison,25,Irvington,775,775
+39,19,39,Peekskill,19,Glenwood,725,725
+11,37,11,Marble Hill,37,Cortlandt,800,800
+71,88,71,Scarsdale,88,Goldens Bridge,600,600
+105,1,105,Mt Vernon East ,1,Grand Central,1125,850
+90,101,90,Croton Falls,101,Dover Plains,650,650
+91,66,91,Brewster,66,Tuckahoe,875,875
+83,62,83,Chappaqua,62,Mt Vernon West,500,500
+88,177,88,Goldens Bridge,177,Wassaic,1000,1000
+94,71,94,Southeast,71,Scarsdale,775,775
+20,42,20,Greystone,42,Garrison,875,875
+31,51,31,Ossining,51,Poughkeepsie,1200,1200
+51,29,51,Poughkeepsie,29,Philipse Manor,1200,1200
+83,98,83,Chappaqua,98,Pawling,825,825
+43,25,43,Cold Spring,25,Irvington,775,775
+64,84,64,Fleetwood,84,Mount Kisco,725,725
+56,80,56,Fordham,80,Hawthorne,575,575
+17,9,17,Ludlow,9,Morris Heights,300,300
+76,58,76,North White Plains,58,Williams Bridge,425,425
+68,54,68,Crestwood,54,Melrose,300,300
+27,22,27,Tarrytown,22,Hastings-on-Hudson,300,300
+59,91,59,Woodlawn,91,Brewster,1150,1150
+30,27,30,Scarborough,27,Tarrytown,300,300
+71,65,71,Scarsdale,65,Bronxville,300,300
+90,78,90,Croton Falls,78,Valhalla,675,675
+110,56,110,Larchmont,56,Fordham,425,425
+20,19,20,Greystone,19,Glenwood,300,300
+71,101,71,Scarsdale,101,Dover Plains,1375,1375
+4,11,4,Harlem-125th St.,11,Marble Hill,975,725
+91,79,91,Brewster,79,Mount Pleasant,675,675
+23,24,23,Dobbs Ferry,24,Ardsley-on-Hudson,300,300
+94,84,94,Southeast,84,Mount Kisco,300,300
+72,65,72,Hartsdale,65,Bronxville,300,300
+64,61,64,Fleetwood,61,Wakefield,300,300
+24,25,24,Ardsley-on-Hudson,25,Irvington,300,300
+56,57,56,Fordham,57,Botanical Garden,300,300
+86,85,86,Katonah,85,Bedford Hills,300,300
+46,49,46,Beacon,49,New Hamburg,300,300
+78,81,78,Valhalla,81,Pleasantville,300,300
+97,94,97,Patterson,94,Southeast,425,425
+98,59,98,Pawling,59,Woodlawn,1450,1450
+57,58,57,Botanical Garden,58,Williams Bridge,300,300
+89,90,89,Purdy's,90,Croton Falls,300,300
+90,55,90,Croton Falls,55,Tremont,1150,1150
+55,97,55,Tremont,97,Patterson,1450,1450
+101,64,101,Dover Plains,64,Fleetwood,1525,1525
+19,31,19,Glenwood,31,Ossining,500,500
+39,9,39,Peekskill,9,Morris Heights,800,800
+11,27,11,Marble Hill,27,Tarrytown,575,575
+111,114,111,Mamaroneck,114,Rye,375,375
+30,40,30,Scarborough,40,Manitou,675,675
+71,78,71,Scarsdale,78,Valhalla,300,300
+91,56,91,Brewster,56,Fordham,1150,1150
+23,1,23,Dobbs Ferry,1,Grand Central,1275,975
+177,59,177,Wassaic,59,Woodlawn,1800,1800
+90,91,90,Croton Falls,91,Brewster,300,300
+94,61,94,Southeast,61,Wakefield,1150,1150
+33,51,33,Croton-Harmon,51,Poughkeepsie,1200,1200
+112,115,112,Harrison,115,Port Chester,375,375
+4,24,4,Harlem-125th St.,24,Ardsley-on-Hudson,1275,975
+23,37,23,Dobbs Ferry,37,Cortlandt,600,600
+1,18,1,Grand Central,18,Yonkers,1150,875
+74,88,74,White Plains,88,Goldens Bridge,600,600
+85,97,85,Bedford Hills,97,Patterson,675,675
+86,62,86,Katonah,62,Mt Vernon West,725,725
+91,177,91,Brewster,177,Wassaic,750,750
+97,71,97,Patterson,71,Scarsdale,1150,1150
+49,31,49,New Hamburg,31,Ossining,825,825
+55,74,55,Tremont,74,White Plains,425,425
+86,98,86,Katonah,98,Pawling,675,675
+18,43,18,Yonkers,43,Cold Spring,875,875
+59,81,59,Woodlawn,81,Pleasantville,575,575
+78,94,78,Valhalla,94,Southeast,675,675
+79,59,79,Mount Pleasant,59,Woodlawn,575,575
+98,72,98,Pawling,72,Hartsdale,1150,1150
+30,17,30,Scarborough,17,Ludlow,500,500
+71,55,71,Scarsdale,55,Tremont,425,425
+90,68,90,Croton Falls,68,Crestwood,875,875
+20,9,20,Greystone,9,Morris Heights,300,300
+39,22,39,Peekskill,22,Hastings-on-Hudson,600,600
+11,40,11,Marble Hill,40,Manitou,1150,1150
+31,18,31,Ossining,18,Yonkers,500,500
+4,1,4,Harlem-125th St.,1,Grand Central,825,625
+23,14,23,Dobbs Ferry,14,Spuyten Duyvil,425,425
+177,72,177,Wassaic,72,Hartsdale,1475,1475
+83,65,83,Chappaqua,65,Bronxville,500,500
+72,55,72,Hartsdale,55,Tremont,425,425
+85,74,85,Bedford Hills,74,White Plains,600,600
+71,176,71,Scarsdale,176,Tenmile River,1475,1475
+74,101,74,White Plains,101,Dover Plains,1375,1375
+66,97,66,Tuckahoe,97,Patterson,1300,1300
+46,39,46,Beacon,39,Peekskill,675,675
+59,58,59,Woodlawn,58,Williams Bridge,300,300
+18,20,18,Yonkers,20,Greystone,300,300
+78,71,78,Valhalla,71,Scarsdale,300,300
+97,84,97,Patterson,84,Mount Kisco,675,675
+89,80,89,Purdy's,80,Hawthorne,675,675
+101,54,101,Dover Plains,54,Melrose,1675,1675
+27,25,27,Tarrytown,25,Irvington,300,300
+59,94,59,Woodlawn,94,Southeast,1150,1150
+72,176,72,Hartsdale,176,Tenmile River,1475,1475
+79,72,79,Mount Pleasant,72,Hartsdale,300,300
+11,17,11,Marble Hill,17,Ludlow,300,300
+71,68,71,Scarsdale,68,Crestwood,300,300
+176,90,176,Tenmile River,90,Croton Falls,750,750
+25,37,25,Irvington,37,Cortlandt,600,600
+112,105,112,Harrison,105,Mt Vernon East ,300,300
+4,14,4,Harlem-125th St.,14,Spuyten Duyvil,975,725
+622,27,622,Yankees-E153 St.,27,Tarrytown,575,575
+115,110,115,Port Chester,110,Larchmont,375,375
+22,31,22,Hastings-on-Hudson,31,Ossining,300,300
+54,100,54,Melrose,100,HM Valley-Wingdale,1675,1675
+14,27,14,Spuyten Duyvil,27,Tarrytown,575,575
+74,78,74,White Plains,78,Valhalla,300,300
+66,74,66,Tuckahoe,74,White Plains,300,300
+46,16,46,Beacon,16,Riverdale,1450,1450
+97,61,97,Patterson,61,Wakefield,1450,1450
+89,57,89,Purdy's,57,Botanical Garden,1150,1150
+55,64,55,Tremont,64,Fleetwood,300,300
+18,33,18,Yonkers,33,Croton-Harmon,500,500
+59,71,59,Woodlawn,71,Scarsdale,425,425
+78,84,78,Valhalla,84,Mount Kisco,300,300
+98,62,98,Pawling,62,Mt Vernon West,1300,1300
+90,58,90,Croton Falls,58,Williams Bridge,1150,1150
+11,30,11,Marble Hill,30,Scarborough,575,575
+23,4,23,Dobbs Ferry,4,Harlem-125th St.,1275,975
+177,62,177,Wassaic,62,Mt Vernon West,1600,1600
+56,1,56,Fordham,1,Grand Central,975,725
+62,81,62,Mt Vernon West,81,Pleasantville,500,500
+81,94,81,Pleasantville,94,Southeast,675,675
+74,55,74,White Plains,55,Tremont,425,425
+622,40,622,Yankees-E153 St.,40,Manitou,1150,1150
+85,64,85,Bedford Hills,64,Fleetwood,725,725
+37,24,37,Cortlandt,24,Ardsley-on-Hudson,600,600
+14,40,14,Spuyten Duyvil,40,Manitou,1150,1150
+74,91,74,White Plains,91,Brewster,775,775
+86,65,86,Katonah,65,Bronxville,725,725
+18,10,18,Yonkers,10,University Heights,300,300
+4,112,4,Harlem-125th St.,112,Harrison,1275,975
+78,61,78,Valhalla,61,Wakefield,575,575
+97,74,97,Patterson,74,White Plains,1150,1150
+17,51,17,Ludlow,51,Poughkeepsie,1525,1525
+1,106,1,Grand Central,106,Pelham,1125,850
+74,176,74,White Plains,176,Tenmile River,1475,1475
+19,11,19,Glenwood,11,Marble Hill,300,300
+100,85,100,HM Valley-Wingdale,85,Bedford Hills,825,825
+71,58,71,Scarsdale,58,Williams Bridge,425,425
+58,88,58,Williams Bridge,88,Goldens Bridge,800,800
+176,80,176,Tenmile River,80,Hawthorne,1275,1275
+81,71,81,Pleasantville,71,Scarsdale,300,300
+33,31,33,Croton-Harmon,31,Ossining,300,300
+25,27,25,Irvington,27,Tarrytown,300,300
+622,17,622,Yankees-E153 St.,17,Ludlow,300,300
+105,56,105,Mt Vernon East ,56,Fordham,300,300
+37,1,37,Cortlandt,1,Grand Central,1750,1325
+62,94,62,Mt Vernon West,94,Southeast,875,875
+54,90,54,Melrose,90,Croton Falls,1150,1150
+14,17,14,Spuyten Duyvil,17,Ludlow,300,300
+74,68,74,White Plains,68,Crestwood,300,300
+66,64,66,Tuckahoe,64,Fleetwood,300,300
+4,89,4,Harlem-125th St.,89,Purdy's,2000,1500
+49,11,49,New Hamburg,11,Marble Hill,1450,1450
+11,622,11,Marble Hill,622,Yankees-E153 St.,300,300
+55,54,55,Tremont,54,Melrose,300,300
+1,83,1,Grand Central,83,Chappaqua,1475,1125
+99,97,99,Appalachian Trail,97,Patterson,300,300
+100,62,100,HM Valley-Wingdale,62,Mt Vernon West,1525,1525
+18,23,18,Yonkers,23,Dobbs Ferry,300,300
+59,61,59,Woodlawn,61,Wakefield,300,300
+57,100,57,Botanical Garden,100,HM Valley-Wingdale,1675,1675
+80,83,80,Hawthorne,83,Chappaqua,300,300
+100,98,100,HM Valley-Wingdale,98,Pawling,425,425
+25,4,25,Irvington,4,Harlem-125th St.,1275,975
+58,101,58,Williams Bridge,101,Dover Plains,1675,1675
+10,24,10,University Heights,24,Ardsley-on-Hudson,425,425
+110,111,110,Larchmont,111,Mamaroneck,300,300
+62,71,62,Mt Vernon West,71,Scarsdale,300,300
+81,84,81,Pleasantville,84,Mount Kisco,300,300
+25,40,25,Irvington,40,Manitou,775,775
+622,30,622,Yankees-E153 St.,30,Scarborough,575,575
+85,54,85,Bedford Hills,54,Melrose,800,800
+37,14,37,Cortlandt,14,Spuyten Duyvil,800,800
+68,1,68,Crestwood,1,Grand Central,1150,875
+14,30,14,Spuyten Duyvil,30,Scarborough,575,575
+99,74,99,Appalachian Trail,74,White Plains,1150,1150
+65,81,65,Bronxville,81,Pleasantville,500,500
+56,112,56,Fordham,112,Harrison,425,425
+76,90,76,North White Plains,90,Croton Falls,775,775
+9,37,9,Morris Heights,37,Cortlandt,800,800
+68,86,68,Crestwood,86,Katonah,725,725
+88,101,88,Goldens Bridge,101,Dover Plains,825,825
+40,24,40,Manitou,24,Ardsley-on-Hudson,775,775
+58,78,58,Williams Bridge,78,Valhalla,575,575
+10,1,10,University Heights,1,Grand Central,975,725
+29,51,29,Philipse Manor,51,Poughkeepsie,1200,1200
+61,83,61,Wakefield,83,Chappaqua,575,575
+81,61,81,Pleasantville,61,Wakefield,575,575
+86,176,86,Katonah,176,Tenmile River,1000,1000
+25,17,25,Irvington,17,Ludlow,300,300
+10,37,10,University Heights,37,Cortlandt,800,800
+56,4,56,Fordham,4,Harlem-125th St.,975,725
+62,84,62,Mt Vernon West,84,Mount Kisco,725,725
+22,11,22,Hastings-on-Hudson,11,Marble Hill,425,425
+54,80,54,Melrose,80,Hawthorne,575,575
+74,58,74,White Plains,58,Williams Bridge,425,425
+66,54,66,Tuckahoe,54,Melrose,300,300
+4,79,4,Harlem-125th St.,79,Mount Pleasant,1475,1125
+72,97,72,Hartsdale,97,Patterson,1150,1150
+17,18,17,Ludlow,18,Yonkers,300,300
+88,78,88,Goldens Bridge,78,Valhalla,300,300
+40,1,40,Manitou,1,Grand Central,2000,1500
+65,94,65,Bronxville,94,Southeast,875,875
+57,90,57,Botanical Garden,90,Croton Falls,1150,1150
+58,55,58,Williams Bridge,55,Tremont,300,300
+68,99,68,Crestwood,99,Appalachian Trail,1300,1300
+23,622,23,Dobbs Ferry,622,Yankees-E153 St.,425,425
+40,37,40,Manitou,37,Cortlandt,300,300
+58,91,58,Williams Bridge,91,Brewster,1150,1150
+91,88,91,Brewster,88,Goldens Bridge,300,300
+10,14,10,University Heights,14,Spuyten Duyvil,300,300
+62,61,62,Mt Vernon West,61,Wakefield,300,300
+81,74,81,Pleasantville,74,White Plains,300,300
+54,57,54,Melrose,57,Botanical Garden,300,300
+37,4,37,Cortlandt,4,Harlem-125th St.,1750,1325
+4,56,4,Harlem-125th St.,56,Fordham,975,725
+58,176,58,Williams Bridge,176,Tenmile River,1800,1800
+84,85,84,Mount Kisco,85,Bedford Hills,300,300
+88,55,88,Goldens Bridge,55,Tremont,800,800
+99,64,99,Appalachian Trail,64,Fleetwood,1300,1300
+65,71,65,Bronxville,71,Scarsdale,300,300
+17,31,17,Ludlow,31,Ossining,500,500
+76,80,76,North White Plains,80,Hawthorne,300,300
+9,27,9,Morris Heights,27,Tarrytown,575,575
+68,76,68,Crestwood,76,North White Plains,300,300
+88,91,88,Goldens Bridge,91,Brewster,300,300
+40,14,40,Manitou,14,Spuyten Duyvil,1150,1150
+100,65,100,HM Valley-Wingdale,65,Bronxville,1525,1525
+4,177,4,Harlem-125th St.,177,Wassaic,2725,2025
+58,68,58,Williams Bridge,68,Crestwood,300,300
+90,100,90,Croton Falls,100,HM Valley-Wingdale,650,650
+80,86,80,Hawthorne,86,Katonah,300,300
+88,176,88,Goldens Bridge,176,Tenmile River,1000,1000
+33,11,33,Croton-Harmon,11,Marble Hill,575,575
+91,101,91,Brewster,101,Dover Plains,650,650
+23,46,23,Dobbs Ferry,46,Beacon,1150,1150
+110,114,110,Larchmont,114,Rye,375,375
+83,97,83,Chappaqua,97,Patterson,825,825
+43,24,43,Cold Spring,24,Ardsley-on-Hudson,775,775
+84,62,84,Mount Kisco,62,Mt Vernon West,725,725
+22,1,22,Hastings-on-Hudson,1,Grand Central,1275,975
+1,27,1,Grand Central,27,Tarrytown,1475,1125
+64,83,64,Fleetwood,83,Chappaqua,500,500
+84,98,84,Mount Kisco,98,Pawling,675,675
+16,43,16,Riverdale,43,Cold Spring,1150,1150
+56,79,56,Fordham,79,Mount Pleasant,575,575
+76,57,76,North White Plains,57,Botanical Garden,425,425
+9,4,9,Morris Heights,4,Harlem-125th St.,975,725
+101,1,101,Dover Plains,1,Grand Central,2575,1925
+88,68,88,Goldens Bridge,68,Crestwood,725,725
+65,84,65,Bronxville,84,Mount Kisco,725,725
+56,115,56,Fordham,115,Port Chester,500,500
+57,80,57,Botanical Garden,80,Hawthorne,575,575
+9,40,9,Morris Heights,40,Manitou,1150,1150
+25,622,25,Irvington,622,Yankees-E153 St.,425,425
+29,18,29,Philipse Manor,18,Yonkers,500,500
+42,37,42,Garrison,37,Cortlandt,300,300
+68,89,68,Crestwood,89,Purdy's,875,875
+39,31,39,Peekskill,31,Ossining,300,300
+71,100,71,Scarsdale,100,HM Valley-Wingdale,1375,1375
+31,27,31,Ossining,27,Tarrytown,300,300
+10,4,10,University Heights,4,Harlem-125th St.,975,725
+91,78,91,Brewster,78,Valhalla,675,675
+83,74,83,Chappaqua,74,White Plains,300,300
+94,83,94,Southeast,83,Chappaqua,675,675
+72,64,72,Hartsdale,64,Fleetwood,300,300
+4,46,4,Harlem-125th St.,46,Beacon,2300,1750
+43,37,43,Cold Spring,37,Cortlandt,300,300
+89,4,89,Purdy's,4,Harlem-125th St.,2000,1500
+16,20,16,Riverdale,20,Greystone,300,300
+1,40,1,Grand Central,40,Manitou,2000,1500
+99,54,99,Appalachian Trail,54,Melrose,1450,1450
+72,100,72,Hartsdale,100,HM Valley-Wingdale,1375,1375
+65,61,65,Bronxville,61,Wakefield,300,300
+9,17,9,Morris Heights,17,Ludlow,300,300
+68,66,68,Crestwood,66,Tuckahoe,300,300
+40,4,40,Manitou,4,Harlem-125th St.,2000,1500
+79,81,79,Mount Pleasant,81,Pleasantville,300,300
+98,94,98,Pawling,94,Southeast,425,425
+30,39,30,Scarborough,39,Peekskill,300,300
+91,55,91,Brewster,55,Tremont,1150,1150
+101,99,101,Dover Plains,99,Appalachian Trail,425,425
+20,31,20,Greystone,31,Ossining,500,500
+112,114,112,Harrison,114,Rye,375,375
+4,23,4,Harlem-125th St.,23,Dobbs Ferry,1275,975
+31,40,31,Ossining,40,Manitou,675,675
+51,18,51,Poughkeepsie,18,Yonkers,1525,1525
+24,1,24,Ardsley-on-Hudson,1,Grand Central,1275,975
+177,94,177,Wassaic,94,Southeast,750,750
+43,14,43,Cold Spring,14,Spuyten Duyvil,1150,1150
+1,17,1,Grand Central,17,Ludlow,1150,875
+100,176,100,HM Valley-Wingdale,176,Tenmile River,300,300
+4,59,4,Harlem-125th St.,59,Woodlawn,975,725
+105,111,105,Mt Vernon East ,111,Mamaroneck,300,300
+24,37,24,Ardsley-on-Hudson,37,Cortlandt,600,600
+16,33,16,Riverdale,33,Croton-Harmon,575,575
+88,58,88,Goldens Bridge,58,Williams Bridge,800,800
+86,97,86,Katonah,97,Patterson,675,675
+98,71,98,Pawling,71,Scarsdale,1150,1150
+68,79,68,Crestwood,79,Mount Pleasant,500,500
+42,27,42,Garrison,27,Tarrytown,675,675
+101,76,101,Dover Plains,76,North White Plains,1375,1375
+54,1,54,Melrose,1,Grand Central,975,725
+19,43,19,Glenwood,43,Cold Spring,875,875
+79,94,79,Mount Pleasant,94,Southeast,675,675
+11,39,11,Marble Hill,39,Peekskill,800,800
+71,90,71,Scarsdale,90,Croton Falls,775,775
+31,17,31,Ossining,17,Ludlow,500,500
+91,68,91,Brewster,68,Crestwood,875,875
+177,71,177,Wassaic,71,Scarsdale,1475,1475
+83,64,83,Chappaqua,64,Fleetwood,500,500
+72,54,72,Hartsdale,54,Melrose,425,425
+23,49,23,Dobbs Ferry,49,New Hamburg,1150,1150
+24,14,24,Ardsley-on-Hudson,14,Spuyten Duyvil,425,425
+43,27,43,Cold Spring,27,Tarrytown,675,675
+16,10,16,Riverdale,10,University Heights,300,300
+84,65,84,Mount Kisco,65,Bronxville,725,725
+55,1,55,Tremont,1,Grand Central,975,725
+1,30,1,Grand Central,30,Scarborough,1475,1125
+74,100,74,White Plains,100,HM Valley-Wingdale,1375,1375
+64,86,64,Fleetwood,86,Katonah,725,725
+17,11,17,Ludlow,11,Marble Hill,300,300
+97,83,97,Patterson,83,Chappaqua,825,825
+49,43,49,New Hamburg,43,Cold Spring,425,425
+68,56,68,Crestwood,56,Fordham,300,300
+176,4,176,Tenmile River,4,Harlem-125th St.,2725,2025
+27,24,27,Tarrytown,24,Ardsley-on-Hudson,300,300
+19,20,19,Glenwood,20,Greystone,300,300
+79,71,79,Mount Pleasant,71,Scarsdale,300,300
+98,84,98,Pawling,84,Mount Kisco,675,675
+30,29,30,Scarborough,29,Philipse Manor,300,300
+90,80,90,Croton Falls,80,Hawthorne,675,675
+42,40,42,Garrison,40,Manitou,300,300
+101,89,101,Dover Plains,89,Purdy's,650,650
+85,1,85,Bedford Hills,1,Grand Central,1750,1325
+31,30,31,Ossining,30,Scarborough,300,300
+177,84,177,Wassaic,84,Mount Kisco,1000,1000
+43,4,43,Cold Spring,4,Harlem-125th St.,2000,1500
+68,177,68,Crestwood,177,Wassaic,1600,1600
+9,622,9,Morris Heights,622,Yankees-E153 St.,300,300
+37,46,37,Cortlandt,46,Beacon,675,675
+16,23,16,Riverdale,23,Dobbs Ferry,425,425
+56,59,56,Fordham,59,Woodlawn,300,300
+49,20,49,New Hamburg,20,Greystone,1300,1300
+108,106,108,New Rochelle,106,Pelham,300,300
+46,51,46,Beacon,51,Poughkeepsie,425,425
+78,83,78,Valhalla,83,Chappaqua,300,300
+98,61,98,Pawling,61,Wakefield,1450,1450
+90,57,90,Croton Falls,57,Botanical Garden,1150,1150
+115,1,115,Port Chester,1,Grand Central,1375,1025
+42,17,42,Garrison,17,Ludlow,875,875
+101,66,101,Dover Plains,66,Tuckahoe,1525,1525
+55,99,55,Tremont,99,Appalachian Trail,1450,1450
+10,622,10,University Heights,622,Yankees-E153 St.,300,300
+27,37,27,Tarrytown,37,Cortlandt,300,300
+19,33,19,Glenwood,33,Croton-Harmon,500,500
+79,84,79,Mount Pleasant,84,Mount Kisco,300,300
+39,11,39,Peekskill,11,Marble Hill,800,800
+11,29,11,Marble Hill,29,Philipse Manor,575,575
+30,42,30,Scarborough,42,Garrison,675,675
+71,80,71,Scarsdale,80,Hawthorne,300,300
+91,58,91,Brewster,58,Williams Bridge,1150,1150
+177,61,177,Wassaic,61,Wakefield,1800,1800
+83,54,83,Chappaqua,54,Melrose,575,575
+25,49,25,Irvington,49,New Hamburg,1150,1150
+622,39,622,Yankees-E153 St.,39,Peekskill,800,800
+24,4,24,Ardsley-on-Hudson,4,Harlem-125th St.,1275,975
+22,43,22,Hastings-on-Hudson,43,Cold Spring,775,775
+1,20,1,Grand Central,20,Greystone,1150,875
+14,39,14,Spuyten Duyvil,39,Peekskill,800,800
+74,90,74,White Plains,90,Croton Falls,775,775
+66,86,66,Tuckahoe,86,Katonah,725,725
+85,99,85,Bedford Hills,99,Appalachian Trail,675,675
+86,64,86,Katonah,64,Fleetwood,725,725
+40,622,40,Manitou,622,Yankees-E153 St.,1150,1150
+49,33,49,New Hamburg,33,Croton-Harmon,825,825
+55,76,55,Tremont,76,North White Plains,425,425
+1,105,1,Grand Central,105,Mt Vernon East ,1125,850
+27,14,27,Tarrytown,14,Spuyten Duyvil,575,575
+59,83,59,Woodlawn,83,Chappaqua,575,575
+19,10,19,Glenwood,10,University Heights,300,300
+79,61,79,Mount Pleasant,61,Wakefield,575,575
+98,74,98,Pawling,74,White Plains,1150,1150
+30,19,30,Scarborough,19,Glenwood,500,500
+71,57,71,Scarsdale,57,Botanical Garden,425,425
+42,30,42,Garrison,30,Scarborough,675,675
+101,79,101,Dover Plains,79,Mount Pleasant,1200,1200
+54,4,54,Melrose,4,Harlem-125th St.,975,725
+20,11,20,Greystone,11,Marble Hill,300,300
+11,42,11,Marble Hill,42,Garrison,1150,1150
+31,20,31,Ossining,20,Greystone,500,500
+23,16,23,Dobbs Ferry,16,Riverdale,425,425
+177,74,177,Wassaic,74,White Plains,1475,1475
+10,46,10,University Heights,46,Beacon,1450,1450
+85,76,85,Bedford Hills,76,North White Plains,600,600
+49,10,49,New Hamburg,10,University Heights,1450,1450
+66,99,66,Tuckahoe,99,Appalachian Trail,1300,1300
+18,22,18,Yonkers,22,Hastings-on-Hudson,300,300
+97,86,97,Patterson,86,Katonah,675,675
+55,89,55,Tremont,89,Purdy's,1150,1150
+101,56,101,Dover Plains,56,Fordham,1675,1675
+40,46,40,Manitou,46,Beacon,425,425
+100,97,100,HM Valley-Wingdale,97,Patterson,425,425
+19,23,19,Glenwood,23,Dobbs Ferry,300,300
+39,1,39,Peekskill,1,Grand Central,1750,1325
+11,19,11,Marble Hill,19,Glenwood,300,300
+111,106,111,Mamaroneck,106,Pelham,300,300
+58,100,58,Williams Bridge,100,HM Valley-Wingdale,1675,1675
+81,83,81,Pleasantville,83,Chappaqua,300,300
+33,43,33,Croton-Harmon,43,Cold Spring,675,675
+25,39,25,Irvington,39,Peekskill,600,600
+622,29,622,Yankees-E153 St.,29,Philipse Manor,575,575
+4,16,4,Harlem-125th St.,16,Riverdale,975,725
+76,4,76,North White Plains,4,Harlem-125th St.,1275,975
+101,177,101,Dover Plains,177,Wassaic,300,300
+22,33,22,Hastings-on-Hudson,33,Croton-Harmon,300,300
+14,29,14,Spuyten Duyvil,29,Philipse Manor,575,575
+74,80,74,White Plains,80,Hawthorne,300,300
+66,76,66,Tuckahoe,76,North White Plains,300,300
+42,622,42,Garrison,622,Yankees-E153 St.,1150,1150
+86,54,86,Katonah,54,Melrose,800,800
+46,18,46,Beacon,18,Yonkers,1300,1300
+4,101,4,Harlem-125th St.,101,Dover Plains,2575,1925
+37,49,37,Cortlandt,49,New Hamburg,675,675
+85,89,85,Bedford Hills,89,Purdy's,300,300
+49,23,49,New Hamburg,23,Dobbs Ferry,1150,1150
+89,59,89,Purdy's,59,Woodlawn,1150,1150
+55,66,55,Tremont,66,Tuckahoe,300,300
+88,100,88,Goldens Bridge,100,HM Valley-Wingdale,825,825
+27,4,27,Tarrytown,4,Harlem-125th St.,1475,1125
+100,74,100,HM Valley-Wingdale,74,White Plains,1375,1375
+30,9,30,Scarborough,9,Morris Heights,575,575
+43,622,43,Cold Spring,622,Yankees-E153 St.,1150,1150
+106,4,106,Pelham,4,Harlem-125th St.,1125,850
+33,20,33,Croton-Harmon,20,Greystone,500,500
+177,64,177,Wassaic,64,Fleetwood,1600,1600
+62,83,62,Mt Vernon West,83,Chappaqua,500,500
+22,10,22,Hastings-on-Hudson,10,University Heights,425,425
+54,79,54,Melrose,79,Mount Pleasant,575,575
+74,57,74,White Plains,57,Botanical Garden,425,425
+99,1,99,Appalachian Trail,1,Grand Central,2300,1750
+622,42,622,Yankees-E153 St.,42,Garrison,1150,1150
+85,66,85,Bedford Hills,66,Tuckahoe,725,725
+57,4,57,Botanical Garden,4,Harlem-125th St.,975,725
+22,46,22,Hastings-on-Hudson,46,Beacon,1150,1150
+14,42,14,Spuyten Duyvil,42,Garrison,1150,1150
+1,72,1,Grand Central,72,Hartsdale,1275,975
+66,89,66,Tuckahoe,89,Purdy's,875,875
+99,86,99,Appalachian Trail,86,Katonah,675,675
+4,114,4,Harlem-125th St.,114,Rye,1375,1025
+89,72,89,Purdy's,72,Hartsdale,775,775
+9,49,9,Morris Heights,49,New Hamburg,1450,1450
+55,79,55,Tremont,79,Mount Pleasant,575,575
+29,27,29,Philipse Manor,27,Tarrytown,300,300
+1,108,1,Grand Central,108,New Rochelle,1125,850
+11,9,11,Marble Hill,9,Morris Heights,300,300
+58,90,58,Williams Bridge,90,Croton Falls,1150,1150
+24,622,24,Ardsley-on-Hudson,622,Yankees-E153 St.,425,425
+25,29,25,Irvington,29,Philipse Manor,300,300
+622,19,622,Yankees-E153 St.,19,Glenwood,300,300
+10,49,10,University Heights,49,New Hamburg,1450,1450
+22,23,22,Hastings-on-Hudson,23,Dobbs Ferry,300,300
+14,19,14,Spuyten Duyvil,19,Glenwood,300,300
+114,106,114,Rye,106,Pelham,400,400
+85,79,85,Bedford Hills,79,Mount Pleasant,300,300
+4,91,4,Harlem-125th St.,91,Brewster,2000,1500
+71,1,71,Scarsdale,1,Grand Central,1275,975
+55,56,55,Tremont,56,Fordham,300,300
+1,85,1,Grand Central,85,Bedford Hills,1750,1325
+88,90,88,Goldens Bridge,90,Croton Falls,300,300
+100,64,100,HM Valley-Wingdale,64,Fleetwood,1525,1525
+29,40,29,Philipse Manor,40,Manitou,675,675
+61,72,61,Wakefield,72,Hartsdale,425,425
+176,59,176,Tenmile River,59,Woodlawn,1800,1800
+40,49,40,Manitou,49,New Hamburg,425,425
+80,85,80,Hawthorne,85,Bedford Hills,300,300
+33,10,33,Croton-Harmon,10,University Heights,575,575
+72,1,72,Hartsdale,1,Grand Central,1275,975
+91,100,91,Brewster,100,HM Valley-Wingdale,650,650
+55,177,55,Tremont,177,Wassaic,1800,1800
+81,86,81,Pleasantville,86,Katonah,300,300
+25,42,25,Irvington,42,Garrison,775,775
+85,56,85,Bedford Hills,56,Fordham,800,800
+37,16,37,Cortlandt,16,Riverdale,800,800
+4,68,4,Harlem-125th St.,68,Crestwood,1150,875
+24,46,24,Ardsley-on-Hudson,46,Beacon,1150,1150
+84,97,84,Mount Kisco,97,Patterson,675,675
+1,62,1,Grand Central,62,Mt Vernon West,1150,875
+106,115,106,Pelham,115,Port Chester,400,400
+99,76,99,Appalachian Trail,76,North White Plains,1150,1150
+65,83,65,Bronxville,83,Chappaqua,500,500
+56,114,56,Fordham,114,Rye,500,500
+17,43,17,Ludlow,43,Cold Spring,875,875
+57,79,57,Botanical Garden,79,Mount Pleasant,575,575
+9,39,9,Morris Heights,39,Peekskill,800,800
+68,88,68,Crestwood,88,Goldens Bridge,725,725
+29,17,29,Philipse Manor,17,Ludlow,500,500
+80,62,80,Hawthorne,62,Mt Vernon West,500,500
+85,177,85,Bedford Hills,177,Wassaic,1000,1000
+58,80,58,Williams Bridge,80,Hawthorne,575,575
+115,56,115,Port Chester,56,Fordham,500,500
+61,85,61,Wakefield,85,Bedford Hills,800,800
+176,72,176,Tenmile River,72,Hartsdale,1475,1475
+80,98,80,Hawthorne,98,Pawling,825,825
+33,23,33,Croton-Harmon,23,Dobbs Ferry,300,300
+25,19,25,Irvington,19,Glenwood,300,300
+622,9,622,Yankees-E153 St.,9,Morris Heights,300,300
+10,39,10,University Heights,39,Peekskill,800,800
+51,40,51,Poughkeepsie,40,Manitou,650,650
+84,74,84,Mount Kisco,74,White Plains,600,600
+14,9,14,Spuyten Duyvil,9,Morris Heights,300,300
+66,56,66,Tuckahoe,56,Fordham,300,300
+4,81,4,Harlem-125th St.,81,Pleasantville,1475,1125
+72,99,72,Hartsdale,99,Appalachian Trail,1150,1150
+27,622,27,Tarrytown,622,Yankees-E153 St.,575,575
+56,91,56,Fordham,91,Brewster,1150,1150
+90,4,90,Croton Falls,4,Harlem-125th St.,2000,1500
+17,20,17,Ludlow,20,Greystone,300,300
+88,80,88,Goldens Bridge,80,Hawthorne,300,300
+99,89,99,Appalachian Trail,89,Purdy's,425,425
+100,54,100,HM Valley-Wingdale,54,Melrose,1675,1675
+58,57,58,Williams Bridge,57,Botanical Garden,300,300
+83,1,83,Chappaqua,1,Grand Central,1475,1125
+68,101,68,Crestwood,101,Dover Plains,1525,1525
+29,30,29,Philipse Manor,30,Scarborough,300,300
+61,62,61,Wakefield,62,Mt Vernon West,300,300
+66,177,66,Tuckahoe,177,Wassaic,1600,1600
+39,43,39,Peekskill,43,Cold Spring,300,300
+91,90,91,Brewster,90,Croton Falls,300,300
+51,17,51,Poughkeepsie,17,Ludlow,1525,1525
+10,16,10,University Heights,16,Riverdale,300,300
+83,86,83,Chappaqua,86,Katonah,300,300
+54,59,54,Melrose,59,Woodlawn,300,300
+4,58,4,Harlem-125th St.,58,Williams Bridge,975,725
+72,76,72,Hartsdale,76,North White Plains,300,300
+43,49,43,Cold Spring,49,New Hamburg,425,425
+88,57,88,Goldens Bridge,57,Botanical Garden,800,800
+106,105,106,Pelham,105,Mt Vernon East ,300,300
+99,66,99,Appalachian Trail,66,Tuckahoe,1300,1300
+71,4,71,Scarsdale,4,Harlem-125th St.,1275,975
+17,33,17,Ludlow,33,Croton-Harmon,500,500
+9,29,9,Morris Heights,29,Philipse Manor,575,575
+68,78,68,Crestwood,78,Valhalla,500,500
+40,16,40,Manitou,16,Riverdale,1150,1150
+176,62,176,Tenmile River,62,Mt Vernon West,1600,1600
+25,9,25,Irvington,9,Morris Heights,425,425
+20,43,20,Greystone,43,Cold Spring,875,875
+51,30,51,Poughkeepsie,30,Scarborough,1200,1200
+83,99,83,Chappaqua,99,Appalachian Trail,825,825
+84,64,84,Mount Kisco,64,Fleetwood,725,725
+1,29,1,Grand Central,29,Philipse Manor,1475,1125
+4,71,4,Harlem-125th St.,71,Scarsdale,1275,975
+72,89,72,Hartsdale,89,Purdy's,775,775
+24,49,24,Ardsley-on-Hudson,49,New Hamburg,1150,1150
+64,85,64,Fleetwood,85,Bedford Hills,725,725
+56,81,56,Fordham,81,Pleasantville,575,575
+17,10,17,Ludlow,10,University Heights,300,300
+76,59,76,North White Plains,59,Woodlawn,425,425
+68,55,68,Crestwood,55,Tremont,300,300
+1,65,1,Grand Central,65,Bronxville,1150,875
+99,79,99,Appalachian Trail,79,Mount Pleasant,825,825
+65,86,65,Bronxville,86,Katonah,725,725
+98,83,98,Pawling,83,Chappaqua,825,825
+68,91,68,Crestwood,91,Brewster,875,875
+42,39,42,Garrison,39,Peekskill,300,300
+101,88,101,Dover Plains,88,Goldens Bridge,825,825
+80,65,80,Hawthorne,65,Bronxville,500,500
+39,33,39,Peekskill,33,Croton-Harmon,300,300
+11,51,11,Marble Hill,51,Poughkeepsie,1675,1675
+31,29,31,Ossining,29,Philipse Manor,300,300
+91,80,91,Brewster,80,Hawthorne,675,675
+23,25,23,Dobbs Ferry,25,Irvington,300,300
+83,76,83,Chappaqua,76,North White Plains,300,300
+68,176,68,Crestwood,176,Tenmile River,1600,1600
+94,85,94,Southeast,85,Bedford Hills,300,300
+86,1,86,Katonah,1,Grand Central,1750,1325
+72,66,72,Hartsdale,66,Tuckahoe,300,300
+64,62,64,Fleetwood,62,Mt Vernon West,300,300
+43,39,43,Cold Spring,39,Peekskill,300,300
+16,22,16,Riverdale,22,Hastings-on-Hudson,425,425
+108,105,108,New Rochelle,105,Mt Vernon East ,300,300
+1,42,1,Grand Central,42,Garrison,2000,1500
+99,56,99,Appalachian Trail,56,Fordham,1450,1450
+64,98,64,Fleetwood,98,Pawling,1300,1300
+56,94,56,Fordham,94,Southeast,1150,1150
+17,23,17,Ludlow,23,Dobbs Ferry,300,300
+57,59,57,Botanical Garden,59,Woodlawn,300,300
+76,72,76,North White Plains,72,Hartsdale,300,300
+9,19,9,Morris Heights,19,Glenwood,300,300
+79,83,79,Mount Pleasant,83,Chappaqua,300,300
+39,10,39,Peekskill,10,University Heights,800,800
+71,79,71,Scarsdale,79,Mount Pleasant,300,300
+91,57,91,Brewster,57,Botanical Garden,1150,1150
+94,62,94,Southeast,62,Mt Vernon West,875,875
+74,4,74,White Plains,4,Harlem-125th St.,1275,975
+99,177,99,Appalachian Trail,177,Wassaic,450,450
+20,33,20,Greystone,33,Croton-Harmon,500,500
+39,46,39,Peekskill,46,Beacon,675,675
+31,42,31,Ossining,42,Garrison,675,675
+4,25,4,Harlem-125th St.,25,Irvington,1275,975
+51,20,51,Poughkeepsie,20,Greystone,1525,1525
+83,89,83,Chappaqua,89,Purdy's,675,675
+43,16,43,Cold Spring,16,Riverdale,1150,1150
+84,54,84,Mount Kisco,54,Melrose,800,800
+94,98,94,Southeast,98,Pawling,425,425
+1,19,1,Grand Central,19,Glenwood,1150,875
+4,61,4,Harlem-125th St.,61,Wakefield,975,725
+72,79,72,Hartsdale,79,Mount Pleasant,300,300
+46,27,46,Beacon,27,Tarrytown,825,825
+56,71,56,Fordham,71,Scarsdale,425,425
+86,99,86,Katonah,99,Appalachian Trail,675,675
+57,72,57,Botanical Garden,72,Hartsdale,425,425
+42,29,42,Garrison,29,Philipse Manor,675,675
+101,78,101,Dover Plains,78,Valhalla,1200,1200
+27,49,27,Tarrytown,49,New Hamburg,825,825
+20,10,20,Greystone,10,University Heights,300,300
+39,23,39,Peekskill,23,Dobbs Ferry,600,600
+31,19,31,Ossining,19,Glenwood,500,500
+83,66,83,Chappaqua,66,Tuckahoe,500,500
+622,51,622,Yankees-E153 St.,51,Poughkeepsie,1675,1675
+72,56,72,Hartsdale,56,Fordham,425,425
+24,16,24,Ardsley-on-Hudson,16,Riverdale,425,425
+80,176,80,Hawthorne,176,Tenmile River,1275,1275
+66,98,66,Tuckahoe,98,Pawling,1300,1300
+46,40,46,Beacon,40,Manitou,425,425
+86,76,86,Katonah,76,North White Plains,600,600
+56,84,56,Fordham,84,Mount Kisco,800,800
+97,85,97,Patterson,85,Bedford Hills,675,675
+89,81,89,Purdy's,81,Pleasantville,675,675
+68,58,68,Crestwood,58,Williams Bridge,300,300
+55,88,55,Tremont,88,Goldens Bridge,800,800
+101,55,101,Dover Plains,55,Tremont,1675,1675
+19,22,19,Glenwood,22,Hastings-on-Hudson,300,300
+72,177,72,Hartsdale,177,Wassaic,1475,1475
+11,18,11,Marble Hill,18,Yonkers,300,300
+98,86,98,Pawling,86,Katonah,675,675
+30,31,30,Scarborough,31,Ossining,300,300
+101,91,101,Dover Plains,91,Brewster,650,650
+20,23,20,Greystone,23,Dobbs Ferry,300,300
+112,106,112,Harrison,106,Pelham,300,300
+51,10,51,Poughkeepsie,10,University Heights,1675,1675
+177,86,177,Wassaic,86,Katonah,1000,1000
+115,111,115,Port Chester,111,Mamaroneck,375,375
+1,9,1,Grand Central,9,Morris Heights,975,725
+85,88,85,Bedford Hills,88,Goldens Bridge,300,300
+46,17,46,Beacon,17,Ludlow,1300,1300
+64,65,64,Fleetwood,65,Bronxville,300,300
+56,61,56,Fordham,61,Wakefield,300,300
+97,62,97,Patterson,62,Mt Vernon West,1300,1300
+49,22,49,New Hamburg,22,Hastings-on-Hudson,1150,1150
+86,89,86,Katonah,89,Purdy's,300,300
+59,72,59,Woodlawn,72,Hartsdale,425,425
+78,85,78,Valhalla,85,Bedford Hills,300,300
+97,98,97,Patterson,98,Pawling,300,300
+89,94,89,Purdy's,94,Southeast,300,300
+90,59,90,Croton Falls,59,Woodlawn,1150,1150
+42,19,42,Garrison,19,Glenwood,875,875
+55,101,55,Tremont,101,Dover Plains,1675,1675
+101,68,101,Dover Plains,68,Crestwood,1525,1525
+27,39,27,Tarrytown,39,Peekskill,300,300
+11,31,11,Marble Hill,31,Ossining,575,575
+31,9,31,Ossining,9,Morris Heights,575,575
+83,56,83,Chappaqua,56,Fordham,575,575
+94,65,94,Southeast,65,Bronxville,875,875
+25,51,25,Irvington,51,Poughkeepsie,1375,1375
+37,25,37,Cortlandt,25,Irvington,600,600
+66,88,66,Tuckahoe,88,Goldens Bridge,725,725
+100,1,100,HM Valley-Wingdale,1,Grand Central,2575,1925
+85,101,85,Bedford Hills,101,Dover Plains,825,825
+46,30,46,Beacon,30,Scarborough,825,825
+86,66,86,Katonah,66,Tuckahoe,725,725
+78,62,78,Valhalla,62,Mt Vernon West,500,500
+58,4,58,Williams Bridge,4,Harlem-125th St.,975,725
+83,177,83,Chappaqua,177,Wassaic,1275,1275
+89,71,89,Purdy's,71,Scarsdale,775,775
+55,78,55,Tremont,78,Valhalla,575,575
+27,16,27,Tarrytown,16,Riverdale,575,575
+59,85,59,Woodlawn,85,Bedford Hills,800,800
+78,98,78,Valhalla,98,Pawling,825,825
+71,59,71,Scarsdale,59,Woodlawn,425,425
+90,72,90,Croton Falls,72,Hartsdale,775,775
+23,18,23,Dobbs Ferry,18,Yonkers,300,300
+177,76,177,Wassaic,76,North White Plains,1475,1475
+54,91,54,Melrose,91,Brewster,1150,1150
+88,4,88,Goldens Bridge,4,Harlem-125th St.,1750,1325
+66,65,66,Tuckahoe,65,Bronxville,300,300
+85,78,85,Bedford Hills,78,Valhalla,300,300
+66,101,66,Tuckahoe,101,Dover Plains,1525,1525
+86,79,86,Katonah,79,Mount Pleasant,300,300
+18,24,18,Yonkers,24,Ardsley-on-Hudson,300,300
+59,62,59,Woodlawn,62,Mt Vernon West,300,300
+89,84,89,Purdy's,84,Mount Kisco,300,300
+42,9,42,Garrison,9,Morris Heights,1150,1150
+55,91,55,Tremont,91,Brewster,1150,1150
+101,58,101,Dover Plains,58,Williams Bridge,1675,1675
+29,39,29,Philipse Manor,39,Peekskill,300,300
+100,99,100,HM Valley-Wingdale,99,Appalachian Trail,425,425
+19,25,19,Glenwood,25,Irvington,300,300
+64,176,64,Fleetwood,176,Tenmile River,1600,1600
+111,108,111,Mamaroneck,108,New Rochelle,300,300
+176,94,176,Tenmile River,94,Southeast,750,750
+62,72,62,Mt Vernon West,72,Hartsdale,300,300
+81,85,81,Pleasantville,85,Bedford Hills,300,300
+622,31,622,Yankees-E153 St.,31,Ossining,575,575
+85,55,85,Bedford Hills,55,Tremont,800,800
+14,31,14,Spuyten Duyvil,31,Ossining,575,575
+106,114,106,Pelham,114,Rye,400,400
+66,78,66,Tuckahoe,78,Valhalla,500,500
+85,91,85,Bedford Hills,91,Brewster,300,300
+46,20,46,Beacon,20,Greystone,1300,1300
+18,1,18,Yonkers,1,Grand Central,1150,875
+86,56,86,Katonah,56,Fordham,800,800
+97,65,97,Patterson,65,Bronxville,1300,1300
+49,25,49,New Hamburg,25,Irvington,1150,1150
+89,61,89,Purdy's,61,Wakefield,1150,1150
+110,4,110,Larchmont,4,Harlem-125th St.,1275,975
+55,68,55,Tremont,68,Crestwood,300,300
+1,97,1,Grand Central,97,Patterson,2300,1750
+18,37,18,Yonkers,37,Cortlandt,725,725
+100,76,100,HM Valley-Wingdale,76,North White Plains,1375,1375
+30,11,30,Scarborough,11,Marble Hill,575,575
+176,71,176,Tenmile River,71,Scarsdale,1475,1475
+80,97,80,Hawthorne,97,Patterson,825,825
+81,62,81,Pleasantville,62,Mt Vernon West,500,500
+33,22,33,Croton-Harmon,22,Hastings-on-Hudson,300,300
+86,177,86,Katonah,177,Wassaic,1000,1000
+25,18,25,Irvington,18,Yonkers,300,300
+62,85,62,Mt Vernon West,85,Bedford Hills,725,725
+81,98,81,Pleasantville,98,Pawling,825,825
+54,81,54,Melrose,81,Pleasantville,575,575
+74,59,74,White Plains,59,Woodlawn,425,425
+66,55,66,Tuckahoe,55,Tremont,300,300
+85,68,85,Bedford Hills,68,Crestwood,725,725
+1,74,1,Grand Central,74,White Plains,1275,975
+88,79,88,Goldens Bridge,79,Mount Pleasant,300,300
+18,14,18,Yonkers,14,Spuyten Duyvil,300,300
+99,88,99,Appalachian Trail,88,Goldens Bridge,675,675
+78,65,78,Valhalla,65,Bronxville,500,500
+91,4,91,Brewster,4,Harlem-125th St.,2000,1500
+9,51,9,Morris Heights,51,Poughkeepsie,1675,1675
+68,100,68,Crestwood,100,HM Valley-Wingdale,1525,1525
+1,110,1,Grand Central,110,Larchmont,1275,975
+80,74,80,Hawthorne,74,White Plains,300,300
+66,176,66,Tuckahoe,176,Tenmile River,1600,1600
+100,89,100,HM Valley-Wingdale,89,Purdy's,650,650
+84,1,84,Mount Kisco,1,Grand Central,1750,1325
+61,97,61,Wakefield,97,Patterson,1450,1450
+176,84,176,Tenmile River,84,Mount Kisco,1000,1000
+54,58,54,Melrose,58,Williams Bridge,300,300
+25,31,25,Irvington,31,Ossining,300,300
+10,51,10,University Heights,51,Poughkeepsie,1675,1675
+84,86,84,Mount Kisco,86,Katonah,300,300
+22,25,22,Hastings-on-Hudson,25,Irvington,300,300
+54,94,54,Melrose,94,Southeast,1150,1150
+114,108,114,Rye,108,New Rochelle,400,400
+74,72,74,White Plains,72,Hartsdale,300,300
+66,68,66,Tuckahoe,68,Crestwood,300,300
+97,55,97,Patterson,55,Tremont,1450,1450
+76,81,76,North White Plains,81,Pleasantville,300,300
+55,58,55,Tremont,58,Williams Bridge,300,300
+99,101,99,Appalachian Trail,101,Dover Plains,425,425
+100,66,100,HM Valley-Wingdale,66,Tuckahoe,1525,1525
+29,42,29,Philipse Manor,42,Garrison,675,675
+61,74,61,Wakefield,74,White Plains,425,425
+176,61,176,Tenmile River,61,Wakefield,1800,1800
+40,51,40,Manitou,51,Poughkeepsie,650,650
+97,176,97,Patterson,176,Tenmile River,450,450
+110,115,110,Larchmont,115,Port Chester,375,375
+54,71,54,Melrose,71,Scarsdale,425,425
+85,58,85,Bedford Hills,58,Williams Bridge,800,800
+72,88,72,Hartsdale,88,Goldens Bridge,600,600
+84,99,84,Mount Kisco,99,Appalachian Trail,675,675
+1,64,1,Grand Central,64,Fleetwood,1150,875
+18,4,18,Yonkers,4,Harlem-125th St.,1150,875
+99,78,99,Appalachian Trail,78,Valhalla,825,825
+4,106,4,Harlem-125th St.,106,Pelham,1125,850
+65,85,65,Bronxville,85,Bedford Hills,725,725
+57,81,57,Botanical Garden,81,Pleasantville,575,575
+76,94,76,North White Plains,94,Southeast,775,775
+68,90,68,Crestwood,90,Croton Falls,875,875
+29,19,29,Philipse Manor,19,Glenwood,500,500
+80,64,80,Hawthorne,64,Fleetwood,500,500
+100,79,100,HM Valley-Wingdale,79,Mount Pleasant,1200,1200
+176,74,176,Tenmile River,74,White Plains,1475,1475
+81,65,81,Pleasantville,65,Bronxville,500,500
+622,11,622,Yankees-E153 St.,11,Marble Hill,300,300
+51,42,51,Poughkeepsie,42,Garrison,650,650
+84,76,84,Mount Kisco,76,North White Plains,600,600
+14,11,14,Spuyten Duyvil,11,Marble Hill,300,300
+66,58,66,Tuckahoe,58,Williams Bridge,300,300
+99,55,99,Appalachian Trail,55,Tremont,1450,1450
+4,83,4,Harlem-125th St.,83,Chappaqua,1475,1125
+72,101,72,Hartsdale,101,Dover Plains,1375,1375
+64,97,64,Fleetwood,97,Patterson,1300,1300
+65,62,65,Bronxville,62,Mt Vernon West,300,300
+17,22,17,Ludlow,22,Hastings-on-Hudson,300,300
+76,71,76,North White Plains,71,Scarsdale,300,300
+9,18,9,Morris Heights,18,Yonkers,300,300
+99,91,99,Appalachian Trail,91,Brewster,425,425
+100,56,100,HM Valley-Wingdale,56,Fordham,1675,1675
+65,98,65,Bronxville,98,Pawling,1300,1300
+57,94,57,Botanical Garden,94,Southeast,1150,1150
+58,59,58,Williams Bridge,59,Woodlawn,300,300
+42,51,42,Garrison,51,Poughkeepsie,650,650
+101,100,101,Dover Plains,100,HM Valley-Wingdale,300,300
+61,64,61,Wakefield,64,Fleetwood,300,300
+99,176,99,Appalachian Trail,176,Tenmile River,450,450
+10,18,10,University Heights,18,Yonkers,300,300
+51,19,51,Poughkeepsie,19,Glenwood,1525,1525
+110,105,110,Larchmont,105,Mt Vernon East ,300,300
+83,88,83,Chappaqua,88,Goldens Bridge,300,300
+62,65,62,Mt Vernon West,65,Bronxville,300,300
+54,61,54,Melrose,61,Wakefield,300,300
+94,97,94,Southeast,97,Patterson,425,425
+100,177,100,HM Valley-Wingdale,177,Wassaic,300,300
+72,78,72,Hartsdale,78,Valhalla,300,300
+105,112,105,Mt Vernon East ,112,Harrison,300,300
+64,74,64,Fleetwood,74,White Plains,300,300
+43,51,43,Cold Spring,51,Poughkeepsie,650,650
+84,89,84,Mount Kisco,89,Purdy's,300,300
+1,54,1,Grand Central,54,Melrose,975,725
+88,59,88,Goldens Bridge,59,Woodlawn,800,800
+99,68,99,Appalachian Trail,68,Crestwood,1300,1300
+56,106,56,Fordham,106,Pelham,300,300
+57,71,57,Botanical Garden,71,Scarsdale,425,425
+76,84,76,North White Plains,84,Mount Kisco,600,600
+9,31,9,Morris Heights,31,Ossining,575,575
+68,80,68,Crestwood,80,Hawthorne,500,500
+29,9,29,Philipse Manor,9,Morris Heights,575,575
+40,18,40,Manitou,18,Yonkers,875,875
+80,54,80,Hawthorne,54,Melrose,575,575
+58,72,58,Williams Bridge,72,Hartsdale,425,425
+71,91,71,Scarsdale,91,Brewster,775,775
+105,4,105,Mt Vernon East ,4,Harlem-125th St.,1125,850
+81,55,81,Pleasantville,55,Tremont,575,575
+94,74,94,Southeast,74,White Plains,775,775
+4,37,4,Harlem-125th St.,37,Cortlandt,1750,1325
+83,101,83,Chappaqua,101,Dover Plains,1200,1200
+84,66,84,Mount Kisco,66,Tuckahoe,725,725
+16,11,16,Riverdale,11,Marble Hill,300,300
+1,31,1,Grand Central,31,Ossining,1475,1125
+72,91,72,Hartsdale,91,Brewster,775,775
+24,51,24,Ardsley-on-Hudson,51,Poughkeepsie,1375,1375
+56,83,56,Fordham,83,Chappaqua,575,575
+76,61,76,North White Plains,61,Wakefield,425,425
+68,57,68,Crestwood,57,Botanical Garden,300,300
+81,176,81,Pleasantville,176,Tenmile River,1275,1275
+88,72,88,Goldens Bridge,72,Hartsdale,600,600
+57,84,57,Botanical Garden,84,Mount Kisco,800,800
+98,85,98,Pawling,85,Bedford Hills,675,675
+90,81,90,Croton Falls,81,Pleasantville,675,675
+61,54,61,Wakefield,54,Melrose,300,300
+101,90,101,Dover Plains,90,Croton Falls,650,650
+20,22,20,Greystone,22,Hastings-on-Hudson,300,300
+51,9,51,Poughkeepsie,9,Morris Heights,1675,1675
+177,85,177,Wassaic,85,Bedford Hills,1000,1000
+83,78,83,Chappaqua,78,Valhalla,300,300
+23,27,23,Dobbs Ferry,27,Tarrytown,300,300
+72,68,72,Hartsdale,68,Crestwood,300,300
+84,79,84,Mount Kisco,79,Mount Pleasant,300,300
+18,622,18,Yonkers,622,Yankees-E153 St.,300,300
+16,24,16,Riverdale,24,Ardsley-on-Hudson,425,425
+99,58,99,Appalachian Trail,58,Williams Bridge,1450,1450
+86,88,86,Katonah,88,Goldens Bridge,300,300
+57,61,57,Botanical Garden,61,Wakefield,300,300
+76,74,76,North White Plains,74,White Plains,300,300
+42,18,42,Garrison,18,Yonkers,875,875
+55,100,55,Tremont,100,HM Valley-Wingdale,1675,1675
+79,85,79,Mount Pleasant,85,Bedford Hills,300,300
+30,43,30,Scarborough,43,Cold Spring,675,675
+71,81,71,Scarsdale,81,Pleasantville,300,300
+90,94,90,Croton Falls,94,Southeast,300,300
+91,59,91,Brewster,59,Woodlawn,1150,1150
+83,55,83,Chappaqua,55,Tremont,575,575
+94,64,94,Southeast,64,Fleetwood,875,875
+4,27,4,Harlem-125th St.,27,Tarrytown,1475,1125
+51,22,51,Poughkeepsie,22,Hastings-on-Hudson,1375,1375
+177,98,177,Wassaic,98,Pawling,450,450
+23,40,23,Dobbs Ferry,40,Manitou,775,775
+84,56,84,Mount Kisco,56,Fordham,800,800
+16,1,16,Riverdale,1,Grand Central,975,725
+43,18,43,Cold Spring,18,Yonkers,875,875
+83,91,83,Chappaqua,91,Brewster,675,675
+72,81,72,Hartsdale,81,Pleasantville,300,300
+85,100,85,Bedford Hills,100,HM Valley-Wingdale,825,825
+46,29,46,Beacon,29,Philipse Manor,825,825
+105,115,105,Mt Vernon East ,115,Port Chester,400,400
+83,176,83,Chappaqua,176,Tenmile River,1275,1275
+86,101,86,Katonah,101,Dover Plains,825,825
+18,46,18,Yonkers,46,Beacon,1300,1300
+59,84,59,Woodlawn,84,Mount Kisco,800,800
+78,97,78,Valhalla,97,Patterson,825,825
+79,62,79,Mount Pleasant,62,Mt Vernon West,500,500
+30,20,30,Scarborough,20,Greystone,500,500
+84,177,84,Mount Kisco,177,Wassaic,1000,1000
+90,71,90,Croton Falls,71,Scarsdale,775,775
+42,31,42,Garrison,31,Ossining,675,675
+101,80,101,Dover Plains,80,Hawthorne,1200,1200
+27,51,27,Tarrytown,51,Poughkeepsie,1200,1200
+79,98,79,Mount Pleasant,98,Pawling,825,825
+39,25,39,Peekskill,25,Irvington,600,600
+11,43,11,Marble Hill,43,Cold Spring,1150,1150
+71,94,71,Scarsdale,94,Southeast,775,775
+91,72,91,Brewster,72,Hartsdale,775,775
+23,17,23,Dobbs Ferry,17,Ludlow,300,300
+83,68,83,Chappaqua,68,Crestwood,500,500
+72,58,72,Hartsdale,58,Williams Bridge,425,425
+4,40,4,Harlem-125th St.,40,Manitou,2000,1500
+24,18,24,Ardsley-on-Hudson,18,Yonkers,300,300
+64,54,64,Fleetwood,54,Melrose,300,300
+16,14,16,Riverdale,14,Spuyten Duyvil,300,300
+66,100,66,Tuckahoe,100,HM Valley-Wingdale,1525,1525
+46,42,46,Beacon,42,Garrison,425,425
+86,78,86,Katonah,78,Valhalla,300,300
+78,74,78,Valhalla,74,White Plains,300,300
+89,83,89,Purdy's,83,Chappaqua,675,675
+55,90,55,Tremont,90,Croton Falls,1150,1150
+101,57,101,Dover Plains,57,Botanical Garden,1675,1675
+59,97,59,Woodlawn,97,Patterson,1450,1450
+19,24,19,Glenwood,24,Ardsley-on-Hudson,300,300
+11,20,11,Marble Hill,20,Greystone,300,300
+98,88,98,Pawling,88,Goldens Bridge,675,675
+30,33,30,Scarborough,33,Croton-Harmon,300,300
+90,84,90,Croton Falls,84,Mount Kisco,300,300
+94,54,94,Southeast,54,Melrose,1150,1150
+20,25,20,Greystone,25,Irvington,300,300
+65,176,65,Bronxville,176,Tenmile River,1600,1600
+112,108,112,Harrison,108,New Rochelle,300,300
+4,17,4,Harlem-125th St.,17,Ludlow,1150,875
+177,88,177,Wassaic,88,Goldens Bridge,1000,1000
+23,30,23,Dobbs Ferry,30,Scarborough,300,300
+1,11,1,Grand Central,11,Marble Hill,975,725
+74,81,74,White Plains,81,Pleasantville,300,300
+85,90,85,Bedford Hills,90,Croton Falls,300,300
+46,19,46,Beacon,19,Glenwood,1300,1300
+86,55,86,Katonah,55,Tremont,800,800
+97,64,97,Patterson,64,Fleetwood,1300,1300
+49,24,49,New Hamburg,24,Ardsley-on-Hudson,1150,1150
+108,110,108,New Rochelle,110,Larchmont,300,300
+86,91,86,Katonah,91,Brewster,300,300
+59,74,59,Woodlawn,74,White Plains,425,425
+19,1,19,Glenwood,1,Grand Central,1150,875
+97,100,97,Patterson,100,HM Valley-Wingdale,425,425
+98,65,98,Pawling,65,Bronxville,1300,1300
+30,10,30,Scarborough,10,University Heights,575,575
+90,61,90,Croton Falls,61,Wakefield,1150,1150
+19,37,19,Glenwood,37,Cortlandt,725,725
+11,33,11,Marble Hill,33,Croton-Harmon,575,575
+71,84,71,Scarsdale,84,Mount Kisco,600,600
+31,11,31,Ossining,11,Marble Hill,575,575
+177,65,177,Wassaic,65,Bronxville,1600,1600
+83,58,83,Chappaqua,58,Williams Bridge,575,575
+81,97,81,Pleasantville,97,Patterson,825,825
+622,43,622,Yankees-E153 St.,43,Cold Spring,1150,1150
+37,27,37,Cortlandt,27,Tarrytown,300,300
+16,4,16,Riverdale,4,Harlem-125th St.,975,725
+49,1,49,New Hamburg,1,Grand Central,2300,1750
+14,43,14,Spuyten Duyvil,43,Cold Spring,1150,1150
+74,94,74,White Plains,94,Southeast,775,775
+66,90,66,Tuckahoe,90,Croton Falls,875,875
+86,68,86,Katonah,68,Crestwood,725,725
+4,115,4,Harlem-125th St.,115,Port Chester,1375,1025
+78,64,78,Valhalla,64,Fleetwood,500,500
+49,37,49,New Hamburg,37,Cortlandt,675,675
+55,80,55,Tremont,80,Hawthorne,575,575
+27,18,27,Tarrytown,18,Yonkers,500,500
+18,49,18,Yonkers,49,New Hamburg,1300,1300
+100,88,100,HM Valley-Wingdale,88,Goldens Bridge,825,825
+19,14,19,Glenwood,14,Spuyten Duyvil,300,300
+79,65,79,Mount Pleasant,65,Bronxville,500,500
+11,10,11,Marble Hill,10,University Heights,300,300
+30,23,30,Scarborough,23,Dobbs Ferry,300,300
+71,61,71,Scarsdale,61,Wakefield,425,425
+176,83,176,Tenmile River,83,Chappaqua,1275,1275
+25,30,25,Irvington,30,Scarborough,300,300
+622,20,622,Yankees-E153 St.,20,Greystone,300,300
+62,97,62,Mt Vernon West,97,Patterson,1300,1300
+22,24,22,Hastings-on-Hudson,24,Ardsley-on-Hudson,300,300
+14,20,14,Spuyten Duyvil,20,Greystone,300,300
+74,71,74,White Plains,71,Scarsdale,300,300
+85,80,85,Bedford Hills,80,Hawthorne,300,300
+46,9,46,Beacon,9,Morris Heights,1450,1450
+37,40,37,Cortlandt,40,Manitou,300,300
+97,54,97,Patterson,54,Melrose,1450,1450
+49,14,49,New Hamburg,14,Spuyten Duyvil,1450,1450
+55,57,55,Tremont,57,Botanical Garden,300,300
+1,86,1,Grand Central,86,Katonah,1750,1325
+80,1,80,Hawthorne,1,Grand Central,1475,1125
+59,64,59,Woodlawn,64,Fleetwood,300,300
+99,100,99,Appalachian Trail,100,HM Valley-Wingdale,425,425
+98,55,98,Pawling,55,Tremont,1450,1450
+42,11,42,Garrison,11,Marble Hill,1150,1150
+4,622,4,Harlem-125th St.,622,Yankees-E153 St.,975,725
+100,101,100,HM Valley-Wingdale,101,Dover Plains,300,300
+11,23,11,Marble Hill,23,Dobbs Ferry,425,425
+111,110,111,Mamaroneck,110,Larchmont,300,300
+177,55,177,Wassaic,55,Tremont,1800,1800
+10,27,10,University Heights,27,Tarrytown,575,575
+62,74,62,Mt Vernon West,74,White Plains,300,300
+25,43,25,Irvington,43,Cold Spring,775,775
+622,33,622,Yankees-E153 St.,33,Croton-Harmon,575,575
+85,57,85,Bedford Hills,57,Botanical Garden,800,800
+98,176,98,Pawling,176,Tenmile River,450,450
+37,17,37,Cortlandt,17,Ludlow,725,725
+22,37,22,Hastings-on-Hudson,37,Cortlandt,600,600
+68,4,68,Crestwood,4,Harlem-125th St.,1150,875
+14,33,14,Spuyten Duyvil,33,Croton-Harmon,575,575
+74,84,74,White Plains,84,Mount Kisco,600,600
+66,80,66,Tuckahoe,80,Hawthorne,500,500
+86,58,86,Katonah,58,Williams Bridge,800,800
+4,105,4,Harlem-125th St.,105,Mt Vernon East ,1125,850
+78,54,78,Valhalla,54,Melrose,575,575
+177,176,177,Wassaic,176,Tenmile River,300,300
+1,99,1,Grand Central,99,Appalachian Trail,2300,1750
+40,27,40,Manitou,27,Tarrytown,675,675
+19,4,19,Glenwood,4,Harlem-125th St.,1150,875
+100,78,100,HM Valley-Wingdale,78,Valhalla,1200,1200
+58,81,58,Williams Bridge,81,Pleasantville,575,575
+61,86,61,Wakefield,86,Katonah,800,800
+80,99,80,Hawthorne,99,Appalachian Trail,825,825
+81,64,81,Pleasantville,64,Fleetwood,500,500
+33,24,33,Croton-Harmon,24,Ardsley-on-Hudson,300,300
+25,20,25,Irvington,20,Greystone,300,300
+622,10,622,Yankees-E153 St.,10,University Heights,300,300
+10,40,10,University Heights,40,Manitou,1150,1150
+22,14,22,Hastings-on-Hudson,14,Spuyten Duyvil,425,425
+81,100,81,Pleasantville,100,HM Valley-Wingdale,1200,1200
+54,83,54,Melrose,83,Chappaqua,575,575
+14,10,14,Spuyten Duyvil,10,University Heights,300,300
+74,61,74,White Plains,61,Wakefield,425,425
+66,57,66,Tuckahoe,57,Botanical Garden,300,300
+37,30,37,Cortlandt,30,Scarborough,300,300
+49,4,49,New Hamburg,4,Harlem-125th St.,2300,1750
+1,76,1,Grand Central,76,North White Plains,1275,975
+88,81,88,Goldens Bridge,81,Pleasantville,300,300
+18,16,18,Yonkers,16,Riverdale,300,300
+59,54,59,Woodlawn,54,Melrose,300,300
+100,55,100,HM Valley-Wingdale,55,Tremont,1675,1675
+99,90,99,Appalachian Trail,90,Croton Falls,425,425
+65,97,65,Bronxville,97,Patterson,1300,1300
+29,31,29,Philipse Manor,31,Ossining,300,300
+80,76,80,Hawthorne,76,North White Plains,300,300
+100,91,100,HM Valley-Wingdale,91,Brewster,650,650
+33,1,33,Croton-Harmon,1,Grand Central,1475,1125
+58,94,58,Williams Bridge,94,Southeast,1150,1150
+10,17,10,University Heights,17,Ludlow,300,300
+61,99,61,Wakefield,99,Appalachian Trail,1450,1450
+176,86,176,Tenmile River,86,Katonah,1000,1000
+62,64,62,Mt Vernon West,64,Fleetwood,300,300
+33,37,33,Croton-Harmon,37,Cortlandt,300,300
+25,33,25,Irvington,33,Croton-Harmon,300,300
+622,23,622,Yankees-E153 St.,23,Dobbs Ferry,425,425
+84,88,84,Mount Kisco,88,Goldens Bridge,300,300
+22,27,22,Hastings-on-Hudson,27,Tarrytown,300,300
+14,23,14,Spuyten Duyvil,23,Dobbs Ferry,425,425
+114,110,114,Rye,110,Larchmont,375,375
+65,74,65,Bronxville,74,White Plains,300,300
+56,105,56,Fordham,105,Mt Vernon East ,300,300
+76,83,76,North White Plains,83,Chappaqua,300,300
+9,30,9,Morris Heights,30,Scarborough,575,575
+1,89,1,Grand Central,89,Purdy's,2000,1500
+88,94,88,Goldens Bridge,94,Southeast,300,300
+40,17,40,Manitou,17,Ludlow,875,875
+100,68,100,HM Valley-Wingdale,68,Crestwood,1525,1525
+58,71,58,Williams Bridge,71,Scarsdale,425,425
+61,76,61,Wakefield,76,North White Plains,425,425
+37,622,37,Cortlandt,622,Yankees-E153 St.,800,800
+81,54,81,Pleasantville,54,Melrose,575,575
+80,89,80,Hawthorne,89,Purdy's,675,675
+33,14,33,Croton-Harmon,14,Spuyten Duyvil,575,575
+25,10,25,Irvington,10,University Heights,425,425
+64,1,64,Fleetwood,1,Grand Central,1150,875
+10,30,10,University Heights,30,Scarborough,575,575
+51,31,51,Poughkeepsie,31,Ossining,1200,1200
+83,100,83,Chappaqua,100,HM Valley-Wingdale,1200,1200
+22,4,22,Hastings-on-Hudson,4,Harlem-125th St.,1275,975
+4,72,4,Harlem-125th St.,72,Hartsdale,1275,975
+72,90,72,Hartsdale,90,Croton Falls,775,775
+84,101,84,Mount Kisco,101,Dover Plains,825,825
+16,46,16,Riverdale,46,Beacon,1450,1450
+101,4,101,Dover Plains,4,Harlem-125th St.,2575,1925
+1,66,1,Grand Central,66,Tuckahoe,1150,875
+88,71,88,Goldens Bridge,71,Scarsdale,600,600
+99,80,99,Appalachian Trail,80,Hawthorne,825,825
+57,83,57,Botanical Garden,83,Chappaqua,575,575
+9,43,9,Morris Heights,43,Cold Spring,1150,1150
+94,1,94,Southeast,1,Grand Central,2000,1500
+40,30,40,Manitou,30,Scarborough,675,675
+80,66,80,Hawthorne,66,Tuckahoe,500,500
+58,84,58,Williams Bridge,84,Mount Kisco,800,800
+91,81,91,Brewster,81,Pleasantville,675,675
+61,89,61,Wakefield,89,Purdy's,1150,1150
+62,54,62,Mt Vernon West,54,Melrose,300,300
+176,76,176,Tenmile River,76,North White Plains,1475,1475
+94,86,94,Southeast,86,Katonah,300,300
+4,49,4,Harlem-125th St.,49,New Hamburg,2300,1750
+24,27,24,Ardsley-on-Hudson,27,Tarrytown,300,300
+43,40,43,Cold Spring,40,Manitou,300,300
+84,78,84,Mount Kisco,78,Valhalla,300,300
+1,43,1,Grand Central,43,Cold Spring,2000,1500
+99,57,99,Appalachian Trail,57,Botanical Garden,1450,1450
+4,85,4,Harlem-125th St.,85,Bedford Hills,1750,1325
+64,99,64,Fleetwood,99,Appalachian Trail,1300,1300
+65,64,65,Bronxville,64,Fleetwood,300,300
+19,622,19,Glenwood,622,Yankees-E153 St.,300,300
+17,24,17,Ludlow,24,Ardsley-on-Hudson,300,300
+9,20,9,Morris Heights,20,Greystone,300,300
+88,84,88,Goldens Bridge,84,Mount Kisco,300,300
+100,58,100,HM Valley-Wingdale,58,Williams Bridge,1675,1675
+98,97,98,Pawling,97,Patterson,300,300
+58,61,58,Williams Bridge,61,Wakefield,300,300
+61,66,61,Wakefield,66,Tuckahoe,300,300
+80,79,80,Hawthorne,79,Mount Pleasant,300,300
+33,4,33,Croton-Harmon,4,Harlem-125th St.,1475,1125
+66,1,66,Tuckahoe,1,Grand Central,1150,875
+31,43,31,Ossining,43,Cold Spring,675,675
+91,94,91,Brewster,94,Southeast,300,300
+177,97,177,Wassaic,97,Patterson,450,450
+23,39,23,Dobbs Ferry,39,Peekskill,600,600
+83,90,83,Chappaqua,90,Croton Falls,675,675
+43,17,43,Cold Spring,17,Ludlow,875,875
+84,55,84,Mount Kisco,55,Tremont,800,800
+94,99,94,Southeast,99,Appalachian Trail,425,425
+49,622,49,New Hamburg,622,Yankees-E153 St.,1450,1450
+4,62,4,Harlem-125th St.,62,Mt Vernon West,1150,875
+72,80,72,Hartsdale,80,Hawthorne,300,300
+105,114,105,Mt Vernon East ,114,Rye,400,400
+24,40,24,Ardsley-on-Hudson,40,Manitou,775,775
+64,76,64,Fleetwood,76,North White Plains,300,300
+56,72,56,Fordham,72,Hartsdale,425,425
+17,1,17,Ludlow,1,Grand Central,1150,875
+84,91,84,Mount Kisco,91,Brewster,300,300
+1,56,1,Grand Central,56,Fordham,975,725
+88,61,88,Goldens Bridge,61,Wakefield,800,800
+86,100,86,Katonah,100,HM Valley-Wingdale,825,825
+56,108,56,Fordham,108,New Rochelle,300,300
+17,37,17,Ludlow,37,Cortlandt,725,725
+76,86,76,North White Plains,86,Katonah,600,600
+9,33,9,Morris Heights,33,Croton-Harmon,575,575
+84,176,84,Mount Kisco,176,Tenmile River,1000,1000
+29,11,29,Philipse Manor,11,Marble Hill,575,575
+80,56,80,Hawthorne,56,Fordham,575,575
+19,46,19,Glenwood,46,Beacon,1300,1300
+79,97,79,Mount Pleasant,97,Patterson,825,825
+39,24,39,Peekskill,24,Ardsley-on-Hudson,600,600
+91,71,91,Brewster,71,Scarsdale,775,775
+1,177,1,Grand Central,177,Wassaic,2725,2025
+94,76,94,Southeast,76,North White Plains,775,775
+72,57,72,Hartsdale,57,Botanical Garden,425,425
+4,39,4,Harlem-125th St.,39,Peekskill,1750,1325
+24,17,24,Ardsley-on-Hudson,17,Ludlow,300,300
+97,1,97,Patterson,1,Grand Central,2300,1750
+43,30,43,Cold Spring,30,Scarborough,675,675
+84,68,84,Mount Kisco,68,Crestwood,725,725
+55,4,55,Tremont,4,Harlem-125th St.,975,725
+80,177,80,Hawthorne,177,Wassaic,1275,1275
+1,33,1,Grand Central,33,Croton-Harmon,1475,1125
+64,89,64,Fleetwood,89,Purdy's,875,875
+65,54,65,Bronxville,54,Melrose,300,300
+16,49,16,Riverdale,49,New Hamburg,1450,1450
+17,14,17,Ludlow,14,Spuyten Duyvil,300,300
+56,85,56,Fordham,85,Bedford Hills,800,800
+49,46,49,New Hamburg,46,Beacon,300,300
+9,10,9,Morris Heights,10,University Heights,300,300
+68,59,68,Crestwood,59,Woodlawn,300,300
+79,74,79,Mount Pleasant,74,White Plains,300,300
+90,83,90,Croton Falls,83,Chappaqua,675,675
+42,43,42,Garrison,43,Cold Spring,300,300
+61,56,61,Wakefield,56,Fordham,300,300
+22,622,22,Hastings-on-Hudson,622,Yankees-E153 St.,425,425
+20,24,20,Greystone,24,Ardsley-on-Hudson,300,300
+39,37,39,Peekskill,37,Cortlandt,300,300
+85,4,85,Bedford Hills,4,Harlem-125th St.,1750,1325
+31,33,31,Ossining,33,Croton-Harmon,300,300
+91,84,91,Brewster,84,Mount Kisco,300,300
+51,11,51,Poughkeepsie,11,Marble Hill,1675,1675
+23,29,23,Dobbs Ferry,29,Philipse Manor,300,300
+83,80,83,Chappaqua,80,Hawthorne,300,300
+115,112,115,Port Chester,112,Harrison,375,375
+94,89,94,Southeast,89,Purdy's,300,300
+1,10,1,Grand Central,10,University Heights,975,725
+78,1,78,Valhalla,1,Grand Central,1475,1125
+24,30,24,Ardsley-on-Hudson,30,Scarborough,300,300
+64,66,64,Fleetwood,66,Tuckahoe,300,300
+56,62,56,Fordham,62,Mt Vernon West,300,300
+61,177,61,Wakefield,177,Wassaic,1800,1800
+1,46,1,Grand Central,46,Beacon,2300,1750
+86,90,86,Katonah,90,Croton Falls,300,300
+78,86,78,Valhalla,86,Katonah,300,300
+97,99,97,Patterson,99,Appalachian Trail,300,300
+98,64,98,Pawling,64,Fleetwood,1300,1300
+68,72,68,Crestwood,72,Hartsdale,300,300
+115,4,115,Port Chester,4,Harlem-125th St.,1375,1025
+42,20,42,Garrison,20,Greystone,875,875
+27,40,27,Tarrytown,40,Manitou,675,675
+20,1,20,Greystone,1,Grand Central,1150,875
+39,14,39,Peekskill,14,Spuyten Duyvil,800,800
+98,100,98,Pawling,100,HM Valley-Wingdale,425,425
+71,83,71,Scarsdale,83,Chappaqua,300,300
+31,10,31,Ossining,10,University Heights,575,575
+91,61,91,Brewster,61,Wakefield,1150,1150
+83,57,83,Chappaqua,57,Botanical Garden,575,575
+108,1,108,New Rochelle,1,Grand Central,1125,850
+94,66,94,Southeast,66,Tuckahoe,875,875
+20,37,20,Greystone,37,Cortlandt,725,725
+66,4,66,Tuckahoe,4,Harlem-125th St.,1150,875
+4,29,4,Harlem-125th St.,29,Philipse Manor,1475,1125
+177,100,177,Wassaic,100,HM Valley-Wingdale,300,300
+23,42,23,Dobbs Ferry,42,Garrison,775,775
+43,20,43,Cold Spring,20,Greystone,875,875
+84,58,84,Mount Kisco,58,Williams Bridge,800,800
+1,23,1,Grand Central,23,Dobbs Ferry,1275,975
+46,31,46,Beacon,31,Ossining,825,825
+64,79,64,Fleetwood,79,Mount Pleasant,500,500
+17,4,17,Ludlow,4,Harlem-125th St.,1150,875
+97,76,97,Patterson,76,North White Plains,1150,1150
+27,17,27,Tarrytown,17,Ludlow,500,500
+59,86,59,Woodlawn,86,Katonah,800,800
+78,99,78,Valhalla,99,Appalachian Trail,825,825
+79,64,79,Mount Pleasant,64,Fleetwood,500,500
+33,622,33,Croton-Harmon,622,Yankees-E153 St.,575,575
+30,22,30,Scarborough,22,Hastings-on-Hudson,300,300
+42,33,42,Garrison,33,Croton-Harmon,675,675
+19,49,19,Glenwood,49,New Hamburg,1300,1300
+20,14,20,Greystone,14,Spuyten Duyvil,300,300
+39,27,39,Peekskill,27,Tarrytown,300,300
+31,23,31,Ossining,23,Dobbs Ferry,300,300
+91,74,91,Brewster,74,White Plains,775,775
+23,19,23,Dobbs Ferry,19,Glenwood,300,300
+51,1,51,Poughkeepsie,1,Grand Central,2575,1925
+94,79,94,Southeast,79,Mount Pleasant,675,675
+64,56,64,Fleetwood,56,Fordham,300,300
+37,39,37,Cortlandt,39,Peekskill,300,300
+86,80,86,Katonah,80,Hawthorne,300,300
+18,25,18,Yonkers,25,Irvington,300,300
+78,76,78,Valhalla,76,North White Plains,300,300
+97,89,97,Patterson,89,Purdy's,425,425
+98,54,98,Pawling,54,Melrose,1450,1450
+89,85,89,Purdy's,85,Bedford Hills,300,300
+42,10,42,Garrison,10,University Heights,1150,1150
+101,59,101,Dover Plains,59,Woodlawn,1675,1675
+81,1,81,Pleasantville,1,Grand Central,1475,1125
+27,30,27,Tarrytown,30,Scarborough,300,300
+59,99,59,Woodlawn,99,Appalachian Trail,1450,1450
+39,4,39,Peekskill,4,Harlem-125th St.,1750,1325
+11,22,11,Marble Hill,22,Hastings-on-Hudson,425,425
+64,177,64,Fleetwood,177,Wassaic,1600,1600
+90,86,90,Croton Falls,86,Katonah,300,300
+177,54,177,Wassaic,54,Melrose,1800,1800
+94,56,94,Southeast,56,Fordham,1150,1150
+33,46,33,Croton-Harmon,46,Beacon,825,825
+112,110,112,Harrison,110,Larchmont,300,300
+4,19,4,Harlem-125th St.,19,Glenwood,1150,875
+177,90,177,Wassaic,90,Croton Falls,750,750
+74,83,74,White Plains,83,Chappaqua,300,300
+66,79,66,Tuckahoe,79,Mount Pleasant,500,500
+86,57,86,Katonah,57,Botanical Garden,800,800
+111,1,111,Mamaroneck,1,Grand Central,1275,975
+56,65,56,Fordham,65,Bronxville,300,300
+97,66,97,Patterson,66,Tuckahoe,1300,1300
+89,62,89,Purdy's,62,Mt Vernon West,875,875
+94,177,94,Southeast,177,Wassaic,750,750
+1,98,1,Grand Central,98,Pawling,2300,1750
+59,76,59,Woodlawn,76,North White Plains,425,425
+78,89,78,Valhalla,89,Purdy's,675,675
+79,54,79,Mount Pleasant,54,Melrose,575,575
+89,98,89,Purdy's,98,Pawling,425,425
+42,23,42,Garrison,23,Dobbs Ferry,775,775
+101,72,101,Dover Plains,72,Hartsdale,1375,1375
+62,1,62,Mt Vernon West,1,Grand Central,1150,875
+20,4,20,Greystone,4,Harlem-125th St.,1150,875
+23,9,23,Dobbs Ferry,9,Morris Heights,425,425
+62,86,62,Mt Vernon West,86,Katonah,725,725
+81,99,81,Pleasantville,99,Appalachian Trail,825,825
+99,4,99,Appalachian Trail,4,Harlem-125th St.,2300,1750
+37,29,37,Cortlandt,29,Philipse Manor,300,300
+22,49,22,Hastings-on-Hudson,49,New Hamburg,1150,1150
+78,66,78,Valhalla,66,Tuckahoe,500,500
+97,79,97,Patterson,79,Mount Pleasant,825,825
+1,111,1,Grand Central,111,Mamaroneck,1275,975
+27,20,27,Tarrytown,20,Greystone,500,500
+40,39,40,Manitou,39,Peekskill,300,300
+59,89,59,Woodlawn,89,Purdy's,1150,1150
+19,16,19,Glenwood,16,Riverdale,300,300
+100,90,100,HM Valley-Wingdale,90,Croton Falls,650,650
+30,25,30,Scarborough,25,Irvington,300,300
+61,98,61,Wakefield,98,Pawling,1450,1450
+176,85,176,Tenmile River,85,Bedford Hills,1000,1000
+81,76,81,Pleasantville,76,North White Plains,300,300
+622,22,622,Yankees-E153 St.,22,Hastings-on-Hudson,425,425
+4,9,4,Harlem-125th St.,9,Morris Heights,975,725
+115,105,115,Port Chester,105,Mt Vernon East ,400,400
+62,99,62,Mt Vernon West,99,Appalachian Trail,1300,1300
+14,22,14,Spuyten Duyvil,22,Hastings-on-Hudson,425,425
+46,11,46,Beacon,11,Marble Hill,1450,1450
+4,94,4,Harlem-125th St.,94,Southeast,2000,1500
+37,42,37,Cortlandt,42,Garrison,300,300
+97,56,97,Patterson,56,Fordham,1450,1450
+49,16,49,New Hamburg,16,Riverdale,1450,1450
+55,59,55,Tremont,59,Woodlawn,300,300
+1,88,1,Grand Central,88,Goldens Bridge,1750,1325
+59,66,59,Woodlawn,66,Tuckahoe,300,300
+29,43,29,Philipse Manor,43,Cold Spring,675,675
+80,88,80,Hawthorne,88,Goldens Bridge,300,300
+114,1,114,Rye,1,Grand Central,1375,1025
+111,112,111,Mamaroneck,112,Harrison,300,300
+72,4,72,Hartsdale,4,Harlem-125th St.,1275,975
+97,177,97,Patterson,177,Wassaic,450,450
+177,57,177,Wassaic,57,Botanical Garden,1800,1800
+10,29,10,University Heights,29,Philipse Manor,575,575
+176,98,176,Tenmile River,98,Pawling,450,450
+62,76,62,Mt Vernon West,76,North White Plains,300,300
+81,89,81,Pleasantville,89,Purdy's,675,675
+54,72,54,Melrose,72,Hartsdale,425,425
+33,49,33,Croton-Harmon,49,New Hamburg,825,825
+85,59,85,Bedford Hills,59,Woodlawn,800,800
+37,19,37,Cortlandt,19,Glenwood,725,725
+65,1,65,Bronxville,1,Grand Central,1150,875
+84,100,84,Mount Kisco,100,HM Valley-Wingdale,825,825
+22,39,22,Hastings-on-Hudson,39,Peekskill,600,600
+78,56,78,Valhalla,56,Fordham,575,575
+89,65,89,Purdy's,65,Bronxville,875,875
+17,46,17,Ludlow,46,Beacon,1300,1300
+39,622,39,Peekskill,622,Yankees-E153 St.,800,800
+9,42,9,Morris Heights,42,Garrison,1150,1150
+55,72,55,Tremont,72,Hartsdale,425,425
+29,20,29,Philipse Manor,20,Greystone,500,500
+1,101,1,Grand Central,101,Dover Plains,2575,1925
+40,29,40,Manitou,29,Philipse Manor,675,675
+100,80,100,HM Valley-Wingdale,80,Hawthorne,1200,1200
+58,83,58,Williams Bridge,83,Chappaqua,575,575
+61,88,61,Wakefield,88,Goldens Bridge,800,800
+80,101,80,Hawthorne,101,Dover Plains,1200,1200
+81,66,81,Pleasantville,66,Tuckahoe,500,500
+25,22,25,Irvington,22,Hastings-on-Hudson,300,300
+78,177,78,Valhalla,177,Wassaic,1275,1275
+10,42,10,University Heights,42,Garrison,1150,1150
+51,43,51,Poughkeepsie,43,Cold Spring,650,650
+62,89,62,Mt Vernon West,89,Purdy's,875,875
+108,56,108,New Rochelle,56,Fordham,300,300
+22,16,22,Hastings-on-Hudson,16,Riverdale,425,425
+54,85,54,Melrose,85,Bedford Hills,800,800
+66,59,66,Tuckahoe,59,Woodlawn,300,300
+85,72,85,Bedford Hills,72,Hartsdale,600,600
+4,84,4,Harlem-125th St.,84,Mount Kisco,1750,1325
+1,78,1,Grand Central,78,Valhalla,1475,1125
+88,83,88,Goldens Bridge,83,Chappaqua,300,300
+59,56,59,Woodlawn,56,Fordham,300,300
+100,57,100,HM Valley-Wingdale,57,Botanical Garden,1675,1675
+65,99,65,Bronxville,99,Appalachian Trail,1300,1300
+20,622,20,Greystone,622,Yankees-E153 St.,300,300
+83,4,83,Chappaqua,4,Harlem-125th St.,1475,1125
+29,33,29,Philipse Manor,33,Croton-Harmon,300,300
+61,65,61,Wakefield,65,Bronxville,300,300
+80,78,80,Hawthorne,78,Valhalla,300,300
+40,42,40,Manitou,42,Garrison,300,300
+10,19,10,University Heights,19,Glenwood,300,300
+110,106,110,Larchmont,106,Pelham,300,300
+61,101,61,Wakefield,101,Dover Plains,1675,1675
+176,88,176,Tenmile River,88,Goldens Bridge,1000,1000
+62,66,62,Mt Vernon West,66,Tuckahoe,300,300
+81,79,81,Pleasantville,79,Mount Pleasant,300,300
+54,62,54,Melrose,62,Mt Vernon West,300,300
+59,177,59,Woodlawn,177,Wassaic,1800,1800
+37,9,37,Cortlandt,9,Morris Heights,800,800
+24,39,24,Ardsley-on-Hudson,39,Peekskill,600,600
+84,90,84,Mount Kisco,90,Croton Falls,300,300
+14,25,14,Spuyten Duyvil,25,Irvington,425,425
+114,112,114,Rye,112,Harrison,375,375
+1,55,1,Grand Central,55,Tremont,975,725
+106,108,106,Pelham,108,New Rochelle,300,300
+4,97,4,Harlem-125th St.,97,Patterson,2300,1750
+65,76,65,Bronxville,76,North White Plains,300,300
+76,85,76,North White Plains,85,Bedford Hills,600,600
+68,81,68,Crestwood,81,Pleasantville,500,500
+29,10,29,Philipse Manor,10,University Heights,575,575
+1,91,1,Grand Central,91,Brewster,2000,1500
+40,19,40,Manitou,19,Glenwood,875,875
+80,55,80,Hawthorne,55,Tremont,575,575
+61,78,61,Wakefield,78,Valhalla,575,575
+176,65,176,Tenmile River,65,Bronxville,1600,1600
+1,176,1,Grand Central,176,Tenmile River,2725,2025
+81,56,81,Pleasantville,56,Fordham,575,575
+80,91,80,Hawthorne,91,Brewster,675,675
+33,16,33,Croton-Harmon,16,Riverdale,575,575
+20,46,20,Greystone,46,Beacon,1300,1300
+51,33,51,Poughkeepsie,33,Croton-Harmon,1200,1200
+23,51,23,Dobbs Ferry,51,Poughkeepsie,1375,1375
+43,29,43,Cold Spring,29,Philipse Manor,675,675
+4,74,4,Harlem-125th St.,74,White Plains,1275,975
+64,88,64,Fleetwood,88,Goldens Bridge,725,725
+98,1,98,Pawling,1,Grand Central,2300,1750
+76,62,76,North White Plains,62,Mt Vernon West,300,300
+81,177,81,Pleasantville,177,Wassaic,1275,1275
+1,68,1,Grand Central,68,Crestwood,1150,875
+65,89,65,Bronxville,89,Purdy's,875,875
+111,56,111,Mamaroneck,56,Fordham,425,425
+17,49,17,Ludlow,49,New Hamburg,1300,1300
+57,85,57,Botanical Garden,85,Bedford Hills,800,800
+177,1,177,Wassaic,1,Grand Central,2725,2025
+76,98,76,North White Plains,98,Pawling,1150,1150
+68,94,68,Crestwood,94,Southeast,875,875
+29,23,29,Philipse Manor,23,Dobbs Ferry,300,300
+61,55,61,Wakefield,55,Tremont,300,300
+80,68,80,Hawthorne,68,Crestwood,500,500
+10,9,10,University Heights,9,Morris Heights,300,300
+91,83,91,Brewster,83,Chappaqua,675,675
+83,79,83,Chappaqua,79,Mount Pleasant,300,300
+62,56,62,Mt Vernon West,56,Fordham,300,300
+94,88,94,Southeast,88,Goldens Bridge,300,300
+86,4,86,Katonah,4,Harlem-125th St.,1750,1325
+4,51,4,Harlem-125th St.,51,Poughkeepsie,2575,1925
+51,46,51,Poughkeepsie,46,Beacon,425,425
+24,29,24,Ardsley-on-Hudson,29,Philipse Manor,300,300
+43,42,43,Cold Spring,42,Garrison,300,300
+84,80,84,Mount Kisco,80,Hawthorne,300,300
+16,25,16,Riverdale,25,Irvington,425,425
+61,176,61,Wakefield,176,Tenmile River,1800,1800
+99,59,99,Appalachian Trail,59,Woodlawn,1450,1450
+79,1,79,Mount Pleasant,1,Grand Central,1475,1125
+64,101,64,Fleetwood,101,Dover Plains,1525,1525
+65,66,65,Bronxville,66,Tuckahoe,300,300
+56,97,56,Fordham,97,Patterson,1450,1450
+57,62,57,Botanical Garden,62,Mt Vernon West,300,300
+9,22,9,Morris Heights,22,Hastings-on-Hudson,425,425
+62,177,62,Mt Vernon West,177,Wassaic,1600,1600
+68,71,68,Crestwood,71,Scarsdale,300,300
+40,9,40,Manitou,9,Morris Heights,1150,1150
+79,86,79,Mount Pleasant,86,Katonah,300,300
+98,99,98,Pawling,99,Appalachian Trail,300,300
+61,68,61,Wakefield,68,Crestwood,300,300
+176,55,176,Tenmile River,55,Tremont,1800,1800
+39,49,39,Peekskill,49,New Hamburg,675,675
+51,23,51,Poughkeepsie,23,Dobbs Ferry,1375,1375
+177,99,177,Wassaic,99,Appalachian Trail,450,450
+43,19,43,Cold Spring,19,Glenwood,875,875
+84,57,84,Mount Kisco,57,Botanical Garden,800,800
+94,101,94,Southeast,101,Dover Plains,650,650
+1,22,1,Grand Central,22,Hastings-on-Hudson,1275,975
+4,64,4,Harlem-125th St.,64,Fleetwood,1150,875
+24,42,24,Ardsley-on-Hudson,42,Garrison,775,775
+64,78,64,Fleetwood,78,Valhalla,500,500
+56,74,56,Fordham,74,White Plains,425,425
+1,58,1,Grand Central,58,Williams Bridge,975,725
+99,72,99,Appalachian Trail,72,Hartsdale,1150,1150
+65,79,65,Bronxville,79,Mount Pleasant,500,500
+56,110,56,Fordham,110,Larchmont,425,425
+98,76,98,Pawling,76,North White Plains,1150,1150
+68,84,68,Crestwood,84,Mount Kisco,725,725
+101,81,101,Dover Plains,81,Pleasantville,1200,1200
+80,58,80,Hawthorne,58,Williams Bridge,575,575
+79,99,79,Mount Pleasant,99,Appalachian Trail,825,825
+31,22,31,Ossining,22,Hastings-on-Hudson,300,300
+94,78,94,Southeast,78,Valhalla,675,675
+114,56,114,Rye,56,Fordham,500,500
+20,49,20,Greystone,49,New Hamburg,1300,1300
+72,59,72,Hartsdale,59,Woodlawn,425,425
+24,19,24,Ardsley-on-Hudson,19,Glenwood,300,300
+64,55,64,Fleetwood,55,Tremont,300,300
+46,43,46,Beacon,43,Cold Spring,425,425
+64,91,64,Fleetwood,91,Brewster,875,875
+65,56,65,Bronxville,56,Fordham,300,300
+17,16,17,Ludlow,16,Riverdale,300,300
+97,88,97,Patterson,88,Goldens Bridge,675,675
+76,65,76,North White Plains,65,Bronxville,300,300
+68,61,68,Crestwood,61,Wakefield,300,300
+27,29,27,Tarrytown,29,Philipse Manor,300,300
+59,98,59,Woodlawn,98,Pawling,1450,1450
+79,76,79,Mount Pleasant,76,North White Plains,300,300
+98,89,98,Pawling,89,Purdy's,425,425
+71,72,71,Scarsdale,72,Hartsdale,300,300
+90,85,90,Croton Falls,85,Bedford Hills,300,300
+61,58,61,Wakefield,58,Williams Bridge,300,300
+101,94,101,Dover Plains,94,Southeast,650,650
+94,55,94,Southeast,55,Tremont,1150,1150
+65,177,65,Bronxville,177,Wassaic,1600,1600
+4,18,4,Harlem-125th St.,18,Yonkers,1150,875
+91,86,91,Brewster,86,Katonah,300,300
+177,89,177,Wassaic,89,Purdy's,750,750
+23,31,23,Dobbs Ferry,31,Ossining,300,300
+43,9,43,Cold Spring,9,Morris Heights,1150,1150
+115,114,115,Port Chester,114,Rye,300,300
+94,91,94,Southeast,91,Brewster,300,300
+4,54,4,Harlem-125th St.,54,Melrose,975,725
+105,106,105,Mt Vernon East ,106,Pelham,300,300
+37,51,37,Cortlandt,51,Poughkeepsie,825,825
+64,68,64,Fleetwood,68,Crestwood,300,300
+56,64,56,Fordham,64,Fleetwood,300,300
+108,111,108,New Rochelle,111,Mamaroneck,300,300
+94,176,94,Southeast,176,Tenmile River,750,750
+78,88,78,Valhalla,88,Goldens Bridge,300,300
+112,1,112,Harrison,1,Grand Central,1275,975
+57,65,57,Botanical Garden,65,Bronxville,300,300
+98,66,98,Pawling,66,Tuckahoe,1300,1300
+97,101,97,Patterson,101,Dover Plains,425,425
+89,97,89,Purdy's,97,Patterson,425,425
+90,62,90,Croton Falls,62,Mt Vernon West,875,875
+42,22,42,Garrison,22,Hastings-on-Hudson,775,775
+101,71,101,Dover Plains,71,Scarsdale,1375,1375
+27,42,27,Tarrytown,42,Garrison,675,675
+79,89,79,Mount Pleasant,89,Purdy's,675,675
+39,16,39,Peekskill,16,Riverdale,800,800
+71,85,71,Scarsdale,85,Bedford Hills,600,600
+90,98,90,Croton Falls,98,Pawling,425,425
+177,66,177,Wassaic,66,Tuckahoe,1600,1600
+83,59,83,Chappaqua,59,Woodlawn,575,575
+94,68,94,Southeast,68,Crestwood,875,875
+4,31,4,Harlem-125th St.,31,Ossining,1475,1125
+24,9,24,Ardsley-on-Hudson,9,Morris Heights,425,425
+1,25,1,Grand Central,25,Irvington,1275,975
+66,91,66,Tuckahoe,91,Brewster,875,875
+100,4,100,HM Valley-Wingdale,4,Harlem-125th St.,2575,1925
+46,33,46,Beacon,33,Croton-Harmon,825,825
+97,78,97,Patterson,78,Valhalla,825,825
+76,55,76,North White Plains,55,Tremont,425,425
+89,74,89,Purdy's,74,White Plains,775,775
+55,81,55,Tremont,81,Pleasantville,575,575
+27,19,27,Tarrytown,19,Glenwood,500,500
+59,88,59,Woodlawn,88,Goldens Bridge,800,800
+78,101,78,Valhalla,101,Dover Plains,1200,1200
+79,66,79,Mount Pleasant,66,Tuckahoe,500,500
+98,79,98,Pawling,79,Mount Pleasant,825,825
+30,24,30,Scarborough,24,Ardsley-on-Hudson,300,300
+71,62,71,Scarsdale,62,Mt Vernon West,300,300
+101,84,101,Dover Plains,84,Mount Kisco,825,825
+19,51,19,Glenwood,51,Poughkeepsie,1525,1525
+20,16,20,Greystone,16,Riverdale,300,300
+31,25,31,Ossining,25,Irvington,300,300
+177,79,177,Wassaic,79,Mount Pleasant,1275,1275
+76,176,76,North White Plains,176,Tenmile River,1475,1475
+83,72,83,Chappaqua,72,Hartsdale,300,300
+62,98,62,Mt Vernon West,98,Pawling,1300,1300
+72,62,72,Hartsdale,62,Mt Vernon West,300,300
+85,81,85,Bedford Hills,81,Pleasantville,300,300
+46,10,46,Beacon,10,University Heights,1450,1450
+64,58,64,Fleetwood,58,Williams Bridge,300,300
+56,54,56,Fordham,54,Melrose,300,300
+18,27,18,Yonkers,27,Tarrytown,500,500
+59,65,59,Woodlawn,65,Bronxville,300,300
+97,91,97,Patterson,91,Brewster,425,425
+98,56,98,Pawling,56,Fordham,1450,1450
+30,1,30,Scarborough,1,Grand Central,1475,1125
+55,94,55,Tremont,94,Southeast,1150,1150
+101,61,101,Dover Plains,61,Wakefield,1675,1675
+59,101,59,Woodlawn,101,Dover Plains,1675,1675
+11,24,11,Marble Hill,24,Ardsley-on-Hudson,425,425
+30,37,30,Scarborough,37,Cortlandt,300,300
+177,56,177,Wassaic,56,Fordham,1800,1800
+94,58,94,Southeast,58,Williams Bridge,1150,1150
+176,97,176,Tenmile River,97,Patterson,450,450
+81,88,81,Pleasantville,88,Goldens Bridge,300,300
+98,177,98,Pawling,177,Wassaic,450,450
+37,18,37,Cortlandt,18,Yonkers,725,725
+74,85,74,White Plains,85,Bedford Hills,600,600
+66,81,66,Tuckahoe,81,Pleasantville,500,500
+85,94,85,Bedford Hills,94,Southeast,300,300
+46,23,46,Beacon,23,Dobbs Ferry,1150,1150
+86,59,86,Katonah,59,Woodlawn,800,800
+78,55,78,Valhalla,55,Tremont,575,575
+97,68,97,Patterson,68,Crestwood,1300,1300
+89,64,89,Purdy's,64,Fleetwood,875,875
+55,71,55,Tremont,71,Scarsdale,425,425
+1,100,1,Grand Central,100,HM Valley-Wingdale,2575,1925
+27,9,27,Tarrytown,9,Morris Heights,575,575
+18,40,18,Yonkers,40,Manitou,875,875
+59,78,59,Woodlawn,78,Valhalla,575,575
+78,91,78,Valhalla,91,Brewster,675,675
+79,56,79,Mount Pleasant,56,Fordham,575,575
+11,1,11,Marble Hill,1,Grand Central,975,725
+30,14,30,Scarborough,14,Spuyten Duyvil,575,575
+90,65,90,Croton Falls,65,Bronxville,875,875
+101,74,101,Dover Plains,74,White Plains,1375,1375
+80,100,80,Hawthorne,100,HM Valley-Wingdale,1200,1200
+33,25,33,Croton-Harmon,25,Irvington,300,300
+78,176,78,Valhalla,176,Tenmile River,1275,1275
+23,11,23,Dobbs Ferry,11,Marble Hill,425,425
+62,88,62,Mt Vernon West,88,Goldens Bridge,725,725
+81,101,81,Pleasantville,101,Dover Plains,1200,1200
+54,84,54,Melrose,84,Mount Kisco,800,800
+74,62,74,White Plains,62,Mt Vernon West,300,300
+79,177,79,Mount Pleasant,177,Wassaic,1275,1275
+85,71,85,Bedford Hills,71,Scarsdale,600,600
+37,31,37,Cortlandt,31,Ossining,300,300
+22,51,22,Hastings-on-Hudson,51,Poughkeepsie,1375,1375
+74,98,74,White Plains,98,Pawling,1150,1150
+66,94,66,Tuckahoe,94,Southeast,875,875

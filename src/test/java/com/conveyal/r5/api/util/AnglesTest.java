@@ -1,14 +1,14 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.common.DirectionUtils;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
-import org.junit.Assert;
-import org.junit.runner.RunWith;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
 import java.util.Collection;

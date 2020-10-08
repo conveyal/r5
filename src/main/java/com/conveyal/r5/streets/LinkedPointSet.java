@@ -4,15 +4,16 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.util.LambdaCounter;
-import org.locationtech.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.streets.EdgeStore.Edge;
-import gnu.trove.set.TIntSet;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,12 +21,16 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
+
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
- * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of
- * that edge.
+ * For each feature in the PointSet, we record the closest edge useable by the specified StreetMode, and the distance
+ * to the vertices at the ends of that edge. There should be a mapping (PointSet, StreetLayer, StreetMode) ==>
+ * LinkedPointSet.
  *
- * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network.
+ * LinkedPointSet is serializable because we save one PointSet and the associated WALK linkage in each Network to speed
+ * up the time to first response on this common mode. We might want to also store linkages for other common modes.
  *
  * FIXME a LinkedPointSet is not a PointSet, it's associated with a PointSet. It should be called PointSetLinkage.
  */
@@ -84,6 +89,12 @@ public class LinkedPointSet implements Serializable {
      * edge to the point to be linked)
      */
     public final int[] distances1_mm;
+
+    /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,
+     * scooter pickup, etc.)
+     */
+    public int[] egressStopDelaysSeconds;
 
     /**
      * LinkedPointSets and their EgressCostTables are often copied from existing ones.
@@ -226,8 +237,8 @@ public class LinkedPointSet implements Serializable {
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
                 if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height) { //point is outside super-grid
-                    //Set the edge value to -1 to indicate no linkage.
-                    //Distances should never be read downstream, so they don't need to be set here.
+                    // Set the edge value to -1 to indicate no linkage.
+                    // Distances should never be read downstream, so they don't need to be set here.
                     edges[pixel] = -1;
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
@@ -287,12 +298,16 @@ public class LinkedPointSet implements Serializable {
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
      *
      * @param all If true, link all points, otherwise link only those that were previously connected to edges that have
-     *            been deleted (i.e. split). We will need to change this behavior when we allow creating new edges
-     *            rather than simply splitting existing ones.
+     *            been deleted (i.e. split), or that are in proximity to an added edge.
      */
     private void linkPointsToStreets (boolean all) {
         LambdaCounter linkCounter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
                 "Linked {} of {} PointSet points to streets.");
+
+        // Construct a geometry around any edges added by the scenario, or null if there are no added edges.
+        // As it is derived from edge geometries this is a fixed-point geometry and must be intersected with the same.
+        final Geometry addedEdgesBoundingGeometry = streetLayer.addedEdgesBoundingGeometry();
+
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
             // When working with a scenario, skip all points that are not linked to a deleted street (i.e. one that has
@@ -301,8 +316,24 @@ public class LinkedPointSet implements Serializable {
             // FIXME when we permit street network modifications beyond adding transit stops we will need to change how this works,
             // we may be able to use some type of flood-fill algorithm in geographic space, expanding the relink envelope until we
             // hit edges on all sides or reach some predefined maximum.
-            if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
-                    streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
+            boolean relinkThisPoint = false;
+            if (all || streetLayer.edgeIsDeletedByScenario(edges[p])) {
+                relinkThisPoint = true;
+            } else if (addedEdgesBoundingGeometry != null) {
+                // If we have a geometry for added edges, see whether those might come closer than any existing linkage.
+                double pointLatFixed = floatingDegreesToFixed(pointSet.getLat(p));
+                double pointLonFixed = floatingDegreesToFixed(pointSet.getLon(p));
+                Envelope pointEnvelopeFixed = new Envelope(pointLonFixed, pointLonFixed, pointLatFixed, pointLatFixed);
+                double radiusMeters = StreetLayer.LINK_RADIUS_METERS;
+                if (edges[p] != -1) {
+                    radiusMeters = this.distancesToEdge_mm[p] / 1000.0;
+                }
+                GeometryUtils.expandEnvelopeFixed(pointEnvelopeFixed, radiusMeters);
+                if (addedEdgesBoundingGeometry.intersects(GeometryUtils.geometryFactory.toGeometry(pointEnvelopeFixed))) {
+                    relinkThisPoint = true;
+                }
+            }
+            if (relinkThisPoint) {
                 // Use radius from StreetLayer such that maximum origin and destination walk distances are symmetric.
                 Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p),
                         StreetLayer.LINK_RADIUS_METERS, streetMode);
@@ -317,13 +348,37 @@ public class LinkedPointSet implements Serializable {
                 linkCounter.increment();
             }
         });
-        long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
         linkCounter.done();
-        LOG.info("      {} of {} points were copied unchanged from the source linkage.",
-                pointSet.featureCount() - linkCounter.getCount(),
-                pointSet.featureCount()
-        );
-        LOG.info("      {} points in resulting linkage were not linked to the street network.", unlinked);
+        {
+            int totalPoints = pointSet.featureCount();
+            int refreshedPoints = linkCounter.getCount();
+            int copiedPoints = totalPoints - refreshedPoints;
+            int changedPoints = 0;
+            int changedToBaselineEdge = 0;
+            int changedToAddedEdge = 0;
+            int changedToUnlinked = 0;
+            if (baseLinkage != null) {
+                for (int p = 0; p < totalPoints; p++) {
+                    if (baseLinkage.edges[p] != this.edges[p]) {
+                        changedPoints += 1;
+                        if (this.edges[p] < 0) {
+                            changedToUnlinked += 1;
+                        } else if (streetLayer.edgeIsAddedByScenario(this.edges[p])) {
+                            changedToAddedEdge += 1;
+                        } else {
+                            changedToBaselineEdge += 1;
+                        }
+                    }
+                }
+            }
+            LOG.info("      {} of {} point linkages were copied directly from a source linkage;",
+                    copiedPoints, totalPoints);
+            LOG.info("      the remaining {} linkages were refreshed, of which {} changed;",
+                    refreshedPoints, changedPoints);
+
+            LOG.info("      of which {} changed to added edges, {} to baseline edges, and {} became unlinked.",
+                    changedToAddedEdge, changedToBaselineEdge, changedToUnlinked);
+        }
     }
 
     /** @return the number of linkages, which should be the same as the number of points in the PointSet. */
@@ -350,7 +405,7 @@ public class LinkedPointSet implements Serializable {
     public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
-        return eval(travelTimeForVertex, 1000, 1000);
+        return eval(travelTimeForVertex, 1000, 1000, null);
     }
 
     /**
@@ -363,12 +418,18 @@ public class LinkedPointSet implements Serializable {
      * @return wrapped int[] of travel times (in seconds) to reach the pointset points
      */
 
-    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
+    public PointSetTimes eval (
+                TravelTimeFunction travelTimeForVertex,
+                Integer onStreetSpeed,
+                int offStreetSpeed,
+                Split origin
+            ) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {
+                // Target point is unlinked.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -377,6 +438,7 @@ public class LinkedPointSet implements Serializable {
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
             if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
+                // The target point lies along an edge with vertices that the street router could not reach.
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
@@ -388,6 +450,14 @@ public class LinkedPointSet implements Serializable {
             // If a null onStreetSpeed is supplied, look up the speed for cars
             if (onStreetSpeed == null) {
                 onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            }
+
+            if (origin != null && origin.edge == edges[i]) {
+                // The target point lies along the same edge as the origin
+                int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
+                offstreetTime += origin.distanceToEdge_mm / offStreetSpeed;
+                travelTimes[i] = onStreetDistance_mm / onStreetSpeed + offstreetTime;
+                continue;
             }
 
             if (time0 != Integer.MAX_VALUE) {
@@ -409,6 +479,7 @@ public class LinkedPointSet implements Serializable {
      *
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
+     * TODO clarify that this can use times or distances, depending on units of the table?
      * @param distanceTableToVertices a map from integer vertex IDs to distances TODO in what units?
      * @param distanceTableZone TODO clarify: in fixed or floating degrees etc.
      * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.

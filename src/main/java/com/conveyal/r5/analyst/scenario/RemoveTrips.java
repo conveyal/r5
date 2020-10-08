@@ -1,14 +1,14 @@
 package com.conveyal.r5.analyst.scenario;
+
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import com.conveyal.r5.transit.TripPattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Remove individual trips by ID, or remove all trips from an entire route.

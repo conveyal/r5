@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.api.util.LegMode;
@@ -80,7 +79,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         this.transportNetworkCache = transportNetworkCache;
     }
 
-    public LoaderState<TransportNetwork> preloadData (AnalysisTask task) {
+    public LoaderState<TransportNetwork> preloadData (AnalysisWorkerTask task) {
         if (task.scenario != null) {
             transportNetworkCache.rememberScenario(task.scenario);
         }
@@ -99,7 +98,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         // reference the scenarioNetwork's built-in full-extent pointset, so can reuse its linkage.
         // TODO handle multiple destination grids.
         setProgress(key, 0, "Fetching gridded point set...");
-        PointSet pointSet = AnalysisTask.gridPointSetCache.get(key.destinationGridExtents, scenarioNetwork.fullExtentGridPointSet);
+        PointSet pointSet = AnalysisWorkerTask.gridPointSetCache.get(key.destinationGridExtents, scenarioNetwork.fullExtentGridPointSet);
 
         // Now rebuild grid linkages as needed. One linkage per mode, and one cost table per egress mode.
         // Cost tables are slow to compute and not needed for access or direct legs, only egress modes.
@@ -158,7 +157,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
          *
          * FIXME but should we really be injecting Grid objects into a class deserialized straight from JSON?
          */
-        public Key (AnalysisTask task) {
+        public Key (AnalysisWorkerTask task) {
             this.networkId = task.graphId;
             // A supplied scenario ID will always override any full scenario that is present.
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
@@ -167,22 +166,10 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
             this.egressModes = LegMode.toStreetModeSet(task.egressModes);
-
-            if (task.isHighPriority() || task.makeTauiSite) {
-                // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.
-                //      And generally remove the term "high priority" from the whole system.
-                // High Priority is an obsolete term for "single point task".
-                // For single point tasks and static sites, there is no opportunity grid. The grid of destinations is
-                // the extents given in the task, which for static sites is also the grid of origins.
-                this.destinationGridExtents = WebMercatorExtents.forTask(task);
-            } else {
-                // A non-static-site regional task. We expect a valid grid of opportunities to be specified as the
-                // destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
-                this.destinationGridExtents = WebMercatorExtents.forGrid(((RegionalTask)task).destinationPointSet);
-            }
+            this.destinationGridExtents = task.getWebMercatorExtents();
         }
 
-        public static Key forTask(AnalysisTask task) {
+        public static Key forTask(AnalysisWorkerTask task) {
             return new Key(task);
         }
 

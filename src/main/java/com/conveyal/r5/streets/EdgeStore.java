@@ -3,17 +3,14 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.P2;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.LineString;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
@@ -23,9 +20,12 @@ import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import gnu.trove.map.hash.TIntIntHashMap;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,12 +49,16 @@ import java.util.function.IntConsumer;
  * parallel arrays is better than a struct simulation because:
  * 1. it is less fancy, 2. it is auto-resizing (not fixed size), 3. I've tried both and they're the same speed.
  *
+ * This problem will be solved when Java JEP 169 (value/inline types) finally becomes part of the language, especially
+ * when inline types are available in generic types like ArrayList. The "record types" now in JVM preview would improve
+ * readability and maintainability but are still reference classes, so not worth the migration.
+ *
  * Edges come in pairs that have the same origin and destination vertices and the same geometries, but reversed.
  * Therefore many of the arrays are only half as big as the number of edges. All even numbered edges are forward, all
  * odd numbered edges are reversed.
  *
  * Typically, somewhat more than half of street segment edges have intermediate points (ie. their geometry contains
- * points other than the two endpoints endpoints). Therefore it's more efficient to add a complete dense column for
+ * points other than the two endpoints). Therefore it's more efficient to add a complete dense column for
  * references to intermediate point arrays, instead of using a sparse HashMap to store values only for those edges that
  * have intermediate points.
  *
@@ -81,7 +85,7 @@ public class EdgeStore implements Serializable {
     public TIntList flags;
 
     /**
-     * One speed for each edge. Separate entries for forward and backward edges.
+     * CAR speeds, one speed for each edge. Separate entries for forward and backward edges.
      * rounded (m/s * 100) (2 decimal places)
      * Saved speed is mostly the same as speed saved as m/s * 1000 it differs in second decimal place and is 0.024% smaller
      * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
@@ -148,6 +152,7 @@ public class EdgeStore implements Serializable {
      * baseline graph shared between all threads.
      */
     public boolean isExtendOnlyCopy() {
+        // FIXME this definition will fail if we ever allow scenrios on top of completely empty street networks.
         return firstModifiableEdge > 0;
     }
 
@@ -156,6 +161,12 @@ public class EdgeStore implements Serializable {
 
     /** Turn restrictions for turning _into_ each edge */
     public TIntIntMultimap turnRestrictionsReverse;
+
+    /**
+     * Stores and retrieves per-edge costs, either specified in input data or derived from standard OSM tags.
+     * For now this may be null, indicating that no per-edge times are available and default values should be used.
+     */
+    public EdgeTraversalTimes edgeTraversalTimes;
 
     /** The street layer of a transport network that the edges in this edgestore make up. */
     public StreetLayer layer;
@@ -189,6 +200,7 @@ public class EdgeStore implements Serializable {
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
         turnRestrictionsReverse = new TIntIntHashMultimap();
+        edgeTraversalTimes = null;
     }
 
     /**
@@ -338,6 +350,11 @@ public class EdgeStore implements Serializable {
         speeds.add(DEFAULT_SPEED_KPH);
         flags.add(0);
 
+        if (edgeTraversalTimes != null) {
+            edgeTraversalTimes.addOneEdge();
+            edgeTraversalTimes.addOneEdge();
+        }
+
         Edge edge = getCursor(forwardEdgeIndex);
         //angles needs to be calculated here since some edges don't get additional geometry (P+R, transit, etc.)
         edge.calculateAngles();
@@ -350,8 +367,7 @@ public class EdgeStore implements Serializable {
      * @param reverseSearch if this is reverse search
      * @param s1 new state
      */
-    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch,
-        StreetRouter.State s1) {
+    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch, StreetRouter.State s1) {
         if (reverseSearch) {
             // add turn restrictions that start on this edge
             // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
@@ -493,10 +509,16 @@ public class EdgeStore implements Serializable {
             return (float) ((speeds.get(edgeIndex) / 100.));
         }
 
-        public float getSpeedkmh() {
+        public float getSpeedKph () {
             return (float) ((speeds.get(edgeIndex) / 100.) * 3.6);
         }
 
+        // This is really ugly, we should store speeds in mm/sec or something. There is an outstanding PR for this.
+        public void setSpeedKph (double speedKph) {
+            speeds.set(edgeIndex, (short)(speedKph / 3.6 * 100));
+        }
+
+        /** Note, this is expecting weird units and should be hidden. Use setSpeedKph. */
         public void setSpeed(short speed) {
             speeds.set(edgeIndex, speed);
         }
@@ -519,6 +541,10 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+        }
+
+        public void copyPairGeometry(Edge other) {
+            geometries.set(pairIndex, other.getEdgeStore().geometries.get(other.pairIndex));
         }
 
         /**
@@ -564,10 +590,20 @@ public class EdgeStore implements Serializable {
             return options.getSpeedForMode(traverseStreetMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req,
-                                            TurnCostCalculator turnCostCalculator, TravelTimeCalculator travelTimeCalculator) {
-
+        // TODO move most or all of this logic into the router to avoid passing search state like req and timeCalculator
+        public StreetRouter.State traverse (
+                StreetRouter.State s0,
+                StreetMode streetMode,
+                ProfileRequest req,
+                TraversalTimeCalculator timeCalculator
+        ) {
             // The vertex we'll be at after the traversal
+            // TODO check/assert that s0 is at the other vertex, at the other end of the edge.
+
+            if (temporarilyDeletedEdges != null && temporarilyDeletedEdges.contains(edgeIndex)) {
+                return null;
+            }
+
             int vertex;
             if (req.reverseSearch) {
                 vertex = getFromVertex();
@@ -575,109 +611,87 @@ public class EdgeStore implements Serializable {
                 vertex = getToVertex();
             }
 
+            // A new instance representing the state after traversing this edge. Fields will be filled in later.
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
-            float time = travelTimeCalculator.getTravelTimeSeconds(this, s0.durationSeconds, streetMode, req);
-            float weight = 0;
 
-            if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
+            if (!canTurnFrom(s0, s1, req.reverseSearch)) {
+                return null;
+            }
 
-            // clear out turn restrictions if they're empty
-            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) s1.turnRestrictions = null;
-
-            // figure out which turn res
-
+            // Null out turn restrictions if they're empty
+            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) {
+                s1.turnRestrictions = null;
+            }
             startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
 
             //We allow two links in a row if this is a first state (negative back edge or no backState
             //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
             //Since backEdges are set from first part of multipart P+R search
-            if ((s0.backEdge >=0 ) && (s0.backState != null) && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+            if ((s0.backEdge >=0 ) && (s0.backState != null) && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK)) {
                 // two link edges in a row, in other words a shortcut. Disallow this.
                 return null;
+            }
 
-            //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
-
-            s1.streetMode = streetMode;
-            if (streetMode == StreetMode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
-                weight = time;
-                //If wheelchair path is requested and this edge doesn't allow wheelchairs we need to find another edge
+            // Check whether this edge allows the selected mode, considering the request settings.
+            if (streetMode == StreetMode.WALK) {
+                if (!getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                    return null;
+                }
                 if (req.wheelchair && !getFlag(EdgeFlag.ALLOWS_WHEELCHAIR)) {
                     return null;
                 }
-                //elevation which changes weight
             } else if (streetMode == StreetMode.BICYCLE) {
-                // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
-                boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
-
+                // If biking is not allowed on this edge, or if the traffic stress is too high, walk the bike.
+                boolean tryWalking = !getFlag(EdgeFlag.ALLOWS_BIKE);
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) walking = true;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) walking = true;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) walking = true;
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) tryWalking = true;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) tryWalking = true;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) tryWalking = true;
                 }
-
-                if (walking) {
-                    //Recalculation of time and speed is needed if we are walking with bike
-                    float speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
-                    time = (float) (getLengthM() / speedms);
+                if (tryWalking) {
+                    if (!getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                        return null;
+                    }
+                    streetMode = StreetMode.WALK;
                 }
-
-                //elevation costs
-                //Triangle (bikesafety, flat, quick)
-                weight = time;
-                // TODO bike walking costs when switching bikes
-
-                // only walk if you're allowed to
-                if (walking && !getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return null;
-
-                if (walking) {
-                    //TODO: set bike walking in state
-                    s1.streetMode = StreetMode.WALK;
-                    // * 1.5 to account for time to get off bike and slower walk speed once off
-                    // this will tend to prefer to bike a slightly longer route than walk a long way,
-                    // but will allow walking to cross a busy street, etc.
-                    weight *=1.5;
+            } else if (streetMode == StreetMode.CAR) {
+                if (!getFlag(EdgeFlag.ALLOWS_CAR)) {
+                    return null;
                 }
-
-            } else if (streetMode == StreetMode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
-                weight = time;
-            } else {
-                return null; // this mode cannot traverse this edge
             }
 
-            if(getFlag(EdgeFlag.STAIRS)) {
-                weight *= STAIR_RELUCTANCE_FACTOR;
-            } else if (streetMode == StreetMode.WALK) {
-                weight *= WALK_RELUCTANCE_FACTOR;
-            }
+            s1.streetMode = streetMode;
+            int traverseTimeSeconds = timeCalculator.traversalTimeSeconds(this, streetMode, req);
 
-            int roundedTime = (int) Math.ceil(time);
+            // This was rounding up, now truncating ... maybe change back for consistency?
+            // int roundedTime = (int) Math.ceil(time);
 
+            int turnTimeSeconds = 0;
             // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
-            int turnCost = 0;
             if (s0.backEdge >= 0) {
                 if (req.reverseSearch) {
-                    turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
+                    turnTimeSeconds = timeCalculator.turnTimeSeconds(getEdgeIndex(), s0.backEdge, streetMode);
                 } else {
-                    turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);
+                    turnTimeSeconds = timeCalculator.turnTimeSeconds(s0.backEdge, getEdgeIndex(), streetMode);
                 }
             }
-
             // TODO add checks for negative increment values to these functions.
-            s1.incrementTimeInSeconds(roundedTime + turnCost);
-            s1.incrementWeight(weight + turnCost);
+            s1.incrementTimeInSeconds(traverseTimeSeconds + turnTimeSeconds);
             s1.distance += getLengthMm();
 
-            // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
-            if (s1.weight == s0.weight) s1.weight += 1;
-            if (s1.durationSeconds == s0.durationSeconds) s1.incrementTimeInSeconds(1);
-            if (s1.distance == s0.distance) s1.distance += 1;
-
+            // Make sure we don't have states that don't increment weight/time, otherwise we could create loops.
+            // This should not happen since we always round upward (ceil function), perhaps replace with assertions.
+            if (s1.durationSeconds == s0.durationSeconds) {
+                s1.incrementTimeInSeconds(1);
+            }
+            if (s1.distance == s0.distance) {
+                s1.distance += 1;
+            }
             return s1;
         }
 
         /** Can we turn onto this edge from this state? Also copies still-applicable restrictions forward. */
-        public boolean canTurnFrom(StreetRouter.State s0, StreetRouter.State s1,
-            boolean reverseSearch) {
+        public boolean canTurnFrom(StreetRouter.State s0, StreetRouter.State s1, boolean reverseSearch) {
             // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
             // if/when it gets changed.
             if (s0.turnRestrictions != null && s0.streetMode == StreetMode.CAR) {
@@ -971,7 +985,7 @@ public class EdgeStore implements Serializable {
         @Override
         public String toString() {
             String base = String.format("Edge from %d to %d. Length %f meters, speed %f kph.",
-                        getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedkmh());
+                        getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedKph());
             return base + getFlagsAsString();
         }
 
@@ -1045,6 +1059,16 @@ public class EdgeStore implements Serializable {
             setFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
         }
 
+        /**
+         * Set the flags for all on-street modes of transportation to "false", so no modes can traverse this edge.
+         */
+        public void disallowAllModes() {
+            clearFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
+            clearFlag(EdgeFlag.ALLOWS_BIKE);
+            clearFlag(EdgeFlag.ALLOWS_CAR);
+            clearFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
         public boolean allowsStreetMode(StreetMode mode) {
             if (mode == StreetMode.WALK) {
                 return getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
@@ -1058,8 +1082,36 @@ public class EdgeStore implements Serializable {
             throw new RuntimeException("Supplied mode not recognized.");
         }
 
+        /** Set flags on the current edge allowing traversals by searches with any of the given streetModes enabled. */
+        public void allowStreetModes (Iterable<StreetMode> streetModes) {
+            for (StreetMode streetMode : streetModes) {
+                allowStreetMode(streetMode);
+            }
+        }
+
+        /** Set a flag on the current edge allowing traversals by searches with the given streetMode enabled. */
+        public void allowStreetMode (StreetMode mode) {
+            if (mode == StreetMode.WALK) {
+                setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            } else if (mode == StreetMode.BICYCLE) {
+                setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            } else if (mode == StreetMode.CAR) {
+                setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            } else {
+                throw new RuntimeException("Mode not recognized:" + mode);
+            }
+        }
+
         public long getOSMID() {
             return osmids.get(pairIndex);
+        }
+
+        public void setWalkTimeFactor (double walkTimeFactor) {
+            edgeTraversalTimes.setWalkTimeFactor(edgeIndex, walkTimeFactor);
+        }
+
+        public void setBikeTimeFactor (double bikeTimeFactor) {
+            edgeTraversalTimes.setBikeTimeFactor(edgeIndex, bikeTimeFactor);
         }
     }
 
@@ -1153,13 +1205,16 @@ public class EdgeStore implements Serializable {
         // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
         copy.turnRestrictionsReverse = turnRestrictionsReverse;
+        if (edgeTraversalTimes != null) {
+            copy.edgeTraversalTimes = edgeTraversalTimes.extendOnlyCopy(copy);
+        }
         return copy;
     }
 
     /**
-     * If this EdgeStore has has a Scenario applied, it may contain edges that are not in the baseline network.
+     * If this EdgeStore has has a Scenario applied, it may contain temporary edges that are not in the baseline network.
      * The edges added temporarily by a Scenario should always be the numbers from firstModifiableEdge to nEdges.
-     * Call the supplied int consumer function with every temporary edge in this EdgeStore.
+     * Call the supplied function with the index number of every such temporarily added edge in this EdgeStore.
      */
     public void forEachTemporarilyAddedEdge (IntConsumer consumer) {
         if (this.isExtendOnlyCopy()) {
@@ -1170,14 +1225,11 @@ public class EdgeStore implements Serializable {
     }
 
     /**
-     * Call the supplied int consumer function with every temporarily added edge in this EdgeStore, then on every
-     * temporarily deleted edge.
+     * If this EdgeStore has has a Scenario applied, some edges in the baseline network may be "removed" by hiding them.
+     * Call the supplied function with the index number of every such temporarily deleted edge in this EdgeStore.
      */
-    public void forEachTemporarilyAddedOrDeletedEdge (IntConsumer consumer) {
+    public void forEachTemporarilyDeletedEdge (IntConsumer consumer) {
         if (this.isExtendOnlyCopy()) {
-            for (int edge = firstModifiableEdge; edge < this.nEdges(); edge++) {
-                consumer.accept(edge);
-            }
             temporarilyDeletedEdges.forEach(edge -> {
                 consumer.accept(edge);
                 return true;
@@ -1185,13 +1237,15 @@ public class EdgeStore implements Serializable {
         }
     }
 
-    public static class DefaultTravelTimeCalculator implements TravelTimeCalculator {
-
-        @Override
-        public float getTravelTimeSeconds(Edge edge, int durationSeconds, StreetMode streetMode, ProfileRequest req) {
-            float speedms = edge.calculateSpeed(req, streetMode);
-            return (float) (edge.getLengthM() / speedms);
-        }
+    /**
+     * Call the supplied function on the index number of every temporarily added edge in this EdgeStore,
+     * then on every temporarily deleted edge. This is a convenience function, equivalent to calling
+     * forEachTemporarilyAddedEdge followed by forEachTemporarilyDeletedEdge.
+     */
+    public void forEachTemporarilyAddedOrDeletedEdge (IntConsumer consumer) {
+        forEachTemporarilyAddedEdge(consumer);
+        forEachTemporarilyDeletedEdge(consumer);
     }
+
 
 }

@@ -68,7 +68,7 @@ public class TimeGridWriter {
 
     private final TravelTimeResult travelTimeResult;
 
-    private final AnalysisTask analysisTask;
+    private final AnalysisWorkerTask analysisWorkerTask;
 
     private final WebMercatorExtents extents;
 
@@ -80,10 +80,10 @@ public class TimeGridWriter {
      * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is interpreted as a
      * rectangular grid matching the supplied WebMercatorExtents.
      */
-    public TimeGridWriter (TravelTimeResult travelTimeResult, AnalysisTask analysisTask) {
+    public TimeGridWriter (TravelTimeResult travelTimeResult, AnalysisWorkerTask analysisWorkerTask) {
         this.travelTimeResult = travelTimeResult;
-        this.analysisTask = analysisTask;
-        this.extents = WebMercatorExtents.forTask(analysisTask);
+        this.analysisWorkerTask = analysisWorkerTask;
+        this.extents = WebMercatorExtents.forTask(analysisWorkerTask);
         if (travelTimeResult.nPoints != extents.width * extents.height) {
             throw new ParameterException("Travel time cannot be for a grid of this dimension.");
         }
@@ -181,8 +181,8 @@ public class TimeGridWriter {
             GeoTiffWriter writer = new GeoTiffWriter(out);
 
             // If the request that produced this TimeGrid was supplied, write scenario metadata into the GeoTIFF
-            if (analysisTask != null) {
-                AnalysisTask clonedRequest = analysisTask.clone();
+            if (analysisWorkerTask != null) {
+                AnalysisWorkerTask clonedRequest = analysisWorkerTask.clone();
                 // Save the scenario ID rather than the full scenario, to avoid making metadata too large. We're not
                 // losing information here, the scenario id used here is qualified with the CRC and is thus immutable
                 // and available from S3.

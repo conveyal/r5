@@ -1,5 +1,7 @@
 # Static analysis output
 
+***This file is out of date. For updated technical details on Conveyal static sites, see [this blog post](https://blog.conveyal.com/upgraded-outreach-serverless-transit-accessibility-with-taui-f90d6d51e177)***
+
 R5 has the capability to output a bunch of flat files when performing an analysis, which can then
 be stored in (for example) Amazon S3 and used to power front-end applications. The initial goal
 is to produce entirely static sites for performing accessibility analysis.

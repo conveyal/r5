@@ -25,6 +25,11 @@ public class FareDominatingList implements DominatingList {
     /**
      * Return true if there is no way that a route with dominator as a prefix can yield a route that is slower or more
      * expensive than the same route with dominatee as a prefix.
+     *
+     * The logic here is described (with proofs) in Conway, M. W., & Stewart, A. F. (2019). Getting Charlie off the MTA:
+     * A multiobjective optimization method to account for cost constraints in public transit accessibility metrics.
+     * International Journal of Geographical Information Science, 33(9), 1759–1787. https://doi.org/10.1080/13658816.2019.1605075
+     * available open-access at https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf
      */
     private boolean betterOrEqual(McRaptorSuboptimalPathProfileRouter.McRaptorState dominator, McRaptorSuboptimalPathProfileRouter.McRaptorState dominatee) {
         // FIXME add check for nonnegative
@@ -35,12 +40,14 @@ public class FareDominatingList implements DominatingList {
             if (dominator.fare.cumulativeFarePaid <= dominateeConsumedValue) {
                 // This route is as fast as the alternate route, and it costs no more than the fare paid for the other route
                 // minus any transfer priviliges that the user gets from the other route that could be realized in the future.
+                // This is Theorem 3.1 from Conway and Stewart (2019)
                 return true;
             }
 
             // if the out of pocket cost is the same or less and the transfer privilege is as good as or better than the
             // other transfer allowance (exact definition depends on the system, see javadoc), then there is no way that
             // dominatee could yield a better fare than dominator.
+            // This is Theorem 3.2 from Conway and Stewart (2019)
             if (dominator.fare.cumulativeFarePaid <= dominatee.fare.cumulativeFarePaid &&
                     dominator.fare.transferAllowance.atLeastAsGoodForAllFutureRedemptions(dominatee.fare.transferAllowance)) {
                 return true;

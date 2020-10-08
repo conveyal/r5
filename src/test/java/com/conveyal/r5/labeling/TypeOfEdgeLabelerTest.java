@@ -1,6 +1,5 @@
 package com.conveyal.r5.labeling;
 
-import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
 import org.junit.BeforeClass;
@@ -11,9 +10,8 @@ import org.junit.runners.Parameterized;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.StringJoiner;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Created by mabu on 27.11.2015.

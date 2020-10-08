@@ -33,15 +33,17 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
      * We could just perform that mapping on the fly in methods, but I suppose this is more clear and efficient.
      */
     private static final BiMap<String, Class<? extends Modification>> modificationTypes = new ImmutableBiMap.Builder()
-            .put("adjust-speed", AdjustSpeed.class)
-            .put("adjust-frequency", AdjustFrequency.class)
-            .put("adjust-dwell-time", AdjustDwellTime.class)
+            .put("add-streets", AddStreets.class)
             .put("add-trips", AddTrips.class)
+            .put("adjust-dwell-time", AdjustDwellTime.class)
+            .put("adjust-frequency", AdjustFrequency.class)
+            .put("adjust-speed", AdjustSpeed.class)
+            .put("modify-streets", ModifyStreets.class)
+            .put("pickup-delay", PickupDelay.class)
+            .put("remove-stops", RemoveStops.class)
             .put("remove-trips", RemoveTrips.class)
             .put("reroute", Reroute.class)
-            .put("remove-stops", RemoveStops.class)
             .put("road-congestion", RoadCongestion.class)
-            .put("pickup-delay", PickupDelay.class)
             .put("set-fare-calculator", SetFareCalculator.class)
             .build();
 

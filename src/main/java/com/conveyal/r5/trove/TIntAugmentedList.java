@@ -16,9 +16,9 @@ import java.util.Random;
  */
 public class TIntAugmentedList implements TIntList {
 
-    TIntList base;
+    private final TIntList base;
 
-    TIntList extension;
+    private final TIntList extension;
 
     public TIntAugmentedList(TIntList base) {
         this.base = base;

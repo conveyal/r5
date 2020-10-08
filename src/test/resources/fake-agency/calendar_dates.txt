@@ -1,0 +1,2 @@
+service_id,date,exception_type
+04100312-8fe1-46a5-a9f2-556f39478f57,20200220,2

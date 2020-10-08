@@ -9,7 +9,10 @@ import com.conveyal.r5.transit.TripPattern;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * The equivalent of a ride in an API response. Information degenerates to Strings and ints here.

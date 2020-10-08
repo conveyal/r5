@@ -18,6 +18,7 @@ public abstract class JsonUtilities {
      * If we receive a JSON object containing a field that we don't recognize, fail. This should catch misspellings.
      * This is used on the broker which should always use the latest R5, ensuring that fields aren't silently
      * dropped when the broker does not support them.
+     * TODO determine whether we can move the backend and worker both toward using a single objectmapper.
      */
     public static final ObjectMapper objectMapper = createBaseObjectMapper();
 

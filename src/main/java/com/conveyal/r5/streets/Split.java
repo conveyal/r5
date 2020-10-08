@@ -2,20 +2,17 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
-import org.locationtech.jts.geom.Envelope;
 import gnu.trove.TIntCollection;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.referencing.GeodeticCalculator;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Represents a potential split point along an existing edge, retaining some geometric calculation state so that
  * once the best candidate is found more detailed calculations can continue.
- * We don't yet handle initial and final Splits on the same edge. This can be a problem for Analysis if your
- * starting point is on a long road without intersections. Travel times to other points along that road would be
- * measured by going to the end of the road and back.
  */
 public class Split {
 

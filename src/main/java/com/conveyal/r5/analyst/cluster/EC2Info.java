@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Regions;
 import com.amazonaws.util.EC2MetadataUtils;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.RequestConfig;

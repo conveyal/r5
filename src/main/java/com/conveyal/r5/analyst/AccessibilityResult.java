@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
 /**
  * This holds and accumulates multiple accessibility indicator values for a single origin as they are computed.
@@ -20,8 +20,8 @@ public class AccessibilityResult {
     private final double[][][] cumulativeOpportunities;
 
     /** Construct an AccessibilityResult of the appropriate dimensions for the specified AnalysisTask. */
-    public AccessibilityResult (AnalysisTask task) {
-        this.nPointSets = 1;
+    public AccessibilityResult (AnalysisWorkerTask task) {
+        this.nPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
         this.nPercentiles = task.percentiles.length;
         this.nCutoffs = task.cutoffsMinutes.length;
         cumulativeOpportunities = new double[nPointSets][nPercentiles][nCutoffs];

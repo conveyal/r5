@@ -1,6 +1,6 @@
 package com.conveyal.r5;
 
-import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 
 import java.util.Arrays;
@@ -27,7 +27,7 @@ public class R5Main {
         String command = args[0];
         String[] commandArguments = Arrays.copyOfRange(args, 1, args.length);
         if ("worker".equals(command)) {
-            AnalystWorker.main(commandArguments);
+            AnalysisWorker.main(commandArguments);
         } else if ("point".equals(command)) {
             PointToPointRouterServer.main(commandArguments);
         } else {

@@ -56,7 +56,7 @@ public class JobSimulator {
 
         // FIXME API now expects one single request defining a grid, rather than a list of requests
 
-        List<AnalysisTask> requests = new ArrayList<>();
+        List<AnalysisWorkerTask> requests = new ArrayList<>();
 
         IntStream.range(0, nOrigins).forEach(i -> {
             // Enqueue one fake origin

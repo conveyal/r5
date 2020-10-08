@@ -1,8 +1,6 @@
 package com.conveyal.r5;
 
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**

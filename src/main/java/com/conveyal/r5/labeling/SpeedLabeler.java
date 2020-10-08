@@ -6,16 +6,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.measure.UnitConverter;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tec.uom.se.unit.Units.METRE_PER_SECOND;
-import static tec.uom.se.unit.Units.KILOMETRE_PER_HOUR;
 import static systems.uom.common.USCustomary.KNOT;
 import static systems.uom.common.USCustomary.MILE_PER_HOUR;
+import static tec.uom.se.unit.Units.KILOMETRE_PER_HOUR;
+import static tec.uom.se.unit.Units.METRE_PER_SECOND;
 
 /**
  * Gets information about max speeds based on highway tags from build-config

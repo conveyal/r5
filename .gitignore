@@ -1,7 +1,50 @@
-.idea
-.DS_Store
+.gradle/
+/build/
+/out/
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
+# Cache of project
+.gradletasknamecache
+
+# Other gradle build objects
+gradle
+gradlew.bat
+gradlew
+
+# IntelliJ IDEA
+.idea/
+
+logs
+project/project
+project/target
+.target
 target
-hs_err_pid*
-cache
-*.iml
+.DS_Store
+tmp
+.history
+dist
+/.idea
+/*.iml
+/out
+/.idea_modules
+/.classpath
+/.project
+/RUNNING_PID
+/.settings
+/data
+s3credentials
+*.class
+/bin
+/cache/
+*~
+nbproject
+logentries.xml
 src/main/resources/git.properties
+pom.xml.versionsBackup
+analysis.properties
+/src/test/resources/snapshots/com/conveyal/analysis/controllers/

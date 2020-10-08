@@ -10,10 +10,13 @@ import org.apache.commons.math3.random.MersenneTwister;
 
 import java.util.Arrays;
 
-/**
- * Stores random offsets for frequency trips.
- * This is not in RaptorWorkerData as RaptorWorkerData may be shared between threads.
- */
+ /**
+  * Generates and stores departure time offsets for every frequency-based set of trips.
+  * This holds only one set of offsets at a time. It is re-randomized before each Monte Carlo iteration.
+  * Therefore we have no memory of exactly which offsets were used in a particular Monte Carlo search.
+  * It may be preferable to work with reproducible low-discrepancy sets instead of simple random samples, in which case
+  * we'd need to make alternate implementations that pre-generate the entire set or use deterministic seeded generators.
+  */
 public class FrequencyRandomOffsets {
     /** map from trip pattern index to a list of offsets for trip i and frequency entry j on that pattern */
     public final TIntObjectMap<int[][]> offsets = new TIntObjectHashMap<>();
@@ -44,6 +47,11 @@ public class FrequencyRandomOffsets {
         }
     }
 
+     /**
+      * Take a new Monte Carlo draw if requested (i.e. if boarding assumption is not half-headway): for each
+      * frequency-based route, choose how long after service starts the first vehicle leaves (the route's "phase").
+      * We run all Raptor rounds with one draw before proceeding to the next draw.
+      */
     public void randomize () {
         int remaining = 0;
 

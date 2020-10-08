@@ -5,7 +5,11 @@ import com.conveyal.r5.streets.EdgeStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Assign traversal permissions to edges based on their tags in OpenStreetMap.

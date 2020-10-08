@@ -1,18 +1,21 @@
 package com.conveyal.r5.analyst;
 
-import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
+import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
@@ -23,48 +26,46 @@ public class TravelTimeReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
-    /** The largest number of cutoffs we'll accept in a task. Too many cutoffs can create very large output files. */
-    public static final int MAX_CUTOFFS = 12;
-
-    /**
-     * Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
-     * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
-     * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
-     * after results have been calculated).
-     *
-     * CHANGING: this now just needs to be larger than the highest cutoff, or should be set to the max cutoff.
-     */
-    private final int maxTripDurationMinutes;
-
     private boolean calculateAccessibility;
 
     private boolean calculateTravelTimes;
 
-    /**
-     * Cumulative opportunities accessibility at this one particular origin.
-     * May be null if we're only recording travel times.
-     */
+    /** Cumulative opportunities accessibility at one particular origin. null if we're only recording travel times. */
     private AccessibilityResult accessibilityResult = null;
 
-    /** Reduced (e.g. at one percentile) travel time results. May be null if we're only recording accessibility. */
+    /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
 
     /** If we are calculating accessibility, the PointSets containing opportunities. */
-    private final PointSet[] destinationPointSets = new PointSet[1];
+    private PointSet[] destinationPointSets;
 
+    /** The array indexes at which we'll find each percentile in a sorted list of length timesPerDestination. */
     private final int[] percentileIndexes;
 
+    /** The number of different percentiles that were requested. */
     private final int nPercentiles;
 
-    private int[] cutoffsMinutes;
+    /** The travel time cutoffs supplied in the request, validated and converted to seconds. */
+    private int[] cutoffsSeconds;
 
+    /** The length of the cutoffs array, just for convenience and code clarity. */
     private int nCutoffs;
+
+    /**
+     * For each cutoff, the travel time in seconds at and above which the decay function will return zero weight.
+     * These are pre-calculated and retained because the default method for finding the zero point is by bisection,
+     * which should not be repeated in a tight loop.
+     */
+    private int[] zeroPointsForCutoffs;
 
     /**
      * The number of travel times we will record at each destination.
      * This is affected by the number of Monte Carlo draws requested and the departure time window.
      */
     private final int timesPerDestination;
+
+    /** Provides a weighting factor for opportunities at a given travel time. */
+    private final DecayFunction decayFunction;
 
     /**
      * Reduce travel time values to requested summary outputs for each origin. The type of output (a single
@@ -85,10 +86,7 @@ public class TravelTimeReducer {
      *
      * @param task task to be performed.
      */
-    public TravelTimeReducer (AnalysisTask task) {
-
-        // Before regional analysis tasks are handled, their max trip duration is forced to the highest cutoff.
-        this.maxTripDurationMinutes = task.maxTripDurationMinutes;
+    public TravelTimeReducer (AnalysisWorkerTask task) {
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
         if (task.inRoutingFareCalculator != null) {
@@ -107,15 +105,11 @@ public class TravelTimeReducer {
 
         // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
+        task.validatePercentiles();
         this.nPercentiles = task.percentiles.length;
         this.percentileIndexes = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
             percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles[p]);
-        }
-        for (int p = 1; p < nPercentiles; p++) {
-            if (task.percentiles[p] < task.percentiles[p-1]) {
-                throw new IllegalArgumentException("Percentiles must be in ascending order.");
-            }
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
@@ -125,18 +119,16 @@ public class TravelTimeReducer {
         // back to the broker in JSON.
 
         // Decide which elements we'll be calculating, retaining, and returning.
-        calculateAccessibility = calculateTravelTimes = false;
+        // Always copy this field, the array in the task may be null or empty but we detect that case.
+        this.destinationPointSets = task.destinationPointSets;
         if (task instanceof TravelTimeSurfaceTask) {
             calculateTravelTimes = true;
+            calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
         } else {
+            // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
             RegionalTask regionalTask = (RegionalTask) task;
-            if (regionalTask.recordAccessibility) {
-                calculateAccessibility = true;
-                this.destinationPointSets[0] = regionalTask.destinationPointSet;
-            }
-            if (regionalTask.recordTimes || regionalTask.makeTauiSite) {
-                calculateTravelTimes = true;
-            }
+            calculateAccessibility = regionalTask.recordAccessibility;
+            calculateTravelTimes = regionalTask.recordTimes || regionalTask.makeTauiSite;
         }
 
         // Instantiate and initialize objects to accumulate the kinds of results we expect to produce.
@@ -148,25 +140,19 @@ public class TravelTimeReducer {
             travelTimeResult = new TravelTimeResult(task);
         }
 
-        // Validate and copy the travel time cutoffs, which only makes sense when calculating accessibility.
-        // Validation should probably happen earlier when making or handling incoming tasks.
+        // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
+        // in tight loops. Also find the points where the decay function reaches zero for these cutoffs.
+        // This is only relevant when calculating accessibility.
+        this.decayFunction = task.decayFunction;
         if (calculateAccessibility) {
+            task.validateCutoffsMinutes();
             this.nCutoffs = task.cutoffsMinutes.length;
-            if (nCutoffs > MAX_CUTOFFS) {
-                throw new IllegalArgumentException("Maximum number of cutoffs allowed is " + MAX_CUTOFFS);
-            }
-            this.cutoffsMinutes = Arrays.copyOf(task.cutoffsMinutes, nCutoffs);
-            Arrays.sort(this.cutoffsMinutes);
-            if (! Arrays.equals(this.cutoffsMinutes, task.cutoffsMinutes)) {
-                throw new IllegalArgumentException("Cutoffs must be in ascending order.");
-            }
-            for (int cutoffMinutes : this.cutoffsMinutes) {
-                if (cutoffMinutes < 1 || cutoffMinutes > 120) {
-                    throw new IllegalArgumentException("Accessibility time cutoffs must be in the range 1 to 120 minutes.");
-                }
-            }
-            if (maxTripDurationMinutes < this.cutoffsMinutes[nCutoffs - 1]) {
-                throw new IllegalArgumentException("Max trip duration must be at least as large as highest cutoff.");
+            this.cutoffsSeconds = new int[nCutoffs];
+            this.zeroPointsForCutoffs = new int[nCutoffs];
+            for (int c = 0; c < nCutoffs; c++) {
+                final int cutoffSeconds = task.cutoffsMinutes[c] * 60;
+                this.cutoffsSeconds[c] = cutoffSeconds;
+                this.zeroPointsForCutoffs[c] = decayFunction.reachesZeroAt(cutoffSeconds);
             }
         }
 
@@ -194,12 +180,12 @@ public class TravelTimeReducer {
      * Given a single unvarying travel time to a destination, replicate it to match the expected number of
      * percentiles, then record those n identical percentiles at the target.
      *
-     * @param timeSeconds Single travel time, for results with no variation, e.g. from walking, biking, or driving.
+     * @param timeSeconds a single travel time for results with no variation, e.g. from walking, biking, or driving.
      */
     public void recordUnvaryingTravelTimeAtTarget (int target, int timeSeconds){
-        int[] travelTimesMinutes = new int[nPercentiles];
-        Arrays.fill(travelTimesMinutes, convertToMinutes(timeSeconds));
-        recordTravelTimePercentilesForTarget(target, travelTimesMinutes);
+        int[] travelTimePercentilesSeconds = new int[nPercentiles];
+        Arrays.fill(travelTimePercentilesSeconds, timeSeconds);
+        recordTravelTimePercentilesForTarget(target, travelTimePercentilesSeconds);
     }
 
     /**
@@ -210,58 +196,72 @@ public class TravelTimeReducer {
      * @param timesSeconds which will be destructively sorted in place to extract percentiles.
      */
     public void extractTravelTimePercentilesAndRecord (int target, int[] timesSeconds) {
-        // Sort the times at each target and extract percentiles at the pre-calculated indexes.
-        int[] travelTimePercentilesMinutes = new int[nPercentiles];
-        if (timesSeconds.length == timesPerDestination) {
-            // Instead of general purpose sort this could be done by performing a counting sort on the times,
-            // converting them to minutes in the process and reusing the small histogram array (120 elements) which
-            // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
-            Arrays.sort(timesSeconds);
-            for (int p = 0; p < nPercentiles; p++) {
-                int timeSeconds = timesSeconds[percentileIndexes[p]];
-                travelTimePercentilesMinutes[p] = convertToMinutes(timeSeconds);
-            }
-        } else {
-            throw new ParameterException(timesSeconds.length + " iterations supplied; expected " + timesPerDestination);
+        checkArgument(timesSeconds.length == timesPerDestination,
+            "Number of times supplied must match the number of iterations in this search.");
+        for (int i : timesSeconds) {
+            checkArgument(i >= 0, "Travel times must be positive.");
         }
-        recordTravelTimePercentilesForTarget(target, travelTimePercentilesMinutes);
+
+        // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
+        // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
+        // We even had a prototype counting sort that would take advantage of this detail. However, applying distance
+        // decay functions with one-second resolution decreases sensitivity to randomization error in travel times.
+        Arrays.sort(timesSeconds);
+        int[] percentileTravelTimesSeconds = new int[nPercentiles];
+        for (int p = 0; p < nPercentiles; p++) {
+            percentileTravelTimesSeconds[p] = timesSeconds[percentileIndexes[p]];
+        }
+        recordTravelTimePercentilesForTarget(target, percentileTravelTimesSeconds);
     }
 
     /**
-     * Given a list of travel times of the expected length, store the extracted percentiles of travel time (if a and/or
-     * accessibility values.
-     * NOTE we will actually receive 5 percentiles here in single point analysis since we request all 5 at once.
+     * Given a list of travel times in seconds, one for each percentile, store these percentiles of travel time
+     * at a particular target location and/or store the derived accessibility values at the origin location. Note that
+     * when handling a single point analysis we will receive 5 percentiles here since the UI requests all 5 at once.
      */
-    private void recordTravelTimePercentilesForTarget (int target, int[] travelTimePercentilesMinutes) {
-        if (travelTimePercentilesMinutes.length != nPercentiles) {
-            throw new IllegalArgumentException("Supplied number of travel times did not match percentile count.");
+    private void recordTravelTimePercentilesForTarget (int target, int[] travelTimePercentilesSeconds) {
+        checkArgument(travelTimePercentilesSeconds.length == nPercentiles,
+                "Must supply exactly as many travel times as there are percentiles.");
+        for (int i : travelTimePercentilesSeconds) {
+            checkArgument(i >= 0, "Travel times must be positive.");
         }
         if (calculateTravelTimes) {
-            travelTimeResult.setTarget(target, travelTimePercentilesMinutes);
+            int[] percentileTravelTimesMinutes = new int[nPercentiles];
+            for (int p = 0; p < nPercentiles; p++) {
+                percentileTravelTimesMinutes[p] = convertToMinutes(travelTimePercentilesSeconds[p]);
+            }
+            travelTimeResult.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {
-            // We only handle one grid at a time for now, because handling more than one grid will require transforming
-            // indexes between multiple grids possibly of different sizes (a GridIndexTransform class?). If these are
-            // for reads only, into a single super-grid, they will only need to add a single number to the width and y.
-            for (int d = 0; d < 1; d++) {
+            // This can handle multiple opportunity grids as long as they have exactly the same extents.
+            // Grids of different extents are handled by using GridTransformWrapper to give them all the same extents.
+            for (int d = 0; d < destinationPointSets.length; d++) {
                 final double opportunityCountAtTarget = destinationPointSets[d].getOpportunityCount(target);
+                if (!(opportunityCountAtTarget > 0)) {
+                    continue;
+                }
                 for (int p = 0; p < nPercentiles; p++) {
-                    final int travelTimeMinutes = travelTimePercentilesMinutes[p];
-                    if (travelTimeMinutes == UNREACHED) {
-                        // Percentiles should be sorted. If one is UNREACHED the rest will also be.
+                    final int travelTimeSeconds = travelTimePercentilesSeconds[p];
+                    if (travelTimeSeconds == FastRaptorWorker.UNREACHED) {
+                        // Percentiles should be sorted. If one is UNREACHED or above a cutoff, the rest will also be.
+                        // This check is somewhat redundant since by virtue of being MAX_INT, UNREACHED is necessarily
+                        // greater than or equal to the decay function's zero point at the highest cutoff.
                         break;
                     }
-                    // Iterate backward through sorted cutoffs, to allow early bail-out when travel time exceeds cutoff.
+                    // Iterate backward through sorted cutoffs, to allow early bail-out when travel time exceeds the
+                    // point where the decay function reaches zero weight.
                     for (int c = nCutoffs - 1; c >= 0; c--) {
-                        final int cutoffMinutes = cutoffsMinutes[c];
-                        // Use of < here (as opposed to <=) matches the definition in JS front end, and works well when
-                        // truncating seconds to minutes. This used to use TravelTimeReducer.maxTripDurationMinutes as
-                        // the cutoff, now that's really the max travel time (which should be the max of all cutoffs).
-                        // Might be more efficient to pass in all cutoffs at once to avoid repeated pointer math.
-                        if (travelTimeMinutes < cutoffMinutes) {
-                            accessibilityResult.incrementAccessibility(d, p, c, opportunityCountAtTarget);
-                        } else {
+                        final int cutoffSeconds = cutoffsSeconds[c];
+                        if (travelTimeSeconds >= zeroPointsForCutoffs[c]) {
                             break;
+                        }
+                        // Precomputing travel weight factors does not seem practical, as it would involve a
+                        // 7200x7200 matrix containing about 415MB of coefficients. Reading through that much memory
+                        // may well be slower than computing the coefficient each time it's needed.
+                        double weightFactor = decayFunction.computeWeight(cutoffSeconds, travelTimeSeconds);
+                        if (weightFactor > 0) {
+                            double weightedOpportunityCount = opportunityCountAtTarget * weightFactor;
+                            accessibilityResult.incrementAccessibility(d, p, c, weightedOpportunityCount);
                         }
                     }
                 }
@@ -270,34 +270,48 @@ public class TravelTimeReducer {
     }
 
     /**
-     * Convert the given timeSeconds to minutes. If that time equals or exceeds the maxTripDurationMinutes, instead
-     * return a value indicating that the location is unreachable. The minutes to seconds conversion uses integer
-     * division, which truncates toward zero. This approach is correct for use in accessibility analysis, where we
-     * are always testing whether a travel time is less than a certain threshold value. For example, all travel times
-     * between 59 and 60 minutes will truncate to 59, and will correctly return true for the expression (t < 60
-     * minutes). We are converting seconds to minutes before we export a binary format mainly to narrow the times so
-     * they fit into single bytes (though this also reduces entropy and makes compression more effective). Arguably
-     * this is coupling the backend too closely to the frontend (which makes use of UInt8 typed arrays); the front
-     * end could in principle receive a more general purpose format using wider or variable width integers.
+     * Convert the given timeSeconds to minutes, being careful to preserve UNREACHED values.
+     * The seconds to minutes conversion uses integer division, which truncates toward zero. This approach is correct
+     * for use in accessibility analysis, where we are always testing whether a travel time is less than a certain
+     * threshold value. For example, all travel times between 59 and 60 minutes will truncate to 59, and will
+     * correctly return true for the expression (t < 60 minutes). We are converting seconds to minutes before we
+     * export a binary format mainly to narrow the times so they fit into single bytes (though this also reduces
+     * entropy and makes compression more effective). Arguably this couplings the backend too closely to the frontend
+     * (which makes use of UInt8 typed arrays); the frontend could in principle receive a more general purpose format
+     * using wider or variable width integers.
+     * TODO revise Javadoc - these values don't seem to ever be used in accessibility or reported to the UI.
      */
     private int convertToMinutes (int timeSeconds) {
-        if (timeSeconds == UNREACHED) return UNREACHED;
-        int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
-        if (timeMinutes < maxTripDurationMinutes) {
-            return timeMinutes;
-        } else {
+        // This check is a bit redundant, UNREACHED is always >= any integer pruning threshold.
+        if (timeSeconds == UNREACHED) {
             return UNREACHED;
+        } else {
+            int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
+            return timeMinutes;
         }
     }
 
-
     /**
-     * If no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the
-     * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around
-     * routing and propagation when the origin point is not connected to the street network.
+     * This is the primary way to create a OneOriginResult and end the processing.
+     * Some alternate code paths exist for TAUI site generation and testing, but this handles all other cases.
+     * For example, if no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the
+     * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around routing and propagation when the
+     * origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
         return new OneOriginResult(travelTimeResult, accessibilityResult);
     }
 
+    /**
+     * Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
+     * calculate travel times. They will only be used if we're calculating accessibility.
+     */
+    public void checkOpportunityExtents (PointSet travelTimePointSet) {
+        if (calculateAccessibility) {
+            for (PointSet opportunityPointSet : destinationPointSets) {
+                checkState(opportunityPointSet.getWebMercatorExtents().equals(travelTimePointSet.getWebMercatorExtents()),
+                        "Travel time would be calculated to a PointSet that does not match the opportunity PointSet.");
+            }
+        }
+    }
 }

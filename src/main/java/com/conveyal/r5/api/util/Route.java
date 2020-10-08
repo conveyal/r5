@@ -1,12 +1,8 @@
 package com.conveyal.r5.api.util;
 
-import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.Collection;
-import java.util.List;
 
 public class Route {
 

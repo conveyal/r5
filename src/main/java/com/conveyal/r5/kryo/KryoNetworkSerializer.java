@@ -1,9 +1,9 @@
 package com.conveyal.r5.kryo;
 
+import com.conveyal.analysis.BackendVersion;
 import com.conveyal.kryo.InstanceCountingClassResolver;
 import com.conveyal.kryo.TIntArrayListSerializer;
 import com.conveyal.kryo.TIntIntHashMapSerializer;
-import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -92,8 +92,8 @@ public abstract class KryoNetworkSerializer {
         Output output = new Output(new FileOutputStream(file));
         Kryo kryo = makeKryo();
         output.write(HEADER);
-        kryo.writeObject(output, R5Version.version);
-        kryo.writeObject(output, R5Version.commit);
+        kryo.writeObject(output, BackendVersion.instance.version);
+        kryo.writeObject(output, BackendVersion.instance.commit);
         kryo.writeObject(output, network);
         output.close();
         LOG.info("Done writing.");
@@ -118,9 +118,9 @@ public abstract class KryoNetworkSerializer {
         String version = kryo.readObject(input, String.class);
         String commit = kryo.readObject(input, String.class);
         LOG.info("Loading {} file saved by R5 version {} commit {}", new String(header), version, commit);
-        if (!R5Version.version.equals(version)) {
+        if (!BackendVersion.instance.version.equals(version)) {
             throw new RuntimeException(String.format("File version %s is not compatible with this R5 version %s",
-                    version, R5Version.version));
+                    version, BackendVersion.instance.version));
         }
         TransportNetwork result = kryo.readObject(input, TransportNetwork.class);
         input.close();

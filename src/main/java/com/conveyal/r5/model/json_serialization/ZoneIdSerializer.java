@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 
 import java.io.IOException;
 import java.time.ZoneId;
-import java.util.BitSet;
 
 /**
  * Serialize a ZoneId to a string

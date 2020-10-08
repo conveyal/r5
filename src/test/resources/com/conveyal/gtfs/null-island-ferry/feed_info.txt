@@ -1,0 +1,2 @@
+﻿feed_id,feed_publisher_name,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,feed_contact_email
+NIF,Conveyal LLC,http://conveyal.com,en,20200901,20201231,1,contact@conveyal.com

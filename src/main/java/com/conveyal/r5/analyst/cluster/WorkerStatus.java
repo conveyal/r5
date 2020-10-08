@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.BackendVersion;
 import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.common.R5Version;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.Sets;
@@ -54,10 +54,10 @@ public class WorkerStatus {
     public WorkerStatus() { }
 
     /** Constructor that fills in all the fields with information about the machine it's running on. */
-    public WorkerStatus (AnalystWorker worker) {
+    public WorkerStatus (AnalysisWorker worker) {
 
         workerName = "R5";
-        workerVersion = R5Version.describe;
+        workerVersion = BackendVersion.instance.version;
         workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
 
         // Eventually we'll want to report all networks the worker has loaded, to give the backend hints about what kind

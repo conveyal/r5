@@ -1,8 +1,8 @@
 package com.conveyal.r5.common;
 
-/**
- * Created by abyrd on 2017-11-29
- */
+import java.util.Collection;
+import java.util.Arrays;
+
 public abstract class Util {
 
     public static String human (double n, String units) {
@@ -24,6 +24,37 @@ public abstract class Util {
             prefix = "Ti";
         }
         return String.format("%1.1f %s%s", n, prefix, units);
+    }
+
+    public static boolean isNullOrEmpty (Collection collection) {
+        return collection == null || collection.isEmpty();
+    }
+
+    public static boolean notNullOrEmpty (Collection collection) {
+        return !isNullOrEmpty(collection);
+    }
+
+    public static <T> boolean isNullOrEmpty (T[] array) {
+        return array == null || array.length == 0;
+    }
+
+    public static <T> boolean notNullOrEmpty (T[] array) {
+        return !isNullOrEmpty(array);
+    }
+
+    public static boolean isNullOrEmpty (int[] array) {
+        return array == null || array.length == 0;
+    }
+
+    public static <T> boolean notNullOrEmpty (int[] array) {
+        return !isNullOrEmpty(array);
+    }
+
+    /** Convenience method to create an array and fill it immediately with a single value. */
+    public static int[] newIntArray (int length, int defaultValue) {
+        int[] array = new int[length];
+        Arrays.fill(array, defaultValue);
+        return array;
     }
 
 }

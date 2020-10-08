@@ -89,7 +89,10 @@ public class TransportNetwork implements Serializable {
     public InRoutingFareCalculator fareCalculator;
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
-    public List<TaskError> scenarioApplicationWarnings;
+    public transient List<TaskError> scenarioApplicationWarnings;
+
+    /** Information about the effects of apparently correct scenario application, null on a base network */
+    public transient List<TaskError> scenarioApplicationInfo;
 
     /**
      * Build some simple derived index tables that are not serialized with the network.

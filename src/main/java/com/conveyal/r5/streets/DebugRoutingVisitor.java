@@ -37,7 +37,6 @@ public class DebugRoutingVisitor implements RoutingVisitor {
         if (!(edgeIdx == null || edgeIdx == -1)) {
             EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
             GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
-            feature.addProperty("weight", state.weight);
             feature.addProperty("mode", state.streetMode);
             feature.addProperty("backEdge", state.backEdge);
             features.add(feature);

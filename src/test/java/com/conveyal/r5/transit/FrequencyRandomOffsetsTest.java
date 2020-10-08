@@ -2,7 +2,6 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.FrequencyRandomOffsets;
 import gnu.trove.list.array.TIntArrayList;
@@ -10,9 +9,8 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.IntStream;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test that phasing works correctly.

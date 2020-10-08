@@ -1,8 +1,6 @@
 package com.conveyal.r5.api.util;
 
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Object represents specific trip at a specific point in time with specific access, transit and egress parts

@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
-import org.glassfish.grizzly.Transport;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

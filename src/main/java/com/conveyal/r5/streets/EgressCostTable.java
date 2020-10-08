@@ -2,17 +2,18 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.LambdaCounter;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +42,10 @@ import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
  *
  * Note that these cost tables are only needed for egress from public transit. They are not needed for a particular
  * mode if that mode is only being used for access to transit or direct travel to the destination points.
+ *
+ * EgressCostTables are derived from data in a specific LinkedPointSet, and can be thought of as memoized or cached
+ * results from computations on that LinkedPointSet. Therefore there is a one-to-one relationship between
+ * LinkedPointSet instances and EgressCostTable instances.
  */
 public class EgressCostTable implements Serializable {
 
@@ -56,7 +61,11 @@ public class EgressCostTable implements Serializable {
 
     // FIELDS
 
-    /** The linkage from which these cost tables were built. */
+    /**
+     * The linkage from which these cost tables were built. There is a one-to-one relationship between LinkedPointSet
+     * instances and EgressCostTable instances, with the latter being memoized or cached results from computations on
+     * one particular LinkedPointSet.
+     */
     public final LinkedPointSet linkedPointSet;
 
     /**
@@ -276,7 +285,8 @@ public class EgressCostTable implements Serializable {
                     PointSetTimes driveTimesToAllPoints = linkedPointSet.eval(
                             sr::getTravelTimeToVertex,
                             null,
-                            LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND
+                            LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND,
+                            null
                     );
                     // TODO optimization: should we make spatial index visit() method public to avoid copying results?
                     TIntList packedDriveTimes = new TIntArrayList();
@@ -299,6 +309,45 @@ public class EgressCostTable implements Serializable {
         }).collect(Collectors.toList());
         computeCounter.done();
         copyCounter.done();
+
+        // Now that we have a full set of tables, filter and transform them to reflect on-demand egress service.
+        // TODO optimization: we could return null immediately above for all stops not served by the on-demand egress:
+        // if (onDemandEgressService != null && ! onDemandEgressService.allows(stopIndex)) return null;
+        // We could also integrate the geographic filtering into that same loop and extendDistanceTableToPoints.
+        // In fact this is a major optimization since building car tables is very slow, and we might only need a few.
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
+        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
+        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
+            if (streetMode != StreetMode.CAR) {
+                // FIXME only cars have egress cost tables in seconds. Others will need a constant time offset field.
+                throw new RuntimeException("Only car egress tables can have a baked in time delay.");
+            }
+            for (int s = 0; s < stopToPointLinkageCostTables.size(); s++) {
+                PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(s);
+                if (egressService == null || egressService.waitTimeSeconds < 0) {
+                    stopToPointLinkageCostTables.set(s, null);
+                    continue;
+                }
+                int[] costs = stopToPointLinkageCostTables.get(s);
+                TIntList filteredCosts = new TIntArrayList();
+                for (int i = 0; i < costs.length; i += 2) {
+                    int point = costs[i];
+                    int cost = costs[i + 1];
+                    // TODO normalize variable names (to costs?), these are not just times they may be distances.
+                    // TODO linkedPointSet.pointSet.getPointsInGeometry(), and pointInsideGeometry? default defs.
+                    double lat = linkedPointSet.pointSet.getLat(point);
+                    double lon = linkedPointSet.pointSet.getLon(point);
+                    if (GeometryUtils.containsPoint(egressService.serviceArea, lon, lat)) {
+                        filteredCosts.add(point);
+                        filteredCosts.add(cost + egressService.waitTimeSeconds);
+                    }
+                }
+                // null represents an empty array, which we presume may be more efficiently serializable than lots of
+                // references to a single empty array instance.
+                int[] filteredCostsArray = filteredCosts.isEmpty() ? null : filteredCosts.toArray();
+                stopToPointLinkageCostTables.set(s, filteredCostsArray);
+            }
+        }
     }
 
     /**

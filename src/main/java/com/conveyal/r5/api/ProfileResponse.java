@@ -1,17 +1,29 @@
 package com.conveyal.r5.api;
 
-import com.conveyal.r5.api.util.*;
-import com.conveyal.r5.profile.*;
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.ProfileOption;
+import com.conveyal.r5.api.util.StreetSegment;
+import com.conveyal.r5.api.util.Transfer;
+import com.conveyal.r5.api.util.TransitJourneyID;
+import com.conveyal.r5.api.util.TripPattern;
+import com.conveyal.r5.profile.HashPath;
+import com.conveyal.r5.profile.PathWithTimes;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.transit.fare.DCFareCalculator;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.fare.DCFareCalculator;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;

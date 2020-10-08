@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
+import com.conveyal.r5.analyst.fare.nyc.NYCInRoutingFareCalculator;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter.McRaptorState;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -14,12 +15,11 @@ import java.util.Map;
 import java.util.function.ToIntFunction;
 
 /**
- * A fare calculator used in Analyst searches. It must be "greedy," i.e. boarding another vehicle should always cost a
- * nonnegative amount (0 is OK). The currency is not important as long as it is constant (i.e. the whole thing is in
- * dollars, yen, bitcoin or kina.
+ * A fare calculator used in Analyst searches. The currency is not important as long as it is integer and constant
+ * (i.e. the whole thing is in cents, yen, bitcoin or kina).
  *
- * Note that this fare calculator will be called on partial trips, both in the forward and (eventually) reverse directions.
- * Adding another ride should be monotonic - the fare should either increase or stay the same.
+ *  Fare calculator need not be greedy, see https://doi.org/10.1080/13658816.2019.1605075 and summary/open-access
+ *  preprint at https://indicatrix.org/post/how-transit-fares-affect-accessibility/
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
@@ -27,7 +27,8 @@ import java.util.function.ToIntFunction;
         @JsonSubTypes.Type(name = "bogota", value = BogotaInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class),
-        @JsonSubTypes.Type(name = "bogota-mixed", value = BogotaMixedInRoutingFareCalculator.class)
+        @JsonSubTypes.Type(name = "bogota-mixed", value = BogotaMixedInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "nyc", value = NYCInRoutingFareCalculator.class)
 })
 public abstract class InRoutingFareCalculator implements Serializable {
     public static final long serialVersionUID = 0L;

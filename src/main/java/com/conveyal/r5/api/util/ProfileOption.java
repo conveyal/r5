@@ -1,6 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StatsCalculator;
@@ -10,10 +9,15 @@ import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.*;
-import java.time.temporal.TemporalAccessor;
-import java.time.temporal.TemporalField;
-import java.util.*;
+import java.time.Duration;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**

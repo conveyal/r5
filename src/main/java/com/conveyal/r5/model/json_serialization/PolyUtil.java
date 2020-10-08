@@ -21,11 +21,10 @@ package com.conveyal.r5.model.json_serialization;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.impl.CoordinateArraySequence;
 import org.locationtech.jts.geom.impl.PackedCoordinateSequence;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 public class PolyUtil {
 

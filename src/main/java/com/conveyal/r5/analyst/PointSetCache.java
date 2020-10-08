@@ -1,15 +1,16 @@
 package com.conveyal.r5.analyst;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageFormat;
+import com.conveyal.file.FileStorageKey;
+import com.conveyal.file.FileUtils;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
@@ -26,7 +27,8 @@ public class PointSetCache {
     /** How large the cache should be. Should be large enough to fit all field of a project */
     private static final int CACHE_SIZE = 200;
 
-    private final AmazonS3 s3;
+    private final FileStorage fileStore;
+    private final String bucket;
 
     private LoadingCache<String, PointSet> cache = CacheBuilder.newBuilder()
                 .maximumSize(CACHE_SIZE)
@@ -38,23 +40,19 @@ public class PointSetCache {
                     }
                 });
 
-    private final String region;
-    private final String bucket;
-
-    public PointSetCache(String region, String bucket) {
+    public PointSetCache(FileStorage fileStore, String bucket) {
         this.bucket = bucket;
-        this.region = region;
-        s3 = AmazonS3ClientBuilder.standard().withRegion(region).build();
+        this.fileStore = fileStore;
     }
 
     private PointSet loadPointSet(String key) throws IOException {
-        S3Object obj = s3.getObject(bucket, key);
+        File file = fileStore.getFile(new FileStorageKey(bucket, key));
         // If the object does not exist on S3, getObject will throw an exception which will be caught in the
         // PointSetCache.get method. Grids are gzipped on S3.
-        InputStream is = new GZIPInputStream(new BufferedInputStream(obj.getObjectContent()));
-        if (key.endsWith(Grid.FILE_EXTENSION)) {
+        InputStream is = new GZIPInputStream(FileUtils.getInputStream(file));
+        if (key.endsWith(FileStorageFormat.GRID.extension)) {
             return Grid.read(is);
-        } else if (key.endsWith(FreeFormPointSet.FILE_EXTENSION)) {
+        } else if (key.endsWith(FileStorageFormat.FREEFORM.extension)) {
             return new FreeFormPointSet(is);
         } else {
             throw new RuntimeException("Unrecognized file extension in object key: " + key);
@@ -69,4 +67,24 @@ public class PointSetCache {
             throw new RuntimeException(e);
         }
     }
+
+    // FIXME total hack to make freeform pointset loading available statically on the backend for use within constructors.
+    //      We should definitely refactor things so this is not necessary to hit network services inside constructors.
+    //      Maybe fill in the freeform pointset on a transient field in request the way we do with the destination Grid.
+    //      RegionalTask.originPointSetKey can produce transient RegionalTalk.originPointSet.
+    private static PointSetCache instance;
+
+    public static void initializeStatically (FileStorage fileStorage, String gridBucket) {
+        instance = new PointSetCache(fileStorage, gridBucket);
+    }
+
+    public static FreeFormPointSet readFreeFormFromFileStore (String key) {
+        try {
+            return (FreeFormPointSet) instance.loadPointSet(key);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading freeform pointset: " + e);
+        }
+
+    }
+
 }

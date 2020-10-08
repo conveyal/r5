@@ -14,5 +14,6 @@
 
     <logger name="com.conveyal.osmlib" level="INFO" />
     <logger name="com.conveyal.gtfs" level="INFO" />
+    <logger name="com.conveyal.r5.profile.ExecutionTimer" level="INFO"/>
 
 </configuration>

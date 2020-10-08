@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -8,18 +9,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * times to each destination. Several travel times to each destination are returned, representing
  * selected percentiles of all travel times from the chosen origin to that destination.
  */
-public class TravelTimeSurfaceTask extends AnalysisTask {
+public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
 
     // FIXME red flag - what is this enum enumerating Java types?
 
     @Override
     public Type getType() {
         return Type.TRAVEL_TIME_SURFACE;
-    }
-
-    @Override
-    public boolean isHighPriority() {
-        return true;
     }
 
     @JsonIgnoreProperties(ignoreUnknown=true)
@@ -41,6 +37,11 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
 
     public Format getFormat(){
         return format;
+    }
+
+    @Override
+    public WebMercatorExtents getWebMercatorExtents() {
+        return WebMercatorExtents.forTask(this);
     }
 
     @Override

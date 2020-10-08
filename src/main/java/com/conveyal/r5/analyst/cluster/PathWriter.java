@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -35,7 +34,7 @@ public class PathWriter {
     public static final int NO_PATH = -1;
 
     /** The task that created the paths being recorded. */
-    private final AnalysisTask task;
+    private final AnalysisWorkerTask task;
 
     /** A list of unique paths, each one associated with a positive integer index by its position in the list. */
     private final List<Path> pathForIndex = new ArrayList<>();
@@ -60,7 +59,7 @@ public class PathWriter {
     private final TIntList pathIndexes = new TIntArrayList();
 
     /** Constructor. Holds onto the task object, which is used to create unique names for the results files. */
-    public PathWriter (AnalysisTask task) {
+    public PathWriter (AnalysisWorkerTask task) {
         this.task = task;
         this.nTargets = task.width * task.height;
         indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
@@ -155,7 +154,7 @@ public class PathWriter {
         }
         persistenceBuffer.doneWriting();
         String pathFileName = task.taskId + "_paths.dat";
-        AnalystWorker.filePersistence.saveStaticSiteData(task, pathFileName, persistenceBuffer);
+        AnalysisWorker.filePersistence.saveStaticSiteData(task, pathFileName, persistenceBuffer);
     }
 
 }

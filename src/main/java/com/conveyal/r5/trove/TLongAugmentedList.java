@@ -1,30 +1,24 @@
 package com.conveyal.r5.trove;
 
-import gnu.trove.TIntCollection;
 import gnu.trove.TLongCollection;
-import gnu.trove.function.TIntFunction;
 import gnu.trove.function.TLongFunction;
-import gnu.trove.iterator.TIntIterator;
 import gnu.trove.iterator.TLongIterator;
-import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.procedure.TIntProcedure;
 import gnu.trove.procedure.TLongProcedure;
 
 import java.util.Collection;
 import java.util.Random;
 
 /**
- * This TIntArrayList extension wraps another TIntList, and only allows extending it and retrieving values.
+ * This TLongArrayList extension wraps another TLongList, and only allows extending it and retrieving values.
  * It assumes the wrapped TIntList is immutable and treats it as such.
  */
 public class TLongAugmentedList implements TLongList {
 
-    TLongList base;
+    private final TLongList base;
 
-    TLongList extension;
+    private final TLongList extension;
 
     public TLongAugmentedList(TLongList base) {
         this.base = base;

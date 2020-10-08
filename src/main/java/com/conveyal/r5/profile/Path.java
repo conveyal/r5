@@ -10,8 +10,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
- * Class used to represent transit paths in Browsochrones and Modeify.
+ * Class used to represent transit paths for display to end users (and debugging).
+ * It is a group of parallel arrays, with each position in the arrays representing a leg in the trip.
  */
 public class Path {
 
@@ -29,11 +32,10 @@ public class Path {
     public final int length;
 
     /**
-     * Scan over a raptor state and extract the path leading up to that state.
+     * Extract the path leading up to a specified stop in a given raptor state.
      */
     public Path(RaptorState state, int stop) {
-        // trace the path back from this RaptorState
-        int previousPattern;
+
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
@@ -41,19 +43,16 @@ public class Path {
         TIntList alightTimes = new TIntArrayList();
 
         while (state.previous != null) {
-            // find the fewest-transfers trip that is still optimal in terms of travel time
+            // We copy the state at each stop from one round to the next. If a stop is not updated in a particular
+            // round, the information about how it was reached optimally will be found in a previous round.
+            // Step back through the rounds until we find a round where this stop was updated.
             if (state.previous.bestNonTransferTimes[stop] == state.bestNonTransferTimes[stop]) {
                 state = state.previous;
                 continue;
             }
-
-            if (state.previous.bestNonTransferTimes[stop] < state.bestNonTransferTimes[stop]) {
-                LOG.error("Previous round has lower weight at stop {}, this implies a bug!", stop);
-            }
-
-            previousPattern = state.previousPatterns[stop];
-
-            patterns.add(previousPattern);
+            checkState(state.previous.bestNonTransferTimes[stop] >= state.bestNonTransferTimes[stop],
+                    "Earlier raptor rounds must have later arrival times at a given stop.");
+            patterns.add(state.previousPatterns[stop]);
             alightStops.add(stop);
             times.add(state.bestTimes[stop]);
             alightTimes.add(state.bestNonTransferTimes[stop]);
@@ -168,12 +167,26 @@ public class Path {
 
     /**
      * Gets tripPattern at provided pathIndex
-     * @param transitLayer
-     * @param pathIndex
-     * @return
      */
     public TripPattern getPattern(TransitLayer transitLayer, int pathIndex) {
         return transitLayer.tripPatterns.get(this.patterns[pathIndex]);
     }
 
+    @Override
+    public String toString () {
+        var builder = new StringBuilder();
+        builder.append("Path:\n");
+        for (int i = 0; i < length; i++) {
+            builder.append("  from ");
+            builder.append(boardStops[i]);
+            builder.append(" to ");
+            builder.append(alightStops[i]);
+            builder.append(" riding ");
+            builder.append(patterns[i]);
+            builder.append(" alighting time ");
+            builder.append(alightTimes[i]);
+            builder.append("\n");
+        }
+        return builder.toString();
+    }
 }

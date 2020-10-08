@@ -1,16 +1,16 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
-import junit.framework.TestCase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
 
-import static org.junit.Assert.*;
-
-import static com.conveyal.r5.analyst.scenario.FakeGraph.*;
+import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test that removing trips works correctly.

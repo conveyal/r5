@@ -3,6 +3,8 @@ package com.conveyal.r5.analyst;
 import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,17 +17,15 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+
 /**
  * These are points serving as origins or destinations in an accessibility analysis which are not constrained to
  * a regular grid. Each point has an arbitrary latitude and longitude attached to it.
  * This class re-uses some of the legacy code, which was removed in R5 PR #338.
  */
 public class FreeFormPointSet extends PointSet {
-
     private static final Logger LOG = LoggerFactory.getLogger(FreeFormPointSet.class);
-
-    /** The file extension we use when persisting freeform pointsets to files. */
-    public static final String FILE_EXTENSION = "freeform";
 
     /** A unique identifier for each feature. */
     private final String[] ids;
@@ -205,6 +205,21 @@ public class FreeFormPointSet extends PointSet {
             counts[i] = data.readDouble();
         }
         data.close();
+    }
+
+    @Override
+    public TIntList getPointsInEnvelope (Envelope envelopeFixedDegrees) {
+        // Convert fixed-degree envelope to floating
+        double west = fixedDegreesToFloating(envelopeFixedDegrees.getMinX());
+        double east = fixedDegreesToFloating(envelopeFixedDegrees.getMaxX());
+        double north = fixedDegreesToFloating(envelopeFixedDegrees.getMaxY());
+        double south = fixedDegreesToFloating(envelopeFixedDegrees.getMinY());
+        TIntList pointsInEnvelope = new TIntArrayList();
+        // Pixels are truncated toward zero, and coords increase toward East and South in web Mercator, so <= south/east.
+        for (int i = 0; i < lats.length; i++) {
+            if (lats[i] < north && lats[i] > south && lons[i] < east && lons[i] > west) pointsInEnvelope.add(i);
+        }
+        return pointsInEnvelope;
     }
 
     @Override

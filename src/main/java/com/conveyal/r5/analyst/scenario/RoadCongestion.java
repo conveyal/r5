@@ -1,14 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.analyst.FileCategory;
-import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygonal;
-import org.locationtech.jts.index.strtree.STRtree;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.map.TObjectIntMap;
@@ -18,6 +14,10 @@ import org.geotools.feature.FeatureIterator;
 import org.geotools.geojson.feature.FeatureJSON;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
@@ -109,7 +109,7 @@ public class RoadCongestion extends Modification {
         // this.features = polygonLayerCache.getPolygonFeatureCollection(this.polygonLayer);
         // Note: Newer JTS now has GeoJsonReader
         try {
-            InputStream s3InputStream = AnalystWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
+            InputStream s3InputStream = AnalysisWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
             // To test on local files:
             //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
             // TODO handle gzip decompression in FilePersistence base class.
@@ -243,7 +243,7 @@ public class RoadCongestion extends Modification {
         }
         if (logUpdatedEdgeCounts) {
             edgeCounts.forEachEntry((polygon, quantity) -> {
-                warnings.add(String.format("%s\t%d edges scaled by %.2f", polygon.name, quantity, polygon.scale));
+                info.add(String.format("polygon '%s' scaled %d edges by %.2f", polygon.name, quantity, polygon.scale));
                 // LOG.info("{} edges were scaled by {} via polygon {} ", quantity, polygon.scale, polygon.name);
                 return true;
             });

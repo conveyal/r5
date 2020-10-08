@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
 import java.io.InputStream;
 
@@ -16,7 +16,7 @@ public abstract class FilePersistence {
      * which is typically a bucket on S3. The top level directory is hard-coded for now but could be configurable
      * if and when actual use cases require it.
      */
-    public void saveStaticSiteData (AnalysisTask task, String fileName, PersistenceBuffer persistenceBuffer) {
+    public void saveStaticSiteData (AnalysisWorkerTask task, String fileName, PersistenceBuffer persistenceBuffer) {
         String directoryName = "analysis-static/" + task.jobId;
         saveData(directoryName, fileName, persistenceBuffer);
     }

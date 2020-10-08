@@ -1,7 +1,8 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.r5.analyst.scenario.FakeGraph;
+import ch.qos.logback.classic.Logger;
 import com.conveyal.object_differ.ObjectDiffer;
+import com.conveyal.r5.analyst.scenario.FakeGraph;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -71,6 +72,8 @@ public class KryoNetworkSerializerTest {
         objectDiffer.useEquals(BitSet.class);
         // IntHashGrid contains unordered lists of elements in each bin. Lists are compared as ordered.
         objectDiffer.ignoreClasses(IntHashGrid.class);
+        // The class ch.qos.logback.classic.Logger holds some reflection data using Java proxy objects
+        objectDiffer.ignoreClasses(Logger.class);
         // If the root objects are identity-equal, enable special testing mode that will compare the entire tree anyway.
         if (a == b) {
             objectDiffer.enableComparingIdenticalObjects();

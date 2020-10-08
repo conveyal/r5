@@ -3,13 +3,13 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
-import org.locationtech.jts.geom.Coordinate;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import junit.framework.TestCase;
 import org.junit.Test;
+import org.locationtech.jts.geom.Coordinate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,7 +23,7 @@ public class StreetLayerTest extends TestCase {
     public void testSubgraphRemoval () {
         OSM osm = new OSM(null);
         osm.intersectionDetection = true;
-        osm.readFromUrl(StreetLayerTest.class.getResource("subgraph.vex").toString());
+        osm.readFromUrl(StreetLayerTest.class.getResource("subgraph.pbf").toString());
 
         StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
         // load from OSM and don't remove floating subgraphs

@@ -3,8 +3,6 @@ package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
 
-import java.util.Set;
-
 /**
 For Pareto searches that include as an optimization criterion monetary cost based on fares, we need to label states
 with information about the potential value of future transfer allowances.  A standard GTFS fare_attribute can include

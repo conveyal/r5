@@ -12,11 +12,12 @@ import spark.Response;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.conveyal.r5.analyst.cluster.AnalystWorker.addErrorJson;
+import static com.conveyal.r5.analyst.cluster.AnalysisWorker.addJsonToGrid;
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
@@ -27,10 +28,10 @@ public class AnalysisWorkerController {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorkerController.class);
 
-    private final AnalystWorker analystWorker;
+    private final AnalysisWorker analysisWorker;
 
-    public AnalysisWorkerController (AnalystWorker analystWorker) {
-        this.analystWorker = analystWorker;
+    public AnalysisWorkerController (AnalysisWorker analysisWorker) {
+        this.analysisWorker = analysisWorker;
     }
 
     public Object handleSinglePoint (Request request, Response response) throws IOException {
@@ -47,7 +48,7 @@ public class AnalysisWorkerController {
 
         try {
             try {
-                byte[] binaryResult = analystWorker.handleOneSinglePointTask(task);
+                byte[] binaryResult = analysisWorker.handleOneSinglePointTask(task);
                 response.status(HttpStatus.OK_200);
                 if (task.getFormat().equals(TravelTimeSurfaceTask.Format.GEOTIFF)) {
                     response.header("Content-Type", "application/x-geotiff");
@@ -94,7 +95,7 @@ public class AnalysisWorkerController {
         // TODO expand task errors, this just logs the memory address of the list.
         LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        addErrorJson(byteArrayOutputStream, taskErrors);
+        addJsonToGrid(byteArrayOutputStream, null, taskErrors, Collections.emptyList());
         byteArrayOutputStream.close();
         return byteArrayOutputStream.toByteArray();
     }

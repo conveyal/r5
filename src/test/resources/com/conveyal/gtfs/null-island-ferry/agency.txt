@@ -1,0 +1,2 @@
+﻿agency_id,agency_name,agency_url,agency_timezone,agency_lang
+NullFerry,Null Island Ferry Authority,"https://www.ndbc.noaa.gov/station_page.php?station=13010",Etc/UTC,en

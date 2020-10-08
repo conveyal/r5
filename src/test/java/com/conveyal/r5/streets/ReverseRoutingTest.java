@@ -114,31 +114,25 @@ public class ReverseRoutingTest extends TestCase {
         List<Integer> correctDuration = Arrays.asList(3,6,9,13);
         List<Integer> correctDistance = Arrays.asList(10, 21, 33, 46).stream().map(n -> n*1000).collect(
             Collectors.toList());
-        List<Integer> correctWeight = Arrays.asList(2,4,7,10);
         List<Long> correctTimes = Arrays.asList(1456876803000L, 1456876806000L, 1456876809000L, 1456876813000L);
 
         List<Integer> currentEdgeIdx = new ArrayList<>(correctEdgeIdx.size());
         List<Integer> currentDuration = new ArrayList<>(correctDuration.size());
         List<Integer> currentDistance = new ArrayList<>(correctDistance.size());
-        List<Integer> currentWeight = new ArrayList<>(correctWeight.size());
-        List<Long> currectTimes = new ArrayList<>(correctTimes.size());
         for (StreetRouter.State state : streetPath.getStates()) {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
                 EdgeStore.Edge edge = streetLayer.edgeStore.getCursor(edgeIdx);
-                LOG.info("Edge IDX:{} {} -> {} {}m IDX:{} {}mm {}sec W:{}", edgeIdx, vertexNames.get(edge.getFromVertex()),
-                    vertexNames.get(edge.getToVertex()), edge.getLengthM(), state.idx, state.distance, state.durationSeconds, state.weight);
+                LOG.info("Edge IDX:{} {} -> {} {}m IDX:{} {}mm {}sec", edgeIdx, vertexNames.get(edge.getFromVertex()),
+                    vertexNames.get(edge.getToVertex()), edge.getLengthM(), state.idx, state.distance, state.durationSeconds);
                 currentEdgeIdx.add(edgeIdx);
                 currentDuration.add(state.durationSeconds);
                 currentDistance.add(state.distance);
-                currentWeight.add(state.weight);
-
             }
         }
         Assert.assertEquals("Correct Edge IDX", correctEdgeIdx, currentEdgeIdx);
         Assert.assertEquals("Correct Distance", correctDistance, currentDistance);
         Assert.assertEquals("Correct duration", correctDuration, currentDuration);
-        Assert.assertEquals("Correct weight", correctWeight, currentWeight);
         //Assert.assertEquals("Correct times", correctTimes.stream().map(Instant::ofEpochMilli).toArray(), currectTimes.stream().map(Instant::ofEpochMilli).toArray());
         //Assert.assertEquals("Correct times", correctTimes, currectTimes);
 

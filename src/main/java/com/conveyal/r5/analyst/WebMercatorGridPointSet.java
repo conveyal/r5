@@ -13,6 +13,8 @@ import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * A pointset that represents a grid of pixels from the web mercator projection.
+ * This PointSet subclass does not yet support opportunity counts.
+ * TODO merge this class with Grid, which does have opportunity counts.
  */
 public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
@@ -79,6 +81,11 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         this.basePointSet = null;
     }
 
+    /** The resulting PointSet will not have a null basePointSet, so should generally not be used for linking. */
+    public WebMercatorGridPointSet (WebMercatorExtents extents) {
+        this(extents.zoom, extents.west, extents.north, extents.width, extents.height, null);
+    }
+
     @Override
     public int featureCount() {
         return height * width;
@@ -87,7 +94,6 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     @Override
     public double sumTotalOpportunities () {
         // For now we are counting each point as 1 opportunity because this class does not have opportunity counts.
-        // TODO merge this class with Grid, which does have opportunity counts.
         return featureCount();
     }
 
@@ -186,7 +192,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
-        throw new UnsupportedOperationException();
+        return new WebMercatorExtents(west, north, width, height, zoom);
     }
 
 }

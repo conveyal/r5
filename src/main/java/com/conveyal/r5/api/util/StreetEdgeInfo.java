@@ -2,8 +2,8 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.LineString;
 
 import java.util.Arrays;
 import java.util.Collections;

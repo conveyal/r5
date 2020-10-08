@@ -1,20 +1,20 @@
-# Conveyal Analysis
+# Conveyal R5 Routing Engine
 
-This is the server component of [Conveyal Analysis](http://conveyal.com/), which allows users to create transportation scenarios and evaluate them in terms of cumulative opportunities accessibility indicators. 
+## Rapid Realistic Routing on Real-world and Reimagined networks
 
-**Please note** that the Conveyal team does not provide technical support for third-party deployments. We provide paid subscriptions to a cloud-based deployment of this system, which performs these complex calculations hundreds of times faster using a compute cluster. This project is open source primarily to ensure transparency and reproducibility in public planning and decision making processes, and in hopes that it may help researchers, students, and potential collaborators to understand and build upon our methodology.
+R5 is Conveyal's routing engine for multimodal (transit/bike/walk/car) networks, with a particular focus on public transit. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opportunities accessibility indicators). 
 
-## R<sup>5</sup> Routing Engine: Rapid Realistic Routing on Real-world and Reimagined networks
-
-Conveyal Analysis relies on R<sup>5</sup>, our routing engine for multimodal (transit/bike/walk/car) networks. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opportunities accessibility indicators). R<sup>5</sup> is included as a module in this repository. Prior to June 2020, it was developed in a [separate repository](https://github.com/conveyal/r5).
-
-We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. 
+We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. R5 handles both scheduled public transit and headway-based lines, using novel methods to characterize variation and uncertainty in travel times.
 
 We say "Real-world and Reimagined" networks because R5's networks are built from widely available open OSM and GTFS data describing baseline transportation systems, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
 
+R5 is a core component of [Conveyal Analysis](http://conveyal.com/), which allows users to create transportation scenarios and evaluate them in terms of cumulative opportunities accessibility indicators. 
+
+**Please note** that the Conveyal team does not provide technical support for third-party deployments of its analysis platform. We provide paid subscriptions to a cloud-based deployment of this system, which performs these complex calculations hundreds of times faster using a compute cluster. This project is open source primarily to ensure transparency and reproducibility in public planning and decision making processes, and in hopes that it may help researchers, students, and potential collaborators to understand and build upon our methodology.
+
 ## Methodology
 
-For details on the core methods implemented in Conveyal Analysis and R<sup>5</sup>, see:
+For details on the core methods implemented in Conveyal Analysis and R5, see:
 
 * [Conway, Byrd, and van der Linden (2017)](http://hdl.handle.net/2286/R.A.218654)
 * [Conway, Byrd, and van Eggermond (2018)](https://www.jtlu.org/index.php/jtlu/article/view/1074)
@@ -30,19 +30,18 @@ It is possible to run a Conveyal Analysis UI and backend locally (e.g. on your l
 
 ### Running Locally
 
-To get started, copy the template configuration (`analysis.properties.tmp`) to `analysis.properties`.  
-
-To run locally, use the default values in the template configuration file. `offline=true` will create a local instance 
-that avoids cloud-based storage, database, or authentication services. By default, analysis-backend will use the `analysis` database in a local MongoDB instance, so you'll also need to install and start a MongoDB instance.
+To get started, copy the template configuration (`analysis.properties.tmp`) to `analysis.properties`.
+To run locally, use the default values in the template configuration file. `offline=true` will create a local instance that avoids cloud-based storage, database, or authentication services.
+By default, analysis-backend will use the `analysis` database in a local MongoDB instance, so you'll also need to install and start a MongoDB instance.
 
 Database configuration variables include:
 
-- `database-uri`: URI to your Mongo cluster
-- `database-name`: name of the database to use in your Mongo cluster
+- `database-uri`: URI to your MongoDB cluster
+- `database-name`: name of the database to use in your MongoDB cluster
 
 ## Building and running
 
-Once you have configured `analysis.properties` and started mongo locally, build the application with `mvn package` and 
+Once you have configured `analysis.properties` and started MongoDB locally, build the application with `gradle build` and 
 start it with `java -Xmx2g -cp target/shaded/vX.Y.Z.jar com.conveyal.analysis.BackendMain`
 
 Next, follow the instructions to start the [analysis-ui frontend](https://github.com/conveyal/analysis-ui). Once that 
@@ -50,7 +49,7 @@ is running, you should be able to log in without authentication (using the front
 
 ## Creating a development environment
 
-In order to do development on the frontend or backend, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on Conveyal Analysis. Add analysis-backend to IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.analysis.BackendMain`, which is the main class. You will need to configure the JVM options and properties file mentioned above.
+In order to do development on the frontend or backend, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on R5. Add r5 to IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.analysis.BackendMain`, which is the main class. You will need to configure the JVM options and properties file mentioned above.
 
 ## Structured Commit Messages
 

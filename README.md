@@ -41,11 +41,11 @@ Database configuration variables include:
 
 ## Building and running
 
-Once you have configured `analysis.properties` and started MongoDB locally, build the application with `gradle build` and 
-start it with `java -Xmx2g -cp build/libs/r5-vX.Y.Z.jar com.conveyal.analysis.BackendMain`
+Once you have configured `analysis.properties` and started MongoDB locally, you can build and run the analysis backend with `gradle runBackend`. If you have checked out a commit (such as a release tag) where you are sure all tests will pass, you can skip the tests with `gradle -x test runBackend`.
 
-Next, follow the instructions to start the [analysis-ui frontend](https://github.com/conveyal/analysis-ui). Once that 
-is running, you should be able to log in without authentication (using the frontend URL, e.g. http://localhost:3000). 
+You can build a single self-contained JAR file containing all the dependencies with `gradle shadowJar` and start it with `java -Xmx2g -cp build/libs/r5-vX.Y.Z-all.jar com.conveyal.analysis.BackendMain`.
+
+Once you have this backend running, follow the instructions to start the [analysis-ui frontend](https://github.com/conveyal/analysis-ui). Once that the UI is running, you should be able to log in without authentication (using the frontend URL, e.g. http://localhost:3000). 
 
 ## Creating a development environment
 

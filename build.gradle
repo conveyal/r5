@@ -67,6 +67,22 @@ task copyDependencies(type: Copy) {
     into 'dependencies'
 }
 
+// Run R5 as an analysis backend with all dependencies on the classpath, without building a shadowJar.
+task runBackend (type: JavaExec) {
+   dependsOn(build)
+   classpath(sourceSets.main.runtimeClasspath)
+   main("com.conveyal.analysis.BackendMain")
+}
+
+// Run R5 as an analysis worker with all dependencies on the classpath, without building a shadowJar.
+task runWorker (type: JavaExec) {
+   dependsOn(build)
+   classpath(sourceSets.main.runtimeClasspath)
+   main("com.conveyal.r5.R5Main")
+}
+
+// Start up the analysis backend from a shaded JAR and ask it to shut down immediately.
+// This is used to check in the automated build that the JAR is usable before we keep it.
 // Create a configuration properties file (by copying the template) before running this task.
 task testShadowJarRunnable(type: JavaExec) {
     dependsOn(shadowJar)

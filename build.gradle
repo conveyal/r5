@@ -3,11 +3,14 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '6.0.0'
     id 'maven-publish'
     id 'com.palantir.git-version' version '0.12.3'
+    id 'com.google.cloud.tools.jib' version '2.6.0'
 }
 
 group = 'com.conveyal'
 // set version to `git describe --tags --always --first-parent`, plus '.dirty' if local changes are present.
 version gitVersion()
+
+jib.to.image = 'ghcr.io/conveyal/r5:' + version
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11

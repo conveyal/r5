@@ -1,0 +1,42 @@
+# Usage:
+# docker-compose build --build-arg r5version=$(cat build/version.txt)
+# docker-compose up 
+version: '3'
+services:
+  r5:
+    container_name: r5
+    build: .
+    # image: ghcr.io/conveyal/r5:latest
+    depends_on:
+      - mongo
+    links:
+      - mongo
+    ports:
+      - "7070:7070"
+    # TODO volumes for backend cache directory
+  ui:
+    container_name: ui
+    depends_on:
+      - mongo
+    # build: ../analysis-ui
+    # image: ghcr.io/conveyal/analysis-ui:latest
+    image: 037a38bb2cdf
+    ports:
+      - "3000:3000"
+    links:
+      - r5
+      - mongo
+    # Map in a config file with mapbox keys, telling the UI to contact host (container) r5
+    volumes:
+      - ./ui-env:/ui/.env.local:ro
+  mongo:
+    container_name: mongo
+    image: mongo
+    restart: always
+    volumes:
+      - mongo-volume:/data/db:rw
+    ports:
+      - "27017:27017"
+
+volumes:
+  mongo-volume:

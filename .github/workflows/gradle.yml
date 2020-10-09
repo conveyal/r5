@@ -60,6 +60,14 @@ jobs:
         VERSION=$(gradle -q printVersion | head -n1)
         LOCAL_FILE=$(ls build/libs/*-all.jar | head -n1)
         aws s3 cp --no-progress --region eu-west-1 $LOCAL_FILE s3://r5-builds/${VERSION}.jar
+    - name: Publish Docker image to GH Container Registry
+      run: |
+        echo $GPR_TOKEN | docker login ghcr.io -u $GPR_USERNAME --password-stdin
+        # TODO --cache-from existing image, set VERSION and BRANCH once across all steps
+        VERSION=$(gradle -q printVersion | head -n1)
+        TAG=ghcr.io/conveyal/r5:$VERSION
+        docker build . --build-arg r5version=$VERSION --tag $TAG
+        docker push $TAG
     # If we are on the head of dev or master, also copy to branch-latest.jar. 'aws s3 cp' will overwrite by default.
     - name: Copy to branch-latest.jar on S3
       if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'

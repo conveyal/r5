@@ -44,6 +44,8 @@ public class AnalysisRequest {
     public String egressModes;
     public float fromLat;
     public float fromLon;
+    public float toLat;
+    public float toLon;
     public int fromTime;
     public int monteCarloDraws = 200;
     public int toTime;
@@ -228,8 +230,12 @@ public class AnalysisRequest {
         task.date = date;
         task.fromLat = fromLat;
         task.fromLon = fromLon;
+        task.toLat = toLat;
+        task.toLon = toLon;
         task.fromTime = fromTime;
         task.toTime = toTime;
+
+        task.computePaths = toLat != 0 && toLon != 0;
 
         task.bikeSpeed = bikeSpeed;
         task.carSpeed = carSpeed;

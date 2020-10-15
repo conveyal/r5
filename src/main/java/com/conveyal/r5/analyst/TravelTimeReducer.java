@@ -2,11 +2,15 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.Path;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +39,8 @@ public class TravelTimeReducer {
 
     /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
+
+    private PathResult pathResult = null;
 
     /** If we are calculating accessibility, the PointSets containing opportunities. */
     private PointSet[] destinationPointSets;
@@ -138,6 +144,7 @@ public class TravelTimeReducer {
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
+            pathResult = new PathResult(task);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -269,6 +276,14 @@ public class TravelTimeReducer {
         }
     }
 
+    public void recordPathsForTarget (int target, Path[] perIterationPaths) {
+        Multimap<Path, Integer> iterationNumbersForPath = HashMultimap.create();
+        for (int i = 0; i < perIterationPaths.length; i++) {
+            iterationNumbersForPath.put(perIterationPaths[i], i);
+        }
+        pathResult.setTarget(target, iterationNumbersForPath);
+    }
+
     /**
      * Convert the given timeSeconds to minutes, being careful to preserve UNREACHED values.
      * The seconds to minutes conversion uses integer division, which truncates toward zero. This approach is correct
@@ -299,7 +314,7 @@ public class TravelTimeReducer {
      * origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(travelTimeResult, accessibilityResult);
+        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
     }
 
     /**

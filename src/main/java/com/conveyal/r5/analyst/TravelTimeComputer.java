@@ -20,7 +20,6 @@ import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,8 +99,9 @@ public class TravelTimeComputer {
         // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel
         // times to the destination points using those access modes.
 
-        // A map from transit stop vertex indices to the travel time it takes to reach those vertices in seconds.
-        TIntIntMap accessTimes = new TIntIntHashMap();
+        // A map from transit stop vertex indices to the travel time (in seconds) and mode used to reach those
+        // vertices.
+        StreetTimesAndModes bestAccessOptions = new StreetTimesAndModes();
 
         // Travel times in seconds to each destination point (or MAX_INT for unreachable points?)
         // Starts out as null but will be updated when any access leg search succeeds.
@@ -184,7 +184,7 @@ public class TravelTimeComputer {
                     }
                     travelTimesToStopsSeconds.transformValues(i -> i + accessService.waitTimeSeconds);
                 }
-                minMergeMap(accessTimes, travelTimesToStopsSeconds);
+               bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
             }
 
             LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
@@ -238,7 +238,7 @@ public class TravelTimeComputer {
                 // Origin not found. Signal this using the same flag as the other modes do.
                 foundAnyOriginPoint = false;
             } else {
-                accessTimes = sr.getReachedStops();
+                bestAccessOptions.update(sr.getReachedStops(), StreetMode.CAR);
                 foundAnyOriginPoint = true;
             }
             // Disallow non-transit access.
@@ -255,7 +255,7 @@ public class TravelTimeComputer {
 
         // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
         // were reached, return the non-transit grid as the final result.
-        if (request.transitModes.isEmpty() || accessTimes.isEmpty()) {
+        if (request.transitModes.isEmpty() || bestAccessOptions.streetTimesAndModes.isEmpty()) {
             LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
             int nTargets =  nonTransitTravelTimesToDestinations.size();
             if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
@@ -273,7 +273,7 @@ public class TravelTimeComputer {
         int[][] transitTravelTimesToStops;
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
-            worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
+            worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
             if (request.computePaths || request.computeTravelTimeBreakdown) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
@@ -319,29 +319,11 @@ public class TravelTimeComputer {
         // When building a static site, perform some additional initialization causing the propagator to do extra work.
         if (request.computePaths || request.computeTravelTimeBreakdown) {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
-            perTargetPropagater.pathWriter = new PathWriter(request);
+            perTargetPropagater.pathWriter = new PathWriter(request, bestAccessOptions);
         }
 
         return perTargetPropagater.propagate();
 
-    }
-
-
-    /**
-     * Utility method. Merges two Trove int-int maps, keeping the minimum value when keys collide.
-     */
-    private static void minMergeMap (TIntIntMap target, TIntIntMap source) {
-        source.forEachEntry((key, val) -> {
-            if (target.containsKey(key)) {
-                int existingVal = target.get(key);
-                if (val < existingVal) {
-                    target.put(key, val);
-                }
-            } else {
-                target.put(key, val);
-            }
-            return true;
-        });
     }
 
 }

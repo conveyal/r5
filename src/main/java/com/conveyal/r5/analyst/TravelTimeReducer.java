@@ -9,6 +9,7 @@ import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
@@ -92,7 +93,7 @@ public class TravelTimeReducer {
      *
      * @param task task to be performed.
      */
-    public TravelTimeReducer (AnalysisWorkerTask task) {
+    public TravelTimeReducer (AnalysisWorkerTask task, TransportNetwork network) {
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
         if (task.inRoutingFareCalculator != null) {
@@ -144,7 +145,7 @@ public class TravelTimeReducer {
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
-            pathResult = new PathResult(task);
+            pathResult = new PathResult(task, network.transitLayer);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication

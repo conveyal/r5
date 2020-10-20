@@ -203,4 +203,22 @@ public class Path {
         builder.append(" " + egressMode + " egress");
         return builder.toString();
     }
+
+    public String toString (TransitLayer transitLayer) {
+        var builder = new StringBuilder();
+        builder.append("Path:\n");
+        builder.append(" " + accessMode + " access \n");
+        for (int i = 0; i < length; i++) {
+            builder.append(transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name);
+            builder.append(" from ");
+            builder.append(transitLayer.stopNames.get(boardStops[i]));
+            builder.append(" to ");
+            builder.append(transitLayer.stopNames.get(alightStops[i]));
+            builder.append(" alighting at ");
+            builder.append(alightTimes[i] / 60f / 60f);
+            builder.append("\n");
+        }
+        builder.append(" " + egressMode + " egress");
+        return builder.toString();
+    }
 }

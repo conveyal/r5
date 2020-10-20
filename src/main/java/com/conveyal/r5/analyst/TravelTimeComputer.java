@@ -74,7 +74,7 @@ public class TravelTimeComputer {
 
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this object within the propagator.
-        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
+        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request, network);
 
         // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
         // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same

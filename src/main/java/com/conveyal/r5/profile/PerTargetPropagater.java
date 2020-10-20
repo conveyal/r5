@@ -369,7 +369,7 @@ public class PerTargetPropagater {
                             // Because that's the case, update the best known travel time and, if requested, the
                             // corresponding path.
                             perIterationTravelTimes[iteration] = timeAtTarget;
-                            if (calculateComponents) {
+                            if (calculateComponents || targetIndex == destinationIndex) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
                                     path.egressMode = linkedTargets.streetMode;

@@ -632,6 +632,8 @@ public class AnalysisWorker implements Runnable {
 
         public List<TaskError> scenarioApplicationInfo;
 
+        public List<PathResult.PathIterations>[] pathSummaries;
+
         @Override
         public String toString () {
             return String.format(
@@ -668,6 +670,7 @@ public class AnalysisWorker implements Runnable {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
+        jsonBlock.pathSummaries = pathResult.getSummaries();
         LOG.info("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

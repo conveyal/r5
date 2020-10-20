@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.collect.Multimap;
 
 import java.util.ArrayList;
@@ -19,7 +20,9 @@ public class PathResult {
     // Map from path to departure times at which the path is optimal
     Multimap<Path, Integer>[] paths;
 
-    public PathResult(AnalysisWorkerTask task) {
+    TransitLayer transitLayer;
+
+    public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
         if (task.toLat != task.fromLat &&  task.toLon != task.fromLon) {
             // TODO better way of signalling we want paths to only one destination
             nPoints = 1;
@@ -28,6 +31,7 @@ public class PathResult {
             nPoints = task.nTargetsPerOrigin();
         }
         paths = new Multimap[nPoints];
+        this.transitLayer = transitLayer;
     }
 
     // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
@@ -41,8 +45,12 @@ public class PathResult {
         public String path;
         public int[] iterations;
 
-        PathIterations(Path path, Collection<Integer> iterations) {
-            this.path = path.toString();
+        PathIterations(Path path, Collection<Integer> iterations, TransitLayer transitLayer) {
+            if (path == null) {
+                this.path = "null";
+            } else {
+                this.path = path.toString(transitLayer);
+            }
             this.iterations = iterations.stream().mapToInt(i -> i).sorted().toArray();
         }
     }
@@ -53,7 +61,7 @@ public class PathResult {
         for (int i = 0; i < nPoints; i++){
             List<PathIterations> summaryToDestination = new ArrayList<PathIterations>();
             for (Path path : paths[i].keySet()) {
-                summaryToDestination.add(new PathIterations(path, paths[i].get(path)));
+                summaryToDestination.add(new PathIterations(path, paths[i].get(path), transitLayer));
             }
             summaries[i] = summaryToDestination;
         }

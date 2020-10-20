@@ -60,8 +60,10 @@ public class PathResult {
 
         for (int i = 0; i < nPoints; i++){
             List<PathIterations> summaryToDestination = new ArrayList<PathIterations>();
-            for (Path path : paths[i].keySet()) {
-                summaryToDestination.add(new PathIterations(path, paths[i].get(path), transitLayer));
+            if (paths[i] != null) {
+                for (Path path : paths[i].keySet()) {
+                    summaryToDestination.add(new PathIterations(path, paths[i].get(path), transitLayer));
+                }
             }
             summaries[i] = summaryToDestination;
         }

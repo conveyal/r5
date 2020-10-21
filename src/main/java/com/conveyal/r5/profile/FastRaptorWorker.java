@@ -843,7 +843,7 @@ public class FastRaptorWorker {
         // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
         // These transfers then update the post-transfers bitset to avoid concurrent modification while iterating.
         for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
-                 stop > 0;
+                 stop > -1;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
             TIntList transfersFromStop = transit.transfersForStop.get(stop);

@@ -539,6 +539,15 @@ public class FastRaptorWorker {
                     } else {
                         // We are already on a trip, but check if this stop was reached early enough to back up
                         // to an earlier trip on the same pattern.
+                        // For example, consider two potential boarding stops on a pattern (A and B), with the search
+                        // origin closer to B:
+                        //  A----B
+                        //       |
+                        //       O
+                        // In this setup, the earliestBoardTime at A is less than (before) the earliestBoardTime at B.
+                        // It might be possible to board a certain trip at B, but only a later trip at A. Because A
+                        // is evaluated first (providing updates to downstream stops), we need to check for earlier
+                        // trips that could be boarded at B.
                         int bestTripIdx = onTrip;
                         while (--bestTripIdx >= 0) {
                             TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
@@ -841,7 +850,8 @@ public class FastRaptorWorker {
         final int maxWalkMillimeters = walkSpeedMillimetersPerSecond * (request.maxWalkTime * SECONDS_PER_MINUTE);
         final int nStops = state.bestNonTransferTimes.length;
         // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
-        // These transfers then update the post-transfers bitset to avoid concurrent modification while iterating.
+        // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
+        // iterating.
         for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
                  stop > -1;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)

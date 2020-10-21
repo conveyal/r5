@@ -42,13 +42,15 @@ public class PathResult {
 
 
     public static class PathIterations {
-        public String path;
+        public String[] path;
         public int[] iterations;
 
         PathIterations(Path path, Collection<Integer> iterations, TransitLayer transitLayer) {
             if (path == null) {
-                this.path = "null";
+                this.path = new String[1];
+                this.path[0] = "No path";
             } else {
+                this.path = new String[path.length + 2];
                 this.path = path.toString(transitLayer);
             }
             this.iterations = iterations.stream().mapToInt(i -> i).sorted().toArray();

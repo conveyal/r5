@@ -204,21 +204,26 @@ public class Path {
         return builder.toString();
     }
 
-    public String toString (TransitLayer transitLayer) {
-        var builder = new StringBuilder();
-        builder.append("Path:\n");
-        builder.append(" " + accessMode + " access \n");
+    public String[] toString (TransitLayer transitLayer) {
+        String[] pathSummary = new String[length + 2];
+        pathSummary[0] = accessMode.toString();
         for (int i = 0; i < length; i++) {
+            var builder = new StringBuilder();
             builder.append(transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name);
-            builder.append(" from ");
+            builder.append(", ");
+            builder.append(boardStops[i]);
+            builder.append(" to ");
+            builder.append(alightStops[i]);
+            builder.append(" alighting ");
+            builder.append(Math.floorDiv(alightTimes[i], 3600) + ":" + alightTimes[0] / 60f % 60);
+            builder.append(" (");
             builder.append(transitLayer.stopNames.get(boardStops[i]));
             builder.append(" to ");
             builder.append(transitLayer.stopNames.get(alightStops[i]));
-            builder.append(" alighting at ");
-            builder.append(alightTimes[i] / 60f / 60f);
-            builder.append("\n");
+            builder.append(")");
+            pathSummary[i + 1] = builder.toString();
         }
-        builder.append(" " + egressMode + " egress");
-        return builder.toString();
+        pathSummary[pathSummary.length - 1] = egressMode.toString();
+        return pathSummary;
     }
 }

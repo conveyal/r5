@@ -854,7 +854,6 @@ public class FastRaptorWorker {
         // Cast and multiplication factored out of the tight loop below to ensure they are not repeatedly evaluated.
         final int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         final int maxWalkMillimeters = walkSpeedMillimetersPerSecond * (request.maxWalkTime * SECONDS_PER_MINUTE);
-        final int nStops = state.bestNonTransferTimes.length;
         // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
         // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
         // iterating.

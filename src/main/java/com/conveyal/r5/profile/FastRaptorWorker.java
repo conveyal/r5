@@ -366,9 +366,12 @@ public class FastRaptorWorker {
                 }
                 // Apply transfers to the scheduled result that will be reused for the previous departure minute.
                 // Transfers will be applied separately to the derived frequency result below, when relevant.
-                raptorTimer.scheduledSearchTransfers.start();
-                doTransfers(scheduleState[round]);
-                raptorTimer.scheduledSearchTransfers.stop();
+                // The transfer step can be skipped in the last round.
+                if (round < request.maxRides) {
+                    raptorTimer.scheduledSearchTransfers.start();
+                    doTransfers(scheduleState[round]);
+                    raptorTimer.scheduledSearchTransfers.stop();
+                }
             }
             raptorTimer.scheduledSearch.stop();
         }
@@ -405,9 +408,13 @@ public class FastRaptorWorker {
                     doFrequencySearchForRound(frequencyState[round], boardingMode);
                     raptorTimer.frequencySearchFrequency.stop();
 
-                    raptorTimer.frequencySearchTransfers.start();
-                    doTransfers(frequencyState[round]);
-                    raptorTimer.frequencySearchTransfers.stop();
+                    if (round < request.maxRides) {
+                        // Transfers not needed after last round
+                        raptorTimer.frequencySearchTransfers.start();
+                        doTransfers(frequencyState[round]);
+                        raptorTimer.frequencySearchTransfers.stop();
+                    }
+
                 }
                 // No need to make an additional protective copy, this state is already a copy of the scheduled state.
                 RaptorState finalRoundState = frequencyState[request.maxRides];
@@ -539,6 +546,15 @@ public class FastRaptorWorker {
                     } else {
                         // We are already on a trip, but check if this stop was reached early enough to back up
                         // to an earlier trip on the same pattern.
+                        // For example, consider two potential boarding stops on a pattern (A and B), with the search
+                        // origin closer to B:
+                        //  A----B
+                        //       |
+                        //       O
+                        // In this setup, the earliestBoardTime at A is less than (before) the earliestBoardTime at B.
+                        // It might be possible to board a certain trip at B, but only a later trip at A. Because A
+                        // is evaluated first (providing updates to downstream stops), we need to check for earlier
+                        // trips that could be boarded at B.
                         int bestTripIdx = onTrip;
                         while (--bestTripIdx >= 0) {
                             TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
@@ -833,17 +849,16 @@ public class FastRaptorWorker {
      * post-transfer times are also updated.
      * The patterns to be explored in the next round are then determined by which stops were updated by either transit
      * or transfer arrivals.
-     * FIXME this should be skipped on the last round, where resulting values will not be used.
      */
     private void doTransfers (RaptorState state) {
         // Cast and multiplication factored out of the tight loop below to ensure they are not repeatedly evaluated.
         final int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         final int maxWalkMillimeters = walkSpeedMillimetersPerSecond * (request.maxWalkTime * SECONDS_PER_MINUTE);
-        final int nStops = state.bestNonTransferTimes.length;
         // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
-        // These transfers then update the post-transfers bitset to avoid concurrent modification while iterating.
+        // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
+        // iterating.
         for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
-                 stop > 0;
+                 stop >= 0;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
             TIntList transfersFromStop = transit.transfersForStop.get(stop);

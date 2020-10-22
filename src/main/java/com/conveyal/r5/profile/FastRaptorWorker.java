@@ -858,7 +858,7 @@ public class FastRaptorWorker {
         // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
         // iterating.
         for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
-                 stop > -1;
+                 stop >= 0;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
             TIntList transfersFromStop = transit.transfersForStop.get(stop);

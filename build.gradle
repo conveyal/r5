@@ -230,10 +230,10 @@ dependencies {
 
     implementation 'javax.xml.bind:jaxb-api:2.3.1'
 
-    // Google Protocol Buffers are used in decoding OSM data and seamless census data.
-    implementation 'com.google.protobuf:protobuf-java:2.6.1'
+    // Google Protocol Buffers are used in decoding OSM data and seamless census data (in Geobuf format).
+    implementation 'com.google.protobuf:protobuf-java:3.13.0'
 
-    // OSM PBF format support. Transitive dependency on Protobuf 3.4.0.
+    // OSM PBF format support. Transitive dependency on Protobuf 3.4.0 (or 2.6.1?)
     // TODO investigate any conflict with above
     implementation 'org.openstreetmap.osmosis:osmosis-osm-binary:0.45'
 

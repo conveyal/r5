@@ -1,6 +1,6 @@
 # Conveyal R5 Routing Engine
 
-## Rapid Realistic Routing on Real-world and Reimagined networks
+## R5: Rapid Realistic Routing on Real-world and Reimagined networks
 
 R5 is Conveyal's routing engine for multimodal (transit/bike/walk/car) networks, with a particular focus on public transit. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opportunities accessibility indicators). 
 
@@ -49,7 +49,9 @@ Once you have this backend running, follow the instructions to start the [analys
 
 ## Creating a development environment
 
-In order to do development on the frontend or backend, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on R5. Add r5 to IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.analysis.BackendMain`, which is the main class. You will need to configure the JVM options and properties file mentioned above.
+In order to do development on the frontend or backend, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on R5. Import R5 into IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.analysis.BackendMain`, which is the main class. You will need to configure the JVM options and properties file mentioned above.
+
+By default, IntelliJ will follow common Gradle practice and build R5 using the "Gradle wrapper" approach, in which operating-system specific scripts are run that download and install a specific version of Gradle in the projet directory. We have encountered problems with this approach where IntelliJ seems to have insufficient control over the build/run/debug cycle. IntelliJ has its own internal implementation of the Gradle build process, and in our experience this works quite smoothly and is better integrated with the debug cycle. To switch to this appraoch, in the Gradle section of the IntelliJ settings, choose "Build and run using IntelliJ IDEA" and "Run tests using IntelliJ IDEA". Below that you may also want to choose "Use Gradle from specified location" to use your local system-wide copy.
 
 ## Structured Commit Messages
 

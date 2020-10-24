@@ -232,37 +232,18 @@ public class RaptorState {
         // update the non-transfer time and path information, then consider updating the bestTimes.
         // We may want to consider splitting the post-transfer updating out into its own method to make this clearer.
         if (!transfer && time < bestNonTransferTimes[stop]) {
+            checkState(previous != null, "Setting times at stops before an initial round is complete.");
             bestNonTransferTimes[stop] = time;
             previousPatterns[stop] = fromPattern;
             previousStop[stop] = fromStop;
-
-            // Carry the travel time components (wait and in-vehicle time) from the previous leg and increment them.
-            int totalWaitTime, totalInVehicleTime;
-            if (previous == null) {
-                // first round, there is no previous wait time or in vehicle time
-                // TODO how and when can this happen? Round zero contains only the access leg and has no transit.
-                totalWaitTime = waitTime;
-                totalInVehicleTime = inVehicleTime;
-            } else {
-                // TODO it seems like this whole block and the assignment below can be condensed significantly.
-                if (previous.transferStop[fromStop] != -1) {
-                    // The fromSop was optimally reached via a transfer at the end of the previous round.
-                    // Get the wait and in-vehicle time from the source stop of that transfer.
-                    int preTransferStop = previous.transferStop[fromStop];
-                    totalWaitTime = previous.nonTransferWaitTime[preTransferStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[preTransferStop] + inVehicleTime;
-                } else {
-                    // The stop we boarded at was reached directly by transit in the previous round.
-                    totalWaitTime = previous.nonTransferWaitTime[fromStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[fromStop] + inVehicleTime;
-                }
-            }
+            // Increment the travel time components (wait and in-vehicle time).
+            int previousAlightingStop = previous.transferStop[fromStop] == -1 ? fromStop : previous.transferStop[fromStop];
+            int totalWaitTime = previous.nonTransferWaitTime[previousAlightingStop] + waitTime;
+            int totalInVehicleTime = previous.nonTransferInVehicleTravelTime[previousAlightingStop] + inVehicleTime;
             nonTransferWaitTime[stop] = totalWaitTime;
             nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
-
             checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime),
                     "Components of travel time are greater than total travel time.");
-
             optimal = true;
             nonTransferStopsUpdated.set(stop);
         }

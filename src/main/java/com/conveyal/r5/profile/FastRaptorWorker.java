@@ -511,13 +511,14 @@ public class FastRaptorWorker {
                 // that we don't check for alighting when boarding
                 if (onTrip > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
                     int alightTime = schedule.arrivals[stopPositionInPattern];
-                    int onVehicleTime = alightTime - boardTime;
+                    int inVehicleTime = alightTime - boardTime;
 
-                    if (waitTime + onVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
+                    // Use checkState instead?
+                    if (waitTime + inVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
                         LOG.error("Components of travel time are larger than travel time!");
                     }
 
-                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, onVehicleTime, false);
+                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, inVehicleTime, false);
                 }
 
                 // Don't attempt to board if this stop was not reached in the last round or if pick up is not allowed.

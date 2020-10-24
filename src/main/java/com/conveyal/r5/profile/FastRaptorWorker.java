@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.RouteInfo;
@@ -108,7 +109,7 @@ public class FastRaptorWorker {
     private final TIntIntMap accessStops;
 
     /** The routing parameters. */
-    private final ProfileRequest request;
+    private final AnalysisWorkerTask request;
 
     /** The indexes of the trip patterns running on a given day with frequency-based trips of selected modes. */
     private final BitSet runningFrequencyPatterns = new BitSet();
@@ -141,7 +142,7 @@ public class FastRaptorWorker {
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
-    public FastRaptorWorker (TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
+    public FastRaptorWorker (TransitLayer transitLayer, AnalysisWorkerTask request, TIntIntMap accessStops) {
         this.transit = transitLayer;
         this.request = request;
         this.accessStops = accessStops;
@@ -571,6 +572,8 @@ public class FastRaptorWorker {
                             } else {
                                 // The trip under consideration arrives too early,
                                 // stop searching since trips are sorted by departure time within a pattern.
+                                // The trip under consideration arrives at this stop earlier than one could feasibly
+                                // board. Stop searching, because trips are sorted by departure time within a pattern.
                                 break;
                             }
                         }

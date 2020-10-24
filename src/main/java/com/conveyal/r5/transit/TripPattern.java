@@ -43,6 +43,9 @@ public class TripPattern implements Serializable, Cloneable {
     public PickDropType[] pickups;
     public PickDropType[] dropoffs;
     public BitSet wheelchairAccessible; // One bit per stop
+
+    /** TripSchedules for all trips following this pattern, sorted in ascending order by time of departure from first
+     *  stop */
     public List<TripSchedule> tripSchedules = new ArrayList<>();
 
     /** GTFS shape for this pattern. Should be left null in non-customer-facing applications */

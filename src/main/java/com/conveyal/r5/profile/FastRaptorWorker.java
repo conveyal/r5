@@ -369,7 +369,7 @@ public class FastRaptorWorker {
                 // The transfer step can be skipped in the last round.
                 if (round < request.maxRides) {
                     raptorTimer.scheduledSearchTransfers.start();
-                    doTransfers(scheduleState[round]);
+                    doTransfersRefactored(scheduleState[round]);
                     raptorTimer.scheduledSearchTransfers.stop();
                 }
             }
@@ -411,7 +411,7 @@ public class FastRaptorWorker {
                     if (round < request.maxRides) {
                         // Transfers not needed after last round
                         raptorTimer.frequencySearchTransfers.start();
-                        doTransfers(frequencyState[round]);
+                        doTransfersRefactored(frequencyState[round]);
                         raptorTimer.frequencySearchTransfers.stop();
                     }
 
@@ -872,6 +872,35 @@ public class FastRaptorWorker {
                         int timeAtTargetStop = state.bestNonTransferTimes[stop] + walkTimeToTargetStopSeconds;
                         state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * This has a few differences: staying at the stop is treated as a "loop transfer", which can simplify the algorithm
+     * and allows imposing minimum transfer times when waiting for another vehicle at the same stop.
+     * For now we're only applying minimum transfer times as an exhaustive list of available transfers, but eventually
+     * we'll want to merge them with transfers found through the OSM network.
+     * THIS DOES NOT WORK WITH SCENARIOS THAT ADD STOPS.
+     */
+    private void doTransfersRefactored (RaptorState state) {
+        // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
+        // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
+        // iterating.
+        final int maxWalkTimeSeconds = request.maxWalkTime * SECONDS_PER_MINUTE;
+        for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
+             stop >= 0;
+             stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
+        ) {
+            TIntList minTimesFromStop = transit.minTransferTimesFromStop[stop];
+            if (minTimesFromStop != null) {
+                for (int i = 0; i < minTimesFromStop.size(); i += 2) {
+                    int targetStop = minTimesFromStop.get(i);
+                    int minTimeSeconds = minTimesFromStop.get(i + 1);
+                    // if (minTimeSeconds < maxWalkTimeSeconds) {
+                    int timeAtTargetStop = state.bestNonTransferTimes[stop] + minTimeSeconds;
+                    state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
                 }
             }
         }

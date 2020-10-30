@@ -2,6 +2,7 @@ package com.conveyal.r5.common;
 
 import java.util.Collection;
 import java.util.Arrays;
+import java.util.Map;
 
 public abstract class Util {
 
@@ -32,6 +33,14 @@ public abstract class Util {
 
     public static boolean notNullOrEmpty (Collection collection) {
         return !isNullOrEmpty(collection);
+    }
+
+    public static boolean isNullOrEmpty (Map map) {
+        return map == null || map.isEmpty();
+    }
+
+    public static boolean notNullOrEmpty (Map map) {
+        return !isNullOrEmpty(map);
     }
 
     public static <T> boolean isNullOrEmpty (T[] array) {

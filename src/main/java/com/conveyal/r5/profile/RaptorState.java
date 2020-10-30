@@ -214,75 +214,66 @@ public class RaptorState {
     /**
      * Check a time against the best known times at a transit stop, and record the new time if it is optimal.
      * This same method is used to handle both transit arrivals and transfers, according to the transfer parameter.
-     * When transfer is false, times can update both the bestNonTransferTime and the bestTime; when transfer is true,
-     * only bestTimes can be updated.
-     *
+     * When transfer is false, times can only update bestNonTransferTime.
+     * When transfer is true, times can only update bestTimes.
+     * Note that staying at the same stop to board in the next round is now treated as a trivial "transfer".
      * @param transfer if true, we are recording a time obtained via a transfer or the initial access leg in round 0
      * @return true if the new time was optimal and the state was updated, false if the existing values were better
      */
     public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer) {
+
         // First check whether the supplied travel time exceeds the specified maximum for this search.
         if (time >= departureTime + maxDurationSeconds) {
             return false;
         }
-        // Method return value: was the new time optimal, leading to a state update?
-        boolean optimal = false;
 
-        // If this is "not a transfer" it is a transit arrival. If it is better than any known transit arrival,
-        // update the non-transfer time and path information, then consider updating the bestTimes.
-        // We may want to consider splitting the post-transfer updating out into its own method to make this clearer.
-        if (!transfer && time < bestNonTransferTimes[stop]) {
-            bestNonTransferTimes[stop] = time;
-            previousPatterns[stop] = fromPattern;
-            previousStop[stop] = fromStop;
-
-            // Carry the travel time components (wait and in-vehicle time) from the previous leg and increment them.
-            int totalWaitTime, totalInVehicleTime;
-            if (previous == null) {
-                // first round, there is no previous wait time or in vehicle time
-                // TODO how and when can this happen? Round zero contains only the access leg and has no transit.
-                totalWaitTime = waitTime;
-                totalInVehicleTime = inVehicleTime;
-            } else {
-                // TODO it seems like this whole block and the assignment below can be condensed significantly.
-                if (previous.transferStop[fromStop] != -1) {
-                    // The fromSop was optimally reached via a transfer at the end of the previous round.
-                    // Get the wait and in-vehicle time from the source stop of that transfer.
-                    int preTransferStop = previous.transferStop[fromStop];
-                    totalWaitTime = previous.nonTransferWaitTime[preTransferStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[preTransferStop] + inVehicleTime;
-                } else {
-                    // The stop we boarded at was reached directly by transit in the previous round.
-                    totalWaitTime = previous.nonTransferWaitTime[fromStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[fromStop] + inVehicleTime;
-                }
-            }
-            nonTransferWaitTime[stop] = totalWaitTime;
-            nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
-
-            checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime),
-                    "Components of travel time are greater than total travel time.");
-
-            optimal = true;
-            nonTransferStopsUpdated.set(stop);
-        }
-
-        // At a given stop, bestTimes is always less than or equal to bestNonTransferTimes. It will always be equal to
-        // the bestNonTransferTimes unless a transfer from some other stop yields an earlier time.
-        // If bestTimes is updated due to a transit arrival, the travel time components are already updated by the
-        // transit-handling block above. If it's due to a transfer, the travel time components were already recorded
-        // by an optimal arrival at the source station of the transfer.
-        if (time < bestTimes[stop]) {
-            bestTimes[stop] = time;
-            if (transfer) {
+        if (transfer) {
+            if (time < bestTimes[stop]) {
+                bestTimes[stop] = time;
                 transferStop[stop] = fromStop;
-            } else {
-                transferStop[stop] = -1;
+                stopsUpdated.set(stop);
+                return true;
             }
-            optimal = true;
-            stopsUpdated.set(stop);
+        } else {
+            // If this is "not a transfer" it is a transit arrival. If it is better than any known transit arrival,
+            // update the non-transfer time and path information.
+            if (time < bestNonTransferTimes[stop]) {
+                bestNonTransferTimes[stop] = time;
+                previousPatterns[stop] = fromPattern;
+                previousStop[stop] = fromStop;
+
+                // Carry the travel time components (wait and in-vehicle time) from the previous leg and increment them.
+                int totalWaitTime, totalInVehicleTime;
+                if (previous == null) {
+                    // first round, there is no previous wait time or in vehicle time
+                    // TODO how and when can this happen? Round zero contains only the access leg and has no transit.
+                    totalWaitTime = waitTime;
+                    totalInVehicleTime = inVehicleTime;
+                } else {
+                    // TODO it seems like this whole block and the assignment below can be condensed significantly.
+                    if (previous.transferStop[fromStop] != -1) {
+                        // The fromSop was optimally reached via a transfer at the end of the previous round.
+                        // Get the wait and in-vehicle time from the source stop of that transfer.
+                        int preTransferStop = previous.transferStop[fromStop];
+                        totalWaitTime = previous.nonTransferWaitTime[preTransferStop] + waitTime;
+                        totalInVehicleTime = previous.nonTransferInVehicleTravelTime[preTransferStop] + inVehicleTime;
+                    } else {
+                        // The stop we boarded at was reached directly by transit in the previous round.
+                        totalWaitTime = previous.nonTransferWaitTime[fromStop] + waitTime;
+                        totalInVehicleTime = previous.nonTransferInVehicleTravelTime[fromStop] + inVehicleTime;
+                    }
+                }
+                nonTransferWaitTime[stop] = totalWaitTime;
+                nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
+                checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime), "Components of travel time are greater than total travel time.");
+                transferStop[stop] = -1; // reached by transit, not transfer
+                nonTransferStopsUpdated.set(stop);
+                return true;
+            }
         }
-        return optimal;
+
+        // If we reach here, no new optimum was found.
+        return false;
     }
 
     /** Debug function: dump the path to a particular stop as a String. */

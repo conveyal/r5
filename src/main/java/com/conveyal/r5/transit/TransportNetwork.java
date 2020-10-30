@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
+
 /**
  * This is a completely new replacement for Graph, Router etc.
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
@@ -178,9 +180,12 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
 
-        // Create transfers
-        new TransferFinder(transportNetwork).findTransfers();
-        new TransferFinder(transportNetwork).findParkRideTransfer();
+        // Create transfers vis OSM network if none were imported from transfers.txt. Eventually the two should be
+        // combined, but for now we're doing analyses with an exhaustive list in transfers.txt.
+        if (isNullOrEmpty(transitLayer.minTransferTimesFromStop)) {
+            new TransferFinder(transportNetwork).findTransfers();
+            new TransferFinder(transportNetwork).findParkRideTransfer();
+        }
 
         transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
 

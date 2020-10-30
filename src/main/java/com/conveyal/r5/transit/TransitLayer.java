@@ -9,6 +9,7 @@ import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
@@ -53,6 +54,11 @@ import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
+
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 
 /**
@@ -110,9 +116,13 @@ public class TransitLayer implements Serializable, Cloneable {
     // Inverse map of streetVertexForStop, and reconstructed from that list.
     public transient TIntIntMap stopForStreetVertex;
 
-    // For each stop, a packed list of transfers to other stops
-    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
+    // For each stop, a packed list of transfers to other stops.
+    // The list for each origin stop is a series of pairs of (destination stop index, distance in millimeters).
     public List<TIntList> transfersForStop = new ArrayList<>();
+
+    // For each stop, a packed list of minimum times required to reach other stops. This reflects GTFS transfer type 2.
+    // The list for each origin stop is a series of pairs of (destination stop index, minimum time in seconds).
+    public TIntList[] minTransferTimesFromStop;
 
     /** Information about a route */
     public List<RouteInfo> routes = new ArrayList<>();
@@ -458,14 +468,38 @@ public class TransitLayer implements Serializable, Cloneable {
             this.fares = new HashMap<>(gtfs.fares);
         }
 
-        // Will be useful in naming patterns.
-//        LOG.info("Finding topology of each route/direction...");
-//        Multimap<T2<String, Integer>, TripPattern> patternsForRouteDirection = HashMultimap.create();
-//        tripPatterns.forEach(tp -> patternsForRouteDirection.put(new T2(tp.routeId, tp.directionId), tp));
-//        for (T2<String, Integer> routeAndDirection : patternsForRouteDirection.keySet()) {
-//            RouteTopology topology = new RouteTopology(routeAndDirection.first, routeAndDirection.second, patternsForRouteDirection.get(routeAndDirection));
-//        }
-
+        // TODO check how min transfer slack is applied on top of transfer times
+        // TODO try storing these minimum times separately so they're not affected by walk speed
+        if (notNullOrEmpty(gtfs.transfers)) {
+            LOG.info("Loading {} transfers from transfers.txt...", gtfs.transfers.size());
+            // Currently this only handles type 2 "minimum time to make a transfer"
+            minTransferTimesFromStop = new TIntList[stopForIndex.size()];
+            for (Transfer transfer : gtfs.transfers.values()) {
+                checkState(transfer.transfer_type == 2);
+                checkState(transfer.min_transfer_time > 0);
+                checkState(transfer.from_route_id == null);
+                checkState(transfer.from_trip_id == null);
+                checkState(transfer.to_route_id == null);
+                checkState(transfer.to_trip_id == null);
+                checkNotNull(transfer.from_stop_id);
+                checkNotNull(transfer.to_stop_id);
+                int fromStopIndex = indexForUnscopedStopId.get(transfer.from_stop_id);
+                int toStopIndex = indexForUnscopedStopId.get(transfer.to_stop_id);
+                // Do not (yet?) support minimum times between stations (rather than stops).
+                checkState(stopForIndex.get(fromStopIndex).location_type == 0);
+                checkState(stopForIndex.get(toStopIndex).location_type == 0);
+                if (minTransferTimesFromStop[fromStopIndex] == null) {
+                    minTransferTimesFromStop[fromStopIndex] = new TIntArrayList();
+                }
+                // final double defaultWalkSpeedMetersPerSecond = 1.3888888888888888;
+                // int millimeters = (int) (transfer.min_transfer_time * defaultWalkSpeedMetersPerSecond * 1000);
+                // minTransferTimesFromStop[fromStopIndex].add(millimeters);
+                // LOG.info("Normalized distance from stop {} to stop {} is {} meters.",
+                //        fromStopIndex, toStopIndex, millimeters / 1000d);
+                minTransferTimesFromStop[fromStopIndex].add(toStopIndex);
+                minTransferTimesFromStop[fromStopIndex].add(transfer.min_transfer_time);
+            }
+        }
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

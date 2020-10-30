@@ -61,7 +61,8 @@ public class FastRaptorWorker {
 
     /**
      * Minimum time between alighting from one vehicle and boarding another, in seconds.
-     * TODO make this configurable, and use loop-transfers from transfers.txt.
+     * FIXME strangely this appears to only be used in classes for displaying paths, not for routing.
+     *  Apply when finding soonest viable departure.
      */
     public static final int BOARD_SLACK_SECONDS = 60;
 
@@ -898,6 +899,9 @@ public class FastRaptorWorker {
                 for (int i = 0; i < minTimesFromStop.size(); i += 2) {
                     int targetStop = minTimesFromStop.get(i);
                     int minTimeSeconds = minTimesFromStop.get(i + 1);
+                    if (minTimeSeconds < BOARD_SLACK_SECONDS) {
+                        minTimeSeconds = BOARD_SLACK_SECONDS;
+                    }
                     // if (minTimeSeconds < maxWalkTimeSeconds) {
                     int timeAtTargetStop = state.bestNonTransferTimes[stop] + minTimeSeconds;
                     state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);

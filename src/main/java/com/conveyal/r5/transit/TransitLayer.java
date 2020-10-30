@@ -485,6 +485,9 @@ public class TransitLayer implements Serializable, Cloneable {
                 checkNotNull(transfer.to_stop_id);
                 int fromStopIndex = indexForUnscopedStopId.get(transfer.from_stop_id);
                 int toStopIndex = indexForUnscopedStopId.get(transfer.to_stop_id);
+                // Do not (yet?) support minimum times between stations (rather than stops).
+                checkState(stopForIndex.get(fromStopIndex).location_type == 0);
+                checkState(stopForIndex.get(toStopIndex).location_type == 0);
                 if (minTransferTimesFromStop[fromStopIndex] == null) {
                     minTransferTimesFromStop[fromStopIndex] = new TIntArrayList();
                 }

@@ -232,6 +232,9 @@ public class RaptorState {
         // update the non-transfer time and path information, then consider updating the bestTimes.
         // We may want to consider splitting the post-transfer updating out into its own method to make this clearer.
         if (!transfer && time < bestNonTransferTimes[stop]) {
+            // There's always a previous state here, because in this block we're setting transit arrival times, which
+            // in the current implementation can only happen in a later round, since the first round contains only
+            // non-transit times.
             checkState(previous != null, "Setting times at stops before an initial round is complete.");
             bestNonTransferTimes[stop] = time;
             previousPatterns[stop] = fromPattern;
@@ -335,6 +338,30 @@ public class RaptorState {
             int prevTime = (previous != null) ? previous.bestTimes[stop] : UNREACHED;
             return time < prevTime;
         }
+    }
+
+    /**
+     * Checks whether boarding a at one stop allows for shorter access/transfer legs than boarding at another stop.
+     */
+    public boolean shorterAccessOrTransferLeg(int here, int there) {
+
+        if (here == there) return false;
+
+        if (this.previous == null) {
+            // In the first transit round (when the pre-transit state is the input state), arriving at this stop before
+            // arriving at the upstream stop implies shorter access time.
+            return this.bestTimes[here] < this.bestTimes[there];
+        } else {
+            // In subsequent transit rounds, we want to compare the length of the transfer legs.
+            // We cannot directly compare arrival times or waiting times at the stops, because the transfer legs may
+            // have started at different times.
+            return transferTime(here) < transferTime(there);
+        }
+    }
+
+    private int transferTime(int stop) {
+        int fromStop = this.transferStop[stop];
+        return fromStop == -1 ? 0 : this.bestTimes[stop] - this.bestNonTransferTimes[fromStop];
     }
 
 }

@@ -330,8 +330,6 @@ public class BrokerController implements HttpController {
 
         // Record any regional analysis results that were supplied by the worker and mark them completed.
         for (RegionalWorkResult workResult : perOriginResults) {
-            // Prevent the backend from shutting down when it's receiving regional analysis results.
-            BackendMain.recordActivityToPreventShutdown();
             broker.handleRegionalWorkResult(workResult);
         }
         // Clear out the results field so it's not visible in the worker list API endpoint.

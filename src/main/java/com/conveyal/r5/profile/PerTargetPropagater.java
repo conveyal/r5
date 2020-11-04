@@ -283,8 +283,6 @@ public class PerTargetPropagater {
      * For every "iteration" (departure minute and Monte Carlo schedule), find a complete travel time to the specified
      * target from the given nearby stop, and update the best known time for that iteration and target.
      * Also record the best paths if we're going to be saving transit path details.
-     * TODO verify if these are actually travel times (vs. clock times after midnight) and clarify code comments.
-     * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex, LinkedPointSet linkedTargets) {
 
@@ -323,10 +321,12 @@ public class PerTargetPropagater {
                 }
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
-                        int timeAtStop = travelTimesToStop[stop][iteration];
-                        if (timeAtStop >= maxTravelTimeSeconds || timeAtStop >= perIterationTravelTimes[iteration]) {
-                            // Skip propagation if all resulting times will be greater than the cutoff and
-                            // cannot improve on the best known time at this iteration. Also avoids overflow.
+                        // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
+                        // calculated in the Raptor route() method.
+                        int timeToReachStop = travelTimesToStop[stop][iteration];
+                        if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
+                            // Skip propagation if the travel time to reach this stop is longer than the maximum
+                            // travel time, or the travel time all the way to this target (via another stop).
                             continue;
                         }
 
@@ -353,10 +353,10 @@ public class PerTargetPropagater {
                                     }
                         }
 
-                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                        if (timeAtTarget < maxTravelTimeSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {
+                        int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
+                        if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
                             // To reach this target, alighting at this stop is faster than any previously checked stop.
-                            perIterationTravelTimes[iteration] = timeAtTarget;
+                            perIterationTravelTimes[iteration] = timeToReachTarget;
                             if (calculateComponents) {
                                 Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
                                 perIterationPaths[iteration] = pathsToStops[stop];

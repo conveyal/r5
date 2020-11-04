@@ -100,6 +100,14 @@ public class EgressCostTable implements Serializable {
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomous vehicle,
+     * scooter pickup, etc.). We track this separately so the egress time limit can exclude waiting time.
+     *
+     * Should remain null if there is not a pickup delay modification applied for this streetmode.
+     */
+    public int[] egressStopDelaysSeconds;
+
+    /**
      * Build an EgressCostTable for the given LinkedPointSet.
      * If the LinkedPointSet is for a scenario built on top of a baseline, elements in the EgressCostTable for the
      * baseline should be reused where possible, with only the differences recomputed.
@@ -127,6 +135,16 @@ public class EgressCostTable implements Serializable {
                 : baseLinkage.getEgressCostTable(progressListener);
 
         this.linkedPointSet = linkedPointSet;
+
+        TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
+        int nStops = transitLayer.getStopCount();
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
+        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
+
+        if (pickupWaitTimes != null && linkedPointSet.streetMode == pickupWaitTimes.streetMode) {
+            egressStopDelaysSeconds = new int[nStops];
+            Arrays.fill(egressStopDelaysSeconds, pickupWaitTimes.getDefaultWaitInSeconds());
+        }
 
         if (linkedPointSet.streetMode == StreetMode.CAR) {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
@@ -193,8 +211,6 @@ public class EgressCostTable implements Serializable {
         if (rebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
-        TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
-        int nStops = transitLayer.getStopCount();
 
         // TODO create a multi-counter that can track two different numbers and include them in a single "Done" message.
         // Maybe we should just make a custom ProgressCounter static inner class everywhere one is needed.
@@ -253,6 +269,10 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
+                if (pickupWaitTimes != null && pickupWaitTimes.egressUnavailable(stopIndex, streetMode)) {
+                    LOG.info("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
+                    return null;
+                }
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
@@ -266,6 +286,17 @@ public class EgressCostTable implements Serializable {
                 // sr.setOrigin(vertexId);
                 VertexStore.Vertex vertex = linkedPointSet.streetLayer.vertexStore.getCursor(vertexId);
                 sr.setOrigin(vertex.getLat(), vertex.getLon());
+
+                Geometry egressArea = null;
+
+                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
+                // initialized and filled with the default value in the constructor. Here, we override the default
+                // values with any stop-specific values.
+                if (egressStopDelaysSeconds != null) {
+                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
+                    egressArea = egressService.serviceArea;
+                    egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
+                }
 
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;

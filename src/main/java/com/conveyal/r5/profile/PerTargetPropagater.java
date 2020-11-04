@@ -327,27 +327,16 @@ public class PerTargetPropagater {
                             continue;
                         }
 
-                        // TODO shouldn't all the below egress delays be baked into linkedTargets.getEgressCostTable()
-                        //  .getCostTableForPoint(targetIndex)? At the end of the EgressCostTable constructor, we can
-                        //  see via linkedPointSet.streetLayer.waitTimePolygons (or a new wrapper class
-                        //  AccessEgressWaitTimes) whether each stop has an egress delay and add it in to all stops.
-                        //  Applying the pickup delay modification creates a new street layer, so a new linkage.
-
                         // Account for any additional delay waiting for pickup at the egress stop.
-                        // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been
-                        //  requested (triggering the building of egressStopDelayTables above, which leads to
-                        //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
-                        //  be ignored when running a scenario without pickup delay modifications.
-                        if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
-                                && linkedTargets.egressStopDelaysSeconds != null) {
-                                    int delayAtEgress = linkedTargets.egressStopDelaysSeconds[stop];
-                                    if (delayAtEgress < 0) {
-                                        // Pickup for this mode not allowed at this stop, so trove iteration should
-                                        // continue
-                                        return true;
-                                    } else {
-                                        secondsFromStopToTarget += delayAtEgress;
-                                    }
+                        if (egressCostTable.egressStopDelaysSeconds != null) {
+                            int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
+                            if (delayAtEgress < 0) {
+                                // Pickup for this mode not allowed at this stop, so trove iteration should
+                                // continue
+                                return true;
+                            } else {
+                                secondsFromStopToTarget += delayAtEgress;
+                            }
                         }
 
                         int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;

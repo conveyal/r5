@@ -91,12 +91,6 @@ public class LinkedPointSet implements Serializable {
     public final int[] distances1_mm;
 
     /**
-     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomoous vehicle,
-     * scooter pickup, etc.)
-     */
-    public int[] egressStopDelaysSeconds;
-
-    /**
      * LinkedPointSets and their EgressCostTables are often copied from existing ones.
      * This field holds a reference to the source linkage from which the copy was made.
      * But there are two different ways linkages and cost tables can be based on existing ones:

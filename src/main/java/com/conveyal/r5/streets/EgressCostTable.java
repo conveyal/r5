@@ -100,6 +100,14 @@ public class EgressCostTable implements Serializable {
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
+     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomous vehicle,
+     * scooter pickup, etc.). We track this separately so the egress time limit can exclude waiting time.
+     *
+     * Should remain null if there is not a pickup delay modification applied for this streetmode.
+     */
+    public int[] egressStopDelaysSeconds;
+
+    /**
      * Build an EgressCostTable for the given LinkedPointSet.
      * If the LinkedPointSet is for a scenario built on top of a baseline, elements in the EgressCostTable for the
      * baseline should be reused where possible, with only the differences recomputed.
@@ -127,8 +135,19 @@ public class EgressCostTable implements Serializable {
                 : baseLinkage.getEgressCostTable(progressListener);
 
         this.linkedPointSet = linkedPointSet;
+        final StreetMode streetMode = linkedPointSet.streetMode;
 
-        if (linkedPointSet.streetMode == StreetMode.CAR) {
+        TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
+        int nStops = transitLayer.getStopCount();
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
+        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
+
+        if (pickupWaitTimes != null && streetMode == pickupWaitTimes.streetMode) {
+            egressStopDelaysSeconds = new int[nStops];
+            Arrays.fill(egressStopDelaysSeconds, pickupWaitTimes.getDefaultWaitInSeconds());
+        }
+
+        if (streetMode == StreetMode.CAR) {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         } else {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
@@ -141,8 +160,6 @@ public class EgressCostTable implements Serializable {
         // Only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
         // If null, build trees for all stops.
         final Geometry rebuildZone;
-
-        final StreetMode streetMode = linkedPointSet.streetMode;
 
         /**
          * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
@@ -193,8 +210,6 @@ public class EgressCostTable implements Serializable {
         if (rebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
-        TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
-        int nStops = transitLayer.getStopCount();
 
         // TODO create a multi-counter that can track two different numbers and include them in a single "Done" message.
         // Maybe we should just make a custom ProgressCounter static inner class everywhere one is needed.
@@ -253,6 +268,10 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
+                if (pickupWaitTimes != null && pickupWaitTimes.egressUnavailable(stopIndex, streetMode)) {
+                    LOG.info("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
+                    return null;
+                }
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
@@ -267,87 +286,36 @@ public class EgressCostTable implements Serializable {
                 VertexStore.Vertex vertex = linkedPointSet.streetLayer.vertexStore.getCursor(vertexId);
                 sr.setOrigin(vertex.getLat(), vertex.getLon());
 
+                Geometry egressArea = null;
+
+                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
+                // initialized and filled with the default value in the constructor. Here, we override the default
+                // values with any stop-specific values.
+                if (egressStopDelaysSeconds != null) {
+                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
+                    egressArea = egressService.serviceArea;
+                    egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
+                }
+
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    return linkedPointSet.extendDistanceTableToPoints(sr.getReachedVertices(), envelopeAroundStop);
                 } else if (streetMode == StreetMode.CAR) {
-                    // The speeds for Walk and Bicycle can be specified in an analysis request, so it makes sense above to
-                    // store distances and apply the requested speed. In contrast, car speeds vary by link and cannot be
-                    // set in analysis requests, so it makes sense to use seconds directly as the linkage cost.
+                    // Car speeds vary by link and cannot be set in analysis requests, so it makes sense to use
+                    // seconds directly as the linkage cost. In contrast, the speeds for Walk and Bicycle can be
+                    // specified in an analysis request, so it makes sense above to store distances and apply the
+                    // requested speed.
                     // TODO confirm this works as expected when modifications can affect street layer.
                     sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case
-                    //      it's much bigger than the driving radius.
-                    PointSetTimes driveTimesToAllPoints = linkedPointSet.eval(
-                            sr::getTravelTimeToVertex,
-                            null,
-                            LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND,
-                            null
-                    );
-                    // TODO optimization: should we make spatial index visit() method public to avoid copying results?
-                    TIntList packedDriveTimes = new TIntArrayList();
-                    for (int p = 0; p < driveTimesToAllPoints.size(); p++) {
-                        int driveTimeToPoint = driveTimesToAllPoints.getTravelTimeToPoint(p);
-                        if (driveTimeToPoint != Integer.MAX_VALUE) {
-                            packedDriveTimes.add(p);
-                            packedDriveTimes.add(driveTimeToPoint);
-                        }
-                    }
-                    if (packedDriveTimes.isEmpty()) {
-                        return null;
-                    } else {
-                        return packedDriveTimes.toArray();
-                    }
                 } else {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }
+                sr.quantityToMinimize = linkageCostUnit;
+                sr.route();
+                return linkedPointSet.extendCostsToPoints(sr, envelopeAroundStop, egressArea);
             }
         }).collect(Collectors.toList());
         computeCounter.done();
         copyCounter.done();
-
-        // Now that we have a full set of tables, filter and transform them to reflect on-demand egress service.
-        // TODO optimization: we could return null immediately above for all stops not served by the on-demand egress:
-        // if (onDemandEgressService != null && ! onDemandEgressService.allows(stopIndex)) return null;
-        // We could also integrate the geographic filtering into that same loop and extendDistanceTableToPoints.
-        // In fact this is a major optimization since building car tables is very slow, and we might only need a few.
-        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
-        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
-        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
-            if (streetMode != StreetMode.CAR) {
-                // FIXME only cars have egress cost tables in seconds. Others will need a constant time offset field.
-                throw new RuntimeException("Only car egress tables can have a baked in time delay.");
-            }
-            for (int s = 0; s < stopToPointLinkageCostTables.size(); s++) {
-                PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(s);
-                if (egressService == null || egressService.waitTimeSeconds < 0) {
-                    stopToPointLinkageCostTables.set(s, null);
-                    continue;
-                }
-                int[] costs = stopToPointLinkageCostTables.get(s);
-                TIntList filteredCosts = new TIntArrayList();
-                for (int i = 0; i < costs.length; i += 2) {
-                    int point = costs[i];
-                    int cost = costs[i + 1];
-                    // TODO normalize variable names (to costs?), these are not just times they may be distances.
-                    // TODO linkedPointSet.pointSet.getPointsInGeometry(), and pointInsideGeometry? default defs.
-                    double lat = linkedPointSet.pointSet.getLat(point);
-                    double lon = linkedPointSet.pointSet.getLon(point);
-                    if (GeometryUtils.containsPoint(egressService.serviceArea, lon, lat)) {
-                        filteredCosts.add(point);
-                        filteredCosts.add(cost + egressService.waitTimeSeconds);
-                    }
-                }
-                // null represents an empty array, which we presume may be more efficiently serializable than lots of
-                // references to a single empty array instance.
-                int[] filteredCostsArray = filteredCosts.isEmpty() ? null : filteredCosts.toArray();
-                stopToPointLinkageCostTables.set(s, filteredCostsArray);
-            }
-        }
     }
 
     /**

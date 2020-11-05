@@ -292,8 +292,6 @@ public class PerTargetPropagater {
      * For every "iteration" (departure minute and Monte Carlo schedule), find a complete travel time to the specified
      * target from the given nearby stop, and update the best known time for that iteration and target.
      * Also record the best paths if we're going to be saving transit path details.
-     * TODO verify if these are actually travel times (vs. clock times after midnight) and clarify code comments.
-     * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex, LinkedPointSet linkedTargets) {
 
@@ -313,9 +311,6 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
-        // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
-        // FIXME ensure this ^ is baked into the PickupDelay class
-
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
@@ -332,49 +327,41 @@ public class PerTargetPropagater {
                 }
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
-                        int timeAtStop = travelTimesToStop[stop][iteration];
-                        if (timeAtStop >= maxTravelTimeSeconds || timeAtStop >= perIterationTravelTimes[iteration]) {
-                            // Skip propagation if all resulting times will be greater than the cutoff and
-                            // cannot improve on the best known time at this iteration. Also avoids overflow.
+                        // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
+                        // calculated in the Raptor route() method.
+                        int timeToReachStop = travelTimesToStop[stop][iteration];
+                        if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
+                            // Skip propagation if the travel time to reach this stop is longer than the maximum
+                            // travel time, or the travel time all the way to this target (via another stop).
                             continue;
                         }
 
-                        // TODO shouldn't all the below egress delays be baked into linkedTargets.getEgressCostTable()
-                        //  .getCostTableForPoint(targetIndex)? At the end of the EgressCostTable constructor, we can
-                        //  see via linkedPointSet.streetLayer.waitTimePolygons (or a new wrapper class
-                        //  AccessEgressWaitTimes) whether each stop has an egress delay and add it in to all stops.
-                        //  Applying the pickup delay modification creates a new street layer, so a new linkage.
-
                         // Account for any additional delay waiting for pickup at the egress stop.
-                        // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been
-                        //  requested (triggering the building of egressStopDelayTables above, which leads to
-                        //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
-                        //  be ignored when running a scenario without pickup delay modifications.
-                        if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
-                                && linkedTargets.egressStopDelaysSeconds != null) {
-                                    int delayAtEgress = linkedTargets.egressStopDelaysSeconds[stop];
-                                    if (delayAtEgress < 0) {
-                                        // Pickup for this mode not allowed at this stop, so trove iteration should
-                                        // continue
-                                        return true;
-                                    } else {
-                                        secondsFromStopToTarget += delayAtEgress;
-                                    }
+                        if (egressCostTable.egressStopDelaysSeconds != null) {
+                            int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
+                            if (delayAtEgress < 0) {
+                                // Pickup for this mode not allowed at this stop, so trove iteration should
+                                // continue
+                                return true;
+                            } else {
+                                secondsFromStopToTarget += delayAtEgress;
+                            }
                         }
 
-                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                        if (timeAtTarget < maxTravelTimeSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {
+                        int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
+                        if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
                             // To reach this target in this iteration, alighting at this stop and proceeding by this
                             // egress mode is faster than any previously checked stop/egress mode combination.
                             // Because that's the case, update the best known travel time and, if requested, the
                             // corresponding path.
-                            perIterationTravelTimes[iteration] = timeAtTarget;
+                            perIterationTravelTimes[iteration] = timeToReachTarget;
                             if (calculateComponents || targetIndex == destinationIndex) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
                                     path.egressMode = linkedTargets.streetMode;
                                 }
                                 perIterationPaths[iteration] = path;
+
                             }
                         }
                     }

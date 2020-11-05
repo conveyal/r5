@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.RouteInfo;
@@ -108,7 +109,7 @@ public class FastRaptorWorker {
     private final TIntIntMap accessStops;
 
     /** The routing parameters. */
-    private final ProfileRequest request;
+    private final AnalysisWorkerTask request;
 
     /** The indexes of the trip patterns running on a given day with frequency-based trips of selected modes. */
     private final BitSet runningFrequencyPatterns = new BitSet();
@@ -141,7 +142,7 @@ public class FastRaptorWorker {
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
-    public FastRaptorWorker (TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
+    public FastRaptorWorker (TransitLayer transitLayer, AnalysisWorkerTask request, TIntIntMap accessStops) {
         this.transit = transitLayer;
         this.request = request;
         this.accessStops = accessStops;
@@ -161,7 +162,8 @@ public class FastRaptorWorker {
     }
 
     /**
-     * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
+     * For each iteration (minute + MC draw combination), return the minimum travel time (duration) to each transit stop
+     * in seconds.
      * Return value dimension order is [searchIteration][transitStopIndex]
      * TODO Create proper types for return values?
      */
@@ -366,9 +368,12 @@ public class FastRaptorWorker {
                 }
                 // Apply transfers to the scheduled result that will be reused for the previous departure minute.
                 // Transfers will be applied separately to the derived frequency result below, when relevant.
-                raptorTimer.scheduledSearchTransfers.start();
-                doTransfers(scheduleState[round]);
-                raptorTimer.scheduledSearchTransfers.stop();
+                // The transfer step can be skipped in the last round.
+                if (round < request.maxRides) {
+                    raptorTimer.scheduledSearchTransfers.start();
+                    doTransfers(scheduleState[round]);
+                    raptorTimer.scheduledSearchTransfers.stop();
+                }
             }
             raptorTimer.scheduledSearch.stop();
         }
@@ -405,9 +410,13 @@ public class FastRaptorWorker {
                     doFrequencySearchForRound(frequencyState[round], boardingMode);
                     raptorTimer.frequencySearchFrequency.stop();
 
-                    raptorTimer.frequencySearchTransfers.start();
-                    doTransfers(frequencyState[round]);
-                    raptorTimer.frequencySearchTransfers.stop();
+                    if (round < request.maxRides) {
+                        // Transfers not needed after last round
+                        raptorTimer.frequencySearchTransfers.start();
+                        doTransfers(frequencyState[round]);
+                        raptorTimer.frequencySearchTransfers.stop();
+                    }
+
                 }
                 // No need to make an additional protective copy, this state is already a copy of the scheduled state.
                 RaptorState finalRoundState = frequencyState[request.maxRides];
@@ -503,13 +512,14 @@ public class FastRaptorWorker {
                 // that we don't check for alighting when boarding
                 if (onTrip > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
                     int alightTime = schedule.arrivals[stopPositionInPattern];
-                    int onVehicleTime = alightTime - boardTime;
+                    int inVehicleTime = alightTime - boardTime;
 
-                    if (waitTime + onVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
+                    // Use checkState instead?
+                    if (waitTime + inVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
                         LOG.error("Components of travel time are larger than travel time!");
                     }
 
-                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, onVehicleTime, false);
+                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, inVehicleTime, false);
                 }
 
                 // Don't attempt to board if this stop was not reached in the last round or if pick up is not allowed.
@@ -527,7 +537,7 @@ public class FastRaptorWorker {
                                 continue;
                             }
                             if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
-                                // board this vehicle
+                                // board this trip (the earliest trip that can be boarded on this pattern at this stop)
                                 onTrip = candidateTripIndex;
                                 schedule = candidateSchedule;
                                 boardTime = candidateSchedule.departures[stopPositionInPattern];
@@ -537,25 +547,49 @@ public class FastRaptorWorker {
                             }
                         }
                     } else {
-                        // We are already on a trip, but check if this stop was reached early enough to back up
-                        // to an earlier trip on the same pattern.
-                        int bestTripIdx = onTrip;
-                        while (--bestTripIdx >= 0) {
-                            TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
-                            if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
-                                // This is a frequency trip or it is not running on the day of the search.
-                                continue;
+                        // A specific trip on this pattern could be boarded at an upstream stop. If we are ready to
+                        // depart from this stop before this trip does, it might be preferable to board at this stop
+                        // instead.
+                        if (earliestBoardTime < schedule.departures[stopPositionInPattern]) {
+                            // First, it might be possible to board an earlier trip at this stop.
+                            int earlierTripIdx = onTrip;
+                            while (--earlierTripIdx >= 0) {
+                                // The tripSchedules in a given pattern are sorted by time of departure from the first
+                                // stop. So they are sorted by time of departure at this stop, if the possibility
+                                // of overtaking is ignored.
+                                TripSchedule earlierTripSchedule = pattern.tripSchedules.get(earlierTripIdx);
+
+                                if (earlierTripSchedule.headwaySeconds != null || !servicesActive.get(earlierTripSchedule.serviceCode)) {
+                                    // This is a frequency trip or it is not running on the day of the search.
+                                    continue;
+                                }
+                                // The assertion below is a sanity check, but not a complete check that all the
+                                // tripSchedules are sorted, because later tripSchedules are not considered.
+                                checkState(earlierTripSchedule.departures[0] <= schedule.departures[0],
+                                        "Trip schedules not sorted by departure time at first stop of pattern");
+
+                                if (earliestBoardTime < earlierTripSchedule.departures[stopPositionInPattern]) {
+                                    // The trip under consideration can be boarded at this stop
+                                    onTrip = earlierTripIdx;
+                                    schedule = earlierTripSchedule;
+                                    boardTime = earlierTripSchedule.departures[stopPositionInPattern];
+                                    waitTime = boardTime - inputState.bestTimes[stop];
+                                    boardStop = stop;
+                                } else {
+                                    // The trip under consideration arrives at this stop earlier than one could feasibly
+                                    // board. Stop searching, because trips are sorted by departure time within a pattern.
+                                    break;
+                                }
                             }
-                            if (trip.departures[stopPositionInPattern] > earliestBoardTime) {
-                                onTrip = bestTripIdx;
-                                schedule = trip;
-                                boardTime = trip.departures[stopPositionInPattern];
+                            // Second, if we care about paths or travel time components, check whether boarding at
+                            // this stop instead of the upstream one would allow a shorter access/transfer leg.
+                            // Doing so will not affect total travel time (as long as this is in a conditional
+                            // ensuring we won't miss the trip we're on), but it will affect the breakdown of walk vs.
+                            // wait time.
+                            if (request.computePaths && inputState.shorterAccessOrTransferLeg(stop, boardStop)) {
+                                boardTime = schedule.departures[stopPositionInPattern];
                                 waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStop = stop;
-                            } else {
-                                // The trip under consideration arrives too early,
-                                // stop searching since trips are sorted by departure time within a pattern.
-                                break;
                             }
                         }
                     }
@@ -833,17 +867,16 @@ public class FastRaptorWorker {
      * post-transfer times are also updated.
      * The patterns to be explored in the next round are then determined by which stops were updated by either transit
      * or transfer arrivals.
-     * FIXME this should be skipped on the last round, where resulting values will not be used.
      */
     private void doTransfers (RaptorState state) {
         // Cast and multiplication factored out of the tight loop below to ensure they are not repeatedly evaluated.
         final int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         final int maxWalkMillimeters = walkSpeedMillimetersPerSecond * (request.maxWalkTime * SECONDS_PER_MINUTE);
-        final int nStops = state.bestNonTransferTimes.length;
         // Compute transfers only from stops updated pre-transfer within this departure minute / randomized schedule.
-        // These transfers then update the post-transfers bitset to avoid concurrent modification while iterating.
+        // These transfers then update the post-transfers bitset (stopsUpdated) to avoid concurrent modification while
+        // iterating.
         for (int stop = state.nonTransferStopsUpdated.nextSetBit(0);
-                 stop > 0;
+                 stop >= 0;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
             TIntList transfersFromStop = transit.transfersForStop.get(stop);

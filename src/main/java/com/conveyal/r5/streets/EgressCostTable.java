@@ -135,18 +135,19 @@ public class EgressCostTable implements Serializable {
                 : baseLinkage.getEgressCostTable(progressListener);
 
         this.linkedPointSet = linkedPointSet;
+        final StreetMode streetMode = linkedPointSet.streetMode;
 
         TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
         StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
         PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
 
-        if (pickupWaitTimes != null && linkedPointSet.streetMode == pickupWaitTimes.streetMode) {
+        if (pickupWaitTimes != null && streetMode == pickupWaitTimes.streetMode) {
             egressStopDelaysSeconds = new int[nStops];
             Arrays.fill(egressStopDelaysSeconds, pickupWaitTimes.getDefaultWaitInSeconds());
         }
 
-        if (linkedPointSet.streetMode == StreetMode.CAR) {
+        if (streetMode == StreetMode.CAR) {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         } else {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
@@ -159,8 +160,6 @@ public class EgressCostTable implements Serializable {
         // Only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
         // If null, build trees for all stops.
         final Geometry rebuildZone;
-
-        final StreetMode streetMode = linkedPointSet.streetMode;
 
         /**
          * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
@@ -300,21 +299,19 @@ public class EgressCostTable implements Serializable {
 
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    return linkedPointSet.extendCostsToPoints(sr, envelopeAroundStop, egressArea);
                 } else if (streetMode == StreetMode.CAR) {
-                    // The speeds for Walk and Bicycle can be specified in an analysis request, so it makes sense above to
-                    // store distances and apply the requested speed. In contrast, car speeds vary by link and cannot be
-                    // set in analysis requests, so it makes sense to use seconds directly as the linkage cost.
+                    // Car speeds vary by link and cannot be set in analysis requests, so it makes sense to use
+                    // seconds directly as the linkage cost. In contrast, the speeds for Walk and Bicycle can be
+                    // specified in an analysis request, so it makes sense above to store distances and apply the
+                    // requested speed.
                     // TODO confirm this works as expected when modifications can affect street layer.
                     sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
-                    sr.quantityToMinimize = linkageCostUnit;
-                    sr.route();
-                    return linkedPointSet.extendCostsToPoints(sr, envelopeAroundStop, egressArea);
                 } else {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }
+                sr.quantityToMinimize = linkageCostUnit;
+                sr.route();
+                return linkedPointSet.extendCostsToPoints(sr, envelopeAroundStop, egressArea);
             }
         }).collect(Collectors.toList());
         computeCounter.done();

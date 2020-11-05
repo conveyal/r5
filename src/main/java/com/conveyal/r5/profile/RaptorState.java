@@ -341,15 +341,18 @@ public class RaptorState {
     }
 
     /**
-     * Checks whether boarding a at one stop allows for shorter access/transfer legs than boarding at another stop.
+     * @param here stopIndex
+     * @param there stopIndex
+     * @return true if the access/transfer leg to reach one stop (here) is shorter than the access/transfer leg to
+     * reach another stop (there) within this round.
      */
     public boolean shorterAccessOrTransferLeg(int here, int there) {
 
         if (here == there) return false;
 
         if (this.previous == null) {
-            // In the first transit round (when the pre-transit state is the input state), arriving at this stop before
-            // arriving at the upstream stop implies shorter access time.
+            // If there is no previous state, the pre-transit access round is being checked. Arriving here before
+            // arriving there implies shorter access time.
             return this.bestTimes[here] < this.bestTimes[there];
         } else {
             // In subsequent transit rounds, we want to compare the length of the transfer legs.
@@ -359,9 +362,13 @@ public class RaptorState {
         }
     }
 
-    private int transferTime(int stop) {
-        int fromStop = this.transferStop[stop];
-        return fromStop == -1 ? 0 : this.bestTimes[stop] - this.bestNonTransferTimes[fromStop];
+    /**
+     * Returns the length of time walking (or using some other street mode) within this round, to achieve the optimal
+     * route to the given stop in this round.
+     */
+    private int transferTime(int stopIndex) {
+        int fromStop = this.transferStop[stopIndex];
+        return fromStop == -1 ? 0 : this.bestTimes[stopIndex] - this.bestNonTransferTimes[fromStop];
     }
 
 }

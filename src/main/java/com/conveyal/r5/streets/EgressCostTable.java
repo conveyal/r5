@@ -293,8 +293,10 @@ public class EgressCostTable implements Serializable {
                 // values with any stop-specific values.
                 if (egressStopDelaysSeconds != null) {
                     PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
-                    egressArea = egressService.serviceArea;
-                    egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
+                    if (egressService != null) {
+                        egressArea = egressService.serviceArea;
+                        egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
+                    }
                 }
 
                 if (streetMode == StreetMode.BICYCLE) {

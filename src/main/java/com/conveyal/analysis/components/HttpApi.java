@@ -84,7 +84,7 @@ public class HttpApi implements Component {
                 // Determine which user is sending the request, and which permissions that user has. This method throws
                 // an error if the user cannot be authenticated.
                 UserPermissions user = authentication.authenticate(req);
-                LOG.info("{} {} by user {} in groups {}", method, pathInfo, user.email, user.groups);
+                LOG.info("{} {} by user {} in access group {}", method, pathInfo, user.email, user.accessGroup);
             }
             BackendMain.recordActivityToPreventShutdown();
         });

@@ -534,6 +534,10 @@ public class LinkedPointSet implements Serializable {
             } else if (routingVariable == RoutingVariable.DURATION_SECONDS) {
                 int time0 = costTableToVertices.get(edge.getFromVertex());
                 int time1 = costTableToVertices.get(edge.getFromVertex());
+                if (time0 == 0 && time1 == 0) {
+                    return true; // Edge unreachable, continue iteration. Should we update sr.getReachedVertices to use
+                    // a different noEntryValue?
+                }
                 int onStreetSpeed = (int) edge.getCarSpeedMetersPerSecond() * 1000;
                 cost = timeToPoint(time0, time1, onStreetSpeed, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND, p);
             }

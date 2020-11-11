@@ -553,9 +553,9 @@ public class LinkedPointSet implements Serializable {
         // Convert a packed array of pairs.
         // TODO don't put in a list and convert to array, just make an array.
         TIntList packed = new TIntArrayList(costToPoint.size() * 2);
-        costToPoint.forEachEntry((point, distance) -> {
+        costToPoint.forEachEntry((point, cost) -> {
             packed.add(point);
-            packed.add(distance);
+            packed.add(cost);
             return true; // Continue iteration.
         });
         return packed.toArray();

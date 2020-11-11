@@ -585,8 +585,13 @@ public class LinkedPointSet implements Serializable {
     /**
      * Given accumulated time to reach vertices, add the remaining time needed to reach a point that is linked to
      * an edge. This remaining time consists of a time traversing part of the edge (at onStreetSpeed), plus a
-     * time needed to travel the perpendicular distance (at offStreetSpeed) from the split point to the final point.
+     * time needed to travel the perpendicular distance (at offStreetSpeed) from the split point to the linked point.
      *
+     * @param time0 time (seconds) to reach the beginning vertex of the edge
+     * @param time1 time (seconds) to reach the end vertex of the edge
+     * @param onStreetSpeed speed (millimenters per second) at which the edge is traversed
+     * @param offStreetSpeed speed (millimeters per second) traveling from the edge to the linked point
+     * @param pointIndex index of the point in this linked pointset.
      * @return minimum time needed to reach point, or Integer.MAX_VALUE if point is not reachable.
      */
     private int timeToPoint(int time0, int time1, int onStreetSpeed, int offStreetSpeed, int pointIndex) {

@@ -543,9 +543,7 @@ public class LinkedPointSet implements Serializable {
             }
 
             if (cost != Integer.MAX_VALUE) {
-                if (cost < costToPoint.get(p)) { // When is this false?
-                    costToPoint.put(p, cost);
-                }
+                costToPoint.put(p, cost);
             }
             return true; // Continue iteration.
         });

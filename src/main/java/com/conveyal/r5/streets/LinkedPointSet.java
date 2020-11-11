@@ -468,7 +468,8 @@ public class LinkedPointSet implements Serializable {
      * points in this PointSet from the same transit stop. All points outside the distanceTableZone are skipped as an
      * optimization. See JavaDoc on the caller: this is one of the slowest parts of building a network.
      *
-     * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
+     * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance. For the
+     * moment it is used only for walk distance tables, which are computed once and saved when the network is built.
      *
      * @param distanceTableToVertices a map from integer vertex IDs to cumulative distance (in millimeters) accrued
      *                                traversing the network from the stop to the vertices

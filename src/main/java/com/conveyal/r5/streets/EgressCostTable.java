@@ -324,11 +324,12 @@ public class EgressCostTable implements Serializable {
      * Private constructor used by factory methods or other constructors to allow fields to be immutable.
      */
     private EgressCostTable (LinkedPointSet linkedPointSet,
-                            StreetRouter.State.RoutingVariable linkageCostUnit,
+                            EgressCostTable superCostTable,
                             List<int[]> stopToPointLinkageCostTables) {
         this.linkedPointSet = linkedPointSet;
-        this.linkageCostUnit = linkageCostUnit;
+        this.linkageCostUnit = superCostTable.linkageCostUnit;
         this.stopToPointLinkageCostTables = stopToPointLinkageCostTables;
+        this.egressStopDelaysSeconds = superCostTable.egressStopDelaysSeconds;
     }
 
     /**
@@ -384,7 +385,7 @@ public class EgressCostTable implements Serializable {
                 })
                 .collect(Collectors.toList());
 
-        return new EgressCostTable(subLinkage, superCostTable.linkageCostUnit, stopToPointLinkageCostTables);
+        return new EgressCostTable(subLinkage, superCostTable, stopToPointLinkageCostTables);
     }
 
     /**

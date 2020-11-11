@@ -491,28 +491,28 @@ public class LinkedPointSet implements Serializable {
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
      * @param sr results of an on-street search from the transit stop
-     * @param distanceTableZone the envelope in FIXED POINT DEGREES within which we want to find all points.
+     * @param envelopeAroundStop the envelope in FIXED POINT DEGREES within which we want to find all points.
      * @param egressArea area served by on-demand service from this stop. If null, there are no restrictions on which
      *                  points can be reached in the egress leg from this stop.
      * @return A packed array of (pointIndex, cost), or null if there are no reachable points. Cost units match
      * supplied sr.routingVariable
      */
-    public int[] extendCostsToPoints(StreetRouter sr, Envelope distanceTableZone, Geometry egressArea) {
+    public int[] extendCostsToPoints(StreetRouter sr, Envelope envelopeAroundStop, Geometry egressArea) {
         return extendCostsToPoints(sr.getReachedVertices(),
                 sr.quantityToMinimize,
-                distanceTableZone,
+                envelopeAroundStop,
                 egressArea);
     }
 
     private int[] extendCostsToPoints(TIntIntMap costTableToVertices,
                                      RoutingVariable routingVariable,
-                                     Envelope distanceTableZone,
+                                     Envelope envelopeAroundStop,
                                      Geometry egressArea) {
         int nPoints = this.size();
         TIntIntMap costToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
         // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
-        TIntList relevantPoints = pointSet.getPointsInEnvelope(distanceTableZone);
+        TIntList relevantPoints = pointSet.getPointsInEnvelope(envelopeAroundStop);
         // This is not correcting for the fact that the method returns false positives, but that should be harmless.
         // It's returning every point in the bounding box. But it is also sensitive to which vertices are in the map.
         relevantPoints.forEach(p -> {

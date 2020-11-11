@@ -269,7 +269,7 @@ public class EgressCostTable implements Serializable {
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
                 if (pickupWaitTimes != null && pickupWaitTimes.egressUnavailable(stopIndex, streetMode)) {
-                    LOG.info("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
+                    LOG.debug("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
                     return null;
                 }
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);

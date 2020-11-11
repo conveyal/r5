@@ -533,7 +533,7 @@ public class LinkedPointSet implements Serializable {
                 cost = distanceToPoint(costTableToVertices, edge, p);
             } else if (routingVariable == RoutingVariable.DURATION_SECONDS) {
                 int time0 = costTableToVertices.get(edge.getFromVertex());
-                int time1 = costTableToVertices.get(edge.getFromVertex());
+                int time1 = costTableToVertices.get(edge.getToVertex());
                 if (time0 == 0 && time1 == 0) {
                     return true; // Edge unreachable, continue iteration. Should we update sr.getReachedVertices to use
                     // a different noEntryValue?

@@ -4,6 +4,9 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.BackendMain;
 import com.conveyal.analysis.BackendVersion;
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.analysis.components.eventbus.Event;
+import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -19,6 +22,8 @@ import spark.Response;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -29,6 +34,12 @@ public class HttpApi implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpApi.class);
 
+    // These "attributes" are attached to an incoming HTTP request with String keys, making them available in handlers
+    private static final String REQUEST_START_TIME_ATTRIBUTE = "requestStartTime";
+    private static final String USER_PERMISSIONS_ATTRIBUTE = "permissions";
+    private static final String USER_EMAIL_ATTRIBUTE = "email";
+    private static final String USER_GROUP_ATTRIBUTE = "accessGroup";
+
     public interface Config {
         boolean offline ();
         int serverPort ();
@@ -36,6 +47,7 @@ public class HttpApi implements Component {
 
     private final FileStorage fileStorage;
     private final Authentication authentication;
+    private final EventBus eventBus;
     private final Config config;
 
     private final spark.Service sparkService;
@@ -44,11 +56,13 @@ public class HttpApi implements Component {
     public HttpApi (
             FileStorage fileStorage,
             Authentication authentication,
+            EventBus eventBus,
             Config config,
             List<HttpController> httpControllers
     ){
         this.fileStorage = fileStorage;
         this.authentication = authentication;
+        this.eventBus = eventBus;
         this.config = config;
         this.httpControllers = httpControllers;
 
@@ -66,6 +80,9 @@ public class HttpApi implements Component {
 
         // Specify actions to take before the main logic of handling each HTTP request.
         sparkService.before((req, res) -> {
+            // Record when the request started, so we can measure elapsed response time.
+            req.attribute(REQUEST_START_TIME_ATTRIBUTE, Instant.now());
+
             // Don't require authentication to view the main page, or for internal API endpoints contacted by workers.
             // FIXME those internal endpoints should be hidden from the outside world by the reverse proxy.
             //       Or now with non-static Spark we can run two HTTP servers on different ports.
@@ -79,14 +96,27 @@ public class HttpApi implements Component {
             // Do not require authentication for internal API endpoints contacted by workers or for OPTIONS requests.
             String method = req.requestMethod();
             String pathInfo = req.pathInfo();
-            boolean authorize = pathInfo.startsWith("/api") && !"OPTIONS".equals(method);
+            boolean authorize = pathInfo.startsWith("/api") && !"OPTIONS".equalsIgnoreCase(method);
             if (authorize) {
-                // Determine which user is sending the request, and which permissions that user has. This method throws
-                // an error if the user cannot be authenticated.
-                UserPermissions user = authentication.authenticate(req);
-                LOG.info("{} {} by user {} in groups {}", method, pathInfo, user.email, user.groups);
+                // Determine which user is sending the request, and which permissions that user has.
+                // This method throws an exception if the user cannot be authenticated.
+                // Store the resulting permissions object in the request so it can be examined by any handler.
+                UserPermissions userPermissions = authentication.authenticate(req);
+                req.attribute(USER_PERMISSIONS_ATTRIBUTE, userPermissions);
+                // TODO stop using these two separate attributes, and use the permissions object directly
+                req.attribute(USER_EMAIL_ATTRIBUTE, userPermissions.email);
+                req.attribute(USER_GROUP_ATTRIBUTE, userPermissions.groups.iterator().next());
             }
-            BackendMain.recordActivityToPreventShutdown();
+        });
+
+        sparkService.after((req, res) -> {
+            // Firing an event after the request allows us to report the response time,
+            // but may fail to record requests experiencing authentication problems.
+            Instant requestStartTime = req.attribute(REQUEST_START_TIME_ATTRIBUTE);
+            Duration elapsed = Duration.between(requestStartTime, Instant.now());
+            Event event = new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis());
+            UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+            eventBus.send(event.forUser(userPermissions));
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).
@@ -134,12 +164,11 @@ public class HttpApi implements Component {
             // Include a stack trace, except when the error is known to be about unauthenticated or unauthorized access,
             // in which case we don't want to leak information about the server to people scanning it for weaknesses.
             if (e.type == AnalysisServerException.TYPE.UNAUTHORIZED ||
-                    e.type == AnalysisServerException.TYPE.FORBIDDEN) {
-
+                e.type == AnalysisServerException.TYPE.FORBIDDEN
+            ){
                 JSONObject body = new JSONObject();
                 body.put("type", e.type.toString());
                 body.put("message", e.message);
-
                 response.status(e.httpCode);
                 response.type("application/json");
                 response.body(body.toJSONString());
@@ -165,6 +194,11 @@ public class HttpApi implements Component {
         });
 
         return sparkService;
+    }
+
+    // Maybe this should be done or called with a JVM shutdown hook
+    public void shutDown () {
+        sparkService.stop();
     }
 
 }

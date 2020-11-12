@@ -27,6 +27,7 @@ import static com.google.common.base.Preconditions.checkState;
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
     // these match the enum values in AnalysisWorkerTask.Type
+    // FIXME it does not seem necessary to automatically detect subtypes. Each endpoint accepts only one type.
     @JsonSubTypes.Type(name = "TRAVEL_TIME_SURFACE", value = TravelTimeSurfaceTask.class),
     @JsonSubTypes.Type(name = "REGIONAL_ANALYSIS", value = RegionalTask.class)
 })

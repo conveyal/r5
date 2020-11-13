@@ -29,7 +29,7 @@ public class EventBus implements Component {
     // Linear scan through handlers is simpler and should be at least as efficient for small numbers of handlers.
     private final List<EventHandler> handlers = new ArrayList<>();
 
-    public EventBus (TaskScheduler taskScheduler, EventHandler... handlers) {
+    public EventBus (TaskScheduler taskScheduler) {
         this.taskScheduler = taskScheduler;
     }
 

@@ -25,59 +25,39 @@ public class EventBus implements Component {
 
     private final TaskScheduler taskScheduler;
 
-    // private final Multimap<Class<? extends Event>, EventHandler<? extends Event>> eventHandlers;
     // For handlers to listen for a hierarchy of events, a hashtable would require one entry per class in the hierarchy.
-    // Linear scan through handlers, and should be at least as efficient for small numbers of handlers.
-    private final List<Listener> eventListeners = new ArrayList<>();
+    // Linear scan through handlers is simpler and should be at least as efficient for small numbers of handlers.
+    private final List<EventHandler> handlers = new ArrayList<>();
 
-    public EventBus (TaskScheduler taskScheduler) {
+    public EventBus (TaskScheduler taskScheduler, EventHandler... handlers) {
         this.taskScheduler = taskScheduler;
     }
 
-    public interface EventHandler<E extends Event> {
-        void handleEvent (E event);
-    }
-
-    /**
-     * Note: this method is not synchronized. Add all handlers before any events are sent.
-     * Ideally we'd register them all at once as an immutable list.
-     */
-    public <E extends Event> void listenFor (Class<E> eventType, EventHandler<E> eventHandler, boolean synchronous) {
-        eventListeners.add(new Listener(eventType, eventHandler, synchronous));
+    /** This is not synchronized, so you should add all handlers at once before any events are fired. */
+    public void addHandlers (EventHandler... handlers) {
+        for (EventHandler handler : handlers) {
+            LOG.info("An instance of {} will receive events.", handler.getClass().getSimpleName());
+            this.handlers.add(handler);
+        }
     }
 
     public <T extends Event> void send (final T event) {
-        LOG.debug("Received event: {}", event);
-        for (Listener listener : eventListeners) {
-            if (listener.eventType.isInstance(event)) {
-                listener.send(event);
-            }
-        }
-    }
-
-    private class Listener<T extends Event> {
-
-        final Class<T> eventType;
-        final EventHandler<T> eventHandler;
-        final boolean synchronous;
-
-        public Listener (Class<T> eventType, EventHandler<T> eventHandler, boolean synchronous) {
-            this.eventType = eventType;
-            this.eventHandler = eventHandler;
-            this.synchronous = synchronous;
-        }
-
-        public void send (T event) {
-            LOG.debug(" -> firing {} handler {}", synchronous ? "sync" : "async", eventHandler);
-            if (synchronous) {
-                try {
-                    eventHandler.handleEvent(event);
-                } catch (Throwable t) {
-                    LOG.error("Event handler failed: {}", t.toString());
-                    t.printStackTrace();
+        LOG.debug("Bus received event: {}", event);
+        for (EventHandler handler : handlers) {
+            final boolean accept = handler.acceptEvent(event);
+            final boolean synchronous = handler.synchronous();
+            LOG.debug(" -> {} {} handler {}", accept ? "firing":"skipping", synchronous ? "sync":"async", handler);
+            if (accept) {
+                if (synchronous) {
+                    try {
+                        handler.handleEvent(event);
+                    } catch (Throwable t) {
+                        LOG.error("Event handler failed: {}", t.toString());
+                        t.printStackTrace();
+                    }
+                } else {
+                    taskScheduler.enqueueLightTask(() -> handler.handleEvent(event));
                 }
-            } else {
-                taskScheduler.enqueueLightTask(() -> eventHandler.handleEvent(event));
             }
         }
     }

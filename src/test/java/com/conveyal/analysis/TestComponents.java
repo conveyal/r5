@@ -36,7 +36,7 @@ public class TestComponents extends Components {
             eventBus = new EventBus(taskScheduler);
             broker = new Broker(config, fileStorage, eventBus, workerLauncher);
             authentication = new LocalAuthentication();
-            httpApi = new HttpApi(fileStorage, authentication, config, standardHttpControllers(this));
+            httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers(this));
         } catch (Exception ex) {
             throw new RuntimeException("Failed to wire up test components.", ex);
         }

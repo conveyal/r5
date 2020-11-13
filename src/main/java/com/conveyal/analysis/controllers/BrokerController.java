@@ -2,7 +2,6 @@ package com.conveyal.analysis.controllers;
 
 import com.amazonaws.services.s3.Headers;
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.BackendMain;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
@@ -207,7 +206,13 @@ public class BrokerController implements HttpController {
             // All other eventbus usage is in Broker, a sign that most of this method should be factored out of the controller.
             if (response.status() == 200) {
                 int durationMsec = (int) (System.currentTimeMillis() - startTimeMsec);
-                eventBus.send(new SinglePointEvent(task.scenarioId, durationMsec).forUser(userEmail, accessGroup));
+                eventBus.send(new SinglePointEvent(
+                        task.scenarioId,
+                        analysisRequest.projectId,
+                        analysisRequest.variantIndex,
+                        durationMsec
+                    ).forUser(userEmail, accessGroup)
+                );
             }
             // If you return a stream to the Spark Framework, its SerializerChain will copy that stream out to the
             // client, but does not then close the stream. HttpClient waits for the stream to be closed to return the
@@ -330,8 +335,6 @@ public class BrokerController implements HttpController {
 
         // Record any regional analysis results that were supplied by the worker and mark them completed.
         for (RegionalWorkResult workResult : perOriginResults) {
-            // Prevent the backend from shutting down when it's receiving regional analysis results.
-            BackendMain.recordActivityToPreventShutdown();
             broker.handleRegionalWorkResult(workResult);
         }
         // Clear out the results field so it's not visible in the worker list API endpoint.

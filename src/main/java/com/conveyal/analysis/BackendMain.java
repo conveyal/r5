@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
-import spark.Spark;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -27,12 +26,6 @@ import java.util.Enumeration;
 public abstract class BackendMain {
 
     private static final Logger LOG = LoggerFactory.getLogger(BackendMain.class);
-
-    /** If auto-shutdown=true, shut down after a period of no user activity. */
-    private static final int IDLE_SHUTDOWN_MINUTES = 60;
-
-    /** Keep track of the last time we received an authenticated (user-facing) API request. */
-    private static long lastUserActivityTimeMsec = System.currentTimeMillis();
 
     /** This backend server's IP address. This is passed to the workers so they know how to reach the backend. */
     private static final InetAddress privateServerAddress = discoverPrivateInetAddress();
@@ -69,11 +62,11 @@ public abstract class BackendMain {
         if (components.config.offline()) {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");
-            components.workerLauncher.launch(
-                    new WorkerCategory(null, null), null, 1, 0);
+            components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, 0);
         }
 
         LOG.info("Conveyal Analysis server is ready.");
+        // TODO replace postStartupThreads with something like components.taskScheduler.enqueueHeavyTask();
         for (Thread thread : postStartupThreads) {
             thread.start();
         }
@@ -82,31 +75,6 @@ public abstract class BackendMain {
             LOG.info("Startup has completed successfully. Exiting immediately as requested.");
             System.exit(0);
         }
-
-        // TODO transform this into a task managed by a scheduled task executor component.
-        if (components.config.autoShutdown) {
-            LOG.info("Server will shut down automatically after {} minutes without user interaction.", IDLE_SHUTDOWN_MINUTES);
-            while ((System.currentTimeMillis() - lastUserActivityTimeMsec) < (IDLE_SHUTDOWN_MINUTES * 60 * 1000)) {
-                try {
-                    Thread.sleep(60 * 1000);
-                } catch (InterruptedException e) {
-                    LOG.info("Shutdown wait loop was interrupted.");
-                }
-            }
-            LOG.info("Shutting down backend server due to inactivity.");
-            Spark.stop();
-            System.exit(0);
-        } else {
-            LOG.info("Server will NOT shut down automatically, it will continue running indefinitely.");
-        }
-    }
-
-    /**
-     * Call this method any time something happens that should keep a staging server from shutting down.
-     * This should include UI actions and incoming regional analysis results.
-     */
-    public static void recordActivityToPreventShutdown() {
-        lastUserActivityTimeMsec = System.currentTimeMillis();
     }
 
     public static void respondToException(Exception e, Request request, Response response, String type, String message, int code) {

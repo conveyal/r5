@@ -26,9 +26,15 @@ public abstract class Event {
     // Location fields for user city / lat / lon derived from IP address? Embed those in the UserPermissions?
     // Could also include lat / lon for affected entities, to allow easy map visualization.
 
+    /**
+     * Set the user and groups from the supplied userPermissions object (if any) and return the modified instance.
+     * @param userPermissions if this is null, the call will have no effect.
+     */
     public Event forUser (UserPermissions userPermissions) {
-        this.user = userPermissions.email;
-        this.accessGroup = userPermissions.accessGroup;
+        if (userPermissions != null) {
+            this.user = userPermissions.email;
+            this.accessGroup = userPermissions.accessGroup;
+        }
         return this;
     }
 

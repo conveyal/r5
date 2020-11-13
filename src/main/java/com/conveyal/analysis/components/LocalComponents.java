@@ -43,7 +43,7 @@ public class LocalComponents extends Components {
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
-        httpApi = new HttpApi(fileStorage, authentication, config, standardHttpControllers(this));
+        httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers(this));
         // compute = new LocalCompute();
         // persistence = persistence(local_Mongo)
     }

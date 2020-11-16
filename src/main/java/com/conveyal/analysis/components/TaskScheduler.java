@@ -63,6 +63,12 @@ public class TaskScheduler implements Component {
         );
     }
 
+    public void repeatRegularly (PeriodicTask... periodicTasks) {
+        for (PeriodicTask periodicTask : periodicTasks) {
+            repeatRegularly(periodicTask);
+        }
+    }
+
     public void enqueueLightTask (Runnable runnable) {
         lightExecutor.submit(new ErrorTrap(runnable));
     }

@@ -1,10 +1,11 @@
 package com.conveyal.r5.analyst.core;
 
 import com.conveyal.r5.common.JsonUtilities;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests correct LocalDate Serialization
@@ -18,7 +19,7 @@ public class LocalDateSerialization {
         String jsonDate = JsonUtilities.objectMapper.writeValueAsString(date);
 
         LocalDate deserializedDate = JsonUtilities.objectMapper.readValue(jsonDate, LocalDate.class);
-        Assertions.assertEquals(date, deserializedDate);
+        assertEquals(date, deserializedDate);
 
 
     }

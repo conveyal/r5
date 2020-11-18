@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -12,6 +11,11 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test adjusting dwell time.
@@ -29,7 +33,7 @@ public class AdjustDwellTest {
     @Test
     public void testSetDwellTimeRoute () {
         // confirm that the dwell times are what they should be in the source network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
@@ -38,27 +42,27 @@ public class AdjustDwellTest {
         adt.routes = set("SINGLE_LINE:route");
 
         // make sure it will have an effect
-        Assertions.assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
+        assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // should not have modified original network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
         // but should have modified new network
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(0, 4).allMatch(i -> ts.departures[i] - ts.arrivals[i] == adt.dwellSecs)));
 
 
-        Assertions.assertEquals(1, mod.transitLayer.tripPatterns.size());
+        assertEquals(1, mod.transitLayer.tripPatterns.size());
 
         // make sure that there still are trip patterns
-        Assertions.assertFalse(mod.transitLayer.tripPatterns.get(0).tripSchedules.isEmpty());
+        assertFalse(mod.transitLayer.tripPatterns.get(0).tripSchedules.isEmpty());
 
         for (TripSchedule schedule : mod.transitLayer.tripPatterns.get(0).tripSchedules) {
             int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
@@ -66,21 +70,21 @@ public class AdjustDwellTest {
 
             // slightly awkward, but make sure that the trip starts at the same time as it did before
             // TODO user-settable zero point for modification
-            Assertions.assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // 500 sec travel time from graph, 42 sec dwell time from modification
-            Assertions.assertArrayEquals(new int[] { 0, 542, 1084, 1626 }, a);
-            Assertions.assertArrayEquals(new int[] { 42, 584, 1126, 1668 }, d);
+            assertArrayEquals(new int[] { 0, 542, 1084, 1626 }, a);
+            assertArrayEquals(new int[] { 42, 584, 1126, 1668 }, d);
         }
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     /** Confirm that setting a dwell time of zero works (since zero is also Java's default value) */
     @Test
     public void testSetZeroDwellTimeRoute () {
         // confirm that the dwell times are what they should be in the source network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
@@ -89,24 +93,24 @@ public class AdjustDwellTest {
         adt.routes = set("SINGLE_LINE:route");
 
         // make sure it will have an effect
-        Assertions.assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
+        assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // should not have modified original network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
         // but should have modified new network
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(0, 4).allMatch(i -> ts.departures[i] - ts.arrivals[i] == adt.dwellSecs)));
 
         // make sure that there still are trip patterns
-        Assertions.assertFalse(mod.transitLayer.tripPatterns.get(0).tripSchedules.isEmpty());
+        assertFalse(mod.transitLayer.tripPatterns.get(0).tripSchedules.isEmpty());
 
         for (TripSchedule schedule : mod.transitLayer.tripPatterns.get(0).tripSchedules) {
             int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
@@ -114,14 +118,14 @@ public class AdjustDwellTest {
 
             // slightly awkward, but make sure that the trip starts at the same time as it did before
             // TODO user-settable zero point for modification
-            Assertions.assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // 500 sec travel time from graph, 0 sec dwell time from modification
-            Assertions.assertArrayEquals(new int[] { 0, 500, 1000, 1500 }, a);
-            Assertions.assertArrayEquals(new int[] { 0, 500, 1000, 1500 }, d);
+            assertArrayEquals(new int[] { 0, 500, 1000, 1500 }, a);
+            assertArrayEquals(new int[] { 0, 500, 1000, 1500 }, d);
         }
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     /**
@@ -130,16 +134,16 @@ public class AdjustDwellTest {
      */
     @Test
     public void testScaleTripSegmentDwellTime () {
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .anyMatch(ts -> "SINGLE_LINE:trip25200".equals(ts.tripId)));
 
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .anyMatch(ts -> !"SINGLE_LINE:trip25200".equals(ts.tripId)));
         
         // confirm that the dwell times are what they should be in the source network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
@@ -149,19 +153,19 @@ public class AdjustDwellTest {
         adt.stops = set("SINGLE_LINE:s2");
 
         // make sure it's not zero; scaling a zero dwell time will not prove anything
-        Assertions.assertNotEquals(0, FakeGraph.DWELL_TIME);
+        assertNotEquals(0, FakeGraph.DWELL_TIME);
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // should not have modified original network
-        Assertions.assertTrue(network.transitLayer.tripPatterns.stream()
+        assertTrue(network.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(1, 3).allMatch(i -> ts.departures[i] - ts.arrivals[i] == FakeGraph.DWELL_TIME)));
 
         // but should have modified new network
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> {
                     if ("SINGLE_LINE:trip25200".equals(ts.tripId)) {
@@ -172,11 +176,11 @@ public class AdjustDwellTest {
                     }
                 }));
 
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .anyMatch(ts -> "SINGLE_LINE:trip25200".equals(ts.tripId)));
 
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .flatMap(t -> t.tripSchedules.stream())
                 .anyMatch(ts -> !"SINGLE_LINE:trip25200".equals(ts.tripId)));
         
@@ -186,19 +190,19 @@ public class AdjustDwellTest {
 
             // slightly awkward, but make sure that the trip starts at the same time as it did before
             // TODO user-settable zero point for modification
-            Assertions.assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             if ("SINGLE_LINE:trip25200".equals(schedule.tripId)) {
                 // dwell times scaled from 30 seconds to 15 at selected stop
-                Assertions.assertArrayEquals(new int[]{ 0, 500, 1015, 1545 }, a);
-                Assertions.assertArrayEquals(new int[]{ 0, 515, 1045, 1545 }, d);
+                assertArrayEquals(new int[]{ 0, 500, 1015, 1545 }, a);
+                assertArrayEquals(new int[]{ 0, 515, 1045, 1545 }, d);
             } else {
-                Assertions.assertArrayEquals(new int[]{ 0, 500, 1030, 1560 }, a);
-                Assertions.assertArrayEquals(new int[]{ 0, 530, 1060, 1560 }, d);
+                assertArrayEquals(new int[]{ 0, 500, 1030, 1560 }, a);
+                assertArrayEquals(new int[]{ 0, 530, 1060, 1560 }, d);
             }
         }
         
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     @AfterEach

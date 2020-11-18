@@ -5,7 +5,6 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +12,12 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test converting lines to a frequency representation.
@@ -32,11 +37,11 @@ public class AdjustFrequencyTest {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
 
-        Assertions.assertEquals(2, network.transitLayer.tripPatterns.size());
+        assertEquals(2, network.transitLayer.tripPatterns.size());
 
         network.transitLayer.tripPatterns.forEach(tp -> {
-            Assertions.assertTrue(tp.hasSchedules);
-            Assertions.assertFalse(tp.hasFrequencies);
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
         });
 
         // make an entry
@@ -61,14 +66,14 @@ public class AdjustFrequencyTest {
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // Trip patterns not referred to by entries should be wiped
-        Assertions.assertEquals(1, mod.transitLayer.tripPatterns.size());
+        assertEquals(1, mod.transitLayer.tripPatterns.size());
 
         TripPattern pattern = mod.transitLayer.tripPatterns.get(0);
 
-        Assertions.assertTrue(pattern.hasFrequencies);
-        Assertions.assertFalse(pattern.hasSchedules);
+        assertTrue(pattern.hasFrequencies);
+        assertFalse(pattern.hasSchedules);
 
-        Assertions.assertEquals(2, pattern.tripSchedules.size());
+        assertEquals(2, pattern.tripSchedules.size());
 
         TripSchedule exemplar0 = pattern.tripSchedules.get(0);
         TripSchedule exemplar1 = pattern.tripSchedules.get(1);
@@ -81,46 +86,46 @@ public class AdjustFrequencyTest {
             exemplar1 = originalExemplar0;
         }
 
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
 
-        Assertions.assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
-        Assertions.assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
-        Assertions.assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
+        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
+        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
-        Assertions.assertEquals(entry.monday, service0.calendar.monday == 1);
-        Assertions.assertEquals(entry.tuesday, service0.calendar.tuesday == 1);
-        Assertions.assertEquals(entry.wednesday, service0.calendar.wednesday == 1);
-        Assertions.assertEquals(entry.thursday, service0.calendar.thursday == 1);
-        Assertions.assertEquals(entry.friday, service0.calendar.friday == 1);
-        Assertions.assertEquals(entry.saturday, service0.calendar.saturday == 1);
-        Assertions.assertEquals(entry.sunday, service0.calendar.sunday == 1);
+        assertEquals(entry.monday, service0.calendar.monday == 1);
+        assertEquals(entry.tuesday, service0.calendar.tuesday == 1);
+        assertEquals(entry.wednesday, service0.calendar.wednesday == 1);
+        assertEquals(entry.thursday, service0.calendar.thursday == 1);
+        assertEquals(entry.friday, service0.calendar.friday == 1);
+        assertEquals(entry.saturday, service0.calendar.saturday == 1);
+        assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
         // should be moved to have first arrival at 0
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar1.arrivals);
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar1.departures);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar1.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar1.departures);
 
-        Assertions.assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
-        Assertions.assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
-        Assertions.assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
+        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
+        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
-        Assertions.assertEquals(entry2.monday, service1.calendar.monday == 1);
-        Assertions.assertEquals(entry2.tuesday, service1.calendar.tuesday == 1);
-        Assertions.assertEquals(entry2.wednesday, service1.calendar.wednesday == 1);
-        Assertions.assertEquals(entry2.thursday, service1.calendar.thursday == 1);
-        Assertions.assertEquals(entry2.friday, service1.calendar.friday == 1);
-        Assertions.assertEquals(entry2.saturday, service1.calendar.saturday == 1);
-        Assertions.assertEquals(entry2.sunday, service1.calendar.sunday == 1);
+        assertEquals(entry2.monday, service1.calendar.monday == 1);
+        assertEquals(entry2.tuesday, service1.calendar.tuesday == 1);
+        assertEquals(entry2.wednesday, service1.calendar.wednesday == 1);
+        assertEquals(entry2.thursday, service1.calendar.thursday == 1);
+        assertEquals(entry2.friday, service1.calendar.friday == 1);
+        assertEquals(entry2.saturday, service1.calendar.saturday == 1);
+        assertEquals(entry2.sunday, service1.calendar.sunday == 1);
 
         // make sure we didn't modify base network
         network.transitLayer.tripPatterns.forEach(tp -> {
-            Assertions.assertTrue(tp.hasSchedules);
-            Assertions.assertFalse(tp.hasFrequencies);
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
         });
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     /** Test converting multiple patterns of a route to frequency representations */
@@ -150,7 +155,7 @@ public class AdjustFrequencyTest {
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // both trip patterns should be still present
-        Assertions.assertEquals(2, mod.transitLayer.tripPatterns.size());
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
 
         TripPattern twoStop = null, threeStop = null;
 
@@ -159,59 +164,59 @@ public class AdjustFrequencyTest {
             else if (tp.stops.length == 3) threeStop = tp;
         }
 
-        Assertions.assertNotNull(twoStop);
-        Assertions.assertNotNull(threeStop);
+        assertNotNull(twoStop);
+        assertNotNull(threeStop);
 
-        Assertions.assertTrue(twoStop.hasFrequencies);
-        Assertions.assertFalse(twoStop.hasSchedules);
-        Assertions.assertTrue(threeStop.hasFrequencies);
-        Assertions.assertFalse(threeStop.hasSchedules);
+        assertTrue(twoStop.hasFrequencies);
+        assertFalse(twoStop.hasSchedules);
+        assertTrue(threeStop.hasFrequencies);
+        assertFalse(threeStop.hasSchedules);
 
-        Assertions.assertEquals(1, twoStop.tripSchedules.size());
-        Assertions.assertEquals(1, threeStop.tripSchedules.size());
+        assertEquals(1, twoStop.tripSchedules.size());
+        assertEquals(1, threeStop.tripSchedules.size());
 
         TripSchedule exemplar0 = twoStop.tripSchedules.get(0);
         TripSchedule exemplar1 = threeStop.tripSchedules.get(0);
 
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
-        Assertions.assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
 
-        Assertions.assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
-        Assertions.assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
-        Assertions.assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
+        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
+        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
-        Assertions.assertEquals(entry.monday, service0.calendar.monday == 1);
-        Assertions.assertEquals(entry.tuesday, service0.calendar.tuesday == 1);
-        Assertions.assertEquals(entry.wednesday, service0.calendar.wednesday == 1);
-        Assertions.assertEquals(entry.thursday, service0.calendar.thursday == 1);
-        Assertions.assertEquals(entry.friday, service0.calendar.friday == 1);
-        Assertions.assertEquals(entry.saturday, service0.calendar.saturday == 1);
-        Assertions.assertEquals(entry.sunday, service0.calendar.sunday == 1);
+        assertEquals(entry.monday, service0.calendar.monday == 1);
+        assertEquals(entry.tuesday, service0.calendar.tuesday == 1);
+        assertEquals(entry.wednesday, service0.calendar.wednesday == 1);
+        assertEquals(entry.thursday, service0.calendar.thursday == 1);
+        assertEquals(entry.friday, service0.calendar.friday == 1);
+        assertEquals(entry.saturday, service0.calendar.saturday == 1);
+        assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
-        Assertions.assertArrayEquals(new int[] { 0, 500, 1030 }, exemplar1.arrivals);
-        Assertions.assertArrayEquals(new int[] { 0, 530, 1030 }, exemplar1.departures);
+        assertArrayEquals(new int[] { 0, 500, 1030 }, exemplar1.arrivals);
+        assertArrayEquals(new int[] { 0, 530, 1030 }, exemplar1.departures);
 
-        Assertions.assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
-        Assertions.assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
-        Assertions.assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
+        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
+        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
-        Assertions.assertEquals(entry2.monday, service1.calendar.monday == 1);
-        Assertions.assertEquals(entry2.tuesday, service1.calendar.tuesday == 1);
-        Assertions.assertEquals(entry2.wednesday, service1.calendar.wednesday == 1);
-        Assertions.assertEquals(entry2.thursday, service1.calendar.thursday == 1);
-        Assertions.assertEquals(entry2.friday, service1.calendar.friday == 1);
-        Assertions.assertEquals(entry2.saturday, service1.calendar.saturday == 1);
-        Assertions.assertEquals(entry2.sunday, service1.calendar.sunday == 1);
+        assertEquals(entry2.monday, service1.calendar.monday == 1);
+        assertEquals(entry2.tuesday, service1.calendar.tuesday == 1);
+        assertEquals(entry2.wednesday, service1.calendar.wednesday == 1);
+        assertEquals(entry2.thursday, service1.calendar.thursday == 1);
+        assertEquals(entry2.friday, service1.calendar.friday == 1);
+        assertEquals(entry2.saturday, service1.calendar.saturday == 1);
+        assertEquals(entry2.sunday, service1.calendar.sunday == 1);
 
         // make sure we didn't modify base network
         network.transitLayer.tripPatterns.forEach(tp -> {
-            Assertions.assertTrue(tp.hasSchedules);
-            Assertions.assertFalse(tp.hasFrequencies);
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
         });
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     /** Test that schedules on frequency-converted lines outside of frequency-conversion window are retained */
@@ -243,8 +248,8 @@ public class AdjustFrequencyTest {
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // there should be frequencies and schedules
-        Assertions.assertTrue(mod.transitLayer.hasFrequencies);
-        Assertions.assertTrue(mod.transitLayer.hasSchedules);
+        assertTrue(mod.transitLayer.hasFrequencies);
+        assertTrue(mod.transitLayer.hasSchedules);
 
         // make sure we have the correct number of patterns and frequency entries
         int twoStopPatternCount = 0;
@@ -272,22 +277,22 @@ public class AdjustFrequencyTest {
                     ts = freqSchedules[1];
                 }
 
-                Assertions.assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-                Assertions.assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
-                Assertions.assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
+                assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
+                assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+                assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
 
-                Assertions.assertArrayEquals(new int[] { entry2.startTime }, ts2.startTimes);
-                Assertions.assertArrayEquals(new int[] { entry2.endTime }, ts2.endTimes);
-                Assertions.assertArrayEquals(new int[] { entry2.headwaySecs }, ts2.headwaySeconds);
+                assertArrayEquals(new int[] { entry2.startTime }, ts2.startTimes);
+                assertArrayEquals(new int[] { entry2.endTime }, ts2.endTimes);
+                assertArrayEquals(new int[] { entry2.headwaySecs }, ts2.headwaySeconds);
 
                 frequencyScheduleCount += freqSchedules.length;
             } else {
                 threeStopPatternCount++;
 
                 // if it doesn't have two stops it should have three
-                Assertions.assertEquals(3, pattern.stops.length);
+                assertEquals(3, pattern.stops.length);
                 // should all be schedule based
-                Assertions.assertTrue(pattern.tripSchedules.stream().allMatch(ts -> ts.headwaySeconds == null));
+                assertTrue(pattern.tripSchedules.stream().allMatch(ts -> ts.headwaySeconds == null));
 
                 boolean foundTripBefore9 = false;
                 boolean foundTripAfter10 = false;
@@ -297,7 +302,7 @@ public class AdjustFrequencyTest {
                 for (TripSchedule schedule : pattern.tripSchedules) {
                     // should be no trips between 9 and 10
                     int dep = schedule.departures[0];
-                    Assertions.assertFalse(dep > 9 * 3600 && dep < 10 * 3600);
+                    assertFalse(dep > 9 * 3600 && dep < 10 * 3600);
 
                     if (dep < 9 * 3600) foundTripBefore9 = true;
                     if (dep > 10 * 3600 && dep < 12 * 3600) foundTripAfter10 = true;
@@ -307,40 +312,40 @@ public class AdjustFrequencyTest {
                         foundTripBetween12And2 = true;
 
                         Service service = mod.transitLayer.services.get(schedule.serviceCode);
-                        Assertions.assertEquals(0, service.calendar.monday);
-                        Assertions.assertEquals(0, service.calendar.tuesday);
-                        Assertions.assertEquals(0, service.calendar.wednesday);
-                        Assertions.assertEquals(0, service.calendar.thursday);
-                        Assertions.assertEquals(0, service.calendar.friday);
+                        assertEquals(0, service.calendar.monday);
+                        assertEquals(0, service.calendar.tuesday);
+                        assertEquals(0, service.calendar.wednesday);
+                        assertEquals(0, service.calendar.thursday);
+                        assertEquals(0, service.calendar.friday);
 
                         // weekend service should be retained as frequency entry is not active on the weekends
-                        Assertions.assertEquals(1, service.calendar.saturday);
-                        Assertions.assertEquals(1, service.calendar.sunday);
+                        assertEquals(1, service.calendar.saturday);
+                        assertEquals(1, service.calendar.sunday);
                     } else {
                         // ensure we didn't mess up the service for trips at other times
                         Service service = mod.transitLayer.services.get(schedule.serviceCode);
-                        Assertions.assertEquals(1, service.calendar.monday);
-                        Assertions.assertEquals(1, service.calendar.tuesday);
-                        Assertions.assertEquals(1, service.calendar.wednesday);
-                        Assertions.assertEquals(1, service.calendar.thursday);
-                        Assertions.assertEquals(1, service.calendar.friday);
-                        Assertions.assertEquals(1, service.calendar.saturday);
-                        Assertions.assertEquals(1, service.calendar.sunday);
+                        assertEquals(1, service.calendar.monday);
+                        assertEquals(1, service.calendar.tuesday);
+                        assertEquals(1, service.calendar.wednesday);
+                        assertEquals(1, service.calendar.thursday);
+                        assertEquals(1, service.calendar.friday);
+                        assertEquals(1, service.calendar.saturday);
+                        assertEquals(1, service.calendar.sunday);
                     }
 
                     if (dep > 14 * 3600) foundTripAfter2 = true;
                 }
 
-                Assertions.assertTrue(foundTripBefore9);
-                Assertions.assertTrue(foundTripAfter10);
-                Assertions.assertTrue(foundTripBetween12And2);
-                Assertions.assertTrue(foundTripAfter2);
+                assertTrue(foundTripBefore9);
+                assertTrue(foundTripAfter10);
+                assertTrue(foundTripBetween12And2);
+                assertTrue(foundTripAfter2);
             }
         }
 
-        Assertions.assertEquals(1, threeStopPatternCount);
-        Assertions.assertEquals(1, twoStopPatternCount);
-        Assertions.assertEquals(2, frequencyScheduleCount);
+        assertEquals(1, threeStopPatternCount);
+        assertEquals(1, twoStopPatternCount);
+        assertEquals(2, frequencyScheduleCount);
     }
 
     /** Test adding scheduled trips */
@@ -382,41 +387,41 @@ public class AdjustFrequencyTest {
                 .findFirst()
                 .orElse(null);
 
-        Assertions.assertNotNull(originalTwoStopPattern);
-        Assertions.assertNotNull(originalThreeStopPattern);
-        Assertions.assertNotNull(newTwoStopPattern);
-        Assertions.assertNotNull(newThreeStopPattern);
+        assertNotNull(originalTwoStopPattern);
+        assertNotNull(originalThreeStopPattern);
+        assertNotNull(newTwoStopPattern);
+        assertNotNull(newThreeStopPattern);
 
-        Assertions.assertEquals(2, mod.transitLayer.tripPatterns.size());
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
 
         // we did nothing to three stop trips, and all should be retained
-        Assertions.assertEquals(originalThreeStopPattern.tripSchedules.size(), newThreeStopPattern.tripSchedules.size());
+        assertEquals(originalThreeStopPattern.tripSchedules.size(), newThreeStopPattern.tripSchedules.size());
         // we have added two trip schedules
-        Assertions.assertEquals(originalTwoStopPattern.tripSchedules.size() + 2, newTwoStopPattern.tripSchedules.size());
+        assertEquals(originalTwoStopPattern.tripSchedules.size() + 2, newTwoStopPattern.tripSchedules.size());
 
         // make sure the schedules were added correctly
         // TripSchedules should be sorted by departure, so the relevant trips should be in positions 1 and 2
         TripSchedule added1 = newTwoStopPattern.tripSchedules.get(1);
 
-        Assertions.assertNull(added1.headwaySeconds);
-        Assertions.assertNull(added1.startTimes);
-        Assertions.assertNull(added1.endTimes);
+        assertNull(added1.headwaySeconds);
+        assertNull(added1.startTimes);
+        assertNull(added1.endTimes);
 
-        Assertions.assertArrayEquals(new int[] { 25300, 25800 }, added1.arrivals);
-        Assertions.assertArrayEquals(new int[] { 25300, 25800 }, added1.departures);
+        assertArrayEquals(new int[] { 25300, 25800 }, added1.arrivals);
+        assertArrayEquals(new int[] { 25300, 25800 }, added1.departures);
 
-        Assertions.assertTrue(newTwoStopPattern.servicesActive.get(added1.serviceCode));
+        assertTrue(newTwoStopPattern.servicesActive.get(added1.serviceCode));
 
         TripSchedule added2 = newTwoStopPattern.tripSchedules.get(2);
 
-        Assertions.assertNull(added2.headwaySeconds);
-        Assertions.assertNull(added2.startTimes);
-        Assertions.assertNull(added2.endTimes);
+        assertNull(added2.headwaySeconds);
+        assertNull(added2.startTimes);
+        assertNull(added2.endTimes);
 
-        Assertions.assertArrayEquals(new int[] { 25400, 25900 }, added2.arrivals);
-        Assertions.assertArrayEquals(new int[] { 25400, 25900 }, added2.departures);
+        assertArrayEquals(new int[] { 25400, 25900 }, added2.arrivals);
+        assertArrayEquals(new int[] { 25400, 25900 }, added2.departures);
 
-        Assertions.assertTrue(newTwoStopPattern.servicesActive.get(added2.serviceCode));
+        assertTrue(newTwoStopPattern.servicesActive.get(added2.serviceCode));
 
     }
 
@@ -425,11 +430,11 @@ public class AdjustFrequencyTest {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
 
-        Assertions.assertEquals(2, network.transitLayer.tripPatterns.size());
+        assertEquals(2, network.transitLayer.tripPatterns.size());
 
         network.transitLayer.tripPatterns.forEach(tp -> {
-            Assertions.assertTrue(tp.hasSchedules);
-            Assertions.assertFalse(tp.hasFrequencies);
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
         });
 
         // make an entry
@@ -464,7 +469,7 @@ public class AdjustFrequencyTest {
                 .findFirst()
                 .orElse(null);
 
-        Assertions.assertNotNull(ts1);
+        assertNotNull(ts1);
 
         TripSchedule ts2 = mod.transitLayer.tripPatterns.stream()
                 .flatMap(tp -> tp.tripSchedules.stream())
@@ -472,19 +477,19 @@ public class AdjustFrequencyTest {
                 .findFirst()
                 .orElse(null);
 
-        Assertions.assertNotNull(ts2);
+        assertNotNull(ts2);
 
-        Assertions.assertArrayEquals(ts1.frequencyEntryIds, ts2.phaseFromId);
-        Assertions.assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s1" }, ts2.phaseFromStop);
-        Assertions.assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s2" }, ts2.phaseAtStop);
-        Assertions.assertArrayEquals(new int[] { 900 }, ts2.phaseSeconds);
+        assertArrayEquals(ts1.frequencyEntryIds, ts2.phaseFromId);
+        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s1" }, ts2.phaseFromStop);
+        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s2" }, ts2.phaseAtStop);
+        assertArrayEquals(new int[] { 900 }, ts2.phaseSeconds);
 
-        Assertions.assertNull(ts1.phaseFromId);
-        Assertions.assertNull(ts1.phaseAtStop);
-        Assertions.assertNull(ts1.phaseFromStop);
-        Assertions.assertNull(ts1.phaseSeconds);
+        assertNull(ts1.phaseFromId);
+        assertNull(ts1.phaseAtStop);
+        assertNull(ts1.phaseFromStop);
+        assertNull(ts1.phaseSeconds);
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     @AfterEach

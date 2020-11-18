@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +9,8 @@ import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test that removing trips works correctly.
@@ -27,12 +28,12 @@ public class RemoveTripsTest {
     @Test
     public void testRemoveByRoute () {
         // there should be 78 trips on each route (6 per hour from 7 am to 8 pm)
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
@@ -47,39 +48,39 @@ public class RemoveTripsTest {
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
         // there should still be trips on the retained route, but none on the removed route
-        Assertions.assertEquals(0, mod.transitLayer.tripPatterns.stream()
+        assertEquals(0, mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(78, mod.transitLayer.tripPatterns.stream()
+        assertEquals(78, mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
         // should not have affected original network
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     @Test
     public void testRemoveSpecificTrips () {
         // there should be 78 trips on each route (6 per hour from 7 am to 8 pm)
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
@@ -93,35 +94,35 @@ public class RemoveTripsTest {
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
-        Assertions.assertEquals(78, mod.transitLayer.tripPatterns.stream()
+        assertEquals(78, mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
         // we removed one trip here
-        Assertions.assertEquals(77, mod.transitLayer.tripPatterns.stream()
+        assertEquals(77, mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
         // make sure the trip is gone
-        Assertions.assertTrue(mod.transitLayer.tripPatterns.stream()
+        assertTrue(mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .flatMap(p -> p.tripSchedules.stream())
                 .noneMatch(t -> "MULTIPLE_LINES:tripb25200".equals(t.tripId)));
 
         // should not have affected original network
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(78, network.transitLayer.tripPatterns.stream()
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        Assertions.assertEquals(checksum, network.checksum());
+        assertEquals(checksum, network.checksum());
     }
 
     // don't keep bunches of copies of the network around, JUnit keeps references to all test classes

@@ -3,8 +3,9 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TimeDependentRoutingTest {
 
@@ -35,7 +36,7 @@ public class TimeDependentRoutingTest {
         streetRouter.route();
         StreetRouter.State stateAtVertex = streetRouter.getStateAtVertex(three);
 
-        Assertions.assertEquals(24, stateAtVertex.durationSeconds);
+        assertEquals(24, stateAtVertex.durationSeconds);
 
         StreetRouter anotherStreetRouter = new StreetRouter(streetLayer);
         anotherStreetRouter.timeCalculator = new TraversalTimeCalculator() {
@@ -53,7 +54,7 @@ public class TimeDependentRoutingTest {
         anotherStreetRouter.route();
         StreetRouter.State anotherStateAtVertex = anotherStreetRouter.getStateAtVertex(three);
 
-        Assertions.assertEquals(60, anotherStateAtVertex.durationSeconds);
+        assertEquals(60, anotherStateAtVertex.durationSeconds);
 
     }
 

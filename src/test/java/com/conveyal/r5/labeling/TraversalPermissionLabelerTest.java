@@ -3,7 +3,6 @@ package com.conveyal.r5.labeling;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -13,6 +12,10 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Created by mabu on 26.11.2015.
@@ -158,7 +161,7 @@ public class TraversalPermissionLabelerTest {
         RoadPermission roadPermission = roadFlagComparision(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
-        Assertions.assertFalse(
+        assertFalse(
             Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
                 .disjoint(roadPermission.backward, ALLPERMISSIONS));
     }
@@ -169,11 +172,11 @@ public class TraversalPermissionLabelerTest {
         RoadPermission roadPermission = roadFlagComparision(osmWay, CAR, NONE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
-        Assertions.assertFalse(
+        assertFalse(
             Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
                 .disjoint(roadPermission.backward, ALLPERMISSIONS));
 
-        Assertions.assertTrue(
+        assertTrue(
             Collections.disjoint(NONE, ALLPERMISSIONS) && Collections
                 .disjoint(NONE, ALLPERMISSIONS));
 
@@ -266,8 +269,8 @@ public class TraversalPermissionLabelerTest {
 
         String tags = "Tags: " + stringJoiner.toString();
 
-        Assertions.assertEquals(forwardExpected, forwardFiltered, tags);
-        Assertions.assertEquals(backwardExpected, backwardFiltered, tags);
+        assertEquals(forwardExpected, forwardFiltered, tags);
+        assertEquals(backwardExpected, backwardFiltered, tags);
         return roadPermission;
     }
 

@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,6 +8,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Some date and time related tests for profile requests.
@@ -28,7 +29,7 @@ public class ProfileRequestTest {
     public void testEmptyGetFromTimeDate() {
         Instant expected = ZonedDateTime.now(profileRequest.zoneId).truncatedTo(ChronoUnit.DAYS).toInstant();
         Instant got = Instant.ofEpochMilli(profileRequest.getFromTimeDate());
-        Assertions.assertEquals(expected, got);
+        assertEquals(expected, got);
     }
 
     @Test
@@ -44,7 +45,7 @@ public class ProfileRequestTest {
 
         Instant expected = Instant.ofEpochMilli(requestWithDate.getFromTimeDate());
         Instant got = Instant.ofEpochMilli(profileRequest.getFromTimeDate());
-        Assertions.assertEquals(expected, got);
+        assertEquals(expected, got);
     }
 
     @Test
@@ -52,7 +53,7 @@ public class ProfileRequestTest {
         profileRequest.date = LocalDate.of(2015,10,5);
         Instant expected = ZonedDateTime.of(2015, 10, 5,0,0,0,0,profileRequest.zoneId).toInstant();
         Instant got = Instant.ofEpochMilli(profileRequest.getFromTimeDate());
-        Assertions.assertEquals(expected, got);
+        assertEquals(expected, got);
     }
 
     @Test
@@ -61,6 +62,6 @@ public class ProfileRequestTest {
         profileRequest.fromTime = 6*3600+22*60;
         Instant expected = ZonedDateTime.of(2015,1,5,6,22,0,0,profileRequest.zoneId).toInstant();
         Instant got = Instant.ofEpochMilli(profileRequest.getFromTimeDate());
-        Assertions.assertEquals(expected, got);
+        assertEquals(expected, got);
     }
 }

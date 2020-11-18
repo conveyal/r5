@@ -7,7 +7,6 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
@@ -22,6 +21,10 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test loading, extracting, etc.
@@ -64,7 +67,7 @@ public class IntegrationTest {
         FileInputStream fis = new FileInputStream(new File(dir, "extract.pbf"));
         GeobufDecoder decoder = new GeobufDecoder(fis);
 
-        Assertions.assertTrue(decoder.hasNext());
+        assertTrue(decoder.hasNext());
 
         Envelope envelope = new Envelope(-77.1086, -77.0378, 38.9218, 38.9872);
 
@@ -74,16 +77,16 @@ public class IntegrationTest {
             GeobufFeature feat = decoder.next();
             // TODO the extractor has a true geometric overlap check, not just an envelope check
             // so this check could be made more specific
-            Assertions.assertTrue(feat.geometry.getEnvelopeInternal().intersects(envelope));
+            assertTrue(feat.geometry.getEnvelopeInternal().intersects(envelope));
 
             features.put(feat.numericId, feat);
-            Assertions.assertNotSame(0, feat.numericId);
+            assertNotSame(0, feat.numericId);
         }
 
         // > 1 to ensure all numeric IDs are not the same
-        Assertions.assertTrue(features.size() > 1);
+        assertTrue(features.size() > 1);
         // random census block in NW DC
-        Assertions.assertTrue(features.containsKey(110010014023009L));
+        assertTrue(features.containsKey(110010014023009L));
 
         // read the workplace area characteristics csv
         InputStream csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "jobs"), "dc_wac_S000_JT00_2013.csv.gz")));
@@ -159,7 +162,7 @@ public class IntegrationTest {
         }
         csv.close();
 
-        Assertions.assertTrue(foundJobsEntry);
+        assertTrue(foundJobsEntry);
 
         // read the rac csv
         csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "workforce"), "dc_rac_S000_JT00_2013.csv.gz")));
@@ -221,7 +224,7 @@ public class IntegrationTest {
         }
         csv.close();
 
-        Assertions.assertTrue(foundWorkforceEntry);
+        assertTrue(foundWorkforceEntry);
         dir.delete();
     }
     
@@ -238,7 +241,7 @@ public class IntegrationTest {
 
         // cast to primitive long so as not to confuse Java's type inference
         if (features.containsKey(fid)) {
-            Assertions.assertEquals((long) Long.parseLong(reader.get(colCode)), (long) features.get(fid).properties.get(colName));
+            assertEquals((long) Long.parseLong(reader.get(colCode)), (long) features.get(fid).properties.get(colName));
             return true;
         }
         else return false;

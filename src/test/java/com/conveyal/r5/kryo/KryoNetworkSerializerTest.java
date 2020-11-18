@@ -6,13 +6,13 @@ import com.conveyal.r5.analyst.scenario.FakeGraph;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.util.BitSet;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Tests that serialization and deserialization of TransportNetworks functions as expected and does not corrupt objects.
@@ -80,7 +80,7 @@ public class KryoNetworkSerializerTest {
         }
         objectDiffer.compareTwoObjects(a, b);
         objectDiffer.printSummary();
-        Assertions.assertFalse(objectDiffer.hasDifferences());
+        assertFalse(objectDiffer.hasDifferences());
     }
 
 }

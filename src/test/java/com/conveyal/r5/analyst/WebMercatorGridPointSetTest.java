@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst;
 
 import gnu.trove.list.TIntList;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
@@ -12,6 +11,9 @@ import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.C
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.OUTSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.PARTIAL;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the web mercator grid pointset.
@@ -27,11 +29,11 @@ public class WebMercatorGridPointSetTest {
         );
 
         for (double lat : new double [] { -75, -25, 0, 25, 75 }) {
-            Assertions.assertEquals(lat, ps.pixelToLat(ps.latToPixel(lat)), 1e-2);
+            assertEquals(lat, ps.pixelToLat(ps.latToPixel(lat)), 1e-2);
         }
 
         for (double lon : new double [] { -175, -90, 0, 90, 175}) {
-            Assertions.assertEquals(lon, ps.pixelToLon(ps.lonToPixel(lon)), 1e-2);
+            assertEquals(lon, ps.pixelToLon(ps.lonToPixel(lon)), 1e-2);
         }
     }
 
@@ -71,23 +73,23 @@ public class WebMercatorGridPointSetTest {
             Envelope envelope = testEnvelope.envelope;
             TIntList points = gridPointSet.getPointsInEnvelope(floatingWgsEnvelopeToFixed(envelope));
             if (testEnvelope.category == OUTSIDE) {
-                Assertions.assertFalse(gridEnvelope.intersects(envelope));
-                Assertions.assertTrue(points.isEmpty());
+                assertFalse(gridEnvelope.intersects(envelope));
+                assertTrue(points.isEmpty());
             } else if (testEnvelope.category == INSIDE) {
-                Assertions.assertTrue(gridEnvelope.contains(envelope));
-                Assertions.assertTrue(points.size() > 30_000);
+                assertTrue(gridEnvelope.contains(envelope));
+                assertTrue(points.size() > 30_000);
             } else if (testEnvelope.category == PARTIAL) {
-                Assertions.assertTrue(gridEnvelope.intersects(envelope));
-                Assertions.assertFalse(gridEnvelope.contains(envelope));
-                Assertions.assertTrue(points.size() > 1_000);
-                Assertions.assertTrue(points.size() < 10_000);
+                assertTrue(gridEnvelope.intersects(envelope));
+                assertFalse(gridEnvelope.contains(envelope));
+                assertTrue(points.size() > 1_000);
+                assertTrue(points.size() < 10_000);
             } else {
                 throw new AssertionError("Unknown category: " + testEnvelope.category);
             }
             // Every reported point index should fall within the total size of the grid.
             points.forEach(p -> {
-                Assertions.assertTrue(p >= 0);
-                Assertions.assertTrue(p < gridPointSet.featureCount());
+                assertTrue(p >= 0);
+                assertTrue(p < gridPointSet.featureCount());
                 return true;
             });
         }

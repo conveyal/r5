@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.transit.TransportNetwork;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -15,6 +14,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Created by mabu on 1.3.2016.
@@ -109,7 +111,7 @@ public class ReverseRoutingTest {
         streetRouter.route();
 
         StreetRouter.State lastState = streetRouter.getStateAtVertex(A); //streetRouter.getDestinationSplit());
-        Assertions.assertNotNull(lastState);
+        assertNotNull(lastState);
         StreetPath streetPath = new StreetPath(lastState, transportNetwork, profileRequest.reverseSearch);
 
         List<Integer> correctEdgeIdx = Arrays.asList( 0, 4, 6, 3 );
@@ -132,9 +134,9 @@ public class ReverseRoutingTest {
                 currentDistance.add(state.distance);
             }
         }
-        Assertions.assertEquals(correctEdgeIdx, currentEdgeIdx, "Correct Edge IDX");
-        Assertions.assertEquals(correctDistance, currentDistance, "Correct Distance");
-        Assertions.assertEquals(correctDuration, currentDuration, "Correct duration");
+        assertEquals(correctEdgeIdx, currentEdgeIdx, "Correct Edge IDX");
+        assertEquals(correctDistance, currentDistance, "Correct Distance");
+        assertEquals(correctDuration, currentDuration, "Correct duration");
         //Assert.assertEquals("Correct times", correctTimes.stream().map(Instant::ofEpochMilli).toArray(), currectTimes.stream().map(Instant::ofEpochMilli).toArray());
         //Assert.assertEquals("Correct times", correctTimes, currectTimes);
 

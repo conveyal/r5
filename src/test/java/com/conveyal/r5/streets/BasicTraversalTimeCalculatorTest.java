@@ -1,10 +1,12 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.StreetMode;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.algorithm.Angle;
 import org.locationtech.jts.geom.Coordinate;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Created by matthewc on 2/23/16.
@@ -14,13 +16,13 @@ public class BasicTraversalTimeCalculatorTest extends TurnTest {
     public void testAngle() throws Exception {
         setUp(false);
         BasicTraversalTimeCalculator calculator = new BasicTraversalTimeCalculator(streetLayer, true);
-        Assertions.assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
-        Assertions.assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
-        Assertions.assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
+        assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
+        assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
         double angle = calculator.computeAngle(ew + 1, ene);
-        Assertions.assertTrue(angle < 0.15 * Math.PI);
-        Assertions.assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
-        Assertions.assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
+        assertTrue(angle < 0.15 * Math.PI);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
     }
 
     /** Make sure angles are right in the southern hemisphere as well. We scale by the cosine of latitude, which is negative in the southern hemisphere. */
@@ -28,20 +30,20 @@ public class BasicTraversalTimeCalculatorTest extends TurnTest {
     public void testAngleSouthernHemisphere() throws Exception {
         setUp(true);
         BasicTraversalTimeCalculator calculator = new BasicTraversalTimeCalculator(streetLayer, true);
-        Assertions.assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
-        Assertions.assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
-        Assertions.assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
+        assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
+        assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
         double angle = calculator.computeAngle(ew + 1, ene);
-        Assertions.assertTrue(angle < 0.15 * Math.PI);
-        Assertions.assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
-        Assertions.assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
+        assertTrue(angle < 0.15 * Math.PI);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
     }
 
     @Test
     public void testCost () throws Exception {
         setUp(false);
         BasicTraversalTimeCalculator calculator = new BasicTraversalTimeCalculator(streetLayer, true);
-        Assertions.assertEquals(calculator.LEFT_TURN, calculator.turnTimeSeconds(ee + 1, es, StreetMode.CAR));
+        assertEquals(calculator.LEFT_TURN, calculator.turnTimeSeconds(ee + 1, es, StreetMode.CAR));
     }
 
     /**
@@ -54,6 +56,6 @@ public class BasicTraversalTimeCalculatorTest extends TurnTest {
     public void testJtsAngle () {
         double a0 = Angle.angle(new Coordinate(10, 10), new Coordinate(10, 9));
         double a1 = Angle.angle(new Coordinate(10, 10), new Coordinate(9, 9));
-        Assertions.assertTrue(a1 < a0);
+        assertTrue(a1 < a0);
     }
 }

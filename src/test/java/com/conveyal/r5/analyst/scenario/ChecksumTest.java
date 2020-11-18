@@ -2,10 +2,12 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.stream.IntStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Test that checksums are stable between serializations of the graph.
@@ -19,7 +21,7 @@ public class ChecksumTest {
         // do a second checksum without doing anything to the network
         long checksum2 = network.checksum();
 
-        Assertions.assertEquals(checksum, checksum2, "checksum not stable under repeated serialization");
+        assertEquals(checksum, checksum2, "checksum not stable under repeated serialization");
 
         // traverse a lot of stuff in the network and see if checksums change
         IntStream.range(0, network.transitLayer.tripPatterns.size()).forEach(i -> network.transitLayer.tripPatterns.get(i));
@@ -31,13 +33,13 @@ public class ChecksumTest {
         });
 
         long checksumTraverse = network.checksum();
-        Assertions.assertEquals(checksum, checksumTraverse, "checksum not stable after traversing collections/maps");
+        assertEquals(checksum, checksumTraverse, "checksum not stable after traversing collections/maps");
 
         // change something
         network.transitLayer.tripPatterns.get(0).routeIndex = -153;
 
         long changedChecksum = network.checksum();
 
-        Assertions.assertNotEquals(checksum, changedChecksum, "Changing network did not change checksum");
+        assertNotEquals(checksum, changedChecksum, "Changing network did not change checksum");
     }
 }

@@ -5,8 +5,8 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.transit.TransportNetwork;
-import junit.framework.Assert;
-import junit.framework.TestCase;
+import org.junit.Before;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,10 +15,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static junit.framework.Assert.assertEquals;
+
 /**
  * Created by mabu on 1.3.2016.
  */
-public class ReverseRoutingTest extends TestCase {
+public class ReverseRoutingTest {
     private static final Logger LOG = LoggerFactory.getLogger(ReverseRoutingTest.class);
     public StreetLayer streetLayer;
     public TransportNetwork transportNetwork;
@@ -27,7 +29,7 @@ public class ReverseRoutingTest extends TestCase {
     public int AB, BC1, C1D, ED, DC2, C2B;
     List<String> vertexNames;
 
-    @Override
+    @Before
     public void setUp() throws Exception {
         streetLayer = new StreetLayer(new TNBuilderConfig());
         transportNetwork = new TransportNetwork();
@@ -83,6 +85,7 @@ public class ReverseRoutingTest extends TestCase {
 
     }
 
+    @Test
     public void testReverseRouting() throws Exception {
         LOG.info("Edges:");
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
@@ -107,7 +110,7 @@ public class ReverseRoutingTest extends TestCase {
         streetRouter.route();
 
         StreetRouter.State lastState = streetRouter.getStateAtVertex(A); //streetRouter.getDestinationSplit());
-        assertNotNull(lastState);
+        org.junit.Assert.assertNotNull(lastState);
         StreetPath streetPath = new StreetPath(lastState, transportNetwork, profileRequest.reverseSearch);
 
         List<Integer> correctEdgeIdx = Arrays.asList( 0, 4, 6, 3 );
@@ -130,9 +133,9 @@ public class ReverseRoutingTest extends TestCase {
                 currentDistance.add(state.distance);
             }
         }
-        Assert.assertEquals("Correct Edge IDX", correctEdgeIdx, currentEdgeIdx);
-        Assert.assertEquals("Correct Distance", correctDistance, currentDistance);
-        Assert.assertEquals("Correct duration", correctDuration, currentDuration);
+        assertEquals("Correct Edge IDX", correctEdgeIdx, currentEdgeIdx);
+        assertEquals("Correct Distance", correctDistance, currentDistance);
+        assertEquals("Correct duration", correctDuration, currentDuration);
         //Assert.assertEquals("Correct times", correctTimes.stream().map(Instant::ofEpochMilli).toArray(), currectTimes.stream().map(Instant::ofEpochMilli).toArray());
         //Assert.assertEquals("Correct times", correctTimes, currectTimes);
 

@@ -6,7 +6,7 @@ import org.junit.Test;
 /**
  * Test the code that finds initial transit stops.
  */
-public class InitialStopsTest extends TestCase {
+public class InitialStopsTest {
     /** Time (in seconds) that a decrease must be greater than in order to be considered a decrease (make sure tests don't inadvertently pass due to rounding errors) */
     public static final int EPSILON = 10;
 

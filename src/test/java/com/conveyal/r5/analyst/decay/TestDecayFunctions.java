@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.decay;
 import com.google.common.primitives.Doubles;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.array.TDoubleArrayList;
-import junit.framework.TestCase;
 import org.apache.commons.math3.util.FastMath;
 import org.junit.Test;
 
@@ -11,8 +10,9 @@ import static com.conveyal.r5.analyst.decay.DecayFunction.FOUR_HOURS_IN_SECONDS;
 import static com.conveyal.r5.analyst.decay.DecayFunction.TWO_HOURS_IN_SECONDS;
 import static com.conveyal.r5.analyst.decay.DecayFunction.ZERO_EPSILON;
 import static com.google.common.base.Preconditions.checkState;
+import static org.junit.Assert.assertEquals;
 
-public class TestDecayFunctions extends TestCase {
+public class TestDecayFunctions {
 
     private static final int TEN_MINUTES_IN_SECONDS = 10 * 60;
 
@@ -53,8 +53,8 @@ public class TestDecayFunctions extends TestCase {
             int travelTimeSeconds = t * 60;
             assertEquals(
                     "Fixed function should produce values identical to those for a half-life of 10 minutes.",
-                     movableFunction.computeWeight(TEN_MINUTES_IN_SECONDS, travelTimeSeconds),
-                     fixedFunction.computeWeight(0, travelTimeSeconds),
+                    movableFunction.computeWeight(TEN_MINUTES_IN_SECONDS, travelTimeSeconds),
+                    fixedFunction.computeWeight(0, travelTimeSeconds),
                     0.0001
             );
         }

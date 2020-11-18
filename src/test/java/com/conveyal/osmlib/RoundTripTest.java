@@ -1,6 +1,6 @@
 package com.conveyal.osmlib;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,10 +9,14 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Map;
 
-public class RoundTripTest extends TestCase {
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+public class RoundTripTest {
 
     static final String TEST_FILE = "./src/test/resources/porto_portugal.osm.pbf";
 
+    @Test
     public void testVexFile() throws Exception {
 
         // Load OSM data from PBF
@@ -35,6 +39,7 @@ public class RoundTripTest extends TestCase {
 
     }
 
+    @Test
     public void testPbfFile() throws Exception {
 
         // Load OSM data from PBF
@@ -57,6 +62,7 @@ public class RoundTripTest extends TestCase {
 
     }
 
+    @Test
     public void testVexStream() throws Exception {
 
         // Create an input/output pipe pair so we can read in a VEX stream without using a file

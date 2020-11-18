@@ -6,13 +6,13 @@ import org.junit.Test;
 /**
  * Test the propagated times store.
  */
-public class PropagatedTimesStoreTest extends TestCase {
+public class PropagatedTimesStoreTest {
     /**
      * Test that changing the reachability threshold works (i.e. averages are computed properly when destinations are
      * only reachable part of the time).
      */
     @Test
-    public static void testReachability () throws Exception {
+    public void testReachability () throws Exception {
         /*
         ProfileRequest pr = new ProfileRequest();
         // old default: no restrictions o

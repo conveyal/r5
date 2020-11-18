@@ -1,10 +1,13 @@
 package com.conveyal.osmlib;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
-public class WayTest extends TestCase {
-	public void testWay(){
+import static org.junit.Assert.assertNotNull;
+
+public class WayTest {
+	@Test
+    public void testWay(){
 		Way way = new Way();
-		assertNotNull( way );
+		assertNotNull(way);
 	}
 }

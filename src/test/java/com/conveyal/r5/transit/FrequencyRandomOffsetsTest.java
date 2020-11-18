@@ -5,12 +5,11 @@ import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.FrequencyRandomOffsets;
 import gnu.trove.list.array.TIntArrayList;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
-
-import static org.junit.Assert.assertTrue;
 
 /**
  * Test that phasing works correctly.
@@ -79,7 +78,7 @@ public class FrequencyRandomOffsetsTest {
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).
-        assertTrue(10 * 60 == timeDifference || -1 * (30 - 10) * 60 == timeDifference);
+        Assertions.assertTrue(10 * 60 == timeDifference || -1 * (30 - 10) * 60 == timeDifference);
     }
 
     /** Test that phasing using arrivals not departures at last stop. */
@@ -146,6 +145,6 @@ public class FrequencyRandomOffsetsTest {
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).
-        assertTrue(10 * 60 == timeDifference || -1 * (30 - 10) * 60 == timeDifference);
+        Assertions.assertTrue(10 * 60 == timeDifference || -1 * (30 - 10) * 60 == timeDifference);
     }
 }

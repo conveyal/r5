@@ -1,12 +1,11 @@
 package com.conveyal.osmlib;
 
-import org.junit.Test;
-
-import static org.junit.Assert.assertNotNull;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class RelationTest {
 	@Test
     public void testRelation(){
-		assertNotNull(new Relation());
+		Assertions.assertNotNull(new Relation());
 	}
 }

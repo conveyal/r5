@@ -1,6 +1,6 @@
 package com.conveyal.gtfs.util;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static org.hamcrest.MatcherAssert.assertThat;

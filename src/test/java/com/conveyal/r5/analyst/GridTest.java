@@ -1,13 +1,12 @@
 package com.conveyal.r5.analyst;
 
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Random;
-
-import static org.junit.Assert.assertEquals;
 
 public class GridTest {
 
@@ -25,10 +24,10 @@ public class GridTest {
         int yTile = 9;
         Grid grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
         ReferencedEnvelope envelope = grid.getMercatorEnvelopeMeters();
-        assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
-        assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
-        assertEquals(17532819.79994059, envelope.getMaxX(), 0.1);
-        assertEquals(-2504688.542848654, envelope.getMaxY(), 0.1);
+        Assertions.assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
+        Assertions.assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
+        Assertions.assertEquals(17532819.79994059, envelope.getMaxX(), 0.1);
+        Assertions.assertEquals(-2504688.542848654, envelope.getMaxY(), 0.1);
 
         // Cutting through Paris
         zoom = 5;
@@ -36,10 +35,10 @@ public class GridTest {
         yTile = 11;
         grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
         envelope = grid.getMercatorEnvelopeMeters();
-        assertEquals(0, envelope.getMinX(), 0.1);
-        assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
-        assertEquals(1252344.271424327, envelope.getMaxX(), 0.1);
-        assertEquals(6261721.357121639, envelope.getMaxY(), 0.1);
+        Assertions.assertEquals(0, envelope.getMinX(), 0.1);
+        Assertions.assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
+        Assertions.assertEquals(1252344.271424327, envelope.getMaxX(), 0.1);
+        Assertions.assertEquals(6261721.357121639, envelope.getMaxY(), 0.1);
 
 //        /**
 //         * Make sure the Mercator projection works properly. Open the resulting file in GIS and
@@ -95,11 +94,11 @@ public class GridTest {
 
     private static void assertGridSemanticEquals(Grid g1, Grid g2, double tolerance) {
         // Note that the name field is excluded because it does not survive serialization.
-        assertEquals(g1.zoom, g2.zoom);
-        assertEquals(g1.north, g2.north);
-        assertEquals(g1.west, g2.west);
-        assertEquals(g1.width, g2.width);
-        assertEquals(g1.height, g2.height);
+        Assertions.assertEquals(g1.zoom, g2.zoom);
+        Assertions.assertEquals(g1.north, g2.north);
+        Assertions.assertEquals(g1.west, g2.west);
+        Assertions.assertEquals(g1.width, g2.width);
+        Assertions.assertEquals(g1.height, g2.height);
         assertArrayEquals(g1.grid, g2.grid, tolerance);
     }
 
@@ -107,13 +106,13 @@ public class GridTest {
      * Compare two 2D arrays of doubles with tolerance. This method is apparently not provided by junit.Assert.
      */
     private static void assertArrayEquals(double[][] a1, double[][]a2, double tolerance) {
-        assertEquals(a1.length, a2.length);
+        Assertions.assertEquals(a1.length, a2.length);
         for (int i = 0; i < a1.length; i++) {
             double[] b1 = a1[i];
             double[] b2 = a2[i];
-            assertEquals(b1.length, b2.length);
+            Assertions.assertEquals(b1.length, b2.length);
             for (int j = 0; j < b1.length; j++) {
-                assertEquals(b1[j], b2[j], tolerance);
+                Assertions.assertEquals(b1[j], b2[j], tolerance);
             }
         }
     }

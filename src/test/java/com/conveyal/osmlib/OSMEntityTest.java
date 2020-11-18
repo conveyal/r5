@@ -1,10 +1,7 @@
 package com.conveyal.osmlib;
 
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class OSMEntityTest {
 
@@ -12,8 +9,8 @@ public class OSMEntityTest {
     public void testCreateTag()
     {
         OSMEntity.Tag tag = new OSMEntity.Tag("key","value");
-        assertEquals(tag.key, "key");
-        assertEquals(tag.value, "value");
+        Assertions.assertEquals(tag.key, "key");
+        Assertions.assertEquals(tag.value, "value");
     }
     
     @Test
@@ -28,21 +25,21 @@ public class OSMEntityTest {
 			}}
     	
     	TaggedTester tt = new TaggedTester();
-    	assertTrue(tt.hasNoTags());
+    	Assertions.assertTrue(tt.hasNoTags());
     	
     	tt.addTag("key", "value");
     	
-    	assertFalse(tt.hasNoTags());
-    	assertTrue(tt.hasTag("key"));
-    	assertTrue(tt.hasTag("key", "value"));
+    	Assertions.assertFalse(tt.hasNoTags());
+    	Assertions.assertTrue(tt.hasTag("key"));
+    	Assertions.assertTrue(tt.hasTag("key", "value"));
 
     	tt.setTagsFromString("foo=true;bar=false");
     	
-    	assertTrue(tt.hasTag("foo", "true"));
-    	assertTrue(tt.tagIsTrue("foo"));
-    	assertTrue(tt.tagIsFalse("bar"));
+    	Assertions.assertTrue(tt.hasTag("foo", "true"));
+    	Assertions.assertTrue(tt.tagIsTrue("foo"));
+    	Assertions.assertTrue(tt.tagIsFalse("bar"));
     	
-    	assertEquals(tt.getTag("key"), "value");
-    	assertEquals(tt.getTag("foo"), "true");
+    	Assertions.assertEquals(tt.getTag("key"), "value");
+    	Assertions.assertEquals(tt.getTag("foo"), "true");
     }
 }

@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile;
 
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test the propagated times store.

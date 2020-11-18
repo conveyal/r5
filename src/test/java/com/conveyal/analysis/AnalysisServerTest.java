@@ -7,7 +7,7 @@ import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.persistence.Persistence;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoDatabase;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +28,7 @@ public class AnalysisServerTest {
      * Prepare and start a testing-specific web server
      * @throws Exception
      */
-    @BeforeClass
+    @BeforeAll
     public static void setUp() {
         if (setUpIsDone) {
             return;

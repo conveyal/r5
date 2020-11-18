@@ -1,6 +1,7 @@
 package com.conveyal.osmlib;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -8,9 +9,6 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Map;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class RoundTripTest {
 
@@ -22,9 +20,9 @@ public class RoundTripTest {
         // Load OSM data from PBF
         OSM osmOriginal = new OSM(null);
         osmOriginal.readFromFile(TEST_FILE);
-        assertTrue(osmOriginal.nodes.size() > 1);
-        assertTrue(osmOriginal.ways.size() > 1);
-        assertTrue(osmOriginal.relations.size() > 1);
+        Assertions.assertTrue(osmOriginal.nodes.size() > 1);
+        Assertions.assertTrue(osmOriginal.ways.size() > 1);
+        Assertions.assertTrue(osmOriginal.relations.size() > 1);
 
         // Write OSM data out to a VEX file
         File vexFile = File.createTempFile("test", ".vex");
@@ -45,9 +43,9 @@ public class RoundTripTest {
         // Load OSM data from PBF
         OSM osmOriginal = new OSM(null);
         osmOriginal.readFromFile(TEST_FILE);
-        assertTrue(osmOriginal.nodes.size() > 1);
-        assertTrue(osmOriginal.ways.size() > 1);
-        assertTrue(osmOriginal.relations.size() > 1);
+        Assertions.assertTrue(osmOriginal.nodes.size() > 1);
+        Assertions.assertTrue(osmOriginal.ways.size() > 1);
+        Assertions.assertTrue(osmOriginal.relations.size() > 1);
 
         // Write OSM data out to a PBF file
         File ourPbfFile = File.createTempFile("test", ".osm.pbf");
@@ -106,13 +104,13 @@ public class RoundTripTest {
     }
 
     private <K,V> void compareMap (Map<K,V> m1, Map<K,V> m2) {
-        assertEquals(m1.size(), m2.size());
+        Assertions.assertEquals(m1.size(), m2.size());
         for (Map.Entry<K,V> entry : m1.entrySet()) {
             V e1 = entry.getValue();
             V e2 = m2.get(entry.getKey());
             // System.out.println(e1);
             // System.out.println(e2);
-            assertEquals(e1, e2);
+            Assertions.assertEquals(e1, e2);
         }
     }
 

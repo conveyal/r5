@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test the code that finds initial transit stops.

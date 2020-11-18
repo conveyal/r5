@@ -1,7 +1,8 @@
 package com.conveyal.osmlib;
 
-import org.junit.After;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.mapdb.Fun;
 
 import java.io.IOException;
@@ -9,17 +10,14 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 public class OSMTest {
 	@Test
     public void testOSM(){
 		OSM osm = new OSM("./src/test/resources/tmp");
 		osm.readFromFile("./src/test/resources/bangor_maine.osm.pbf");
-		assertEquals(osm.nodes.size(), 12030);
-		assertEquals(osm.ways.size(), 1828);
-		assertEquals(osm.relations.size(), 2);
+		Assertions.assertEquals(osm.nodes.size(), 12030);
+		Assertions.assertEquals(osm.ways.size(), 1828);
+		Assertions.assertEquals(osm.relations.size(), 2);
 
 		// make sure the indices work
 		for (Map.Entry<Long, Relation> e : osm.relations.entrySet()) {
@@ -28,16 +26,16 @@ public class OSMTest {
 			// Tested: Bangor contains relations with way, node, and relation members
 			for (Relation.Member member : relation.members) {
 				if (member.type == OSMEntity.Type.NODE)
-					assertTrue(osm.relationsByNode.contains(Fun.t2(member.id, id)));
+					Assertions.assertTrue(osm.relationsByNode.contains(Fun.t2(member.id, id)));
 				else if (member.type == OSMEntity.Type.WAY)
-					assertTrue(osm.relationsByWay.contains(Fun.t2(member.id, id)));
+					Assertions.assertTrue(osm.relationsByWay.contains(Fun.t2(member.id, id)));
 				else if (member.type == OSMEntity.Type.RELATION)
-					assertTrue(osm.relationsByRelation.contains(Fun.t2(member.id, id)));
+					Assertions.assertTrue(osm.relationsByRelation.contains(Fun.t2(member.id, id)));
 			}
 		}
 	}
 	
-	@After
+	@AfterEach
     public void tearDown() throws IOException{
 		Files.delete( Paths.get("./src/test/resources/tmp") );
 		Files.delete( Paths.get("./src/test/resources/tmp.p") );

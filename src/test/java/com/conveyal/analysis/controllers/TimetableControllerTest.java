@@ -2,8 +2,8 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerTest;
 import com.fasterxml.jackson.databind.JsonNode;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +23,7 @@ public class TimetableControllerTest {
      * Prepare and start a testing-specific web server
      * @throws Exception
      */
-    @BeforeClass
+    @BeforeAll
     public static void setUp() throws Exception {
         if (setUpIsDone) {
             return;

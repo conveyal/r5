@@ -7,18 +7,14 @@ import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 public class StreetLayerTest {
 
@@ -37,28 +33,28 @@ public class StreetLayerTest {
 
         // find an edge that should be removed
         int v = sl.vertexIndexForOsmNode.get(961011556);
-        assertEquals(3, sl.incomingEdges.get(v).size());
-        assertEquals(3, sl.outgoingEdges.get(v).size());
+        Assertions.assertEquals(3, sl.incomingEdges.get(v).size());
+        Assertions.assertEquals(3, sl.outgoingEdges.get(v).size());
 
         // make sure that it's a subgraph
         StreetRouter r = new StreetRouter(sl);
         r.setOrigin(v);
         r.route();
-        assertTrue(r.getReachedVertices().size() < 40);
+        Assertions.assertTrue(r.getReachedVertices().size() < 40);
 
         int e0 = sl.incomingEdges.get(v).get(0);
         int e1 = e0 % 2 == 0 ? e0 + 1 : e0 - 1;
 
-        assertEquals(v, sl.edgeStore.getCursor(e0).getToVertex());
-        assertEquals(v, sl.edgeStore.getCursor(e1).getFromVertex());
+        Assertions.assertEquals(v, sl.edgeStore.getCursor(e0).getToVertex());
+        Assertions.assertEquals(v, sl.edgeStore.getCursor(e1).getFromVertex());
 
         new TarjanIslandPruner(sl, 40, StreetMode.WALK).run();
 
         // note: disconnected subgraphs are not removed, they are de-pedestrianized
         final EdgeStore.Edge edge = sl.edgeStore.getCursor();
-        assertTrue(Arrays.stream(sl.incomingEdges.get(v).toArray())
+        Assertions.assertTrue(Arrays.stream(sl.incomingEdges.get(v).toArray())
                 .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
-        assertTrue(Arrays.stream(sl.outgoingEdges.get(v).toArray())
+        Assertions.assertTrue(Arrays.stream(sl.outgoingEdges.get(v).toArray())
                 .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
     }
 
@@ -109,26 +105,26 @@ public class StreetLayerTest {
         //Edge from A to B
         EdgeStore.Edge oldForwardEdge = streetLayer.edgeStore.getCursor(0);
         //This should always work since in existing edges only length and toVertex changes
-        assertEquals(forwardEdgeFlags, oldForwardEdge.getFlags());
-        assertEquals(forwardEdgeSpeed, oldForwardEdge.getSpeed());
+        Assertions.assertEquals(forwardEdgeFlags, oldForwardEdge.getFlags());
+        Assertions.assertEquals(forwardEdgeSpeed, oldForwardEdge.getSpeed());
         //assertEquals(forwardEdgeName, oldForwardEdge.getName());
         //Edge from B to A
         EdgeStore.Edge oldBackwardEdge = streetLayer.edgeStore.getCursor(1);
-        assertEquals(backwardEdgeFlags, oldBackwardEdge.getFlags());
-        assertEquals(backwardEdgeSpeed, oldBackwardEdge.getSpeed());
+        Assertions.assertEquals(backwardEdgeFlags, oldBackwardEdge.getFlags());
+        Assertions.assertEquals(backwardEdgeSpeed, oldBackwardEdge.getSpeed());
         //assertEquals(backwardEdgeName, oldBackwardEdge.getName());
 
         //Here errors can happen since flags, names, speeds and everything needs to be copied to new edges
         //Edge from B to C
         EdgeStore.Edge newForwardEdge = streetLayer.edgeStore.getCursor(2);
-        assertEquals(forwardEdgeFlags, newForwardEdge.getFlags());
-        assertEquals(forwardEdgeSpeed, newForwardEdge.getSpeed());
+        Assertions.assertEquals(forwardEdgeFlags, newForwardEdge.getFlags());
+        Assertions.assertEquals(forwardEdgeSpeed, newForwardEdge.getSpeed());
         //assertEquals(forwardEdgeName, newForwardEdge.getName());
 
         //Edge from C to B
         EdgeStore.Edge newBackwardEdge = streetLayer.edgeStore.getCursor(3);
-        assertEquals(backwardEdgeFlags, newBackwardEdge.getFlags());
-        assertEquals(backwardEdgeSpeed, newBackwardEdge.getSpeed());
+        Assertions.assertEquals(backwardEdgeFlags, newBackwardEdge.getFlags());
+        Assertions.assertEquals(backwardEdgeSpeed, newBackwardEdge.getSpeed());
         //assertEquals(backwardEdgeName, newBackwardEdge.getName());
 
         //streetLayer.edgeStore.dump();
@@ -157,8 +153,8 @@ public class StreetLayerTest {
          streetLayer.indexStreets();
 
          // Check that there's only one edge pair in this street layer, composed of two edges in opposite directions.
-         assertEquals(streetLayer.edgeStore.nEdges(), 2);
-         assertEquals(streetLayer.edgeStore.nEdgePairs(), 1);
+         Assertions.assertEquals(streetLayer.edgeStore.nEdges(), 2);
+         Assertions.assertEquals(streetLayer.edgeStore.nEdgePairs(), 1);
 
          EdgeStore.Edge snakeEdge = streetLayer.edgeStore.getCursor(0);
 
@@ -173,11 +169,11 @@ public class StreetLayerTest {
              int stopVertexId = streetLayer.createAndLinkVertex(stopCoordinate.y, stopCoordinate.x);
              // Vertex IDs 0 and 1 should be taken by the beginning and end points of the single original edge.
              // Negative vertex ID would indicate a linking problem.
-             assertTrue(stopVertexId > 1);
+             Assertions.assertTrue(stopVertexId > 1);
              stopVertexIds.add(stopVertexId);
              // Each added stop should create one new pair of street edges and one new pair of link edges, in addition
              // to the original pair of edges from the original single street.
-             assertTrue(streetLayer.edgeStore.nEdgePairs() == stopVertexIds.size() * 2 + 1);
+             Assertions.assertTrue(streetLayer.edgeStore.nEdgePairs() == stopVertexIds.size() * 2 + 1);
          }
 
          // As we iterate over all the newly split edges, we'll add up their lengths.
@@ -196,9 +192,9 @@ public class StreetLayerTest {
                  continue;
              }
              // All newly created non-link edges should represent the same OSM way.
-             assertEquals(edge.getOSMID(), originalOsmId);
+             Assertions.assertEquals(edge.getOSMID(), originalOsmId);
              int edgeLengthMm = edge.getLengthMm();
-             assertTrue(edgeLengthMm > 0);
+             Assertions.assertTrue(edgeLengthMm > 0);
              Coordinate[] edgeCoordinates = edge.getGeometry().getCoordinates();
              // Make no assumptions about the order of the edges in the edge store.
              // Figure out where it would be in the series of edges made out of the original edge.
@@ -222,30 +218,30 @@ public class StreetLayerTest {
                  }
              }
          }
-         assertEquals(nLinkEdges, stopCoordinates.size() * 2);
+         Assertions.assertEquals(nLinkEdges, stopCoordinates.size() * 2);
          // The position of the coordinate currently being compared in the original (unsplit) geometry.
          // Skip first and last coordinates in each edge, which are the edge endpoint vertices.
          // We don't expect to see the split coordinates in the original geometry.
          int originalGeometryIndex = 1;
          for (Coordinate[] edgeCoordinates : forwardEdgeGeometries) {
-             assertNotNull(edgeCoordinates);
-             assertTrue(edgeCoordinates.length > 2);
+             Assertions.assertNotNull(edgeCoordinates);
+             Assertions.assertTrue(edgeCoordinates.length > 2);
              for (int i = 1; i < edgeCoordinates.length - 1; i++){
-                 assertTrue(edgeCoordinates[i].equals2D(originalGeometry[originalGeometryIndex]));
+                 Assertions.assertTrue(edgeCoordinates[i].equals2D(originalGeometry[originalGeometryIndex]));
                  originalGeometryIndex += 1;
              }
          }
          originalGeometryIndex = originalGeometry.length - 2;
          for (Coordinate[] edgeCoordinates : backwardEdgeGeometries) {
-             assertNotNull(edgeCoordinates);
-             assertTrue(edgeCoordinates.length > 2);
+             Assertions.assertNotNull(edgeCoordinates);
+             Assertions.assertTrue(edgeCoordinates.length > 2);
              for (int i = 1; i < edgeCoordinates.length - 1; i++){
-                 assertTrue(edgeCoordinates[i].equals2D(originalGeometry[originalGeometryIndex]));
+                 Assertions.assertTrue(edgeCoordinates[i].equals2D(originalGeometry[originalGeometryIndex]));
                  originalGeometryIndex -= 1;
              }
          }
-         assertEquals(originalLength, accumulatedForwardLength);
-         assertEquals(originalLength, accumulatedBackwardLength);
+         Assertions.assertEquals(originalLength, accumulatedForwardLength);
+         Assertions.assertEquals(originalLength, accumulatedBackwardLength);
      }
 
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
@@ -273,23 +269,23 @@ public class StreetLayerTest {
             if (edge.getOSMID() == 382852845L) break;
         }
 
-        assertTrue(e != -1);
+        Assertions.assertTrue(e != -1);
 
         // make sure it's in the turn restrictions
-        assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
+        Assertions.assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
 
         TIntCollection restrictions = sl.edgeStore.turnRestrictions.get(e);
 
-        assertEquals(1, restrictions.size());
+        Assertions.assertEquals(1, restrictions.size());
 
         TurnRestriction restriction = sl.turnRestrictions.get(restrictions.iterator().next());
 
-        assertEquals(e, restriction.fromEdge);
-        assertEquals(0, restriction.viaEdges.length);
+        Assertions.assertEquals(e, restriction.fromEdge);
+        Assertions.assertEquals(0, restriction.viaEdges.length);
         edge.seek(restriction.toEdge);
         // Cathedral Ave NW, west of Connecticut.
-        assertEquals(130908001L, edge.getOSMID());
-        assertFalse(restriction.only);
+        Assertions.assertEquals(130908001L, edge.getOSMID());
+        Assertions.assertFalse(restriction.only);
     }
 
     /** Test that complex turn restrictions (via ways) are read properly, using http://www.openstreetmap.org/relation/555630 */
@@ -317,14 +313,14 @@ public class StreetLayerTest {
             if (edge.getOSMID() == 238215855) break;
         }
 
-        assertTrue(e != -1);
+        Assertions.assertTrue(e != -1);
 
         // make sure it's in the turn restrictions
-        assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
+        Assertions.assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
 
         TIntCollection restrictions = sl.edgeStore.turnRestrictions.get(e);
 
-        assertEquals(2, restrictions.size());
+        Assertions.assertEquals(2, restrictions.size());
 
         // annoyingly there are two turn restrictions at that node. Find the one we care about.
 
@@ -334,22 +330,22 @@ public class StreetLayerTest {
             if (restriction.viaEdges.length > 0) break; // we have found the complex one
         }
 
-        assertNotNull(restriction);
+        Assertions.assertNotNull(restriction);
 
-        assertEquals(e, restriction.fromEdge);
-        assertEquals(2, restriction.viaEdges.length);
+        Assertions.assertEquals(e, restriction.fromEdge);
+        Assertions.assertEquals(2, restriction.viaEdges.length);
 
         // check the funny little bits of Reisterstown in the intersection.
         // make sure also that they wind up in the correct order.
         edge.seek(restriction.viaEdges[0]);
-        assertEquals(238215854L, edge.getOSMID());
+        Assertions.assertEquals(238215854L, edge.getOSMID());
 
         edge.seek(restriction.viaEdges[1]);
-        assertEquals(53332280L, edge.getOSMID());
+        Assertions.assertEquals(53332280L, edge.getOSMID());
 
         edge.seek(restriction.toEdge);
         // Bit of Reisterstown in intersection but after restriction
-        assertEquals(238215856L, edge.getOSMID());
-        assertFalse(restriction.only);
+        Assertions.assertEquals(238215856L, edge.getOSMID());
+        Assertions.assertFalse(restriction.only);
     }
 }

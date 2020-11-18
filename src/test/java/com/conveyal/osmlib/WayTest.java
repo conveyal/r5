@@ -1,13 +1,12 @@
 package com.conveyal.osmlib;
 
-import org.junit.Test;
-
-import static org.junit.Assert.assertNotNull;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class WayTest {
 	@Test
     public void testWay(){
 		Way way = new Way();
-		assertNotNull(way);
+		Assertions.assertNotNull(way);
 	}
 }

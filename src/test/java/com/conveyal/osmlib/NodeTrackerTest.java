@@ -1,13 +1,10 @@
 package com.conveyal.osmlib;
 
 import com.beust.jcommander.internal.Sets;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.Set;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class NodeTrackerTest {
 
@@ -35,18 +32,18 @@ public class NodeTrackerTest {
             // Note that a Set<Long> containing 0L returns false for contains((int)0).
             for (long i = lo; i < hi; i++) {
                 if (tracker.contains(i)) {
-                    assertTrue(numbers.contains(i));
+                    Assertions.assertTrue(numbers.contains(i));
                 } else {
-                    assertFalse(numbers.contains(i));
+                    Assertions.assertFalse(numbers.contains(i));
                 }
                 if (numbers.contains(i)) {
-                    assertTrue(tracker.contains(i));
+                    Assertions.assertTrue(tracker.contains(i));
                 } else {
-                    assertFalse(tracker.contains(i));
+                    Assertions.assertFalse(tracker.contains(i));
                 }
             }
 
-            assertEquals(numbers.size(), tracker.cardinality());
+            Assertions.assertEquals(numbers.size(), tracker.cardinality());
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.conveyal.data.geobuf;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -12,10 +13,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /**
  * An integration test of our GeoBuf library.
@@ -44,37 +41,37 @@ public class IntegrationTest {
         encoder.writeFeatureCollection(Arrays.asList(feat));
         GeobufDecoder decoder = new GeobufDecoder(new ByteArrayInputStream(baos.toByteArray()));
 
-        assertTrue(decoder.hasNext());
+        Assertions.assertTrue(decoder.hasNext());
         GeobufFeature feat2 = decoder.next();
-        assertFalse(decoder.hasNext());
+        Assertions.assertFalse(decoder.hasNext());
 
         // make sure the properties survived
-        assertTrue(feat2.properties.get("string") instanceof String);
-        assertEquals("Matt", feat2.properties.get("string"));
+        Assertions.assertTrue(feat2.properties.get("string") instanceof String);
+        Assertions.assertEquals("Matt", feat2.properties.get("string"));
 
         // ints become longs
-        assertTrue(feat2.properties.get("int") instanceof Long);
-        assertEquals(2015, (long) feat2.properties.get("int"));
+        Assertions.assertTrue(feat2.properties.get("int") instanceof Long);
+        Assertions.assertEquals(2015, (long) feat2.properties.get("int"));
 
-        assertTrue(feat2.properties.get("double") instanceof Double);
-        assertEquals(49.94, (double) feat2.properties.get("double"), 1e-12);
+        Assertions.assertTrue(feat2.properties.get("double") instanceof Double);
+        Assertions.assertEquals(49.94, (double) feat2.properties.get("double"), 1e-12);
 
         // test that the holes survived
-        assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.55498, 52.76564))));
-        assertTrue(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5559, 52.7627))));
-        assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5567, 52.7575))));
-        assertTrue(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5146, 52.7654))));
-        assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5248, 52.7560))));
+        Assertions.assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.55498, 52.76564))));
+        Assertions.assertTrue(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5559, 52.7627))));
+        Assertions.assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5567, 52.7575))));
+        Assertions.assertTrue(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5146, 52.7654))));
+        Assertions.assertFalse(feat2.geometry.contains(gf.createPoint(new Coordinate(5.5248, 52.7560))));
 
         // make sure that the geometries are equal
         // I believe parts and rings should be in the same order, even though that's not strictly necessary
-        assertEquals(feat.geometry.getNumGeometries(), feat2.geometry.getNumGeometries());
+        Assertions.assertEquals(feat.geometry.getNumGeometries(), feat2.geometry.getNumGeometries());
 
         for (int partIdx = 0; partIdx < feat.geometry.getNumGeometries(); partIdx++) {
             Polygon part = (Polygon) feat.geometry.getGeometryN(partIdx);
             Polygon part2 = (Polygon) feat2.geometry.getGeometryN(partIdx);
 
-            assertEquals(part.getNumInteriorRing(), part2.getNumInteriorRing());
+            Assertions.assertEquals(part.getNumInteriorRing(), part2.getNumInteriorRing());
 
             ringsEqual(part.getExteriorRing(), part2.getExteriorRing());
 
@@ -85,13 +82,13 @@ public class IntegrationTest {
     }
 
     public static void ringsEqual (LineString expected, LineString actual) {
-        assertEquals(expected.getNumPoints(), actual.getNumPoints());
+        Assertions.assertEquals(expected.getNumPoints(), actual.getNumPoints());
 
         for (int pointIdx = 0; pointIdx < expected.getNumPoints(); pointIdx++) {
             Coordinate coord = expected.getCoordinateN(pointIdx);
             Coordinate coord2 = expected.getCoordinateN(pointIdx);
-            assertEquals(coord.x, coord2.x, 1e-11);
-            assertEquals(coord.y, coord2.y, 1e-11);
+            Assertions.assertEquals(coord.x, coord2.x, 1e-11);
+            Assertions.assertEquals(coord.y, coord2.y, 1e-11);
         }
     }
 }

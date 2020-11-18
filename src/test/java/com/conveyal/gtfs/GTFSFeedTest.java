@@ -2,7 +2,7 @@ package com.conveyal.gtfs;
 
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

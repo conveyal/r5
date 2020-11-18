@@ -5,15 +5,13 @@ import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Test that when a modification creates new stops and therefore new street vertices and edges,
@@ -28,7 +26,7 @@ public class RelinkingTest {
     public TransportNetwork network;
     public long checksum;
 
-    @Before
+    @BeforeEach
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
         checksum = network.checksum();
@@ -42,7 +40,7 @@ public class RelinkingTest {
     @Test
     public void testAddBidirectionalTrip () {
 
-        assertEquals(1, network.transitLayer.tripPatterns.size());
+        Assertions.assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = true;
@@ -68,9 +66,9 @@ public class RelinkingTest {
         scenario.modifications = Arrays.asList(at);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
-        assertEquals(3, mod.transitLayer.tripPatterns.size());
-        assertEquals(5, network.transitLayer.getStopCount());
-        assertEquals(8, mod.transitLayer.getStopCount());
+        Assertions.assertEquals(3, mod.transitLayer.tripPatterns.size());
+        Assertions.assertEquals(5, network.transitLayer.getStopCount());
+        Assertions.assertEquals(8, mod.transitLayer.getStopCount());
 
         // Check that stop s4 is in the transfers for stop 6
         // (the middle stop of the three new ones at indexes 5, 6, 7)
@@ -82,10 +80,10 @@ public class RelinkingTest {
             int stop = transfers[i];
             int distance = transfers[i+1];
             foundStops.add(stop);
-            assertTrue(distance >= 0);
+            Assertions.assertTrue(distance >= 0);
         }
         int s4StopIndex = mod.transitLayer.indexForStopId.get("SINGLE_LINE:s4");
-        assertTrue(foundStops.contains(s4StopIndex));
+        Assertions.assertTrue(foundStops.contains(s4StopIndex));
 
         // Check that stop stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
         // is in the transfers for existing stop s4
@@ -95,30 +93,30 @@ public class RelinkingTest {
             int stop = transfers[i];
             int distance = transfers[i+1];
             foundStops.add(stop);
-            assertTrue(distance >= 0);
+            Assertions.assertTrue(distance >= 0);
         }
-        assertTrue(foundStops.contains(6));
+        Assertions.assertTrue(foundStops.contains(6));
 
         // Check that stops s3 and s4 are included in the distance table
         // for stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
         TIntIntMap distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(6);
-        assertNotNull(distanceTable);
+        Assertions.assertNotNull(distanceTable);
         int s4streetVertexIndex = mod.transitLayer.streetVertexForStop.get(s4StopIndex);
-        assertTrue(distanceTable.containsKey(s4streetVertexIndex));
+        Assertions.assertTrue(distanceTable.containsKey(s4streetVertexIndex));
         int s3StopIndex = mod.transitLayer.indexForStopId.get("SINGLE_LINE:s3");
         int s3streetVertexIndex = mod.transitLayer.streetVertexForStop.get(s3StopIndex);
-        assertTrue(distanceTable.containsKey(s3streetVertexIndex));
+        Assertions.assertTrue(distanceTable.containsKey(s3streetVertexIndex));
 
         // Check that stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
         // is included in the distance table for stops s3 and s4
         int newStopStreetVertex = mod.transitLayer.streetVertexForStop.get(6);
-        assertTrue(newStopStreetVertex > 2000);
+        Assertions.assertTrue(newStopStreetVertex > 2000);
         distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(s3StopIndex);
-        assertNotNull(distanceTable);
-        assertTrue(distanceTable.containsKey(newStopStreetVertex));
+        Assertions.assertNotNull(distanceTable);
+        Assertions.assertTrue(distanceTable.containsKey(newStopStreetVertex));
         distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(s4StopIndex);
-        assertNotNull(distanceTable);
-        assertTrue(distanceTable.containsKey(newStopStreetVertex));
+        Assertions.assertNotNull(distanceTable);
+        Assertions.assertTrue(distanceTable.containsKey(newStopStreetVertex));
 
         // TODO check that PointSets are properly relinked to the new street layer.
 

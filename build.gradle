@@ -246,8 +246,5 @@ dependencies {
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
     testImplementation('org.junit.jupiter:junit-jupiter')
 
-    // Assertion library used in a few tests, which prints pretty messages when assertions fail.
-    testImplementation 'org.hamcrest:java-hamcrest:2.0.0.0'
-
 }
 

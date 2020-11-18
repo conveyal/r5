@@ -4,7 +4,7 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 import org.junit.jupiter.api.Test;
 
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests to verify functionality of classes that load fields from GTFS tables.
@@ -31,11 +31,16 @@ public class FieldTests {
         for (String badDate : badDates) {
             try {
                 new DateField("date", Requirement.REQUIRED).validateAndConvert(badDate);
-                assertThat("Parsing bad dates should throw an exception and never reach this point.", false);
+                assertTrue(false, "Parsing bad dates should throw an exception and never reach this point.");
             } catch (StorageException ex) {
-                assertThat("Error type should be date-related.",
-                        ex.errorType == NewGTFSErrorType.DATE_FORMAT || ex.errorType == NewGTFSErrorType.DATE_RANGE);
-                assertThat("Error's bad value should be the input value (the bad date).", ex.badValue.equals(badDate));
+                assertTrue(
+                    ex.errorType == NewGTFSErrorType.DATE_FORMAT || ex.errorType == NewGTFSErrorType.DATE_RANGE,
+                    "Error type should be date-related."
+                );
+                assertTrue(
+                    ex.badValue.equals(badDate),
+                    "Error's bad value should be the input value (the bad date)."
+                );
             }
         }
 
@@ -43,7 +48,7 @@ public class FieldTests {
 
         for (String goodDate : goodDates) {
             String convertedValue = new DateField("date", Requirement.REQUIRED).validateAndConvert(goodDate);
-            assertThat("Returned value matches the well-formed date.", convertedValue.equals(goodDate));
+            assertTrue(convertedValue.equals(goodDate), "Returned value matches the well-formed date.");
         }
 
     }

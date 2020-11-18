@@ -14,9 +14,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test suite for the GTFSFeed class.
@@ -59,7 +58,7 @@ public class GTFSFeedTest {
         GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
         feed.toFile(outZip.getAbsolutePath());
         feed.close();
-        assertThat(outZip.exists(), is(true));
+        assertTrue(outZip.exists());
 
         // assert that rows of data were written to files within the zipfile
         ZipFile zip = new ZipFile(outZip);
@@ -120,7 +119,7 @@ public class GTFSFeedTest {
             ZipEntry entry = zip.getEntry(fileTestCase.filename);
 
             // make sure the file exists within the zipfile
-            assertThat(entry, notNullValue());
+            assertNotNull(entry);
 
             // create csv reader for file
             InputStream zis = zip.getInputStream(entry);
@@ -129,7 +128,7 @@ public class GTFSFeedTest {
 
             // make sure the file has headers
             boolean hasHeaders = reader.readHeaders();
-            assertThat(hasHeaders, is(true));
+            assertTrue(hasHeaders);
 
             // make sure that the a record matching the expected row exists in this table
             boolean recordFound = false;
@@ -145,10 +144,9 @@ public class GTFSFeedTest {
                     recordFound = true;
                 }
             }
-            assertThat(
-                "Data Expectation record not found in " + fileTestCase.filename,
+            assertTrue(
                 recordFound,
-                is(true)
+                "Data Expectation record not found in " + fileTestCase.filename
             );
         }
     }

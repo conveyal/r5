@@ -7,10 +7,9 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
@@ -19,6 +18,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Created by mabu on 2.2.2016.
@@ -33,7 +37,7 @@ public class StreetSegmentTest {
         return mapper.readValue(file, StreetSegment.class);
     }
 
-    @BeforeClass
+    @BeforeAll
     public static void setUpClass() throws Exception {
         GeometryWKTDeserializer geometryWKTDeserializer = new GeometryWKTDeserializer();
 
@@ -52,8 +56,8 @@ public class StreetSegmentTest {
 
         //Gets part of 3 similar and 2 different edges
         streetSegment.streetEdges = streetSegment.streetEdges.subList(3,9);
-        Assert.assertNotNull(streetSegment);
-        Assert.assertEquals(6, streetSegment.streetEdges.size());
+        assertNotNull(streetSegment);
+        assertEquals(6, streetSegment.streetEdges.size());
         int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
         /*LOG.info("BEFORE:");
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
@@ -65,8 +69,8 @@ public class StreetSegmentTest {
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
-        Assert.assertEquals(3, streetSegment.streetEdges.size());
-        Assert.assertEquals(distanceBefore, distanceAfter);
+        assertEquals(3, streetSegment.streetEdges.size());
+        assertEquals(distanceBefore, distanceAfter);
 
 
     }
@@ -75,8 +79,8 @@ public class StreetSegmentTest {
     @Test
     public void testCompactDiffSameDiff() throws Exception {
         StreetSegment streetSegment = loadFile("streetSegmentWALK.json");
-        Assert.assertNotNull(streetSegment);
-        Assert.assertEquals(24, streetSegment.streetEdges.size());
+        assertNotNull(streetSegment);
+        assertEquals(24, streetSegment.streetEdges.size());
         int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
         /*LOG.info("BEFORE:");
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
@@ -88,8 +92,8 @@ public class StreetSegmentTest {
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
-        Assert.assertEquals(21, streetSegment.streetEdges.size());
-        Assert.assertEquals(distanceBefore, distanceAfter);
+        assertEquals(21, streetSegment.streetEdges.size());
+        assertEquals(distanceBefore, distanceAfter);
 
 
     }
@@ -102,8 +106,8 @@ public class StreetSegmentTest {
         //Gets part of different and similar edges
         streetSegment.streetEdges = streetSegment.streetEdges.subList(0,7);
         int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
-        Assert.assertNotNull(streetSegment);
-        Assert.assertEquals(7, streetSegment.streetEdges.size());
+        assertNotNull(streetSegment);
+        assertEquals(7, streetSegment.streetEdges.size());
         /*LOG.info("BEFORE:");
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
@@ -114,8 +118,8 @@ public class StreetSegmentTest {
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
-        Assert.assertEquals(4, streetSegment.streetEdges.size());
-        Assert.assertEquals(distanceBefore, distanceAfter);
+        assertEquals(4, streetSegment.streetEdges.size());
+        assertEquals(distanceBefore, distanceAfter);
 
 
     }
@@ -126,15 +130,15 @@ public class StreetSegmentTest {
         /*for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
-        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
-        Assert.assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(3).relativeDirection);
-        Assert.assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(4).relativeDirection);
+        assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(3).relativeDirection);
+        assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(4).relativeDirection);
         streetSegment.compactEdges();
-        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
-        Assert.assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
+        assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
     }
 
-    @Ignore("Roundabout exit numbers and compactness isn't supported yet")
+    @Disabled("Roundabout exit numbers and compactness isn't supported yet")
     @Test
     public void testRoundaboutExit() throws Exception {
         StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
@@ -143,19 +147,19 @@ public class StreetSegmentTest {
         }
 
         //Compact roundabout and add exit number
-        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
-        Assert.assertEquals("3", streetSegment.streetEdges.get(2).exit);
-        Assert.assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
+        assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        assertEquals("3", streetSegment.streetEdges.get(2).exit);
+        assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
     }
 
     @Test
     public void testSimilarTo() throws Exception {
         StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
 
-        Assert.assertFalse(streetSegment.streetEdges.get(0).similarTo(streetSegment.streetEdges.get(1)));
-        Assert.assertFalse(streetSegment.streetEdges.get(1).similarTo(streetSegment.streetEdges.get(2)));
-        Assert.assertTrue(streetSegment.streetEdges.get(2).similarTo(streetSegment.streetEdges.get(3)));
-        Assert.assertTrue(streetSegment.streetEdges.get(3).similarTo(streetSegment.streetEdges.get(4)));
+        assertFalse(streetSegment.streetEdges.get(0).similarTo(streetSegment.streetEdges.get(1)));
+        assertFalse(streetSegment.streetEdges.get(1).similarTo(streetSegment.streetEdges.get(2)));
+        assertTrue(streetSegment.streetEdges.get(2).similarTo(streetSegment.streetEdges.get(3)));
+        assertTrue(streetSegment.streetEdges.get(3).similarTo(streetSegment.streetEdges.get(4)));
 
     }
 }

@@ -47,4 +47,3 @@ logentries.xml
 src/main/resources/git.properties
 pom.xml.versionsBackup
 analysis.properties
-/src/test/resources/snapshots/com/conveyal/analysis/controllers/

@@ -1,11 +1,11 @@
 package com.conveyal.r5.analyst.core;
 
 import com.conveyal.r5.common.JsonUtilities;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests correct LocalDate Serialization

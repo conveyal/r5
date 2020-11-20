@@ -9,9 +9,9 @@ import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -19,12 +19,12 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test adding trips.
@@ -33,7 +33,7 @@ public class AddTripsTest {
     public TransportNetwork network;
     public long checksum;
 
-    @Before
+    @BeforeEach
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
         checksum = network.checksum();
@@ -583,7 +583,7 @@ public class AddTripsTest {
         }
     }
 
-    @After
+    @AfterEach
     public void tearDown () {
         this.network = null;
     }

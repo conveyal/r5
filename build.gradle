@@ -37,6 +37,10 @@ shadowJar {
     mergeServiceFiles()
 }
 
+test {
+    useJUnitPlatform()
+}
+
 // `gradle publish` will upload both shadow and simple JAR to Github Packages
 publishing {
     repositories {
@@ -238,17 +242,9 @@ dependencies {
 
     ////// Test-only dependencies //////
 
-    // Assertion library that "makes testing web APIs easy".
-    testImplementation 'io.rest-assured:rest-assured:3.0.3'
-
     // Java unit testing framework.
-    testImplementation 'junit:junit:4.12'
-
-    // Assertion library used in a few tests, which prints pretty messages when assertions fail.
-    testImplementation 'org.hamcrest:java-hamcrest:2.0.0.0'
-
-    // Snapshotting library for testing. This looks fragile, we should probably eliminate it.
-    testImplementation 'com.github.conveyal:java-snapshot-matcher:e6a78d3af9d67f6f6240261fcba497d3b50f9399'
+    testImplementation(platform('org.junit:junit-bom:5.7.0'))
+    testImplementation('org.junit.jupiter:junit-jupiter')
 
 }
 

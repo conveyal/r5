@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Create a gridded transport system with very regular spacing of roads and transit stops,
@@ -62,11 +64,9 @@ public class GridLayout {
     }
 
     public TransportNetwork generateNetwork () {
-        GTFSFeed gtfs = new GridGtfsGenerator(this).generate();
         OSM osm = new GridOsmGenerator(this).generate();
-        // TransportNetwork.fromFeeds()
-        gtfs.toFile("out.gtfs.zip");
-        osm.writeToFile("out.osm.pbf");
+        GTFSFeed gtfs = new GridGtfsGenerator(this).generate();
+        TransportNetwork transportNetwork = TransportNetwork.fromInputs(new TNBuilderConfig(), osm, Stream.of(gtfs));
         return null;
     }
 

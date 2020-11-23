@@ -11,7 +11,6 @@ public class GridTest {
 
     @Test
     public void testGrid () {
-        Coordinate aliceSprings = new CoordinateXY(133.87, -23.7);
         Coordinate simpsonDesert = new CoordinateXY(136.5, -25.5);
         GridLayout gridLayout = new GridLayout(simpsonDesert, 100);
         gridLayout.addHorizontalRoute(20, 20);

@@ -107,12 +107,12 @@ public class GridGtfsGenerator {
             trip.direction_id = back ? 1 : 0;
             trip.trip_id = String.format("%s:%d:%d", route.id, tripIndex, trip.direction_id);
             trip.route_id = route.id;
-            trip.service_id = "WEEKDAY";
+            trip.service_id = SERVICE_ID;
             feed.trips.put(trip.trip_id, trip);
             int departureTime = intialDeparture;
             int arrivalTime = departureTime - dwell;
             for (int stopSequence = 0; stopSequence < route.nStops; stopSequence++) {
-                int stopInRoute = back ? route.nStops - stopSequence : stopSequence;
+                int stopInRoute = back ? route.nStops - 1 - stopSequence: stopSequence;
                 StopTime stopTime = new StopTime();
                 stopTime.stop_id = route.stopId(stopInRoute, mergeStops);
                 stopTime.stop_sequence = stopSequence;

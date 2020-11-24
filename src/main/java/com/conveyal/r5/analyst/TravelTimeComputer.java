@@ -70,9 +70,6 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
-        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this object within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
@@ -130,10 +127,6 @@ public class TravelTimeComputer {
                 continue;
             }
 
-            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
-            if (streetSpeedMillimetersPerSecond <= 0){
-                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
-            }
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
@@ -187,14 +180,24 @@ public class TravelTimeComputer {
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
 
+            // Calculate times to reach destinations directly by this street mode, without using transit
             LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
                     destinations,
                     network.streetLayer,
                     accessMode
             );
 
+            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
+            if (streetSpeedMillimetersPerSecond <= 0){
+                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
+            }
+
+            // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+            int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+
             Split origin = sr.getOriginSplit();
 
+            // TODO refactor so this method takes sr as the sole argument
             PointSetTimes pointSetTimes = linkedDestinations.eval(
                     sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond,

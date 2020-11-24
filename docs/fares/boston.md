@@ -1,6 +1,6 @@
 # Boston in-routing fare calculation
 
-The Boston fare calculator is the original fare calculator used as a an example in [our original paper on computing accessibility with fares](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf). It handles fares for the [Massachusetts Bay Transportation Authority](https://mbta.com), which provides most of the transit service in the Boston area, including subways, light rail, commuter rail, local and express buses, bus rapid transit, and ferries. As of summer 2018, when we wrote the paper, the fares were as shown in Table 2 of [the original paper](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf). This document details the implementation of this fare system in R<sup>5</sup>.
+The Boston fare calculator is the original fare calculator used as a an example in [our original paper on computing accessibility with fares](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf). It handles fares for the [Massachusetts Bay Transportation Authority](https://mbta.com), which provides most of the transit service in the Boston area, including subways, light rail, commuter rail, local and express buses, bus rapid transit, and ferries. As of summer 2018, when we wrote the paper, the fares were as shown in Table 2 of [the original paper](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf). This document details the implementation of this fare system in R<sup>5</sup>. The fare system is based on fares and modified GTFS from July 2018.
 
 ## General principles
 
@@ -30,7 +30,7 @@ Local buses cost $1.70 [with one free transfer](https://projects.indicatrix.org/
 
 Transfer from [local to express buses require an upgrade fare payment](https://projects.indicatrix.org/fareto-examples/?load=bos-local-express&index=0), while [transfers from express to local buses are free](https://projects.indicatrix.org/fareto-examples/?load=bos-express-local&index=1).
 
-TODO inner/outer
+[Inner express buses](https://projects.indicatrix.org/fareto-examples/?load=bos-inner&index=0) and [outer express buses](https://projects.indicatrix.org/fareto-examples/?load=bos-outer&index=1) have different fare characteristics but the same transfer characteristics.
 
 ## Silver Line
 
@@ -58,22 +58,50 @@ Commuter rail has a zone-based fare system, with fares from each zone to downtow
 
 Two broad classes of one-way commuter rail fares exist: zone fares and interzone fares. Zone fares are fares for trips beginning or ending in Zone 1A, which contains the Downtown Boston terminals as well as several other central stations in Boston, Cambridge, Medford, Malden, and Chelsea; for instance a Zone 5 fare would cover travel from Zone 5 to Zone 1A. Interzone fares are for trips that pass through other zones but not Zone 1A. For instance, an Interzone 3 fare would cover a trip from Zone 6 to Zone 4 (because it passes through three fare zones). The fares are as follows:
 
+### Zone fares
+
 - [Zone 1A <> Zone 1A: $2.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-1a&index=0)
 - [Zone 1 -> Zone 1A: $6.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1-1a&index=3)
 - [Zone 1A -> Zone 1: $6.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-1&index=0)
-- [Zone 2 -> Zone 1A: $6.75]()
+- [Zone 2 -> Zone 1A: $6.75](https://projects.indicatrix.org/fareto-examples/?load=bos-2-1a&index=2)
 - [Zone 1A -> Zone 2: $6.75](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-2&index=4)
+- [Zone 3 -> Zone 1A: $7.50](https://projects.indicatrix.org/fareto-examples/?load=bos-3-1a&index=4)
 - [Zone 1A -> Zone 3: $7.50](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-3&index=1)
+- [Zone 4 -> Zone 1A: $8.25](https://projects.indicatrix.org/fareto-examples/?load=bos-4-1a&index=0)
 - [Zone 1A -> Zone 4: $8.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-4&index=2)
+- [Zone 5 -> Zone 1A: $9.25](https://projects.indicatrix.org/fareto-examples/?load=bos-5-1a&index=2)
 - [Zone 1A -> Zone 5: $9.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-5&index=0)
+- [Zone 6 -> Zone 1A: $10.00](https://projects.indicatrix.org/fareto-examples/?load=bos-6-1a&index=1)
 - [Zone 1A -> Zone 6: $10.00](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-6&index=0)
+- [Zone 7 -> 1A: $10.50](https://projects.indicatrix.org/fareto-examples/?load=bos-7-1a&index=0)
 - [Zone 1A -> Zone 7: $10.50](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-7&index=0)
+- [Zone 8 -> Zone 1A: $11.50](https://projects.indicatrix.org/fareto-examples/?load=bos-8-1a&index=1)
 - [Zone 1A -> Zone 8: $11.50](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-8&index=0)
+- [Zone 9 -> Zone 1A: $12.00](https://projects.indicatrix.org/fareto-examples/?load=bos-9-1a&index=0)
 - [Zone 1A -> Zone 9: $12.00](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-9&index=0)
-- Zone 1A to Zone 10 (Wickford Junction) is outside of the analysis area of this project
+- Zone 10 (Wickford Junction) is outside of the analysis area of this project
 
-Per the fare tariff, there are no discounted transfers at all on commuter rail. However, in practice and since the commuter rail system is a proof-of-payment system, and since some trains express during rush hour, it is possible to transfer and continue a same-direction trip, for instance a trip from [Worcester to Auburndale at rush hour, with a transfer in Framingham to to express service](https://projects.indicatrix.org/fareto-examples/?load=bos-cr-same-dir-xfer&index=0). The router calculates the fare for this as $8—two $4 interzone 4 fares for the two legs of the trip. However, in practice you purchase a $5.50 interzone 7 ticket for this trip. This type of express service is rare in the MBTA commuter rail system, and is thus left unimplemented.
+### Interzone fares
 
-- Same direction transfers at SL Way should be okay
-- Harvard Busway is "behind gates"
-- Document assumptions
+Charged by the number of zones passed through, in whole or in part.
+
+- [Interzone 1: $2.75](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-1&index=0)
+- [Interzone 2: $3.25](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-2&index=0)
+- [Interzone 3: $3.50](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-3&index=0)
+- [Interzone 4: $4.00](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-4&index=0)
+- [Interzone 5: $4.50](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-5&index=0)
+- [Interzone 6: $5.00](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-6&index=0)
+- [Interzone 7: $5.50](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-7&index=0)
+- [Interzone 8: $6.00](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-8&index=0)
+- [Interzone 9: $6.50](https://projects.indicatrix.org/fareto-examples/?load=bos-iz-9&index=0)
+- Interzone 10 is not possible without Wickford Junction, which is outside the analysis area.
+
+### Boundary zones
+
+In the baseline, there is one station, Quincy Center, that is in a special 1A/1 boundary zone, which was due to a subway station closure at the time. Fares from Zone 1A/1 to Zone 1A stations [are charged the Zone 1A fare of $2.25](https://projects.indicatrix.org/fareto-examples/?load=bos-1a1-1&index=3), while trips from Zone 1A/1 to other zones [are charged the appropriate interzone fare as if the station was in Zone 1](https://projects.indicatrix.org/fareto-examples/?load=bos-1a1-6&index=0). The opposite is also true, for trips [from Zone 1A](https://projects.indicatrix.org/fareto-examples/?load=bos-1a-1a1&index=) and [from outlying zones](https://projects.indicatrix.org/fareto-examples/?load=bos-6-1a1&index=0).
+
+### Transfers
+
+Per the fare tariff, there are no discounted transfers at all on commuter rail. However, in practice and since the commuter rail system is a proof-of-payment system, and since some trains express during rush hour, it is possible to transfer and continue a same-direction trip, for instance a trip from [Worcester to Auburndale at rush hour, with a transfer in Framingham to to express service](https://projects.indicatrix.org/fareto-examples/?load=bos-cr-same-dir-xfer&index=0). The router calculates the fare for this as $8—two $4 interzone 4 fares for the two legs of the trip. However, in practice you purchase a $5.50 interzone 7 ticket for this trip. This type of express service is rare in the MBTA commuter rail system, and the transfer discounts are thus left unimplemented.
+
+There are no discounted transfers [to other modes](https://projects.indicatrix.org/fareto-examples/?load=bos-cr-xfer&index=0) with pay-as-you-go fares on commuter rail, although [the router will trade off a longer trip on commuter rail with disembarking early and changing to local transit when it is cheaper to do so](https://projects.indicatrix.org/fareto-examples/?load=bos-cr-xfer&index=4). Similarly, there are no discounted transfers [from other modes](https://projects.indicatrix.org/fareto-examples/?load=bos-xfer-cr&index=0). Like ferries, when the commuter rail is used in between two other modes, [the transfer allowance from the first mode is preserved and can be used for a discounted transfer on the second mode](https://projects.indicatrix.org/fareto-examples/?load=bos-bus-cr-orange&index=0).

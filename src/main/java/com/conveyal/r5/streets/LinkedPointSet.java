@@ -427,7 +427,6 @@ public class LinkedPointSet implements Serializable {
                 Split origin
             ) {
         int[] travelTimes = new int[edges.length];
-        // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {

@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
+import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
 
 /**
  * This routes over the street layer of a TransitNetwork.
@@ -229,7 +231,7 @@ public class StreetRouter {
      * objective variable for the optimal path to that vertex.
      */
     public TIntIntMap getReachedVertices () {
-        TIntIntMap result = new TIntIntHashMap();
+        TIntIntMap result = new TIntIntHashMap(DEFAULT_CAPACITY, DEFAULT_LOAD_FACTOR, -1, Integer.MAX_VALUE);
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;

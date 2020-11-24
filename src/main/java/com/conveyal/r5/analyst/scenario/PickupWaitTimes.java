@@ -165,10 +165,6 @@ public class PickupWaitTimes {
 
     }
 
-    public boolean egressUnavailable(int stop, StreetMode mode) {
-            return this.streetMode == mode && egressServiceForStop.get(stop) == null && getDefaultWaitInSeconds() == -1;
-    }
-
     public int getDefaultWaitInSeconds() {
         return (int) (polygons.defaultData * 60);
     }

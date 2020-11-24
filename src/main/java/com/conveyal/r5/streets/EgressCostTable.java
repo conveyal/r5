@@ -241,7 +241,7 @@ public class EgressCostTable implements Serializable {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
-            if (rebuildZone != null && !rebuildZone.contains(stopPoint)) {
+            if (rebuildZone != null && !rebuildZone.contains(stopPoint) && egressStopDelaysSeconds == null) {
                 // This cannot be affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so
                 // all stops outside the relink zone should already have a distance table entry.
@@ -268,10 +268,29 @@ public class EgressCostTable implements Serializable {
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
-                if (pickupWaitTimes != null && pickupWaitTimes.egressUnavailable(stopIndex, streetMode)) {
-                    LOG.debug("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
-                    return null;
+
+                Geometry egressArea = null;
+
+                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
+                // initialized and filled with the default value in the constructor. Here, we override the default
+                // values with any stop-specific values.
+                if (egressStopDelaysSeconds != null) {
+                    // TODO handle case where stopsForZone is not specified in the modification, implying the main
+                    //  polygon can be used for both access and egress service.
+                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
+                    if (egressService == null) {
+                        if (pickupWaitTimes.getDefaultWaitInSeconds() < 0) {
+                            // Bail out early if egress from this stop is not specified and the default is no available
+                            // on-demand mode
+                            LOG.debug("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
+                            return null;
+                        }
+                    } else {
+                        egressArea = egressService.serviceArea;
+                        egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
+                    }
                 }
+
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
@@ -285,19 +304,6 @@ public class EgressCostTable implements Serializable {
                 // sr.setOrigin(vertexId);
                 VertexStore.Vertex vertex = linkedPointSet.streetLayer.vertexStore.getCursor(vertexId);
                 sr.setOrigin(vertex.getLat(), vertex.getLon());
-
-                Geometry egressArea = null;
-
-                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
-                // initialized and filled with the default value in the constructor. Here, we override the default
-                // values with any stop-specific values.
-                if (egressStopDelaysSeconds != null) {
-                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
-                    if (egressService != null) {
-                        egressArea = egressService.serviceArea;
-                        egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
-                    }
-                }
 
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;

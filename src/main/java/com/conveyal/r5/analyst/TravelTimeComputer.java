@@ -193,10 +193,6 @@ public class TravelTimeComputer {
                     accessMode
             );
 
-            // This is iterating over every cell in the (possibly huge) destination grid just to get the access times
-            // around the origin. If this is measured to be inefficient, we could construct a sub-grid that's an
-            // envelope around sr.originSplit's lat/lon, then iterate over the points in that sub-grid.
-
             Split origin = sr.getOriginSplit();
 
             PointSetTimes pointSetTimes = linkedDestinations.eval(

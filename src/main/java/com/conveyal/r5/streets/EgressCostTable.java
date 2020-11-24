@@ -313,7 +313,10 @@ public class EgressCostTable implements Serializable {
                 }
                 sr.quantityToMinimize = linkageCostUnit;
                 sr.route();
-                return linkedPointSet.extendCostsToPoints(sr, envelopeAroundStop, egressArea);
+                return linkedPointSet.extendCostsToPoints(sr.getReachedVertices()::get,
+                        sr.quantityToMinimize,
+                        envelopeAroundStop,
+                        egressArea);
             }
         }).collect(Collectors.toList());
         computeCounter.done();

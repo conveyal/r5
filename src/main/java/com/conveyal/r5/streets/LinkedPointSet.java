@@ -436,21 +436,9 @@ public class LinkedPointSet implements Serializable {
                 continue;
             }
 
-            // TODO consider including time from origin to origin split point. See comments about "length of
-            //  perpendicular" in StreetRouter
             edge.seek(edges[i]);
-            int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
-            int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
-            if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
-                // The target point lies along an edge with vertices that the street router could not reach.
-                travelTimes[i] = Integer.MAX_VALUE;
-                continue;
-            }
-
-            // Portion of point-to-vertex time spent along edge, between split point and vertex
-            // If a null onStreetSpeed is supplied, look up the speed for cars
-            if (onStreetSpeed == null) {
+            if (streetMode == StreetMode.CAR) {
                 onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
             }
 
@@ -461,7 +449,7 @@ public class LinkedPointSet implements Serializable {
                                 onStreetDistance_mm / onStreetSpeed + // along street
                                 distancesToEdge_mm[i] / offStreetSpeed; // from destination split point to destination
             } else {
-                travelTimes[i] = timeToPoint(time0, time1, onStreetSpeed, offStreetSpeed, i);
+                travelTimes[i] = timeToPoint(timeToVertex, edge, i, onStreetSpeed);
             }
         }
         return new PointSetTimes(pointSet, travelTimes);
@@ -481,7 +469,7 @@ public class LinkedPointSet implements Serializable {
      * @return A packed array of (pointIndex, cost), or null if there are no reachable points.
      */
     public int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
-        return extendCostsToPoints(distanceTableToVertices,
+        return extendCostsToPoints(distanceTableToVertices::get,
                 RoutingVariable.DISTANCE_MILLIMETERS,
                 distanceTableZone,
                 null);
@@ -495,21 +483,15 @@ public class LinkedPointSet implements Serializable {
      *
      * This is a pure function i.e. it has no side effects on the state of the LinkedPointSet instance.
      *
-     * @param sr results of an on-street search from the transit stop
+     * @param costToVertex method to get the travel time or distance for a given vertex id
+     * @param routingVariable whether the costToVertex method returns distances (millimeters) or times (seconds)
      * @param envelopeAroundStop the envelope in FIXED POINT DEGREES within which we want to find all points.
      * @param egressArea area served by on-demand service from this stop. If null, there are no restrictions on which
      *                  points can be reached in the egress leg from this stop.
      * @return A packed array of (pointIndex, cost), or null if there are no reachable points. Cost units match
      * supplied sr.routingVariable
      */
-    public int[] extendCostsToPoints(StreetRouter sr, Envelope envelopeAroundStop, Geometry egressArea) {
-        return extendCostsToPoints(sr.getReachedVertices(),
-                sr.quantityToMinimize,
-                envelopeAroundStop,
-                egressArea);
-    }
-
-    private int[] extendCostsToPoints(TIntIntMap costTableToVertices,
+    public int[] extendCostsToPoints(CostToVertexFunction costToVertex,
                                      RoutingVariable routingVariable,
                                      Envelope envelopeAroundStop,
                                      Geometry egressArea) {
@@ -535,16 +517,12 @@ public class LinkedPointSet implements Serializable {
             int cost = Integer.MAX_VALUE;
 
             if (routingVariable == RoutingVariable.DISTANCE_MILLIMETERS) {
-                cost = distanceToPoint(costTableToVertices, edge, p);
+                cost = distanceToPoint(costToVertex, edge, p);
             } else if (routingVariable == RoutingVariable.DURATION_SECONDS) {
-                int time0 = costTableToVertices.get(edge.getFromVertex());
-                int time1 = costTableToVertices.get(edge.getToVertex());
-                if (time0 == 0 && time1 == 0) {
-                    return true; // Edge unreachable, continue iteration. Should we update sr.getReachedVertices to use
-                    // a different noEntryValue?
-                }
-                int onStreetSpeed = (int) edge.getCarSpeedMetersPerSecond() * 1000;
-                cost = timeToPoint(time0, time1, onStreetSpeed, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND, p);
+                // The routing variable is seconds only if we're doing a car search, so look up the car speed on the
+                // linked edge.
+                int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed);
             }
 
             if (cost != Integer.MAX_VALUE) {
@@ -571,20 +549,22 @@ public class LinkedPointSet implements Serializable {
      * an edge. This remaining distance consists of a distance along part of the edge (to the "split point"), plus a
      * perpendicular distance from the split point to the final point.
      *
+     * @param costToVertex function returning the accumulated distance to reach a given vertex
+     * @param edge to which the target is linked
+     * @param pointIndex index of the point in this linkage
      * @return minimum distance needed to reach point, or Integer.MAX_VALUE if point is not reachable.
      */
-    private int distanceToPoint(TIntIntMap distancesToVertices, Edge edge, int pointIndex) {
-        int distance0 = Integer.MAX_VALUE;
-        int distance1 = Integer.MAX_VALUE;
+    private int distanceToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex) {
         // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
-        if (distancesToVertices.containsKey(edge.getFromVertex())) {
-            distance0 = distancesToVertices.get(edge.getFromVertex()) + distances0_mm[pointIndex] + distancesToEdge_mm[pointIndex];
+        int distance0 = costToVertex.getCost(edge.getFromVertex());
+        int distance1 = costToVertex.getCost(edge.getToVertex());
+        if (distance0 == Integer.MAX_VALUE && distance1 == Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        } else {
+            distance0 += distances0_mm[pointIndex] + distancesToEdge_mm[pointIndex];
+            distance1 += distances1_mm[pointIndex] + distancesToEdge_mm[pointIndex];
+            return Math.min(handleOverflow(distance0), handleOverflow(distance1));
         }
-        if (distancesToVertices.containsKey(edge.getToVertex())) {
-            distance1 = distancesToVertices.get(edge.getToVertex()) + distances1_mm[pointIndex] + distancesToEdge_mm[pointIndex];
-        }
-
-        return Math.min(handleOverflow(distance0), handleOverflow(distance1));
     }
 
     /**
@@ -592,20 +572,23 @@ public class LinkedPointSet implements Serializable {
      * an edge. This remaining time consists of a time traversing part of the edge (at onStreetSpeed), plus a
      * time needed to travel the perpendicular distance (at offStreetSpeed) from the split point to the linked point.
      *
-     * @param time0 time (seconds) to reach the beginning vertex of the edge
-     * @param time1 time (seconds) to reach the end vertex of the edge
-     * @param onStreetSpeed speed (millimenters per second) at which the edge is traversed
-     * @param offStreetSpeed speed (millimeters per second) traveling from the edge to the linked point
-     * @param pointIndex index of the point in this linked pointset.
+     * @param costToVertex function returning the accumulated time to reach a given vertex
+     * @param edge to which the target is linked
+     * @param pointIndex index of the point in this linkage
+     * @param onStreetSpeed speed at which the destination edge (to which the target is linked) is traversed
      * @return minimum time needed to reach point, or Integer.MAX_VALUE if point is not reachable.
      */
-    private int timeToPoint(int time0, int time1, int onStreetSpeed, int offStreetSpeed, int pointIndex) {
-
-        time0 += distances0_mm[pointIndex] / onStreetSpeed + distancesToEdge_mm[pointIndex] / offStreetSpeed;
-        time1 += distances1_mm[pointIndex] / onStreetSpeed + distancesToEdge_mm[pointIndex] / offStreetSpeed;
-
-        return Math.min(handleOverflow(time0), handleOverflow(time1));
-
+    private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed) {
+        int time0 = costToVertex.getCost(edge.getFromVertex());
+        int time1 = costToVertex.getCost(edge.getToVertex());
+        if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        } else {
+            int offStreetTime = distancesToEdge_mm[pointIndex] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+            time0 += distances0_mm[pointIndex] / onStreetSpeed + offStreetTime;
+            time1 += distances1_mm[pointIndex] / onStreetSpeed + offStreetTime;
+            return Math.min(handleOverflow(time0), handleOverflow(time1));
+        }
     }
 
     private int handleOverflow (int value) {

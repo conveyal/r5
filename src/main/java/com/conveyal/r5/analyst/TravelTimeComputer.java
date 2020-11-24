@@ -69,9 +69,6 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
-        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this object within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request, network);
@@ -130,10 +127,6 @@ public class TravelTimeComputer {
                 continue;
             }
 
-            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
-            if (streetSpeedMillimetersPerSecond <= 0){
-                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
-            }
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
@@ -187,18 +180,24 @@ public class TravelTimeComputer {
                bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
             }
 
+            // Calculate times to reach destinations directly by this street mode, without using transit
             LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
                     destinations,
                     network.streetLayer,
                     accessMode
             );
 
-            // This is iterating over every cell in the (possibly huge) destination grid just to get the access times
-            // around the origin. If this is measured to be inefficient, we could construct a sub-grid that's an
-            // envelope around sr.originSplit's lat/lon, then iterate over the points in that sub-grid.
+            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
+            if (streetSpeedMillimetersPerSecond <= 0){
+                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
+            }
+
+            // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+            int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
 
             Split origin = sr.getOriginSplit();
 
+            // TODO refactor so this method takes sr as the sole argument
             PointSetTimes pointSetTimes = linkedDestinations.eval(
                     sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond,

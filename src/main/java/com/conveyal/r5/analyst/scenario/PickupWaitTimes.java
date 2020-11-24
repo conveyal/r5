@@ -82,7 +82,7 @@ public class PickupWaitTimes {
         }
         // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
         // By default all stops can be reached (null means no restrictions applied).
-        int waitTimeSeconds = (int) waitTimeMinutes * 60;
+        int waitTimeSeconds = (int) (waitTimeMinutes * 60);
         TIntSet stopsReachable = null;
         // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
         if (stopNumbersForZonePolygon != null) {
@@ -165,12 +165,8 @@ public class PickupWaitTimes {
 
     }
 
-    public boolean egressUnavailable(int stop, StreetMode mode) {
-            return this.streetMode == mode && egressServiceForStop.get(stop) == null && getDefaultWaitInSeconds() == -1;
-    }
-
     public int getDefaultWaitInSeconds() {
-        return (int) polygons.defaultData * 60;
+        return (int) (polygons.defaultData * 60);
     }
 
     /**

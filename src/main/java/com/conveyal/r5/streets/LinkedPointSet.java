@@ -382,42 +382,46 @@ public class LinkedPointSet implements Serializable {
     }
 
     /**
-     * A functional interface for fetching the travel time to any street vertex in the transport network. Note that
-     * TIntIntMap::get matches this functional interface. There may be a generic IntToIntFunction library interface
-     * somewhere, but this interface provides type information about what the function and its parameters mean.
+     * A functional interface for fetching the accumulated cost (time or distance) to any street vertex in the
+     * transport network. Note that TIntIntMap::get matches this functional interface. There may be a generic
+     * IntToIntFunction library interface somewhere, but this interface provides type information about what the
+     * function and its parameters mean.
+     * TODO wrap with StreetRouterResult class that specifies whether costs are distance or time.
      */
     @FunctionalInterface
-    public static interface TravelTimeFunction {
+    public static interface CostToVertexFunction {
         /**
          * @param vertexId the index of a vertex in the StreetLayer of a TransitNetwork.
-         * @return the travel time to the given street vertex, or Integer.MAX_VALUE if the vertex is unreachable.
+         * @return the accumulated cost to the given street vertex, or Integer.MAX_VALUE if the vertex is unreachable.
          */
-        public int getTravelTime (int vertexId);
+        public int getCost(int vertexId);
     }
 
 
     @Deprecated
-    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
+    public PointSetTimes eval (CostToVertexFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
         return eval(travelTimeForVertex, 1000, 1000, null);
     }
 
     /**
-     * Calculate time needed to reach points in this pointset (origin split to vertices of destination edge, plus vertex
-     * of destination edge to destination split, plus destination split to destination).
+     * Calculate the total time needed to reach every point in this pointset (e.g. from an origin when evaluating
+     * direct, non-transit travel times). The total time includes time from origin split to vertices of destination
+     * edge, vertex of destination edge to destination split, and destination split to destination.
      *
-     * @param travelTimeForVertex returning the time required to reach a vertex, in seconds
-     * @param onStreetSpeed speed at which the first/last edge is traversed, in millimeters per second. If null, look
-     *                     up CAR speed on the edge.
-     * @param offStreetSpeed travel speed between the first/last edge and the pointset point, in millimeters per
+     * @param timeToVertex function returning the time required to reach a vertex, in seconds
+     * @param onStreetSpeed speed at which the first/last edge is traversed, in millimeters per second. If this
+     *                      linkage is for CAR, the destination edge's car speed will override the supplied
+     *                      onStreetSpeed.
+     * @param offStreetSpeed travel speed between the first/last edge and origin/target, in millimeters per
      *                       second. Generally walking (we don't account for off-street parking not specified in OSM)
      * @return wrapped int[] of travel times (in seconds) to reach the pointset points, with Integer.MAX_VALUE for
      * unreached points.
      */
 
     public PointSetTimes eval (
-                TravelTimeFunction travelTimeForVertex,
+                CostToVertexFunction timeToVertex,
                 Integer onStreetSpeed,
                 int offStreetSpeed,
                 Split origin

@@ -522,6 +522,7 @@ public class LinkedPointSet implements Serializable {
                 // The routing variable is seconds only if we're doing a car search, so look up the car speed on the
                 // linked edge.
                 int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed);
             }
 
             if (cost != Integer.MAX_VALUE) {

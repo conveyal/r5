@@ -317,6 +317,18 @@ public class PerTargetPropagater {
                     throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                 }
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
+                    // Account for any additional delay waiting for pickup at the egress stop.
+                    if (egressCostTable.egressStopDelaysSeconds != null) {
+                        int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
+                        if (delayAtEgress < 0) {
+                            // Pickup for this mode not allowed at this stop, so trove iteration should
+                            // continue
+                            return true;
+                        } else {
+                            secondsFromStopToTarget += delayAtEgress;
+                        }
+                    }
+
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
                         // calculated in the Raptor route() method.
@@ -325,18 +337,6 @@ public class PerTargetPropagater {
                             // Skip propagation if the travel time to reach this stop is longer than the maximum
                             // travel time, or the travel time all the way to this target (via another stop).
                             continue;
-                        }
-
-                        // Account for any additional delay waiting for pickup at the egress stop.
-                        if (egressCostTable.egressStopDelaysSeconds != null) {
-                            int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
-                            if (delayAtEgress < 0) {
-                                // Pickup for this mode not allowed at this stop, so trove iteration should
-                                // continue
-                                return true;
-                            } else {
-                                secondsFromStopToTarget += delayAtEgress;
-                            }
                         }
 
                         int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;

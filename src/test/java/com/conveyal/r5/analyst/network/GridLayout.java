@@ -147,7 +147,10 @@ public class GridLayout {
         return new Envelope(originPoint.x, farCorner.x, originPoint.y, farCorner.y);
     }
 
-    /** Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell. */
+    /**
+     * Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell.
+     * TODO maybe derive this from the network's gridded pointset rather than the GridLayout.
+     */
     public Grid makeUniformOpportunityDataset (double density) {
         Grid grid = new Grid(DEFAULT_ZOOM, this.gridEnvelope());
         for (double[] column : grid.grid) {

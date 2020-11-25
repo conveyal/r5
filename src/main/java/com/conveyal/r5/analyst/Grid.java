@@ -480,6 +480,8 @@ public class Grid extends PointSet {
     }
 
     /**
+     * TODO note that these are center points of the grid cells defined by integer mercator pixel numbers.
+     *      WebMercatorGridPointSet should follow the same definition but it doesn't!
      * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
      * @return the WGS84 latitude of the center of the corresponding pixel in the grid
      */
@@ -522,7 +524,10 @@ public class Grid extends PointSet {
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
-    /** Return the latitude of the center of the given pixel */
+    /**
+     * Return the latitude of the center of the given pixel.
+     * TODO clarify that these are world pixels at given zoom, not intra-grid pixels.
+     */
     public static double pixelToCenterLat (int pixel, int zoom) {
         return pixelToLat(pixel + 0.5, zoom);
     }

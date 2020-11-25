@@ -176,6 +176,10 @@ public class TransportNetwork implements Serializable {
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
+
+        // This would re-build the street index and edge list, so we only rebuild indexes on the transit layer.
+        // However TransportNetworkCache#buildNetworkFromManifest does seem to call rebuild on the whole network.
+        // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 
         // Create transfers

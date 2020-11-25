@@ -85,13 +85,15 @@ public class TravelTimeComputer {
         PointSet destinations;
 
         if (request instanceof  RegionalTask
-                && !request.makeTauiSite
-                && request.destinationPointSets[0] instanceof FreeFormPointSet) {
+            && !request.makeTauiSite
+            && request.destinationPointSets[0] instanceof FreeFormPointSet
+        ) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = request.destinationPointSets[0];
         } else {
+            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
-            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
+            // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
             destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
             travelTimeReducer.checkOpportunityExtents(destinations);
         }

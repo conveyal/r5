@@ -32,7 +32,7 @@ public class LocalComponents extends Components {
         taskScheduler = new TaskScheduler(config);
         fileStorage = new LocalFileStorage(
                 config.localCacheDirectory(),
-                String.format("http://localhost:%s/files", config.serverPort())
+                "/api/backend/files" // proxied by analysis-ui
         );
         gtfsCache = new GTFSCache(fileStorage, config);
         osmCache = new OSMCache(fileStorage, config);

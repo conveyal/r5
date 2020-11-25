@@ -17,6 +17,8 @@ import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.stream.IntStream;
@@ -379,6 +381,7 @@ public class LinkedPointSet implements Serializable {
             LOG.info("      of which {} changed to added edges, {} to baseline edges, and {} became unlinked.",
                     changedToAddedEdge, changedToBaselineEdge, changedToUnlinked);
         }
+        // dumpLinkagesToWkt();
     }
 
     /** @return the number of linkages, which should be the same as the number of points in the PointSet. */
@@ -529,4 +532,28 @@ public class LinkedPointSet implements Serializable {
         return packed.toArray();
     }
 
+    /** For debugging purposes, write all the linkages out as CSV separated WKT which can be loaded into QGIS. */
+    public void dumpLinkagesToWkt () {
+        // Dump all linkages as WKT CSV for QGIS
+        try (FileWriter writer = new FileWriter("linkage.wkt.csv")) {
+            for (int p = 0; p < edges.length; p++) {
+                int edgeIndex = edges[p];
+                if (edgeIndex < 0) continue;
+                double pointLat = pointSet.getLat(p);
+                double pointLon = pointSet.getLon(p);
+                Edge edge = streetLayer.edgeStore.getCursor(edgeIndex);
+                VertexStore.Vertex fromVertex = streetLayer.vertexStore.getCursor(edge.getFromVertex());
+                VertexStore.Vertex toVertex = streetLayer.vertexStore.getCursor(edge.getToVertex());
+                String wkt = String.format(
+                        "%d, \"LINESTRING (%f %f, %f %f, %f %f)\"\n", p,
+                        fromVertex.getLon(), fromVertex.getLat(),
+                        pointLon, pointLat,
+                        toVertex.getLon(), toVertex.getLat()
+                );
+                writer.write(wkt);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

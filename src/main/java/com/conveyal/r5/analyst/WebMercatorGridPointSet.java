@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,6 +179,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         int y = i / this.width;
         int x = i % this.width;
         return x + "," + y;
+    }
+
+    public int getPointIndexContaining (Coordinate latLon) {
+        return  getPointIndexContaining(latLon.x, latLon.y);
     }
 
     public int getPointIndexContaining (double lon, double lat) {

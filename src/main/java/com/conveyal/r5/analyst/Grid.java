@@ -48,6 +48,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -277,6 +278,14 @@ public class Grid extends PointSet {
             grid[x][y] += amount;
         } else {
             LOG.warn("{} opportunities are outside regional bounds, at {}, {}", amount, lon, lat);
+        }
+    }
+
+    public void write (String filename) {
+        try {
+            write(new FileOutputStream(filename));
+        } catch (Exception e) {
+            throw new RuntimeException("Error writing grid.", e);
         }
     }
 

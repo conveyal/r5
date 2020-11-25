@@ -15,6 +15,7 @@ import java.util.Arrays;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -145,6 +146,7 @@ public class TravelTimeReducer {
         // This is only relevant when calculating accessibility.
         this.decayFunction = task.decayFunction;
         if (calculateAccessibility) {
+            checkNotNull(decayFunction);
             task.validateCutoffsMinutes();
             this.nCutoffs = task.cutoffsMinutes.length;
             this.cutoffsSeconds = new int[nCutoffs];

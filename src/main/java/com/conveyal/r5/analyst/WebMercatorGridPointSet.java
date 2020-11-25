@@ -180,6 +180,12 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return x + "," + y;
     }
 
+    public int getPointIndexContaining (double lon, double lat) {
+        int x = lonToPixel(lon) - west;
+        int y = latToPixel(lat) - north;
+        return y * width + x;
+    }
+
     @Override
     public String toString () {
         return "WebMercatorGridPointSet{" + "zoom=" + zoom + ", west=" + west + ", north=" + north + ", width=" + width + ", height=" + height + ", basePointSet=" + basePointSet + '}';

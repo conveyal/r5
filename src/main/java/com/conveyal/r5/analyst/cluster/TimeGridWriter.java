@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
@@ -12,7 +11,6 @@ import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
-import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.slf4j.Logger;
@@ -167,11 +165,8 @@ public class TimeGridWriter {
                 }
             }
 
-            Grid grid = new Grid(extents);
-            ReferencedEnvelope env = grid.getMercatorEnvelopeMeters();
-
             GridCoverageFactory gcf = new GridCoverageFactory();
-            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, env);
+            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, extents.getMercatorEnvelopeMeters());
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
@@ -195,11 +190,10 @@ public class TimeGridWriter {
                         .writeValueAsString(clonedRequest));
                 writer.setMetadataValue("305", "Conveyal R5");
             }
-
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to write GeoTIFF file.", e);
         }
     }
 

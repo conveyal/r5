@@ -1,7 +1,11 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.util.Arrays;
 
@@ -110,6 +114,49 @@ public class WebMercatorExtents {
 
     private static int hashCode (int... ints) {
         return Arrays.hashCode(ints);
+    }
+
+
+    /**
+     * TODO clarify what this does in Javadoc.
+     * At zoom level zero, our coordinates are pixels in a single planetary tile, with coordinates are in the range
+     * [0...256). We want to export with a conventional web Mercator envelope in meters.
+     */
+    public ReferencedEnvelope getMercatorEnvelopeMeters () {
+        Coordinate northwest = mercatorPixelToMeters(west, north);
+        Coordinate southeast = mercatorPixelToMeters(west + width, north + height);
+        Envelope mercatorEnvelope = new Envelope(northwest, southeast);
+        try {
+            // Get Spherical Mercator pseudo-projection CRS
+            CoordinateReferenceSystem webMercator = CRS.decode("EPSG:3857");
+            ReferencedEnvelope env = new ReferencedEnvelope(mercatorEnvelope, webMercator);
+            return env;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    /**
+     * TODO clarify what this method does in javadoc. Inputs are at zoom level zero, floating point pixels in [0...256).
+     *
+     * How to get the width of the world in meters according to the EPSG CRS spec:
+     * $ gdaltransform -s_srs epsg:4326 -t_srs epsg:3857
+     * 180, 0
+     * 20037508.3427892 -7.08115455161362e-10 0
+     * You can't do 180, 90 because this projection is cut off above a certain level to make the world square.
+     * You can do the reverse projection to find this latitude:
+     * $ gdaltransform -s_srs epsg:3857 -t_srs epsg:4326
+     * 20037508.342789, 20037508.342789
+     * 179.999999999998 85.0511287798064 0
+     */
+    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
+        double worldWidthPixels = Math.pow(2, zoom) * 256D;
+        // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
+        // The 0.5 terms below shift the origin from the upper left of the world (pixels) to WGS84 (0,0) (for meters).
+        final double worldWidthMeters = 20037508.342789244 * 2;
+        double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
+        double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
+        return new Coordinate(xMeters, yMeters);
     }
 
 }

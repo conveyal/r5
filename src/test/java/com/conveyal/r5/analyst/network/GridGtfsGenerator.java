@@ -24,6 +24,8 @@ public class GridGtfsGenerator {
     public static final String AGENCY_ID = "AGENCY";
     public static final String SERVICE_ID = "ALL";
 
+    public static final LocalDate GTFS_DATE = LocalDate.of(2020, 1, 1);
+
     public int gtfsDate = 20210101;
 
     public final GridLayout gridLayout;

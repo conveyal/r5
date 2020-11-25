@@ -17,6 +17,7 @@ import java.util.EnumSet;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+import static com.conveyal.r5.analyst.network.GridGtfsGenerator.GTFS_DATE;
 
 /**
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
@@ -35,16 +36,20 @@ public class GridSinglePointTaskBuilder {
         this.gridLayout = gridLayout;
         // We will accumulate settings into this task.
         task = new TravelTimeSurfaceTask();
+        task.date = GTFS_DATE;
         // Set defaults that can be overridden by calling builder methods.
         task.accessModes = EnumSet.of(LegMode.WALK);
         task.egressModes = EnumSet.of(LegMode.WALK);
         task.directModes = EnumSet.of(LegMode.WALK);
         task.transitModes = EnumSet.allOf(TransitModes.class);
-        task.date = LocalDate.of(2020, 1, 1); // Date used by GTFS export TODO make this a constant.
-        task.percentiles = new int[] {5, 25, 50, 75, 95};
+        // Max percentiles is limited to 5 so we can't return all 100 of them.
+        // Our percentile definition will yield an index of -1 for percentile zero.
+        // But in a list of more than 100 items, percentile 1 and 99 will return the first and last elements.
+        task.percentiles = new int[] {1, 25, 50, 75, 99};
         // In single point tasks all 121 cutoffs are required (there is a check).
         task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
         task.decayFunction = new StepDecayFunction();
+        task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
     }
 
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
@@ -80,6 +85,11 @@ public class GridSinglePointTaskBuilder {
         task.width = grid.width;
         task.height = grid.height;
 
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder monteCarloDraws (int draws) {
+        task.monteCarloDraws = draws;
         return this;
     }
 

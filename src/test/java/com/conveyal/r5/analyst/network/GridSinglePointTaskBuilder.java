@@ -42,6 +42,7 @@ public class GridSinglePointTaskBuilder {
         task.egressModes = EnumSet.of(LegMode.WALK);
         task.directModes = EnumSet.of(LegMode.WALK);
         task.transitModes = EnumSet.allOf(TransitModes.class);
+        // Override the percentiles to get min, 25, median, 75, max.
         // Max percentiles is limited to 5 so we can't return all 100 of them.
         // Our percentile definition will yield an index of -1 for percentile zero.
         // But in a list of more than 100 items, percentile 1 and 99 will return the first and last elements.

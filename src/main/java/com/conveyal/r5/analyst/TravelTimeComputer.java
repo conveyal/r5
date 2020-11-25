@@ -86,9 +86,9 @@ public class TravelTimeComputer {
 
         if (request instanceof  RegionalTask
                 && !request.makeTauiSite
-                && ((RegionalTask) request).destinationPointSets[0] instanceof FreeFormPointSet) {
+                && request.destinationPointSets[0] instanceof FreeFormPointSet) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
-            destinations = ((RegionalTask) request).destinationPointSets[0];
+            destinations = request.destinationPointSets[0];
         } else {
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)

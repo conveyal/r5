@@ -64,16 +64,10 @@ public class PathWriter {
      */
     private final TIntList pathIndexes = new TIntArrayList();
 
-    /**
-     * Map from transit stop vertex indices to the mode used to reach those vertices.
-     */
-    private final StreetTimesAndModes accessModes;
-
     /** Constructor. Holds onto the task object, which is used to create unique names for the results files. */
-    public PathWriter (AnalysisWorkerTask task, StreetTimesAndModes accessModes) {
+    public PathWriter (AnalysisWorkerTask task) {
         this.task = task;
         this.nTargets = task.width * task.height;
-        this.accessModes = accessModes;
         indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
         nPathsPerTarget = task.nPathsPerTarget;
     }
@@ -94,7 +88,6 @@ public class PathWriter {
         int nPathsRecorded = 0;
         for (Path path : paths) {
             if (path != null) {
-                path.accessMode = accessModes.streetTimesAndModes.get(path.boardStops[0]).mode;
                 // Deduplicate paths across destinations using the map.
                 int pathIndex = indexForPath.get(path);
                 if (pathIndex == NO_PATH) {

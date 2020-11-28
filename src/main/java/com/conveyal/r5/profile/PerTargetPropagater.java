@@ -358,10 +358,9 @@ public class PerTargetPropagater {
                             if (calculateComponents || targetIndex == destinationIndex) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
-                                    path.egressMode = linkedTargets.streetMode;
+                                    path = new Path(path, linkedTargets.streetMode);
                                 }
                                 perIterationPaths[iteration] = path;
-
                             }
                         }
                     }

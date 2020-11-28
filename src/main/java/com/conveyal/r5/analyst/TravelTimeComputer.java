@@ -12,6 +12,7 @@ import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
@@ -317,8 +319,14 @@ public class TravelTimeComputer {
 
         // When building a static site, perform some additional initialization causing the propagator to do extra work.
         if (request.computePaths || request.computeTravelTimeBreakdown) {
-            perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
-            perTargetPropagater.pathWriter = new PathWriter(request, bestAccessOptions);
+            perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
+                for (Path path : paths) {
+                    if (path != null) {
+                        path.accessMode = bestAccessOptions.streetTimesAndModes.get(path.boardStops[0]).mode;
+                    }
+                }
+            }).collect(Collectors.toList());
+            perTargetPropagater.pathWriter = new PathWriter(request);
         }
 
         return perTargetPropagater.propagate();

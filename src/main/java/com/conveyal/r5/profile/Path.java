@@ -30,14 +30,30 @@ public class Path {
     public int[] trips;
     public int[] boardStopPositions;
     public int[] alightStopPositions;
-    public StreetMode accessMode = StreetMode.WALK;
+    public StreetMode accessMode;
     /**
-     * Used only in propagation for writing paths for Taui outputs (abusing input paths as scratch buffer)
+     * Used only in propagation for writing paths for Taui outputs
      * TODO update egress mode outside of path (e.g. in wrapper or array parallel to perIterationTravelTimes in
      * propagater)
      */
-    public StreetMode egressMode = StreetMode.WALK;
+    public StreetMode egressMode;
     public final int length;
+
+    /**
+     * Copy a path and add the specified egress mode
+     */
+    public Path(Path input, StreetMode egressMode) {
+        this.patterns = input.patterns;
+        this.boardStops = input.boardStops;
+        this.alightStops = input.alightStops;
+        this.alightTimes = input.alightTimes;
+        this.trips = input.trips;
+        this.boardStopPositions = input.boardStopPositions;
+        this.alightStopPositions = input.alightStopPositions;
+        this.accessMode = input.accessMode;
+        this.egressMode = egressMode;
+        this.length = input.patterns.length;
+    }
 
     /**
      * Extract the path leading up to a specified stop in a given raptor state.

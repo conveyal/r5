@@ -231,7 +231,7 @@ public class Path {
             builder.append(" to ");
             builder.append(alightStops[i]);
             builder.append(" alighting ");
-            builder.append(Math.floorDiv(alightTimes[i], 3600) + ":" + alightTimes[0] / 60f % 60);
+            builder.append(Math.floorDiv(alightTimes[i], 3600) + ":" + alightTimes[i] / 60f % 60);
             builder.append(" (");
             builder.append(transitLayer.stopNames.get(boardStops[i]));
             builder.append(" to ");

@@ -7,12 +7,14 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.BitSet;
 
 /**
@@ -45,24 +47,23 @@ public class MultiOriginAssembler {
      */
     private GridResultWriter[][] accessibilityGridWriters;
 
+    /**
+     * If the job includes a freeform origin pointset, csv results may be written for each of those freeform origins.
+     * Additionally, if templateTask.recordAccessibility = true, accessibility results will be written to CSV instead
+     * of the grids above.
+     */
+    private CsvResultWriter accessibilityCsvWriter;
     private CsvResultWriter timeCsvWriter;
 
-    private CsvResultWriter accessibilityCsvWriter;
+    // TODO the grid/CSV ResultWriters could potentially be replaced with a combined list and polymorphism e.g. for
+    //  (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
+    private ArrayList<CsvResultWriter> csvResultWriters;
 
     /** For the time being this field is only set when the origins are freeform (rather than a grid). */
     private PointSet originPointSet;
 
     /** For the time being this field is only set when the destinations are freeform (rather than a grid). */
     private PointSet destinationPointSet;
-
-    // TODO the ResultWriters and associated booleans could potentially be replaced with a list and polymorphism
-    //      e.g. for (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
-
-    private boolean writeAccessibilityGrid = false;
-
-    private boolean writeTimeCsv = false;
-
-    private boolean writeAccessibilityCsv = false;
 
     private boolean error = false;
 
@@ -136,9 +137,9 @@ public class MultiOriginAssembler {
                         job.nTasksTotal
                     );
                     accessibilityCsvWriter = new CsvResultWriter(
-                        job.templateTask, "accessibility", outputBucket, fileStorage
+                        job.templateTask, outputBucket, fileStorage, "accessibility"
                     );
-                    writeAccessibilityCsv = true;
+                    csvResultWriters.add(accessibilityCsvWriter);
                 } else {
                     // Create one grid writer per percentile and destination pointset
                     accessibilityGridWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
@@ -148,7 +149,6 @@ public class MultiOriginAssembler {
                                     new GridResultWriter(job.templateTask, outputBucket, fileStorage);
                         }
                     }
-                    writeAccessibilityGrid = true;
                 }
             }
 
@@ -166,8 +166,10 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.recordTimes) {
                 LOG.info("Creating csv file to store time results for {} origins.", job.nTasksTotal);
-                timeCsvWriter = new CsvResultWriter(job.templateTask, "time", outputBucket, fileStorage);
-                writeTimeCsv = true;
+                timeCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, "time");
+                csvResultWriters.add(timeCsvWriter);
+            }
+
             }
 
         } catch (IOException e) {
@@ -182,7 +184,7 @@ public class MultiOriginAssembler {
     private synchronized void finish() {
         LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
         try {
-            if (writeAccessibilityGrid) {
+            if (accessibilityGridWriters != null) {
                 for (int d = 0; d < nDestinationPointSets; d++) {
                     for (int p = 0; p < nPercentiles; p++) {
                         int percentile = job.templateTask.percentiles[p];
@@ -193,11 +195,9 @@ public class MultiOriginAssembler {
                     }
                 }
             }
-            if (writeAccessibilityCsv) {
-                accessibilityCsvWriter.finish(String.format("%s_access.csv.gz",job.jobId));
-            }
-            if (writeTimeCsv) {
-                timeCsvWriter.finish(String.format("%s_times.csv.gz",job.jobId));
+
+            for (CsvResultWriter writer : csvResultWriters) {
+                writer.finish();
             }
         } catch (Exception e) {
             LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
@@ -214,7 +214,7 @@ public class MultiOriginAssembler {
      */
     public synchronized void handleMessage (RegionalWorkResult workResult) {
         try {
-            if (writeAccessibilityGrid || writeAccessibilityCsv) {
+            if (job.templateTask.recordAccessibility) {
                 // Sanity check the shape of the work result we received against expectations.
                 checkAccessibilityDimension(workResult);
                 // Infer x and y cell indexes based on the template task
@@ -224,12 +224,11 @@ public class MultiOriginAssembler {
                 // TODO check monotonic increasing invariants here rather than in worker.
                 for (int d = 0; d < workResult.accessibilityValues.length; d++) {
                     int[][] percentilesForGrid = workResult.accessibilityValues[d];
-                    if (writeAccessibilityCsv) {
+                    if (accessibilityCsvWriter != null) {
                         String originId = originPointSet.getId(workResult.taskId);
                         // FIXME this is writing only accessibility for the first percentile and cutoff
-                        accessibilityCsvWriter.writeOneValue(originId, "", percentilesForGrid[0][0]);
-                    }
-                    if (writeAccessibilityGrid) {
+                        accessibilityCsvWriter.writeOneValue(originId, "", String.valueOf(percentilesForGrid[0][0]));
+                    } else {
                         for (int p = 0; p < nPercentiles; p++) {
                             int[] cutoffsForPercentile = percentilesForGrid[p];
                             GridResultWriter writer = accessibilityGridWriters[d][p];
@@ -239,7 +238,7 @@ public class MultiOriginAssembler {
                 }
             }
 
-            if (writeTimeCsv) {
+            if (job.templateTask.recordTimes) {
                 // Sanity check the shape of the work result we received against expectations.
                 checkTravelTimeDimension(workResult);
                 String originId = originPointSet.getId(workResult.taskId);
@@ -252,7 +251,10 @@ public class MultiOriginAssembler {
                         // Always writing both origin and destination ID we should alert the user if something is amiss.
                         int destinationIndex = oneToOne ? workResult.taskId : d;
                         String destinationId = destinationPointSet.getId(destinationIndex);
-                        timeCsvWriter.writeOneValue(originId, destinationId, travelTime);
+                        timeCsvWriter.writeOneValue(originId, destinationId, String.valueOf(travelTime));
+                    }
+                }
+
                     }
                 }
             }
@@ -302,18 +304,15 @@ public class MultiOriginAssembler {
 
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */
     public synchronized void terminate () throws IOException {
-        if (writeAccessibilityGrid) {
+        if (accessibilityGridWriters != null) {
             for (GridResultWriter[] writers : accessibilityGridWriters) {
                 for (GridResultWriter writer : writers) {
                     writer.terminate();
                 }
             }
         }
-        if (writeAccessibilityCsv) {
-            accessibilityCsvWriter.terminate();
-        }
-        if (writeTimeCsv) {
-            timeCsvWriter.terminate();
+        for (CsvResultWriter writer : csvResultWriters) {
+            writer.terminate();
         }
     }
 

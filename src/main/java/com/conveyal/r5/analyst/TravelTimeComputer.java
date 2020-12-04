@@ -70,9 +70,6 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
-        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this object within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
@@ -130,10 +127,6 @@ public class TravelTimeComputer {
                 continue;
             }
 
-            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
-            if (streetSpeedMillimetersPerSecond <= 0){
-                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
-            }
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
@@ -187,37 +180,51 @@ public class TravelTimeComputer {
                 minMergeMap(accessTimes, travelTimesToStopsSeconds);
             }
 
-            LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
-                    destinations,
-                    network.streetLayer,
-                    accessMode
-            );
+            // Calculate times to reach destinations directly by this street mode, without using transit.
+            //
+            // The current implementation iterates over every cell in the destination grid. That usually makes sense
+            // for non-transit searches, where we need to evaluate times up to the full travel time limit. But for
+            // transit searches, where sr.timeLimitSeconds is typically small, it may not make sense to iterate over
+            // every cell in a (possibly huge) destination grid. If this is measured to be inefficient, we could
+            // construct a sub-grid that's an envelope around sr.originSplit's lat/lon (sized according to sr
+            // .timeLimitSeconds and a mode-specific speed?), then iterate over the points in that sub-grid.
+            {
+                LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
+                        destinations,
+                        network.streetLayer,
+                        accessMode
+                );
 
-            // This is iterating over every cell in the (possibly huge) destination grid just to get the access times
-            // around the origin. If this is measured to be inefficient, we could construct a sub-grid that's an
-            // envelope around sr.originSplit's lat/lon, then iterate over the points in that sub-grid.
-
-            Split origin = sr.getOriginSplit();
-
-            PointSetTimes pointSetTimes = linkedDestinations.eval(
-                    sr::getTravelTimeToVertex,
-                    streetSpeedMillimetersPerSecond,
-                    walkSpeedMillimetersPerSecond,
-                    origin
-            );
-
-            if (accessService != NO_WAIT_ALL_STOPS) {
-                LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
-                        accessService.waitTimeSeconds, accessMode);
-                if (accessService.stopsReachable != null) {
-                    // Disallow direct travel to destination if pickupDelay zones are associated with stops.
-                    pointSetTimes = PointSetTimes.allUnreached(destinations);
-                } else {
-                    // Allow direct travel to destination using services not associated with specific stops.
-                    pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                int streetSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
+                if (streetSpeedMillimetersPerSecond <= 0) {
+                    throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
+
+                // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+
+                Split origin = sr.getOriginSplit();
+
+                PointSetTimes pointSetTimes = linkedDestinations.eval(
+                        sr::getTravelTimeToVertex,
+                        streetSpeedMillimetersPerSecond,
+                        walkSpeedMillimetersPerSecond,
+                        origin
+                );
+
+                if (accessService != NO_WAIT_ALL_STOPS) {
+                    LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
+                            accessService.waitTimeSeconds, accessMode);
+                    if (accessService.stopsReachable != null) {
+                        // Disallow direct travel to destination if pickupDelay zones are associated with stops.
+                        pointSetTimes = PointSetTimes.allUnreached(destinations);
+                    } else {
+                        // Allow direct travel to destination using services not associated with specific stops.
+                        pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                    }
+                }
+                nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
             }
-            nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
         }
 
         // Handle park+ride, a mode represented in the request LegMode but not in the internal StreetMode.

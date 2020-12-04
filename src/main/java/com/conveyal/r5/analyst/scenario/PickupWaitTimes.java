@@ -76,12 +76,13 @@ public class PickupWaitTimes {
     public AccessService getAccessService (double lat, double lon) {
         Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
         ModificationPolygon polygon = polygons.getWinningPolygon(point);
-        if (polygon == null || polygon.data == -1) {
+        double waitTimeMinutes = polygon == null ? polygons.defaultData : polygon.data;
+        if (waitTimeMinutes == -1) {
             return NO_SERVICE_HERE;
         }
         // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
         // By default all stops can be reached (null means no restrictions applied).
-        int waitTimeSeconds = (int) (polygon.data * 60);
+        int waitTimeSeconds = (int) (waitTimeMinutes * 60);
         TIntSet stopsReachable = null;
         // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
         if (stopNumbersForZonePolygon != null) {
@@ -162,6 +163,10 @@ public class PickupWaitTimes {
             this.serviceArea = serviceArea;
         }
 
+    }
+
+    public int getDefaultWaitInSeconds() {
+        return (int) (polygons.defaultData * 60);
     }
 
     /**

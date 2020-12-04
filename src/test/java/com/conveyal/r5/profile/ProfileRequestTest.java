@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -9,7 +9,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Some date and time related tests for profile requests.
@@ -19,7 +19,7 @@ public class ProfileRequestTest {
 
     private ProfileRequest profileRequest;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         profileRequest = new ProfileRequest();
         profileRequest.zoneId = ZoneId.of("Europe/Ljubljana");

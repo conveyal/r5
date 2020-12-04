@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.StreetMode;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,10 +9,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TurnRestrictionTest extends TurnTest {
 
@@ -173,14 +173,14 @@ public class TurnRestrictionTest extends TurnTest {
 
         LOG.debug("TR:{}", tr);
         List<TurnRestriction> trs = tr.remap(streetLayer);
-        assertEquals("Remapped size differ", expectedTurnRestrictions.size(),trs.size());
+        assertEquals(expectedTurnRestrictions.size(),trs.size(), "Remapped size differ");
         for(int i = 0; i < expectedTurnRestrictions.size(); i++) {
             TurnRestriction expected = expectedTurnRestrictions.get(i);
             TurnRestriction remapped = trs.get(i);
-            assertEquals("FROM Edge: EX:" + expected + " !=  REM:" + remapped, expected.fromEdge, remapped.fromEdge);
-            assertEquals("TO Edge: EX:" + expected + " !=  REM:" + remapped, expected.toEdge, remapped.toEdge);
-            assertEquals("ONLY: EX:" + expected + " !=  REM:" + remapped, expected.only, remapped.only);
-            assertTrue("VIA edges: EX:" + expected + " !=  REM:" + remapped, Arrays.equals(expected.viaEdges, remapped.viaEdges));
+            assertEquals(expected.fromEdge, remapped.fromEdge, "FROM Edge: EX:" + expected + " !=  REM:" + remapped);
+            assertEquals(expected.toEdge, remapped.toEdge, "TO Edge: EX:" + expected + " !=  REM:" + remapped);
+            assertEquals(expected.only, remapped.only, "ONLY: EX:" + expected + " !=  REM:" + remapped);
+            assertTrue(Arrays.equals(expected.viaEdges, remapped.viaEdges), "VIA edges: EX:" + expected + " !=  REM:" + remapped);
         }
 
     }
@@ -651,7 +651,7 @@ public class TurnRestrictionTest extends TurnTest {
         try {
             r.route();
         } catch (CountExceededException e) {
-            assertTrue("Search will progress infinitely", false);
+            assertTrue(false, "Search will progress infinitely");
         }
     }
 
@@ -681,7 +681,7 @@ public class TurnRestrictionTest extends TurnTest {
         try {
             r.route();
         } catch (CountExceededException e) {
-            assertTrue("Search will progress infinitely", false);
+            assertTrue(false, "Search will progress infinitely");
         }
     }
 

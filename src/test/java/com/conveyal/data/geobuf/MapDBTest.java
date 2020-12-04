@@ -1,8 +1,7 @@
 package com.conveyal.data.geobuf;
 
 import com.google.common.io.Files;
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -16,11 +15,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.conveyal.data.geobuf.IntegrationTest.ringsEqual;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the MapDB Geobuf serializer.
  */
-public class MapDBTest extends TestCase {
+public class MapDBTest {
     private final GeometryFactory gf = new GeometryFactory();
 
     /** make sure geometry is serialized and deserialized correctly */

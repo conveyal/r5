@@ -7,8 +7,7 @@ import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 
 import java.util.ArrayList;
@@ -16,7 +15,12 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
-public class StreetLayerTest extends TestCase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class StreetLayerTest {
 
     /** Test that subgraphs are removed as expected */
     @Test
@@ -63,6 +67,7 @@ public class StreetLayerTest extends TestCase {
      *
      * @throws Exception
      */
+    @Test
     public void testSplits() throws Exception {
         OSM osm = new OSM(null);
         osm.intersectionDetection = true;

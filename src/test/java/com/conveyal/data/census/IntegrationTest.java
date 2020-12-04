@@ -7,8 +7,7 @@ import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
 import java.io.File;
@@ -23,10 +22,14 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * Test loading, extracting, etc.
  */
-public class IntegrationTest extends TestCase {
+public class IntegrationTest {
     private CsvReader reader;
     private TLongObjectMap<GeobufFeature> features;
     

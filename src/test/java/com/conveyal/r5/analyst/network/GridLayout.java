@@ -45,6 +45,9 @@ public class GridLayout {
      */
     public final int widthAndHeightInBlocks;
 
+    // TODO not yet implemented: position intersections exactly on web Mercator sample points to eliminate walking
+    public final boolean alignIntersectionsToMercatorGrid = true;
+
     /** Spacing between streets in meters. Type is integer to emphasize the use of simple round numbers. */
     public final int streetGridSpacingMeters = 200;
 
@@ -57,6 +60,15 @@ public class GridLayout {
      * is always equal to this block traversal time, even when a dwell time is specified.
      */
     public final int transitBlockTraversalTimeSeconds = 30;
+
+    /**
+     * The walk speed when routing will be derived from this block traversal time to ensure predictable times.
+     * For example traversing a 200 meter block at 1.3 meters per second would take 153.8 seconds.
+     * Rounding this down to 120 seconds gives an even two minutes, implying a speed of 1.666 m/sec.
+     * Setting this to 100 or 200 will give an integral speed in meters per second, which could also be advantageous.
+     * It may also be desirable to make walking very fast, so it becomes a negligible part of end to end travel time.
+     */
+    public final int walkBlockTraversalTimeSeconds = 200;
 
     /**
      * The length of time that transit vehicles wait at each stop. This is taken out of the block traversal time rather

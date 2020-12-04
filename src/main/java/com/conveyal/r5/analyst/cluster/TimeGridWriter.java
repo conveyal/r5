@@ -24,22 +24,24 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * This writes travel times from one origin to NxM gridded destinations out to a binary grid file.
- * For each destination, it saves one or more percentiles of the travel time distribution.
- *
- * This format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel values,
- * and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
+ * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations, this class will write
+ * them out to various file formats. Output is multi-channel: for each destination, it saves one or more percentiles of
+ * the travel time distribution. Supported formats are the Conveyal internal binary format and GeoTIFF for
+ * interoperability with desktop GIS.
+ * <p>
+ * The Conveyal binary format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel
+ * values, and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
  * now says ACCESSGR instead of TIMEGRID.
- *
+ * <p>
  * TODO Unify this class with GridResultWriter in the backend, as they both write the same format now.
  *      We should be able to remove GridResultWriter from the backend and use this class imported from R5.
  *      We may eventually also be able to store opportunities in the same format.
  *      Prefiltering could aid compression (delta coding, skipping over or not delta coding UNREACHED values).
- *
- * Time grids look like this:
+ * <p>
+ * Time grids are composed of little-endian signed 4-byte ints, so the full grid can be mapped into a Javascript typed
+ * array of 4-byte integers if desired. They are laid out as follows:
  * <ol>
- * <li>Header (ASCII text "ACCESSGR", note that this header is eight bytes, so the full grid can be
-       mapped into a Javascript typed array of 4-byte integers if desired)</li>
+ * <li>(8 bytes) Magic numbers: ASCII text "ACCESSGR". This is a multiple of four bytes to maintain alignment.</li>
  * <li>(4 byte int) File format version</li>
  * <li>(4 byte int) Web mercator zoom level</li>
  * <li>(4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world</li>
@@ -50,7 +52,6 @@ import java.io.OutputStream;
  * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).
  *     Values are not delta-coded.</li>
  * </ol>
- * NOTE: All integers are little-endian and the same width, to facilitate reading grids as Javascript typed arrays.
  */
 public class TimeGridWriter {
 
@@ -72,7 +73,7 @@ public class TimeGridWriter {
 
     private final long nIntegersInOuput;
 
-    private final long nBytesInOutput;
+    private final long nBytesInOutput; // specifically for Conveyal internal format
 
     /**
      * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is interpreted as a
@@ -195,7 +196,7 @@ public class TimeGridWriter {
         } catch (Exception e) {
             throw new RuntimeException("Failed to write GeoTIFF file.", e);
         }
-    }
 
+    }
 
 }

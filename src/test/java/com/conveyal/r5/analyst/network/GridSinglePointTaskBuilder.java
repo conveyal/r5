@@ -51,6 +51,8 @@ public class GridSinglePointTaskBuilder {
         task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
         task.decayFunction = new StepDecayFunction();
         task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
+        // By default, traverse one block in a round predictable number of seconds.
+        task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
     }
 
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {

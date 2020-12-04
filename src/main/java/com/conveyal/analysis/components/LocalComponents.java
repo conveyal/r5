@@ -27,7 +27,7 @@ import java.util.List;
 /**
  * Wires up the components for a local backend instance (as opposed to a cloud cluster).
  */
-public class LocalComponents extends Components {
+public class LocalComponents extends BackendComponents {
 
     public LocalComponents () {
         config = new BackendConfig();
@@ -58,7 +58,7 @@ public class LocalComponents extends Components {
      * of components into the HttpApi constructor, ensuring clear declaration of each component's dependencies.
      * Such bulk-passing of components should only occur in this wiring-up code, not in component code.
      */
-     public static List<HttpController> standardHttpControllers (Components components) {
+     public static List<HttpController> standardHttpControllers (BackendComponents components) {
         final List<HttpController> httpControllers = Arrays.asList(
                 // These handlers are at paths beginning with /api
                 // and therefore subject to authentication and authorization.

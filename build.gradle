@@ -20,12 +20,12 @@ java {
 jar {
     // For Java 11 Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
-    // Main-Class R5Main will start a worker, BackendMain must be specified on JVM command line to start backend.
+    // Main-Class WorkerMain will start a worker, BackendMain must be specified on JVM command line to start backend.
     // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.
     // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.analysis',
-            'Main-Class': 'com.conveyal.r5.R5Main',
+            'Main-Class': 'com.conveyal.r5.analyst.cluster.WorkerMain',
             'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
             'Implementation-Title': 'Conveyal Analysis Backend',
             'Implementation-Vendor': 'Conveyal LLC',
@@ -194,6 +194,10 @@ dependencies {
 
     // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
     implementation 'com.google.guava:guava:28.2-jre'
+
+    // Dagger compile-time dependency injection framework FIXME why does "api" not work here?
+    implementation 'com.google.dagger:dagger:2.30.1'
+    annotationProcessor 'com.google.dagger:dagger-compiler:2.30.1'
 
     // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
     //capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.

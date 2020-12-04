@@ -1,6 +1,6 @@
 package com.conveyal.analysis;
 
-import com.conveyal.analysis.components.Components;
+import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalComponents;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.Persistence;
@@ -31,11 +31,11 @@ public abstract class BackendMain {
     private static final InetAddress privateServerAddress = discoverPrivateInetAddress();
 
     public static void main (String... args) {
-        final Components components = new LocalComponents();
+        final BackendComponents components = new LocalComponents();
         startServer(components);
     }
 
-    protected static void startServer (Components components, Thread... postStartupThreads) {
+    protected static void startServer (BackendComponents components, Thread... postStartupThreads) {
         // We have several non-daemon background thread pools which will keep the JVM alive if the main thread crashes.
         // If initialization fails, we need to catch the exception or error and force JVM shutdown.
         try {
@@ -46,7 +46,7 @@ public abstract class BackendMain {
         }
     }
 
-    private static void startServerInternal (Components components, Thread... postStartupThreads) {
+    private static void startServerInternal (BackendComponents components, Thread... postStartupThreads) {
         LOG.info("Starting Conveyal analysis backend, the time is now {}", DateTime.now());
         LOG.info("Backend version is: {}", BackendVersion.instance.version);
         LOG.info("Connecting to database...");
@@ -54,6 +54,7 @@ public abstract class BackendMain {
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
         // passing in non-static components we've already created. TODO migrate to non-static Components.
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
+        // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
         SeamlessCensusGridExtractor.configureStatically(components.config);
         ApiMain.initialize(components.gtfsCache);

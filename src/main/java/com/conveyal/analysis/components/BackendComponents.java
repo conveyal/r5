@@ -36,9 +36,9 @@ import org.slf4j.LoggerFactory;
  * generalization. We only expect to ever have 2-3 variants of this class. Just make a new subclass and complete
  * constructor for each.
  */
-public abstract class Components {
+public abstract class BackendComponents {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Components.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BackendComponents.class);
 
     public BackendConfig config;
     /** Verification of user identity and permissions. */

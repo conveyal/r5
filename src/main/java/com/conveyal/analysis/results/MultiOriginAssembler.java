@@ -57,7 +57,7 @@ public class MultiOriginAssembler {
 
     // TODO the grid/CSV ResultWriters could potentially be replaced with a combined list and polymorphism e.g. for
     //  (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
-    private ArrayList<CsvResultWriter> csvResultWriters;
+    private ArrayList<CsvResultWriter> csvResultWriters = new ArrayList<>();
 
     /** For the time being this field is only set when the origins are freeform (rather than a grid). */
     private PointSet originPointSet;

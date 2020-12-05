@@ -250,26 +250,27 @@ public class MultiOriginAssembler {
                 // Sanity check the shape of the work result we received against expectations.
                 checkTravelTimeDimension(workResult);
                 String originId = originPointSet.getId(workResult.taskId);
-                boolean oneToOne = job.templateTask.oneToOne;
                 for (int p = 0; p < nPercentiles; p++) {
                     int[] percentileResult = workResult.travelTimeValues[p];
                     for (int d = 0; d < percentileResult.length; d++) {
                         int travelTime = percentileResult[d];
                         // oneToOne results will perform only one iteration of this loop
                         // Always writing both origin and destination ID we should alert the user if something is amiss.
-                        int destinationIndex = oneToOne ? workResult.taskId : d;
+                        int destinationIndex = job.templateTask.oneToOne ? workResult.taskId : d;
                         String destinationId = destinationPointSet.getId(destinationIndex);
                         timeCsvWriter.writeOneValue(originId, destinationId, String.valueOf(travelTime));
                     }
                 }
+            }
 
+            if (job.templateTask.includePathResults) {
                 String[][][] pathsToPoints = workResult.pathResult;
                 // TODO sanity check shape
-                for (int p = 0; p < pathsToPoints.length; p++) {
-                    String[][] pathsIterations = pathsToPoints[p];
+                for (int d = 0; d < pathsToPoints.length; d++) {
+                    String[][] pathsIterations = pathsToPoints[d];
                     for (String[] iterationDetails : pathsIterations) {
-                        int destinationIndex = oneToOne ? workResult.taskId : p;
-                        String destinationId = destinationPointSet.getId(destinationIndex);
+                        String originId = originPointSet.getId(workResult.taskId);
+                        String destinationId = destinationPointSet.getId(d);
                         pathCsvWriter.writeOneValue(originId, destinationId, iterationDetails);
                     }
                 }

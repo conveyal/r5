@@ -586,7 +586,7 @@ public class FastRaptorWorker {
                             // Doing so will not affect total travel time (as long as this is in a conditional
                             // ensuring we won't miss the trip we're on), but it will affect the breakdown of walk vs.
                             // wait time.
-                            if (request.computePaths && inputState.shorterAccessOrTransferLeg(stop, boardStop)) {
+                            if (retainPaths && inputState.shorterAccessOrTransferLeg(stop, boardStop)) {
                                 boardTime = schedule.departures[stopPositionInPattern];
                                 waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStop = stop;

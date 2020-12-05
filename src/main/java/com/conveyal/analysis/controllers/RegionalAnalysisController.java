@@ -409,13 +409,13 @@ public class RegionalAnalysisController implements HttpController {
 
         task.oneToOne = analysisRequest.oneToOne;
         task.recordTimes = analysisRequest.recordTimes;
+        // For now, we support calculating paths in regional analyses only for freeform origins.
+        task.includePathResults = analysisRequest.originPointSetId != null && analysisRequest.recordPaths;
         task.recordAccessibility = analysisRequest.recordAccessibility;
 
-        // Making a static site implies several different processes - turn them all on if requested.
+        // Making a Taui site implies writing static travel time and path files per origin, but not accessibility.
         if (analysisRequest.makeTauiSite) {
             task.makeTauiSite = true;
-            task.computeTravelTimeBreakdown = true;
-            task.computePaths = true;
             task.recordAccessibility = false;
         }
 

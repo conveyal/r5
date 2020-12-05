@@ -275,7 +275,7 @@ public class TravelTimeComputer {
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
             worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
-            if (request.computePaths || request.computeTravelTimeBreakdown) {
+            if (request.includePathResults || request.makeTauiSite) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
                 worker.retainPaths = true;
@@ -317,8 +317,10 @@ public class TravelTimeComputer {
         // because in the non-transit case we call the reducer directly (see above).
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
-        // When building a static site, perform some additional initialization causing the propagator to do extra work.
-        if (request.computePaths || request.computeTravelTimeBreakdown) {
+        // When path results are needed (directly requested, or for a Taui site), read them from the worker,
+        // annotating with the access mode, then use the annotated paths to initialize the appropriate field in the
+        // propagater. Not supported for fare requests, which use the McRaptor router and path style.
+        if ((request.includePathResults || request.makeTauiSite) && worker != null) {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
                 for (Path path : paths) {
                     if (path != null) {
@@ -326,7 +328,11 @@ public class TravelTimeComputer {
                     }
                 }
             }).collect(Collectors.toList());
-            perTargetPropagater.pathWriter = new PathWriter(request);
+            // Initialize the propagater's pathWriter to write Taui results directly to storage (instead of returning
+            // them to the backend).
+            if (request.makeTauiSite) {
+                perTargetPropagater.pathWriter = new PathWriter(request);
+            }
         }
 
         return perTargetPropagater.propagate();

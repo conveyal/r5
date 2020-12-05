@@ -114,6 +114,11 @@ public class AnalysisRequest {
     public boolean recordTimes;
 
     /**
+     * Whether to record path and travel time details
+     */
+    public boolean recordPaths;
+
+    /**
      * Whether to record travel time from each origin to a one corresponding destination (the
      * destination at the same position in the destionationPointSet). This is relevant for the
      * travel-time reporting functions triggered if recordTimes is true, not for the originally
@@ -234,9 +239,7 @@ public class AnalysisRequest {
         task.toLon = toLon;
         task.fromTime = fromTime;
         task.toTime = toTime;
-
-        task.computePaths = toLat != 0 && toLon != 0;
-
+        task.includePathResults = recordPaths;
         task.bikeSpeed = bikeSpeed;
         task.carSpeed = carSpeed;
         task.walkSpeed = walkSpeed;

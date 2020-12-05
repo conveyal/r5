@@ -145,6 +145,8 @@ public class TravelTimeReducer {
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
+        }
+        if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
         }
 

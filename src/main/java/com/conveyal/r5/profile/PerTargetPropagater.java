@@ -81,20 +81,29 @@ public class PerTargetPropagater {
 
     /**
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
-     * transit stop. May be null, only needs to be set if we're recording paths, as in a static site.
+     * transit stop. May be null, only needs to be set if we're recording paths.
      */
     public List<Path[]> pathsToStopsForIteration = null;
 
-    /** Whether to break travel times down into walk, wait, and ride time. */
-    private boolean calculateComponents;
+    /** Whether the worker should calculate paths then write them to storage for use in Taui sites. */
+    private final boolean writePathsForTaui;
+
+    /**
+     * Whether the worker should calculate paths to all destinations, then return them to the broker for assembly or
+     * forwarding to the UI
+     * */
+    private final boolean calculateAllPaths;
+
+    /**
+     * Single destination for which paths should be returned (when toLat/toLon are specified in a single-point request)
+     */
+    private int destinationIndexForPaths = -1;
 
     /**
      * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
      * calculation).
      */
     private final boolean oneToOne;
-
-    int destinationIndex;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -132,12 +141,15 @@ public class PerTargetPropagater {
 
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        calculateComponents = task.makeTauiSite;
+        writePathsForTaui = task.makeTauiSite;
+        calculateAllPaths = task instanceof RegionalTask && task.includePathResults;
 
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
-        destinationIndex = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(request.toLon, request.toLat,
-                ((AnalysisWorkerTask)request).zoom);
+        if (request.toLat != 0.0f && request.toLon != 0.0f){
+            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(request.toLon, request.toLat,
+                    ((AnalysisWorkerTask)request).zoom);
+        }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         nTargets = targets.featureCount();
@@ -174,7 +186,9 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        perIterationPaths = new Path[nIterations];
+        if (writePathsForTaui || calculateAllPaths || destinationIndexForPaths != -1) {
+            perIterationPaths = new Path[nIterations];
+        }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
         int startTarget = 0;
@@ -195,7 +209,7 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (calculateComponents || targetIdx == destinationIndex) {
+            if (writePathsForTaui || calculateAllPaths || targetIdx == destinationIndexForPaths) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -208,7 +222,7 @@ public class PerTargetPropagater {
             // Construct the PathScorer before extracting percentiles because the scorer needs to make a copy of
             // the unsorted complete travel times.
             PathScorer pathScorer = null;
-            if (calculateComponents) {
+            if (writePathsForTaui) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
                 pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
@@ -220,11 +234,11 @@ public class PerTargetPropagater {
             travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
             timer.reducer.stop();
 
-            if (targetIdx == destinationIndex) {
+            if (targetIdx == destinationIndexForPaths) {
                 travelTimeReducer.recordPathsForTarget(0, perIterationPaths);
             }
 
-            if (calculateComponents) {
+            if (writePathsForTaui) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
@@ -236,7 +250,7 @@ public class PerTargetPropagater {
         }
         timer.fullPropagation.stop();
         timer.log();
-        if (calculateComponents && pathWriter != null) {
+        if (writePathsForTaui && pathWriter != null) {
             pathWriter.finishAndStorePaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.
@@ -355,7 +369,7 @@ public class PerTargetPropagater {
                             // Because that's the case, update the best known travel time and, if requested, the
                             // corresponding path.
                             perIterationTravelTimes[iteration] = timeToReachTarget;
-                            if (calculateComponents || targetIndex == destinationIndex) {
+                            if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
                                     path = new Path(path, linkedTargets.streetMode);

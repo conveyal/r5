@@ -7,7 +7,6 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +53,7 @@ public class MultiOriginAssembler {
      */
     private CsvResultWriter accessibilityCsvWriter;
     private CsvResultWriter timeCsvWriter;
+    private CsvResultWriter pathCsvWriter;
 
     // TODO the grid/CSV ResultWriters could potentially be replaced with a combined list and polymorphism e.g. for
     //  (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
@@ -170,6 +170,14 @@ public class MultiOriginAssembler {
                 csvResultWriters.add(timeCsvWriter);
             }
 
+            if (job.templateTask.includePathResults) {
+                LOG.info("Creating csv file to store path results for {} origins.", job.nTasksTotal);
+                pathCsvWriter = new CsvResultWriter(
+                        job.templateTask,
+                        outputBucket,
+                        fileStorage,
+                        "path", "");
+                csvResultWriters.add(pathCsvWriter);
             }
 
         } catch (IOException e) {
@@ -255,6 +263,14 @@ public class MultiOriginAssembler {
                     }
                 }
 
+                String[][][] pathsToPoints = workResult.pathResult;
+                // TODO sanity check shape
+                for (int p = 0; p < pathsToPoints.length; p++) {
+                    String[][] pathsIterations = pathsToPoints[p];
+                    for (String[] iterationDetails : pathsIterations) {
+                        int destinationIndex = oneToOne ? workResult.taskId : p;
+                        String destinationId = destinationPointSet.getId(destinationIndex);
+                        pathCsvWriter.writeOneValue(originId, destinationId, iterationDetails);
                     }
                 }
             }

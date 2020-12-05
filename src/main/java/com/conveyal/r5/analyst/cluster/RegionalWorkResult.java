@@ -19,7 +19,11 @@ public class RegionalWorkResult {
      */
     public int[][] travelTimeValues;
 
-    // TODO paths and components (access/egress, wait) of travel time?
+    /**
+     * String array summarizing the details of a path at a specific iteration (e.g. wait time, in-vehicle time), keyed
+     * on target index and iteration.
+     */
+    public String[][][] pathResult;
 
     /**
      * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
@@ -42,6 +46,7 @@ public class RegionalWorkResult {
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
+        this.pathResult = result.paths == null ? null : result.paths.getSummaryOfIterations();
     }
 
     // TODO checkTravelTimeInvariants, checkAccessibilityInvariants

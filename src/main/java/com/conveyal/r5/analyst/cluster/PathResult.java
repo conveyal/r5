@@ -89,13 +89,16 @@ public class PathResult {
     public String[][][] getSummaryOfIterations() {
         String[][][] summary = new String[nDestinations][nIterations][4];
         for (int d = 0; d < nDestinations; d++){
-            for (Path pathTemplate : itinerariesForPathTemplates[d].keySet()) {
-                String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                for (IterationDetails itinerary : itinerariesForPathTemplates[d].get(pathTemplate)) {
-                    summary[d][itinerary.iteration][0] = pathSummary;
-                    summary[d][itinerary.iteration][1] = String.valueOf(itinerary.waitTime);
-                    summary[d][itinerary.iteration][2] = String.valueOf(itinerary.inVehicleTime);
-                    summary[d][itinerary.iteration][3] = String.valueOf(itinerary.totalTime);
+            Multimap<Path, IterationDetails> itineraries = itinerariesForPathTemplates[d];
+            if (itineraries != null) {
+                for (Path pathTemplate : itineraries.keySet()) {
+                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
+                    for (IterationDetails itinerary : itineraries.get(pathTemplate)) {
+                        summary[d][itinerary.iteration][0] = pathSummary;
+                        summary[d][itinerary.iteration][1] = String.valueOf(itinerary.waitTime);
+                        summary[d][itinerary.iteration][2] = String.valueOf(itinerary.inVehicleTime);
+                        summary[d][itinerary.iteration][3] = String.valueOf(itinerary.totalTime);
+                    }
                 }
             }
         }

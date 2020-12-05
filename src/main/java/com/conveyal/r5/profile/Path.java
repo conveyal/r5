@@ -236,10 +236,11 @@ public class Path {
     public String toItineraryString(TransitLayer transitLayer){
         StringJoiner joiner = new StringJoiner("->");
         for (int i = 0; i < length; i++) {
-            String routeId = transitLayer.tripPatterns.get(patterns[i]).routeId;
+            // TODO use a compact feed index, instead of splitting to remove feedIds
+            String routeId = transitLayer.tripPatterns.get(patterns[i]).routeId.split(":")[1];
             String routeShortName = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name;
-            String boardStopId = transitLayer.stopIdForIndex.get(boardStops[i]);
-            String alightStopId = transitLayer.stopIdForIndex.get(alightStops[i]);
+            String boardStopId = transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1];
+            String alightStopId = transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1];
             joiner.add(boardStopId + " to " + alightStopId + " on " + routeId + "(" + routeShortName + ")");
         }
         return joiner.toString();

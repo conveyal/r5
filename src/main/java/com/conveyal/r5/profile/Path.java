@@ -179,18 +179,20 @@ public class Path {
     }
 
     @Override
+    // We tried replacing this custom implementation with Objects.hash(...), but it did not produce the expected
+    // results.
     public int hashCode() {
-        return Objects.hash(
-                patterns,
-                boardStops,
-                alightStops,
-                alightTimes,
-                trips,
-                boardStopPositions,
-                alightStopPositions,
-                accessMode,
-                egressMode
-        );
+        int result = Ints.hashCode(length);
+        result = 31 * result + Arrays.hashCode(patterns);
+        result = 31 * result + Arrays.hashCode(boardStops);
+        result = 31 * result + Arrays.hashCode(alightStops);
+        result = 31 * result + Arrays.hashCode(alightTimes);
+        result = 31 * result + Arrays.hashCode(trips);
+        result = 31 * result + Arrays.hashCode(boardStopPositions);
+        result = 31 * result + Arrays.hashCode(alightStopPositions);
+        result = 31 * result + Objects.hash(accessMode);
+        result = 31 * result + Objects.hash(egressMode);
+        return result;
     }
 
     /**

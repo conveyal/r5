@@ -176,7 +176,7 @@ public class MultiOriginAssembler {
                         job.templateTask,
                         outputBucket,
                         fileStorage,
-                        "path", "");
+                        "path", "waitTime", "inVehicleTime", "totalTime");
                 csvResultWriters.add(pathCsvWriter);
             }
 

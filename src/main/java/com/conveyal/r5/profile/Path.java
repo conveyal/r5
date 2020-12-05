@@ -25,6 +25,7 @@ public class Path {
     // It does effectively allow you to leave out the boardStopPositions and alightStopPositions, but a subclass could do that too.
     public int[] patterns;
     public int[] boardStops;
+    // Note that including stop arrival times would imply a distinct path for each departure minute.
     public int[] alightStops;
     public int[] alightTimes;
     public int[] trips;
@@ -34,9 +35,13 @@ public class Path {
     /**
      * Used only in propagation for writing paths for Taui outputs
      * TODO update egress mode outside of path (e.g. in wrapper or array parallel to perIterationTravelTimes in
-     * propagater)
+     *  propagater)
      */
     public StreetMode egressMode;
+
+    // Additional characteristics (not keys for hashing)
+    public int inVehicleTime;
+    public int waitTime;
     public final int length;
 
     /**
@@ -52,6 +57,8 @@ public class Path {
         this.alightStopPositions = input.alightStopPositions;
         this.accessMode = input.accessMode;
         this.egressMode = egressMode;
+        this.inVehicleTime = input.inVehicleTime;
+        this.waitTime = input.waitTime;
         this.length = input.patterns.length;
     }
 
@@ -65,6 +72,9 @@ public class Path {
         TIntList alightStops = new TIntArrayList();
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
+
+        this.waitTime = state.nonTransferWaitTime[stop];
+        this.inVehicleTime = state.nonTransferInVehicleTravelTime[stop];
 
         while (state.previous != null) {
             // We copy the state at each stop from one round to the next. If a stop is not updated in a particular

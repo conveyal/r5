@@ -146,7 +146,7 @@ public class PerTargetPropagater {
 
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
-        if (request.toLat != 0.0f && request.toLon != 0.0f){
+        if (task.includePathResults && request.toLat != 0.0f && request.toLon != 0.0f){
             destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(request.toLon, request.toLat,
                     ((AnalysisWorkerTask)request).zoom);
         }

@@ -8,6 +8,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -88,16 +89,19 @@ public class PerTargetPropagater {
     /** Whether the worker should calculate paths then write them to storage for use in Taui sites. */
     private final boolean writePathsForTaui;
 
-    /**
-     * Whether the worker should calculate paths to all destinations, then return them to the broker for assembly or
-     * forwarding to the UI
-     * */
+    /** Whether the worker should calculate paths to all destinations, then return them to the broker for assembly */
     private final boolean calculateAllPaths;
+
+    /**
+     * Whether the worker should calculate paths to one specific destination, then return them to the broker for
+     * forwarding to the UI
+     */
+    private final boolean calculateOnePath;
 
     /**
      * Single destination for which paths should be returned (when toLat/toLon are specified in a single-point request)
      */
-    private int destinationIndexForPaths = -1;
+    private int destinationIndexForPaths;
 
     /**
      * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
@@ -143,12 +147,15 @@ public class PerTargetPropagater {
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         writePathsForTaui = task.makeTauiSite;
         calculateAllPaths = task instanceof RegionalTask && task.includePathResults;
-
+        calculateOnePath = task instanceof TravelTimeSurfaceTask && task.includePathResults;
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
-        if (task.includePathResults && request.toLat != 0.0f && request.toLon != 0.0f){
-            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(request.toLon, request.toLat,
-                    ((AnalysisWorkerTask)request).zoom);
+        if (calculateOnePath){
+            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
+                    task.toLon,
+                    task.toLat,
+                    task.zoom
+            );
         }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -186,7 +193,7 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        if (writePathsForTaui || calculateAllPaths || destinationIndexForPaths != -1) {
+        if (writePathsForTaui || calculateAllPaths || calculateOnePath) {
             perIterationPaths = new Path[nIterations];
         }
 

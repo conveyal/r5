@@ -229,8 +229,12 @@ public class StreetRouter {
     /**
      * Return a map where the keys are all the reached vertices, and the values are the value of the optimization
      * objective variable for the optimal path to that vertex.
+     * @return map from vertices to routing variable (time or distance), with <code>noEntryKey = -1</code> and
+     * <code>noEntryValue = Integer.MAX_VALUE</code>
      */
     public TIntIntMap getReachedVertices () {
+        // TODO use and return a more clearly defined type than this TIntIntMap, such as CostToVertexFunction (which has
+        //  Javadoc stating that MAX_VALUE always means unreachable). See suggestion in R5 #647.
         TIntIntMap result = new TIntIntHashMap(DEFAULT_CAPACITY, DEFAULT_LOAD_FACTOR, -1, Integer.MAX_VALUE);
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {

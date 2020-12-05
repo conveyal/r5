@@ -274,8 +274,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * @return the speed at which the given mode will traverse street edges, in floating point meters per second.
      *
-     * This will return a default value for CAR. Callers should implement logic to replace this default with
-     * appropriate per-edge speeds.
+     * For WALK and BICYCLE, it makes sense to allow users to adjust speeds in the request. For CAR (where speeds
+     * vary by edge) callers should implement logic that uses appropriate per-edge speeds instead of the returned
+     * carSpeed. TODO throw exception if streetMode == CAR
      */
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {

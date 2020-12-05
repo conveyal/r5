@@ -279,12 +279,18 @@ public class TravelTimeReducer {
         }
     }
 
-    public void recordPathsForTarget (int target, Path[] perIterationPaths) {
-        Multimap<Path, Integer> iterationNumbersForPath = HashMultimap.create();
+    public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths) {
+        Multimap<Path, PathResult.IterationDetails> paths = HashMultimap.create();
         for (int i = 0; i < perIterationPaths.length; i++) {
-            iterationNumbersForPath.put(perIterationPaths[i], i);
+            if (perIterationPaths[i] != null) {
+                PathResult.IterationDetails details = new PathResult.IterationDetails(
+                        perIterationPaths[i],
+                        i,
+                        perIterationTimes[i]);
+                paths.put(perIterationPaths[i], details);
+            }
         }
-        pathResult.setTarget(target, iterationNumbersForPath);
+        pathResult.setTarget(target, paths);
     }
 
     /**

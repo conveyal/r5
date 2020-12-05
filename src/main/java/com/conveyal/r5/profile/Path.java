@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -232,7 +233,19 @@ public class Path {
         return builder.toString();
     }
 
-    public String[] toString (TransitLayer transitLayer) {
+    public String toItineraryString(TransitLayer transitLayer){
+        StringJoiner joiner = new StringJoiner("->");
+        for (int i = 0; i < length; i++) {
+            String routeId = transitLayer.tripPatterns.get(patterns[i]).routeId;
+            String routeShortName = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name;
+            String boardStopId = transitLayer.stopIdForIndex.get(boardStops[i]);
+            String alightStopId = transitLayer.stopIdForIndex.get(alightStops[i]);
+            joiner.add(boardStopId + " to " + alightStopId + " on " + routeId + "(" + routeShortName + ")");
+        }
+        return joiner.toString();
+    }
+
+    public String[] toTripString(TransitLayer transitLayer) {
         String[] pathSummary = new String[length + 2];
         pathSummary[0] = accessMode.toString();
         for (int i = 0; i < length; i++) {

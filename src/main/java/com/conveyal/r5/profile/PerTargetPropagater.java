@@ -228,15 +228,19 @@ public class PerTargetPropagater {
                 pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             }
 
+            if (calculateAllPaths) {
+                // For regional tasks, return paths to all targets.
+                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
+            } else if (targetIdx == destinationIndexForPaths) {
+                // For single point tasks, return paths to the one target destination specified by toLat/toLon.
+                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
+            }
+
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
             int targetToWrite = oneToOne ? 0 : targetIdx;
             timer.reducer.start();
             travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
             timer.reducer.stop();
-
-            if (targetIdx == destinationIndexForPaths) {
-                travelTimeReducer.recordPathsForTarget(0, perIterationPaths);
-            }
 
             if (writePathsForTaui) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.

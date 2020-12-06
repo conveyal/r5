@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
+import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -68,6 +69,14 @@ public class PathResult {
             this.totalTime = totalTime;
         }
 
+        public String[] timesToString () {
+            return new String[]{
+                String.valueOf(waitTime),
+                String.valueOf(inVehicleTime),
+                String.valueOf(totalTime)
+            };
+        }
+
     }
 
     /**
@@ -99,6 +108,52 @@ public class PathResult {
                         summary[d][itinerary.iteration][2] = String.valueOf(itinerary.inVehicleTime);
                         summary[d][itinerary.iteration][3] = String.valueOf(itinerary.totalTime);
                     }
+                }
+            }
+        }
+        return summary;
+    }
+
+    // TODO throw error if this method is called for tasks with Monte Carlo draws
+    public ArrayList<String[]>[] getMinimumForPathIterations() {
+        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
+        for (int d = 0; d < nDestinations; d++) {
+            summary[d] = new ArrayList<>();
+            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
+            if (itinerariesForPathTemplate != null) {
+                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
+                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
+                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
+                    String nIterations = String.valueOf(itineraries.size());
+                    IterationDetails latestIteration = (IterationDetails) itineraries.toArray()[0];
+                    summary[d].add(ArrayUtils.addAll(
+                            new String[]{pathSummary, nIterations},
+                            latestIteration.timesToString()
+                    ));
+                }
+            }
+        }
+        return summary;
+    }
+
+    // TODO merge with previous, using min/average enum as a parameter
+    public ArrayList<String[]>[] getAverageForPathIterations() {
+        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
+        for (int d = 0; d < nDestinations; d++) {
+            summary[d] = new ArrayList<>();
+            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
+            if (itinerariesForPathTemplate != null) {
+                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
+                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
+                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
+                    String nIterations = String.valueOf(itineraries.size());
+                    String avgWaitTime =
+                            String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).average().orElse(-1));
+                    String inVehicleTime =
+                            String.valueOf(itineraries.stream().mapToDouble(i -> i.inVehicleTime).average().orElse(-1));
+                    String avgTotalTime =
+                            String.valueOf(itineraries.stream().mapToDouble(i -> i.totalTime).average().orElse(-1));
+                    summary[d].add(new String[]{pathSummary, nIterations, avgWaitTime, inVehicleTime, avgTotalTime});
                 }
             }
         }

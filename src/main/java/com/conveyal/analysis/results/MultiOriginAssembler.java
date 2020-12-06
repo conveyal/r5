@@ -177,7 +177,7 @@ public class MultiOriginAssembler {
                         job.templateTask,
                         outputBucket,
                         fileStorage,
-                        "path", "waitTime", "inVehicleTime", "totalTime");
+                        "path", "nIterations", "avgWaitTime", "inVehicleTime", "avgTotalTime");
                 csvResultWriters.add(pathCsvWriter);
             }
 
@@ -265,17 +265,14 @@ public class MultiOriginAssembler {
             }
 
             if (job.templateTask.includePathResults) {
-                String[][][] pathsToPoints = workResult.pathResult;
+                ArrayList<String[]>[] pathsToPoints = workResult.pathResult;
                 // TODO sanity check shape
                 for (int d = 0; d < pathsToPoints.length; d++) {
-                    String[][] pathsIterations = pathsToPoints[d];
-                    // Write one row per origin-destination-iteration, if at least one iteration is not blank
-                    if (Arrays.stream(pathsIterations).anyMatch(iteration -> iteration[0] != null)) {
-                        for (String[] iterationDetails : pathsIterations) {
-                            String originId = originPointSet.getId(workResult.taskId);
-                            String destinationId = destinationPointSet.getId(d);
-                            pathCsvWriter.writeOneValue(originId, destinationId, iterationDetails);
-                        }
+                    ArrayList<String[]> pathsIterations = pathsToPoints[d];
+                    for (String[] iterationDetails : pathsIterations) {
+                        String originId = originPointSet.getId(workResult.taskId);
+                        String destinationId = destinationPointSet.getId(d);
+                        pathCsvWriter.writeOneValue(originId, destinationId, iterationDetails);
                     }
                 }
             }

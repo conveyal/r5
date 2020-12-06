@@ -10,11 +10,11 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Holds and from an origin to destination target(s) at every Raptor iteration. For single-point  tasks, paths to
+ * Holds and from an origin to destination target(s) at every Raptor iteration. For single-point tasks, paths to
  * only a single destination (specified by toLon and toLat coordinates in the task) are recorded.
  *
- * This class is used to accumulate paths to be returned to the broker. In contrast, workers use the PathWriter to
- * write paths directly to S3 for Taui sites.
+ * This class is used to accumulate paths to be returned to the broker. In contrast, workers use PathWriter to write
+ * paths directly to S3 for Taui sites.
  */
 
 public class PathResult {

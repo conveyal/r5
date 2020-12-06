@@ -279,6 +279,14 @@ public class TravelTimeReducer {
         }
     }
 
+    /**
+     * For each specified target index, record the path and travel time details for each iteration.
+     *
+     * @param target index for destination target
+     * @param perIterationTimes total travel time for each iteration, sorted in order of iteration (latest departure
+     *                          time first).
+     * @param perIterationPaths paths for each iteration, sorted in order of iteration (latest departure time first).
+     */
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths) {
         Multimap<Path, PathResult.IterationDetails> paths = HashMultimap.create();
         for (int i = 0; i < perIterationPaths.length; i++) {

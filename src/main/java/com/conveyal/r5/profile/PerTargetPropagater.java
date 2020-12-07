@@ -216,7 +216,7 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (writePathsForTaui || calculateAllPaths || targetIdx == destinationIndexForPaths) {
+            if (writePathsForTaui || calculateAllPaths || (calculateOnePath && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -238,7 +238,7 @@ public class PerTargetPropagater {
             if (calculateAllPaths) {
                 // For regional tasks, return paths to all targets.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
-            } else if (targetIdx == destinationIndexForPaths) {
+            } else if (calculateOnePath && targetIdx == destinationIndexForPaths) {
                 // For single point tasks, return paths to the one target destination specified by toLat/toLon.
                 travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
             }

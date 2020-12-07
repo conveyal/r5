@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.google.common.primitives.Ints;
@@ -238,10 +239,10 @@ public class Path {
         for (int i = 0; i < length; i++) {
             // TODO use a compact feed index, instead of splitting to remove feedIds
             String routeId = transitLayer.tripPatterns.get(patterns[i]).routeId.split(":")[1];
-            String routeShortName = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name;
+            // String routeShortName = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name;
             String boardStopId = transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1];
             String alightStopId = transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1];
-            joiner.add(boardStopId + " to " + alightStopId + " on " + routeId + "(" + routeShortName + ")");
+            joiner.add(boardStopId + " to " + alightStopId + " on " + routeId); //.add("(" + routeShortName + ")");
         }
         return joiner.toString();
     }
@@ -251,18 +252,15 @@ public class Path {
         pathSummary[0] = accessMode.toString();
         for (int i = 0; i < length; i++) {
             var builder = new StringBuilder();
-            builder.append(transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name);
-            builder.append(", ");
-            builder.append(boardStops[i]);
-            builder.append(" to ");
-            builder.append(alightStops[i]);
-            builder.append(" alighting ");
-            builder.append(Math.floorDiv(alightTimes[i], 3600) + ":" + alightTimes[i] / 60f % 60);
-            builder.append(" (");
-            builder.append(transitLayer.stopNames.get(boardStops[i]));
-            builder.append(" to ");
-            builder.append(transitLayer.stopNames.get(alightStops[i]));
-            builder.append(")");
+            RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
+            builder.append(route.route_id)
+                    // .append(" (").append(route.route_short_name)
+                    .append(") | ")
+                    .append(transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1])
+                    .append(" (").append(transitLayer.stopNames.get(boardStops[i])).append(") -> ")
+                    .append(transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1])
+                    .append(" (").append(transitLayer.stopNames.get(alightStops[i])).append(") alight ")
+                    .append(String.format("%02d:%02d", Math.floorDiv(alightTimes[i], 3600), (int) (alightTimes[i] / 60.0 % 60)));
             pathSummary[i + 1] = builder.toString();
         }
         pathSummary[pathSummary.length - 1] = egressMode.toString();

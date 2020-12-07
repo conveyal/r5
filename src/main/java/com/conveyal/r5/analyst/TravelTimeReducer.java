@@ -98,8 +98,13 @@ public class TravelTimeReducer {
                 // HALF_HEADWAY boarding, returning a single travel time per departure minute per destination.
                 this.timesPerDestination = task.getTimeWindowLengthMinutes();
             } else {
-                // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
-                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+                if (network.transitLayer.hasFrequencies) {
+                    // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
+                    this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+                } else {
+                    // No frequency-based routes, so only one iteration per departure time.
+                    this.timesPerDestination = task.getTimeWindowLengthMinutes();
+                }
             }
         }
 

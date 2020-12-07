@@ -154,7 +154,7 @@ public class FastRaptorWorker {
         nMinutes = request.getTimeWindowLengthMinutes();
 
         // How many random schedules per departure minute to meet or exceed the requested total iterations?
-        monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
+        monteCarloDrawsPerMinute = transit.hasFrequencies ? request.getMonteCarloDrawsPerMinute() : 1;
 
         // Hidden feature: activate half-headway boarding times by specifying zero Monte Carlo draws.
         // The UI requires one or more draws, so this can only be activated by editing request JSON directly.

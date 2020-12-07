@@ -254,8 +254,8 @@ public class Path {
             var builder = new StringBuilder();
             RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
             builder.append(route.route_id)
-                    // .append(" (").append(route.route_short_name)
-                    .append(") | ")
+                    // .append(" (").append(route.route_short_name).append(")")
+                    .append(" | ")
                     .append(transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1])
                     .append(" (").append(transitLayer.stopNames.get(boardStops[i])).append(") -> ")
                     .append(transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1])

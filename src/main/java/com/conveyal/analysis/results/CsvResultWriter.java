@@ -29,7 +29,7 @@ public class CsvResultWriter extends ResultWriter {
     CsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage, String... dataColumns) throws IOException {
         super(fileStorage);
         super.prepare(task.jobId, outputBucket);
-        this.fileName = task.jobId + dataColumns[0];
+        this.fileName = task.jobId + "_" + dataColumns[0] +".csv";
         this.nDataColumns = dataColumns.length;
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
         csvWriter = new CsvWriter(bufferedWriter, ',');

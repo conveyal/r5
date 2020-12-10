@@ -42,10 +42,13 @@ public class CsvResultWriter extends ResultWriter {
         csvWriter = new CsvWriter(bufferedWriter, ',');
     }
 
+    /**
+     * Writes a header row, including "origin," "destination," and the supplied data columns
+     */
     public void setDataColumns(String... columns) throws IOException {
         this.nDataColumns = columns.length;
         csvWriter.writeRecord(ArrayUtils.addAll(new String[]{"origin", "destination"}, columns));
-        LOG.info("Created csv file to store {} results from workers.", columns[0]);
+        LOG.info("Created csv file to store {} results from workers.", resultType);
     }
 
     /**
@@ -59,7 +62,7 @@ public class CsvResultWriter extends ResultWriter {
     /**
      * Write a single row into the CSV file.
      */
-    synchronized void writeOneValue (String originId, String destinationId, String... values) throws IOException {
+    synchronized void writeOneRow(String originId, String destinationId, String... values) throws IOException {
         // CsvWriter is not threadsafe and multiple threads may call this, so the actual writing is synchronized (TODO confirm)
         Preconditions.checkArgument(values.length == nDataColumns, "Attempted to write the wrong number of columns to" +
                 " a result CSV");

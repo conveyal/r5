@@ -518,7 +518,6 @@ public class LinkedPointSet implements Serializable {
             if (routingVariable == RoutingVariable.DISTANCE_MILLIMETERS) {
                 cost = distanceToPoint(costToVertex, edge, p);
             } else if (routingVariable == RoutingVariable.DURATION_SECONDS) {
-
                 // The routing variable is seconds only if we're doing a car search, so look up the car speed on the
                 // linked edge.
                 int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);

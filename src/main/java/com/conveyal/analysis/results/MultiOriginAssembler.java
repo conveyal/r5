@@ -235,7 +235,7 @@ public class MultiOriginAssembler {
                     if (accessibilityCsvWriter != null) {
                         String originId = originPointSet.getId(workResult.taskId);
                         // FIXME this is writing only accessibility for the first percentile and cutoff
-                        accessibilityCsvWriter.writeOneValue(originId, "", String.valueOf(percentilesForGrid[0][0]));
+                        accessibilityCsvWriter.writeOneRow(originId, "", String.valueOf(percentilesForGrid[0][0]));
                     } else {
                         for (int p = 0; p < nPercentiles; p++) {
                             int[] cutoffsForPercentile = percentilesForGrid[p];
@@ -258,7 +258,7 @@ public class MultiOriginAssembler {
                         // Always writing both origin and destination ID we should alert the user if something is amiss.
                         int destinationIndex = job.templateTask.oneToOne ? workResult.taskId : d;
                         String destinationId = destinationPointSet.getId(destinationIndex);
-                        timeCsvWriter.writeOneValue(originId, destinationId, String.valueOf(travelTime));
+                        timeCsvWriter.writeOneRow(originId, destinationId, String.valueOf(travelTime));
                     }
                 }
             }
@@ -271,7 +271,7 @@ public class MultiOriginAssembler {
                     for (String[] iterationDetails : pathsIterations) {
                         String originId = originPointSet.getId(workResult.taskId);
                         String destinationId = destinationPointSet.getId(d);
-                        pathCsvWriter.writeOneValue(originId, destinationId, iterationDetails);
+                        pathCsvWriter.writeOneRow(originId, destinationId, iterationDetails);
                     }
                 }
             }

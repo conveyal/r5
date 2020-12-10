@@ -3,6 +3,7 @@ package com.conveyal.analysis.results;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
@@ -14,7 +15,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 
 /**
@@ -138,8 +138,9 @@ public class MultiOriginAssembler {
                         job.nTasksTotal
                     );
                     accessibilityCsvWriter = new CsvResultWriter(
-                        job.templateTask, outputBucket, fileStorage, "accessibility"
+                        job.templateTask, outputBucket, fileStorage, Result.ACCESS
                     );
+                    accessibilityCsvWriter.setDataColumns("access");
                     csvResultWriters.add(accessibilityCsvWriter);
                 } else {
                     // Create one grid writer per percentile and destination pointset
@@ -167,17 +168,15 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.recordTimes) {
                 LOG.info("Creating csv file to store time results for {} origins.", job.nTasksTotal);
-                timeCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, "time");
+                timeCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.TIMES);
+                timeCsvWriter.setDataColumns("time");
                 csvResultWriters.add(timeCsvWriter);
             }
 
             if (job.templateTask.includePathResults) {
                 LOG.info("Creating csv file to store path results for {} origins.", job.nTasksTotal);
-                pathCsvWriter = new CsvResultWriter(
-                        job.templateTask,
-                        outputBucket,
-                        fileStorage,
-                        "path", "nIterations", "avgWaitTime", "inVehicleTime", "avgTotalTime");
+                pathCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.PATHS);
+                pathCsvWriter.setDataColumns("path", "nIterations", "avgWaitTime", "inVehicleTime", "avgTotalTime");
                 csvResultWriters.add(pathCsvWriter);
             }
 
@@ -285,6 +284,7 @@ public class MultiOriginAssembler {
             }
             if (nComplete == nOriginsTotal && !error) {
                 finish();
+                this.regionalAnalysis.complete = true;
             }
         } catch (Exception e) {
             error = true;

@@ -19,23 +19,33 @@ public class CsvResultWriter extends ResultWriter {
 
     private final CsvWriter csvWriter;
     private final String fileName;
-    private final int nDataColumns;
+    private int nDataColumns;
+    private Result resultType;
+
+    public enum Result {
+        ACCESS,
+        TIMES,
+        PATHS
+    }
 
     /**
      * Construct a writer to record incoming results in a CSV file, with header row consisting of
      * "origin", "destination", and the supplied indicator.
      * FIXME it's strange we're manually passing injectable components into objects not wired up at application construction.
      */
-    CsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage, String... dataColumns) throws IOException {
+    CsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage, Result resultType) throws IOException {
         super(fileStorage);
         super.prepare(task.jobId, outputBucket);
-        this.fileName = task.jobId + "_" + dataColumns[0] +".csv";
-        this.nDataColumns = dataColumns.length;
+        this.resultType = resultType;
+        this.fileName = task.jobId + "_" + resultType +".csv";
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
         csvWriter = new CsvWriter(bufferedWriter, ',');
-        // Write the CSV header
-        csvWriter.writeRecord(ArrayUtils.addAll(new String[]{"origin", "destination"}, dataColumns));
-        LOG.info("Created csv file to store {} results from workers.", dataColumns[0]);
+    }
+
+    public void setDataColumns(String... columns) throws IOException {
+        this.nDataColumns = columns.length;
+        csvWriter.writeRecord(ArrayUtils.addAll(new String[]{"origin", "destination"}, columns));
+        LOG.info("Created csv file to store {} results from workers.", columns[0]);
     }
 
     /**
@@ -43,7 +53,7 @@ public class CsvResultWriter extends ResultWriter {
      */
     protected synchronized void finish () throws IOException {
         csvWriter.close();
-        super.finish(this.fileName);
+        super.finish(this.fileName + ".gz");
     }
 
     /**

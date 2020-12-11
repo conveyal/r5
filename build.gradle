@@ -148,7 +148,7 @@ dependencies {
     implementation 'org.mongodb:mongo-java-driver:3.11.0'
 
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
-    implementation 'org.mongojack:mongojack:2.5.1'
+    implementation 'org.mongojack:mongojack:2.10.1'
 
     // JSON serialization and deserialization from and to Java objects
     implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'

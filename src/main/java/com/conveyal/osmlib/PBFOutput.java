@@ -3,6 +3,7 @@ package com.conveyal.osmlib;
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessageLite;
+import com.google.protobuf.GeneratedMessageV3;
 import org.openstreetmap.osmosis.osmbinary.Fileformat;
 import org.openstreetmap.osmosis.osmbinary.Osmformat;
 import org.slf4j.Logger;
@@ -78,7 +79,7 @@ public class PBFOutput implements OSMEntitySink, Runnable {
     }
 
     /** @param block is either a PrimitiveBlock or a HeaderBlock */
-    private void writeOneBlob(GeneratedMessageLite block) {
+    private void writeOneBlob(GeneratedMessageV3 block) {
 
         // FIXME lotsa big copies going on here
 

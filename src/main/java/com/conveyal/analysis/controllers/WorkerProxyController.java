@@ -39,7 +39,8 @@ public class WorkerProxyController implements HttpController {
     public void registerEndpoints (Service sparkService) {
         // Ideally we'd have region, project, bundle, and worker version parameters.
         // Those could be path parameters, x-conveyal-headers, etc.
-        sparkService.get("/workerProxy/:bundle/:workerVersion", this::proxyGet);
+        // Path starts with api to ensure authentication
+        sparkService.get("/api/bundles/:bundle/workerProxy/:workerVersion", this::proxyGet);
     }
 
     /**

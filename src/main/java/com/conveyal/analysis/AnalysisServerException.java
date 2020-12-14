@@ -86,4 +86,8 @@ public class AnalysisServerException extends RuntimeException {
         message = m;
     }
 
+    @Override
+    public String getMessage() {
+        return message;
+    }
 }

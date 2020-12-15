@@ -383,7 +383,7 @@ public class PerTargetPropagater {
                             if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
-                                    path = new Path(path, linkedTargets.streetMode);
+                                    path = path.cloneWithEgress(linkedTargets.streetMode);
                                 }
                                 perIterationPaths[iteration] = path;
                             }

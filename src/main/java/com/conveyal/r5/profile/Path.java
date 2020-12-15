@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkState;
  * Class used to represent transit paths for display to end users (and debugging).
  * It is a group of parallel arrays, with each position in the arrays representing a leg in the trip.
  */
-public class Path {
+public class Path implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
@@ -35,7 +35,7 @@ public class Path {
     public int[] alightStopPositions;
     public StreetMode accessMode;
     /**
-     * Used only in propagation for writing paths for Taui outputs
+     * Used only in propagation for writing paths
      * TODO update egress mode outside of path (e.g. in wrapper or array parallel to perIterationTravelTimes in
      *  propagater)
      */
@@ -46,22 +46,23 @@ public class Path {
     public int waitTime;
     public final int length;
 
+    @Override
+    public Path clone() {
+        try {
+            Path path = (Path) super.clone();
+            return path;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Copy a path and add the specified egress mode
      */
-    public Path(Path input, StreetMode egressMode) {
-        this.patterns = input.patterns;
-        this.boardStops = input.boardStops;
-        this.alightStops = input.alightStops;
-        this.alightTimes = input.alightTimes;
-        this.trips = input.trips;
-        this.boardStopPositions = input.boardStopPositions;
-        this.alightStopPositions = input.alightStopPositions;
-        this.accessMode = input.accessMode;
-        this.egressMode = egressMode;
-        this.inVehicleTime = input.inVehicleTime;
-        this.waitTime = input.waitTime;
-        this.length = input.patterns.length;
+    public Path cloneWithEgress(StreetMode egressMode) {
+        Path path = this.clone();
+        path.egressMode = egressMode;
+        return path;
     }
 
     /**

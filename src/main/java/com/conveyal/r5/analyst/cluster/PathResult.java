@@ -44,8 +44,7 @@ public class PathResult {
             if (nDestinations > 5000) throw new UnsupportedOperationException("Path results are limited to 5000 " +
                     "destinations");
         }
-        // TODO factor out into a method that could also be used setting reducer's timesPerDestination?
-        this.nIterations = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
+        this.nIterations = task.getTotalIterations(transitLayer.hasFrequencies);
         itinerariesForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
     }

@@ -96,19 +96,7 @@ public class TravelTimeReducer {
     public TravelTimeReducer (AnalysisWorkerTask task, TransportNetwork network) {
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
-        if (task.inRoutingFareCalculator != null) {
-            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different
-            // departure times (rather than sampling multiple draws at every minute in the departure time window).
-            this.timesPerDestination = task.monteCarloDraws;
-        } else {
-            if (task.monteCarloDraws == 0) {
-                // HALF_HEADWAY boarding, returning a single travel time per departure minute per destination.
-                this.timesPerDestination = task.getTimeWindowLengthMinutes();
-            } else {
-                // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
-                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
-            }
-        }
+        this.timesPerDestination = task.getTotalIterations(network.transitLayer.hasFrequencies);
 
         // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.

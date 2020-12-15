@@ -223,7 +223,8 @@ public class ProfileRequest implements Serializable, Cloneable {
      * FastRaptorWorker divides up the number of draws into an equal number at each minute of the time window, then
      * rounds up. Note that the algorithm may actually take somewhat more draws than this, depending on the width of
      * your time window. As an extreme example, if your time window is 120 minutes and you request 121 draws, you
-     * will actually get 240, because 1 &lt; 121 / 120 &lt; 2.
+     * will actually get 240, because 1 &lt; 121 / 120 &lt; 2. 0 is a special value triggering HALF_HEADWAY boarding
+     * mode.
      *
      * McRaptor worker samples departure times, repeating a random walk over the departure time window until a sample
      * with exactly this number of departure times is generated.
@@ -388,11 +389,39 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Return the number of Monte Carlo draws that must be done each minute to get at least the desired number of total
-     * Monte Carlo draws over all minutes.
+     * Determine the number of iterations to run at each departure minute.
+     * @param monteCarlo whether the search will include Monte Carlo draws with randomized schedules for
+     *                   frequency-based routes
+     * @return if monteCarlo is true and a sensible number of total draws is requested, the number of iterations needed
+     *                   per minute such that the total number of draws is at least the total requested. Otherwise, 1.
      */
     @JsonIgnore
-    public int getMonteCarloDrawsPerMinute() {
-        return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+    public int getIterationsPerMinute(boolean monteCarlo) {
+        if (monteCarlo && monteCarloDraws > 0) {
+            // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
+            return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+        } else {
+            return 1;
+        }
     }
+
+    /**
+     * Return the total number of iterations expected
+     * @param monteCarlo whether the search will include Monte Carlo draws with randomized schedules for
+     *                   frequency-based routes
+     * @return a total of number draws that is an even multiple of the number of minutes (unless fares are being
+     *                   calculated). The total will be at least the total monteCarloDraws requested if monteCarlo is
+     *                   true.
+     */
+    @JsonIgnore
+    public int getTotalIterations(boolean monteCarlo) {
+        if (inRoutingFareCalculator != null) {
+            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different
+            // departure times (rather than sampling multiple draws at every minute in the departure time window).
+            return monteCarloDraws;
+        } else {
+            return getTimeWindowLengthMinutes() * getIterationsPerMinute(monteCarlo);
+        }
+    }
+
 }

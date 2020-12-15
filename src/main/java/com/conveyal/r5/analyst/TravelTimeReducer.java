@@ -59,8 +59,8 @@ public class TravelTimeReducer {
     private int[] zeroPointsForCutoffs;
 
     /**
-     * The number of travel times we will record at each destination.
-     * This is affected by the number of Monte Carlo draws requested and the departure time window.
+     * The number of travel times we will record at each destination, across all iterations (all departure times in the
+     * departure time window and all Monte Carlo draws).
      */
     private final int timesPerDestination;
 
@@ -206,10 +206,9 @@ public class TravelTimeReducer {
         for (int i : timesSeconds) {
             checkArgument(i >= 0, "Travel times must be positive.");
         }
-
         // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
-        // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
-        // We even had a prototype counting sort that would take advantage of this detail. However, applying distance
+        // We used to convert these to minutes before sorting, which may allow the sort to be more efficient. For
+        // example, a counting sort benefits from less bins, and was measured to be faster. However, applying distance
         // decay functions with one-second resolution decreases sensitivity to randomization error in travel times.
         Arrays.sort(timesSeconds);
         int[] percentileTravelTimesSeconds = new int[nPercentiles];

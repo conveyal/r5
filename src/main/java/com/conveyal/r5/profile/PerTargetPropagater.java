@@ -86,17 +86,23 @@ public class PerTargetPropagater {
      */
     public List<Path[]> pathsToStopsForIteration = null;
 
-    /** Whether the worker should calculate paths then write them to storage for use in Taui sites. */
-    private final boolean writePathsForTaui;
-
-    /** Whether the worker should calculate paths to all destinations, then return them to the broker for assembly */
-    private final boolean calculateAllPaths;
-
     /**
-     * Whether the worker should calculate paths to one specific destination, then return them to the broker for
-     * forwarding to the UI
+     * Different options for retaining and reporting paths. In default analyses, paths are not retained.
+     * For Taui sites, workers write directly to file storage.
+     * For regional analyses with freeform pointsets, workers return paths to all destinations to the broker for
+     * assembly.
+     * For single-point analyses with freeform pointsets, workers return paths to one destination to the broker for
+     * fowarding to the UI.
      */
-    private final boolean calculateOnePath;
+    private enum SavePaths {
+        NONE,
+        WRITE_TAUI,
+        ALL_DESTINATIONS,
+        ONE_DESTINATION
+    }
+
+    /** Whether to save paths, and what to do with them */
+    private final SavePaths savePaths;
 
     /**
      * Single destination for which paths should be returned (when toLat/toLon are specified in a single-point request)
@@ -145,12 +151,16 @@ public class PerTargetPropagater {
 
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        writePathsForTaui = task.makeTauiSite;
-        calculateAllPaths = task instanceof RegionalTask && task.includePathResults;
-        calculateOnePath = task instanceof TravelTimeSurfaceTask && task.includePathResults;
+        if (task.makeTauiSite) {
+            savePaths = SavePaths.WRITE_TAUI;
+        } else if (task.includePathResults) {
+            savePaths = task instanceof RegionalTask ? SavePaths.ALL_DESTINATIONS : SavePaths.ONE_DESTINATION;
+        } else {
+            savePaths = SavePaths.NONE;
+        }
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
-        if (calculateOnePath){
+        if (savePaths == SavePaths.ONE_DESTINATION){
             destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
                     task.toLon,
                     task.toLat,
@@ -193,7 +203,7 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        if (writePathsForTaui || calculateAllPaths || calculateOnePath) {
+        if (savePaths != savePaths.NONE) {
             perIterationPaths = new Path[nIterations];
         }
 
@@ -216,7 +226,8 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (writePathsForTaui || calculateAllPaths || (calculateOnePath && targetIdx == destinationIndexForPaths)) {
+            if (savePaths == savePaths.WRITE_TAUI || savePaths == savePaths.ALL_DESTINATIONS
+                    || (savePaths == savePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -229,16 +240,14 @@ public class PerTargetPropagater {
             // Construct the PathScorer before extracting percentiles because the scorer needs to make a copy of
             // the unsorted complete travel times.
             PathScorer pathScorer = null;
-            if (writePathsForTaui) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
                 pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
-            }
-
-            if (calculateAllPaths) {
+            } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
-            } else if (calculateOnePath && targetIdx == destinationIndexForPaths) {
+            } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
                 // For single point tasks, return paths to the one target destination specified by toLat/toLon.
                 travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
             }
@@ -249,7 +258,7 @@ public class PerTargetPropagater {
             travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
             timer.reducer.stop();
 
-            if (writePathsForTaui) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
@@ -261,7 +270,7 @@ public class PerTargetPropagater {
         }
         timer.fullPropagation.stop();
         timer.log();
-        if (writePathsForTaui && pathWriter != null) {
+        if (savePaths == SavePaths.WRITE_TAUI && pathWriter != null) {
             pathWriter.finishAndStorePaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.

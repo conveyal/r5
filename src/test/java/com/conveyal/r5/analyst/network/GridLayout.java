@@ -148,6 +148,15 @@ public class GridLayout {
         this.routes.add(GridRoute.newVerticalRoute(this, col, headwayMinutes));
     }
 
+    // TODO builder pattern for direction (row or column methods), headway, frequency etc.
+    public void addHorizontalFrequencyRoute (int row, int headwayMinutes) {
+        this.routes.add(GridRoute.newHorizontalRoute(this, row, headwayMinutes).pureFrequency());
+    }
+
+    public void addVerticalFrequencyRoute (int col, int headwayMinutes) {
+        this.routes.add(GridRoute.newVerticalRoute(this, col, headwayMinutes).pureFrequency());
+    }
+
     /** Creates a builder for analysis worker tasks, which represent searches on this grid network. */
     public GridSinglePointTaskBuilder newTaskBuilder() {
         return new GridSinglePointTaskBuilder(this);

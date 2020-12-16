@@ -45,6 +45,17 @@ public class TravelTimeResult {
         }
     }
 
+    /**
+     * @return an array of all percentiles of travel time for the specified target.
+     */
+    public int[] getTarget (int targetIndex) {
+        int[] ret = new int[values.length];
+        for (int p = 0; p < ret.length; p++) {
+            ret[p] = values[p][targetIndex];
+        }
+        return ret;
+    }
+
     public int[][] getValues() { return values;}
 
     /**

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
@@ -96,7 +97,6 @@ public class GridGtfsGenerator {
         }
     }
 
-    // TODO optional pure frequency routes
     public void addTripsForRoute (GridRoute route, boolean back) {
         int tripIndex = 0;
         int start = route.startHour * 60 * 60;
@@ -104,6 +104,7 @@ public class GridGtfsGenerator {
         int headway = route.headwayMinutes * 60;
         int dwell = gridLayout.transitDwellSeconds;
         int interstop = route.stopSpacingBlocks * gridLayout.transitBlockTraversalTimeSeconds;
+        // Maybe we should use exact_times = 1 instead of generating individual trips.
         for (int intialDeparture = start; intialDeparture < end; intialDeparture += headway, tripIndex++) {
             Trip trip = new Trip();
             trip.direction_id = back ? 1 : 0;
@@ -124,6 +125,16 @@ public class GridGtfsGenerator {
                 feed.stop_times.put(new Fun.Tuple2<>(stopTime.trip_id, stopTime.stop_sequence), stopTime);
                 arrivalTime += interstop;
                 departureTime += interstop;
+            }
+            if (route.pureFrequency) {
+                Frequency frequency = new Frequency();
+                frequency.start_time = start;
+                frequency.end_time = end;
+                frequency.headway_secs = headway;
+                frequency.exact_times = 0;
+                feed.frequencies.add(new Fun.Tuple2<>(trip.trip_id, frequency));
+                // Do not make any additional trips, frequency entry represents them.
+                break;
             }
         }
 

@@ -46,7 +46,7 @@ public class GridSinglePointTaskBuilder {
         // Max percentiles is limited to 5 so we can't return all 100 of them.
         // Our percentile definition will yield an index of -1 for percentile zero.
         // But in a list of more than 100 items, percentile 1 and 99 will return the first and last elements.
-        task.percentiles = new int[] {1, 25, 50, 75, 99};
+        task.percentiles = DistributionTester.PERCENTILES;
         // In single point tasks all 121 cutoffs are required (there is a check).
         task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
         task.decayFunction = new StepDecayFunction();

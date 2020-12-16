@@ -19,6 +19,7 @@ public class GridRoute {
     public int startHour;
     public int endHour;
     public int headwayMinutes;
+    public boolean pureFrequency;
 
     private Stream<String> stopIds() {
         return null;
@@ -94,5 +95,9 @@ public class GridRoute {
         return route;
     }
 
+    public GridRoute pureFrequency () {
+        pureFrequency = true;
+        return this;
+    }
 
 }

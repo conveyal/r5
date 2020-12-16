@@ -443,7 +443,6 @@ public class Broker {
             job = findJob(workResult.jobId);
             assembler = resultAssemblers.get(workResult.jobId);
         }
-
         if (assembler == null) {
             LOG.error("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
         } else {
@@ -499,14 +498,14 @@ public class Broker {
         }
     }
 
-    public boolean anyJobsActive () {
+    public synchronized boolean anyJobsActive () {
         for (Job job : jobs.values()) {
             if (!job.isComplete()) return true;
         }
         return false;
     }
 
-    public void logJobStatus() {
+    public synchronized void logJobStatus() {
         for (Job job : jobs.values()) {
             LOG.info(job.toString());
         }

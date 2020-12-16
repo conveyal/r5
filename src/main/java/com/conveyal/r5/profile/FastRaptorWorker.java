@@ -162,7 +162,8 @@ public class FastRaptorWorker {
     }
 
     /**
-     * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
+     * For each iteration (minute + MC draw combination), return the minimum travel time (duration) to each transit stop
+     * in seconds.
      * Return value dimension order is [searchIteration][transitStopIndex]
      * TODO Create proper types for return values?
      */

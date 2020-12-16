@@ -77,7 +77,11 @@ public class ProfileRequest implements Serializable, Cloneable {
      * linking the street network to a pointset (i.e. it is applied between the true origin and the first street
      * vertex, and between the last street vertex and the true destination). Note that slow speeds specified here may
      * result in longer travel times than expected on long, high-speed blocks. But we tolerate some imprecision at
-     * the scale of individual blocks (see conversation at #436)*/
+     * the scale of individual blocks (see conversation at #436)
+     *
+     * This value is used only in the goal direction heuristic of the PointToPoint router. Code used in analysis may
+     * appear to use this value, but various conditionals ensure edge-specific speeds take precedence.
+     */
     public float carSpeed = 2.22f; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
@@ -269,6 +273,10 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * @return the speed at which the given mode will traverse street edges, in floating point meters per second.
+     *
+     * For WALK and BICYCLE, it makes sense to allow users to adjust speeds in the request. For CAR (where speeds
+     * vary by edge) callers should implement logic that uses appropriate per-edge speeds instead of the returned
+     * carSpeed. TODO throw exception if streetMode == CAR
      */
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {

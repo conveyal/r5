@@ -102,7 +102,7 @@ public class EgressCostTable implements Serializable {
     /**
      * Build an EgressCostTable for the given LinkedPointSet.
      * If the LinkedPointSet is for a scenario built on top of a baseline, elements in the EgressCostTable for the
-     * baseline should be reused where possible, with only the differences recomsputed.
+     * baseline should be reused where possible, with only the differences recomputed.
      *
      * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
      * PointSet.

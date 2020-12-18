@@ -24,8 +24,8 @@ public class PathResult {
     private final int nDestinations;
     private final int nIterations;
     /**
-     * Map from each "path template" (i.e. a path ignoring per-iteration details such as wait time) to the associated
-     * iteration details.
+     * Array with one entry per destination. Each entry is a map from each "path template" (i.e. a path ignoring
+     * per-iteration details such as wait time) to the associated iteration details.
      */
     // TODO clean this up: maybe use a BasicPath (boardStopIds, alightStopIds, route or pattern Ids), extended by
     //  a Path (adds tripIds and associated boarding/alighting times), extended by a FullItinerary (includes specific

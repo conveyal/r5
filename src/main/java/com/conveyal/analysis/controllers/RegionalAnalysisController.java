@@ -9,7 +9,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.CsvResultWriter;
+import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -330,7 +330,7 @@ public class RegionalAnalysisController implements HttpController {
 
     private Object getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
-        final CsvResultWriter.Result resultType = CsvResultWriter.Result.valueOf(req.params("resultType").toUpperCase());
+        final Result resultType = Result.valueOf(req.params("resultType").toUpperCase());
 
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(regionalAnalysisId).get(),
@@ -342,15 +342,15 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
 
-        if (resultType == CsvResultWriter.Result.ACCESS && !analysis.request.recordAccessibility) {
+        if (resultType == Result.ACCESS && !analysis.request.recordAccessibility) {
             throw AnalysisServerException.notFound("Accessibility results were not recorded for this analysis");
         }
 
-        if (resultType == CsvResultWriter.Result.TIMES && !analysis.request.recordTimes) {
+        if (resultType == Result.TIMES && !analysis.request.recordTimes) {
             throw AnalysisServerException.notFound("Travel time results were not recorded for this analysis");
         }
 
-        if (resultType == CsvResultWriter.Result.PATHS && !analysis.request.includePathResults) {
+        if (resultType == Result.PATHS && !analysis.request.includePathResults) {
             throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
         }
 

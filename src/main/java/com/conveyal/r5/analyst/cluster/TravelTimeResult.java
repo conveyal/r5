@@ -4,6 +4,8 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 
 import java.util.Arrays;
 
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+
 /**
  * Stores various samples of travel time (usually reduced to selected percentiles of total travel time) to every
  * point in a pointset (aka targets)
@@ -20,6 +22,9 @@ public class TravelTimeResult {
     // Travel time values, indexed by percentile (sample) and target (grid cell/point)
     int[][] values;
 
+    // For each target, the number of times falling in each of 120 one-minute bins. This is optional and may be null.
+    int[][] histograms;
+
     public TravelTimeResult(AnalysisWorkerTask task) {
         nPoints = task.nTargetsPerOrigin();
         nSamplesPerPoint = task.percentiles.length;
@@ -29,7 +34,7 @@ public class TravelTimeResult {
         values = new int[nSamplesPerPoint][nPoints];
         for (int i = 0; i < nSamplesPerPoint; i++) {
             for (int j = 0; j < nPoints; j++) {
-                values[i][j] = FastRaptorWorker.UNREACHED;
+                values[i][j] = UNREACHED;
             }
         }
     }
@@ -58,13 +63,31 @@ public class TravelTimeResult {
 
     public int[][] getValues() { return values;}
 
+    public void recordHistogram (int target, int[] travelTimesSeconds) {
+        // Lazy-initialize only when histograms are being recorded
+        if (histograms == null) {
+            histograms = new int[nPoints][120];
+        }
+        int[] counts = histograms[target];
+        for (int seconds : travelTimesSeconds) {
+            if (seconds == UNREACHED) continue;
+            int minutes = seconds / 60;
+            counts[minutes] += 1;
+        }
+        // TODO scale by nIterations to get probabilities?
+    }
+
     /**
      * @return true if the search reached any destination cell, false if it did not reach any cells. No cells will be
      * reached when the origin point is outside the transport network. Some cells will still be reached via the street
      * network when we are outside the transit network but within the street network.
      */
     public boolean anyCellReached() {
-        return Arrays.stream(values).anyMatch(vals -> Arrays.stream(vals).anyMatch(v -> v != FastRaptorWorker.UNREACHED));
+        return Arrays.stream(values).anyMatch(vals -> Arrays.stream(vals).anyMatch(v -> v != UNREACHED));
+    }
+
+    public int[] getHistogram (int pointIndex) {
+        return histograms[pointIndex];
     }
 
 }

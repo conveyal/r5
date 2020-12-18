@@ -203,7 +203,8 @@ public class TravelTimeReducer {
         for (int i : timesSeconds) {
             checkArgument(i >= 0, "Travel times must be positive.");
         }
-
+        // FIXME temporary record all histograms
+        travelTimeResult.recordHistogram(target, timesSeconds);
         // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
         // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
         // We even had a prototype counting sort that would take advantage of this detail. However, applying distance

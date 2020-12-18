@@ -245,6 +245,6 @@ dependencies {
     // Java unit testing framework.
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
     testImplementation('org.junit.jupiter:junit-jupiter')
-
+    testImplementation('org.jfree:jfreechart:1.5.1')
 }
 

@@ -79,6 +79,8 @@ public class GridLayout {
     /** The internal list of transit routes that have been added to this gridded transportation system. */
     protected final List<GridRoute> routes = new ArrayList<>();
 
+    private int nextIntegerId = 0;
+
     /**
      * Create a square grid of streets with the with the default spacing, extending east and north of the origin point.
      */
@@ -192,4 +194,7 @@ public class GridLayout {
         return grid;
     }
 
+    public String nextIntegerId() {
+        return Integer.toString(nextIntegerId++);
+    }
 }

@@ -67,6 +67,7 @@ public class GridRoute {
 
     private static GridRoute newBareRoute (GridLayout gridLayout, int headwayMinutes) {
         GridRoute route = new GridRoute();
+        route.id = gridLayout.nextIntegerId(); // Avoid collisions when same route is added multiple times
         route.stopSpacingBlocks = 1;
         route.gridLayout = gridLayout;
         route.startHour = 5;
@@ -82,7 +83,7 @@ public class GridRoute {
         route.orientation = Orientation.HORIZONTAL;
         route.startX = 0;
         route.startY = row;
-        route.id = "H" + row;
+        // route.id = "H" + row;
         return route;
     }
 
@@ -91,7 +92,7 @@ public class GridRoute {
         route.orientation = Orientation.VERTICAL;
         route.startX = col;
         route.startY = 0;
-        route.id = "V" + col;
+        // route.id = "V" + col;
         return route;
     }
 

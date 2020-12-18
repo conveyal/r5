@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.TimeGridWriter;
+import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -80,7 +81,6 @@ public class GridTest {
 
     /**
      * Similar to above, but using frequency routes which should increase uncertainty waiting for second ride.
-     * The availability of multiple alternative paths should also reduce the variance of the distribution.
      */
     @Test
     public void testGridFrequency () throws Exception {
@@ -117,6 +117,95 @@ public class GridTest {
     }
 
 
+    /**
+     * Similar to frequency case above, but with two different alternative paths.
+     * The availability of multiple alternative paths should also reduce the variance of the distribution.
+     */
+    @Test
+    public void testGridFrequencyAlternatives () throws Exception {
+        GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
+        gridLayout.addHorizontalFrequencyRoute(20, 20);
+        gridLayout.addHorizontalFrequencyRoute(40, 10);
+        gridLayout.addVerticalFrequencyRoute(20, 10);
+        // gridLayout.addVerticalFrequencyRoute(30, 20); // This route should have no effect on travel time to destination.
+        gridLayout.addVerticalFrequencyRoute(40, 20);
+        TransportNetwork network = gridLayout.generateNetwork();
+
+        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+                .morningPeak()
+                .setOrigin(20, 20)
+                .uniformOpportunityDensity(10)
+                .monteCarloDraws(20000)
+                .build();
+
+        TravelTimeComputer computer = new TravelTimeComputer(task, network);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        // This should be factored out into a method eventually
+        Coordinate destLatLon = gridLayout.getIntersectionLatLon(40, 40);
+        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
+        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
+
+
+        Distribution rideA = new Distribution(2, 10).delay(10);
+        Distribution rideB = new Distribution(2, 20).delay(10);
+        Distribution twoRideAsAndWalk = Distribution.convolution(rideA, rideA);
+        Distribution twoRideBsAndWalk = Distribution.convolution(rideB, rideB);
+        Distribution twoAlternatives = Distribution.or(twoRideAsAndWalk, twoRideBsAndWalk).delay(3);
+
+        // Compare expected and actual
+        Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, pointIndex);
+
+        // DistributionChart.showChart(this, observed);
+
+        twoAlternatives.assertSimilar(observed);
+        DistributionTester.assertExpectedDistribution(twoAlternatives, travelTimePercentiles);
+    }
+
+    /**
+     * Experiments
+     */
+    @Test
+    public void testExperiments () throws Exception {
+        GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
+        // Common trunk of three routes intersecting another route
+        gridLayout.addHorizontalFrequencyRoute(20, 20);
+        gridLayout.addHorizontalFrequencyRoute(20, 20);
+        gridLayout.addHorizontalFrequencyRoute(20, 20);
+        gridLayout.addVerticalFrequencyRoute(80, 20);
+        TransportNetwork network = gridLayout.generateNetwork();
+
+        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+                .morningPeak()
+                .setOrigin(20, 20)
+                .uniformOpportunityDensity(10)
+                .monteCarloDraws(4000)
+                .build();
+
+        TravelTimeComputer computer = new TravelTimeComputer(task, network);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        // This should be factored out into a method eventually
+        Coordinate destLatLon = gridLayout.getIntersectionLatLon(80, 80);
+        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
+        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
+
+
+        // Each 60-block ride should take 30 minutes (across and up).
+        // Two minutes board slack, and 20-minute headways. Add one minute walking.
+        Distribution ride = new Distribution(2, 20).delay(30);
+        Distribution tripleCommonTrunk = Distribution.or(ride, ride, ride);
+        Distribution endToEnd = Distribution.convolution(tripleCommonTrunk, ride);
+
+        // Compare expected and actual
+        Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, pointIndex);
+
+        // DistributionChart.showChart(this, observed);
+
+        endToEnd.assertSimilar(observed);
+        DistributionTester.assertExpectedDistribution(endToEnd, travelTimePercentiles);
+    }
+
     /** Write travel times to GeoTiff. Convenience method to help visualize results in GIS while developing tests. */
     private static void toGeotiff (OneOriginResult oneOriginResult, AnalysisWorkerTask task) {
         try {
@@ -126,5 +215,4 @@ public class GridTest {
             throw new RuntimeException("Could not write geotiff.", e);
         }
     }
-
 }

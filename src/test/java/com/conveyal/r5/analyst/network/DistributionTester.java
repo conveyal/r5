@@ -62,7 +62,6 @@ public class DistributionTester {
     }
 
     public static void assertExpectedDistribution (Distribution expectedDistribution, int[] values) {
-        expectedDistribution.illustrate();
         for (int p = 0; p < PERCENTILES.length; p++) {
             int expected = expectedDistribution.findPercentile(PERCENTILES[p]);
             int actual = values[p];

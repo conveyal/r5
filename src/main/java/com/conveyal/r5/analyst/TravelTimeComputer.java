@@ -30,6 +30,7 @@ import java.util.function.IntFunction;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
+import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -156,7 +157,7 @@ public class TravelTimeComputer {
             // often minimize distance to allow reuse at different speeds).
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             if (request.hasTransit()) {
-                sr.timeLimitSeconds = request.getMaxTimeSeconds(accessMode);
+                sr.timeLimitSeconds = (int) (WALK_DISTANCE_LIMIT_METERS /  request.walkSpeed);
             } else {
                 sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
             }

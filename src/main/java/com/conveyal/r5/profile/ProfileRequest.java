@@ -389,18 +389,26 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Determine the number of iterations to run at each departure minute.
-     * @param monteCarlo whether the search will include Monte Carlo draws with randomized schedules for
-     *                   frequency-based routes
-     * @return if monteCarlo is true and a sensible number of total draws is requested, the number of iterations needed
-     *                   per minute such that the total number of draws is at least the total requested. Otherwise, 1.
+     * Determine the number of iterations per minute to run in the transit search, which will be 1 unless the network
+     * has frequencies and multiple iterations per minute are needed to attain at least the total requested
+     * monteCarloDraws.
+     * @param networkHasFrequencies whether the network has any patterns represented by frequencies as opposed to
+     *                              fully specified schedules.
+     * @return if networkHasFrequencies and a sensible number of total draws is requested, the number of iterations
+     *              needed per minute such that the total number of draws is at least the total requested. Otherwise, 1.
      */
     @JsonIgnore
-    public int getIterationsPerMinute(boolean monteCarlo) {
-        if (monteCarlo && monteCarloDraws > 0) {
-            // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
-            return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+    public int getIterationsPerMinute(boolean networkHasFrequencies) {
+        if (networkHasFrequencies) {
+            if (monteCarloDraws == 0) {
+                // HALF_HEADWAY boarding, returning a one result per departure minute.
+                return 1;
+            } else {
+                // MONTE_CARLO boarding, using the same number of randomized schedules at each departure time.
+                return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes()); // MONTE_CARLO
+            }
         } else {
+            // No frequency routes, so no need for schedule randomization. One result per departure minute.
             return 1;
         }
     }

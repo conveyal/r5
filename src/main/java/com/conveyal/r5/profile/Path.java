@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.google.common.primitives.Ints;
@@ -9,6 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Objects;
+import java.util.StringJoiner;
 
 import static com.google.common.base.Preconditions.checkState;
 
@@ -16,7 +19,7 @@ import static com.google.common.base.Preconditions.checkState;
  * Class used to represent transit paths for display to end users (and debugging).
  * It is a group of parallel arrays, with each position in the arrays representing a leg in the trip.
  */
-public class Path {
+public class Path implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
@@ -24,12 +27,43 @@ public class Path {
     // It does effectively allow you to leave out the boardStopPositions and alightStopPositions, but a subclass could do that too.
     public int[] patterns;
     public int[] boardStops;
+    // Note that including stop arrival times would imply a distinct path for each departure minute.
     public int[] alightStops;
     public int[] alightTimes;
     public int[] trips;
     public int[] boardStopPositions;
     public int[] alightStopPositions;
+    public StreetMode accessMode;
+    /**
+     * Used only in propagation for writing paths
+     * TODO update egress mode outside of path (e.g. in wrapper or array parallel to perIterationTravelTimes in
+     *  propagater)
+     */
+    public StreetMode egressMode;
+
+    // Additional characteristics (not keys for hashing)
+    public int inVehicleTime;
+    public int waitTime;
     public final int length;
+
+    @Override
+    public Path clone() {
+        try {
+            Path path = (Path) super.clone();
+            return path;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Copy a path and add the specified egress mode
+     */
+    public Path cloneWithEgress(StreetMode egressMode) {
+        Path path = this.clone();
+        path.egressMode = egressMode;
+        return path;
+    }
 
     /**
      * Extract the path leading up to a specified stop in a given raptor state.
@@ -41,6 +75,9 @@ public class Path {
         TIntList alightStops = new TIntArrayList();
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
+
+        this.waitTime = state.nonTransferWaitTime[stop];
+        this.inVehicleTime = state.nonTransferInVehicleTravelTime[stop];
 
         while (state.previous != null) {
             // We copy the state at each stop from one round to the next. If a stop is not updated in a particular
@@ -149,10 +186,14 @@ public class Path {
                 Arrays.equals(alightTimes, path.alightTimes) &&
                 Arrays.equals(trips, path.trips) &&
                 Arrays.equals(boardStopPositions, path.boardStopPositions) &&
-                Arrays.equals(alightStopPositions, path.alightStopPositions);
+                Arrays.equals(alightStopPositions, path.alightStopPositions) &&
+                accessMode == path.accessMode &&
+                egressMode == path.egressMode;
     }
 
     @Override
+    // We tried replacing this custom implementation with Objects.hash(...), but it did not produce the expected
+    // results.
     public int hashCode() {
         int result = Ints.hashCode(length);
         result = 31 * result + Arrays.hashCode(patterns);
@@ -162,6 +203,8 @@ public class Path {
         result = 31 * result + Arrays.hashCode(trips);
         result = 31 * result + Arrays.hashCode(boardStopPositions);
         result = 31 * result + Arrays.hashCode(alightStopPositions);
+        result = 31 * result + Objects.hash(accessMode);
+        result = 31 * result + Objects.hash(egressMode);
         return result;
     }
 
@@ -176,6 +219,7 @@ public class Path {
     public String toString () {
         var builder = new StringBuilder();
         builder.append("Path:\n");
+        builder.append(" " + accessMode + " access \n");
         for (int i = 0; i < length; i++) {
             builder.append("  from ");
             builder.append(boardStops[i]);
@@ -187,6 +231,40 @@ public class Path {
             builder.append(alightTimes[i]);
             builder.append("\n");
         }
+        builder.append(" " + egressMode + " egress");
         return builder.toString();
+    }
+
+    public String toItineraryString(TransitLayer transitLayer){
+        StringJoiner joiner = new StringJoiner("->");
+        for (int i = 0; i < length; i++) {
+            // TODO use a compact feed index, instead of splitting to remove feedIds
+            String routeId = transitLayer.tripPatterns.get(patterns[i]).routeId.split(":")[1];
+            // String routeShortName = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex).route_short_name;
+            String boardStopId = transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1];
+            String alightStopId = transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1];
+            joiner.add(boardStopId + " to " + alightStopId + " on " + routeId); //.add("(" + routeShortName + ")");
+        }
+        return joiner.toString();
+    }
+
+    public String[] toTripString(TransitLayer transitLayer) {
+        String[] pathSummary = new String[length + 2];
+        pathSummary[0] = accessMode.toString();
+        for (int i = 0; i < length; i++) {
+            var builder = new StringBuilder();
+            RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
+            builder.append(route.route_id)
+                    // .append(" (").append(route.route_short_name).append(")")
+                    .append(" | ")
+                    .append(transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1])
+                    .append(" (").append(transitLayer.stopNames.get(boardStops[i])).append(") -> ")
+                    .append(transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1])
+                    .append(" (").append(transitLayer.stopNames.get(alightStops[i])).append(") alight ")
+                    .append(String.format("%02d:%02d", Math.floorDiv(alightTimes[i], 3600), (int) (alightTimes[i] / 60.0 % 60)));
+            pathSummary[i + 1] = builder.toString();
+        }
+        pathSummary[pathSummary.length - 1] = egressMode.toString();
+        return pathSummary;
     }
 }

@@ -9,6 +9,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -179,7 +180,7 @@ public class RegionalAnalysisController implements HttpController {
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis in unknown or has been deleted.");
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
         }
 
         // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
@@ -327,6 +328,39 @@ public class RegionalAnalysisController implements HttpController {
         }
     }
 
+    private Object getCsvResults (Request req, Response res) {
+        final String regionalAnalysisId = req.params("_id");
+        final Result resultType = Result.valueOf(req.params("resultType").toUpperCase());
+
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(regionalAnalysisId).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                req.attribute("accessGroup")
+        ).iterator().next();
+
+        if (analysis == null || analysis.deleted || !analysis.complete) {
+            throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
+        }
+
+        if (resultType == Result.ACCESS && !analysis.request.recordAccessibility) {
+            throw AnalysisServerException.notFound("Accessibility results were not recorded for this analysis");
+        }
+
+        if (resultType == Result.TIMES && !analysis.request.recordTimes) {
+            throw AnalysisServerException.notFound("Travel time results were not recorded for this analysis");
+        }
+
+        if (resultType == Result.PATHS && !analysis.request.includePathResults) {
+            throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
+        }
+
+        String key = regionalAnalysisId + resultType + ".csv.gz";
+        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
+        JSONObject json = new JSONObject();
+        json.put("url", fileStorage.getURL(fileStorageKey));
+        return json.toJSONString();
+    }
+
     /**
      * Deserialize a description of a new regional analysis (an AnalysisRequest object) POSTed as JSON over the HTTP API.
      * Derive an internal RegionalAnalysis object, which is enqueued in the broker and also returned to the caller
@@ -409,13 +443,13 @@ public class RegionalAnalysisController implements HttpController {
 
         task.oneToOne = analysisRequest.oneToOne;
         task.recordTimes = analysisRequest.recordTimes;
+        // For now, we support calculating paths in regional analyses only for freeform origins.
+        task.includePathResults = analysisRequest.originPointSetId != null && analysisRequest.recordPaths;
         task.recordAccessibility = analysisRequest.recordAccessibility;
 
-        // Making a static site implies several different processes - turn them all on if requested.
+        // Making a Taui site implies writing static travel time and path files per origin, but not accessibility.
         if (analysisRequest.makeTauiSite) {
             task.makeTauiSite = true;
-            task.computeTravelTimeBreakdown = true;
-            task.computePaths = true;
             task.recordAccessibility = false;
         }
 
@@ -499,6 +533,7 @@ public class RegionalAnalysisController implements HttpController {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
+            sparkService.get("/:_id/csv/resultType", this::getCsvResults);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
             sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);

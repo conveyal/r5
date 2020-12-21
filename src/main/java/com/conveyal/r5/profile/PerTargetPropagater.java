@@ -4,9 +4,11 @@ import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -80,12 +82,32 @@ public class PerTargetPropagater {
 
     /**
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
-     * transit stop. May be null, only needs to be set if we're recording paths, as in a static site.
+     * transit stop. May be null, only needs to be set if we're recording paths.
      */
     public List<Path[]> pathsToStopsForIteration = null;
 
-    /** Whether to break travel times down into walk, wait, and ride time. */
-    private boolean calculateComponents;
+    /**
+     * Different options for retaining and reporting paths. In default analyses, paths are not retained.
+     * For Taui sites, workers write directly to file storage.
+     * For regional analyses with freeform pointsets, workers return paths to all destinations to the broker for
+     * assembly.
+     * For single-point analyses with freeform pointsets, workers return paths to one destination to the broker for
+     * fowarding to the UI.
+     */
+    private enum SavePaths {
+        NONE,
+        WRITE_TAUI,
+        ALL_DESTINATIONS,
+        ONE_DESTINATION
+    }
+
+    /** Whether to save paths, and what to do with them */
+    private final SavePaths savePaths;
+
+    /**
+     * Single destination for which paths should be returned (when toLat/toLon are specified in a single-point request)
+     */
+    private int destinationIndexForPaths;
 
     /**
      * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
@@ -129,10 +151,22 @@ public class PerTargetPropagater {
 
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        calculateComponents = task.makeTauiSite;
-
+        if (task.makeTauiSite) {
+            savePaths = SavePaths.WRITE_TAUI;
+        } else if (task.includePathResults) {
+            savePaths = task instanceof RegionalTask ? SavePaths.ALL_DESTINATIONS : SavePaths.ONE_DESTINATION;
+        } else {
+            savePaths = SavePaths.NONE;
+        }
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+        if (savePaths == SavePaths.ONE_DESTINATION){
+            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
+                    task.toLon,
+                    task.toLat,
+                    task.zoom
+            );
+        }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         nTargets = targets.featureCount();
@@ -169,7 +203,9 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        perIterationPaths = calculateComponents ? new Path[nIterations] : null;
+        if (savePaths != savePaths.NONE) {
+            perIterationPaths = new Path[nIterations];
+        }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
         int startTarget = 0;
@@ -190,7 +226,8 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (perIterationPaths != null) {
+            if (savePaths == savePaths.WRITE_TAUI || savePaths == savePaths.ALL_DESTINATIONS
+                    || (savePaths == savePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -203,10 +240,16 @@ public class PerTargetPropagater {
             // Construct the PathScorer before extracting percentiles because the scorer needs to make a copy of
             // the unsorted complete travel times.
             PathScorer pathScorer = null;
-            if (calculateComponents) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
                 pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+            } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
+                // For regional tasks, return paths to all targets.
+                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
+            } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
+                // For single point tasks, return paths to the one target destination specified by toLat/toLon.
+                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
@@ -215,7 +258,7 @@ public class PerTargetPropagater {
             travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
             timer.reducer.stop();
 
-            if (calculateComponents) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
@@ -227,7 +270,7 @@ public class PerTargetPropagater {
         }
         timer.fullPropagation.stop();
         timer.log();
-        if (pathWriter != null) {
+        if (savePaths == SavePaths.WRITE_TAUI && pathWriter != null) {
             pathWriter.finishAndStorePaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.
@@ -341,11 +384,17 @@ public class PerTargetPropagater {
 
                         int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
                         if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
-                            // To reach this target, alighting at this stop is faster than any previously checked stop.
+                            // To reach this target in this iteration, alighting at this stop and proceeding by this
+                            // egress mode is faster than any previously checked stop/egress mode combination.
+                            // Because that's the case, update the best known travel time and, if requested, the
+                            // corresponding path.
                             perIterationTravelTimes[iteration] = timeToReachTarget;
-                            if (calculateComponents) {
-                                Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
-                                perIterationPaths[iteration] = pathsToStops[stop];
+                            if (pathsToStopsForIteration != null) {
+                                Path path = pathsToStopsForIteration.get(iteration)[stop];
+                                if (path != null) {
+                                    path = path.cloneWithEgress(linkedTargets.streetMode);
+                                }
+                                perIterationPaths[iteration] = path;
                             }
                         }
                     }

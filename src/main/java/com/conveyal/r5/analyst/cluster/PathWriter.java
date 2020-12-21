@@ -36,7 +36,7 @@ public class PathWriter {
     /** This is a symbolic value used in the output file format an in our internal primitive int maps. */
     public static final int NO_PATH = -1;
 
-    /** Version of our path grid format **/
+    /** Version of our path grid format TODO add changelog */
     public static final int VERSION = 1;
 
     /** The task that created the paths being recorded. */

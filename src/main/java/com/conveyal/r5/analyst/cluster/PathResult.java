@@ -103,49 +103,36 @@ public class PathResult {
     }
 
     // TODO throw error if this method is called for tasks with Monte Carlo draws
-    public ArrayList<String[]>[] getMinimumForPathIterations() {
+    public ArrayList<String[]>[] summarizeIterations(Stat stat) {
         ArrayList<String[]>[] summary = new ArrayList[nDestinations];
         for (int d = 0; d < nDestinations; d++) {
             summary[d] = new ArrayList<>();
-            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
+            Multimap<PathTemplate, Iteration> itinerariesForPathTemplate = iterationsForPathTemplates[d];
             if (itinerariesForPathTemplate != null) {
-                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
-                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
+                for (PathTemplate pathTemplate : itinerariesForPathTemplate.keySet()) {
+                    String[] pathTemplateSummary = pathTemplate.detailsWithGtfsIds(transitLayer);
+                    Collection<Iteration> itineraries = itinerariesForPathTemplate.get(pathTemplate);
                     String nIterations = String.valueOf(itineraries.size());
-                    IterationDetails latestIteration = (IterationDetails) itineraries.toArray()[0];
-                    summary[d].add(ArrayUtils.addAll(
-                            new String[]{pathSummary, nIterations},
-                            latestIteration.timesToString()
-                    ));
+                    String waitTime;
+                    if (stat == Stat.MEAN){
+                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).average().orElse(-1));
+                    } else if (stat == Stat.MINIMUM) {
+                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).min().orElse(-1));
+                    } else {
+                        throw new RuntimeException("Unrecognized statistic for path summary");
+                    }
+                    String[] row = ArrayUtils.addAll(pathTemplateSummary, nIterations, waitTime);
+                    Preconditions.checkState(row.length == DATA_COLUMNS.length);
+                    summary[d].add(row);
                 }
             }
         }
         return summary;
     }
 
-    // TODO merge with previous, using min/average enum as a parameter
-    public ArrayList<String[]>[] getAverageForPathIterations() {
-        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
-        for (int d = 0; d < nDestinations; d++) {
-            summary[d] = new ArrayList<>();
-            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
-            if (itinerariesForPathTemplate != null) {
-                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
-                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
-                    String nIterations = String.valueOf(itineraries.size());
-                    String avgWaitTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).average().orElse(-1));
-                    String inVehicleTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.inVehicleTime).average().orElse(-1));
-                    String avgTotalTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.totalTime).average().orElse(-1));
-                    summary[d].add(new String[]{pathSummary, nIterations, avgWaitTime, inVehicleTime, avgTotalTime});
-                }
-            }
-        }
-        return summary;
+    public enum Stat {
+        MEAN,
+        MINIMUM
     }
 
     public static class PathIterations {

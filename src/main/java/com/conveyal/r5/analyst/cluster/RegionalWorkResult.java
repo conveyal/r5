@@ -48,7 +48,7 @@ public class RegionalWorkResult {
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
-        this.pathResult = result.paths == null ? null : result.paths.getAverageForPathIterations();
+        this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
     }
 
     // TODO checkTravelTimeInvariants, checkAccessibilityInvariants

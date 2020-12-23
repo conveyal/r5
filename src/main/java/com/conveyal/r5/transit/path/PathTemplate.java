@@ -5,8 +5,9 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.primitives.Ints;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Objects;
+import java.util.Collection;
 import java.util.StringJoiner;
 
 public class PathTemplate {
@@ -48,24 +49,46 @@ public class PathTemplate {
         };
     }
 
-    public String[] toTripString(TransitLayer transitLayer) {
-        String[] pathSummary = new String[patterns.length + 2];
-        pathSummary[0] = access.toString();
+    public Summary summary(TransitLayer transitLayer) {
+        Collection<TransitLeg> transitLegs = new ArrayList<>();
         for (int i = 0; i < patterns.length; i++) {
-            var builder = new StringBuilder();
-            RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
-            builder.append(route.route_id)
-                    // .append(" (").append(route.route_short_name).append(")")
-                    .append(" | ")
-                    .append(String.format("%.1f", rideTimesSeconds[i] / 60.0)).append (" min. | ")
-                    .append(transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1])
-                    .append(" (").append(transitLayer.stopNames.get(boardStops[i])).append(") -> ")
-                    .append(transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1])
-                    .append(" (").append(transitLayer.stopNames.get(alightStops[i])).append(")");
-            pathSummary[i + 1] = builder.toString();
+            RouteInfo routeInfo = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
+            String routeString = routeInfo.route_id + " (" + routeInfo.route_short_name + ")";
+            String boardStop = transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1] + " (" +
+                    transitLayer.stopNames.get(boardStops[i]) + ")";
+            String alightStop = transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1] + " (" +
+                    transitLayer.stopNames.get(alightStops[i]) + ")";
+            transitLegs.add(new TransitLeg(routeString, rideTimesSeconds[i], boardStop, alightStop));
         }
-        pathSummary[pathSummary.length - 1] = egress.toString();
-        return pathSummary;
+        return new Summary(this.access, transitLegs, this.egress);
+    }
+
+    public static class Summary {
+        public StreetTimesAndModes.StreetTimeAndMode access;
+        public Collection<TransitLeg> transitLegs;
+        public StreetTimesAndModes.StreetTimeAndMode egress;
+
+        public Summary(StreetTimesAndModes.StreetTimeAndMode access, Collection<TransitLeg> transitLegs, StreetTimesAndModes.StreetTimeAndMode egress) {
+            this.access = access;
+            this.transitLegs = transitLegs;
+            this.egress = egress;
+        }
+
+    }
+
+    public static class TransitLeg {
+        public String route;
+        public double inVehicleTime;
+        public String from;
+        public String to;
+
+        public TransitLeg (String route, double inVehicleTime, String boardStop, String alightStop) {
+            this.route = route;
+            this.inVehicleTime = inVehicleTime;
+            this.from = boardStop;
+            this.to = alightStop;
+        }
+
     }
 
     @Override

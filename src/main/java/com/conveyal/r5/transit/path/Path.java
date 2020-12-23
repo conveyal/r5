@@ -19,8 +19,7 @@ public class Path implements Cloneable {
 
     public PathTemplate pathTemplate;
     public final int departureTime;
-    public final int waitTime;
-    public int initialWait;
+    public int[] waitTimes;
 
     /**
      * Extract the path leading up to a specified stop in a given raptor state.
@@ -31,9 +30,9 @@ public class Path implements Cloneable {
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
         TIntList cumulativeInVehicleTimes = new TIntArrayList();
+        TIntList cumulativeWaitTimes = new TIntArrayList();
 
         this.departureTime = state.departureTime;
-        this.waitTime = state.nonTransferWaitTime[stop];
 
         while (state.previous != null) {
             // We copy the state at each stop from one round to the next. If a stop is not updated in a particular
@@ -48,11 +47,11 @@ public class Path implements Cloneable {
             patterns.add(state.previousPatterns[stop]);
 
             cumulativeInVehicleTimes.add(state.nonTransferInVehicleTravelTime[stop]);
+            cumulativeWaitTimes.add(state.nonTransferWaitTime[stop]);
             alightStops.add(stop);
             stop = state.previousStop[stop];
             boardStops.add(stop);
 
-            this.initialWait = state.nonTransferWaitTime[stop];
             // go to previous state before handling transfers as transfers are done at the end of a round
             state = state.previous;
 
@@ -66,6 +65,7 @@ public class Path implements Cloneable {
         if (length == 0)
             LOG.error("Transit path computed without a transit segment!");
         pathTemplate = new PathTemplate(length);
+        waitTimes = new int[length];
 
         // we traversed up the tree but the user wants to see paths down the tree
         // TODO when we do reverse searches we won't want to reverse paths
@@ -80,9 +80,12 @@ public class Path implements Cloneable {
         for (int i = 0; i < cumulativeInVehicleTimes.size() - 1; i++) {
             int inVehicleTime = cumulativeInVehicleTimes.get(i) - cumulativeInVehicleTimes.get(i + 1);
             pathTemplate.rideTimesSeconds[length - 1 - i] = inVehicleTime;
+            int waitTime = cumulativeWaitTimes.get(i) - cumulativeWaitTimes.get(i + 1);
+            waitTimes[length - 1 - i] = waitTime;
         }
 
         pathTemplate.rideTimesSeconds[0] = cumulativeInVehicleTimes.get(length - 1);
+        waitTimes[0] = cumulativeWaitTimes.get(length - 1);
 
     }
 
@@ -98,7 +101,9 @@ public class Path implements Cloneable {
     public void setTransferTimeFromTotalTime(int totalTime) {
         checkState(pathTemplate.access != null);
         checkState(pathTemplate.egress != null);
-        pathTemplate.transferTimeSeconds = totalTime - waitTime - pathTemplate.access.time - pathTemplate.egress.time - Arrays.stream(pathTemplate.rideTimesSeconds).sum();
+        pathTemplate.transferTimeSeconds = totalTime
+                - pathTemplate.access.time - pathTemplate.egress.time
+                - Arrays.stream(waitTimes).sum() - Arrays.stream(pathTemplate.rideTimesSeconds).sum();
         // checkState(pathTemplate.transferTimeSeconds >= 0);
     }
 }

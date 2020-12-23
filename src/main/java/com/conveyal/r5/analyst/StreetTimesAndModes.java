@@ -24,7 +24,7 @@ public class StreetTimesAndModes {
 
         @Override
         public String toString(){
-            return mode.toString() +(" | ") + (String.format("%.1f", time / 60.0)) + (" min.");
+            return mode.toString() +(" ") + (String.format("%.1f", time / 60.0)) + (" min.");
         }
 
         @Override

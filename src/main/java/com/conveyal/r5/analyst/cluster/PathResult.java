@@ -8,6 +8,7 @@ import com.google.common.collect.Multimap;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -71,33 +72,26 @@ public class PathResult {
 
     public static class Iteration {
         public int departureTime;
-        public int initialWait;
-        public int waitTime;
+        public int[] waitTimes;
         public int totalTime;
 
         public Iteration(Path path, int totalTime) {
             this.departureTime = path.departureTime;
-            this.initialWait = path.initialWait;
-            this.waitTime = path.waitTime;
+            this.waitTimes = path.waitTimes;
             this.totalTime = totalTime;
         }
-
-        public HumanReadableIteration humanReadable() {
-            return new HumanReadableIteration(this);
-        }
-
     }
 
     public static class HumanReadableIteration {
         public String departureTime;
-        public float waitTime;
-        public float totalTime;
+        public double[] waitTimes;
+        public double totalTime;
 
         HumanReadableIteration(Iteration iteration) {
             this.departureTime =
                     String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
                             (int) (iteration.departureTime / 60.0 % 60));
-            this.waitTime =  iteration.waitTime / 60f;
+            this.waitTimes =  Arrays.stream(iteration.waitTimes).mapToDouble(wait -> wait / 60f).toArray();
             this.totalTime =  iteration.totalTime / 60f;
         };
     }
@@ -115,9 +109,9 @@ public class PathResult {
                     String nIterations = String.valueOf(itineraries.size());
                     String waitTime;
                     if (stat == Stat.MEAN){
-                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).average().orElse(-1));
+                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> Arrays.stream(i.waitTimes).average().orElse(-1)));
                     } else if (stat == Stat.MINIMUM) {
-                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).min().orElse(-1));
+                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> Arrays.stream(i.waitTimes).min().orElse(-1)));
                     } else {
                         throw new RuntimeException("Unrecognized statistic for path summary");
                     }
@@ -136,12 +130,12 @@ public class PathResult {
     }
 
     public static class PathIterations {
-        public String[] pathSummary;
-        public Collection<HumanReadableIteration> iterations;
+        public PathTemplate.Summary pathSummary;
+        public Collection<Iteration> iterations;
 
-        PathIterations(String[] pathSummary, Collection<Iteration> iterations) {
+        PathIterations(PathTemplate.Summary pathSummary, Collection<Iteration> iterations) {
             this.pathSummary = pathSummary;
-            this.iterations = iterations.stream().map(Iteration::humanReadable).collect(Collectors.toList());
+            this.iterations = iterations;
         }
     }
 
@@ -155,7 +149,7 @@ public class PathResult {
         Multimap<PathTemplate, Iteration> iterations = iterationsForPathTemplates[0];
         if (iterations != null) {
             for (PathTemplate path : iterationsForPathTemplates[0].keySet()) {
-                String[] pathSummary = path.toTripString(transitLayer);
+                PathTemplate.Summary pathSummary = path.summary(transitLayer);
                 summaryToDestination.add(new PathIterations(pathSummary,
                         iterations.get(path).stream().sorted(Comparator.comparingInt(p -> p.departureTime)).collect(Collectors.toList())));
             }

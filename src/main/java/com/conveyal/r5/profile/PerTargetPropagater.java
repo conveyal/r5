@@ -203,7 +203,7 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        if (savePaths != savePaths.NONE) {
+        if (savePaths != SavePaths.NONE) {
             perIterationPaths = new Path[nIterations];
         }
 

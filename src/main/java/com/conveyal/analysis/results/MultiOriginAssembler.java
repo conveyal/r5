@@ -8,6 +8,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +177,7 @@ public class MultiOriginAssembler {
             if (job.templateTask.includePathResults) {
                 LOG.info("Creating csv file to store path results for {} origins.", job.nTasksTotal);
                 pathCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.PATHS);
-                pathCsvWriter.setDataColumns("path", "nIterations", "avgWaitTime", "inVehicleTime", "avgTotalTime");
+                pathCsvWriter.setDataColumns(PathResult.DATA_COLUMNS);
                 csvResultWriters.add(pathCsvWriter);
             }
 

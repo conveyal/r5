@@ -34,6 +34,18 @@ public class PathResult {
     private final Multimap<Path, IterationDetails>[] itinerariesForPathTemplates;
     private final TransitLayer transitLayer;
 
+    public static String[] DATA_COLUMNS = new String[]{
+            "routes",
+            "boardStops",
+            "alightStops",
+            "rideTimes",
+            "accessTime",
+            "egressTime",
+            "transferTime",
+            "nIterations",
+            "waitTime"
+    };
+
     public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
         if (task instanceof TravelTimeSurfaceTask) {
             // In interactive single-point tasks, paths are only returned for one destination

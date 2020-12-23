@@ -3,16 +3,17 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -243,7 +244,7 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                // FIXME pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
@@ -264,7 +265,7 @@ public class PerTargetPropagater {
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
                 // NOTE this is currently using only the first (lowest) travel time.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
+                Set<com.conveyal.r5.profile.Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }
@@ -392,7 +393,10 @@ public class PerTargetPropagater {
                             if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
-                                    path = path.cloneWithEgress(linkedTargets.streetMode);
+                                    Path pathWithEgress = path.clone();
+                                    pathWithEgress.pathTemplate.egress =
+                                            new StreetTimesAndModes.StreetTimeAndMode(secondsFromStopToTarget,
+                                                    linkedTargets.streetMode);
                                 }
                                 perIterationPaths[iteration] = path;
                             }

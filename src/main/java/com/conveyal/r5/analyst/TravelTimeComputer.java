@@ -12,7 +12,6 @@ import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -20,6 +19,7 @@ import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -332,7 +332,7 @@ public class TravelTimeComputer {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
                 for (Path path : paths) {
                     if (path != null) {
-                        path.accessMode = bestAccessOptions.streetTimesAndModes.get(path.boardStops[0]).mode;
+                        path.pathTemplate.access = bestAccessOptions.streetTimesAndModes.get(path.pathTemplate.boardStops[0]);
                     }
                 }
             }).collect(Collectors.toList());

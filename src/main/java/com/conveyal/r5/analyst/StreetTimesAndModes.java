@@ -17,9 +17,23 @@ public class StreetTimesAndModes {
         public int time;
         public StreetMode mode;
 
-        StreetTimeAndMode(int time, StreetMode mode) {
+        public StreetTimeAndMode(int time, StreetMode mode) {
             this.time = time;
             this.mode = mode;
+        }
+
+        @Override
+        public String toString(){
+            return mode.toString() +(" | ") + (String.format("%.1f", time / 60.0)) + (" min.");
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            StreetTimeAndMode streetTimeAndMode = (StreetTimeAndMode) o;
+            return this.mode == streetTimeAndMode.mode &&
+                    this.time == streetTimeAndMode.time;
         }
     };
 

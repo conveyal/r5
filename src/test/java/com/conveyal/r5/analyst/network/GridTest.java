@@ -147,6 +147,8 @@ public class GridTest {
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
 
 
+        // FIXME convolving new Distribution(2, 10) with itself and delaying 20 minutes is not the same
+        //       as convolving new Distribution(2, 10).delay(10) with itself, but it should be.
         Distribution rideA = new Distribution(2, 10).delay(10);
         Distribution rideB = new Distribution(2, 20).delay(10);
         Distribution twoRideAsAndWalk = Distribution.convolution(rideA, rideA);

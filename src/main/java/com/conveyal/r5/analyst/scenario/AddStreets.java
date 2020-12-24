@@ -39,7 +39,6 @@ public class AddStreets extends Modification {
      * An increase in traversal time can be seen as more clock time or perceived time (generalized cost).
      * Values less than one imply it's faster (or more pleasant) to traverse, e.g. a slight downhill slope
      * with trees.
-     * TODO in implementation REPLACE existing factors instead of scaling the existing factor.
      */
     public Double walkTimeFactor;
 

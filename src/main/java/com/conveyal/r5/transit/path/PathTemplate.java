@@ -32,10 +32,9 @@ public class PathTemplate {
         StringJoiner alightStopIds = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < patterns.length; i++) {
-            // TODO use a compact feed index, instead of splitting to remove feedIds
-            routeIds.add(transitLayer.tripPatterns.get(patterns[i]).routeId.split(":")[1]);
-            boardStopIds.add(transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1]);
-            alightStopIds.add(transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1]);
+            routeIds.add(transitLayer.routeString(patterns[i], false));
+            boardStopIds.add(transitLayer.stopString(boardStops[i], false));
+            alightStopIds.add(transitLayer.stopString(alightStops[i], false));
             rideTimes.add(String.format("%.2f", rideTimesSeconds[i]/ 60f));
         }
         return new String[]{
@@ -52,12 +51,9 @@ public class PathTemplate {
     public Summary summary(TransitLayer transitLayer) {
         Collection<TransitLeg> transitLegs = new ArrayList<>();
         for (int i = 0; i < patterns.length; i++) {
-            RouteInfo routeInfo = transitLayer.routes.get(transitLayer.tripPatterns.get(patterns[i]).routeIndex);
-            String routeString = routeInfo.route_id + " (" + routeInfo.route_short_name + ")";
-            String boardStop = transitLayer.stopIdForIndex.get(boardStops[i]).split(":")[1] + " (" +
-                    transitLayer.stopNames.get(boardStops[i]) + ")";
-            String alightStop = transitLayer.stopIdForIndex.get(alightStops[i]).split(":")[1] + " (" +
-                    transitLayer.stopNames.get(alightStops[i]) + ")";
+            String routeString = transitLayer.routeString(patterns[i], true);
+            String boardStop = transitLayer.stopString(boardStops[i], true);
+            String alightStop = transitLayer.stopString(alightStops[i], true);
             transitLegs.add(new TransitLeg(routeString, rideTimesSeconds[i], boardStop, alightStop));
         }
         return new Summary(this.access, transitLegs, this.egress);

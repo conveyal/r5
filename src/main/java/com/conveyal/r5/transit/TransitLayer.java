@@ -808,4 +808,32 @@ public class TransitLayer implements Serializable, Cloneable {
         return stops;
     }
 
+    /**
+     * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
+     * also include a route_short_name or route_long_name (if they are not null).
+     */
+    public String routeString(int patternIndex, boolean includeName) {
+        RouteInfo routeInfo = routes.get(tripPatterns.get(patternIndex).routeIndex);
+        String route = routeInfo.route_id;
+        if (includeName) {
+            if (routeInfo.route_short_name != null) {
+                route += " (" + routeInfo.route_short_name + ")";
+            } else if (routeInfo.route_long_name != null){
+                route += " (" + routeInfo.route_long_name + ")";
+            }
+        }
+        return route;
+    }
+
+    /**
+     * For the given stop index, returns the GTFS stopId (stripped of R5's feedId prefix) and, if includeName is true,
+     * stopName.
+     */
+    public String stopString(int stopIndex, boolean includeName) {
+        // TODO use a compact feed index, instead of splitting to remove feedIds
+        String stop = stopIdForIndex.get(stopIndex).split(":")[1];
+        if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
+        return stop;
+    }
+
 }

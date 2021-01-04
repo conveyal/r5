@@ -227,8 +227,8 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (savePaths == savePaths.WRITE_TAUI || savePaths == savePaths.ALL_DESTINATIONS
-                    || (savePaths == savePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
+            if (savePaths == SavePaths.WRITE_TAUI || savePaths == SavePaths.ALL_DESTINATIONS
+                    || (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 

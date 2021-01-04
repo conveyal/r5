@@ -9,6 +9,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.results.CsvResultWriter;
 import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -506,9 +507,12 @@ public class RegionalAnalysisController implements HttpController {
         task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
         task.percentiles = regionalAnalysis.travelTimePercentiles;
 
-        // Persist this newly created RegionalAnalysis to Mongo.
-        // Why are we overwriting the regionalAnalysis reference with the result of saving it? This looks like a no-op.
+        // Persist this newly created RegionalAnalysis to Mongo, which assigns it an id and creation/update time stamps.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
+        if (analysisRequest.recordTimes) regionalAnalysis.addCsvStoragePath(Result.TIMES, config.resultsBucket());
+        if (analysisRequest.recordPaths) regionalAnalysis.addCsvStoragePath(Result.PATHS, config.resultsBucket());
+        if (analysisRequest.recordAccessibility) regionalAnalysis.addCsvStoragePath(Result.ACCESS, config.resultsBucket());
+        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);

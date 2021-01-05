@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.path.PathTemplate;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.Path;
@@ -13,6 +14,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Holds paths and associated details from an origin to destination target(s) at every Raptor iteration. For
@@ -96,7 +98,15 @@ public class PathResult {
         };
     }
 
-    // TODO throw error if this method is called for tasks with Monte Carlo draws
+    /**
+     * Summary of iterations for each destination. Conversion to strings happens here (on workers) to minimize work
+     * that the assembler needs to perform.
+     *
+     * @param stat whether the reported per-leg wait times should correspond to the trip with the minimum or mean
+     *             total travel time.
+     * @return For each destination, a list of String[]s that summarize the itineraries (at specific departure times)
+     * for various path templates are optimal.
+     */
     public ArrayList<String[]>[] summarizeIterations(Stat stat) {
         ArrayList<String[]>[] summary = new ArrayList[nDestinations];
         for (int d = 0; d < nDestinations; d++) {
@@ -104,18 +114,37 @@ public class PathResult {
             Multimap<PathTemplate, Iteration> itinerariesForPathTemplate = iterationsForPathTemplates[d];
             if (itinerariesForPathTemplate != null) {
                 for (PathTemplate pathTemplate : itinerariesForPathTemplate.keySet()) {
-                    String[] pathTemplateSummary = pathTemplate.detailsWithGtfsIds(transitLayer);
-                    Collection<Iteration> itineraries = itinerariesForPathTemplate.get(pathTemplate);
-                    String nIterations = String.valueOf(itineraries.size());
-                    String waitTime;
-                    if (stat == Stat.MEAN){
-                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> Arrays.stream(i.waitTimes).average().orElse(-1)));
-                    } else if (stat == Stat.MINIMUM) {
-                        waitTime = String.valueOf(itineraries.stream().mapToDouble(i -> Arrays.stream(i.waitTimes).min().orElse(-1)));
+                    String[] path = pathTemplate.detailsWithGtfsIds(transitLayer);
+                    int nIterations = itinerariesForPathTemplate.get(pathTemplate).size();
+                    Iteration[] itineraries =
+                            itinerariesForPathTemplate.get(pathTemplate).toArray(new Iteration[nIterations]);
+                    String waitTimes = null;
+                    String totalTime = null;
+                    double targetValue;
+                    IntStream totalWaits = Arrays.stream(itineraries).mapToInt(i -> Arrays.stream(i.waitTimes).sum());
+                    if (stat == Stat.MINIMUM) {
+                        targetValue = totalWaits.min().orElse(-1);
+                    } else if (stat == Stat.MEAN){
+                        targetValue = totalWaits.average().orElse(-1);
                     } else {
                         throw new RuntimeException("Unrecognized statistic for path summary");
                     }
-                    String[] row = ArrayUtils.addAll(pathTemplateSummary, nIterations, waitTime);
+                    double score = Double.MAX_VALUE;
+                    for (int i = 0; i < nIterations; i++) {
+                        StringJoiner waits = new StringJoiner("|");
+                        // TODO clean up, maybe re-using approaches from PathScore? There is a way to bail-out early
+                        //  when looking for the minimum, but added branches create additional maintenance overhead.
+                        double thisScore = Math.abs(targetValue - Arrays.stream(itineraries[i].waitTimes).sum());
+                        if (thisScore < score) {
+                            Arrays.stream(itineraries[i].waitTimes).forEach(
+                                    wait -> waits.add(String.format("%.1f", wait / 60f))
+                            );
+                            score = thisScore;
+                            waitTimes = waits.toString();
+                            totalTime = String.format("%.1f", itineraries[i].totalTime / 60f);
+                        }
+                    }
+                    String[] row = ArrayUtils.addAll(path, waitTimes, totalTime, String.valueOf(nIterations));
                     Preconditions.checkState(row.length == DATA_COLUMNS.length);
                     summary[d].add(row);
                 }

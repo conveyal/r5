@@ -1,25 +1,29 @@
 package com.conveyal.r5.transit.path;
 
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.profile.RaptorState;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
 
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- *
+ * Full door-to-door itinerary at a specific departure time and with specific wait times (which may be derived from
+ * random frequency offsets). TODO rename Itinerary, compare to PathWithTimes?
  */
 public class Path implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
-    public PathTemplate pathTemplate;
+    public final PathTemplate pathTemplate;
     public final int departureTime;
-    public int[] waitTimes;
+    // One wait time for each transit leg boarded. This is tracked outside the pathTemplate, because initial wait
+    // will depends on the specific departure time (and subsequent waits may depend on random frequency offsets used
+    // in the Monte Carlo approach).
+    public final int[] waitTimes;
 
     /**
      * Extract the path leading up to a specified stop in a given raptor state.
@@ -29,8 +33,8 @@ public class Path implements Cloneable {
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
-        TIntList cumulativeInVehicleTimes = new TIntArrayList();
-        TIntList cumulativeWaitTimes = new TIntArrayList();
+        TIntList waitTimes = new TIntArrayList();
+        TIntList inVehicleTimes = new TIntArrayList();
 
         this.departureTime = state.departureTime;
 
@@ -46,13 +50,16 @@ public class Path implements Cloneable {
                     "Earlier raptor rounds must have later arrival times at a given stop.");
             patterns.add(state.previousPatterns[stop]);
 
-            cumulativeInVehicleTimes.add(state.nonTransferInVehicleTravelTime[stop]);
-            cumulativeWaitTimes.add(state.nonTransferWaitTime[stop]);
+            // Set details of the transit leg just ridden.
             alightStops.add(stop);
+            waitTimes.add(state.previousWaitTime[stop]);
+            inVehicleTimes.add(state.previousInVehicleTravelTime[stop]);
+
+            // Step back to boarding stop
             stop = state.previousStop[stop];
             boardStops.add(stop);
 
-            // go to previous state before handling transfers as transfers are done at the end of a round
+            // Step back to previous state before handling transfers, as transfers are done at the end of a round
             state = state.previous;
 
             // handle transfers
@@ -64,29 +71,18 @@ public class Path implements Cloneable {
         int length = patterns.size();
         if (length == 0)
             LOG.error("Transit path computed without a transit segment!");
-        pathTemplate = new PathTemplate(length);
-        waitTimes = new int[length];
 
-        // we traversed up the tree but the user wants to see paths down the tree
+        // We traversed up the tree (working backward in time) but the user wants to see paths down the tree
         // TODO when we do reverse searches we won't want to reverse paths
         patterns.reverse();
         boardStops.reverse();
         alightStops.reverse();
+        waitTimes.reverse();
+        inVehicleTimes.reverse();
 
-        pathTemplate.patterns = patterns.toArray();
-        pathTemplate.boardStops = boardStops.toArray();
-        pathTemplate.alightStops = alightStops.toArray();
-
-        for (int i = 0; i < cumulativeInVehicleTimes.size() - 1; i++) {
-            int inVehicleTime = cumulativeInVehicleTimes.get(i) - cumulativeInVehicleTimes.get(i + 1);
-            pathTemplate.rideTimesSeconds[length - 1 - i] = inVehicleTime;
-            int waitTime = cumulativeWaitTimes.get(i) - cumulativeWaitTimes.get(i + 1);
-            waitTimes[length - 1 - i] = waitTime;
-        }
-
-        pathTemplate.rideTimesSeconds[0] = cumulativeInVehicleTimes.get(length - 1);
-        waitTimes[0] = cumulativeWaitTimes.get(length - 1);
-
+        this.waitTimes = waitTimes.toArray();
+        pathTemplate = new PathTemplate(patterns.toArray(), boardStops.toArray(), alightStops.toArray(),
+                inVehicleTimes.toArray());
     }
 
     @Override

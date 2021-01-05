@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -48,8 +49,9 @@ public class PathResult {
             "accessTime",
             "egressTime",
             "transferTime",
-            "nIterations",
-            "waitTime"
+            "waitTimes",
+            "totalTime",
+            "nIterations"
     };
 
     public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
@@ -93,8 +95,10 @@ public class PathResult {
             this.departureTime =
                     String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
                             (int) (iteration.departureTime / 60.0 % 60));
-            this.waitTimes =  Arrays.stream(iteration.waitTimes).mapToDouble(wait -> wait / 60f).toArray();
-            this.totalTime =  iteration.totalTime / 60f;
+            this.waitTimes =  Arrays.stream(iteration.waitTimes).mapToDouble(
+                    wait -> Math.round(wait / 60f * 10) / 10.0
+            ).toArray();
+            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
         };
     }
 
@@ -158,18 +162,30 @@ public class PathResult {
         MINIMUM
     }
 
+    /**
+     * Wraps path and iteration details for JSON serialization
+     */
     public static class PathIterations {
-        public PathTemplate.Summary pathSummary;
-        public Collection<Iteration> iterations;
+        public String access; // StreetTimesAndModes.StreetTimeAndMode would be more machine-readable.
+        public String egress;
+        public Collection<PathTemplate.TransitLeg> transitLegs;
+        public Collection<HumanReadableIteration> iterations;
 
-        PathIterations(PathTemplate.Summary pathSummary, Collection<Iteration> iterations) {
-            this.pathSummary = pathSummary;
-            this.iterations = iterations;
+        PathIterations(
+                StreetTimesAndModes.StreetTimeAndMode access,
+                StreetTimesAndModes.StreetTimeAndMode egress,
+                Collection<PathTemplate.TransitLeg> transitLegs,
+                Collection<Iteration> iterations
+        ) {
+            this.access = access.toString();
+            this.egress = egress.toString();
+            this.transitLegs = transitLegs;
+            this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
         }
     }
 
     /**
-     * Returns a summary of path iterations suitable for JSON representation.
+     * Returns a summary of path iterations suitable for JSON representation (in the UI console).
      */
     List<PathIterations> getSummaryForDestination() {
         Preconditions.checkState(iterationsForPathTemplates.length == 1, "Paths were stored for multiple " +
@@ -178,9 +194,13 @@ public class PathResult {
         Multimap<PathTemplate, Iteration> iterations = iterationsForPathTemplates[0];
         if (iterations != null) {
             for (PathTemplate path : iterationsForPathTemplates[0].keySet()) {
-                PathTemplate.Summary pathSummary = path.summary(transitLayer);
-                summaryToDestination.add(new PathIterations(pathSummary,
-                        iterations.get(path).stream().sorted(Comparator.comparingInt(p -> p.departureTime)).collect(Collectors.toList())));
+                summaryToDestination.add(new PathIterations(
+                        path.access,
+                        path.egress,
+                        path.transitLegs(transitLayer),
+                        iterations.get(path).stream().sorted(Comparator.comparingInt(p -> p.departureTime))
+                                .collect(Collectors.toList())
+                ));
             }
         }
         return summaryToDestination;

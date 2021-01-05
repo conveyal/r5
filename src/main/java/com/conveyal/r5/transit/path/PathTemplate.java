@@ -1,7 +1,6 @@
 package com.conveyal.r5.transit.path;
 
 import com.conveyal.r5.analyst.StreetTimesAndModes;
-import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.primitives.Ints;
 
@@ -10,22 +9,51 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.StringJoiner;
 
+import static com.google.common.base.Preconditions.checkState;
+
+/**
+ * A door-to-door path, i.e. access characteristics, transit legs (keyed on characteristics including per-leg
+ * in-vehicle times), and egress characteristics, which may be repeated at different departure times.
+ *
+ * Instances are constructed initially from transit legs, with access, egress, and transferTimes set in successive
+ * operations.
+ */
 public class PathTemplate {
-    public int[] patterns;
-    public int[] boardStops;
-    public int[] alightStops;
-    public int[] rideTimesSeconds;
+    private final int[] patterns;
+    private final int[] boardStops;
+    private final int[] alightStops;
+    private final int[] rideTimesSeconds;
     public StreetTimesAndModes.StreetTimeAndMode access;
     public StreetTimesAndModes.StreetTimeAndMode egress;
-    public int transferTimeSeconds;
+    // This could be calculated from other fields, but we explicitly calculate it for convenience
+    private int transferTimeSeconds;
 
-    PathTemplate(int length) {
-        this.patterns = new int[length];
-        this.boardStops = new int[length];
-        this.alightStops = new int[length];
-        this.rideTimesSeconds = new int[length];
+    /**
+     * Create a PathTemplate from transit leg characteristics.
+     */
+    PathTemplate(int[] patterns, int[] boardStops, int[] alightStops, int[] rideTimesSeconds) {
+        this.patterns = patterns;
+        this.boardStops = boardStops;
+        this.alightStops = alightStops;
+        this.rideTimesSeconds = rideTimesSeconds;
     }
 
+    /**
+     * Create a pathTemplate by copying the transit leg and access fields of a source pathTemplate. The source's
+     * egress and transfer properties are ignored.
+     */
+    public PathTemplate(PathTemplate source) {
+        this.patterns = source.patterns;
+        this.boardStops = source.boardStops;
+        this.alightStops = source.alightStops;
+        this.rideTimesSeconds = source.rideTimesSeconds;
+        this.access = source.access;
+    }
+
+
+    /**
+     * Returns details summarizing a path template, using GTFS ids stored in the supplied transitLayer.
+     */
     public String[] detailsWithGtfsIds(TransitLayer transitLayer){
         StringJoiner routeIds = new StringJoiner("|");
         StringJoiner boardStopIds = new StringJoiner("|");
@@ -35,20 +63,23 @@ public class PathTemplate {
             routeIds.add(transitLayer.routeString(patterns[i], false));
             boardStopIds.add(transitLayer.stopString(boardStops[i], false));
             alightStopIds.add(transitLayer.stopString(alightStops[i], false));
-            rideTimes.add(String.format("%.2f", rideTimesSeconds[i]/ 60f));
+            rideTimes.add(String.format("%.1f", rideTimesSeconds[i]/ 60f));
         }
         return new String[]{
                 routeIds.toString(),
                 boardStopIds.toString(),
                 alightStopIds.toString(),
                 rideTimes.toString(),
-                String.format("%.2f", access.time / 60f),
-                String.format("%.2f", egress.time / 60f),
-                String.format("%.2f", transferTimeSeconds / 60f)
+                String.format("%.1f", access.time / 60f),
+                String.format("%.1f", egress.time / 60f),
+                String.format("%.1f", transferTimeSeconds / 60f)
         };
     }
 
-    public Summary summary(TransitLayer transitLayer) {
+    /**
+     * Verbose description of the transit legs in a path, including GTFS ids and names.
+     */
+    public Collection<TransitLeg> transitLegs(TransitLayer transitLayer) {
         Collection<TransitLeg> transitLegs = new ArrayList<>();
         for (int i = 0; i < patterns.length; i++) {
             String routeString = transitLayer.routeString(patterns[i], true);
@@ -56,31 +87,22 @@ public class PathTemplate {
             String alightStop = transitLayer.stopString(alightStops[i], true);
             transitLegs.add(new TransitLeg(routeString, rideTimesSeconds[i], boardStop, alightStop));
         }
-        return new Summary(this.access, transitLegs, this.egress);
+        return transitLegs;
     }
 
-    public static class Summary {
-        public StreetTimesAndModes.StreetTimeAndMode access;
-        public Collection<TransitLeg> transitLegs;
-        public StreetTimesAndModes.StreetTimeAndMode egress;
-
-        public Summary(StreetTimesAndModes.StreetTimeAndMode access, Collection<TransitLeg> transitLegs, StreetTimesAndModes.StreetTimeAndMode egress) {
-            this.access = access;
-            this.transitLegs = transitLegs;
-            this.egress = egress;
-        }
-
-    }
-
+    /**
+     * String representations of the boarding (from) stop, alighting (to) stop, and route, with in-vehicle time (in
+     * minutes).
+     */
     public static class TransitLeg {
         public String route;
         public double inVehicleTime;
         public String from;
         public String to;
 
-        public TransitLeg (String route, double inVehicleTime, String boardStop, String alightStop) {
+        public TransitLeg (String route, int inVehicleTime, String boardStop, String alightStop) {
             this.route = route;
-            this.inVehicleTime = inVehicleTime;
+            this.inVehicleTime = Math.round(inVehicleTime / 60f * 10) / 10.0;
             this.from = boardStop;
             this.to = alightStop;
         }

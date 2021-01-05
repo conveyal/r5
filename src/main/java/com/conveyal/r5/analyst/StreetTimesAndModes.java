@@ -6,8 +6,10 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
+import java.util.Objects;
+
 /**
- * Contains a map from stop vertex to the clock time at which, and mode by which, the stop is reached, plus utility
+ * Contains a map from stop index to the elapsed time in which, and mode by which, the stop is reached, plus utility
  * methods for updating/processing this map.
  */
 public class StreetTimesAndModes {
@@ -35,6 +37,12 @@ public class StreetTimesAndModes {
             return this.mode == streetTimeAndMode.mode &&
                     this.time == streetTimeAndMode.time;
         }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(this.time, this.mode);
+        }
+
     };
 
     /**

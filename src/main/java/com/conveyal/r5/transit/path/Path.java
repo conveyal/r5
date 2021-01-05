@@ -98,12 +98,10 @@ public class Path implements Cloneable {
         }
     }
 
-    public void setTransferTimeFromTotalTime(int totalTime) {
-        checkState(pathTemplate.access != null);
-        checkState(pathTemplate.egress != null);
-        pathTemplate.transferTimeSeconds = totalTime
-                - pathTemplate.access.time - pathTemplate.egress.time
-                - Arrays.stream(waitTimes).sum() - Arrays.stream(pathTemplate.rideTimesSeconds).sum();
-        // checkState(pathTemplate.transferTimeSeconds >= 0);
+    public PathTemplate completeTemplate(int totalTime, StreetTimesAndModes.StreetTimeAndMode egress) {
+        PathTemplate template = new PathTemplate(this.pathTemplate);
+        template.setEgress(egress);
+        template.setTransferTime(totalTime, waitTimes);
+        return template;
     }
 }

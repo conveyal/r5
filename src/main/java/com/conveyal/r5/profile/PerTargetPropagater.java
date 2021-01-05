@@ -131,6 +131,8 @@ public class PerTargetPropagater {
      */
     private Path[] perIterationPaths;
 
+    private StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress;
+
     private final PropagationTimer timer = new PropagationTimer();
 
     /**
@@ -206,6 +208,7 @@ public class PerTargetPropagater {
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
         if (savePaths != SavePaths.NONE) {
             perIterationPaths = new Path[nIterations];
+            perIterationEgress = new StreetTimesAndModes.StreetTimeAndMode[nIterations];
         }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
@@ -247,10 +250,12 @@ public class PerTargetPropagater {
                 // FIXME pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
-                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
+                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
+                        perIterationEgress);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
                 // For single point tasks, return paths to the one target destination specified by toLat/toLon.
-                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
+                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths,
+                        perIterationEgress);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
@@ -373,6 +378,11 @@ public class PerTargetPropagater {
                         }
                     }
 
+                    StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
+                            secondsFromStopToTarget,
+                            linkedTargets.streetMode
+                    );
+
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
                         // calculated in the Raptor route() method.
@@ -393,12 +403,9 @@ public class PerTargetPropagater {
                             if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
-                                    Path pathWithEgress = path.clone();
-                                    pathWithEgress.pathTemplate.egress =
-                                            new StreetTimesAndModes.StreetTimeAndMode(secondsFromStopToTarget,
-                                                    linkedTargets.streetMode);
+                                    perIterationPaths[iteration] = path;
+                                    perIterationEgress[iteration] = egress;
                                 }
-                                perIterationPaths[iteration] = path;
                             }
                         }
                     }

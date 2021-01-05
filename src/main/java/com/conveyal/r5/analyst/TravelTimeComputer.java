@@ -332,7 +332,7 @@ public class TravelTimeComputer {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
                 for (Path path : paths) {
                     if (path != null) {
-                        path.pathTemplate.access = bestAccessOptions.streetTimesAndModes.get(path.pathTemplate.boardStops[0]);
+                        path.pathTemplate.setAccess(bestAccessOptions);
                     }
                 }
             }).collect(Collectors.toList());

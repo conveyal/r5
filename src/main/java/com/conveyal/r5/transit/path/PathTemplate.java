@@ -109,8 +109,27 @@ public class PathTemplate {
         result = 31 * result + Arrays.hashCode(boardStops);
         result = 31 * result + Arrays.hashCode(alightStops);
         result = 31 * result + Arrays.hashCode(rideTimesSeconds);
+        result = 31 * result + access.hashCode();
+        result = 31 * result + egress.hashCode();
         result = 31 * result + Ints.hashCode(transferTimeSeconds);
         return result;
     }
+
+    public void setAccess(StreetTimesAndModes bestAccessOptions) {
+        access = bestAccessOptions.streetTimesAndModes.get(boardStops[0]);
+    }
+
+    public void setEgress(StreetTimesAndModes.StreetTimeAndMode egress) {
+        this.egress = egress;
+    }
+
+    public void setTransferTime(int totalTime, int[] waitTimes) {
+        checkState(access != null);
+        checkState(egress != null);
+        transferTimeSeconds = totalTime - access.time - egress.time
+                - Arrays.stream(waitTimes).sum() - Arrays.stream(rideTimesSeconds).sum();
+        checkState(transferTimeSeconds >= 0);
+    }
+
 
 }

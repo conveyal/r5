@@ -276,15 +276,16 @@ public class TravelTimeReducer {
      *                          time first).
      * @param perIterationPaths paths for each iteration, sorted in order of iteration (latest departure time first).
      */
-    public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths) {
+    public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
+                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
         Multimap<PathTemplate, PathResult.Iteration> paths = HashMultimap.create();
         for (int i = 0; i < perIterationPaths.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
-                path.setTransferTimeFromTotalTime(totalTime);
-                PathResult.Iteration waitTimeForIteration = new PathResult.Iteration(path, totalTime);
-                paths.put(path.pathTemplate, waitTimeForIteration);
+                PathTemplate template = path.completeTemplate(totalTime, perIterationEgress[i]);
+                PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                paths.put(template, iteration);
             }
         }
         pathResult.setTarget(target, paths);

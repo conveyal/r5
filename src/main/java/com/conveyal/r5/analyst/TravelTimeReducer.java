@@ -9,7 +9,7 @@ import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.path.PathTemplate;
+import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.Path;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -269,21 +269,20 @@ public class TravelTimeReducer {
     }
 
     /**
-     * For each specified target index, record the path and travel time details for each iteration.
+     * For the specified target index, record the path and travel time details for each iteration.
      *
      * @param target index for destination target
-     * @param perIterationTimes total travel time for each iteration, sorted in order of iteration (latest departure
-     *                          time first).
-     * @param perIterationPaths paths for each iteration, sorted in order of iteration (latest departure time first).
+     * @param perIterationTimes total travel time for each iteration
+     * @param perIterationPaths paths for each iteration
      */
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
                                       StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
-        Multimap<PathTemplate, PathResult.Iteration> paths = HashMultimap.create();
+        Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
         for (int i = 0; i < perIterationPaths.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
-                PathTemplate template = path.completeTemplate(totalTime, perIterationEgress[i]);
+                PatternSequence template = path.completeTemplate(totalTime, perIterationEgress[i]);
                 PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
                 paths.put(template, iteration);
             }

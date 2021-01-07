@@ -11,19 +11,21 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- * Full door-to-door itinerary at a specific departure time and with specific wait times (which may be derived from
- * random frequency offsets). TODO rename Itinerary, compare to PathWithTimes?
+ * Fully specified door-to-door itinerary (at a specific departure time and with specific wait times, which may be
+ * derived from random frequency offsets). These itineraries are an optional result from Raptor searches, and they
+ * can be reduced/summarized in different ways (e.g. de-duplicating repeated PatternSequences or RouteSequences)
+ * TODO rename to Itinerary, compare to PathWithTimes?
  */
 public class Path implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
-    public final PathTemplate pathTemplate;
+    public final PatternSequence patternSequence;
     public final int departureTime;
     // One wait time for each transit leg boarded. This is tracked outside the pathTemplate, because initial wait
     // will depends on the specific departure time (and subsequent waits may depend on random frequency offsets used
     // in the Monte Carlo approach).
-    public final int[] waitTimes;
+    public final TIntList waitTimes;
 
     /**
      * Extract the path leading up to a specified stop in a given raptor state.
@@ -80,9 +82,8 @@ public class Path implements Cloneable {
         waitTimes.reverse();
         inVehicleTimes.reverse();
 
-        this.waitTimes = waitTimes.toArray();
-        pathTemplate = new PathTemplate(patterns.toArray(), boardStops.toArray(), alightStops.toArray(),
-                inVehicleTimes.toArray());
+        this.waitTimes = waitTimes;
+        patternSequence = new PatternSequence(patterns, boardStops, alightStops, inVehicleTimes);
     }
 
     @Override
@@ -94,10 +95,13 @@ public class Path implements Cloneable {
         }
     }
 
-    public PathTemplate completeTemplate(int totalTime, StreetTimesAndModes.StreetTimeAndMode egress) {
-        PathTemplate template = new PathTemplate(this.pathTemplate);
-        template.setEgress(egress);
-        template.setTransferTime(totalTime, waitTimes);
+    /**
+     * Set the egress details and transfer time
+     */
+    public PatternSequence completeTemplate(int totalTime, StreetTimesAndModes.StreetTimeAndMode egress) {
+        PatternSequence template = new PatternSequence(this.patternSequence);
+        template.stopSequence.setEgress(egress);
+        template.stopSequence.setTransferTime(totalTime, waitTimes);
         return template;
     }
 }

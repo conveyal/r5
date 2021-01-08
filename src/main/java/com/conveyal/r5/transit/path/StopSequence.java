@@ -36,18 +36,18 @@ public class StopSequence {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        StopSequence path = (StopSequence) o;
-        return  boardStops.equals(path.boardStops) &&
-                alightStops.equals(path.alightStops) &&
-                rideTimesSeconds.equals(path.rideTimesSeconds) &&
-                this.access.equals(path.access) &&
-                this.egress.equals(path.egress) &&
-                this.transferTimeSeconds == path.transferTimeSeconds;
+        StopSequence that = (StopSequence) o;
+        return transferTimeSeconds == that.transferTimeSeconds &&
+                boardStops.equals(that.boardStops) &&
+                alightStops.equals(that.alightStops) &&
+                rideTimesSeconds.equals(that.rideTimesSeconds) &&
+                Objects.equals(access, that.access) &&
+                Objects.equals(egress, that.egress);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(access, egress, transferTimeSeconds, boardStops, alightStops, rideTimesSeconds);
+        return Objects.hash(boardStops, alightStops, rideTimesSeconds, access, egress, transferTimeSeconds);
     }
 
     /**

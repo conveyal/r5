@@ -33,16 +33,15 @@ public class StreetTimesAndModes {
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            StreetTimeAndMode streetTimeAndMode = (StreetTimeAndMode) o;
-            return this.mode == streetTimeAndMode.mode &&
-                    this.time == streetTimeAndMode.time;
+            StreetTimeAndMode that = (StreetTimeAndMode) o;
+            return time == that.time &&
+                    mode == that.mode;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(this.time, this.mode);
+            return Objects.hash(time, mode);
         }
-
     };
 
     /**

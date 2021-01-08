@@ -245,6 +245,10 @@ dependencies {
     // Java unit testing framework.
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
     testImplementation('org.junit.jupiter:junit-jupiter')
+
+    // Chart drawing library for examining travel time distributions when crafting tests.
+    // Although rarely used it should be low-impact: it is a test-only dependency with no transitive dependenices.
     testImplementation('org.jfree:jfreechart:1.5.1')
+
 }
 

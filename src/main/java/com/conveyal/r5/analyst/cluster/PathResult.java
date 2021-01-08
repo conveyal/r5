@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -120,13 +121,13 @@ public class PathResult {
             summary[d] = new ArrayList<>();
             Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
             if (iterationMap != null) {
-                for (RouteSequence pathTemplate : iterationMap.keySet()) {
-                    Collection<Iteration> iterations = iterationMap.get(pathTemplate);
+                for (Map.Entry<RouteSequence, Collection<Iteration>> entry : iterationMap.asMap().entrySet()) {
+                    Collection<Iteration> iterations = entry.getValue();
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
                     String waitTimes = null;
                     String totalTime = null;
-                    String[] path = pathTemplate.detailsWithGtfsIds(transitLayer);
+                    String[] path = entry.getKey().detailsWithGtfsIds(transitLayer);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {

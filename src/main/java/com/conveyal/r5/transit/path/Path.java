@@ -94,14 +94,4 @@ public class Path implements Cloneable {
             throw new RuntimeException(e);
         }
     }
-
-    /**
-     * Set the egress details and transfer time
-     */
-    public PatternSequence completeTemplate(int totalTime, StreetTimesAndModes.StreetTimeAndMode egress) {
-        PatternSequence template = new PatternSequence(this.patternSequence);
-        template.stopSequence.setEgress(egress);
-        template.stopSequence.setTransferTime(totalTime, waitTimes);
-        return template;
-    }
 }

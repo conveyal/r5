@@ -41,8 +41,7 @@ public class RouteSequence {
                 alightStopIds.toString(),
                 rideTimes.toString(),
                 String.format("%.1f", stopSequence.access.time / 60f),
-                String.format("%.1f", stopSequence.egress.time / 60f),
-                String.format("%.1f", stopSequence.transferTimeSeconds / 60f)
+                String.format("%.1f", stopSequence.egress.time / 60f)
         };
     }
 

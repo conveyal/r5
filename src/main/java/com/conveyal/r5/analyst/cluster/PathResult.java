@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -34,8 +33,9 @@ public class PathResult {
 
     private final int nDestinations;
     /**
-     * Array with one entry per destination. Each entry is a map from a "path template" (i.e. a route-based path
-     * ignoring per-iteration details such as wait time) to the associated iteration details.
+     * Array with one entry per destination. Each entry is a map from a "path template" to the associated iteration
+     * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
+     * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
     private final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
@@ -68,47 +68,19 @@ public class PathResult {
         this.transitLayer = transitLayer;
     }
 
+    /**
+     * Populate the multimap of path templates to iterations, reducing by using route-based keys instead of
+     * pattern-based keys
+     */
     public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
         Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
-        // Not a lambda because map is also read when summarizing iterations?
-        //        for (Map.Entry<PatternSequence, Iteration> entry : patterns.entries()) {
-        //            routes.put(new RouteSequence(entry.getKey(), this.transitLayer), entry.getValue());
-        //        }
-        patterns.forEach(((patternSequence, iteration) -> routes.put(new RouteSequence(patternSequence, transitLayer), iteration)));
+        patterns.forEach(((patternSeq, iteration) -> routes.put(new RouteSequence(patternSeq, transitLayer), iteration)));
         iterationsForPathTemplates[targetIndex] = routes;
     }
 
-    public static class Iteration {
-        public int departureTime;
-        public TIntList waitTimes;
-        public int totalTime;
-
-        public Iteration(Path path, int totalTime) {
-            this.departureTime = path.departureTime;
-            this.waitTimes = path.waitTimes;
-            this.totalTime = totalTime;
-        }
-    }
-
-    public static class HumanReadableIteration {
-        public String departureTime;
-        public double[] waitTimes;
-        public double totalTime;
-
-        HumanReadableIteration(Iteration iteration) {
-            this.departureTime =
-                    String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
-                            (int) (iteration.departureTime / 60.0 % 60));
-            this.waitTimes =  Arrays.stream(iteration.waitTimes.toArray()).mapToDouble(
-                    wait -> Math.round(wait / 60f * 10) / 10.0
-            ).toArray();
-            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
-        }
-    }
-
     /**
-     * Summary of iterations for each destination. Conversion to strings happens here (on distributed workers) to
-     * minimize pressure on central assembler.
+     * Summary of iterations for each destination, suitable for writing to a CSV. Conversion to strings happens here
+     * (on distributed workers) to minimize pressure on the central Broker's assembler.
      *
      * @param stat whether the reported per-leg wait times should correspond to the iteration with the minimum or mean
      *             total waiting time.
@@ -121,13 +93,12 @@ public class PathResult {
             summary[d] = new ArrayList<>();
             Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
             if (iterationMap != null) {
-                for (Map.Entry<RouteSequence, Collection<Iteration>> entry : iterationMap.asMap().entrySet()) {
-                    Collection<Iteration> iterations = entry.getValue();
+                for (RouteSequence routeSequence: iterationMap.keySet()) {
+                    Collection<Iteration> iterations = iterationMap.get(routeSequence);
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
-                    String waitTimes = null;
-                    String totalTime = null;
-                    String[] path = entry.getKey().detailsWithGtfsIds(transitLayer);
+                    String waits = null, transfer = null, totalTime = null;
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {
@@ -139,21 +110,22 @@ public class PathResult {
                     }
                     double score = Double.MAX_VALUE;
                     for (Iteration iteration: iterations) {
-                        StringJoiner waits = new StringJoiner("|");
                         // TODO clean up, maybe re-using approaches from PathScore?
                         double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
                         if (thisScore < score) {
+                            StringJoiner waitTimes = new StringJoiner("|");
                             iteration.waitTimes.forEach(w -> {
-                                    waits.add(String.format("%.1f", w / 60f));
+                                    waitTimes.add(String.format("%.1f", w / 60f));
                                     return true;
                             });
-                            waitTimes = waits.toString();
+                            waits = waitTimes.toString();
+                            transfer =  String.format("%.1f", routeSequence.stopSequence.transferTime(iteration) / 60f);
                             totalTime = String.format("%.1f", iteration.totalTime / 60f);
                             if (thisScore == 0) break;
                             score = thisScore;
                         }
                     }
-                    String[] row = ArrayUtils.addAll(path, waitTimes, totalTime, String.valueOf(nIterations));
+                    String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, String.valueOf(nIterations));
                     checkState(row.length == DATA_COLUMNS.length);
                     summary[d].add(row);
                 }
@@ -202,4 +174,40 @@ public class PathResult {
         }
         return detailsForDestination;
     }
+
+    /**
+     * Temporal details of a specific iteration of our RAPTOR implementation (per-leg wait times and total time
+     * implied by a specific departure time and randomized schedule offsets).
+     */
+    public static class Iteration {
+        public int departureTime;
+        public TIntList waitTimes;
+        public int totalTime;
+
+        public Iteration(Path path, int totalTime) {
+            this.departureTime = path.departureTime;
+            this.waitTimes = path.waitTimes;
+            this.totalTime = totalTime;
+        }
+    }
+
+    /**
+     * Timestamp style clock times, and rounded wait/total time, for inspection as JSON.
+     */
+    public static class HumanReadableIteration {
+        public String departureTime;
+        public double[] waitTimes;
+        public double totalTime;
+
+        HumanReadableIteration(Iteration iteration) {
+            this.departureTime =
+                    String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
+                            (int) (iteration.departureTime / 60.0 % 60));
+            this.waitTimes =  Arrays.stream(iteration.waitTimes.toArray()).mapToDouble(
+                    wait -> Math.round(wait / 60f * 10) / 10.0
+            ).toArray();
+            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
+        }
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit.path;
 
 import com.conveyal.r5.analyst.StreetTimesAndModes;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import gnu.trove.list.TIntList;
 
 import java.util.Objects;
@@ -11,8 +12,7 @@ import static com.google.common.base.Preconditions.checkState;
  * A door-to-door path, i.e. access/egress characteristics and transit legs (keyed on characteristics including per-leg
  * in-vehicle times but not specific trips/patterns/routes), which may be repeated at different departure times.
  *
- * Instances are constructed initially from transit legs, with access, egress, and transferTimes set in successive
- * operations.
+ * Instances are constructed initially from transit legs, with access and egress set in successive operations.
  */
 public class StopSequence {
     public final TIntList boardStops;
@@ -20,8 +20,6 @@ public class StopSequence {
     public final TIntList rideTimesSeconds;
     public StreetTimesAndModes.StreetTimeAndMode access;
     public StreetTimesAndModes.StreetTimeAndMode egress;
-    // This could be calculated from other fields, but we explicitly calculate it for convenience
-    public int transferTimeSeconds;
 
     /**
      * Populate the basic transit path characteristics
@@ -37,8 +35,7 @@ public class StopSequence {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         StopSequence that = (StopSequence) o;
-        return transferTimeSeconds == that.transferTimeSeconds &&
-                boardStops.equals(that.boardStops) &&
+        return boardStops.equals(that.boardStops) &&
                 alightStops.equals(that.alightStops) &&
                 rideTimesSeconds.equals(that.rideTimesSeconds) &&
                 Objects.equals(access, that.access) &&
@@ -47,7 +44,7 @@ public class StopSequence {
 
     @Override
     public int hashCode() {
-        return Objects.hash(boardStops, alightStops, rideTimesSeconds, access, egress, transferTimeSeconds);
+        return Objects.hash(boardStops, alightStops, rideTimesSeconds, access, egress);
     }
 
     /**
@@ -63,12 +60,14 @@ public class StopSequence {
     }
 
     /**
-     * Set the time spent transfering between stops, which is not stored in our Raptor implementation but can be
+     * Set the time spent transferring between stops, which is not stored in our Raptor implementation but can be
      * calculated by  subtracting the other components of travel time from the total travel time
      */
-    public void setTransferTime(int totalTime, TIntList waitTimes) {
-        transferTimeSeconds = totalTime - access.time - egress.time - waitTimes.sum() - rideTimesSeconds.sum();
+    public int transferTime(PathResult.Iteration iteration) {
+        int transferTimeSeconds =
+                iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
         checkState(transferTimeSeconds >= 0);
+        return transferTimeSeconds;
     }
 
 }

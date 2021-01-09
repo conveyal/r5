@@ -282,9 +282,9 @@ public class TravelTimeReducer {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
-                PatternSequence template = path.completeTemplate(totalTime, perIterationEgress[i]);
+                PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
                 PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
-                paths.put(template, iteration);
+                paths.put(patternSequence, iteration);
             }
         }
         pathResult.setTarget(target, paths);

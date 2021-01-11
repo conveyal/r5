@@ -1,7 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -12,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -32,6 +35,9 @@ public class PathWriter {
 
     /** This is a symbolic value used in the output file format an in our internal primitive int maps. */
     public static final int NO_PATH = -1;
+
+    /** Version of our path grid format **/
+    public static final int VERSION = 1;
 
     /** The task that created the paths being recorded. */
     private final AnalysisWorkerTask task;
@@ -103,6 +109,12 @@ public class PathWriter {
         }
     }
 
+    private static byte getSingleByteCode(StreetMode mode){
+        if (mode == StreetMode.WALK) return StandardCharsets.US_ASCII.encode("W").get(0); // WALK
+        if (mode == StreetMode.BICYCLE) return StandardCharsets.US_ASCII.encode("B").get(0); // BICYCLE
+        return StandardCharsets.US_ASCII.encode("C").get(0); // CAR
+    };
+
     /**
      * Once recordPathsForTarget has been called once for each target in order, this method is called to write out the
      * full set of paths to a buffer, which is then saved to S3 (or other equivalent persistence system).
@@ -125,6 +137,8 @@ public class PathWriter {
             // the number of destinations and the number of paths at each destination.
             DataOutput dataOutput = persistenceBuffer.getDataOutput();
             dataOutput.write("PATHGRID".getBytes());
+            dataOutput.write("_VER".getBytes());
+            dataOutput.writeInt(VERSION);
             dataOutput.writeInt(nTargets);
             dataOutput.writeInt(nPathsPerTarget);
 
@@ -133,6 +147,8 @@ public class PathWriter {
             dataOutput.writeInt(pathForIndex.size());
             for (Path path : pathForIndex) {
                 dataOutput.writeInt(path.patterns.length);
+                dataOutput.write(getSingleByteCode(path.accessMode));
+                dataOutput.write(getSingleByteCode(path.egressMode));
                 for (int i = 0 ; i < path.patterns.length; i ++){
                     dataOutput.writeInt(path.boardStops[i]);
                     dataOutput.writeInt(path.patterns[i]);

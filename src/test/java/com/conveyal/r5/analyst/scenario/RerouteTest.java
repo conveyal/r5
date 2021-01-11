@@ -6,9 +6,9 @@ import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -16,10 +16,10 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test adding stops (rerouting)
@@ -28,7 +28,7 @@ public class RerouteTest {
     public TransportNetwork network;
     public long checksum;
 
-    @Before
+    @BeforeEach
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
         checksum = network.checksum();
@@ -353,7 +353,7 @@ public class RerouteTest {
         assertEquals(checksum, network.checksum());
     }
 
-    @After
+    @AfterEach
     public void tearDown () {
         network = null;
     }

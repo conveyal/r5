@@ -4,9 +4,11 @@ import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeReducer;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -80,12 +82,32 @@ public class PerTargetPropagater {
 
     /**
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
-     * transit stop. May be null, only needs to be set if we're recording paths, as in a static site.
+     * transit stop. May be null, only needs to be set if we're recording paths.
      */
     public List<Path[]> pathsToStopsForIteration = null;
 
-    /** Whether to break travel times down into walk, wait, and ride time. */
-    private boolean calculateComponents;
+    /**
+     * Different options for retaining and reporting paths. In default analyses, paths are not retained.
+     * For Taui sites, workers write directly to file storage.
+     * For regional analyses with freeform pointsets, workers return paths to all destinations to the broker for
+     * assembly.
+     * For single-point analyses with freeform pointsets, workers return paths to one destination to the broker for
+     * fowarding to the UI.
+     */
+    private enum SavePaths {
+        NONE,
+        WRITE_TAUI,
+        ALL_DESTINATIONS,
+        ONE_DESTINATION
+    }
+
+    /** Whether to save paths, and what to do with them */
+    private final SavePaths savePaths;
+
+    /**
+     * Single destination for which paths should be returned (when toLat/toLon are specified in a single-point request)
+     */
+    private int destinationIndexForPaths;
 
     /**
      * Whether to propagate only to a single target that corresponds to the origin (e.g. in a travel time savings
@@ -129,10 +151,22 @@ public class PerTargetPropagater {
 
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        calculateComponents = task.makeTauiSite;
-
+        if (task.makeTauiSite) {
+            savePaths = SavePaths.WRITE_TAUI;
+        } else if (task.includePathResults) {
+            savePaths = task instanceof RegionalTask ? SavePaths.ALL_DESTINATIONS : SavePaths.ONE_DESTINATION;
+        } else {
+            savePaths = SavePaths.NONE;
+        }
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
         oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+        if (savePaths == SavePaths.ONE_DESTINATION){
+            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
+                    task.toLon,
+                    task.toLat,
+                    task.zoom
+            );
+        }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         nTargets = targets.featureCount();
@@ -169,7 +203,9 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        perIterationPaths = calculateComponents ? new Path[nIterations] : null;
+        if (savePaths != savePaths.NONE) {
+            perIterationPaths = new Path[nIterations];
+        }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
         int startTarget = 0;
@@ -190,7 +226,8 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (perIterationPaths != null) {
+            if (savePaths == savePaths.WRITE_TAUI || savePaths == savePaths.ALL_DESTINATIONS
+                    || (savePaths == savePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -203,10 +240,16 @@ public class PerTargetPropagater {
             // Construct the PathScorer before extracting percentiles because the scorer needs to make a copy of
             // the unsorted complete travel times.
             PathScorer pathScorer = null;
-            if (calculateComponents) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
                 pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+            } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
+                // For regional tasks, return paths to all targets.
+                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
+            } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
+                // For single point tasks, return paths to the one target destination specified by toLat/toLon.
+                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
@@ -215,7 +258,7 @@ public class PerTargetPropagater {
             travelTimeReducer.extractTravelTimePercentilesAndRecord(targetToWrite, perIterationTravelTimes);
             timer.reducer.stop();
 
-            if (calculateComponents) {
+            if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
@@ -227,7 +270,7 @@ public class PerTargetPropagater {
         }
         timer.fullPropagation.stop();
         timer.log();
-        if (pathWriter != null) {
+        if (savePaths == SavePaths.WRITE_TAUI && pathWriter != null) {
             pathWriter.finishAndStorePaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.
@@ -283,8 +326,6 @@ public class PerTargetPropagater {
      * For every "iteration" (departure minute and Monte Carlo schedule), find a complete travel time to the specified
      * target from the given nearby stop, and update the best known time for that iteration and target.
      * Also record the best paths if we're going to be saving transit path details.
-     * TODO verify if these are actually travel times (vs. clock times after midnight) and clarify code comments.
-     * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex, LinkedPointSet linkedTargets) {
 
@@ -304,9 +345,6 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
-        // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
-        // FIXME ensure this ^ is baked into the PickupDelay class
-
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
@@ -322,44 +360,41 @@ public class PerTargetPropagater {
                     throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                 }
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
+                    // Account for any additional delay waiting for pickup at the egress stop.
+                    if (egressCostTable.egressStopDelaysSeconds != null) {
+                        int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
+                        if (delayAtEgress < 0) {
+                            // Pickup for this mode not allowed at this stop, so trove iteration should
+                            // continue
+                            return true;
+                        } else {
+                            secondsFromStopToTarget += delayAtEgress;
+                        }
+                    }
+
                     for (int iteration = 0; iteration < nIterations; iteration++) {
-                        int timeAtStop = travelTimesToStop[stop][iteration];
-                        if (timeAtStop >= maxTravelTimeSeconds || timeAtStop >= perIterationTravelTimes[iteration]) {
-                            // Skip propagation if all resulting times will be greater than the cutoff and
-                            // cannot improve on the best known time at this iteration. Also avoids overflow.
+                        // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
+                        // calculated in the Raptor route() method.
+                        int timeToReachStop = travelTimesToStop[stop][iteration];
+                        if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
+                            // Skip propagation if the travel time to reach this stop is longer than the maximum
+                            // travel time, or the travel time all the way to this target (via another stop).
                             continue;
                         }
 
-                        // TODO shouldn't all the below egress delays be baked into linkedTargets.getEgressCostTable()
-                        //  .getCostTableForPoint(targetIndex)? At the end of the EgressCostTable constructor, we can
-                        //  see via linkedPointSet.streetLayer.waitTimePolygons (or a new wrapper class
-                        //  AccessEgressWaitTimes) whether each stop has an egress delay and add it in to all stops.
-                        //  Applying the pickup delay modification creates a new street layer, so a new linkage.
-
-                        // Account for any additional delay waiting for pickup at the egress stop.
-                        // FIXME This adds delays to regular BICYCLE egress if BICYCLE_RENT egress has previously been
-                        //  requested (triggering the building of egressStopDelayTables above, which leads to
-                        //  non-null egressStopDelaysSeconds). Maybe this is fine -- as with CAR, the delays should
-                        //  be ignored when running a scenario without pickup delay modifications.
-                        if ((linkedTargets.streetMode == StreetMode.CAR || linkedTargets.streetMode == StreetMode.BICYCLE)
-                                && linkedTargets.egressStopDelaysSeconds != null) {
-                                    int delayAtEgress = linkedTargets.egressStopDelaysSeconds[stop];
-                                    if (delayAtEgress < 0) {
-                                        // Pickup for this mode not allowed at this stop, so trove iteration should
-                                        // continue
-                                        return true;
-                                    } else {
-                                        secondsFromStopToTarget += delayAtEgress;
-                                    }
-                        }
-
-                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                        if (timeAtTarget < maxTravelTimeSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {
-                            // To reach this target, alighting at this stop is faster than any previously checked stop.
-                            perIterationTravelTimes[iteration] = timeAtTarget;
-                            if (calculateComponents) {
-                                Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
-                                perIterationPaths[iteration] = pathsToStops[stop];
+                        int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
+                        if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
+                            // To reach this target in this iteration, alighting at this stop and proceeding by this
+                            // egress mode is faster than any previously checked stop/egress mode combination.
+                            // Because that's the case, update the best known travel time and, if requested, the
+                            // corresponding path.
+                            perIterationTravelTimes[iteration] = timeToReachTarget;
+                            if (pathsToStopsForIteration != null) {
+                                Path path = pathsToStopsForIteration.get(iteration)[stop];
+                                if (path != null) {
+                                    path = path.cloneWithEgress(linkedTargets.streetMode);
+                                }
+                                perIterationPaths[iteration] = path;
                             }
                         }
                     }

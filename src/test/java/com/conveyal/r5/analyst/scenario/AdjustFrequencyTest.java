@@ -4,20 +4,20 @@ import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test converting lines to a frequency representation.
@@ -26,7 +26,7 @@ public class AdjustFrequencyTest {
     public TransportNetwork network;
     public long checksum;
 
-    @Before
+    @BeforeEach
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_PATTERNS);
         checksum = network.checksum();
@@ -492,7 +492,7 @@ public class AdjustFrequencyTest {
         assertEquals(checksum, network.checksum());
     }
 
-    @After
+    @AfterEach
     public void tearDown () {
         network = null;
     }

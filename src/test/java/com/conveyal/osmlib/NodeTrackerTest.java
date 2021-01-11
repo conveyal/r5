@@ -1,16 +1,21 @@
 package com.conveyal.osmlib;
 
 import com.beust.jcommander.internal.Sets;
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import java.util.Set;
 
-public class NodeTrackerTest extends TestCase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class NodeTrackerTest {
 
     /**
      * Check the NodeTracker against a stock Set<Long>.
      * This is done in ranges that will include numbers significantly greater than 2^32
      */
+    @Test
     public void testAgainstSet() {
         final int N = 1000;
         // Set N numbers in each of four different ranges.

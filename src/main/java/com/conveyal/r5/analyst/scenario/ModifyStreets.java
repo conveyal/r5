@@ -55,7 +55,6 @@ public class ModifyStreets extends Modification {
      * An increase in traversal time can be seen as more clock time or perceived time (generalized cost).
      * Values less than one imply it's faster (or more pleasant) to traverse, e.g. a slight downhill slope
      * with trees.
-     * TODO in implementation REPLACE existing factors instead of scaling the existing factor.
      */
     public Double walkTimeFactor;
 
@@ -204,6 +203,11 @@ public class ModifyStreets extends Modification {
         return errors.size() > 0;
     }
 
+    /**
+     * Copy and modify the characteristics of a single edge in a pair.
+     * The shared characteristics of the pair are copied / modified separately in the caller (the apply method).
+     * Our scenarios can only extend existing edge lists, so modifying an edge is implemented as a soft delete + copy.
+     */
     @JsonIgnore
     private void handleOneEdge (EdgeStore.Edge newEdge, EdgeStore.Edge oldEdge) {
         newEdge.disallowAllModes();

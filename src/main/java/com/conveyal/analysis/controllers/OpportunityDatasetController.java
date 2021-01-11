@@ -23,6 +23,7 @@ import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
+import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.FilenameUtils;
@@ -327,7 +328,7 @@ public class OpportunityDatasetController implements HttpController {
             List<FileItem> fileItems = formFields.get(fieldName);
             if (fileItems == null || fileItems.isEmpty()) {
                 if (required) {
-                    throw AnalysisServerException.badRequest("Query was missing required field: " + fieldName);
+                    throw AnalysisServerException.badRequest("Missing required field: " + fieldName);
                 } else {
                     return null;
                 }
@@ -437,21 +438,20 @@ public class OpportunityDatasetController implements HttpController {
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
-
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
-
-        final String sourceName, regionId;
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
             formFields = sfu.parseParameterMap(req.raw());
-            sourceName = getFormField(formFields, "Name", true);
-            regionId = getFormField(formFields, "regionId", true);
-        } catch (Exception e) {
+        } catch (FileUploadException e) {
             // We can't even get enough information to create a status tracking object. Re-throw an exception.
             throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.asString(e));
         }
+
+        // Parse required fields. Will throw a ServerException on failure.
+        final String sourceName = getFormField(formFields, "Name", true);
+        final String regionId = getFormField(formFields, "regionId", true);
 
         // Create a region-wide status object tracking the processing of opportunity data.
         // Create the status object before doing anything including input and parameter validation, so that any problems

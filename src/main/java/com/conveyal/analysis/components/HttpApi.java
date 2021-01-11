@@ -36,9 +36,9 @@ public class HttpApi implements Component {
 
     // These "attributes" are attached to an incoming HTTP request with String keys, making them available in handlers
     private static final String REQUEST_START_TIME_ATTRIBUTE = "requestStartTime";
-    private static final String USER_PERMISSIONS_ATTRIBUTE = "permissions";
-    private static final String USER_EMAIL_ATTRIBUTE = "email";
-    private static final String USER_GROUP_ATTRIBUTE = "accessGroup";
+    public static final String USER_PERMISSIONS_ATTRIBUTE = "permissions";
+    public static final String USER_EMAIL_ATTRIBUTE = "email";
+    public static final String USER_GROUP_ATTRIBUTE = "accessGroup";
 
     public interface Config {
         boolean offline ();

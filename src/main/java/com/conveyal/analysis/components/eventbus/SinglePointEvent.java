@@ -31,7 +31,7 @@ public class SinglePointEvent extends Event {
                 ", variant=" + variant +
                 ", durationMsec=" + durationMsec +
                 ", user='" + user + '\'' +
-                ", groups=" + groups +
+                ", accessGroup=" + accessGroup +
                 ", success=" + success +
                 '}';
     }

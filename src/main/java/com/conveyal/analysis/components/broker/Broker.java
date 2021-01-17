@@ -468,7 +468,7 @@ public class Broker {
             // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
             int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
             // Guardrail until freeform pointsets are tested more thoroughly
-            if (job.originPointSet == null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
+            if (job.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
             createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }

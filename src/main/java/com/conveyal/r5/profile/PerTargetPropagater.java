@@ -247,7 +247,8 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                // FIXME pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                // FIXME commenting out the line below causes Taui site creation to fail
+                // pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,

@@ -9,6 +9,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.results.CsvResultWriter;
 import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -328,7 +329,7 @@ public class RegionalAnalysisController implements HttpController {
         }
     }
 
-    private Object getCsvResults (Request req, Response res) {
+    private String getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
         final Result resultType = Result.valueOf(req.params("resultType").toUpperCase());
 
@@ -338,7 +339,7 @@ public class RegionalAnalysisController implements HttpController {
                 req.attribute("accessGroup")
         ).iterator().next();
 
-        if (analysis == null || analysis.deleted || !analysis.complete) {
+        if (analysis == null || analysis.deleted) {
             throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
 
@@ -354,11 +355,12 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
         }
 
-        String key = regionalAnalysisId + resultType + ".csv.gz";
+        // TODO result path is stored in model, use that?
+        String key = regionalAnalysisId + '_' + resultType + ".csv.gz";
         FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
-        JSONObject json = new JSONObject();
-        json.put("url", fileStorage.getURL(fileStorageKey));
-        return json.toJSONString();
+
+        res.type("text");
+        return fileStorage.getURL(fileStorageKey);
     }
 
     /**
@@ -506,9 +508,12 @@ public class RegionalAnalysisController implements HttpController {
         task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
         task.percentiles = regionalAnalysis.travelTimePercentiles;
 
-        // Persist this newly created RegionalAnalysis to Mongo.
-        // Why are we overwriting the regionalAnalysis reference with the result of saving it? This looks like a no-op.
+        // Persist this newly created RegionalAnalysis to Mongo, which assigns it an id and creation/update time stamps.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
+        if (analysisRequest.recordTimes) regionalAnalysis.addCsvStoragePath(Result.TIMES, config.resultsBucket());
+        if (analysisRequest.recordPaths) regionalAnalysis.addCsvStoragePath(Result.PATHS, config.resultsBucket());
+        if (analysisRequest.recordAccessibility) regionalAnalysis.addCsvStoragePath(Result.ACCESS, config.resultsBucket());
+        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);
@@ -533,7 +538,7 @@ public class RegionalAnalysisController implements HttpController {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
-            sparkService.get("/:_id/csv/resultType", this::getCsvResults);
+            sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
             sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);

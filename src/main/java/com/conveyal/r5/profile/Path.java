@@ -193,7 +193,7 @@ public class Path implements Cloneable {
 
     @Override
     // We tried replacing this custom implementation with Objects.hash(...), but it did not produce the expected
-    // results.
+    // results. TODO investigate and replace with stock hash function
     public int hashCode() {
         int result = Ints.hashCode(length);
         result = 31 * result + Arrays.hashCode(patterns);

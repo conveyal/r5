@@ -1,14 +1,24 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransitLayer;
-import com.google.common.base.Preconditions;
+import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
+import com.conveyal.r5.transit.path.RouteSequence;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import gnu.trove.list.TIntList;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Holds paths and associated details from an origin to destination target(s) at every Raptor iteration. For
@@ -22,17 +32,26 @@ import java.util.List;
 public class PathResult {
 
     private final int nDestinations;
-    private final int nIterations;
     /**
-     * Array with one entry per destination. Each entry is a map from each "path template" (i.e. a path ignoring
-     * per-iteration details such as wait time) to the associated iteration details.
+     * Array with one entry per destination. Each entry is a map from a "path template" to the associated iteration
+     * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
+     * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
-    // TODO clean this up: maybe use a BasicPath (boardStopIds, alightStopIds, route or pattern Ids), extended by
-    //  a Path (adds tripIds and associated boarding/alighting times), extended by a FullItinerary (includes specific
-    //  iteration number/departure time, wait time details, etc.). Or just track full paths with the per-iteration
-    //  details, if this deduplication isn't worth it.
-    private final Multimap<Path, IterationDetails>[] itinerariesForPathTemplates;
+    private final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
+
+    public static String[] DATA_COLUMNS = new String[]{
+            "routes",
+            "boardStops",
+            "alightStops",
+            "rideTimes",
+            "accessTime",
+            "egressTime",
+            "transferTime",
+            "waitTimes",
+            "totalTime",
+            "nIterations"
+    };
 
     public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
         if (task instanceof TravelTimeSurfaceTask) {
@@ -45,142 +64,150 @@ public class PathResult {
             if (nDestinations > 5000) throw new UnsupportedOperationException("Path results are limited to 5000 " +
                     "destinations");
         }
-        this.nIterations = task.getTotalIterations(transitLayer.hasFrequencies);
-        itinerariesForPathTemplates = new Multimap[nDestinations];
+        iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
     }
 
-    public void setTarget(int targetIndex, Multimap<Path, IterationDetails> pathsToTarget) {
-        itinerariesForPathTemplates[targetIndex] = pathsToTarget;
+    /**
+     * Populate the multimap of path templates to iterations, reducing by using route-based keys instead of
+     * pattern-based keys
+     */
+    public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
+        Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
+        patterns.forEach(((patternSeq, iteration) -> routes.put(new RouteSequence(patternSeq, transitLayer), iteration)));
+        iterationsForPathTemplates[targetIndex] = routes;
     }
 
-    public static class IterationDetails {
-        public int iteration;
-        public int waitTime;
-        public int inVehicleTime;
+    /**
+     * Summary of iterations for each destination, suitable for writing to a CSV. Conversion to strings happens here
+     * (on distributed workers) to minimize pressure on the central Broker's assembler.
+     *
+     * @param stat whether the reported per-leg wait times should correspond to the iteration with the minimum or mean
+     *             total waiting time.
+     * @return For each destination, a list of String[]s summarizing path templates. For each path template, details
+     *          of the itinerary with waiting time closest to the requested stat are included.
+     */
+    public ArrayList<String[]>[] summarizeIterations(Stat stat) {
+        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
+        for (int d = 0; d < nDestinations; d++) {
+            summary[d] = new ArrayList<>();
+            Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
+            if (iterationMap != null) {
+                for (RouteSequence routeSequence: iterationMap.keySet()) {
+                    Collection<Iteration> iterations = iterationMap.get(routeSequence);
+                    int nIterations = iterations.size();
+                    checkState(nIterations > 0, "A path was stored without any iterations");
+                    String waits = null, transfer = null, totalTime = null;
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer);
+                    double targetValue;
+                    IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
+                    if (stat == Stat.MINIMUM) {
+                        targetValue = totalWaits.min().orElse(-1);
+                    } else if (stat == Stat.MEAN){
+                        targetValue = totalWaits.average().orElse(-1);
+                    } else {
+                        throw new RuntimeException("Unrecognized statistic for path summary");
+                    }
+                    double score = Double.MAX_VALUE;
+                    for (Iteration iteration: iterations) {
+                        // TODO clean up, maybe re-using approaches from PathScore?
+                        double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
+                        if (thisScore < score) {
+                            StringJoiner waitTimes = new StringJoiner("|");
+                            iteration.waitTimes.forEach(w -> {
+                                    waitTimes.add(String.format("%.1f", w / 60f));
+                                    return true;
+                            });
+                            waits = waitTimes.toString();
+                            transfer =  String.format("%.1f", routeSequence.stopSequence.transferTime(iteration) / 60f);
+                            totalTime = String.format("%.1f", iteration.totalTime / 60f);
+                            if (thisScore == 0) break;
+                            score = thisScore;
+                        }
+                    }
+                    String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, String.valueOf(nIterations));
+                    checkState(row.length == DATA_COLUMNS.length);
+                    summary[d].add(row);
+                }
+            }
+        }
+        return summary;
+    }
+
+    public enum Stat {
+        MEAN,
+        MINIMUM
+    }
+
+    /**
+     * Wraps path and iteration details for JSON serialization
+     */
+    public static class PathIterations {
+        public String access; // StreetTimesAndModes.StreetTimeAndMode would be more machine-readable.
+        public String egress;
+        public Collection<RouteSequence.TransitLeg> transitLegs;
+        public Collection<HumanReadableIteration> iterations;
+
+        PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
+            this.access = pathTemplate.stopSequence.access.toString();
+            this.egress = pathTemplate.stopSequence.egress.toString();
+            this.transitLegs = pathTemplate.transitLegs(transitLayer);
+            this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
+        }
+    }
+
+    /**
+     * Returns human-readable details of path iterations, for JSON representation (e.g. in the UI console).
+     */
+    List<PathIterations> getPathIterationsForDestination() {
+        checkState(iterationsForPathTemplates.length == 1, "Paths were stored for multiple " +
+                "destinations, but only one is being requested");
+        List<PathIterations> detailsForDestination = new ArrayList<>();
+        Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[0];
+        if (iterationMap != null) {
+            for (RouteSequence pathTemplate : iterationMap.keySet()) {
+                detailsForDestination.add(new PathIterations(pathTemplate, transitLayer,
+                        iterationMap.get(pathTemplate).stream().sorted(Comparator.comparingInt(p -> p.departureTime))
+                                .collect(Collectors.toList())
+                ));
+            }
+        }
+        return detailsForDestination;
+    }
+
+    /**
+     * Temporal details of a specific iteration of our RAPTOR implementation (per-leg wait times and total time
+     * implied by a specific departure time and randomized schedule offsets).
+     */
+    public static class Iteration {
+        public int departureTime;
+        public TIntList waitTimes;
         public int totalTime;
 
-        public IterationDetails(Path path, int iteration, int totalTime) {
-            this.iteration = iteration;
-            this.waitTime = path.waitTime;
-            this.inVehicleTime = path.inVehicleTime;
+        public Iteration(Path path, int totalTime) {
+            this.departureTime = path.departureTime;
+            this.waitTimes = path.waitTimes;
             this.totalTime = totalTime;
         }
-
-        public String[] timesToString () {
-            return new String[]{
-                String.valueOf(waitTime),
-                String.valueOf(inVehicleTime),
-                String.valueOf(totalTime)
-            };
-        }
-
     }
 
     /**
-     * Summary of paths and associated wait, in-vehicle, and total times. Array is keyed on
-     * destination index, iteration number, and result type:
-     *
-     * 0: path summary (using GTFS ids), reduced to board stop/alight stop/route details and ignoring which
-     * specific trips are used
-     * 1: accumulated wait time (in seconds)
-     * 2: accumulated in-vehicle time (in seconds)
-     * 3: total time (in seconds)
-     *
-     * Note that for a single iteration, the combined on-street time (access/transfer/egress) can be calculated as the
-     * total time minus the wait and in-vehicle times.
-     *
-     * This may not be an efficient way to send path details over the wire, but it is designed to make it easy for
-     * the backend server's result assembler to write a CSV when receiving results from multiple workers.
+     * Timestamp style clock times, and rounded wait/total time, for inspection as JSON.
      */
-    public String[][][] getSummaryOfIterations() {
-        String[][][] summary = new String[nDestinations][nIterations][4];
-        for (int d = 0; d < nDestinations; d++){
-            Multimap<Path, IterationDetails> itineraries = itinerariesForPathTemplates[d];
-            if (itineraries != null) {
-                for (Path pathTemplate : itineraries.keySet()) {
-                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                    for (IterationDetails itinerary : itineraries.get(pathTemplate)) {
-                        summary[d][itinerary.iteration][0] = pathSummary;
-                        summary[d][itinerary.iteration][1] = String.valueOf(itinerary.waitTime);
-                        summary[d][itinerary.iteration][2] = String.valueOf(itinerary.inVehicleTime);
-                        summary[d][itinerary.iteration][3] = String.valueOf(itinerary.totalTime);
-                    }
-                }
-            }
-        }
-        return summary;
-    }
+    public static class HumanReadableIteration {
+        public String departureTime;
+        public double[] waitTimes;
+        public double totalTime;
 
-    // TODO throw error if this method is called for tasks with Monte Carlo draws
-    public ArrayList<String[]>[] getMinimumForPathIterations() {
-        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
-        for (int d = 0; d < nDestinations; d++) {
-            summary[d] = new ArrayList<>();
-            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
-            if (itinerariesForPathTemplate != null) {
-                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
-                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
-                    String nIterations = String.valueOf(itineraries.size());
-                    IterationDetails latestIteration = (IterationDetails) itineraries.toArray()[0];
-                    summary[d].add(ArrayUtils.addAll(
-                            new String[]{pathSummary, nIterations},
-                            latestIteration.timesToString()
-                    ));
-                }
-            }
-        }
-        return summary;
-    }
-
-    // TODO merge with previous, using min/average enum as a parameter
-    public ArrayList<String[]>[] getAverageForPathIterations() {
-        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
-        for (int d = 0; d < nDestinations; d++) {
-            summary[d] = new ArrayList<>();
-            Multimap<Path, IterationDetails> itinerariesForPathTemplate = itinerariesForPathTemplates[d];
-            if (itinerariesForPathTemplate != null) {
-                for (Path pathTemplate : itinerariesForPathTemplate.keySet()) {
-                    String pathSummary = pathTemplate.toItineraryString(transitLayer);
-                    Collection<IterationDetails> itineraries = itinerariesForPathTemplate.get(pathTemplate);
-                    String nIterations = String.valueOf(itineraries.size());
-                    String avgWaitTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.waitTime).average().orElse(-1));
-                    String inVehicleTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.inVehicleTime).average().orElse(-1));
-                    String avgTotalTime =
-                            String.valueOf(itineraries.stream().mapToDouble(i -> i.totalTime).average().orElse(-1));
-                    summary[d].add(new String[]{pathSummary, nIterations, avgWaitTime, inVehicleTime, avgTotalTime});
-                }
-            }
-        }
-        return summary;
-    }
-
-    public static class PathIterations {
-        public String[] pathSummary;
-        public Collection<IterationDetails> iterations;
-
-        PathIterations(String[] pathSummary, Collection<IterationDetails> iterations) {
-            this.pathSummary = pathSummary;
-            this.iterations = iterations;
+        HumanReadableIteration(Iteration iteration) {
+            this.departureTime =
+                    String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
+                            (int) (iteration.departureTime / 60.0 % 60));
+            this.waitTimes =  Arrays.stream(iteration.waitTimes.toArray()).mapToDouble(
+                    wait -> Math.round(wait / 60f * 10) / 10.0
+            ).toArray();
+            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
         }
     }
 
-    /**
-     * Returns a summary of path iterations suitable for JSON representation.
-     */
-    List<PathIterations> getSummaryForDestination() {
-        Preconditions.checkState(itinerariesForPathTemplates.length == 1, "Paths were stored for multiple destinations, but " +
-                "only one is being requested");
-        List<PathIterations> summaryToDestination = new ArrayList<>();
-        if (itinerariesForPathTemplates[0] != null) {
-            for (Path path : itinerariesForPathTemplates[0].keySet()) {
-                String[] pathSummary = path.toTripString(transitLayer);
-                summaryToDestination.add(new PathIterations(pathSummary, itinerariesForPathTemplates[0].get(path)));
-            }
-        }
-        return summaryToDestination;
-    }
 }

@@ -671,7 +671,7 @@ public class AnalysisWorker implements Runnable {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
-        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getSummaryForDestination();
+        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
         LOG.info("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

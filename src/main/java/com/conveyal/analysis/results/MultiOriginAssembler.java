@@ -8,6 +8,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +177,7 @@ public class MultiOriginAssembler {
             if (job.templateTask.includePathResults) {
                 LOG.info("Creating csv file to store path results for {} origins.", job.nTasksTotal);
                 pathCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.PATHS);
-                pathCsvWriter.setDataColumns("path", "nIterations", "avgWaitTime", "inVehicleTime", "avgTotalTime");
+                pathCsvWriter.setDataColumns(PathResult.DATA_COLUMNS);
                 csvResultWriters.add(pathCsvWriter);
             }
 
@@ -264,13 +265,14 @@ public class MultiOriginAssembler {
             }
 
             if (job.templateTask.includePathResults) {
+                checkPathDimension(workResult);
                 ArrayList<String[]>[] pathsToPoints = workResult.pathResult;
-                // TODO sanity check shape
                 for (int d = 0; d < pathsToPoints.length; d++) {
                     ArrayList<String[]> pathsIterations = pathsToPoints[d];
                     for (String[] iterationDetails : pathsIterations) {
                         String originId = originPointSet.getId(workResult.taskId);
                         String destinationId = destinationPointSet.getId(d);
+                        checkDimension(workResult, "columns", iterationDetails.length, PathResult.DATA_COLUMNS.length);
                         pathCsvWriter.writeOneRow(originId, destinationId, iterationDetails);
                     }
                 }
@@ -318,6 +320,13 @@ public class MultiOriginAssembler {
         for (int[] percentileResult : workResult.travelTimeValues) {
             checkDimension(workResult, "destinations", percentileResult.length, nDestinations);
         }
+    }
+
+    private void checkPathDimension (RegionalWorkResult workResult) {
+        // In one-to-one mode, we expect only one value per origin, the destination point at the same pointset index as
+        // the origin point. Otherwise, for each origin, we expect one value per destination.
+        final int nDestinations = job.templateTask.oneToOne ? 1 : destinationPointSet.featureCount();
+        checkDimension(workResult, "destinations", workResult.pathResult.length, nDestinations);
     }
 
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */

@@ -3,16 +3,17 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +131,8 @@ public class PerTargetPropagater {
      */
     private Path[] perIterationPaths;
 
+    private StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress;
+
     private final PropagationTimer timer = new PropagationTimer();
 
     /**
@@ -203,8 +206,9 @@ public class PerTargetPropagater {
         perIterationTravelTimes = new int[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
-        if (savePaths != savePaths.NONE) {
+        if (savePaths != SavePaths.NONE) {
             perIterationPaths = new Path[nIterations];
+            perIterationEgress = new StreetTimesAndModes.StreetTimeAndMode[nIterations];
         }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
@@ -226,8 +230,8 @@ public class PerTargetPropagater {
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
-            if (savePaths == savePaths.WRITE_TAUI || savePaths == savePaths.ALL_DESTINATIONS
-                    || (savePaths == savePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
+            if (savePaths == SavePaths.WRITE_TAUI || savePaths == SavePaths.ALL_DESTINATIONS
+                    || (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
             }
 
@@ -243,13 +247,16 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                // FIXME commenting out the line below causes Taui site creation to fail
+                // pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
-                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths);
+                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
+                        perIterationEgress);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
                 // For single point tasks, return paths to the one target destination specified by toLat/toLon.
-                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths);
+                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths,
+                        perIterationEgress);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
@@ -264,7 +271,7 @@ public class PerTargetPropagater {
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
                 // NOTE this is currently using only the first (lowest) travel time.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
+                Set<com.conveyal.r5.profile.Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }
@@ -372,6 +379,11 @@ public class PerTargetPropagater {
                         }
                     }
 
+                    StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
+                            secondsFromStopToTarget,
+                            linkedTargets.streetMode
+                    );
+
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
                         // calculated in the Raptor route() method.
@@ -392,9 +404,9 @@ public class PerTargetPropagater {
                             if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
-                                    path = path.cloneWithEgress(linkedTargets.streetMode);
+                                    perIterationPaths[iteration] = path;
+                                    perIterationEgress[iteration] = egress;
                                 }
-                                perIterationPaths[iteration] = path;
                             }
                         }
                     }

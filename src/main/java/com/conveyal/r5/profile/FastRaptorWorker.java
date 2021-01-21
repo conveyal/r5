@@ -7,6 +7,7 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.transit.path.Path;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
@@ -456,7 +457,7 @@ public class FastRaptorWorker {
     /**
      * Create the optimal path to each stop in the transit network, based on the given RaptorState.
      */
-    private static Path[] pathToEachStop (RaptorState state) {
+    private static Path[] pathToEachStop(RaptorState state) {
         int nStops = state.bestNonTransferTimes.length;
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {

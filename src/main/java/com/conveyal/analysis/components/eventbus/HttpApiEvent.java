@@ -29,6 +29,6 @@ public class HttpApiEvent extends Event {
     @Override
     public String toString () {
         return String.format("[HTTP %s %s by %s of group %s, status code %d, duration %d msec]",
-                method, path, user, groups, statusCode, durationMsec);
+                method, path, user, accessGroup, statusCode, durationMsec);
     }
 }

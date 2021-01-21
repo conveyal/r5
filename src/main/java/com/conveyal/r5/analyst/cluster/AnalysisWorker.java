@@ -373,7 +373,7 @@ public class AnalysisWorker implements Runnable {
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
                 if (autoShutdown) {considerShuttingDown();}
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+                LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }

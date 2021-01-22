@@ -140,15 +140,20 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
 
-    /** Convert longitude to pixel value. */
+    /**
+     * Return the x pixel number containing the given longitude at this grid's zoom level, relative to the left edge
+     * of the world  (not relative to this grid or to any particular tile).
+     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
+     */
     public int lonToPixel (double lon) {
         // factor of 256 is to get a pixel value not a tile number
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
     /**
-     * Convert latitude to pixel value.
-     * This could be static if zoom level was a parameter. And/or could be moved to WebMercatorExtents.
+     * Return the y pixel number containing the given latitude at this grid's zoom level, relative to the top edge of
+     * the world (not relative to this grid or to any particular tile).
+     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
      */
     public int latToPixel (double lat) {
         double invCos = 1 / Math.cos(Math.toRadians(lat));
@@ -157,11 +162,24 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return (int) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
+    /**
+     * Return the longitude in degrees of the west edge of any pixel at the specified x coordinate relative to the left
+     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
+     * TODO This method could be reusable and static if zoom level was a parameter.
+     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
+     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
+     */
     public double pixelToLon (double x) {
         return x / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
-    // TODO add Javadoc - these are absolute pixels right? They don't seem to be relative to the PointSet edge.
+    /**
+     * Return the latitude in degrees of the north edge of any pixel at the specified y coordinate relative to the top
+     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
+     * TODO This method could be reusable and static if zoom level was a parameter.
+     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
+     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
+     */
     public double pixelToLat (double y) {
         double tile = y / 256d;
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));

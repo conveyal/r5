@@ -438,62 +438,82 @@ public class Grid extends PointSet {
     }
 
     /**
-     * TODO note that these are center points of the grid cells defined by integer mercator pixel numbers.
-     *      WebMercatorGridPointSet should follow the same definition but it doesn't!
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 latitude of the center of the corresponding pixel in the grid
+     * Return the latitude of the center point of the grid cell for the specified one-dimensional index into this
+     * gridded pointset (flattened, with x varying faster than y).
+     * TODO WebMercatorGridPointSet should follow a consistent definition (edge or center) but it doesn't!
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 latitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLat(int i) {
+        // Integer division of linear index to find vertical integer intra-grid pixel coordinate
         int y = i / width;
         return pixelToCenterLat(north + y, zoom);
     }
 
     /**
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 longitude of the center of the corresponding pixel in the grid
+     * Like getLat, but returns the longitude of the center point of the specified cell.
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 longitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLon(int i) {
+        // Remainder of division yields horizontal integer intra-grid pixel coordinate
         int x = i % width;
         return pixelToCenterLon(west + x, zoom);
     }
 
-    public int featureCount() { return width * height; }
+    public int featureCount() {
+        return width * height;
+    }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
-    /** Return the pixel the given longitude falls within */
+    /**
+     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
+     * zoom level.
+     */
     public static int lonToPixel (double lon, int zoom) {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
-    /** return the west side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
+    /**
+     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
+     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     */
     public static double pixelToLon (double pixel, int zoom) {
         return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
-    /** Return the longitude of the center of the given pixel */
-    public static double pixelToCenterLon (int pixel, int zoom) {
-        return pixelToLon(pixel + 0.5, zoom);
+    /**
+     * Return the longitude of the center of all pixels at the given zoom and x pixel number, measured from the west
+     * edge of the world.
+     */
+    public static double pixelToCenterLon (int xPixel, int zoom) {
+        return pixelToLon(xPixel + 0.5, zoom);
     }
 
-    /** Return the pixel the given latitude falls within */
+    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
     public static int latToPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
     /**
-     * Return the latitude of the center of the given pixel.
-     * TODO clarify that these are world pixels at given zoom, not intra-grid pixels.
+     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
+     * measured southward from the north edge of the world.
      */
-    public static double pixelToCenterLat (int pixel, int zoom) {
-        return pixelToLat(pixel + 0.5, zoom);
+    public static double pixelToCenterLat (int yPixel, int zoom) {
+        return pixelToLat(yPixel + 0.5, zoom);
     }
 
-    // We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
-    /** return the north side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
-    public static double pixelToLat (double pixel, int zoom) {
-        return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+    /**
+     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
+     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
+     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+     */
+    public static double pixelToLat (double yPixel, int zoom) {
+        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /**

@@ -257,6 +257,7 @@ public class FreeFormPointSet extends PointSet {
         return webMercatorExtents;
     }
 
+    /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */
     public FreeFormPointSet (Coordinate... coordinates) {
         this(coordinates.length);
         int i = 0;

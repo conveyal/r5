@@ -1,0 +1,93 @@
+{
+  "version": 8,
+  "name": "Local R5",
+  "sources": {
+    "r5": {
+      "type": "vector",
+      "tiles": [
+        "http://localhost:7070/vectorTiles/5f9bcd619cffc76a49c8fcc7_5f9bcd619cffc76a49c8fcc6/{z}/{x}/{y}"
+      ],
+      "maxzoom": 14
+    },
+    "dem-terrain": {
+      "type": "raster-dem",
+      "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+      "tileSize": 512,
+      "maxzoom": 14
+    },
+    "dem-hillshade": {
+      "type": "raster-dem",
+      "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+      "tileSize": 512,
+      "maxzoom": 14
+    },
+    "mapbox-streets": {
+      "type": "vector",
+      "url": "mapbox://mapbox.mapbox-streets-v8",
+      "tileSize": 512
+    }
+  },
+  "terrain": { "source": "dem-terrain", "exaggeration": 1.4 },
+  "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+  "layers": [
+    {"id": "hillshading", "source": "dem-hillshade", "type": "hillshade"},
+    {
+      "id": "water",
+      "source": "mapbox-streets",
+      "source-layer": "water",
+      "type": "fill",
+      "paint": {
+        "fill-color": "#606090"
+      }
+    },
+    {
+      "id": "patterns",
+      "source": "r5",
+      "source-layer": "patternShapes",
+      "type": "line",
+      "paint": {
+        "line-color": "#008000"
+      }
+    },
+    {
+      "id": "pattern-labels",
+      "source": "r5",
+      "source-layer": "patternShapes",
+      "minzoom": 12,
+      "type": "symbol",
+      "layout": {
+        "symbol-placement": "line",
+        "text-anchor": "bottom",
+        "text-font": [
+          "Open Sans Bold",
+          "Arial Unicode MS Bold"
+        ],
+        "text-field": "route name"
+      }
+    },
+    {
+      "id": "stops",
+      "source": "r5",
+      "source-layer": "stops",
+      "type": "circle",
+      "minzoom": 10
+    },
+    {
+      "id": "stop-labels",
+      "source": "r5",
+      "source-layer": "stops",
+      "minzoom": 13,
+      "type": "symbol",
+      "layout": {
+        "symbol-placement": "point",
+        "text-anchor": "left",
+        "text-font": [
+          "Open Sans Bold",
+          "Arial Unicode MS Bold"
+        ],
+        "text-field": "stop-name"
+      }
+    }
+  ]
+}
+

@@ -1,4 +1,9 @@
-option optimize_for = LITE_RUNTIME;
+// To generate Java source, install protobuf then:
+// protoc geobuf.proto --java_out=lite:../src/main/java/geobuf
+// then add "package geobuf;" at top of generated .java file
+// The lite: might not be useful since we (and our dependencies) are not using the lite runtime
+// TODO should we just put that in the com.conveyal.data.geobuf package?
+syntax = "proto2";
 
 message Data {
     repeated string keys = 1; // global arrays of unique keys

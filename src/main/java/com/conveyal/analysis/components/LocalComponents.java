@@ -8,6 +8,7 @@ import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.FileStorageController;
 import com.conveyal.analysis.controllers.GTFSGraphQLController;
+import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.ModificationController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
@@ -74,7 +75,8 @@ public class LocalComponents extends Components {
                 // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
                 // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
-                new BrokerController(components.broker, components.eventBus)
+                new BrokerController(components.broker, components.eventBus),
+                new GtfsTileController(components.gtfsCache)
         );
         return httpControllers;
     }

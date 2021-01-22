@@ -23,8 +23,10 @@ import static com.conveyal.r5.analyst.network.GridGtfsGenerator.GTFS_DATE;
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
  * It provides convenience methods to set all the necessary fields.
  *
- * NOTE single point tasks can only search out to grids, not freeform pointsets.
- * Those grids are hard-wired into fields of the task, not derived from the pointset object.
+ * Usually we would rather search out to freeform pointsets containing a few exact points instead of grid pointsets
+ * which will not align exactly with the street intersections. However as of this writing single point tasks could only
+ * search out to grids, which are hard-wired into fields of the task, not derived from the pointset object.
+ *
  * We may actually want to test with regional tasks to make this less strange, and eventually merge both request types.
  */
 public class GridSinglePointTaskBuilder {

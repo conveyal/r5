@@ -3,7 +3,7 @@ package com.conveyal.r5.analyst.network;
 import java.util.stream.Stream;
 
 /**
- * Represents a transit route on a grid.
+ * Represents a single transit route on a grid, used to create networks with predictable characteristics in tests.
  */
 public class GridRoute {
 

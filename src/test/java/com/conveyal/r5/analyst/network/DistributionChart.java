@@ -20,8 +20,11 @@ import org.jfree.data.time.TimeSeriesCollection;
 import java.awt.*;
 import java.util.Arrays;
 
-// TODO show percentiles as vertical lines on chart
-
+/**
+ * Show a chart of predicted or empirical distributions in a Swing graphical window.
+ * Used in test design and debugging.
+ * TODO show percentiles as vertical lines on chart
+ */
 public class DistributionChart extends ApplicationFrame {
 
     public DistributionChart (Distribution... distributions) {

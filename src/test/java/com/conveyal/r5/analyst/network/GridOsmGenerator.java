@@ -11,7 +11,8 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 
 /**
- * Created by abyrd on 2020-11-20
+ * Generates a MapDB backed OSM object, not necessarily to be serialized out to OSM PBF or XML format, but to be fed
+ * directly into the R5 network builder. Used to create networks with predictable characteristics in tests.
  */
 public class GridOsmGenerator {
 

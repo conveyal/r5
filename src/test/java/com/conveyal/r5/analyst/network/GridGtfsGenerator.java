@@ -17,7 +17,8 @@ import java.time.LocalDate;
 import java.util.stream.IntStream;
 
 /**
- * Created by abyrd on 2020-11-20
+ * Create a MapDB backed GTFS object from a GridLayout, not necessarily to be written out as a standard CSV/ZIP feed,
+ * but to be fed directly into the R5 network builder. Used to create networks with predictable characteristics in tests.
  */
 public class GridGtfsGenerator {
 

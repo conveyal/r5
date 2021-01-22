@@ -14,7 +14,7 @@ import org.locationtech.jts.geom.CoordinateXY;
 import java.io.FileOutputStream;
 
 /**
- * Created by abyrd on 2020-11-20
+ * FIXME rename this class and add Javadoc
  *
  * TODO option to align grid exactly with sample points in WebMercatorGridPointSet to eliminate walking time
  *      and check splitting

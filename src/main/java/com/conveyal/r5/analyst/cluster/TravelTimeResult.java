@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.profile.FastRaptorWorker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
@@ -13,6 +15,8 @@ import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
  * TODO standardize terminology: the terms targets, destinations, and points are used interchangeably throughout
  */
 public class TravelTimeResult {
+
+    public static final Logger LOG = LoggerFactory.getLogger(TravelTimeResult.class);
 
     /**
      * The number of travel times that will be recorded at each destination point.
@@ -31,6 +35,8 @@ public class TravelTimeResult {
     /**
      * For each target, the number of times falling in each of 120 one-minute bins.
      * This is optional, generally used only for debugging and testing, so may be null if no histograms are recorded.
+     * Since this is used for debugging and testing it might even be interesting to do it at one-second resolution or
+     * just store every travel time, but binning makes it easy to compare with probability distributions.
      */
     int[][] histograms;
 
@@ -45,6 +51,12 @@ public class TravelTimeResult {
             for (int j = 0; j < nPoints; j++) {
                 values[i][j] = UNREACHED;
             }
+        }
+        if (task.recordTravelTimeHistograms) {
+            // Initializing the array to a non-null value will enable histogram recording.
+            LOG.warn("Recording travel time histograms at every desitination. " +
+                    "This increases memory consumption and should only be enabled in tests.");
+            histograms = new int[nPoints][120];
         }
     }
 
@@ -70,18 +82,16 @@ public class TravelTimeResult {
 
     public int[][] getValues() { return values;}
 
-    public void recordHistogram (int target, int[] travelTimesSeconds) {
-        // Lazy-initialize only when histograms are being recorded
-        if (histograms == null) {
-            histograms = new int[nPoints][120];
+    public void recordHistogramIfEnabled (int target, int[] travelTimesSeconds) {
+        if (histograms != null) {
+            int[] counts = histograms[target];
+            for (int seconds : travelTimesSeconds) {
+                if (seconds == UNREACHED) continue;
+                int minutes = seconds / 60;
+                counts[minutes] += 1;
+            }
+            // TODO scale by nIterations to get probabilities?
         }
-        int[] counts = histograms[target];
-        for (int seconds : travelTimesSeconds) {
-            if (seconds == UNREACHED) continue;
-            int minutes = seconds / 60;
-            counts[minutes] += 1;
-        }
-        // TODO scale by nIterations to get probabilities?
     }
 
     /**
@@ -93,7 +103,14 @@ public class TravelTimeResult {
         return Arrays.stream(values).anyMatch(vals -> Arrays.stream(vals).anyMatch(v -> v != UNREACHED));
     }
 
+    /**
+     * For the specified destination point index, return an array of 120 integers representing the number of paths with
+     * each total travel time from zero to 120 minutes.
+     */
     public int[] getHistogram (int pointIndex) {
+        if (histograms == null) {
+            throw new RuntimeException("Travel time histograms were not retained. Enable them in the request.");
+        }
         return histograms[pointIndex];
     }
 

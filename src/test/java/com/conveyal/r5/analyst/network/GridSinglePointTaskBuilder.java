@@ -53,6 +53,8 @@ public class GridSinglePointTaskBuilder {
         task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
         // By default, traverse one block in a round predictable number of seconds.
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
+        // Record more detailed information to allow comparison to theoretical travel time distributions.
+        task.recordTravelTimeHistograms = true;
     }
 
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {

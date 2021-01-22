@@ -68,15 +68,6 @@ public class GridTest {
         // Maybe codify this estimation logic as a TravelTimeEstimate.waitWithHeadaway(20) etc.
         DistributionTester.assertUniformlyDistributed(travelTimePercentiles, 32, 52);
 
-//        for (int p = 0; p < 5; p++) {
-//            int travelTimeMinutes = oneOriginResult.travelTimes.getValues()[p][pointIndex];
-//            System.out.printf(
-//                "percentile %d %s\n",
-//                p,
-//                (travelTimeMinutes == UNREACHED) ? "NONE" : Integer.toString(travelTimeMinutes) + "minutes"
-//            );
-//        }
-
     }
 
     /**
@@ -115,7 +106,6 @@ public class GridTest {
 
         DistributionTester.assertExpectedDistribution(expected, travelTimePercentiles);
     }
-
 
     /**
      * Similar to frequency case above, but with two different alternative paths.
@@ -158,8 +148,6 @@ public class GridTest {
         // Compare expected and actual
         Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, pointIndex);
 
-        // DistributionChart.showChart(this, observed);
-
         twoAlternatives.assertSimilar(observed);
         DistributionTester.assertExpectedDistribution(twoAlternatives, travelTimePercentiles);
     }
@@ -192,7 +180,6 @@ public class GridTest {
         int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
 
-
         // Each 60-block ride should take 30 minutes (across and up).
         // Two minutes board slack, and 20-minute headways. Add one minute walking.
         Distribution ride = new Distribution(2, 20).delay(30);
@@ -201,8 +188,6 @@ public class GridTest {
 
         // Compare expected and actual
         Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, pointIndex);
-
-        // DistributionChart.showChart(this, observed);
 
         endToEnd.assertSimilar(observed);
         DistributionTester.assertExpectedDistribution(endToEnd, travelTimePercentiles);

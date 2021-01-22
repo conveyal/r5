@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.network;
 
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
-import com.google.common.primitives.Doubles;
 
 import java.util.Arrays;
 
@@ -13,6 +12,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * modeling successive waits for pure frequency routes or waits for scheduled routes given a departure time distribution.
  */
 public class Distribution {
+
+    // For debugging and test development: display a chart in a window every time two distributions are compared.
+    private static final boolean SHOW_CHARTS = false;
 
     private int skip;
     private double[] masses; // impulse response
@@ -193,7 +195,7 @@ public class Distribution {
             result.masses[i] = counts[i];
         }
         result.normalize();
-        result.crop();
+        result.trim();
         return result;
     }
 
@@ -214,13 +216,10 @@ public class Distribution {
         return sum;
     }
 
-    public void assertFits (Distribution observed) {
-//        observed.min >= this.min;
-//        observed.max <= this.max;
-
-    }
-
     public void assertSimilar (Distribution observed) {
+        if (SHOW_CHARTS) {
+            DistributionChart.showChart(this, observed);
+        }
         double overlapPercent = this.overlap(observed) * 100;
         assertTrue(overlapPercent >= 95, String.format("Overlap less than 95%% at %3f", overlapPercent));
     }
@@ -230,7 +229,11 @@ public class Distribution {
         return skip;
     }
 
-    public void crop () {
+    /**
+     * Remove any zeros from the beginning and end of the probability density array.
+     * This improves both storage space and convolution efficiency.
+     */
+    public void trim () {
         int i = 0;
         while (i < masses.length && masses[i] == 0) {
             skip += 1;

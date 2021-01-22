@@ -9,6 +9,9 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * Tests for the Grid class, which holds destination counts in tiled spherical mercator pixels.
+ */
 public class GridTest {
 
     private static final long SEED = 4321;

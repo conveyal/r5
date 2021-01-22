@@ -481,8 +481,8 @@ public class Grid extends PointSet {
      * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
      * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
      */
-    public static double pixelToLon (double pixel, int zoom) {
-        return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+    public static double pixelToLon (double xPixel, int zoom) {
+        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
     /**

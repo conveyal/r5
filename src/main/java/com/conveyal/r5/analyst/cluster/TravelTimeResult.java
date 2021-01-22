@@ -7,22 +7,31 @@ import java.util.Arrays;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
- * Stores various samples of travel time (usually reduced to selected percentiles of total travel time) to every
- * point in a pointset (aka targets)
+ * Stores one or more percentiles of total travel time to each point in a pointset (aka targets or destinations).
+ * This is the internal result produced by the worker for a single origin, nested inside a OneOriginResult instance.
+ *
+ * TODO standardize terminology: the terms targets, destinations, and points are used interchangeably throughout
  */
-
 public class TravelTimeResult {
 
-    // In the past, when doing large numbers of bootstrapping samples, this used to be a long
-    // but now it should never be so huge and should fit in an int without fear of overflow.
+    /**
+     * The number of travel times that will be recorded at each destination point.
+     * This is currently equal to the number of percentiles being recorded.
+     */
     public final int nSamplesPerPoint;
 
     public final int nPoints;
 
-    // Travel time values, indexed by percentile (sample) and target (grid cell/point)
+    /**
+     * 2D array of travel times in minutes.
+     * First index is percentile, second index is target number (grid cell or point number within a pointset).
+     */
     int[][] values;
 
-    // For each target, the number of times falling in each of 120 one-minute bins. This is optional and may be null.
+    /**
+     * For each target, the number of times falling in each of 120 one-minute bins.
+     * This is optional, generally used only for debugging and testing, so may be null if no histograms are recorded.
+     */
     int[][] histograms;
 
     public TravelTimeResult(AnalysisWorkerTask task) {
@@ -39,14 +48,12 @@ public class TravelTimeResult {
         }
     }
 
-    // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
-    // So no real risk of overflowing an int index.
-    public void setTarget(int targetIndex, int[] targetValues) {
-        if (targetValues.length != nSamplesPerPoint) {
+    public void setTarget(int targetIndex, int[] percentileTravelTimesMinutes) {
+        if (percentileTravelTimesMinutes.length != nSamplesPerPoint) {
             throw new IllegalArgumentException("Incorrect number of values per pixel.");
         }
-        for (int i = 0; i < targetValues.length; i++) {
-            values[i][targetIndex] = targetValues[i];
+        for (int i = 0; i < percentileTravelTimesMinutes.length; i++) {
+            values[i][targetIndex] = percentileTravelTimesMinutes[i];
         }
     }
 

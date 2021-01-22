@@ -1,8 +1,12 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.results.CsvResultWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Represents a single regional (multi-origin) accessibility analysis,
@@ -71,6 +75,13 @@ public class RegionalAnalysis extends Model implements Cloneable {
 
     /** Has this analysis been (soft) deleted? */
     public boolean deleted;
+
+    public Map<CsvResultWriter.Result, String> resultStorage = new HashMap<>();
+
+    public void addCsvStoragePath (CsvResultWriter.Result resultType, String outputBucket) {
+        // TODO less fragile path, consistent gzip behavior
+        resultStorage.put(resultType, outputBucket + "/" + this._id + "_" + resultType + ".csv.gz");
+    }
 
     public RegionalAnalysis clone () {
         try {

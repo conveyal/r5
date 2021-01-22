@@ -50,7 +50,8 @@ public class BootstrappingTravelTimeReducer {
     public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid) {
         this.task = request;
         this.grid = grid;
-        int nIterations = request.getTimeWindowLengthMinutes() * request.getMonteCarloDrawsPerMinute();
+        // FIXME this assumes frequency entries are present.
+        int nIterations = request.getTotalIterations(true);
         // TODO handle multiple percentiles, request already has an array to hold more than one of them
         if (request.percentiles.length != 1) {
             throw new IllegalArgumentException("Bootstrapped travel times only support a single percentile of travel time!");

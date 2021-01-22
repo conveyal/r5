@@ -82,7 +82,7 @@ public class FreeFormPointSet extends PointSet {
             if (idField != null && idCol < 0) {
                 throw new ParameterException("CSV file did not contain the specified ID column.");
             }
-            if (idField != null && idCol < 0) {
+            if (countField != null && countCol < 0) {
                 throw new ParameterException("CSV file did not contain the specified opportunity count column.");
             }
             while (reader.readRecord()) {

@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
 
+import java.util.ArrayList;
+
 /**
  * Model class used for serialized travel times and accessibility indicators for a multi-origin (regional) analysis,
  * sent over HTTP to the backend/broker. Similar to OneOriginResult, but with arrays for results (instead of more
@@ -19,7 +21,11 @@ public class RegionalWorkResult {
      */
     public int[][] travelTimeValues;
 
-    // TODO paths and components (access/egress, wait) of travel time?
+    /**
+     * String array summarizing the details of a path at a specific iteration (e.g. wait time, in-vehicle time), keyed
+     * on target index and iteration.
+     */
+    public ArrayList<String[]>[] pathResult;
 
     /**
      * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
@@ -42,6 +48,7 @@ public class RegionalWorkResult {
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
+        this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
     }
 
     // TODO checkTravelTimeInvariants, checkAccessibilityInvariants

@@ -7,6 +7,7 @@ import com.conveyal.r5.transit.path.RouteSequence;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
@@ -149,8 +150,8 @@ public class PathResult {
         public Collection<HumanReadableIteration> iterations;
 
         PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
-            this.access = pathTemplate.stopSequence.access.toString();
-            this.egress = pathTemplate.stopSequence.egress.toString();
+            this.access = pathTemplate.stopSequence.access == null ? null : pathTemplate.stopSequence.access.toString();
+            this.egress = pathTemplate.stopSequence.egress == null ? null : pathTemplate.stopSequence.egress.toString();
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
             this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
         }
@@ -189,6 +190,14 @@ public class PathResult {
             this.waitTimes = path.waitTimes;
             this.totalTime = totalTime;
         }
+
+        /**
+         * Constructor for paths with no transit boardings (and therefore no wait times).
+         */
+        public Iteration(int totalTime) {
+            this.waitTimes = new TIntArrayList();
+            this.totalTime = totalTime;
+        }
     }
 
     /**
@@ -200,6 +209,7 @@ public class PathResult {
         public double totalTime;
 
         HumanReadableIteration(Iteration iteration) {
+            // TODO track departure time for non-transit paths (so direct trips don't show departure time 00:00).
             this.departureTime =
                     String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
                             (int) (iteration.departureTime / 60.0 % 60));

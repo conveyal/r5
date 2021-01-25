@@ -64,10 +64,15 @@ public class StopSequence {
      * calculated by  subtracting the other components of travel time from the total travel time
      */
     public int transferTime(PathResult.Iteration iteration) {
-        int transferTimeSeconds =
-                iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
-        checkState(transferTimeSeconds >= 0);
-        return transferTimeSeconds;
+        if (access == null && egress == null && iteration.waitTimes.size() == 0 && rideTimesSeconds == null) {
+            // No transit ridden, so transfer time is 0.
+            return 0;
+        } else {
+            int transferTimeSeconds =
+                    iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
+            checkState(transferTimeSeconds >= 0);
+            return transferTimeSeconds;
+        }
     }
 
 }

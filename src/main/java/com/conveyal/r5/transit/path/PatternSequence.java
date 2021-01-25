@@ -16,7 +16,7 @@ public class PatternSequence {
     /**
      * Create a PatternSequence from transit leg characteristics.
      */
-    PatternSequence(TIntList patterns, TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds) {
+    public PatternSequence(TIntList patterns, TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds) {
         this.patterns = patterns;
         this.stopSequence = new StopSequence(boardStops, alightStops, rideTimesSeconds);
     }

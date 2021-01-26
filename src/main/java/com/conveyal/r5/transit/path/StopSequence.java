@@ -35,9 +35,9 @@ public class StopSequence {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         StopSequence that = (StopSequence) o;
-        return boardStops.equals(that.boardStops) &&
-                alightStops.equals(that.alightStops) &&
-                rideTimesSeconds.equals(that.rideTimesSeconds) &&
+        return Objects.equals(boardStops, that.boardStops) &&
+                Objects.equals(alightStops, that.alightStops) &&
+                Objects.equals(rideTimesSeconds, that.rideTimesSeconds) &&
                 Objects.equals(access, that.access) &&
                 Objects.equals(egress, that.egress);
     }

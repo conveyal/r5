@@ -37,9 +37,9 @@ public class PatternSequence {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        PatternSequence path = (PatternSequence) o;
-        return patterns.equals(path.patterns) &&
-               this.stopSequence.equals(path.stopSequence);
+        PatternSequence that = (PatternSequence) o;
+        return Objects.equals(patterns, that.patterns) &&
+                Objects.equals(stopSequence, that.stopSequence);
     }
 
     @Override

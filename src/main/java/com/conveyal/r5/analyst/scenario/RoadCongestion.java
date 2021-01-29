@@ -164,9 +164,10 @@ public class RoadCongestion extends Modification {
                             priority, priorityAttribute, featureNumber));
                     indexThisFeature = false;
                 }
-                if (!(scale instanceof Number)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
-                            scale, scalingAttribute, featureNumber));
+                if (!(scale instanceof Number) && !(speed instanceof Number)) {
+                    errors.add(String.format("At least one of '%s'/'%s' of attributes '%s'/'%s' of feature %d should " +
+                                    "be a number.",
+                            scale, speed, scalingAttribute, speedAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (!(geometry instanceof Polygonal)) {
@@ -174,11 +175,13 @@ public class RoadCongestion extends Modification {
                     indexThisFeature = false;
                 }
                 if (indexThisFeature) {
+                    double scaleValue = scale == null ? 0 : ((Number) scale).doubleValue();
+                    double speedValue =speed == null ? 0 : ((Number) speed).doubleValue();
                     polygonSpatialIndex.insert(geometry.getEnvelopeInternal(), new CongestionPolygon
                             ((Polygonal) geometry,
                             (String)name,
-                            ((Number)scale).doubleValue(),
-                            ((Number)speed).doubleValue(),
+                            scaleValue,
+                            speedValue,
                             ((Number)priority).doubleValue()));
                 }
             }

@@ -81,6 +81,12 @@ public class RoadCongestion extends Modification {
     /** The name of the attribute (floating-point) within the polygon layer that contains the speed scaling factor. */
     public String scalingAttribute = "scale";
 
+    /**
+     * Name of the attribute (floating-point) within the polygon layer that contains the speed (in km/hr). If a
+     * non-zero speed is set, it will be used and the scale will be ignored.
+     */
+    public String speedAttribute = "speed";
+
     /** The name of the attribute (numeric) within the polygon layer that contains the polygon priority. */
     public String priorityAttribute = "priority";
 
@@ -140,6 +146,7 @@ public class RoadCongestion extends Modification {
                 Geometry geometry = (Geometry) feature.getDefaultGeometry();
                 // NOTE all features must have the same attributes because schema is inferred from the first feature
                 Object scale = feature.getAttribute(scalingAttribute);
+                Object speed = feature.getAttribute(speedAttribute);
                 Object name = feature.getAttribute(nameAttribute);
                 Object priority = feature.getAttribute(priorityAttribute);
                 boolean indexThisFeature = true;
@@ -171,6 +178,7 @@ public class RoadCongestion extends Modification {
                             ((Polygonal) geometry,
                             (String)name,
                             ((Number)scale).doubleValue(),
+                            ((Number)speed).doubleValue(),
                             ((Number)priority).doubleValue()));
                 }
             }
@@ -192,12 +200,14 @@ public class RoadCongestion extends Modification {
         Geometry polygonal;
         String name;
         double scale;
+        double speed;
         double priority;
 
-        public CongestionPolygon (Polygonal polygonal, String name, double scale, double priority) {
+        public CongestionPolygon (Polygonal polygonal, String name, double scale, double speed, double priority) {
             this.polygonal = (Geometry) polygonal;
             this.name = name;
             this.scale = scale;
+            this.speed = speed;
             this.priority = priority;
         }
     }
@@ -211,7 +221,7 @@ public class RoadCongestion extends Modification {
         TShortList adjustedSpeeds = new TShortArrayList(edgeStore.speeds.size());
         EdgeStore.Edge edge = edgeStore.getCursor();
         CongestionPolygon defaultPolygon =
-                new CongestionPolygon(null, "DEFAULT", defaultScaling, 0);
+                new CongestionPolygon(null, "DEFAULT", defaultScaling, 0, 0);
         TObjectIntMap<CongestionPolygon> edgeCounts = new TObjectIntHashMap<>();
         while (edge.advance()) {
             // Look up polygons in spatial index. Find the one polygon that contains most of the edge.
@@ -238,8 +248,13 @@ public class RoadCongestion extends Modification {
             if (logUpdatedEdgeCounts) {
                 edgeCounts.adjustOrPutValue(winner, 1, 1);
             }
-            // TODO reconsider why we are saving cm/sec, it apparently only shaves a few percent off the file size.
-            adjustedSpeeds.add((short)(edge.getSpeed() * winner.scale));
+            if (winner.speed != 0) {
+                // Convert from km/hr to cm/sec
+                adjustedSpeeds.add((short) (winner.speed / 3.6 * 100));
+            } else {
+                // TODO reconsider why we are saving cm/sec, it apparently only shaves a few percent off the file size.
+                adjustedSpeeds.add((short) (edge.getSpeed() * winner.scale));
+            }
         }
         if (logUpdatedEdgeCounts) {
             edgeCounts.forEachEntry((polygon, quantity) -> {

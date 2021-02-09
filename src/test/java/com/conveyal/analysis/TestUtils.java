@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.restassured.response.Response;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,8 +14,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import static io.restassured.RestAssured.given;
 
 public class TestUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
@@ -63,22 +60,6 @@ public class TestUtils {
      */
     public static void removeDynamicValues(JsonNode json) {
         removeKeysAndValues(json, new String[]{"_id", "createdAt", "nonce", "updatedAt"});
-    }
-
-    /**
-     * Helper method to do the parsing and checking of whether an object with a given ObjectId is present or not in a
-     * response that contains a list of objects
-     */
-    public static boolean objectIdInResponse(Response response, String objectId) {
-        ObjectWithId[] objects = response.then()
-            .extract()
-            .as(ObjectWithId[].class);
-
-        boolean foundObject = false;
-        for (ObjectWithId object : objects) {
-            if (object._id.equals(objectId)) foundObject = true;
-        }
-        return foundObject;
     }
 
     /**

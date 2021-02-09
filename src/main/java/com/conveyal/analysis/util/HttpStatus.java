@@ -10,5 +10,6 @@ public class HttpStatus {
     public static final int NO_CONTENT_204 = 204;
     public static final int BAD_REQUEST_400 = 400;
     public static final int SERVER_ERROR_500 = 500;
+    public static final int BAD_GATEWAY_502 = 502;
     public static final int SERVICE_UNAVAILABLE = 000;
 }

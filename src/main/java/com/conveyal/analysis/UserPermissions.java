@@ -1,9 +1,5 @@
 package com.conveyal.analysis;
 
-import com.google.common.collect.Sets;
-
-import java.util.Set;
-
 /**
  * Groups together all information about what a user is allowed to do.
  * Currently all such information is known from the group ID.
@@ -13,21 +9,21 @@ public class UserPermissions {
 
     public final String email;
 
-    public final Set<String> groups;
+    public final String accessGroup;
 
     public final boolean admin;
 
-    public UserPermissions (String email, boolean admin, String... groups) {
+    public UserPermissions (String email, boolean admin, String accessGroup) {
         this.email = email;
         this.admin = admin;
-        this.groups = Sets.newHashSet(groups);
+        this.accessGroup = accessGroup;
     }
 
     @Override
     public String toString () {
         return "UserPermissions{" +
                 "email='" + email + '\'' +
-                ", groups='" + groups + '\'' +
+                ", accessGroup='" + accessGroup + '\'' +
                 '}';
     }
 }

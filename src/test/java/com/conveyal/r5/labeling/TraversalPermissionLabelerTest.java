@@ -3,10 +3,9 @@ package com.conveyal.r5.labeling;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
-import junit.framework.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -14,7 +13,9 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Created by mabu on 26.11.2015.
@@ -49,7 +50,7 @@ public class TraversalPermissionLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_CAR);
 
-    @BeforeClass
+    @BeforeAll
     public static void setUpClass() {
         traversalPermissionLabeler = new TestPermissionsLabeler();
     }
@@ -93,7 +94,7 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, "wheelchair", "no", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
     }
 
-    @Ignore("specific tagging isn't supported yet in specific permissions")
+    @Disabled("specific tagging isn't supported yet in specific permissions")
     @Test
     public void testSidewalk() throws Exception {
         Way osmWay = new Way();
@@ -160,7 +161,7 @@ public class TraversalPermissionLabelerTest {
         RoadPermission roadPermission = roadFlagComparision(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
-        Assert.assertFalse(
+        assertFalse(
             Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
                 .disjoint(roadPermission.backward, ALLPERMISSIONS));
     }
@@ -171,11 +172,11 @@ public class TraversalPermissionLabelerTest {
         RoadPermission roadPermission = roadFlagComparision(osmWay, CAR, NONE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
-        Assert.assertFalse(
+        assertFalse(
             Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
                 .disjoint(roadPermission.backward, ALLPERMISSIONS));
 
-        Assert.assertTrue(
+        assertTrue(
             Collections.disjoint(NONE, ALLPERMISSIONS) && Collections
                 .disjoint(NONE, ALLPERMISSIONS));
 
@@ -268,8 +269,8 @@ public class TraversalPermissionLabelerTest {
 
         String tags = "Tags: " + stringJoiner.toString();
 
-        assertEquals(tags, forwardExpected, forwardFiltered);
-        assertEquals(tags, backwardExpected, backwardFiltered);
+        assertEquals(forwardExpected, forwardFiltered, tags);
+        assertEquals(backwardExpected, backwardFiltered, tags);
         return roadPermission;
     }
 

@@ -46,6 +46,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -372,7 +373,7 @@ public class AnalysisWorker implements Runnable {
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
                 if (autoShutdown) {considerShuttingDown();}
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+                LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
@@ -470,7 +471,8 @@ public class AnalysisWorker implements Runnable {
                     byteArrayOutputStream,
                     oneOriginResult.accessibility,
                     transportNetwork.scenarioApplicationWarnings,
-                    transportNetwork.scenarioApplicationInfo
+                    transportNetwork.scenarioApplicationInfo,
+                    oneOriginResult.paths
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -576,7 +578,7 @@ public class AnalysisWorker implements Runnable {
                 // progress. This avoids crashing the backend by sending back massive 2 million element travel times
                 // that have already been written to S3, and throwing exceptions on old backends that can't deal with
                 // null AccessibilityResults.
-                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task));
+                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
             }
 
             // Accumulate accessibility results, which will be returned to the backend in batches.
@@ -605,7 +607,7 @@ public class AnalysisWorker implements Runnable {
             e.printStackTrace();
         }
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult());
+            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult(), null);
             synchronized (workResults) {
                 workResults.add(new RegionalWorkResult(emptyContainer, task));
             }
@@ -631,6 +633,8 @@ public class AnalysisWorker implements Runnable {
 
         public List<TaskError> scenarioApplicationInfo;
 
+        public List<PathResult.PathIterations> pathSummaries;
+
         @Override
         public String toString () {
             return String.format(
@@ -655,7 +659,8 @@ public class AnalysisWorker implements Runnable {
             OutputStream outputStream,
             AccessibilityResult accessibilityResult,
             List<TaskError> scenarioApplicationWarnings,
-            List<TaskError> scenarioApplicationInfo
+            List<TaskError> scenarioApplicationInfo,
+            PathResult pathResult
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
@@ -666,6 +671,7 @@ public class AnalysisWorker implements Runnable {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
+        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
         LOG.info("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

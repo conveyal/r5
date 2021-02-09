@@ -74,6 +74,10 @@ public class RaptorState {
      */
     public int[] nonTransferInVehicleTravelTime;
 
+    public int[] previousWaitTime;
+
+    public int[] previousInVehicleTravelTime;
+
     /**
      * The transit pattern used to achieve the travel times recorded for each stop in bestNonTransferTimes.
      * When a transfer improves upon that time, bestNonTransferTimes will still contain the time that the pattern in
@@ -139,6 +143,8 @@ public class RaptorState {
         // These fields accumulate times, so are initially filled with zeros.
         this.nonTransferWaitTime = new int[nStops];
         this.nonTransferInVehicleTravelTime = new int[nStops];
+        this.previousInVehicleTravelTime = new int[nStops];
+        this.previousWaitTime = new int[nStops];
 
         // Previous round reference should be set as needed by the code calling this constructor.
         this.previous = null;
@@ -158,6 +164,9 @@ public class RaptorState {
         this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
         this.nonTransferInVehicleTravelTime =
                 Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
+        this.previousWaitTime = Arrays.copyOf(state.previousInVehicleTravelTime, state.previousInVehicleTravelTime.length);
+        this.previousInVehicleTravelTime = Arrays.copyOf(state.previousInVehicleTravelTime,
+                state.previousInVehicleTravelTime.length);
         this.departureTime = state.departureTime;
         this.maxDurationSeconds = state.maxDurationSeconds;
 
@@ -206,6 +215,8 @@ public class RaptorState {
                 this.previousPatterns[stop] = previous.previousPatterns[stop];
                 this.previousStop[stop] = previous.previousStop[stop];
                 this.nonTransferInVehicleTravelTime[stop] = previous.nonTransferInVehicleTravelTime[stop];
+                this.previousWaitTime[stop] = previous.previousWaitTime[stop];
+                this.previousInVehicleTravelTime[stop] = previous.previousInVehicleTravelTime[stop];
                 this.nonTransferWaitTime[stop] = previous.nonTransferWaitTime[stop];
             }
         }
@@ -248,6 +259,8 @@ public class RaptorState {
             checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime),
                     "Components of travel time are greater than total travel time.");
             optimal = true;
+            previousWaitTime[stop] = waitTime;
+            previousInVehicleTravelTime[stop] = inVehicleTime;
             nonTransferStopsUpdated.set(stop);
         }
 
@@ -319,6 +332,10 @@ public class RaptorState {
         for (int stop = 0; stop < this.bestTimes.length; stop++) {
             if (this.previousPatterns[stop] > -1) {
                 this.nonTransferWaitTime[stop] += additionalWaitSeconds;
+                if (this.previous.previous == null) {
+                    // increment initial wait
+                    this.previousWaitTime[stop] += additionalWaitSeconds;
+                }
             } else {
                 this.nonTransferWaitTime[stop] = 0;
                 this.nonTransferInVehicleTravelTime[stop] = 0;

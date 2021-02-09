@@ -19,13 +19,14 @@ import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
@@ -70,12 +71,9 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
-        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this object within the propagator.
-        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
+        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request, network);
 
         // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
         // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
@@ -86,9 +84,9 @@ public class TravelTimeComputer {
 
         if (request instanceof  RegionalTask
                 && !request.makeTauiSite
-                && ((RegionalTask) request).destinationPointSets[0] instanceof FreeFormPointSet) {
+                && request.destinationPointSets[0] instanceof FreeFormPointSet) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
-            destinations = ((RegionalTask) request).destinationPointSets[0];
+            destinations = request.destinationPointSets[0];
         } else {
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
@@ -100,8 +98,9 @@ public class TravelTimeComputer {
         // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel
         // times to the destination points using those access modes.
 
-        // A map from transit stop vertex indices to the travel time it takes to reach those vertices in seconds.
-        TIntIntMap accessTimes = new TIntIntHashMap();
+        // A map from transit stop vertex indices to the travel time (in seconds) and mode used to reach those
+        // vertices.
+        StreetTimesAndModes bestAccessOptions = new StreetTimesAndModes();
 
         // Travel times in seconds to each destination point (or MAX_INT for unreachable points?)
         // Starts out as null but will be updated when any access leg search succeeds.
@@ -130,10 +129,6 @@ public class TravelTimeComputer {
                 continue;
             }
 
-            int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
-            if (streetSpeedMillimetersPerSecond <= 0){
-                throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
-            }
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
@@ -184,40 +179,54 @@ public class TravelTimeComputer {
                     }
                     travelTimesToStopsSeconds.transformValues(i -> i + accessService.waitTimeSeconds);
                 }
-                minMergeMap(accessTimes, travelTimesToStopsSeconds);
+               bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
             }
 
-            LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
-                    destinations,
-                    network.streetLayer,
-                    accessMode
-            );
+            // Calculate times to reach destinations directly by this street mode, without using transit.
+            //
+            // The current implementation iterates over every cell in the destination grid. That usually makes sense
+            // for non-transit searches, where we need to evaluate times up to the full travel time limit. But for
+            // transit searches, where sr.timeLimitSeconds is typically small, it may not make sense to iterate over
+            // every cell in a (possibly huge) destination grid. If this is measured to be inefficient, we could
+            // construct a sub-grid that's an envelope around sr.originSplit's lat/lon (sized according to sr
+            // .timeLimitSeconds and a mode-specific speed?), then iterate over the points in that sub-grid.
+            {
+                LinkedPointSet linkedDestinations = network.linkageCache.getLinkage(
+                        destinations,
+                        network.streetLayer,
+                        accessMode
+                );
 
-            // This is iterating over every cell in the (possibly huge) destination grid just to get the access times
-            // around the origin. If this is measured to be inefficient, we could construct a sub-grid that's an
-            // envelope around sr.originSplit's lat/lon, then iterate over the points in that sub-grid.
-
-            Split origin = sr.getOriginSplit();
-
-            PointSetTimes pointSetTimes = linkedDestinations.eval(
-                    sr::getTravelTimeToVertex,
-                    streetSpeedMillimetersPerSecond,
-                    walkSpeedMillimetersPerSecond,
-                    origin
-            );
-
-            if (accessService != NO_WAIT_ALL_STOPS) {
-                LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
-                        accessService.waitTimeSeconds, accessMode);
-                if (accessService.stopsReachable != null) {
-                    // Disallow direct travel to destination if pickupDelay zones are associated with stops.
-                    pointSetTimes = PointSetTimes.allUnreached(destinations);
-                } else {
-                    // Allow direct travel to destination using services not associated with specific stops.
-                    pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                int streetSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
+                if (streetSpeedMillimetersPerSecond <= 0) {
+                    throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
+
+                // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+
+                Split origin = sr.getOriginSplit();
+
+                PointSetTimes pointSetTimes = linkedDestinations.eval(
+                        sr::getTravelTimeToVertex,
+                        streetSpeedMillimetersPerSecond,
+                        walkSpeedMillimetersPerSecond,
+                        origin
+                );
+
+                if (accessService != NO_WAIT_ALL_STOPS) {
+                    LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
+                            accessService.waitTimeSeconds, accessMode);
+                    if (accessService.stopsReachable != null) {
+                        // Disallow direct travel to destination if pickupDelay zones are associated with stops.
+                        pointSetTimes = PointSetTimes.allUnreached(destinations);
+                    } else {
+                        // Allow direct travel to destination using services not associated with specific stops.
+                        pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
+                    }
+                }
+                nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
             }
-            nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
         }
 
         // Handle park+ride, a mode represented in the request LegMode but not in the internal StreetMode.
@@ -238,7 +247,7 @@ public class TravelTimeComputer {
                 // Origin not found. Signal this using the same flag as the other modes do.
                 foundAnyOriginPoint = false;
             } else {
-                accessTimes = sr.getReachedStops();
+                bestAccessOptions.update(sr.getReachedStops(), StreetMode.CAR);
                 foundAnyOriginPoint = true;
             }
             // Disallow non-transit access.
@@ -255,7 +264,7 @@ public class TravelTimeComputer {
 
         // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
         // were reached, return the non-transit grid as the final result.
-        if (request.transitModes.isEmpty() || accessTimes.isEmpty()) {
+        if (request.transitModes.isEmpty() || bestAccessOptions.streetTimesAndModes.isEmpty()) {
             LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
             int nTargets =  nonTransitTravelTimesToDestinations.size();
             if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
@@ -273,8 +282,8 @@ public class TravelTimeComputer {
         int[][] transitTravelTimesToStops;
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
-            worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-            if (request.computePaths || request.computeTravelTimeBreakdown) {
+            worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
+            if (request.includePathResults || request.makeTauiSite) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
                 worker.retainPaths = true;
@@ -316,32 +325,26 @@ public class TravelTimeComputer {
         // because in the non-transit case we call the reducer directly (see above).
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
-        // When building a static site, perform some additional initialization causing the propagator to do extra work.
-        if (request.computePaths || request.computeTravelTimeBreakdown) {
-            perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
-            perTargetPropagater.pathWriter = new PathWriter(request);
+        // When path results are needed (directly requested, or for a Taui site), read them from the worker,
+        // annotating with the access mode, then use the annotated paths to initialize the appropriate field in the
+        // propagater. Not supported for fare requests, which use the McRaptor router and path style.
+        if ((request.includePathResults || request.makeTauiSite) && worker != null) {
+            perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
+                for (Path path : paths) {
+                    if (path != null) {
+                        path.patternSequence.stopSequence.setAccess(bestAccessOptions);
+                    }
+                }
+            }).collect(Collectors.toList());
+            // Initialize the propagater's pathWriter to write Taui results directly to storage (instead of returning
+            // them to the backend).
+            if (request.makeTauiSite) {
+                perTargetPropagater.pathWriter = new PathWriter(request);
+            }
         }
 
         return perTargetPropagater.propagate();
 
-    }
-
-
-    /**
-     * Utility method. Merges two Trove int-int maps, keeping the minimum value when keys collide.
-     */
-    private static void minMergeMap (TIntIntMap target, TIntIntMap source) {
-        source.forEachEntry((key, val) -> {
-            if (target.containsKey(key)) {
-                int existingVal = target.get(key);
-                if (val < existingVal) {
-                    target.put(key, val);
-                }
-            } else {
-                target.put(key, val);
-            }
-            return true;
-        });
     }
 
 }

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * A pointset that represents a grid of pixels from the web mercator projection.
@@ -193,6 +194,13 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
         return new WebMercatorExtents(west, north, width, height, zoom);
+    }
+
+    public int indexFromWgsCoordinates(double lon, double lat, int zoom) {
+        checkArgument(zoom == this.zoom, "Zoom levels must be identical.");
+        int x = lonToPixel(lon) - west;
+        int y = latToPixel(lat) - north;
+        return y * width + x;
     }
 
 }

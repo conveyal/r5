@@ -1,8 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import gnu.trove.list.TIntList;
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
 import java.util.Arrays;
@@ -12,15 +11,18 @@ import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.C
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.OUTSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.PARTIAL;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the web mercator grid pointset.
  */
-public class WebMercatorGridPointSetTest extends TestCase {
+public class WebMercatorGridPointSetTest {
 
     /** Test that latitude/longitude to pixel conversions are correct */
     @Test
-    public static void testLatLonPixelConversions () {
+    public void testLatLonPixelConversions () {
         // offsets and width/height not needed for calculations
         WebMercatorGridPointSet ps = new WebMercatorGridPointSet(
             WebMercatorGridPointSet.DEFAULT_ZOOM, 0,0, 100, 100, null
@@ -37,7 +39,7 @@ public class WebMercatorGridPointSetTest extends TestCase {
 
     /** Test that we can find pixel numbers for envelopes intersecting a gridded PointSet. */
     @Test
-    public static void testPixelsInEnvelope () {
+    public void testPixelsInEnvelope () {
 
         // Envelope and grid 1 degree high and 5 degrees wide, in the ocean south of Africa.
         Envelope gridEnvelope = new Envelope(10, 15, -45, -44);

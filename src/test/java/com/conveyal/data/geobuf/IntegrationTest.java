@@ -1,7 +1,6 @@
 package com.conveyal.data.geobuf;
 
-import junit.framework.TestCase;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -14,10 +13,14 @@ import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * An integration test of our GeoBuf library.
  */
-public class IntegrationTest extends TestCase {
+public class IntegrationTest {
     private final GeometryFactory gf = new GeometryFactory();
 
     /** make sure geometry is serialized and deserialized correctly */

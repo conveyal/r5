@@ -190,6 +190,8 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * Construct a new LinkedPointSet for a grid that falls entirely within an existing gridded LinkedPointSet.
+     * FIXME in fact this does not require the subgrid to fall entirely within the existing grid.
+     *       Change Javadoc to reflect actual behaviour.
      *
      * @param sourceLinkage a LinkedPointSet whose PointSet must be a WebMercatorGridPointset
      * @param subGrid       the grid for which to create a linkage

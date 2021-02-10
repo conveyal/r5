@@ -278,12 +278,16 @@ public class TravelTimeReducer {
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
                                       StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
         Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
-        for (int i = 0; i < perIterationPaths.length; i++) {
+        for (int i = 0; i < perIterationTimes.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
                 PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
                 PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                paths.put(patternSequence, iteration);
+            } else if (totalTime < UNREACHED){
+                PatternSequence patternSequence = new PatternSequence(null, null, null, null);
+                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
                 paths.put(patternSequence, iteration);
             }
         }

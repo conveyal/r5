@@ -255,10 +255,7 @@ public class MultiOriginAssembler {
                     int[] percentileResult = workResult.travelTimeValues[p];
                     for (int d = 0; d < percentileResult.length; d++) {
                         int travelTime = percentileResult[d];
-                        // oneToOne results will perform only one iteration of this loop
-                        // Always writing both origin and destination ID we should alert the user if something is amiss.
-                        int destinationIndex = job.templateTask.oneToOne ? workResult.taskId : d;
-                        String destinationId = destinationPointSet.getId(destinationIndex);
+                        String destinationId = destinationId(workResult.taskId, d);
                         timeCsvWriter.writeOneRow(originId, destinationId, String.valueOf(travelTime));
                     }
                 }
@@ -271,7 +268,7 @@ public class MultiOriginAssembler {
                     ArrayList<String[]> pathsIterations = pathsToPoints[d];
                     for (String[] iterationDetails : pathsIterations) {
                         String originId = originPointSet.getId(workResult.taskId);
-                        String destinationId = destinationPointSet.getId(d);
+                        String destinationId = destinationId(workResult.taskId, d);
                         checkDimension(workResult, "columns", iterationDetails.length, PathResult.DATA_COLUMNS.length);
                         pathCsvWriter.writeOneRow(originId, destinationId, iterationDetails);
                     }
@@ -340,6 +337,16 @@ public class MultiOriginAssembler {
         }
         for (CsvResultWriter writer : csvResultWriters) {
             writer.terminate();
+        }
+    }
+
+    String destinationId(int taskId, int index) {
+        // oneToOne results will have the same origin and destination IDs.
+        // Always writing both should alert the user if something is amiss.
+        if (job.templateTask.oneToOne) {
+            return destinationPointSet.getId(taskId);
+        } else {
+            return destinationPointSet.getId(index);
         }
     }
 

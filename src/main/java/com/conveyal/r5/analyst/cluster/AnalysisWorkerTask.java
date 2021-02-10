@@ -99,6 +99,9 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      */
     public boolean includePathResults = false;
 
+    /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
+    public boolean recordTravelTimeHistograms = false;
+
     /**
      * Which percentiles of travel time to calculate.
      * These should probably just be integers, but there are already a lot of them in Mongo as floats.

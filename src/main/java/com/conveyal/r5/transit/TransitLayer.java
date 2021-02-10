@@ -176,13 +176,17 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String scenarioId;
 
-    /** Load a GTFS feed with full load level */
+    /**
+     * Load a GTFS feed with full load level. The feed is not closed after being loaded.
+     * TODO eliminate "load levels"
+     */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         loadFromGtfs(gtfs, LoadLevel.FULL);
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
+     * The feed is not closed after being loaded.
      */
     public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {

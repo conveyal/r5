@@ -7,7 +7,6 @@ import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import com.google.common.primitives.Doubles;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -22,7 +21,6 @@ import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
@@ -39,7 +37,6 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +45,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -280,6 +278,14 @@ public class Grid extends PointSet {
         }
     }
 
+    public void write (String filename) {
+        try {
+            write(new FileOutputStream(filename));
+        } catch (Exception e) {
+            throw new RuntimeException("Error writing grid.", e);
+        }
+    }
+
     /**
      * Write this opportunity density grid out in R5 binary format.
      * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional
@@ -314,45 +320,6 @@ public class Grid extends PointSet {
         out.close();
     }
 
-    /**
-     * How to get the width of the world in meters according to the EPSG CRS spec:
-     * $ gdaltransform -s_srs epsg:4326 -t_srs epsg:3857
-     * 180, 0
-     * 20037508.3427892 -7.08115455161362e-10 0
-     * You can't do 180, 90 because this projection is cut off above a certain level to make the world square.
-     * You can do the reverse projection to find this latitude:
-     * $ gdaltransform -s_srs epsg:3857 -t_srs epsg:4326
-     * 20037508.342789, 20037508.342789
-     * 179.999999999998 85.0511287798064 0
-     */
-    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
-        double worldWidthPixels = Math.pow(2, zoom) * 256D;
-        // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
-        // The origin is WGS84 (0,0).
-        final double worldWidthMeters = 20037508.342789244 * 2;
-        double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
-        double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
-        return new Coordinate(xMeters, yMeters);
-    }
-
-    /**
-     * At zoom level zero, our coordinates are pixels in a single planetary tile, with coordinates are in the range
-     * [0...256). We want to export with a conventional web Mercator envelope in meters.
-     */
-    public ReferencedEnvelope getMercatorEnvelopeMeters() {
-        Coordinate topLeft = mercatorPixelToMeters(west, north);
-        Coordinate bottomRight = mercatorPixelToMeters(west + width, north + height);
-        Envelope mercatorEnvelope = new Envelope(topLeft, bottomRight);
-        try {
-            // Get Spherical Mercator pseudo-projection CRS
-            CoordinateReferenceSystem webMercator = CRS.decode("EPSG:3857");
-            ReferencedEnvelope env = new ReferencedEnvelope(mercatorEnvelope, webMercator);
-            return env;
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
     /** Write this grid out in GeoTIFF format */
     public void writeGeotiff (OutputStream out) {
         try {
@@ -362,7 +329,7 @@ public class Grid extends PointSet {
                     data[y][x] = (float) grid[x][y];
                 }
             }
-            ReferencedEnvelope env = getMercatorEnvelopeMeters();
+            ReferencedEnvelope env = this.getWebMercatorExtents().getMercatorEnvelopeMeters();
             GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
@@ -471,57 +438,82 @@ public class Grid extends PointSet {
     }
 
     /**
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 latitude of the center of the corresponding pixel in the grid
+     * Return the latitude of the center point of the grid cell for the specified one-dimensional index into this
+     * gridded pointset (flattened, with x varying faster than y).
+     * TODO WebMercatorGridPointSet should follow a consistent definition (edge or center) but it doesn't!
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 latitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLat(int i) {
+        // Integer division of linear index to find vertical integer intra-grid pixel coordinate
         int y = i / width;
         return pixelToCenterLat(north + y, zoom);
     }
 
     /**
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 longitude of the center of the corresponding pixel in the grid
+     * Like getLat, but returns the longitude of the center point of the specified cell.
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 longitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLon(int i) {
+        // Remainder of division yields horizontal integer intra-grid pixel coordinate
         int x = i % width;
         return pixelToCenterLon(west + x, zoom);
     }
 
-    public int featureCount() { return width * height; }
+    public int featureCount() {
+        return width * height;
+    }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
-    /** Return the pixel the given longitude falls within */
+    /**
+     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
+     * zoom level.
+     */
     public static int lonToPixel (double lon, int zoom) {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
-    /** return the west side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
-    public static double pixelToLon (double pixel, int zoom) {
-        return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+    /**
+     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
+     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     */
+    public static double pixelToLon (double xPixel, int zoom) {
+        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
-    /** Return the longitude of the center of the given pixel */
-    public static double pixelToCenterLon (int pixel, int zoom) {
-        return pixelToLon(pixel + 0.5, zoom);
+    /**
+     * Return the longitude of the center of all pixels at the given zoom and x pixel number, measured from the west
+     * edge of the world.
+     */
+    public static double pixelToCenterLon (int xPixel, int zoom) {
+        return pixelToLon(xPixel + 0.5, zoom);
     }
 
-    /** Return the pixel the given latitude falls within */
+    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
     public static int latToPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
-    /** Return the latitude of the center of the given pixel */
-    public static double pixelToCenterLat (int pixel, int zoom) {
-        return pixelToLat(pixel + 0.5, zoom);
+    /**
+     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
+     * measured southward from the north edge of the world.
+     */
+    public static double pixelToCenterLat (int yPixel, int zoom) {
+        return pixelToLat(yPixel + 0.5, zoom);
     }
 
-    // We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
-    /** return the north side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
-    public static double pixelToLat (double pixel, int zoom) {
-        return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+    /**
+     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
+     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
+     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+     */
+    public static double pixelToLat (double yPixel, int zoom) {
+        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /**

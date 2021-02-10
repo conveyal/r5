@@ -11,8 +11,8 @@ public abstract class DistributionTester {
     public static final int[] PERCENTILES = new int[] {5, 25, 50, 75, 95};
 
     /**
-     * Assert that the supplied array within 1 of the expected value for percentiles 5, 25, 50, 75, and 95
-     * for a values uniformly distributed from the given min to max.
+     * Assert that the five percentiles given in the array (5, 25, 50, 75, and 95) appear to be drawn from values
+     * uniformly distributed from the given min to max.
      */
     public static void assertUniformlyDistributed (int[] sortedPercentiles, int min, int max) {
         double range = max - min;

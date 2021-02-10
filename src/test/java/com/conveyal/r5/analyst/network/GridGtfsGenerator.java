@@ -28,8 +28,6 @@ public class GridGtfsGenerator {
 
     public static final LocalDate GTFS_DATE = LocalDate.of(2020, 1, 1);
 
-    public int gtfsDate = 20210101;
-
     public final GridLayout gridLayout;
 
     private final GTFSFeed feed;

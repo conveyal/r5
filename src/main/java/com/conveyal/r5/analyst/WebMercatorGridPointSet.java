@@ -225,11 +225,4 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return new WebMercatorExtents(west, north, width, height, zoom);
     }
 
-    public int indexFromWgsCoordinates(double lon, double lat, int zoom) {
-        checkArgument(zoom == this.zoom, "Zoom levels must be identical.");
-        int x = lonToPixel(lon) - west;
-        int y = latToPixel(lat) - north;
-        return y * width + x;
-    }
-
 }

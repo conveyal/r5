@@ -172,10 +172,9 @@ public class PerTargetPropagater {
 
         if (savePaths == SavePaths.ONE_DESTINATION){
             if (targets instanceof WebMercatorGridPointSet) {
-                destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
-                        task.toLon,
-                        task.toLat,
-                        task.zoom
+                destinationIndexForPaths = ((WebMercatorGridPointSet) targets).getPointIndexContaining(
+                    task.toLon,
+                    task.toLat
                 );
             } else if (targets instanceof FreeFormPointSet) {
                 destinationIndexForPaths = task.taskId;

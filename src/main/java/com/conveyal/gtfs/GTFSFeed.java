@@ -6,8 +6,12 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FareArea;
 import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareLegRule;
+import com.conveyal.gtfs.model.FareNetwork;
 import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FareTransferRule;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Pattern;
@@ -144,6 +148,18 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** A fare is a fare_attribute and all fare_rules that reference that fare_attribute. TODO what is the path? */
     public final Map<String, Fare> fares;
 
+    /** GTFS-Fares V2: One entry per fare area, containing all the rows for that fare area */
+    public final Map<String, FareArea> fare_areas;
+
+    /** GTFS-Fares V2: One entry per fare network, containing all members of that network */
+    public final Map<String, FareNetwork> fare_networks;
+
+    /** GTFS Fares V2: Fare leg rules */
+    public final NavigableSet<FareLegRule> fare_leg_rules;
+
+    /** GTFS Fares V2: Fare transfer rules */
+    public final NavigableSet<FareTransferRule> fare_transfer_rules;
+
     /** A service is a calendar entry and all calendar_dates that modify that calendar entry. TODO what is the path? */
     public final BTreeMap<String, Service> services;
 
@@ -227,6 +243,24 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.fares.putAll(fares);
         // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
         fares = null;
+
+        // Read GTFS-Fares V2
+
+        // FareAreas are joined into a single object for each FareArea. Use an in-memory map since
+        // there will be a lot of changing of values that are immutable once placed in MapDB.
+        Map<String, FareArea> fare_areas = new HashMap<>();
+        new FareArea.Loader(this, fare_areas).loadTable(zip);
+        this.fare_areas.putAll(fare_areas);
+        fare_areas = null; // allow gc
+
+        // FareNetworks are likewise joined into single objects
+        Map<String, FareNetwork> fare_networks = new HashMap<>();
+        new FareNetwork.Loader(this, fare_networks).loadTable(zip);
+        this.fare_networks.putAll(fare_networks);
+        fare_networks = null; // allow gc
+
+        new FareLegRule.Loader(this).loadTable(zip);
+        new FareTransferRule.Loader(this).loadTable(zip);
 
         // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
         new Route.Loader(this).loadTable(zip);
@@ -812,6 +846,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         fares = db.getTreeMap("fares");
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
+        fare_areas = db.getTreeMap("fare_areas");
+        fare_networks = db.getTreeMap("fare_networks");
+        fare_leg_rules = db.getTreeSet("fare_leg_rules");
+        fare_transfer_rules = db.getTreeSet("fare_transfer_rules");
 
         // Note that the feedId and checksum fields are manually read in and out of entries in the MapDB, rather than
         // the class fields themselves being of type Atomic.String and Atomic.Long. This avoids any locking and

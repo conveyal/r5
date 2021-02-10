@@ -71,7 +71,7 @@ public class PointToPointRouterServer {
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
-    private static final String USAGE = "It expects --build [path to directory with GTFS and PBF files] to build the graphs\nor --graphs [path to directory with graph] to start the server with provided graph";
+    private static final String USAGE = "It expects --build [path to directory with GTFS and PBF files] to build the graphs\nor --graphs [path to directory with graph] to start the server with provided graph.\n--build --save-shapes [path] will save the shapes in the feed";
 
     public static final int RADIUS_METERS = 200;
 
@@ -82,14 +82,20 @@ public class PointToPointRouterServer {
         final boolean inMemory = false;
 
         if ("--build".equals(commandArguments[0])) {
-
-            File dir = new File(commandArguments[1]);
+            boolean saveShapes = false;
+            File dir;
+            if ("--save-shapes".equals(commandArguments[1])) {
+                saveShapes = true;
+                dir = new File(commandArguments[2]);
+            } else {
+                dir = new File(commandArguments[1]);
+            }
 
             if (!dir.isDirectory() && dir.canRead()) {
                 LOG.error("'{}' is not a readable directory.", dir);
             }
 
-            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir);
+            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir, saveShapes);
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {
@@ -153,26 +159,6 @@ public class PointToPointRouterServer {
         staticFileLocation("debug-plan");
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
         ParetoServer paretoServer = new ParetoServer(transportNetwork);
-
-        // add cors header
-        before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
-
-        options("/*", (request, response) -> {
-
-            String accessControlRequestHeaders = request
-                .headers("Access-Control-Request-Headers");
-            if (accessControlRequestHeaders != null) {
-                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
-            }
-
-            String accessControlRequestMethod = request
-                .headers("Access-Control-Request-Method");
-            if (accessControlRequestMethod != null) {
-                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
-            }
-
-            return "OK";
-        });
 
         get("/metadata", (request, response) -> {
             response.header("Content-Type", "application/json");

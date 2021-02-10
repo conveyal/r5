@@ -107,7 +107,7 @@ public class TransportNetwork implements Serializable {
 
     /** Create a TransportNetwork from gtfs-lib feeds */
     public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
-        return fromFiles(osmSourceFile, null, feeds, config);
+        return fromFiles(osmSourceFile, null, feeds, config, false);
     }
 
     /** Legacy method to load from a single GTFS file */
@@ -122,7 +122,8 @@ public class TransportNetwork implements Serializable {
      * (due to caching etc.)
      */
     private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds,
-                                               TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+                                               TNBuilderConfig tnBuilderConfig, boolean saveShapes)
+            throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -154,6 +155,7 @@ public class TransportNetwork implements Serializable {
 
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = new TransitLayer();
+        transitLayer.saveShapes = saveShapes;
 
         if (feeds != null) {
             for (GTFSFeed feed : feeds) {
@@ -197,11 +199,17 @@ public class TransportNetwork implements Serializable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
      * doesn't really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
-        return fromFiles(osmFile, gtfsFiles, null, config);
+    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config,
+                                              boolean saveShapes) {
+        return fromFiles(osmFile, gtfsFiles, null, config, saveShapes);
     }
 
-    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
+    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
+        // default to not saving shapes
+        return fromFiles(osmFile, gtfsFiles, config, false);
+    }
+
+    public static TransportNetwork fromDirectory (File directory, boolean saveShapes) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;
@@ -232,8 +240,13 @@ public class TransportNetwork implements Serializable {
             LOG.error("An OSM PBF file is required to build a network.");
             return null;
         } else {
-            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig, saveShapes);
         }
+    }
+
+    public static final TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
+        // default to not saving shapes
+        return fromDirectory(directory, false);
     }
 
     /**

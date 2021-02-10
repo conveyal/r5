@@ -8,5 +8,6 @@ Finding cheapest paths is implemented in the McRAPTOR (multi-criteria RAPTOR) ro
 
 Unfortunately, while there is a common data format for transit timetables (GTFS), no such format exists for fares. GTFS does include two different fare specifications (GTFS-fares and GTFS-fares v2), but they are not able to represent complex fare systems. As such, unless and until such a specification becomes available, Conveyal Analysis includes location-specific fare calculators for a number of locations around the world. They have their own documentation:
 
-- [New York](newyork.html)
+- [New York](newyork.md)
 - Boston (documentation coming soon)
+- [GTFS-Fares v2](gtfs-fares-v2.md)

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
+import com.conveyal.r5.analyst.fare.faresv2.FaresV2InRoutingFareCalculator;
 import com.conveyal.r5.analyst.fare.nyc.NYCInRoutingFareCalculator;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter.McRaptorState;
@@ -12,7 +13,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
-import java.util.function.ToIntFunction;
 
 /**
  * A fare calculator used in Analyst searches. The currency is not important as long as it is integer and constant
@@ -28,7 +28,8 @@ import java.util.function.ToIntFunction;
         @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "bogota-mixed", value = BogotaMixedInRoutingFareCalculator.class),
-        @JsonSubTypes.Type(name = "nyc", value = NYCInRoutingFareCalculator.class)
+        @JsonSubTypes.Type(name = "nyc", value = NYCInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "fares-v2", value = FaresV2InRoutingFareCalculator.class)
 })
 public abstract class InRoutingFareCalculator implements Serializable {
     public static final long serialVersionUID = 0L;

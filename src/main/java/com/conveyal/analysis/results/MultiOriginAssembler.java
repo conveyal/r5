@@ -159,8 +159,8 @@ public class MultiOriginAssembler {
                 // It's kind of fragile to read from an external network service here. But this is
                 // only triggered when destinations are freeform, which is an experimental feature.
                 destinationPointSet = PointSetCache.readFreeFormFromFileStore(job.templateTask.grid);
-                if (job.templateTask.recordTimes && !job.templateTask.oneToOne) {
-                    if (nOriginsTotal * destinationPointSet.featureCount() > 1_000_000) {
+                if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
+                    if (nOriginsTotal * destinationPointSet.featureCount() > 16_000_000) {
                         error = true;
                         throw new AnalysisServerException("Temporarily limited to 1 million origin-destination pairs");
                     }

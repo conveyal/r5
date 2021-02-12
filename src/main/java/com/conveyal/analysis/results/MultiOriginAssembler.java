@@ -67,6 +67,7 @@ public class MultiOriginAssembler {
     /** For the time being this field is only set when the destinations are freeform (rather than a grid). */
     private PointSet destinationPointSet;
 
+    /** TODO check if error is true before all results are received (when receiving each result?) and cancel job. */
     private boolean error = false;
 
     /**
@@ -181,6 +182,20 @@ public class MultiOriginAssembler {
                 csvResultWriters.add(pathCsvWriter);
             }
 
+            {
+                int nWriters = csvResultWriters.size();
+                if (accessibilityGridWriters != null) {
+                    for (GridResultWriter[] grw : accessibilityGridWriters) {
+                        nWriters += grw.length;
+                    }
+                }
+                if (nWriters == 0) {
+                    // TODO handle all error conditions of this form with a single method that also cancels the job
+                    error = true;
+                    LOG.error("A regional analysis should always create at least one grid or CSV file.");
+                }
+            }
+
         } catch (IOException e) {
             error = true;
             LOG.error("Exception while creating multi-origin assembler: " + e.toString());
@@ -293,7 +308,8 @@ public class MultiOriginAssembler {
 
     /**
      * Check that each dimension of the 3D results array matches the expected size for the job being processed.
-     * There are different dimension requirements for accessibility and travel time results, so two different methods.
+     * There are different dimension requirements for accessibility, travel time, and path results, so three different
+     * dimension check methods.
      */
     private void checkAccessibilityDimension (RegionalWorkResult workResult) {
         checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, this.nDestinationPointSets);

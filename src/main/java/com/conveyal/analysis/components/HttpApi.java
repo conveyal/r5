@@ -105,7 +105,7 @@ public class HttpApi implements Component {
                 req.attribute(USER_PERMISSIONS_ATTRIBUTE, userPermissions);
                 // TODO stop using these two separate attributes, and use the permissions object directly
                 req.attribute(USER_EMAIL_ATTRIBUTE, userPermissions.email);
-                req.attribute(USER_GROUP_ATTRIBUTE, userPermissions.groups.iterator().next());
+                req.attribute(USER_GROUP_ATTRIBUTE, userPermissions.accessGroup);
             }
         });
 

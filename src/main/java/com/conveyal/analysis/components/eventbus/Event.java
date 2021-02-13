@@ -18,9 +18,9 @@ public abstract class Event {
      * FlightRecorder, in an effort to impose strict temporal ordering on threads coherent with the timestamp order.
      * But the timestamp has only millisecond resolution so that might not be very effective.
      */
-    public Date timestamp =  new Date();
+    public Date timestamp = new Date();
     public String user;
-    public Set<String> groups;
+    public String accessGroup;
     public boolean success = true;
 
     // Location fields for user city / lat / lon derived from IP address? Embed those in the UserPermissions?
@@ -33,14 +33,14 @@ public abstract class Event {
     public Event forUser (UserPermissions userPermissions) {
         if (userPermissions != null) {
             this.user = userPermissions.email;
-            this.groups = userPermissions.groups;
+            this.accessGroup = userPermissions.accessGroup;
         }
         return this;
     }
 
-    public Event forUser (String user, String... groups) {
+    public Event forUser (String user, String accessGroup) {
         this.user = user;
-        this.groups = Set.of(groups);
+        this.accessGroup = accessGroup;
         return this;
     }
 

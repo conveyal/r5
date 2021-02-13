@@ -148,7 +148,7 @@ dependencies {
     implementation 'org.mongodb:mongo-java-driver:3.11.0'
 
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
-    implementation 'org.mongojack:mongojack:2.5.1'
+    implementation 'org.mongojack:mongojack:2.10.1'
 
     // JSON serialization and deserialization from and to Java objects
     implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'
@@ -171,6 +171,8 @@ dependencies {
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geotiff'
     // Provides the EPSG coordinate reference system catalog as an HSQL database.
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-epsg-hsql'
+
+    compile 'com.wdtinc:mapbox-vector-tile:3.1.0'
 
     // Legacy JTS with com.vividsolutions package name. Newer Geotools compatible with Java 11 uses a newer version of
     // JTS with the org.locationtech package name. But our MapDB format includes serialized JTS geometries with the
@@ -230,12 +232,12 @@ dependencies {
 
     implementation 'javax.xml.bind:jaxb-api:2.3.1'
 
-    // Google Protocol Buffers are used in decoding OSM data and seamless census data.
-    implementation 'com.google.protobuf:protobuf-java:2.6.1'
+    // Google Protocol Buffers are used in decoding OSM data and seamless census data (in Geobuf format).
+    // implementation 'com.google.protobuf:protobuf-java:3.13.0'
 
-    // OSM PBF format support. Transitive dependency on Protobuf 3.4.0.
-    // TODO investigate any conflict with above
-    implementation 'org.openstreetmap.osmosis:osmosis-osm-binary:0.45'
+    // OSM PBF format support. Transitive dependency on Protobuf 3.12.2,
+    // align with mapbox-vecor-tile and geobuf generated classes
+    implementation 'org.openstreetmap.osmosis:osmosis-osm-binary:0.48.3'
 
     // Compressed bitmaps (bitsets) used to track which long OSM IDs have been encountered.
     implementation 'org.roaringbitmap:RoaringBitmap:0.7.3'
@@ -245,6 +247,10 @@ dependencies {
     // Java unit testing framework.
     testImplementation(platform('org.junit:junit-bom:5.7.0'))
     testImplementation('org.junit.jupiter:junit-jupiter')
+
+    // Chart drawing library for examining travel time distributions when crafting tests.
+    // Although rarely used it should be low-impact: it is a test-only dependency with no transitive dependenices.
+    testImplementation('org.jfree:jfreechart:1.5.1')
 
 }
 

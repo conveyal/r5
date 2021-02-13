@@ -5,6 +5,7 @@ import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +82,7 @@ public class FreeFormPointSet extends PointSet {
             if (idField != null && idCol < 0) {
                 throw new ParameterException("CSV file did not contain the specified ID column.");
             }
-            if (idField != null && idCol < 0) {
+            if (countField != null && countCol < 0) {
                 throw new ParameterException("CSV file did not contain the specified opportunity count column.");
             }
             while (reader.readRecord()) {
@@ -256,4 +257,16 @@ public class FreeFormPointSet extends PointSet {
         return webMercatorExtents;
     }
 
+    /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */
+    public FreeFormPointSet (Coordinate... coordinates) {
+        this(coordinates.length);
+        int i = 0;
+        for (Coordinate coordinate : coordinates) {
+            ids[i] = Integer.toString(i);
+            lons[i] = coordinate.x;
+            lats[i] = coordinate.y;
+            counts[i] = 1;
+            i++;
+        }
+    }
 }

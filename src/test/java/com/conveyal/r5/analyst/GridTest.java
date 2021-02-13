@@ -9,6 +9,9 @@ import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/**
+ * Tests for the Grid class, which holds destination counts in tiled spherical mercator pixels.
+ */
 public class GridTest {
 
     private static final long SEED = 4321;
@@ -24,7 +27,7 @@ public class GridTest {
         int xTile = 14;
         int yTile = 9;
         Grid grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
-        ReferencedEnvelope envelope = grid.getMercatorEnvelopeMeters();
+        ReferencedEnvelope envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
         assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
         assertEquals(17532819.79994059, envelope.getMaxX(), 0.1);
@@ -35,7 +38,7 @@ public class GridTest {
         xTile = 16;
         yTile = 11;
         grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
-        envelope = grid.getMercatorEnvelopeMeters();
+        envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(0, envelope.getMinX(), 0.1);
         assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
         assertEquals(1252344.271424327, envelope.getMaxX(), 0.1);

@@ -46,6 +46,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -57,6 +58,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
@@ -372,7 +374,7 @@ public class AnalysisWorker implements Runnable {
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
                 if (autoShutdown) {considerShuttingDown();}
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+                LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
@@ -405,16 +407,8 @@ public class AnalysisWorker implements Runnable {
         }
     }
 
-    /**
-     * Synchronously handle one single-point task.
-     * @return the travel time grid (binary data) which will be passed back to the client UI, with a JSON block at the
-     *         end containing accessibility figures, scenario application warnings, and informational messages.
-     */
-    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task)
-            throws WorkerNotReadyException, ScenarioApplicationException, IOException {
-
+    protected byte[] handleAndSerializeOneSinglePointTask (TravelTimeSurfaceTask task) throws IOException {
         LOG.info("Handling single-point task {}", task.toString());
-
         // Get all the data needed to run one analysis task, or at least begin preparing it.
         final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
@@ -423,7 +417,6 @@ public class AnalysisWorker implements Runnable {
         if (networkLoaderState.status != AsyncLoader.Status.PRESENT) {
             throw new WorkerNotReadyException(networkLoaderState);
         }
-
         // Get the graph object for the ID given in the task, fetching inputs and building as needed.
         // All requests handled together are for the same graph, and this call is synchronized so the graph will
         // only be built once.
@@ -431,6 +424,16 @@ public class AnalysisWorker implements Runnable {
         // TODO allow for a list of multiple already loaded TransitNetworks.
         networkId = task.graphId;
         TransportNetwork transportNetwork = networkLoaderState.value;
+        OneOriginResult oneOriginResult = handleOneSinglePointTask(task, transportNetwork);
+        return singlePointResultToBinary(oneOriginResult, task, transportNetwork);
+    }
+
+    /**
+     * Synchronously handle one single-point task.
+     * @return the travel time grid (binary data) which will be passed back to the client UI, with a JSON block at the
+     *         end containing accessibility figures, scenario application warnings, and informational messages.
+     */
+    protected OneOriginResult handleOneSinglePointTask (TravelTimeSurfaceTask task, TransportNetwork transportNetwork) {
 
         // The presence of destination point set keys indicates that we should calculate single-point accessibility.
         // Every task should include a decay function (set to step function by backend if not supplied by user).
@@ -449,16 +452,23 @@ public class AnalysisWorker implements Runnable {
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
+        return oneOriginResult;
+    }
 
-        // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
-        // it back to the broker. Compression ratios here are extreme (100x is not uncommon).
-        // We had many "connection reset by peer" and buffer overflows errors on large files.
+    private byte[] singlePointResultToBinary (
+            OneOriginResult oneOriginResult,
+            TravelTimeSurfaceTask task,
+            TransportNetwork transportNetwork
+    ) throws IOException {
+        // Prepare a binary travel time grid which will be sent back to the client via the backend (broker). Data are
+        // gzipped before sending back to the broker. Compression ratios here are extreme (100x is not uncommon).
+        // We had many "connection reset by peer" and buffer overflow errors on large files.
         // Handle gzipping with HTTP headers (caller should already be doing this)
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
         TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
-        if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+        if (task.getFormat() == GEOTIFF) {
             timeGridWriter.writeGeotiff(byteArrayOutputStream);
         } else {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
@@ -470,11 +480,12 @@ public class AnalysisWorker implements Runnable {
                     byteArrayOutputStream,
                     oneOriginResult.accessibility,
                     transportNetwork.scenarioApplicationWarnings,
-                    transportNetwork.scenarioApplicationInfo
+                    transportNetwork.scenarioApplicationInfo,
+                    oneOriginResult.paths
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
-        throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
+        this.throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
 
         // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
         byteArrayOutputStream.close();
@@ -576,7 +587,7 @@ public class AnalysisWorker implements Runnable {
                 // progress. This avoids crashing the backend by sending back massive 2 million element travel times
                 // that have already been written to S3, and throwing exceptions on old backends that can't deal with
                 // null AccessibilityResults.
-                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task));
+                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
             }
 
             // Accumulate accessibility results, which will be returned to the backend in batches.
@@ -605,7 +616,7 @@ public class AnalysisWorker implements Runnable {
             e.printStackTrace();
         }
         if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult());
+            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult(), null);
             synchronized (workResults) {
                 workResults.add(new RegionalWorkResult(emptyContainer, task));
             }
@@ -631,6 +642,8 @@ public class AnalysisWorker implements Runnable {
 
         public List<TaskError> scenarioApplicationInfo;
 
+        public List<PathResult.PathIterations> pathSummaries;
+
         @Override
         public String toString () {
             return String.format(
@@ -655,7 +668,8 @@ public class AnalysisWorker implements Runnable {
             OutputStream outputStream,
             AccessibilityResult accessibilityResult,
             List<TaskError> scenarioApplicationWarnings,
-            List<TaskError> scenarioApplicationInfo
+            List<TaskError> scenarioApplicationInfo,
+            PathResult pathResult
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
@@ -666,6 +680,7 @@ public class AnalysisWorker implements Runnable {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
+        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
         LOG.info("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

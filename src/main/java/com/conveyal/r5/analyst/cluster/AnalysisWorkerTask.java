@@ -90,18 +90,17 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * If true, travel time surfaces and paths will be saved to S3
      * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
      * accessibility indicator values.
-     * FIXME in practice this currently implies computeTravelTimeBreakdown and computePaths, so we've got redundant and
-     * potentially incoherent information in the request. The intent is in the future to make all these options
-     * separate - we can make either travel time surfaces or accessibility indicators or both, and they may or may
-     * not be saved to S3.
      */
     public boolean makeTauiSite = false;
 
-    /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
-    public boolean computeTravelTimeBreakdown = false;
+    /**
+     * Whether to include paths and travel time breakdowns in results sent back to broker. Allowed to be true for a
+     * single-point task or freeform regional task, but not for a regional task with grid origins.
+     */
+    public boolean includePathResults = false;
 
-    /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
-    public boolean computePaths = false;
+    /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
+    public boolean recordTravelTimeHistograms = false;
 
     /**
      * Which percentiles of travel time to calculate.

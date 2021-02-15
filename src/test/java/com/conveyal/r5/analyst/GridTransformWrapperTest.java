@@ -78,7 +78,7 @@ class GridTransformWrapperTest {
     /*
      * TODO lat/lon based testing
      * Given a set of points at latitudes and longitudes, write the same points into overlapping grids of different
-     * dimensions. Then transform all grids into a single super-grid, and make sure the opporunity counts at different
+     * dimensions. Then transform all grids into a single super-grid, and make sure the opportunity counts at different
      * lat/lon points are identical in the subgrids and the transformed (wrapped) ones.
      */
 

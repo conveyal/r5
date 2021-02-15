@@ -151,7 +151,7 @@ public class Grid extends PointSet {
         public final int y;
         public final double weight;
 
-        private PixelWeight (int x, int y, double weight){
+        public PixelWeight (int x, int y, double weight){
             this.x = x;
             this.y = y;
             this.weight = weight;

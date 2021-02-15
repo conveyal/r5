@@ -417,8 +417,9 @@ public class RegionalAnalysisController implements HttpController {
             if (nPointSets == 1) {
                 task.grid = task.destinationPointSetKeys[0];
             }
-            // Preflight check that all destination pointsets are exactly the same size. Equivalent to worker-side
-            // checks in AnalysisWorkerTask.loadAndValidateDestinationPointSets and WebMercatorExtents.forPointsets.
+            // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
+            // The worker will perform equivalent checks via the GridTransformWrapper constructor,
+            // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
             for (OpportunityDataset dataset : opportunityDatasets) {
                 if (dataset.format == FileStorageFormat.FREEFORM) {
                     checkArgument(
@@ -427,7 +428,7 @@ public class RegionalAnalysisController implements HttpController {
                     );
                 } else {
                     checkArgument(
-                        dataset.getWebMercatorExtents().equals(opportunityDatasets.get(0).getWebMercatorExtents()),
+                        dataset.getWebMercatorExtents().zoom == opportunityDatasets.get(0).getWebMercatorExtents().zoom,
                         "If multiple grids are specified as destinations, they must have identical extents."
                     );
                 }

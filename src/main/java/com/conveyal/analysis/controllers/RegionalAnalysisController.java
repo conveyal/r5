@@ -429,7 +429,7 @@ public class RegionalAnalysisController implements HttpController {
                 } else {
                     checkArgument(
                         dataset.getWebMercatorExtents().zoom == opportunityDatasets.get(0).getWebMercatorExtents().zoom,
-                        "If multiple grids are specified as destinations, they must have identical extents."
+                        "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
                     );
                 }
             }

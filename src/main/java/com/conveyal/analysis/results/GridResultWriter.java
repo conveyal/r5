@@ -63,7 +63,6 @@ public class GridResultWriter extends ResultWriter {
             height,
             channels
         );
-        long outputFileSizeBytes = width * height * channels  * Integer.BYTES;
         super.prepare(task.jobId, outputBucket);
 
         // Write the access grid file header to the temporary file.
@@ -86,9 +85,11 @@ public class GridResultWriter extends ResultWriter {
         // the IOPS budget on cloud servers with network storage. That then causes the server to fall behind in
         // processing incoming results.
         this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
-        randomAccessFile.setLength(outputFileSizeBytes); //TODO check if this should include header length
-        LOG.info("Created temporary file to accumulate results from workers, size is {}.",
-                human(randomAccessFile.length(), "B"));
+        randomAccessFile.setLength(HEADER_LENGTH_BYTES + (width * height * channels * Integer.BYTES));
+        LOG.info(
+            "Created temporary file to accumulate results from workers, size is {}.",
+            human(randomAccessFile.length(), "B")
+        );
     }
 
     /** Gzip the access grid and upload it to S3. */

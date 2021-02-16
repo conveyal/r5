@@ -136,7 +136,11 @@ public class AdjustSpeed extends Modification {
                     if (originalPattern.stops[i] == hopFromStops.get(j)
                             && originalPattern.stops[i + 1] == hopToStops.get(j)) {
                         shouldScaleHop[i] = true;
-                        break;
+                        // break; FIXME why break after one hop?
+                    } else if (originalPattern.stops[i + 1] == hopFromStops.get(j)
+                            && originalPattern.stops[i] == hopToStops.get(j)) {
+                        // Stopgap to handle effects of #687
+                        shouldScaleHop[i] = true;
                     }
                 }
             }

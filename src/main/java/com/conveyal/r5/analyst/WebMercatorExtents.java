@@ -40,15 +40,23 @@ public class WebMercatorExtents {
         this.zoom = zoom;
     }
 
+    /**
+     * Return the analysis extents embedded in the task object itself.
+     * Sometimes these imply gridded origin points (non-Taui regional tasks without freeform origins specified) and
+     * sometimes these imply gridded destination points (single point tasks and Taui regional tasks).
+     */
     public static WebMercatorExtents forTask (AnalysisWorkerTask task) {
         return new WebMercatorExtents(task.west, task.north, task.width, task.height, task.zoom);
     }
 
-    /** If pointSets are all gridded, return the minimum-sized WebMercatorExtents containing them all. */
+    /**
+     * If pointSets are all gridded, return the minimum bounding WebMercatorExtents containing them all.
+     * Otherwise return null (this null is a hack explained below and should eventually be made more consistent).
+     */
     public static WebMercatorExtents forPointsets (PointSet[] pointSets) {
         checkNotNull(pointSets);
         checkElementIndex(0, pointSets.length, "You must supply at least one destination PointSet.");
-        if (pointSets[0] instanceof Grid) {
+        if (pointSets[0] instanceof Grid || pointSets[0] instanceof GridTransformWrapper) {
             WebMercatorExtents extents = pointSets[0].getWebMercatorExtents();
             for (PointSet pointSet : pointSets) {
                 extents = extents.expandToInclude(pointSet.getWebMercatorExtents());

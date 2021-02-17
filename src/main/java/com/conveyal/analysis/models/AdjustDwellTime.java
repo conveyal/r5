@@ -28,12 +28,12 @@ public class AdjustDwellTime extends Modification {
         adt.comment = name;
 
         if (trips == null) {
-            adt.routes = feedScopeIds(feed, routes);
+            adt.routes = feedScopedIdSet(feed, routes);
         } else {
-            adt.patterns = feedScopeIds(feed, trips);
+            adt.patterns = feedScopedIdSet(feed, trips);
         }
 
-        adt.stops = feedScopeIds(feed, stops);
+        adt.stops = feedScopedIdSet(feed, stops);
 
         if (scale) {
             adt.scale = value;

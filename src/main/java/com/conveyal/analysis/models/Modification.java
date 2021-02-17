@@ -4,8 +4,11 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * We could add defaultImpl = CustomModificationHolder.class, which might allow us to eliminate having separate type vs.
@@ -45,19 +48,37 @@ public abstract class Modification extends Model implements Cloneable {
     public String description;
 
     /**
-     * Add scope to each ID in an array of IDs. Used in converting internal analysis-backend modification types to R5
-     * modifications sent to the workers. See feedScopeId() for more details.
+     * Add scope to each ID in an array of IDs and return as an unordered Set. Used in converting internal
+     * analysis-backend modification types to R5 modifications sent to the workers. See feedScopeId() for more details.
      *
      * This preserves null arrays coming in from MongoDB (in the internal analysis-backend modification types) because
      * in R5 modifications, the null set has a distinct meaning from an empty set (null matches everything, empty set
      * matches nothing). TODO We should probably disallow and fail on empty sets though, since they must be mistakes.
      */
-    public Set<String> feedScopeIds (String feed, String[] ids) {
+    public static Set<String> feedScopedIdSet (String feed, String[] ids) {
         if (ids == null) {
             return null;
         } else {
-            return Arrays.stream(ids).map(id -> feedScopeId(feed, id)).collect(Collectors.toSet());
+            Set<String> feedScopedIdSet = new HashSet<>(ids.length);
+            for (String id : ids) {
+                feedScopedIdSet.add(feedScopeId(feed, id));
+            }
+            return feedScopedIdSet;
         }
+    }
+
+    /**
+     * This is similar to feedScopedIdSet but it preserves order (by returning an array instead of a set) and it does
+     * not tolerate nulls, because it is never directly used on top level fields of a modification where nulls have
+     * meaning.
+     */
+    public static String[] feedScopedIdArray (String feed, String[] ids) {
+        checkNotNull(ids);
+        String[] scopedIds = new String[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            scopedIds[i] = feedScopeId(feed, ids[i]);
+        }
+        return scopedIds;
     }
 
     /**
@@ -66,7 +87,7 @@ public abstract class Modification extends Model implements Cloneable {
      * with the ID of the feed uniquely identifying it within a Bundle. R5 (worker) modifications do not have this feed
      * field, so every individual entity reference has to be prepended with a feed scope.
      */
-    public String feedScopeId (String feed, String id) {
+    public static String feedScopeId (String feed, String id) {
         return String.format("%s:%s", feed, id);
     }
 

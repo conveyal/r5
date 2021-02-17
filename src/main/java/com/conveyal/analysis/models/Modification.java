@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.google.common.collect.Sets;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -59,11 +60,7 @@ public abstract class Modification extends Model implements Cloneable {
         if (ids == null) {
             return null;
         } else {
-            Set<String> feedScopedIdSet = new HashSet<>(ids.length);
-            for (String id : ids) {
-                feedScopedIdSet.add(feedScopeId(feed, id));
-            }
-            return feedScopedIdSet;
+            return Sets.newHashSet(feedScopedIdArray(feed, ids));
         }
     }
 

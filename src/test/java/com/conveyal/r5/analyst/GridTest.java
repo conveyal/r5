@@ -126,7 +126,6 @@ public class GridTest {
         assertEquals(g1.west, g2.west);
         assertEquals(g1.width, g2.width);
         assertEquals(g1.height, g2.height);
-        // Our rounding error diffusion process should lose no more than 1/2 opportunity per row
         assertArrayEquals(g1.grid, g2.grid, tolerateRounding);
     }
 
@@ -138,7 +137,7 @@ public class GridTest {
             double[][] b,
             boolean tolerateRounding
     ) {
-        // Single cell can be off by 1/2 plus error term from previous cell when rounding
+        // Each individual cell can be off by 1/2 due to rounding, plus error term of up to 1/2 from previous cell
         double cellTolerance = tolerateRounding ? 1 : 0;
         assertEquals(a.length, b.length);
         for (int i = 0; i < a.length; i++) {
@@ -150,9 +149,9 @@ public class GridTest {
             }
         }
         if (tolerateRounding) {
-            // Sum equality is implied by cellTolerance == 0,
-            // additional checks are only necessary when cellTolerance > 0.
-            // Grid must be transposed to check row sums, first index is column (x coordinate).
+            // When cellTolerance == 0, it can be deduced that the sums of the grids are equal.
+            // So additional checks are only necessary when cellTolerance > 0.
+            // The grid must be transposed to check row sums, its first index is column (x coordinate).
             final int nCols = a.length;
             final int nRows = a[0].length;
             final double pairSumTolerance = 1; // count of two adjacent cells should be off by max of 1

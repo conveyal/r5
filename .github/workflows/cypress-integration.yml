@@ -26,7 +26,7 @@ jobs:
         with:
           java-version: 11
       - name: Gradle build
-        run: gradle build
+        run: gradle build --stacktrace
         working-directory: r5
       - name: Copy JAR
         run: |

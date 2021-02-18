@@ -10,28 +10,30 @@ jobs:
         ports:
           - 27017:27017
 
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     steps:
+      # Checkout each repo into sub-directories
       - uses: actions/checkout@v2
         with:
           repository: conveyal/analysis-ui
           ref: dev
-
-      # Build .jar and copy. analysis-ui runs the first *.jar it finds in it's base directory.
+          path: ui
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
           path: r5
+
+      # Build .jar and copy to ./ui directory
       - uses: actions/setup-java@v1
         with:
           java-version: 11
       - name: Gradle build
         run: gradle build --stacktrace
-        working-directory: r5
+        working-directory: ./r5
       - name: Copy JAR
         run: |
-          LOCAL_FILE=$(ls r5/build/libs/*-all.jar | head -n1)
-          cp $LOCAL_FILE .
+          LOCAL_FILE=$(ls ./r5/build/libs/*-all.jar | head -n1)
+          cp $LOCAL_FILE ./ui
 
       # Install / cache dependencies with Cypress to handle caching Cypress binary.
       - uses: cypress-io/github-action@v2
@@ -39,9 +41,4 @@ jobs:
           start: yarn start, yarn start-backend # runs frontend and java server together
           wait-on: 'http://localhost:3000, http://localhost:7070/version'
           wait-on-timeout: 60
-
-      - uses: actions/upload-artifact@v1
-        if: failure()
-        with:
-          name: cypress-screenshots
-          path: cypress/screenshots
+          working-directory: ui

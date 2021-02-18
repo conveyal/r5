@@ -29,7 +29,8 @@ jobs:
           java-version: 11
       - run: gradle build
         working-directory: r5
-      - run: cp $(ls r5/build/libs/*-all.jar | head -n1) ui/latest.jar
+      - run: ls -lah ./r5/build/libs
+      - run: cp $(ls ./r5/build/libs/*-all.jar | head -n1) ./ui/latest.jar
 
       # Install / cache dependencies with Cypress to handle caching Cypress binary.
       - uses: actions/setup-node@v2

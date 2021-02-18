@@ -72,4 +72,3 @@ jobs:
         BRANCH=${GITHUB_REF#refs/heads/}
         echo VERSION is $VERSION, BRANCH is $BRANCH
         aws s3 cp --no-progress --region eu-west-1 s3://r5-builds/${VERSION}.jar s3://r5-builds/${BRANCH}-latest.jar
-        

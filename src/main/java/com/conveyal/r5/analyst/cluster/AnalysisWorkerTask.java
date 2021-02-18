@@ -209,8 +209,11 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * supplied cache. The PointSets themselves are not serialized and sent over to the worker in the task, so this
      * method is called by the worker to materialize them.
      *
+     * This should not be called for Taui sites (which have no destination point sets) so contains logic for only
+     * non-Taui single point and regional tasks.
+     *
      * If multiple grids are specified, they must be at the same zoom level, but they will all be wrapped to transform
-     * their indexes to match a single task-wide grid.
+     * them all to the same minimum bounding extents.
      */
     public void loadAndValidateDestinationPointSets (PointSetCache pointSetCache) {
         // First, validate and load the pointsets.
@@ -233,8 +236,12 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         if (freeForm){
             checkArgument(nPointSets == 1, "Only one freeform destination PointSet may be specified.");
         } else {
-            // Get a grid for this particular task (determined by dimensions in the request, or by unifying the grids).
-            // This requires the grids to already be loaded into the array, hence the two-stage loading then wrapping.
+            // If destinationPointSets does not contain a single freeform pointset, we expect one or more grids.
+            // Determine the destination grid extents for this task, which are either supplied in request (single point)
+            // or derived from the opportunity grids (regional). Grids are then transformed to match this single size.
+            // Determining the minimum bouding extents requires the grids to already be loaded into the array, hence the
+            // two-stage loading then wrapping. After this wrapping, subsequent calls to getWebMercatorExtents should
+            // still yield the same extents.
             final var taskGridExtents = this.getWebMercatorExtents();
             for (int i = 0; i < nPointSets; i++) {
                 Grid grid = (Grid) destinationPointSets[i];

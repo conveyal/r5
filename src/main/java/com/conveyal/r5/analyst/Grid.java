@@ -62,6 +62,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -288,13 +289,14 @@ public class Grid extends PointSet {
 
     /**
      * Write this opportunity density grid out in R5 binary format.
-     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional
-     * doubles. This can lead to some strange effects. If you rasterize two polygons into the grid, one with 0.49
-     * opportunities in each cell and the other with 0.51, only one polygon will survive. If one has 1.2 per cell and
-     * the other 0.4 per cell, one polygon will survive as well as the overlap of the two (which will round to 2) but
-     * not the second polygon alone. Maybe we should be truncating instead of rounding to avoid this weirdness.
-     * TODO conversion to integers should happen as separate method, not during writing, and should be better, #566
-     *
+     * Note that while opportunity densities are internally represented as doubles and don't have to be integers, our
+     * file format uses integers so writing a grid rounds off the densities. This can lead to some strange effects
+     * described in issue #566. If you rasterize two polygons into the grid, one with 0.49 opportunities in each cell
+     * and the other with 0.51, the first polygon will disappear, while the number of opportunities within the second
+     * polygon will almost double. If one polygon has 1.2 per cell and the other 0.4 per cell, the first polygon will
+     * survive as well as the overlap of the two (which will round to 2) but not the non-overlapping portion of the
+     * second polygon.
+     * TODO this conversion to integers should happen as separate method, not during writing, and should be better, #566
      * Also note that this is a different format than "access grids" and "time grids". Maybe someday they should all be
      * the same format with a couple of options for compression or number of channels.
      */
@@ -310,11 +312,22 @@ public class Grid extends PointSet {
         out.writeInt(width);
         out.writeInt(height);
         // The rest of the file is 32-bit integers in row-major order (x changes faster than y), delta-coded.
-        for (int y = 0, prev = 0; y < height; y++) {
+        // Delta coding and error diffusion are reset on each row to avoid wrapping.
+        int prev = 0;
+        for (int y = 0; y < height; y++) {
+            // Reset error on each row to avoid diffusing to distant locations.
+            // An alternative is to use serpentine iteration or iterative diffusion.
+            double error = 0;
             for (int x = 0; x < width; x++) {
-                int val = (int) Math.round(grid[x][y]);
-                out.writeInt(val - prev);
-                prev = val;
+                double val = grid[x][y];
+                checkState(val >= 0, "Opportunity density should never be negative.");
+                val += error;
+                int rounded = ((int) Math.round(val));
+                checkState(rounded >= 0, "Rounded opportunity density should never be negative.");
+                error = val - rounded;
+                int delta = rounded - prev;
+                out.writeInt(delta);
+                prev = rounded;
             }
         }
         out.close();

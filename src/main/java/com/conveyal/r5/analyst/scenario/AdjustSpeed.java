@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.util.P2;
 import com.google.common.primitives.Booleans;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -49,8 +51,11 @@ public class AdjustSpeed extends Modification {
     public List<String> referenceStops;
 
     /**
-     * Hops which should have their speed set or scaled. If not supplied, all hops should be modified.
+     * Hops which should have their speed set or scaled. If not supplied (hops is null), all hops should be modified.
      * Each hop is a pair of adjacent stop IDs (from/to) and the hop specification is directional.
+     * The UI produces one copy of each hop per pattern containing that hop, yielding duplicates.
+     * Even if this behavior is changed, re-running a regional analysis will reuse saved JSON for existing scenarios,
+     * so we need to tolerate duplicate hops in this field.
      */
     public List<String[]> hops;
 
@@ -60,36 +65,63 @@ public class AdjustSpeed extends Modification {
      */
     public boolean scaleDwells = false;
 
-    /** These are two parallel arrays of the same length, where (hopFromStops[i], hopToStops[i]) represents one hop. */
+    /**
+     * A deduplicated copy of the hops field. Each hop appears only once, but as a List they have a specific order.
+     * Besides being more efficient, deduplicating allows accurately reporting how many patterns are affected by each
+     * hop to better detect mistakes or errors in the scenario. All hop indexes after resolve() reference this List.
+     */
+    private transient List<P2<String>> uniqueHops;
+
+    /** These are two parallel arrays of length nUniqueHops, where (hopFromStops[i], hopToStops[i]) represents one hop. */
     private transient TIntList hopFromStops;
 
     private transient TIntList hopToStops;
 
     /** For logging the effects of the modification and reporting an error when the modification has no effect. */
-    private int nTripsAffected = 0;
+    private transient int nTripsAffected = 0;
+
+    /**
+     * For logging the effects of the modification and reporting an error when the modification has no effect. An array
+     * is more convenient than TIntList for progressively incrementing a known number of elements defaulting to zero.
+     */
+    private transient int[] nPatternsAffectedByHop;
 
     @Override
     public boolean resolve(TransportNetwork network) {
         if (scale <= 0) {
             errors.add("Scaling factor must be a positive number.");
         }
-
         if (hops != null) {
-            hopFromStops = new TIntArrayList(hops.size());
-            hopToStops = new TIntArrayList(hops.size());
-            for (String[] pair : hops) {
-                if (pair.length != 2) {
-                    errors.add("Hops must all have exactly two stops.");
-                    continue;
+            // De-duplicate hops. See explanation on the hops and uniqueHops fields.
+            {
+                Set<P2<String>> uniqueHopSet = new HashSet<>();
+                for (String[] pair : hops) {
+                    if (pair.length != 2) {
+                        errors.add("Hops must all have exactly two stops.");
+                        continue;
+                    }
+                    // Pair has equals and hashcode implementations which arrays lack
+                    P2<String> hopAsPair = new P2<String>(pair[0], pair[1]);
+                    uniqueHopSet.add(hopAsPair);
                 }
-                int intFromId = network.transitLayer.indexForStopId.get(pair[0]);
-                int intToId = network.transitLayer.indexForStopId.get(pair[1]);
+                // Copy Set into a List to maintain a predictable, indexable order. By convention we don't overwrite
+                // fields deserialized from the scenario (like hops), so we use another transient field.
+                // There is some risk here of confusing the lengths and indexes of the two lists -
+                // ensure there are no other uses of the hops field after this point.
+                uniqueHops = new ArrayList<>(uniqueHopSet);
+            }
+            hopFromStops = new TIntArrayList(uniqueHops.size());
+            hopToStops = new TIntArrayList(uniqueHops.size());
+            nPatternsAffectedByHop = new int[uniqueHops.size()];
+            for (P2<String> pair: uniqueHops) {
+                int intFromId = network.transitLayer.indexForStopId.get(pair.a);
+                int intToId = network.transitLayer.indexForStopId.get(pair.b);
                 if (intFromId == -1) {
-                    errors.add("Could not find hop origin stop " + pair[0]);
+                    errors.add("Could not find hop origin stop " + pair.a);
                     continue;
                 }
                 if (intToId == -1) {
-                    errors.add("Could not find hop destination stop " + pair[1]);
+                    errors.add("Could not find hop destination stop " + pair.b);
                     continue;
                 }
                 hopFromStops.add(intFromId);
@@ -105,10 +137,19 @@ public class AdjustSpeed extends Modification {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
+
         if (nTripsAffected > 0) {
-            LOG.info("Speed was changed on {} trips.", nTripsAffected);
+            info.add(String.format("Speed was changed on %d trips.", nTripsAffected));
         } else {
             errors.add("This modification did not cause any changes to the transport network.");
+        }
+        if (uniqueHops != null) {
+            for (int h = 0; h < uniqueHops.size(); h++) {
+                if (nPatternsAffectedByHop[h] == 0) {
+                    errors.add("No patterns were affected by hop: " + uniqueHops.get(h));
+                }
+            }
+            info.add("Number of patterns affected by each unique hop: " + Arrays.toString(nPatternsAffectedByHop));
         }
         return errors.size() > 0;
     }
@@ -128,7 +169,7 @@ public class AdjustSpeed extends Modification {
         }
         // First, decide which hops in this pattern should be scaled.
         boolean[] shouldScaleHop = new boolean[originalPattern.stops.length - 1];
-        if (hops == null) {
+        if (uniqueHops == null) {
             Arrays.fill(shouldScaleHop, true);
         } else {
             for (int i = 0; i < originalPattern.stops.length - 1; i++) {
@@ -136,6 +177,7 @@ public class AdjustSpeed extends Modification {
                     if (originalPattern.stops[i] == hopFromStops.get(j)
                             && originalPattern.stops[i + 1] == hopToStops.get(j)) {
                         shouldScaleHop[i] = true;
+                        nPatternsAffectedByHop[j] += 1;
                         break;
                     }
                 }

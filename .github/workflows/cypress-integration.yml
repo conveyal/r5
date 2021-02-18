@@ -28,7 +28,7 @@ jobs:
         with:
           java-version: 11
       - name: Gradle build
-        run: gradle build --stacktrace
+        run: gradle build --scan
         working-directory: ./r5
       - name: Copy JAR
         run: cp $(ls ./r5/build/libs/*-all.jar | head -n1) ./ui

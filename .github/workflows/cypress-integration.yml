@@ -18,7 +18,7 @@ jobs:
           repository: conveyal/analysis-ui
           ref: dev
           path: ui
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.2
         with:
           fetch-depth: 0
           path: r5
@@ -31,9 +31,7 @@ jobs:
         run: gradle build --stacktrace
         working-directory: ./r5
       - name: Copy JAR
-        run: |
-          LOCAL_FILE=$(ls ./r5/build/libs/*-all.jar | head -n1)
-          cp $LOCAL_FILE ./ui
+        run: cp $(ls ./r5/build/libs/*-all.jar | head -n1) ./ui
 
       # Install / cache dependencies with Cypress to handle caching Cypress binary.
       - uses: cypress-io/github-action@v2

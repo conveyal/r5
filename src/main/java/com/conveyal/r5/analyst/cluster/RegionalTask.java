@@ -60,7 +60,8 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      * the destinations, as this is necessary to compute accessibility. Travel times to any location outside those grids
      * cannot change accessibility results, and we are not displaying travel time isochrones, so we extract the
      * minimal bounds containing all destination opportunity grids. This is not optimal where the full extent of the
-     * road network is smaller than the opportunity data, but that should be rare.
+     * road network is smaller than the opportunity data, but that should be rare. We could intersect with the extents
+     * of the street network, but that probably requires access to the loaded TransportNetwork.
      */
     @Override
     public WebMercatorExtents getWebMercatorExtents() {

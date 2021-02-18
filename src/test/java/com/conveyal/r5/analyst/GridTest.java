@@ -1,11 +1,16 @@
 package com.conveyal.r5.analyst;
 
+import com.google.common.io.Resources;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
+import java.util.stream.DoubleStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -62,17 +67,35 @@ public class GridTest {
         serializationTestLoop(random,false);
     }
 
-    private void serializationTestLoop (Random random, boolean wholeNumbersOnly) throws Exception {
-        final double tolerance = wholeNumbersOnly ? 0 : 0.5;
-        for (int i = 0; i < N_ITERATIONS; i++) {
-            Grid gridA = generateRandomGrid(random, wholeNumbersOnly);
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            gridA.write(byteArrayOutputStream);
-            Grid gridB = Grid.read(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
-            assertGridSemanticEquals(gridA, gridB, tolerance);
+    /**
+     * This tests serialization on a Shapefile specially designed to fail without rounding error diffusion.
+     * The polygons in the shapefile are large but contain relatively few opportunities.
+     */
+    @Test
+    public void trickyRasterizationTest () throws Exception {
+        File shapefile = new File(Resources.getResource(Grid.class, "pdx-three-overlapping.shp").toURI());
+        List<Grid> grids = Grid.fromShapefile(shapefile, 9);
+        assertEquals(grids.size(), 2);
+        // Although the second attribute of the shapefile is of type integer, the polygons still create fractional
+        // opportunities when split across many cells in the grid. Test both grids with rounding tolerance.
+        for (Grid grid : grids) {
+            oneRoundTrip(grid, true);
         }
     }
 
+    private void serializationTestLoop (Random random, boolean wholeNumbersOnly) throws Exception {
+        for (int i = 0; i < N_ITERATIONS; i++) {
+            Grid gridA = generateRandomGrid(random, wholeNumbersOnly);
+            oneRoundTrip(gridA, !wholeNumbersOnly);
+        }
+    }
+
+    private void oneRoundTrip (Grid original, boolean tolerateRounding) throws Exception {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        original.write(byteArrayOutputStream);
+        Grid copy = Grid.read(new ByteArrayInputStream(byteArrayOutputStream.toByteArray()));
+        assertGridSemanticEquals(original, copy, tolerateRounding);
+    }
 
     private static Grid generateRandomGrid (Random random, boolean wholeNumbersOnly) {
         final int zoom = 9;
@@ -96,28 +119,65 @@ public class GridTest {
         return grid;
     }
 
-    private static void assertGridSemanticEquals(Grid g1, Grid g2, double tolerance) {
+    private static void assertGridSemanticEquals(Grid g1, Grid g2, boolean tolerateRounding) {
         // Note that the name field is excluded because it does not survive serialization.
         assertEquals(g1.zoom, g2.zoom);
         assertEquals(g1.north, g2.north);
         assertEquals(g1.west, g2.west);
         assertEquals(g1.width, g2.width);
         assertEquals(g1.height, g2.height);
-        assertArrayEquals(g1.grid, g2.grid, tolerance);
+        assertArrayEquals(g1.grid, g2.grid, tolerateRounding);
     }
 
     /**
-     * Compare two 2D arrays of doubles with tolerance. This method is apparently not provided by junit.Assert.
+     * Compare two 2D arrays of doubles with tolerance on each cell, and on the sums of rows and the whole array.
      */
-    private static void assertArrayEquals(double[][] a1, double[][]a2, double tolerance) {
-        assertEquals(a1.length, a2.length);
-        for (int i = 0; i < a1.length; i++) {
-            double[] b1 = a1[i];
-            double[] b2 = a2[i];
-            assertEquals(b1.length, b2.length);
-            for (int j = 0; j < b1.length; j++) {
-                assertEquals(b1[j], b2[j], tolerance);
+    private static void assertArrayEquals (
+            double[][] a,
+            double[][] b,
+            boolean tolerateRounding
+    ) {
+        // Each individual cell can be off by 1/2 due to rounding, plus error term of up to 1/2 from previous cell
+        double cellTolerance = tolerateRounding ? 1 : 0;
+        assertEquals(a.length, b.length);
+        for (int i = 0; i < a.length; i++) {
+            double[] ai = a[i];
+            double[] bi = b[i];
+            assertEquals(ai.length, bi.length);
+            for (int j = 0; j < ai.length; j++) {
+                assertEquals(ai[j], bi[j], cellTolerance);
             }
+        }
+        if (tolerateRounding) {
+            // When cellTolerance == 0, it can be deduced that the sums of the grids are equal.
+            // So additional checks are only necessary when cellTolerance > 0.
+            // The grid must be transposed to check row sums, its first index is column (x coordinate).
+            final int nCols = a.length;
+            final int nRows = a[0].length;
+            final double pairSumTolerance = 1; // count of two adjacent cells should be off by max of 1
+            final double rowSumTolerance = 0.5; // rounding error may "fall off" the end of a row
+            final double gridSumTolerance = 0.5 * nRows; // rounding error on each row is independent
+            double aSum = 0;
+            double bSum = 0;
+            for (int y = 0; y < nRows; y++) {
+                double aRowSum = 0;
+                double bRowSum = 0;
+                for (int x = 0; x < nCols; x++) {
+                    final double aVal = a[x][y];
+                    final double bVal = b[x][y];
+                    aRowSum += aVal;
+                    bRowSum += bVal;
+                    aSum += aVal;
+                    bSum += bVal;
+                    if (x > 0) {
+                        final double aPrevVal = a[x-1][y];
+                        final double bPrevVal = b[x-1][y];
+                        assertEquals(aPrevVal + aVal, bPrevVal + bVal, pairSumTolerance);
+                    }
+                }
+                assertEquals(aRowSum, bRowSum, rowSumTolerance);
+            }
+            assertEquals(aSum, bSum, gridSumTolerance);
         }
     }
 

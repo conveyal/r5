@@ -27,6 +27,10 @@ public class MultiOriginAssembler {
 
     public static final Logger LOG = LoggerFactory.getLogger(MultiOriginAssembler.class);
 
+    private static final int MAX_FREEFORM_OD_PAIRS = 16_000_000;
+
+    private static final int MAX_FREEFORM_DESTINATIONS = 4_000_000;
+
     /**
      * The regional analysis for which this object is assembling results.
      * We retain the whole object rather than just its ID so we'll have the full details, e.g. destination point set
@@ -156,14 +160,21 @@ public class MultiOriginAssembler {
                 }
             }
 
-            if (!job.templateTask.makeTauiSite && job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+            if (!job.templateTask.makeTauiSite &&
+                 job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
+            ) {
                 // It's kind of fragile to read from an external network service here. But this is
                 // only triggered when destinations are freeform, which is an experimental feature.
                 destinationPointSet = PointSetCache.readFreeFormFromFileStore(job.templateTask.grid);
                 if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
-                    if (nOriginsTotal * destinationPointSet.featureCount() > 16_000_000) {
+                    if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
+                        destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
+                    ) {
                         error = true;
-                        throw new AnalysisServerException("Temporarily limited to 1 million origin-destination pairs");
+                        throw new AnalysisServerException(String.format(
+                            "Freeform requests limited to %d destinations and %d origin-destination pairs.",
+                            MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                        ));
                     }
                 }
             }

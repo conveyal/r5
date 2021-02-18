@@ -34,14 +34,13 @@ jobs:
       # Install / cache dependencies with Cypress to handle caching Cypress binary.
       - uses: actions/setup-node@v2
         with:
-          node-version: '12'
-      - run: yarn build
-        working-directory: ui
-        env:
-            NEXT_PUBLIC_BASEMAP_DISABLED: true
-            NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          node-version: '12'        
       - uses: cypress-io/github-action@v2
+        env:
+          NEXT_PUBLIC_BASEMAP_DISABLED: true
+          NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
         with:
+          build: yarn build
           start: yarn start, yarn start-backend # runs frontend and java server together
           wait-on: 'http://localhost:3000, http://localhost:7070/version'
           wait-on-timeout: 60

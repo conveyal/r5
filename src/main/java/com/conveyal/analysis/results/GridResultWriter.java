@@ -63,7 +63,6 @@ public class GridResultWriter extends ResultWriter {
             height,
             channels
         );
-        long outputFileSizeBytes = width * height * channels  * Integer.BYTES;
         super.prepare(task.jobId, outputBucket);
 
         // Write the access grid file header to the temporary file.
@@ -81,14 +80,19 @@ public class GridResultWriter extends ResultWriter {
 
         // Initialize the temporary file where the accessibility results will be stored. Setting this newly created
         // file to a larger size should just create a sparse file full of blocks of zeros (at least on Linux).
+        // The call to setLength is not strictly necessary (resizing will happen automatically on write, see Javadoc
+        // on RandomAccessFile.seek) but seems reasonable since we know the exact size of the resulting file.
         // In the past we filled the file with zeros here, to "overwrite anything that might be in the file already"
-        // according to a code comment. However that creates a burst of up to 1GB of disk activity, which exhausts
-        // the IOPS budget on cloud servers with network storage. That then causes the server to fall behind in
-        // processing incoming results.
+        // according to a code comment. However that creates a large burst of disk activity which can run up against
+        // IO limits on cloud servers with network storage. Even without initialization, any complete regional analysis
+        // would overwrite every byte in the file with a result for some origin point, so the initial values are only
+        // important when visualizing or debugging partially completed analysis results.
         this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
-        randomAccessFile.setLength(outputFileSizeBytes); //TODO check if this should include header length
-        LOG.info("Created temporary file to accumulate results from workers, size is {}.",
-                human(randomAccessFile.length(), "B"));
+        randomAccessFile.setLength(HEADER_LENGTH_BYTES + (width * height * channels * Integer.BYTES));
+        LOG.info(
+            "Created temporary file to accumulate results from workers, size is {}.",
+            human(randomAccessFile.length(), "B")
+        );
     }
 
     /** Gzip the access grid and upload it to S3. */

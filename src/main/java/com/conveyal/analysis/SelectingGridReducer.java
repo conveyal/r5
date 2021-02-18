@@ -48,6 +48,7 @@ public class SelectingGridReducer {
 
         int version = input.readInt();
 
+        // FIXME access grid reading logic should not be embedded in this reduce operation
         if (version != ACCESS_GRID_VERSION) {
             throw new IllegalArgumentException(String.format("Version mismatch of access grids, expected %s, found %s", ACCESS_GRID_VERSION, version));
         }

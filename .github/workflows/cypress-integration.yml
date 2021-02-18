@@ -1,6 +1,6 @@
 name: 'Run Cypress integration tests from UI'
 
-on: [pull_request]
+on: [push]
 
 jobs:
   cypressIntegration:
@@ -18,7 +18,7 @@ jobs:
           repository: conveyal/analysis-ui
           ref: dev
           path: ui
-      - uses: actions/checkout@v2.3.2
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
           path: r5
@@ -27,13 +27,19 @@ jobs:
       - uses: actions/setup-java@v1
         with:
           java-version: 11
-      - name: Gradle build
-        run: gradle build --scan
-        working-directory: ./r5
-      - name: Copy JAR
-        run: cp $(ls ./r5/build/libs/*-all.jar | head -n1) ./ui
+      - run: gradle build
+        working-directory: r5
+      - run: cp $(ls r5/build/libs/*-all.jar | head -n1) ui
 
       # Install / cache dependencies with Cypress to handle caching Cypress binary.
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '12'
+      - run: yarn build
+        working-directory: ui
+        env:
+            NEXT_PUBLIC_BASEMAP_DISABLED: true
+            NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
       - uses: cypress-io/github-action@v2
         with:
           start: yarn start, yarn start-backend # runs frontend and java server together

@@ -1,4 +1,4 @@
-name: 'Run Cypress integration tests from UI'
+name: 'Cypress Integration Tests'
 
 on: [push]
 

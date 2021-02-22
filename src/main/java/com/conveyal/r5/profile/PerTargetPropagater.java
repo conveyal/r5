@@ -258,7 +258,7 @@ public class PerTargetPropagater {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
                 // FIXME commenting out the line below causes Taui site creation to fail
-                // pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
@@ -282,7 +282,7 @@ public class PerTargetPropagater {
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
                 // NOTE this is currently using only the first (lowest) travel time.
-                Set<com.conveyal.r5.profile.Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

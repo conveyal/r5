@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PersistenceBuffer;
-import com.conveyal.r5.analyst.StreetTimesAndModes;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -42,11 +42,16 @@ public class PathWriter {
     /** The task that created the paths being recorded. */
     private final AnalysisWorkerTask task;
 
-    /** A list of unique paths, each one associated with a positive integer index by its position in the list. */
-    private final List<Path> pathForIndex = new ArrayList<>();
+    /**
+     * A list of unique PatternSequences, each one associated with a positive integer index by its position in the list.
+     */
+    private final List<PatternSequence> patternSequenceForIndex = new ArrayList<>();
 
-    /** The inverse of pathForIndex, giving the position of each path within that list. Used to deduplicate paths. */
-    private final TObjectIntMap<Path> indexForPath;
+    /**
+     * The inverse of patternSequenceForIndex, giving the position of each path within that list.
+     * Used to deduplicate paths (or rather the pattern sequences shared by multiple paths).
+     */
+    private final TObjectIntMap<PatternSequence> indexForPatternSequence;
 
     /** The total number of targets for which we're recording paths, i.e. width * height of the destination grid. */
     private final int nTargets;
@@ -68,7 +73,7 @@ public class PathWriter {
     public PathWriter (AnalysisWorkerTask task) {
         this.task = task;
         this.nTargets = task.width * task.height;
-        indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
+        indexForPatternSequence = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
         nPathsPerTarget = task.nPathsPerTarget;
     }
 
@@ -88,14 +93,19 @@ public class PathWriter {
         int nPathsRecorded = 0;
         for (Path path : paths) {
             if (path != null) {
+                // For Taui purposes we want to deduplicate the more general PatternSequence. It has semantic hash and
+                // equals methods, which Path does not as they wouldn't be used for anything in our current code. We
+                // could even generalize the deduplication further to RouteSequence, see how PathResult.setTarget
+                // derives RouteSequences for non-Taui cases.
+                PatternSequence pseq = path.patternSequence;
                 // Deduplicate paths across destinations using the map.
-                int pathIndex = indexForPath.get(path);
-                if (pathIndex == NO_PATH) {
-                    pathIndex = pathForIndex.size();
-                    pathForIndex.add(path);
-                    indexForPath.put(path, pathIndex);
+                int psidx = indexForPatternSequence.get(pseq);
+                if (psidx == NO_PATH) {
+                    psidx = patternSequenceForIndex.size();
+                    patternSequenceForIndex.add(pseq);
+                    indexForPatternSequence.put(pseq, psidx);
                 }
-                pathIndexes.add(pathIndex);
+                pathIndexes.add(psidx);
                 nPathsRecorded += 1;
                 if (nPathsRecorded == nPathsPerTarget) {
                     break;
@@ -125,7 +135,7 @@ public class PathWriter {
             throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
                     nExpectedPaths, pathIndexes.size()));
         }
-        if (pathForIndex.isEmpty()) {
+        if (patternSequenceForIndex.isEmpty()) {
             // No cells were reached with any transit paths. Do not write anything out to save storage space.
             LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
             return;
@@ -144,15 +154,15 @@ public class PathWriter {
 
             // Write the number of different distinct paths used to reach all destination cells,
             // followed by the details for each of those distinct paths.
-            dataOutput.writeInt(pathForIndex.size());
-            for (Path path : pathForIndex) {
-                dataOutput.writeInt(path.patterns.length);
-                dataOutput.write(getSingleByteCode(path.accessMode));
-                dataOutput.write(getSingleByteCode(path.egressMode));
-                for (int i = 0 ; i < path.patterns.length; i ++){
-                    dataOutput.writeInt(path.boardStops[i]);
-                    dataOutput.writeInt(path.patterns[i]);
-                    dataOutput.writeInt(path.alightStops[i]);
+            dataOutput.writeInt(patternSequenceForIndex.size());
+            for (PatternSequence patternSequence : patternSequenceForIndex) {
+                dataOutput.writeInt(patternSequence.patterns.size());
+                dataOutput.write(getSingleByteCode(patternSequence.stopSequence.access.mode));
+                dataOutput.write(getSingleByteCode(patternSequence.stopSequence.egress.mode));
+                for (int i = 0 ; i < patternSequence.patterns.size(); i ++){
+                    dataOutput.writeInt(patternSequence.stopSequence.boardStops.get(i));
+                    dataOutput.writeInt(patternSequence.patterns.get(i));
+                    dataOutput.writeInt(patternSequence.stopSequence.alightStops.get(i));
                 }
             }
 

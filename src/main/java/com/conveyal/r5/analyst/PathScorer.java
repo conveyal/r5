@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.transit.path.Path;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
@@ -43,7 +43,8 @@ public class PathScorer {
 
     /**
      * Decorates a path with characteristics that will allow us to score it later once we know the travel time of
-     * interest.
+     * interest. We might not need to perform this wrapping anymore to attach the totalTravelTime since Path now
+     * represents the full end to end travel time.
      */
     private static class PathScore implements Comparable<PathScore> {
         Path path;
@@ -62,7 +63,7 @@ public class PathScorer {
          */
         public void computeScore (int targetTravelTimeSeconds) {
             int distanceFromTarget = FastMath.abs(targetTravelTimeSeconds - this.totalTravelTime);
-            int nTransfers = this.path.length - 1;
+            int nTransfers = this.path.waitTimes.size() - 1; // TODO any chance this can end up negative (no transit)?
             this.score = nTransfers * 5 * 60 + distanceFromTarget;
         }
 
@@ -101,9 +102,8 @@ public class PathScorer {
 
         // Iterate over the top ranked paths, de-duplicating them and skipping over any nulls.
         for (PathScore pathScore : pathScores) {
-            Path path = pathScore.path;
-            if (path != null) {
-                chosenPaths.add(path);
+            if (pathScore.path != null) {
+                chosenPaths.add(pathScore.path);
                 if (chosenPaths.size() == nPaths) {
                     break;
                 }

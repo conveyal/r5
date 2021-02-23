@@ -79,8 +79,8 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public Map<CsvResultWriter.Result, String> resultStorage = new HashMap<>();
 
     public void addCsvStoragePath (CsvResultWriter.Result resultType, String outputBucket) {
-        // TODO less fragile path, consistent gzip behavior
-        resultStorage.put(resultType, outputBucket + "/" + this._id + "_" + resultType + ".csv.gz");
+        // TODO less fragile path
+        resultStorage.put(resultType, outputBucket + "/" + this._id + "_" + resultType + ".csv");
     }
 
     public RegionalAnalysis clone () {

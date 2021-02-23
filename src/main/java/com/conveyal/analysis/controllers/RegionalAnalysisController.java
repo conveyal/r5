@@ -355,8 +355,7 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
         }
 
-        // TODO result path is stored in model, use that?
-        String key = regionalAnalysisId + '_' + resultType + ".csv.gz";
+        String key = analysis.resultStorage.get(resultType);
         FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
 
         res.type("text");

@@ -56,7 +56,10 @@ public class CsvResultWriter extends ResultWriter {
      */
     protected synchronized void finish () throws IOException {
         csvWriter.close();
-        super.finish(this.fileName + ".gz");
+        // Note that stored file undergo gzip compression in super.finish(), but be stored with a .csv extension.
+        // When this file is downloaded from the UI, the browser will decompress, yielding a logically named .csv file.
+        // Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
+        super.finish(this.fileName);
     }
 
     /**

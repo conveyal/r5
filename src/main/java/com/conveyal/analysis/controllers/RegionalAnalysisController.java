@@ -510,9 +510,9 @@ public class RegionalAnalysisController implements HttpController {
 
         // Persist this newly created RegionalAnalysis to Mongo, which assigns it an id and creation/update time stamps.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
-        if (analysisRequest.recordTimes) regionalAnalysis.addCsvStoragePath(Result.TIMES, config.resultsBucket());
-        if (analysisRequest.recordPaths) regionalAnalysis.addCsvStoragePath(Result.PATHS, config.resultsBucket());
-        if (analysisRequest.recordAccessibility) regionalAnalysis.addCsvStoragePath(Result.ACCESS, config.resultsBucket());
+        if (analysisRequest.recordTimes) regionalAnalysis.addCsvStoragePath(Result.TIMES);
+        if (analysisRequest.recordPaths) regionalAnalysis.addCsvStoragePath(Result.PATHS);
+        if (analysisRequest.recordAccessibility) regionalAnalysis.addCsvStoragePath(Result.ACCESS);
         Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.

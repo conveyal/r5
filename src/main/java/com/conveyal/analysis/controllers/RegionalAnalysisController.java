@@ -360,7 +360,7 @@ public class RegionalAnalysisController implements HttpController {
         String key = analysis.resultStorage.get(resultType);
         FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
 
-        res.type("text");
+        res.type("text/plain");
         return fileStorage.getURL(fileStorageKey);
     }
 

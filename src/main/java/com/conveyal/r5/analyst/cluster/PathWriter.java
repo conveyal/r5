@@ -28,6 +28,9 @@ import java.util.List;
  *
  * Users may be surprised to see an uncommon path that happens to be associated with the median travel time, so we now
  * save several different ones.
+ *
+ * TODO could this Taui-specific class be combined with PathResult (used in normal single point and regional tasks)?
+ *      PathScorer could then be applied after the fact, or on the fly as paths are added here
  */
 public class PathWriter {
 
@@ -77,6 +80,7 @@ public class PathWriter {
         nPathsPerTarget = task.nPathsPerTarget;
     }
 
+
     /**
      * After construction, this method is called on every destination in order.
      * The list of paths may contain nulls if there are not N transit paths to a particular target.
@@ -84,21 +88,21 @@ public class PathWriter {
      * Note that if adjacent destinations have common paths, then adjacent origins
      * should also have common paths. We currently don't have an optimization to deal with that.
      *
+     * For Taui purposes we want to deduplicate the more general PatternSequence. It has semantic hash and
+     * equals methods, which Path does not as they wouldn't be used for anything in our current code. We
+     * could even generalize the deduplication further to RouteSequence, see how PathResult.setTarget
+     * derives RouteSequences for non-Taui cases.
+     *
      * @param paths a collection of paths that reach a single destination. Only the first n paths will be recorded.
      *              This collection should be pre-filtered to not include duplicate paths.
      *
      * TODO perform the creation and selection of N paths here rather than in the caller, for clearer deduplication.
      */
-    public void recordPathsForTarget (Collection<Path> paths) {
+    public void recordPathsForTarget (Collection<PatternSequence> paths) {
         int nPathsRecorded = 0;
-        for (Path path : paths) {
-            if (path != null) {
-                // For Taui purposes we want to deduplicate the more general PatternSequence. It has semantic hash and
-                // equals methods, which Path does not as they wouldn't be used for anything in our current code. We
-                // could even generalize the deduplication further to RouteSequence, see how PathResult.setTarget
-                // derives RouteSequences for non-Taui cases.
-                PatternSequence pseq = path.patternSequence;
-                // Deduplicate paths across destinations using the map.
+        for (PatternSequence pseq : paths) {
+            if (pseq != null) {
+                // Deduplicate paths across all destinations using this persistent map.
                 int psidx = indexForPatternSequence.get(pseq);
                 if (psidx == NO_PATH) {
                     psidx = patternSequenceForIndex.size();

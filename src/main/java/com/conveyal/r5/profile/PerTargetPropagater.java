@@ -16,6 +16,7 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -257,10 +258,10 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                // FIXME commenting out the line below causes Taui site creation to fail
-                pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                pathScorer = new PathScorer(perIterationTravelTimes, perIterationPaths, perIterationEgress);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
+                // Typically used with freeform destinations fewer in number than gridded destinations.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
                         perIterationEgress);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
@@ -282,7 +283,9 @@ public class PerTargetPropagater {
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
                 // NOTE this is currently using only the first (lowest) travel time.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
+                Set<PatternSequence> selectedPaths = pathScorer.getTopPaths(
+                        pathWriter.nPathsPerTarget, perIterationTravelTimes[0]
+                );
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

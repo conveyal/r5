@@ -135,10 +135,10 @@ public class MultiOriginAssembler {
                 job.templateTask.destinationPointSetKeys.length;
         this.nOriginsTotal = job.nTasksTotal;
         this.originsReceived = new BitSet(job.nTasksTotal);
-        this.originPointSet = job.originPointSet;
+        this.originPointSet = job.templateTask.originPointSet;
         try {
             if (job.templateTask.recordAccessibility) {
-                if (job.originPointSet != null) {
+                if (job.templateTask.originPointSet != null) {
                     LOG.info(
                         "Creating CSV file to store accessibility results for {} origins.",
                         job.nTasksTotal
@@ -163,9 +163,8 @@ public class MultiOriginAssembler {
             if (!job.templateTask.makeTauiSite &&
                  job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
             ) {
-                // It's kind of fragile to read from an external network service here. But this is
-                // only triggered when destinations are freeform, which is an experimental feature.
-                destinationPointSet = PointSetCache.readFreeFormFromFileStore(job.templateTask.grid);
+                // This requires us to have already loaded this destination pointset instance into the transient field.
+                destinationPointSet = job.templateTask.destinationPointSets[0];
                 if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS

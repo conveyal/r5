@@ -17,6 +17,8 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -441,6 +443,18 @@ public class RegionalAnalysisController implements HttpController {
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
                     .findByIdIfPermitted(analysisRequest.originPointSetId, accessGroup).storageLocation();
+            // Look up origin pointset instance itself, so Jobs / Broker can see point coordinates, ids etc.
+            task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
+        }
+
+        // Load the destination pointset if we're in one-to-one mode,
+        // so the result assembler has enough information to match IDs
+        if (analysisRequest.oneToOne) {
+            checkArgument(task.destinationPointSetKeys.length == 1);
+            checkArgument(task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension));
+            task.destinationPointSets = new PointSet[] {
+                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
+            };
         }
 
         task.oneToOne = analysisRequest.oneToOne;

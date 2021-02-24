@@ -345,20 +345,12 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
 
-        if (resultType == Result.ACCESS && !analysis.request.recordAccessibility) {
-            throw AnalysisServerException.notFound("Accessibility results were not recorded for this analysis");
+        String storageKey = analysis.resultStorage.get(resultType);
+        if (storageKey == null) {
+            throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
         }
 
-        if (resultType == Result.TIMES && !analysis.request.recordTimes) {
-            throw AnalysisServerException.notFound("Travel time results were not recorded for this analysis");
-        }
-
-        if (resultType == Result.PATHS && !analysis.request.includePathResults) {
-            throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
-        }
-
-        String key = analysis.resultStorage.get(resultType);
-        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
+        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), storageKey);
 
         res.type("text/plain");
         return fileStorage.getURL(fileStorageKey);

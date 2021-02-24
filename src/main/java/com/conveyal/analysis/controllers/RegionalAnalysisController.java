@@ -439,19 +439,18 @@ public class RegionalAnalysisController implements HttpController {
             task.validatePercentiles();
         }
 
-        // Set the origin pointset if one is specified.
+        // Set the origin pointset key if an ID is specified. Currently this will always be a freeform pointset.
+        // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
                     .findByIdIfPermitted(analysisRequest.originPointSetId, accessGroup).storageLocation();
-            // Look up origin pointset instance itself, so Jobs / Broker can see point coordinates, ids etc.
             task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
 
-        // Load the destination pointset if we're in one-to-one mode,
-        // so the result assembler has enough information to match IDs
-        if (analysisRequest.oneToOne) {
+        // If our destinations are freeform, pre-load the destination pointset on the backend.
+        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
+        if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
             checkArgument(task.destinationPointSetKeys.length == 1);
-            checkArgument(task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension));
             task.destinationPointSets = new PointSet[] {
                     PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
             };

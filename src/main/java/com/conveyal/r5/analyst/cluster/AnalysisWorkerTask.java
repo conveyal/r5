@@ -140,7 +140,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     /**
      * The storage keys for the pointsets we will compute access to. The format is regionId/datasetId.fileFormat.
      * Ideally we'd just provide the IDs of the grids, but creating the key requires us to know the region
-     * ID and file format, which are not otherwise easily available.
+     * ID and file format, which are not otherwise easily available on workers that don't have a database connection.
      * This field is required for regional analyses, which always compute accessibility to destinations.
      * On the other hand, in a single point request this may be null, in which case the worker will report only
      * travel times to destinations and not accessibility figures.

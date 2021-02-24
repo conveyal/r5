@@ -3,6 +3,7 @@ package com.conveyal.analysis.results;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -229,9 +230,10 @@ public class MultiOriginAssembler {
                     }
                 }
             }
-
             for (CsvResultWriter writer : csvResultWriters) {
                 writer.finish();
+                // Note that the caller must flush this object back out to the database after the analysis is complete.
+                regionalAnalysis.addCsvStoragePath(writer.resultType);
             }
         } catch (Exception e) {
             LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
@@ -309,6 +311,9 @@ public class MultiOriginAssembler {
             if (nComplete == nOriginsTotal && !error) {
                 finish();
                 this.regionalAnalysis.complete = true;
+                // Write updated regionalAnalysis object back out to database, to mark it finished and record locations
+                // of any CSV files generated. TODO is it correct to use this method that doesn't update the lock?
+                Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
             }
         } catch (Exception e) {
             error = true;

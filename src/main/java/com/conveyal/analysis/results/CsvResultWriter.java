@@ -20,8 +20,9 @@ public class CsvResultWriter extends ResultWriter {
     private final CsvWriter csvWriter;
     private final String fileName;
     private int nDataColumns;
-    private Result resultType;
+    public final Result resultType;
 
+    // An enum of types seems like a red flag in Java - perhaps we should instead be using subtypes and polymorphism
     public enum Result {
         ACCESS,
         TIMES,

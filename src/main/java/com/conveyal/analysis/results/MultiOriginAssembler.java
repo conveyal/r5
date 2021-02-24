@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 
 /**
  * This assembles regional results arriving from workers into one or more files per regional analysis on
@@ -50,15 +51,9 @@ public class MultiOriginAssembler {
      */
     private GridResultWriter[][] accessibilityGridWriters;
 
-    // TODO the grid/CSV ResultWriters could potentially be replaced with a combined list and polymorphism e.g. for
-    //  (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
-    private ArrayList<CsvResultWriter> csvResultWriters = new ArrayList<>();
-
-    /** For the time being this field is only set when the origins are freeform (rather than a grid). */
-    private PointSet originPointSet;
-
-    /** For the time being this field is only set when the destinations are freeform (rather than a grid). */
-    private PointSet destinationPointSet;
+    // TODO it seems plausible to make a MultiGridResultWriter that also conforms to this same interface
+    // We could then have a single list of all writers, CSV and grids mixed together.
+    private List<CsvResultWriter> csvResultWriters = new ArrayList<>();
 
     /** TODO check if error is true before all results are received (when receiving each result?) and cancel job. */
     private boolean error = false;
@@ -94,16 +89,6 @@ public class MultiOriginAssembler {
     private final int nDestinationPointSets;
 
     /**
-     * The number of different travel time cutoffs being applied when computing accessibility for each origin. This
-     * is the number of values stored per origin cell in an accessibility results grid.
-     * Note that we're storing only the number of different cutoffs, but not the cutoff values themselves in the file.
-     * This means that the files can only be properly interpreted with the Mongo metadata from the regional analysis.
-     * This is an intentional choice to avoid changing the file format, and in any case these files are not expected
-     * to ever be used separately from an environment where the Mongo database is available.
-     */
-    private final int nCutoffs;
-
-    /**
      * Constructor. This sets up one or more ResultWriters depending on whether we're writing gridded or non-gridded
      * cumulative opportunities accessibility, or origin-destination travel times.
      * TODO do not pass the FileStorage component down into this non-component and the ResultWriter non-component,
@@ -118,13 +103,10 @@ public class MultiOriginAssembler {
         this.regionalAnalysis = regionalAnalysis;
         this.job = job;
         this.nPercentiles = job.templateTask.percentiles.length;
-        // Newly launched analyses have the cutoffs field, even when being sent to old workers that don't read it.
-        this.nCutoffs = job.templateTask.cutoffsMinutes.length;
         this.nDestinationPointSets = job.templateTask.makeTauiSite ? 0 :
                 job.templateTask.destinationPointSetKeys.length;
         this.nOriginsTotal = job.nTasksTotal;
         this.originsReceived = new BitSet(job.nTasksTotal);
-        this.originPointSet = job.templateTask.originPointSet;
         try {
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
@@ -145,7 +127,7 @@ public class MultiOriginAssembler {
                  job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
             ) {
                 // This requires us to have already loaded this destination pointset instance into the transient field.
-                destinationPointSet = job.templateTask.destinationPointSets[0];
+                PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
                 if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS

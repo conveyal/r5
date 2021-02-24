@@ -49,6 +49,14 @@ public class GridResultWriter extends ResultWriter {
     /** The offset to get to the data section of the access grid file. */
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
+    /**
+     * The number of different travel time cutoffs being applied when computing accessibility for each origin.
+     * The number of values stored per origin cell in an accessibility results grid.
+     * Note that we're storing only the number of different cutoffs, but not the cutoff values themselves in the file.
+     * This means that the files can only be properly interpreted with the Mongo metadata from the regional analysis.
+     * This is an intentional choice to avoid changing the file format, and in any case these files are not expected
+     * to ever be used separately from an environment where the Mongo database is available.
+     */
     private final int channels;
 
     /**

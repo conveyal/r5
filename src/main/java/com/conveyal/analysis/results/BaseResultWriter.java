@@ -25,16 +25,16 @@ import static com.conveyal.r5.common.Util.human;
  * term cloud storage once the regional analysis is complete. Concrete subclasses handle writing CSV
  * or proprietary binary grid files, depending on the type of regional analysis.
  */
-public abstract class ResultWriter {
+public abstract class BaseResultWriter {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ResultWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BaseResultWriter.class);
 
     private final FileStorage fileStorage;
 
     protected File bufferFile;
     private String outputBucket;
 
-    public ResultWriter (FileStorage fileStorage) {
+    public BaseResultWriter (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
@@ -81,6 +81,6 @@ public abstract class ResultWriter {
     /**
      * Close all buffers and temporary files.
      */
-    abstract void terminate () throws IOException;
+    abstract void terminate () throws Exception;
 
 }

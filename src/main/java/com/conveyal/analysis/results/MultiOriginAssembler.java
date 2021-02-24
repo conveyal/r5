@@ -1,5 +1,6 @@
 package com.conveyal.analysis.results;
 
+import com.beust.jcommander.ParameterException;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
@@ -45,15 +46,8 @@ public class MultiOriginAssembler {
      */
     public final Job job;
 
-    /**
-     * We create one GridResultWriter for each destination pointset and percentile.  Each of those output files
-     * contains data for all travel time cutoffs at each origin.
-     */
-    private GridResultWriter[][] accessibilityGridWriters;
-
-    // TODO it seems plausible to make a MultiGridResultWriter that also conforms to this same interface
-    // We could then have a single list of all writers, CSV and grids mixed together.
-    private List<CsvResultWriter> csvResultWriters = new ArrayList<>();
+    // One writer per CSV/Grids we're outputting
+    private List<RegionalResultWriter> resultWriters = new ArrayList<>();
 
     /** TODO check if error is true before all results are received (when receiving each result?) and cancel job. */
     private boolean error = false;
@@ -82,12 +76,6 @@ public class MultiOriginAssembler {
      */
     public final int nOriginsTotal;
 
-    /** The number of different percentiles for which we're calculating accessibility on the workers. */
-    private final int nPercentiles;
-
-    /** The number of destination pointsets to which we're calculating accessibility */
-    private final int nDestinationPointSets;
-
     /**
      * Constructor. This sets up one or more ResultWriters depending on whether we're writing gridded or non-gridded
      * cumulative opportunities accessibility, or origin-destination travel times.
@@ -97,32 +85,25 @@ public class MultiOriginAssembler {
      *      file up to an umbrella location where a single reference to the file storage can be used to
      *      store all of them.
      */
-    public MultiOriginAssembler (RegionalAnalysis regionalAnalysis, Job job, String outputBucket,
-                                 FileStorage fileStorage) {
-
+    public MultiOriginAssembler (
+            RegionalAnalysis regionalAnalysis, Job job, String outputBucket, FileStorage fileStorage
+    ) {
         this.regionalAnalysis = regionalAnalysis;
         this.job = job;
-        this.nPercentiles = job.templateTask.percentiles.length;
-        this.nDestinationPointSets = job.templateTask.makeTauiSite ? 0 :
-                job.templateTask.destinationPointSetKeys.length;
         this.nOriginsTotal = job.nTasksTotal;
         this.originsReceived = new BitSet(job.nTasksTotal);
         try {
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
-                    csvResultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
                 } else {
-                    // Create one grid writer per percentile and destination pointset
-                    accessibilityGridWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
-                    for (int d = 0; d < nDestinationPointSets; d++) {
-                        for (int p = 0; p < nPercentiles; p++) {
-                            accessibilityGridWriters[d][p] =
-                                    new GridResultWriter(job.templateTask, outputBucket, fileStorage);
-                        }
-                    }
+                    resultWriters.add(
+                            new MultiGridResultWriter(regionalAnalysis, job.templateTask, outputBucket, fileStorage)
+                    );
                 }
             }
 
+            // TODO refactor the following conditional block
             if (!job.templateTask.makeTauiSite &&
                  job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
             ) {
@@ -144,32 +125,28 @@ public class MultiOriginAssembler {
             }
 
             if (job.templateTask.recordTimes) {
-                csvResultWriters.add(new TimeCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new TimeCsvResultWriter(job.templateTask, outputBucket, fileStorage));
             }
 
             if (job.templateTask.includePathResults) {
-                csvResultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
             }
 
-            {
-                int nWriters = csvResultWriters.size();
-                if (accessibilityGridWriters != null) {
-                    for (GridResultWriter[] grw : accessibilityGridWriters) {
-                        nWriters += grw.length;
-                    }
-                }
-                if (nWriters == 0) {
-                    // TODO handle all error conditions of this form with a single method that also cancels the job
-                    error = true;
-                    LOG.error("A regional analysis should always create at least one grid or CSV file.");
-                }
+            if (resultWriters.isEmpty()) {
+                // TODO handle all error conditions of this form with a single method that also cancels the job
+                error = true;
+                throw new ParameterException("A regional analysis should always create at least one grid or CSV file.");
             }
 
             // Record the paths of any CSV files that will be produced by this analysis.
             // The caller must flush the RegionalAnalysis back out to the database to retain this information.
             // We avoid database access here in constructors, especially when called in synchronized methods.
-            for (CsvResultWriter writer : csvResultWriters) {
-                regionalAnalysis.resultStorage.put(writer.resultType(), writer.fileName);
+            for (RegionalResultWriter writer : resultWriters) {
+                // FIXME instanceof+cast is ugly, do this some other way or even record the Grids
+                if (writer instanceof CsvResultWriter) {
+                    CsvResultWriter csvWriter = (CsvResultWriter) writer;
+                    regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
+                }
             }
 
         } catch (IOException e) {
@@ -184,19 +161,8 @@ public class MultiOriginAssembler {
     private synchronized void finish() {
         LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
         try {
-            if (accessibilityGridWriters != null) {
-                for (int d = 0; d < nDestinationPointSets; d++) {
-                    for (int p = 0; p < nPercentiles; p++) {
-                        int percentile = job.templateTask.percentiles[p];
-                        String destinationPointSetId = regionalAnalysis.destinationPointSetIds[d];
-                        String gridFileName =
-                                String.format("%s_%s_P%d.access", job.jobId, destinationPointSetId, percentile);
-                        accessibilityGridWriters[d][p].finish(gridFileName);
-                    }
-                }
-            }
-            for (CsvResultWriter csvWriter : csvResultWriters) {
-                csvWriter.finish();
+            for (RegionalResultWriter writer : resultWriters) {
+                writer.finish();
             }
             regionalAnalysis.complete = true;
             // Write updated regionalAnalysis object back out to database, to mark it complete and record locations
@@ -218,30 +184,9 @@ public class MultiOriginAssembler {
      */
     public synchronized void handleMessage (RegionalWorkResult workResult) {
         try {
-            // TODO replace individual calls to writeOneWorkResult() with iteration over the list. Eliminate fields.
-
-            if (job.templateTask.recordAccessibility && accessibilityGridWriters != null) {
-                // Drop work results for this particular origin into a little-endian output file.
-                // TODO more efficient way to write little-endian integers
-                // TODO check monotonic increasing invariants here rather than in worker.
-                // Infer x and y cell indexes based on the template task
-                int taskNumber = workResult.taskId;
-                for (int d = 0; d < workResult.accessibilityValues.length; d++) {
-                    int[][] percentilesForGrid = workResult.accessibilityValues[d];
-                    for (int p = 0; p < nPercentiles; p++) {
-                        int[] cutoffsForPercentile = percentilesForGrid[p];
-                        GridResultWriter gridWriter = accessibilityGridWriters[d][p];
-                        gridWriter.writeOneOrigin(taskNumber, cutoffsForPercentile);
-                    }
-                }
+            for (RegionalResultWriter writer : resultWriters) {
+                writer.writeOneWorkResult(workResult);
             }
-
-            if (csvResultWriters != null) {
-                for (CsvResultWriter csvWriter : csvResultWriters) {
-                    csvWriter.writeOneWorkResult(workResult);
-                }
-            }
-
             // Don't double-count origins if we receive them more than once. Atomic get-and-increment requires
             // synchronization, currently achieved by synchronizing this entire method.
             if (!originsReceived.get(workResult.taskId)) {
@@ -258,30 +203,9 @@ public class MultiOriginAssembler {
     }
 
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */
-    public synchronized void terminate () throws IOException {
-        if (accessibilityGridWriters != null) {
-            for (GridResultWriter[] writers : accessibilityGridWriters) {
-                for (GridResultWriter writer : writers) {
-                    writer.terminate();
-                }
-            }
-        }
-        for (CsvResultWriter writer : csvResultWriters) {
+    public synchronized void terminate () throws Exception {
+        for (RegionalResultWriter writer : resultWriters) {
             writer.terminate();
-        }
-    }
-
-    /**
-     * We don't have any straightforward way to return partial CSV results, so we only return
-     * partially filled grids. This leaks the file object out of the abstraction so is not ideal,
-     * but will work for now to allow partial display.
-     */
-    public File getGridBufferFile () {
-        if (accessibilityGridWriters == null) {
-            return null;
-        } else {
-            // TODO this returns only one buffer file, which has not been processed by the SelectingGridReducer
-            return accessibilityGridWriters[0][0].bufferFile;
         }
     }
 

@@ -494,7 +494,7 @@ public class Broker {
         if (resultAssembler == null) {
             return null;
         } else {
-            return resultAssembler.getGridBufferFile();
+            return null; // Was: resultAssembler.getGridBufferFile(); TODO implement fetching partially completed?
         }
     }
 

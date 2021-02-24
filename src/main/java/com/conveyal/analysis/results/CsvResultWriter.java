@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkState;
  * Subclasses are used to record origin/destination "skim" matrices, accessibility indicators for non-gridded
  * ("freeform") origin point sets, and cataloging paths between pairs of origins and destinations.
  */
-public abstract class CsvResultWriter extends ResultWriter {
+public abstract class CsvResultWriter extends BaseResultWriter implements RegionalResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
 
@@ -78,7 +78,8 @@ public abstract class CsvResultWriter extends ResultWriter {
      * When this file is downloaded from the UI, the browser will decompress, yielding a logically named .csv file.
      * Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
      */
-    protected synchronized void finish () throws IOException {
+    @Override
+    public synchronized void finish () throws IOException {
         csvWriter.close();
         super.finish(this.fileName);
     }
@@ -86,7 +87,8 @@ public abstract class CsvResultWriter extends ResultWriter {
     /**
      * Write all rows for a single regional work result (single origin) into the CSV file.
      */
-    public void writeOneWorkResult (RegionalWorkResult workResult) throws IOException {
+    @Override
+    public void writeOneWorkResult (RegionalWorkResult workResult) throws Exception {
         // CsvWriter is not threadsafe and multiple threads may call this, so after values are generated,
         // the actual writing is synchronized (TODO confirm)
         // Is result row generation slow enough to bother synchronizing only the following block?
@@ -102,7 +104,7 @@ public abstract class CsvResultWriter extends ResultWriter {
     }
 
     @Override
-    synchronized void terminate () throws IOException {
+    public synchronized void terminate () throws Exception {
         csvWriter.close();
         bufferFile.delete();
     }

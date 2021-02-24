@@ -4,12 +4,9 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.CsvResultWriter.Result;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,15 +49,6 @@ public class MultiOriginAssembler {
      * contains data for all travel time cutoffs at each origin.
      */
     private GridResultWriter[][] accessibilityGridWriters;
-
-    /**
-     * If the job includes a freeform origin pointset, csv results may be written for each of those freeform origins.
-     * Additionally, if templateTask.recordAccessibility = true, accessibility results will be written to CSV instead
-     * of the grids above.
-     */
-    private CsvResultWriter accessibilityCsvWriter;
-    private CsvResultWriter timeCsvWriter;
-    private CsvResultWriter pathCsvWriter;
 
     // TODO the grid/CSV ResultWriters could potentially be replaced with a combined list and polymorphism e.g. for
     //  (ResultWriter rw : resultWriters) rw.writeOne(RegionalWorkResult workResult);
@@ -144,11 +132,7 @@ public class MultiOriginAssembler {
                         "Creating CSV file to store accessibility results for {} origins.",
                         job.nTasksTotal
                     );
-                    accessibilityCsvWriter = new CsvResultWriter(
-                        job.templateTask, outputBucket, fileStorage, Result.ACCESS
-                    );
-                    accessibilityCsvWriter.setDataColumns("access");
-                    csvResultWriters.add(accessibilityCsvWriter);
+                    csvResultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
                 } else {
                     // Create one grid writer per percentile and destination pointset
                     accessibilityGridWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
@@ -170,6 +154,8 @@ public class MultiOriginAssembler {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
                     ) {
+                        // TODO actually we need to check dimensions for gridded pointsets as well,
+                        //  which can be supplied for recordTimes.
                         error = true;
                         throw new AnalysisServerException(String.format(
                             "Freeform requests limited to %d destinations and %d origin-destination pairs.",
@@ -180,17 +166,11 @@ public class MultiOriginAssembler {
             }
 
             if (job.templateTask.recordTimes) {
-                LOG.info("Creating CSV file to store time results for {} origins.", job.nTasksTotal);
-                timeCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.TIMES);
-                timeCsvWriter.setDataColumns("time");
-                csvResultWriters.add(timeCsvWriter);
+                csvResultWriters.add(new TimeCsvResultWriter(job.templateTask, outputBucket, fileStorage));
             }
 
             if (job.templateTask.includePathResults) {
-                LOG.info("Creating CSV file to store path results for {} origins.", job.nTasksTotal);
-                pathCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.PATHS);
-                pathCsvWriter.setDataColumns(PathResult.DATA_COLUMNS);
-                csvResultWriters.add(pathCsvWriter);
+                csvResultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
             }
 
             {
@@ -211,7 +191,7 @@ public class MultiOriginAssembler {
             // The caller must flush the RegionalAnalysis back out to the database to retain this information.
             // We avoid database access here in constructors, especially when called in synchronized methods.
             for (CsvResultWriter writer : csvResultWriters) {
-                regionalAnalysis.addCsvStoragePath(writer.resultType);
+                regionalAnalysis.addCsvStoragePath(writer.resultType());
             }
 
         } catch (IOException e) {
@@ -237,8 +217,8 @@ public class MultiOriginAssembler {
                     }
                 }
             }
-            for (CsvResultWriter writer : csvResultWriters) {
-                writer.finish();
+            for (CsvResultWriter csvWriter : csvResultWriters) {
+                csvWriter.finish();
             }
             regionalAnalysis.complete = true;
             // Write updated regionalAnalysis object back out to database, to mark it complete and record locations
@@ -260,55 +240,27 @@ public class MultiOriginAssembler {
      */
     public synchronized void handleMessage (RegionalWorkResult workResult) {
         try {
-            if (job.templateTask.recordAccessibility) {
-                // Sanity check the shape of the work result we received against expectations.
-                checkAccessibilityDimension(workResult);
-                // Infer x and y cell indexes based on the template task
-                int taskNumber = workResult.taskId;
+            // TODO replace individual calls to writeOneWorkResult() with iteration over the list. Eliminate fields.
+
+            if (job.templateTask.recordAccessibility && accessibilityGridWriters != null) {
                 // Drop work results for this particular origin into a little-endian output file.
                 // TODO more efficient way to write little-endian integers
                 // TODO check monotonic increasing invariants here rather than in worker.
+                // Infer x and y cell indexes based on the template task
+                int taskNumber = workResult.taskId;
                 for (int d = 0; d < workResult.accessibilityValues.length; d++) {
                     int[][] percentilesForGrid = workResult.accessibilityValues[d];
-                    if (accessibilityCsvWriter != null) {
-                        String originId = originPointSet.getId(workResult.taskId);
-                        // FIXME this is writing only accessibility for the first percentile and cutoff
-                        accessibilityCsvWriter.writeOneRow(originId, "", String.valueOf(percentilesForGrid[0][0]));
-                    } else {
-                        for (int p = 0; p < nPercentiles; p++) {
-                            int[] cutoffsForPercentile = percentilesForGrid[p];
-                            GridResultWriter writer = accessibilityGridWriters[d][p];
-                            writer.writeOneOrigin(taskNumber, cutoffsForPercentile);
-                        }
+                    for (int p = 0; p < nPercentiles; p++) {
+                        int[] cutoffsForPercentile = percentilesForGrid[p];
+                        GridResultWriter gridWriter = accessibilityGridWriters[d][p];
+                        gridWriter.writeOneOrigin(taskNumber, cutoffsForPercentile);
                     }
                 }
             }
 
-            if (job.templateTask.recordTimes) {
-                // Sanity check the shape of the work result we received against expectations.
-                checkTravelTimeDimension(workResult);
-                String originId = originPointSet.getId(workResult.taskId);
-                for (int p = 0; p < nPercentiles; p++) {
-                    int[] percentileResult = workResult.travelTimeValues[p];
-                    for (int d = 0; d < percentileResult.length; d++) {
-                        int travelTime = percentileResult[d];
-                        String destinationId = destinationId(workResult.taskId, d);
-                        timeCsvWriter.writeOneRow(originId, destinationId, String.valueOf(travelTime));
-                    }
-                }
-            }
-
-            if (job.templateTask.includePathResults) {
-                checkPathDimension(workResult);
-                ArrayList<String[]>[] pathsToPoints = workResult.pathResult;
-                for (int d = 0; d < pathsToPoints.length; d++) {
-                    ArrayList<String[]> pathsIterations = pathsToPoints[d];
-                    for (String[] iterationDetails : pathsIterations) {
-                        String originId = originPointSet.getId(workResult.taskId);
-                        String destinationId = destinationId(workResult.taskId, d);
-                        checkDimension(workResult, "columns", iterationDetails.length, PathResult.DATA_COLUMNS.length);
-                        pathCsvWriter.writeOneRow(originId, destinationId, iterationDetails);
-                    }
+            if (csvResultWriters != null) {
+                for (CsvResultWriter csvWriter : csvResultWriters) {
+                    csvWriter.writeOneWorkResult(workResult);
                 }
             }
 
@@ -327,42 +279,6 @@ public class MultiOriginAssembler {
         }
     }
 
-    /**
-     * Check that each dimension of the 3D results array matches the expected size for the job being processed.
-     * There are different dimension requirements for accessibility, travel time, and path results, so three different
-     * dimension check methods.
-     */
-    private void checkAccessibilityDimension (RegionalWorkResult workResult) {
-        checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, this.nDestinationPointSets);
-        for (int[][] percentilesForGrid : workResult.accessibilityValues) {
-            checkDimension(workResult, "percentiles", percentilesForGrid.length, this.nPercentiles);
-            for (int[] cutoffsForPercentile : percentilesForGrid) {
-                checkDimension(workResult, "cutoffs", cutoffsForPercentile.length, this.nCutoffs);
-            }
-        }
-    }
-
-    /**
-     * Check that each dimension of the 2D results array matches the expected size for the job being processed.
-     * There are different dimension requirements for accessibility and travel time results, so two different methods.
-     */
-    private void checkTravelTimeDimension (RegionalWorkResult workResult) {
-        // In one-to-one mode, we expect only one value per origin, the destination point at the same pointset index as
-        // the origin point. Otherwise, for each origin, we expect one value per destination.
-        final int nDestinations = job.templateTask.oneToOne ? 1 : destinationPointSet.featureCount();
-        checkDimension(workResult, "percentiles", workResult.travelTimeValues.length, nPercentiles);
-        for (int[] percentileResult : workResult.travelTimeValues) {
-            checkDimension(workResult, "destinations", percentileResult.length, nDestinations);
-        }
-    }
-
-    private void checkPathDimension (RegionalWorkResult workResult) {
-        // In one-to-one mode, we expect only one value per origin, the destination point at the same pointset index as
-        // the origin point. Otherwise, for each origin, we expect one value per destination.
-        final int nDestinations = job.templateTask.oneToOne ? 1 : destinationPointSet.featureCount();
-        checkDimension(workResult, "destinations", workResult.pathResult.length, nDestinations);
-    }
-
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */
     public synchronized void terminate () throws IOException {
         if (accessibilityGridWriters != null) {
@@ -377,16 +293,6 @@ public class MultiOriginAssembler {
         }
     }
 
-    String destinationId(int taskId, int index) {
-        // oneToOne results will have the same origin and destination IDs.
-        // Always writing both should alert the user if something is amiss.
-        if (job.templateTask.oneToOne) {
-            return destinationPointSet.getId(taskId);
-        } else {
-            return destinationPointSet.getId(index);
-        }
-    }
-
     /**
      * We don't have any straightforward way to return partial CSV results, so we only return
      * partially filled grids. This leaks the file object out of the abstraction so is not ideal,
@@ -398,18 +304,6 @@ public class MultiOriginAssembler {
         } else {
             // TODO this returns only one buffer file, which has not been processed by the SelectingGridReducer
             return accessibilityGridWriters[0][0].bufferFile;
-        }
-    }
-
-    /**
-     * Validate that the work results we're receiving match what is expected for the job at hand.
-     */
-    private void checkDimension (RegionalWorkResult workResult, String dimensionName,
-                                 int seen, int expected) {
-        if (seen != expected) {
-            LOG.error("Result for task {} of job {} has {} {}, expected {}.",
-                    workResult.taskId, workResult.jobId, dimensionName, seen, expected);
-            error = true;
         }
     }
 

@@ -222,7 +222,6 @@ public class MongoMap<V extends Model> {
 
     /**
      * Insert without updating the nonce or updateBy/updatedAt
-     * @return
      */
     public V modifiyWithoutUpdatingLock (V value) {
         wrappedCollection.updateById(value._id, value);

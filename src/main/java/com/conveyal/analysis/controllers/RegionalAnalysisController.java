@@ -9,8 +9,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.CsvResultWriter;
-import com.conveyal.analysis.results.CsvResultWriter.Result;
+import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -333,7 +332,8 @@ public class RegionalAnalysisController implements HttpController {
 
     private String getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
-        final Result resultType = Result.valueOf(req.params("resultType").toUpperCase());
+        final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
+        // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
 
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(regionalAnalysisId).get(),

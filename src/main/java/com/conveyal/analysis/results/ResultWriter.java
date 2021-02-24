@@ -57,12 +57,12 @@ public abstract class ResultWriter {
     protected synchronized void finish (String fileName) throws IOException {
         LOG.info("Compressing {} and moving into file storage.", fileName);
         FileStorageKey fileStorageKey = new FileStorageKey(outputBucket, fileName);
-        File gzippedGridFile = FileUtils.createScratchFile();
+        File gzippedResultFile = FileUtils.createScratchFile();
 
         // There's probably a more elegant way to do this with NIO and without closing the buffer.
         // That would be Files.copy(File.toPath(),X) or ByteStreams.copy.
         InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
-        OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedGridFile)));
+        OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedResultFile)));
         ByteStreams.copy(is, os);
         is.close();
         os.close();
@@ -70,11 +70,11 @@ public abstract class ResultWriter {
         LOG.info("GZIP compression reduced analysis results {} from {} to {} ({}x compression)",
                 fileName,
                 human(bufferFile.length(), "B"),
-                human(gzippedGridFile.length(), "B"),
-                (double) bufferFile.length() / gzippedGridFile.length()
+                human(gzippedResultFile.length(), "B"),
+                (double) bufferFile.length() / gzippedResultFile.length()
         );
 
-        fileStorage.moveIntoStorage(fileStorageKey, gzippedGridFile);
+        fileStorage.moveIntoStorage(fileStorageKey, gzippedResultFile);
         bufferFile.delete();
     }
 

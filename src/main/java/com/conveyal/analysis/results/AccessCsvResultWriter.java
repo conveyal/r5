@@ -31,7 +31,7 @@ public class AccessCsvResultWriter extends CsvResultWriter {
      */
     @Override
     protected void checkDimension (RegionalWorkResult workResult) {
-        checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, task.destinationPointSets.length);
+        checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, task.destinationPointSetKeys.length);
         for (int[][] percentilesForGrid : workResult.accessibilityValues) {
             checkDimension(workResult, "percentiles", percentilesForGrid.length, task.percentiles.length);
             for (int[] cutoffsForPercentile : percentilesForGrid) {
@@ -44,7 +44,7 @@ public class AccessCsvResultWriter extends CsvResultWriter {
     public Iterable<String[]> rowValues (RegionalWorkResult workResult) {
         String originId = task.originPointSet.getId(workResult.taskId);
         List<String[]> rows = new ArrayList<>();
-        for (int d = 0; d < task.destinationPointSets.length; d++) {
+        for (int d = 0; d < task.destinationPointSetKeys.length; d++) {
             int[][] percentilesForDestPointset = workResult.accessibilityValues[d];
             for (int p = 0; p < task.percentiles.length; p++) {
                 int[] cutoffsForPercentile = percentilesForDestPointset[p];

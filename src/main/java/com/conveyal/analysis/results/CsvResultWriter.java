@@ -23,8 +23,8 @@ public abstract class CsvResultWriter extends ResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
 
+    public final String fileName;
     private final CsvWriter csvWriter;
-    private final String fileName;
     private int nDataColumns;
 
     /**

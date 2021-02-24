@@ -187,7 +187,7 @@ public class MultiOriginAssembler {
             // The caller must flush the RegionalAnalysis back out to the database to retain this information.
             // We avoid database access here in constructors, especially when called in synchronized methods.
             for (CsvResultWriter writer : csvResultWriters) {
-                regionalAnalysis.addCsvStoragePath(writer.resultType());
+                regionalAnalysis.resultStorage.put(writer.resultType(), writer.fileName);
             }
 
         } catch (IOException e) {

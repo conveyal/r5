@@ -93,10 +93,6 @@ public class RegionalAnalysis extends Model implements Cloneable {
      */
     public Map<CsvResultType, String> resultStorage = new HashMap<>();
 
-    public void addCsvStoragePath (CsvResultType resultType) {
-        resultStorage.put(resultType, this._id + "_" + resultType + ".csv");
-    }
-
     public RegionalAnalysis clone () {
         try {
             return (RegionalAnalysis) super.clone();

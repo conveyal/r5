@@ -27,7 +27,7 @@ import static com.conveyal.r5.common.Util.human;
  */
 public abstract class ResultWriter {
 
-    public static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
+    public static final Logger LOG = LoggerFactory.getLogger(ResultWriter.class);
 
     private final FileStorage fileStorage;
 
@@ -55,7 +55,7 @@ public abstract class ResultWriter {
      * Gzip the access grid and store it.
      */
     protected synchronized void finish (String fileName) throws IOException {
-        LOG.info("Compressing {} and uploading to S3", fileName);
+        LOG.info("Compressing {} and moving into file storage.", fileName);
         FileStorageKey fileStorageKey = new FileStorageKey(outputBucket, fileName);
         File gzippedGridFile = FileUtils.createScratchFile();
 

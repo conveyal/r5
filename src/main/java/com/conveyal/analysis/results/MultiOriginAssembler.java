@@ -180,14 +180,14 @@ public class MultiOriginAssembler {
             }
 
             if (job.templateTask.recordTimes) {
-                LOG.info("Creating csv file to store time results for {} origins.", job.nTasksTotal);
+                LOG.info("Creating CSV file to store time results for {} origins.", job.nTasksTotal);
                 timeCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.TIMES);
                 timeCsvWriter.setDataColumns("time");
                 csvResultWriters.add(timeCsvWriter);
             }
 
             if (job.templateTask.includePathResults) {
-                LOG.info("Creating csv file to store path results for {} origins.", job.nTasksTotal);
+                LOG.info("Creating CSV file to store path results for {} origins.", job.nTasksTotal);
                 pathCsvWriter = new CsvResultWriter(job.templateTask, outputBucket, fileStorage, Result.PATHS);
                 pathCsvWriter.setDataColumns(PathResult.DATA_COLUMNS);
                 csvResultWriters.add(pathCsvWriter);

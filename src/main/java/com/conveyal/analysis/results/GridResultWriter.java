@@ -95,7 +95,7 @@ public class GridResultWriter extends ResultWriter {
         );
     }
 
-    /** Gzip the access grid and upload it to S3. */
+    /** Gzip the access grid and upload it to file storage (such as AWS S3). */
     @Override
     protected synchronized void finish (String fileName) throws IOException {
         super.finish(fileName);

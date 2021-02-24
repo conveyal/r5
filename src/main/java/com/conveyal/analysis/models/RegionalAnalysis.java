@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.results.CsvResultWriter;
+import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
 
@@ -91,11 +91,7 @@ public class RegionalAnalysis extends Model implements Cloneable {
      * place because these files are not meant for direct download by the end user, so the UI doesn't need to replicate
      * any of that logic.
      */
-    public Map<CsvResultWriter.Result, String> resultStorage = new HashMap<>();
-
-    public void addCsvStoragePath (CsvResultWriter.Result resultType) {
-        resultStorage.put(resultType, this._id + "_" + resultType + ".csv");
-    }
+    public Map<CsvResultType, String> resultStorage = new HashMap<>();
 
     public RegionalAnalysis clone () {
         try {

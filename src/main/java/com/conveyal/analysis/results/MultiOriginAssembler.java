@@ -93,34 +93,32 @@ public class MultiOriginAssembler {
         this.nOriginsTotal = job.nTasksTotal;
         this.originsReceived = new BitSet(job.nTasksTotal);
         try {
-            if (job.templateTask.recordAccessibility) {
-                if (job.templateTask.originPointSet != null) {
-                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
-                } else {
-                    resultWriters.add(
-                            new MultiGridResultWriter(regionalAnalysis, job.templateTask, outputBucket, fileStorage)
-                    );
-                }
-            }
-
-            // TODO refactor the following conditional block
+            // Check that origin and destination sets are not too big for generating CSV files.
             if (!job.templateTask.makeTauiSite &&
                  job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
             ) {
-                // This requires us to have already loaded this destination pointset instance into the transient field.
+               // This requires us to have already loaded this destination pointset instance into the transient field.
                 PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
                 if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
                     ) {
-                        // TODO actually we need to check dimensions for gridded pointsets as well,
-                        //  which can be supplied for recordTimes.
                         error = true;
                         throw new AnalysisServerException(String.format(
                             "Freeform requests limited to %d destinations and %d origin-destination pairs.",
                             MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
                         ));
                     }
+                }
+            }
+
+            if (job.templateTask.recordAccessibility) {
+                if (job.templateTask.originPointSet != null) {
+                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                } else {
+                    resultWriters.add( new MultiGridResultWriter(
+                        regionalAnalysis, job.templateTask, outputBucket, fileStorage
+                    ));
                 }
             }
 

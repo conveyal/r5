@@ -128,10 +128,6 @@ public class MultiOriginAssembler {
         try {
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
-                    LOG.info(
-                        "Creating CSV file to store accessibility results for {} origins.",
-                        job.nTasksTotal
-                    );
                     csvResultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
                 } else {
                     // Create one grid writer per percentile and destination pointset

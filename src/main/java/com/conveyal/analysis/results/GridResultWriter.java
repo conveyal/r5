@@ -3,6 +3,8 @@ package com.conveyal.analysis.results;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -36,6 +38,8 @@ import static com.conveyal.r5.common.Util.human;
  * </ol>
  */
 public class GridResultWriter extends ResultWriter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
     private RandomAccessFile randomAccessFile;
 

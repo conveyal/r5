@@ -27,7 +27,7 @@ import static com.conveyal.r5.common.Util.human;
  */
 public abstract class ResultWriter {
 
-    public static final Logger LOG = LoggerFactory.getLogger(ResultWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ResultWriter.class);
 
     private final FileStorage fileStorage;
 

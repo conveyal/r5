@@ -5,6 +5,8 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.csvreader.CsvWriter;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -18,6 +20,8 @@ import static com.google.common.base.Preconditions.checkState;
  * ("freeform") origin point sets, and cataloging paths between pairs of origins and destinations.
  */
 public abstract class CsvResultWriter extends ResultWriter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
 
     private final CsvWriter csvWriter;
     private final String fileName;
@@ -57,7 +61,7 @@ public abstract class CsvResultWriter extends ResultWriter {
         csvWriter = new CsvWriter(bufferedWriter, ',');
         setDataColumns(columnHeaders());
         this.task = task;
-        LOG.info("Created CSV file to store {} results from workers.", resultType());
+        LOG.info("Created CSV file to hold {} results for regional job {}", resultType(), task.jobId);
     }
 
     /**

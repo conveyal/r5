@@ -521,11 +521,17 @@ public class RegionalAnalysisController implements HttpController {
         task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
         task.percentiles = regionalAnalysis.travelTimePercentiles;
 
-        // Persist this newly created RegionalAnalysis to Mongo, which assigns it an id and creation/update time stamps.
+        // Persist this newly created RegionalAnalysis to Mongo.
+        // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);
+
+        // Flush to the database any information added to the RegionalAnalysis object when it was enqueued.
+        // This includes the paths of any CSV files that will be produced by this analysis.
+        // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock() or put().
+        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         return regionalAnalysis;
     }

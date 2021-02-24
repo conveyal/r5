@@ -170,8 +170,9 @@ public class Broker {
         // TODO encapsulate MultiOriginAssemblers in a new Component
         // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
         // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
-        MultiOriginAssembler assembler =
-                new MultiOriginAssembler(regionalAnalysis, job, config.resultsBucket(), fileStorage);
+        MultiOriginAssembler assembler = new MultiOriginAssembler(
+                regionalAnalysis, job, config.resultsBucket(), fileStorage
+        );
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {

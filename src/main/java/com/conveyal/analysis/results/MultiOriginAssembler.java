@@ -207,6 +207,13 @@ public class MultiOriginAssembler {
                 }
             }
 
+            // Record the paths of any CSV files that will be produced by this analysis.
+            // The caller must flush the RegionalAnalysis back out to the database to retain this information.
+            // We avoid database access here in constructors, especially when called in synchronized methods.
+            for (CsvResultWriter writer : csvResultWriters) {
+                regionalAnalysis.addCsvStoragePath(writer.resultType);
+            }
+
         } catch (IOException e) {
             error = true;
             LOG.error("Exception while creating multi-origin assembler: " + e.toString());
@@ -232,9 +239,12 @@ public class MultiOriginAssembler {
             }
             for (CsvResultWriter writer : csvResultWriters) {
                 writer.finish();
-                // Note that the caller must flush this object back out to the database after the analysis is complete.
-                regionalAnalysis.addCsvStoragePath(writer.resultType);
             }
+            regionalAnalysis.complete = true;
+            // Write updated regionalAnalysis object back out to database, to mark it complete and record locations
+            // of any CSV files generated. Use method that updates lock/timestamp, otherwise updates are not seen in UI.
+            // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock().
+            Persistence.regionalAnalyses.put(regionalAnalysis);
         } catch (Exception e) {
             LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
         }
@@ -310,10 +320,6 @@ public class MultiOriginAssembler {
             }
             if (nComplete == nOriginsTotal && !error) {
                 finish();
-                this.regionalAnalysis.complete = true;
-                // Write updated regionalAnalysis object back out to database, to mark it finished and record locations
-                // of any CSV files generated. TODO is it correct to use this method that doesn't update the lock?
-                Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
             }
         } catch (Exception e) {
             error = true;

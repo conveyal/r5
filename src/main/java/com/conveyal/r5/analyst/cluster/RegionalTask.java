@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 
 /**
@@ -29,6 +30,13 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      * Key for pointset (e.g. regionId/datasetId.pointset) from which to calculate travel times or accessibility
      */
     public String originPointSetKey;
+
+    /**
+     * The PointSet instance looked up from the originPointSetKey.
+     * Transient so it's not serialized when the task is sent over the wire, but still available wherever we need to
+     * look up lat/lon coordinates or the number of origin points etc.
+     */
+    public transient PointSet originPointSet;
 
     /**
      * Whether to calculate travel time from each origin to one corresponding destination (the destination at the

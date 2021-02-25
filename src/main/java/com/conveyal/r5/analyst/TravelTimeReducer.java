@@ -43,6 +43,7 @@ public class TravelTimeReducer {
     /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
 
+    /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
     private PathResult pathResult = null;
 
     /** If we are calculating accessibility, the PointSets containing opportunities. */

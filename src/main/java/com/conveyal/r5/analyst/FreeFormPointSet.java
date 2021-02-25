@@ -145,8 +145,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double sumTotalOpportunities () {
-        // For now we always have one opportunity per point.
-        return featureCount();
+        return Arrays.stream(counts).sum();
     }
 
     @Override
@@ -225,9 +224,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double getOpportunityCount (int i) {
-        // For now, these points do not have attached opportunity counts.
-        // We consider them to all have a count of 1.
-        return 1D;
+        return counts[i];
     }
 
     @Override

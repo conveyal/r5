@@ -88,7 +88,7 @@ public class FileStorageController implements HttpController {
      */
     private String generateDownloadURL(Request req, Response res) {
         FileInfo file = fileCollection.findPermittedByRequestParamId(req, res);
-        res.type("text");
+        res.type("text/plain");
         return fileStorage.getURL(file.getKey());
     }
 

@@ -16,6 +16,7 @@ public class AdjustSpeed extends Modification {
 
     public String[] routes;
 
+    /** At least one trip from each pattern to modify. Does not select single trips, only whole patterns. */
     public String[] trips;
 
     /** array of [from stop, to stop] specifying single hops this should be applied to */

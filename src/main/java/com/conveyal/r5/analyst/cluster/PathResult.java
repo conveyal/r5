@@ -62,8 +62,9 @@ public class PathResult {
             // In regional analyses, return paths to all destinations
             nDestinations = task.nTargetsPerOrigin();
             // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinations > 5000) throw new UnsupportedOperationException("Path results are limited to 5000 " +
-                    "destinations");
+            if (nDestinations > 5000) {
+                throw new UnsupportedOperationException("Path results are limited to 5000 destinations");
+            }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;

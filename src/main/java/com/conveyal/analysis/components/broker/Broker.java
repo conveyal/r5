@@ -151,7 +151,6 @@ public class Broker {
     /**
      * Enqueue a set of tasks for a regional analysis.
      * Only a single task is passed in, which the broker will expand into all the individual tasks for a regional job.
-     * We pass in the group and user only to tag any newly created workers. This should probably be done in the caller.
      */
     public synchronized void enqueueTasksForRegionalJob (RegionalAnalysis regionalAnalysis) {
 
@@ -169,9 +168,11 @@ public class Broker {
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler =
-                new MultiOriginAssembler(regionalAnalysis, job, config.resultsBucket(), fileStorage);
-
+        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
+        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
+        MultiOriginAssembler assembler = new MultiOriginAssembler(
+                regionalAnalysis, job, config.resultsBucket(), fileStorage
+        );
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {
@@ -211,6 +212,8 @@ public class Broker {
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);
+            // FIXME this is using a network service in a method called from a synchronized broker method.
+            //  Move file into storage before entering the synchronized block.
             fileStorage.moveIntoStorage(fileStorageKey, localScenario);
         } catch (IOException e) {
             LOG.error("Error storing scenario for retrieval by workers.", e);
@@ -468,7 +471,7 @@ public class Broker {
             // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
             int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
             // Guardrail until freeform pointsets are tested more thoroughly
-            if (job.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
+            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
             createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }
@@ -491,7 +494,7 @@ public class Broker {
         if (resultAssembler == null) {
             return null;
         } else {
-            return resultAssembler.getGridBufferFile();
+            return null; // Was: resultAssembler.getGridBufferFile(); TODO implement fetching partially completed?
         }
     }
 

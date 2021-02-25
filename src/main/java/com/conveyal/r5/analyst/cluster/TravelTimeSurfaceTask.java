@@ -8,6 +8,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * interactive tasks usually originating from the Analysis UI, and returning a surface of travel
  * times to each destination. Several travel times to each destination are returned, representing
  * selected percentiles of all travel times from the chosen origin to that destination.
+ *
+ * TODO rename to something like SinglePointTask because these can now return accessibility, travel time, paths, etc.
  */
 public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
 

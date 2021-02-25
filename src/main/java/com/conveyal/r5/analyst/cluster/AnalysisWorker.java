@@ -523,7 +523,10 @@ public class AnalysisWorker implements Runnable {
             int maxCutoffMinutes = Arrays.stream(task.cutoffsMinutes).max().getAsInt();
             int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * SECONDS_PER_MINUTE);
             int maxTripDurationMinutes = (int)(Math.ceil(maxTripDurationSeconds / 60D));
-            checkState(maxTripDurationMinutes <= 120, "Distance decay function must reach zero at or before 120 minutes.");
+            if (maxTripDurationMinutes > 120) {
+                LOG.warn("Distance decay function reached zero above 120 minutes. Capping travel time at 120 minutes.");
+                maxTripDurationMinutes = 120;
+            }
             task.maxTripDurationMinutes = maxTripDurationMinutes;
             LOG.info("Maximum cutoff was {} minutes, limiting trip duration to {} minutes based on decay function {}.",
                     maxCutoffMinutes, maxTripDurationMinutes, task.decayFunction.getClass().getSimpleName());

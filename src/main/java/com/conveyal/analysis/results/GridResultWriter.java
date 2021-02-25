@@ -3,6 +3,8 @@ package com.conveyal.analysis.results;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -35,7 +37,9 @@ import static com.conveyal.r5.common.Util.human;
  * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).</li>
  * </ol>
  */
-public class GridResultWriter extends ResultWriter {
+public class GridResultWriter extends BaseResultWriter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
     private RandomAccessFile randomAccessFile;
 
@@ -45,6 +49,14 @@ public class GridResultWriter extends ResultWriter {
     /** The offset to get to the data section of the access grid file. */
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
+    /**
+     * The number of different travel time cutoffs being applied when computing accessibility for each origin.
+     * The number of values stored per origin cell in an accessibility results grid.
+     * Note that we're storing only the number of different cutoffs, but not the cutoff values themselves in the file.
+     * This means that the files can only be properly interpreted with the Mongo metadata from the regional analysis.
+     * This is an intentional choice to avoid changing the file format, and in any case these files are not expected
+     * to ever be used separately from an environment where the Mongo database is available.
+     */
     private final int channels;
 
     /**
@@ -52,7 +64,7 @@ public class GridResultWriter extends ResultWriter {
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) throws IOException {
+    GridResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) {
         super(fileStorage);
         int width = task.width;
         int height = task.height;
@@ -65,37 +77,41 @@ public class GridResultWriter extends ResultWriter {
         );
         super.prepare(task.jobId, outputBucket);
 
-        // Write the access grid file header to the temporary file.
-        FileOutputStream fos = new FileOutputStream(bufferFile);
-        LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
-        data.writeAscii("ACCESSGR");
-        data.writeInt(ACCESS_GRID_VERSION);
-        data.writeInt(task.zoom);
-        data.writeInt(task.west);
-        data.writeInt(task.north);
-        data.writeInt(width);
-        data.writeInt(height);
-        data.writeInt(channels);
-        data.close();
+        try {
+            // Write the access grid file header to the temporary file.
+            FileOutputStream fos = new FileOutputStream(bufferFile);
+            LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
+            data.writeAscii("ACCESSGR");
+            data.writeInt(ACCESS_GRID_VERSION);
+            data.writeInt(task.zoom);
+            data.writeInt(task.west);
+            data.writeInt(task.north);
+            data.writeInt(width);
+            data.writeInt(height);
+            data.writeInt(channels);
+            data.close();
 
-        // Initialize the temporary file where the accessibility results will be stored. Setting this newly created
-        // file to a larger size should just create a sparse file full of blocks of zeros (at least on Linux).
-        // The call to setLength is not strictly necessary (resizing will happen automatically on write, see Javadoc
-        // on RandomAccessFile.seek) but seems reasonable since we know the exact size of the resulting file.
-        // In the past we filled the file with zeros here, to "overwrite anything that might be in the file already"
-        // according to a code comment. However that creates a large burst of disk activity which can run up against
-        // IO limits on cloud servers with network storage. Even without initialization, any complete regional analysis
-        // would overwrite every byte in the file with a result for some origin point, so the initial values are only
-        // important when visualizing or debugging partially completed analysis results.
-        this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
-        randomAccessFile.setLength(HEADER_LENGTH_BYTES + (width * height * channels * Integer.BYTES));
-        LOG.info(
-            "Created temporary file to accumulate results from workers, size is {}.",
-            human(randomAccessFile.length(), "B")
-        );
+            // Initialize the temporary file where the accessibility results will be stored. Setting this newly created
+            // file to a larger size should just create a sparse file full of blocks of zeros (at least on Linux).
+            // The call to setLength is not strictly necessary (resizing will happen automatically on write, see Javadoc
+            // on RandomAccessFile.seek) but seems reasonable since we know the exact size of the resulting file.
+            // In the past we filled the file with zeros here, to "overwrite anything that might be in the file already"
+            // according to a code comment. However that creates a large burst of disk activity which can run up against
+            // IO limits on cloud servers with network storage. Even without initialization, any complete regional analysis
+            // would overwrite every byte in the file with a result for some origin point, so the initial values are only
+            // important when visualizing or debugging partially completed analysis results.
+            this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
+            randomAccessFile.setLength(HEADER_LENGTH_BYTES + (width * height * channels * Integer.BYTES));
+            LOG.info(
+                    "Created temporary file to accumulate results from workers, size is {}.",
+                    human(randomAccessFile.length(), "B")
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Error initializing regional access grid output file.", e);
+        }
     }
 
-    /** Gzip the access grid and upload it to S3. */
+    /** Gzip the access grid and upload it to file storage (such as AWS S3). */
     @Override
     protected synchronized void finish (String fileName) throws IOException {
         super.finish(fileName);

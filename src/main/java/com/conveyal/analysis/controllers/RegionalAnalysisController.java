@@ -439,15 +439,6 @@ public class RegionalAnalysisController implements HttpController {
             task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
 
-        // If our destinations are freeform, pre-load the destination pointset on the backend.
-        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
-        if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
-            checkArgument(task.destinationPointSetKeys.length == 1);
-            task.destinationPointSets = new PointSet[] {
-                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
-            };
-        }
-
         task.oneToOne = analysisRequest.oneToOne;
         task.recordTimes = analysisRequest.recordTimes;
         // For now, we support calculating paths in regional analyses only for freeform origins.
@@ -458,6 +449,17 @@ public class RegionalAnalysisController implements HttpController {
         if (analysisRequest.makeTauiSite) {
             task.makeTauiSite = true;
             task.recordAccessibility = false;
+        }
+
+        // If our destinations are freeform, pre-load the destination pointset on the backend.
+        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
+        // Initialization order is important here: task fields makeTauiSite and destinationPointSetKeys must already be
+        // set above.
+        if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+            checkArgument(task.destinationPointSetKeys.length == 1);
+            task.destinationPointSets = new PointSet[] {
+                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
+            };
         }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.

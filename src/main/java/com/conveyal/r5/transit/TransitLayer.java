@@ -835,7 +835,7 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String stopString(int stopIndex, boolean includeName) {
         // TODO use a compact feed index, instead of splitting to remove feedIds
-        String stop = stopIdForIndex.get(stopIndex).split(":")[1];
+        String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
         if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
         return stop;
     }

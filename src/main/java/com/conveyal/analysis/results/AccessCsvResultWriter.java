@@ -49,6 +49,7 @@ public class AccessCsvResultWriter extends CsvResultWriter {
             for (int p = 0; p < task.percentiles.length; p++) {
                 int[] cutoffsForPercentile = percentilesForDestPointset[p];
                 for (int c = 0; c < task.cutoffsMinutes.length; c++) {
+                    // Ideally we'd output the pointset IDs (rather than keys) which we have in the RegionalAnalysis
                     rows.add(new String[] {
                             originId,
                             task.destinationPointSetKeys[d],

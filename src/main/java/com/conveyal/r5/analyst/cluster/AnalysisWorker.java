@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.analysis.BackendVersion;
+import com.conveyal.file.Bucket;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.file.S3FileStorage;
@@ -235,8 +236,9 @@ public class AnalysisWorker implements Runnable {
 
         // TODO worker config classes structured like BackendConfig
         String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
-        OSMCache osmCache = new OSMCache(fileStore, () -> graphsBucket);
-        GTFSCache gtfsCache = new GTFSCache(fileStore, () -> graphsBucket);
+        Bucket bundleBucket = new Bucket(graphsBucket, fileStore);
+        OSMCache osmCache = new OSMCache(bundleBucket);
+        GTFSCache gtfsCache = new GTFSCache(bundleBucket);
 
         TransportNetworkCache cache = new TransportNetworkCache(fileStore, gtfsCache, osmCache, graphsBucket);
         return new AnalysisWorker(config, fileStore, cache);

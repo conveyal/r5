@@ -14,7 +14,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Date;
 
-public class S3FileStorage extends FileStorage {
+public class S3FileStorage implements FileStorage {
 
     private final AmazonS3 s3;
 

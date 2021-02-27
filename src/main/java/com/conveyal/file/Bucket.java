@@ -35,15 +35,4 @@ public class Bucket {
     public boolean exists(String key) {
         return fileStore.exists(new FileStorageKey(bucket, key));
     }
-
-    public BiConsumer<String, File> createMoveIntoStorage () {
-        return fileStore.createMoveIntoStorage(bucket);
-    }
-
-    /**
-     * Create a `getFile` method with a pre-defined bucket.
-     */
-    public Function<String, File> createGetFile () {
-        return fileStore.createGetFile(bucket);
-    }
 }

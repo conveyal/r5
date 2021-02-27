@@ -4,6 +4,7 @@ import com.conveyal.analysis.BackendConfig;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.Bucket;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
@@ -44,6 +45,7 @@ public abstract class Components {
     /** Verification of user identity and permissions. */
     public Authentication authentication;
     public FileStorage fileStorage;
+    public Bucket bundleBucket;
     public GTFSCache gtfsCache;
     public OSMCache osmCache;
     /** System for processing incoming accessibility analysis requests. */

@@ -7,6 +7,7 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.file.Bucket;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -53,18 +54,16 @@ public class BundleController implements HttpController {
     // COMPONENT DEPENDENCIES
     // This particular controller has a lot of dependencies, should something be refactored?
 
-    private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
     private final OSMCache osmCache;
     private final TaskScheduler taskScheduler;
-    private final String bundleBucket;
+    private final Bucket bundleBucket;
 
     public BundleController (Components components) {
-        this.fileStorage = components.fileStorage;
+        this.bundleBucket = components.bundleBucket;
         this.gtfsCache = components.gtfsCache;
         this.osmCache = components.osmCache;
         this.taskScheduler = components.taskScheduler;
-        this.bundleBucket = components.config.bundleBucket();
     }
 
     // INTERFACE METHOD
@@ -155,7 +154,7 @@ public class BundleController implements HttpController {
                     osm.intersectionDetection = true;
                     osm.readPbf(fi.getInputStream());
 
-                    fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
+                    bundleBucket.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
                 }
 
                 if (bundle.feedGroupId == null) {
@@ -200,9 +199,9 @@ public class BundleController implements HttpController {
                         feed.close();
 
                         // Ensure all files have been stored.
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+                        bundleBucket.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
+                        bundleBucket.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
+                        bundleBucket.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
 
                         // Increment feeds complete for the progress handler
                         bundle.feedsComplete += 1;
@@ -246,14 +245,13 @@ public class BundleController implements HttpController {
         File manifestFile = FileUtils.createScratchFile("json");
         JsonUtil.objectMapper.writeValue(manifestFile, manifest);
 
-        FileStorageKey key = new FileStorageKey(bundleBucket, manifestFileName);
-        fileStorage.moveIntoStorage(key, manifestFile);
+        bundleBucket.moveIntoStorage(manifestFileName, manifestFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
         Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
-        FileStorageKey key = new FileStorageKey(bundleBucket, bundle._id + ".zip");
-        fileStorage.delete(key);
+        String key = bundle._id + ".zip";
+        bundleBucket.delete(key);
 
         return bundle;
     }

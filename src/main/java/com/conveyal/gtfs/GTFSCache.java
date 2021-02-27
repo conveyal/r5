@@ -1,6 +1,6 @@
 package com.conveyal.gtfs;
 
-import com.conveyal.file.FileStorage;
+import com.conveyal.file.Bucket;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -24,21 +24,15 @@ public class GTFSCache {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
     private final LoadingCache<String, GTFSFeed> cache;
 
-    public final String bucket;
-    public final FileStorage fileStore;
-
-    public interface Config {
-        String bundleBucket ();
-    }
+    public final Bucket bucket;
 
     public static String cleanId(String id) {
         return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
 
-    public GTFSCache(FileStorage fileStore, Config config) {
+    public GTFSCache(Bucket bucket) {
         LOG.info("Initializing the GTFS cache...");
-        this.fileStore = fileStore;
-        this.bucket = config.bundleBucket();
+        this.bucket = bucket;
         this.cache = makeCaffeineCache();
     }
 
@@ -79,8 +73,8 @@ public class GTFSCache {
                 .build(this::retrieveAndProcessFeed);
     }
 
-    public FileStorageKey getFileKey (String id, String extension) {
-        return new FileStorageKey(this.bucket, String.join(".", cleanId(id), extension));
+    public String getFileKey (String id, String extension) {
+        return String.join(".", cleanId(id), extension);
     }
 
     public void add (String id, GTFSFeed feed) {
@@ -99,22 +93,22 @@ public class GTFSCache {
     // This should only ever be called by the cache loader. The returned feed must be closed, and
     // it's preferable to have a single component managing when files shared between threads are opened and closed.
     private GTFSFeed retrieveAndProcessFeed(String id) {
-        FileStorageKey dbKey = getFileKey(id, "db");
-        FileStorageKey dbpKey = getFileKey(id, "db.p");
+        String dbKey = getFileKey(id, "db");
+        String dbpKey = getFileKey(id, "db.p");
 
-        if (fileStore.exists(dbKey) && fileStore.exists(dbpKey)) {
+        if (bucket.exists(dbKey) && bucket.exists(dbpKey)) {
             // Ensure both files are local
-            fileStore.getFile(dbpKey);
-            return new GTFSFeed(fileStore.getFile(dbKey));
+            bucket.getFile(dbpKey);
+            return new GTFSFeed(bucket.getFile(dbKey));
         }
 
-        FileStorageKey zipKey = getFileKey(id, "zip");
+        String zipKey = getFileKey(id, "zip");
         LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
-        if (fileStore.exists(zipKey)) {
+        if (bucket.exists(zipKey)) {
             try {
                 File tempDbFile = FileUtils.createScratchFile("db");
                 File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-                ZipFile zipFile = new ZipFile(fileStore.getFile(zipKey));
+                ZipFile zipFile = new ZipFile(bucket.getFile(zipKey));
 
                 GTFSFeed feed = new GTFSFeed(tempDbFile);
                 feed.loadFromFile(zipFile);
@@ -124,10 +118,10 @@ public class GTFSCache {
                 feed.close();
 
                 // Ensure the DB and DB.p files have been fully stored.
-                fileStore.moveIntoStorage(dbKey, tempDbFile);
-                fileStore.moveIntoStorage(dbpKey, tempDbpFile);
+                bucket.moveIntoStorage(dbKey, tempDbFile);
+                bucket.moveIntoStorage(dbpKey, tempDbpFile);
 
-                return new GTFSFeed(fileStore.getFile(dbKey));
+                return new GTFSFeed(bucket.getFile(dbKey));
             } catch (Exception e) {
                 LOG.error("Error loading Zip file for GTFS Feed from {}", zipKey, e);
                 throw new RuntimeException(e);

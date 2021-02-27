@@ -16,6 +16,7 @@ import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
 import com.conveyal.analysis.controllers.TimetableController;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.Bucket;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
@@ -35,8 +36,9 @@ public class LocalComponents extends Components {
                 config.localCacheDirectory(),
                 String.format("http://localhost:%s/files", config.serverPort())
         );
-        gtfsCache = new GTFSCache(fileStorage, config);
-        osmCache = new OSMCache(fileStorage, config);
+        bundleBucket = new Bucket(config.bundleBucket(), fileStorage);
+        gtfsCache = new GTFSCache(bundleBucket);
+        osmCache = new OSMCache(bundleBucket);
         // New (October 2019) DB layer, this should progressively replace the Persistence class
         database = new AnalysisDB(config);
         eventBus = new EventBus(taskScheduler);

@@ -29,8 +29,6 @@ public class BackendConfig implements
         AnalysisDB.Config,
         Broker.Config,
         BundleController.Config,
-        OSMCache.Config,
-        GTFSCache.Config,
         HttpApi.Config,
         RegionalAnalysisController.Config,
         AggregationAreaController.Config,

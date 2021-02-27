@@ -9,7 +9,7 @@ import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
-public class LocalFileStorage implements FileStorage {
+public class LocalFileStorage extends FileStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(LocalFileStorage.class);
 

@@ -5,13 +5,10 @@ import com.conveyal.analysis.components.LocalWorkerLauncher;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.controllers.AggregationAreaController;
-import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.streets.OSMCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +25,6 @@ public class BackendConfig implements
         TaskScheduler.Config,
         AnalysisDB.Config,
         Broker.Config,
-        BundleController.Config,
         HttpApi.Config,
         RegionalAnalysisController.Config,
         AggregationAreaController.Config,

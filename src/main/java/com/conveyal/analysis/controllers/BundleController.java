@@ -8,8 +8,6 @@ import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.Bucket;
-import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
@@ -77,10 +75,6 @@ public class BundleController implements HttpController {
             sparkService.put("/:_id", this::update, toJson);
             sparkService.delete("/:_id", this::deleteBundle, toJson);
         });
-    }
-
-    public interface Config {
-        String bundleBucket ();
     }
 
     // HTTP REQUEST HANDLERS

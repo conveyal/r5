@@ -130,7 +130,7 @@ public class MultiOriginAssembler {
                 resultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
             }
 
-            if (resultWriters.isEmpty()) {
+            if (resultWriters.isEmpty() && !job.templateTask.makeTauiSite) {
                 // TODO handle all error conditions of this form with a single method that also cancels the job
                 error = true;
                 throw new ParameterException("A regional analysis should always create at least one grid or CSV file.");

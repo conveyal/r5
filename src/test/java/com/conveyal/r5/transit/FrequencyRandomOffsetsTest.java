@@ -5,12 +5,12 @@ import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.FrequencyRandomOffsets;
 import gnu.trove.list.array.TIntArrayList;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test that phasing works correctly.

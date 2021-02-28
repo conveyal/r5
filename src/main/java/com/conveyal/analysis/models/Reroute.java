@@ -39,9 +39,9 @@ public class Reroute extends Modification {
         rr.stops = ModificationStop.toStopSpecs(stops);
 
         if (this.trips == null) {
-            rr.routes = feedScopeIds(feed, routes);
+            rr.routes = feedScopedIdSet(feed, routes);
         } else {
-            rr.patterns = feedScopeIds(feed, trips);
+            rr.patterns = feedScopedIdSet(feed, trips);
         }
 
         if (fromStop != null) {

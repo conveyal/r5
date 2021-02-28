@@ -176,13 +176,17 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String scenarioId;
 
-    /** Load a GTFS feed with full load level */
+    /**
+     * Load a GTFS feed with full load level. The feed is not closed after being loaded.
+     * TODO eliminate "load levels"
+     */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         loadFromGtfs(gtfs, LoadLevel.FULL);
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
+     * The feed is not closed after being loaded.
      */
     public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
@@ -806,6 +810,34 @@ public class TransitLayer implements Serializable, Cloneable {
             return true;
         });
         return stops;
+    }
+
+    /**
+     * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
+     * also include a route_short_name or route_long_name (if they are not null).
+     */
+    public String routeString(int routeIndex, boolean includeName) {
+        RouteInfo routeInfo = routes.get(routeIndex);
+        String route = routeInfo.route_id;
+        if (includeName) {
+            if (routeInfo.route_short_name != null) {
+                route += " (" + routeInfo.route_short_name + ")";
+            } else if (routeInfo.route_long_name != null){
+                route += " (" + routeInfo.route_long_name + ")";
+            }
+        }
+        return route;
+    }
+
+    /**
+     * For the given stop index, returns the GTFS stopId (stripped of R5's feedId prefix) and, if includeName is true,
+     * stopName.
+     */
+    public String stopString(int stopIndex, boolean includeName) {
+        // TODO use a compact feed index, instead of splitting to remove feedIds
+        String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
+        if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
+        return stop;
     }
 
 }

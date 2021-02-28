@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
 
+import java.util.ArrayList;
+
 /**
  * Model class used for serialized travel times and accessibility indicators for a multi-origin (regional) analysis,
  * sent over HTTP to the backend/broker. Similar to OneOriginResult, but with arrays for results (instead of more
@@ -14,20 +16,25 @@ public class RegionalWorkResult {
 
     /**
      * Values from a travelTimeResult, keyed on percentile of total travel time and target index.
-     * FIXME Note that the broker's polling system was not designed to handle large amounts of data; travel time
-     *       results are currently an experimental feature and large numbers of targets may overwhelm the system.
+     * Note that the broker's polling system was not designed to handle large amounts of data; travel time
+     * results are currently an experimental feature and large numbers of targets may overwhelm the system.
      */
     public int[][] travelTimeValues;
 
-    // TODO paths and components (access/egress, wait) of travel time?
+    /**
+     * String array summarizing the details of a path at a specific iteration (e.g. wait time, in-vehicle time), keyed
+     * on target index and iteration.
+     */
+    public ArrayList<String[]>[] pathResult;
 
     /**
+     * These are the truncated integer accessibility results for each [destinationGrid, percentile, cutoff].
      * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
      * So the rows are the percentiles, and the columns are the accessibility values for particular cutoffs of that percentile of travel time.
      * There are also more cutoffs than percentiles, so given Java's 2D array representation this is more efficient.
-     * These are the truncated integer accessibility results for each [destinationGrid, percentile, cutoff].
+     * TODO Should this be floating point?
      */
-    public int[][][] accessibilityValues; // TODO Should this be floating point?
+    public int[][][] accessibilityValues;
 
     /** Trivial no-arg constructor for deserialization. Private to prevent usage outside deserialization. */
     private RegionalWorkResult() { }
@@ -42,8 +49,9 @@ public class RegionalWorkResult {
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
+        this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
     }
 
-    // TODO checkTravelTimeInvariants, checkAccessibilityInvariants
+    // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
 
 }

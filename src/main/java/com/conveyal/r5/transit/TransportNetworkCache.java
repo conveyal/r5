@@ -100,13 +100,17 @@ public class TransportNetworkCache {
      * rather than a compound key of (networkId, scenarioId).
      *
      * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
-     * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving the scenario against caches on S3 or local disk should be pulled out into a separate function
+     * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving
+     *      the scenario against caches on S3 or local disk should be pulled out into a separate function
      * the problem is that then you resolve the scenario every time, even when the ID is enough to look up the already built network.
      * So we need to pass the whole task in here, so either the ID or full scenario are visible.
+     * FIXME the fact that this whole thing is synchronized will cause each new scenario to be applied in sequence.
+     *       I guess that's good as long as building distance tables is already parallelized.
      */
     public synchronized TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
-        // The following call clears the scenarioNetworkCache if the current base graph changes.
-        // FIXME does it? What does that mean? Are we trying to say that the cache of scenario networks is cleared?
+        // If the networkId is different than previous calls, a new network will be loaded. Its transient nested map
+        // of scenarios will be empty at first. This ensures it's initialized if null.
+        // FIXME apparently this can't happen - the field is transient and initialized in TransportNetwork.
         TransportNetwork baseNetwork = this.getNetwork(networkId);
         if (baseNetwork.scenarios == null) {
             baseNetwork.scenarios = new HashMap<>();

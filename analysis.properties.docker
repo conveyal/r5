@@ -1,0 +1,17 @@
+# When running in docker, we reference services running on other containers
+# The database is given the hostname mongo by the docker-compose links section
+database-uri=mongodb://mongo:27017
+database-name=analysis
+frontend-url=https://ui:3000
+bundle-bucket=analysis-local-bundles
+grid-bucket=analysis-local-grids
+results-bucket=analysis-local-results
+resources-bucket=analysis-local-resources
+seamless-census-bucket=lodes-data-2014
+seamless-census-region=us-east-1
+offline=true
+server-port=7070
+local-cache=cache
+light-threads=3
+heavy-threads=3
+max-workers=8

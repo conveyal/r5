@@ -1,5 +1,6 @@
 package com.conveyal.analysis.models;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -15,6 +16,7 @@ public class AdjustSpeed extends Modification {
 
     public String[] routes;
 
+    /** At least one trip from each pattern to modify. Does not select single trips, only whole patterns. */
     public String[] trips;
 
     /** array of [from stop, to stop] specifying single hops this should be applied to */
@@ -28,21 +30,17 @@ public class AdjustSpeed extends Modification {
         as.comment = name;
 
         if (trips == null) {
-            as.routes = feedScopeIds(feed, routes);
+            as.routes = feedScopedIdSet(feed, routes);
         } else {
-            as.patterns = feedScopeIds(feed, trips);
+            as.patterns = feedScopedIdSet(feed, trips);
         }
 
         if (hops != null) {
-            as.hops = Arrays.stream(hops)
-                    .map(h -> feedScopeIds(feed, h))
-                    .map(s -> {
-                        Object[] oa = s.toArray();
-                        return Arrays.copyOf(oa, oa.length, String[].class);
-                    })
-                    .collect(Collectors.toList());
+            as.hops = new ArrayList<>(hops.length);
+            for (String[] hopStops : hops) {
+                as.hops.add(feedScopedIdArray(feed, hopStops));
+            }
         }
-
         as.scale = scale;
 
         return as;

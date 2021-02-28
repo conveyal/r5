@@ -1,7 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PersistenceBuffer;
-import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -12,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -25,6 +28,9 @@ import java.util.List;
  *
  * Users may be surprised to see an uncommon path that happens to be associated with the median travel time, so we now
  * save several different ones.
+ *
+ * TODO could this Taui-specific class be combined with PathResult (used in normal single point and regional tasks)?
+ *      PathScorer could then be applied after the fact, or on the fly as paths are added here
  */
 public class PathWriter {
 
@@ -33,14 +39,22 @@ public class PathWriter {
     /** This is a symbolic value used in the output file format an in our internal primitive int maps. */
     public static final int NO_PATH = -1;
 
+    /** Version of our path grid format TODO add changelog */
+    public static final int VERSION = 1;
+
     /** The task that created the paths being recorded. */
     private final AnalysisWorkerTask task;
 
-    /** A list of unique paths, each one associated with a positive integer index by its position in the list. */
-    private final List<Path> pathForIndex = new ArrayList<>();
+    /**
+     * A list of unique PatternSequences, each one associated with a positive integer index by its position in the list.
+     */
+    private final List<PatternSequence> patternSequenceForIndex = new ArrayList<>();
 
-    /** The inverse of pathForIndex, giving the position of each path within that list. Used to deduplicate paths. */
-    private final TObjectIntMap<Path> indexForPath;
+    /**
+     * The inverse of patternSequenceForIndex, giving the position of each path within that list.
+     * Used to deduplicate paths (or rather the pattern sequences shared by multiple paths).
+     */
+    private final TObjectIntMap<PatternSequence> indexForPatternSequence;
 
     /** The total number of targets for which we're recording paths, i.e. width * height of the destination grid. */
     private final int nTargets;
@@ -62,9 +76,10 @@ public class PathWriter {
     public PathWriter (AnalysisWorkerTask task) {
         this.task = task;
         this.nTargets = task.width * task.height;
-        indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
+        indexForPatternSequence = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
         nPathsPerTarget = task.nPathsPerTarget;
     }
+
 
     /**
      * After construction, this method is called on every destination in order.
@@ -73,23 +88,28 @@ public class PathWriter {
      * Note that if adjacent destinations have common paths, then adjacent origins
      * should also have common paths. We currently don't have an optimization to deal with that.
      *
+     * For Taui purposes we want to deduplicate the more general PatternSequence. It has semantic hash and
+     * equals methods, which Path does not as they wouldn't be used for anything in our current code. We
+     * could even generalize the deduplication further to RouteSequence, see how PathResult.setTarget
+     * derives RouteSequences for non-Taui cases.
+     *
      * @param paths a collection of paths that reach a single destination. Only the first n paths will be recorded.
      *              This collection should be pre-filtered to not include duplicate paths.
      *
      * TODO perform the creation and selection of N paths here rather than in the caller, for clearer deduplication.
      */
-    public void recordPathsForTarget (Collection<Path> paths) {
+    public void recordPathsForTarget (Collection<PatternSequence> paths) {
         int nPathsRecorded = 0;
-        for (Path path : paths) {
-            if (path != null) {
-                // Deduplicate paths across destinations using the map.
-                int pathIndex = indexForPath.get(path);
-                if (pathIndex == NO_PATH) {
-                    pathIndex = pathForIndex.size();
-                    pathForIndex.add(path);
-                    indexForPath.put(path, pathIndex);
+        for (PatternSequence pseq : paths) {
+            if (pseq != null) {
+                // Deduplicate paths across all destinations using this persistent map.
+                int psidx = indexForPatternSequence.get(pseq);
+                if (psidx == NO_PATH) {
+                    psidx = patternSequenceForIndex.size();
+                    patternSequenceForIndex.add(pseq);
+                    indexForPatternSequence.put(pseq, psidx);
                 }
-                pathIndexes.add(pathIndex);
+                pathIndexes.add(psidx);
                 nPathsRecorded += 1;
                 if (nPathsRecorded == nPathsPerTarget) {
                     break;
@@ -103,6 +123,12 @@ public class PathWriter {
         }
     }
 
+    private static byte getSingleByteCode(StreetMode mode){
+        if (mode == StreetMode.WALK) return StandardCharsets.US_ASCII.encode("W").get(0); // WALK
+        if (mode == StreetMode.BICYCLE) return StandardCharsets.US_ASCII.encode("B").get(0); // BICYCLE
+        return StandardCharsets.US_ASCII.encode("C").get(0); // CAR
+    };
+
     /**
      * Once recordPathsForTarget has been called once for each target in order, this method is called to write out the
      * full set of paths to a buffer, which is then saved to S3 (or other equivalent persistence system).
@@ -113,7 +139,7 @@ public class PathWriter {
             throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
                     nExpectedPaths, pathIndexes.size()));
         }
-        if (pathForIndex.isEmpty()) {
+        if (patternSequenceForIndex.isEmpty()) {
             // No cells were reached with any transit paths. Do not write anything out to save storage space.
             LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
             return;
@@ -125,18 +151,22 @@ public class PathWriter {
             // the number of destinations and the number of paths at each destination.
             DataOutput dataOutput = persistenceBuffer.getDataOutput();
             dataOutput.write("PATHGRID".getBytes());
+            dataOutput.write("_VER".getBytes());
+            dataOutput.writeInt(VERSION);
             dataOutput.writeInt(nTargets);
             dataOutput.writeInt(nPathsPerTarget);
 
             // Write the number of different distinct paths used to reach all destination cells,
             // followed by the details for each of those distinct paths.
-            dataOutput.writeInt(pathForIndex.size());
-            for (Path path : pathForIndex) {
-                dataOutput.writeInt(path.patterns.length);
-                for (int i = 0 ; i < path.patterns.length; i ++){
-                    dataOutput.writeInt(path.boardStops[i]);
-                    dataOutput.writeInt(path.patterns[i]);
-                    dataOutput.writeInt(path.alightStops[i]);
+            dataOutput.writeInt(patternSequenceForIndex.size());
+            for (PatternSequence patternSequence : patternSequenceForIndex) {
+                dataOutput.writeInt(patternSequence.patterns.size());
+                dataOutput.write(getSingleByteCode(patternSequence.stopSequence.access.mode));
+                dataOutput.write(getSingleByteCode(patternSequence.stopSequence.egress.mode));
+                for (int i = 0 ; i < patternSequence.patterns.size(); i ++){
+                    dataOutput.writeInt(patternSequence.stopSequence.boardStops.get(i));
+                    dataOutput.writeInt(patternSequence.patterns.get(i));
+                    dataOutput.writeInt(patternSequence.stopSequence.alightStops.get(i));
                 }
             }
 

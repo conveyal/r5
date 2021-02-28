@@ -1,9 +1,11 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.util.ExceptionUtils;
+import com.google.common.io.LittleEndianDataOutputStream;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.r5.analyst.cluster.AnalysisWorker.addJsonToGrid;
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
@@ -48,9 +51,9 @@ public class AnalysisWorkerController {
 
         try {
             try {
-                byte[] binaryResult = analysisWorker.handleOneSinglePointTask(task);
+                byte[] binaryResult = analysisWorker.handleAndSerializeOneSinglePointTask(task);
                 response.status(HttpStatus.OK_200);
-                if (task.getFormat().equals(TravelTimeSurfaceTask.Format.GEOTIFF)) {
+                if (task.getFormat().equals(GEOTIFF)) {
                     response.header("Content-Type", "application/x-geotiff");
                 } else {
                     response.header("Content-Type", "application/octet-stream");
@@ -95,7 +98,7 @@ public class AnalysisWorkerController {
         // TODO expand task errors, this just logs the memory address of the list.
         LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        addJsonToGrid(byteArrayOutputStream, null, taskErrors, Collections.emptyList());
+        addJsonToGrid(byteArrayOutputStream, null, taskErrors, Collections.emptyList(), null);
         byteArrayOutputStream.close();
         return byteArrayOutputStream.toByteArray();
     }

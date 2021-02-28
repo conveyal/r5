@@ -25,16 +25,16 @@ import static com.conveyal.r5.common.Util.human;
  * term cloud storage once the regional analysis is complete. Concrete subclasses handle writing CSV
  * or proprietary binary grid files, depending on the type of regional analysis.
  */
-public abstract class ResultWriter {
+public abstract class BaseResultWriter {
 
-    public static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BaseResultWriter.class);
 
     private final FileStorage fileStorage;
 
     protected File bufferFile;
     private String outputBucket;
 
-    public ResultWriter (FileStorage fileStorage) {
+    public BaseResultWriter (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
@@ -55,14 +55,14 @@ public abstract class ResultWriter {
      * Gzip the access grid and store it.
      */
     protected synchronized void finish (String fileName) throws IOException {
-        LOG.info("Compressing {} and uploading to S3", fileName);
+        LOG.info("Compressing {} and moving into file storage.", fileName);
         FileStorageKey fileStorageKey = new FileStorageKey(outputBucket, fileName);
-        File gzippedGridFile = FileUtils.createScratchFile();
+        File gzippedResultFile = FileUtils.createScratchFile();
 
         // There's probably a more elegant way to do this with NIO and without closing the buffer.
         // That would be Files.copy(File.toPath(),X) or ByteStreams.copy.
         InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
-        OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedGridFile)));
+        OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedResultFile)));
         ByteStreams.copy(is, os);
         is.close();
         os.close();
@@ -70,17 +70,17 @@ public abstract class ResultWriter {
         LOG.info("GZIP compression reduced analysis results {} from {} to {} ({}x compression)",
                 fileName,
                 human(bufferFile.length(), "B"),
-                human(gzippedGridFile.length(), "B"),
-                (double) bufferFile.length() / gzippedGridFile.length()
+                human(gzippedResultFile.length(), "B"),
+                (double) bufferFile.length() / gzippedResultFile.length()
         );
 
-        fileStorage.moveIntoStorage(fileStorageKey, gzippedGridFile);
+        fileStorage.moveIntoStorage(fileStorageKey, gzippedResultFile);
         bufferFile.delete();
     }
 
     /**
      * Close all buffers and temporary files.
      */
-    abstract void terminate () throws IOException;
+    abstract void terminate () throws Exception;
 
 }

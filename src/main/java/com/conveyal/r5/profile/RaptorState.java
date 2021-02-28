@@ -74,6 +74,10 @@ public class RaptorState {
      */
     public int[] nonTransferInVehicleTravelTime;
 
+    public int[] previousWaitTime;
+
+    public int[] previousInVehicleTravelTime;
+
     /**
      * The transit pattern used to achieve the travel times recorded for each stop in bestNonTransferTimes.
      * When a transfer improves upon that time, bestNonTransferTimes will still contain the time that the pattern in
@@ -139,6 +143,8 @@ public class RaptorState {
         // These fields accumulate times, so are initially filled with zeros.
         this.nonTransferWaitTime = new int[nStops];
         this.nonTransferInVehicleTravelTime = new int[nStops];
+        this.previousInVehicleTravelTime = new int[nStops];
+        this.previousWaitTime = new int[nStops];
 
         // Previous round reference should be set as needed by the code calling this constructor.
         this.previous = null;
@@ -158,6 +164,9 @@ public class RaptorState {
         this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
         this.nonTransferInVehicleTravelTime =
                 Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
+        this.previousWaitTime = Arrays.copyOf(state.previousWaitTime, state.previousWaitTime.length);
+        this.previousInVehicleTravelTime = Arrays.copyOf(state.previousInVehicleTravelTime,
+                state.previousInVehicleTravelTime.length);
         this.departureTime = state.departureTime;
         this.maxDurationSeconds = state.maxDurationSeconds;
 
@@ -206,6 +215,8 @@ public class RaptorState {
                 this.previousPatterns[stop] = previous.previousPatterns[stop];
                 this.previousStop[stop] = previous.previousStop[stop];
                 this.nonTransferInVehicleTravelTime[stop] = previous.nonTransferInVehicleTravelTime[stop];
+                this.previousWaitTime[stop] = previous.previousWaitTime[stop];
+                this.previousInVehicleTravelTime[stop] = previous.previousInVehicleTravelTime[stop];
                 this.nonTransferWaitTime[stop] = previous.nonTransferWaitTime[stop];
             }
         }
@@ -232,38 +243,24 @@ public class RaptorState {
         // update the non-transfer time and path information, then consider updating the bestTimes.
         // We may want to consider splitting the post-transfer updating out into its own method to make this clearer.
         if (!transfer && time < bestNonTransferTimes[stop]) {
+            // There's always a previous state here, because in this block we're setting transit arrival times, which
+            // in the current implementation can only happen in a later round, since the first round contains only
+            // non-transit times.
+            checkState(previous != null, "Setting times at stops before an initial round is complete.");
             bestNonTransferTimes[stop] = time;
             previousPatterns[stop] = fromPattern;
             previousStop[stop] = fromStop;
-
-            // Carry the travel time components (wait and in-vehicle time) from the previous leg and increment them.
-            int totalWaitTime, totalInVehicleTime;
-            if (previous == null) {
-                // first round, there is no previous wait time or in vehicle time
-                // TODO how and when can this happen? Round zero contains only the access leg and has no transit.
-                totalWaitTime = waitTime;
-                totalInVehicleTime = inVehicleTime;
-            } else {
-                // TODO it seems like this whole block and the assignment below can be condensed significantly.
-                if (previous.transferStop[fromStop] != -1) {
-                    // The fromSop was optimally reached via a transfer at the end of the previous round.
-                    // Get the wait and in-vehicle time from the source stop of that transfer.
-                    int preTransferStop = previous.transferStop[fromStop];
-                    totalWaitTime = previous.nonTransferWaitTime[preTransferStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[preTransferStop] + inVehicleTime;
-                } else {
-                    // The stop we boarded at was reached directly by transit in the previous round.
-                    totalWaitTime = previous.nonTransferWaitTime[fromStop] + waitTime;
-                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[fromStop] + inVehicleTime;
-                }
-            }
+            // Increment the travel time components (wait and in-vehicle time).
+            int previousAlightingStop = previous.transferStop[fromStop] == -1 ? fromStop : previous.transferStop[fromStop];
+            int totalWaitTime = previous.nonTransferWaitTime[previousAlightingStop] + waitTime;
+            int totalInVehicleTime = previous.nonTransferInVehicleTravelTime[previousAlightingStop] + inVehicleTime;
             nonTransferWaitTime[stop] = totalWaitTime;
             nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
-
             checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime),
                     "Components of travel time are greater than total travel time.");
-
             optimal = true;
+            previousWaitTime[stop] = waitTime;
+            previousInVehicleTravelTime[stop] = inVehicleTime;
             nonTransferStopsUpdated.set(stop);
         }
 
@@ -335,6 +332,10 @@ public class RaptorState {
         for (int stop = 0; stop < this.bestTimes.length; stop++) {
             if (this.previousPatterns[stop] > -1) {
                 this.nonTransferWaitTime[stop] += additionalWaitSeconds;
+                if (this.previous.previous == null) {
+                    // increment initial wait
+                    this.previousWaitTime[stop] += additionalWaitSeconds;
+                }
             } else {
                 this.nonTransferWaitTime[stop] = 0;
                 this.nonTransferInVehicleTravelTime[stop] = 0;
@@ -354,6 +355,37 @@ public class RaptorState {
             int prevTime = (previous != null) ? previous.bestTimes[stop] : UNREACHED;
             return time < prevTime;
         }
+    }
+
+    /**
+     * @param here stopIndex
+     * @param there stopIndex
+     * @return true if the access/transfer leg to reach one stop (here) is shorter than the access/transfer leg to
+     * reach another stop (there) within this round.
+     */
+    public boolean shorterAccessOrTransferLeg(int here, int there) {
+
+        if (here == there) return false;
+
+        if (this.previous == null) {
+            // If there is no previous state, the pre-transit access round is being checked. Arriving here before
+            // arriving there implies shorter access time.
+            return this.bestTimes[here] < this.bestTimes[there];
+        } else {
+            // In subsequent transit rounds, we want to compare the length of the transfer legs.
+            // We cannot directly compare arrival times or waiting times at the stops, because the transfer legs may
+            // have started at different times.
+            return transferTime(here) < transferTime(there);
+        }
+    }
+
+    /**
+     * Returns the length of time walking (or using some other street mode) within this round, to achieve the optimal
+     * route to the given stop in this round.
+     */
+    private int transferTime(int stopIndex) {
+        int fromStop = this.transferStop[stopIndex];
+        return fromStop == -1 ? 0 : this.bestTimes[stopIndex] - this.bestNonTransferTimes[fromStop];
     }
 
 }

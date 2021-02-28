@@ -5,15 +5,15 @@ import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test that when a modification creates new stops and therefore new street vertices and edges,
@@ -28,7 +28,7 @@ public class RelinkingTest {
     public TransportNetwork network;
     public long checksum;
 
-    @Before
+    @BeforeEach
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
         checksum = network.checksum();

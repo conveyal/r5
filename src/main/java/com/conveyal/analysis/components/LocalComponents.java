@@ -8,6 +8,7 @@ import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.FileStorageController;
 import com.conveyal.analysis.controllers.GTFSGraphQLController;
+import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.ModificationController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
@@ -43,7 +44,7 @@ public class LocalComponents extends Components {
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
-        httpApi = new HttpApi(fileStorage, authentication, config, standardHttpControllers(this));
+        httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers(this));
         // compute = new LocalCompute();
         // persistence = persistence(local_Mongo)
     }
@@ -74,7 +75,8 @@ public class LocalComponents extends Components {
                 // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
                 // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
-                new BrokerController(components.broker, components.eventBus)
+                new BrokerController(components.broker, components.eventBus),
+                new GtfsTileController(components.gtfsCache)
         );
         return httpControllers;
     }

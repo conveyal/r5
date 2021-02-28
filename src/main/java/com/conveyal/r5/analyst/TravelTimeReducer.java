@@ -2,11 +2,17 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.path.PatternSequence;
+import com.conveyal.r5.transit.path.Path;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +21,7 @@ import java.util.Arrays;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -35,6 +42,9 @@ public class TravelTimeReducer {
 
     /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
+
+    /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
+    private PathResult pathResult = null;
 
     /** If we are calculating accessibility, the PointSets containing opportunities. */
     private PointSet[] destinationPointSets;
@@ -86,22 +96,10 @@ public class TravelTimeReducer {
      *
      * @param task task to be performed.
      */
-    public TravelTimeReducer (AnalysisWorkerTask task) {
+    public TravelTimeReducer (AnalysisWorkerTask task, TransportNetwork network) {
 
         // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
-        if (task.inRoutingFareCalculator != null) {
-            // Calculating fares within routing (using the McRaptor router) is slow, so sample at different
-            // departure times (rather than sampling multiple draws at every minute in the departure time window).
-            this.timesPerDestination = task.monteCarloDraws;
-        } else {
-            if (task.monteCarloDraws == 0) {
-                // HALF_HEADWAY boarding, returning a single travel time per departure minute per destination.
-                this.timesPerDestination = task.getTimeWindowLengthMinutes();
-            } else {
-                // MONTE_CARLO boarding, using several different randomized schedules at each departure time.
-                this.timesPerDestination = task.getTimeWindowLengthMinutes() * task.getMonteCarloDrawsPerMinute();
-            }
-        }
+        this.timesPerDestination = task.getTotalIterations(network.transitLayer.hasFrequencies);
 
         // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
@@ -139,12 +137,16 @@ public class TravelTimeReducer {
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
         }
+        if (task.includePathResults) {
+            pathResult = new PathResult(task, network.transitLayer);
+        }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
         // in tight loops. Also find the points where the decay function reaches zero for these cutoffs.
         // This is only relevant when calculating accessibility.
         this.decayFunction = task.decayFunction;
         if (calculateAccessibility) {
+            checkNotNull(decayFunction);
             task.validateCutoffsMinutes();
             this.nCutoffs = task.cutoffsMinutes.length;
             this.cutoffsSeconds = new int[nCutoffs];
@@ -201,7 +203,9 @@ public class TravelTimeReducer {
         for (int i : timesSeconds) {
             checkArgument(i >= 0, "Travel times must be positive.");
         }
-
+        if (travelTimeResult != null) {
+            travelTimeResult.recordHistogramIfEnabled(target, timesSeconds);
+        }
         // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
         // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
         // We even had a prototype counting sort that would take advantage of this detail. However, applying distance
@@ -270,6 +274,32 @@ public class TravelTimeReducer {
     }
 
     /**
+     * For the specified target index, record the path and travel time details for each iteration.
+     *
+     * @param target index for destination target
+     * @param perIterationTimes total travel time for each iteration
+     * @param perIterationPaths paths for each iteration
+     */
+    public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
+                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
+        Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
+        for (int i = 0; i < perIterationTimes.length; i++) {
+            Path path = perIterationPaths[i];
+            int totalTime = perIterationTimes[i];
+            if (path != null) {
+                PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
+                PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                paths.put(patternSequence, iteration);
+            } else if (totalTime < UNREACHED){
+                PatternSequence patternSequence = new PatternSequence(null, null, null, null);
+                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
+                paths.put(patternSequence, iteration);
+            }
+        }
+        pathResult.setTarget(target, paths);
+    }
+
+    /**
      * Convert the given timeSeconds to minutes, being careful to preserve UNREACHED values.
      * The seconds to minutes conversion uses integer division, which truncates toward zero. This approach is correct
      * for use in accessibility analysis, where we are always testing whether a travel time is less than a certain
@@ -299,7 +329,7 @@ public class TravelTimeReducer {
      * origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(travelTimeResult, accessibilityResult);
+        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
     }
 
     /**

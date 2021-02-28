@@ -27,6 +27,7 @@ import static com.google.common.base.Preconditions.checkState;
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
     // these match the enum values in AnalysisWorkerTask.Type
+    // FIXME it does not seem necessary to automatically detect subtypes. Each endpoint accepts only one type.
     @JsonSubTypes.Type(name = "TRAVEL_TIME_SURFACE", value = TravelTimeSurfaceTask.class),
     @JsonSubTypes.Type(name = "REGIONAL_ANALYSIS", value = RegionalTask.class)
 })
@@ -89,18 +90,17 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * If true, travel time surfaces and paths will be saved to S3
      * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
      * accessibility indicator values.
-     * FIXME in practice this currently implies computeTravelTimeBreakdown and computePaths, so we've got redundant and
-     * potentially incoherent information in the request. The intent is in the future to make all these options
-     * separate - we can make either travel time surfaces or accessibility indicators or both, and they may or may
-     * not be saved to S3.
      */
     public boolean makeTauiSite = false;
 
-    /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
-    public boolean computeTravelTimeBreakdown = false;
+    /**
+     * Whether to include paths and travel time breakdowns in results sent back to broker. Allowed to be true for a
+     * single-point task or freeform regional task, but not for a regional task with grid origins.
+     */
+    public boolean includePathResults = false;
 
-    /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
-    public boolean computePaths = false;
+    /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
+    public boolean recordTravelTimeHistograms = false;
 
     /**
      * Which percentiles of travel time to calculate.
@@ -140,7 +140,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     /**
      * The storage keys for the pointsets we will compute access to. The format is regionId/datasetId.fileFormat.
      * Ideally we'd just provide the IDs of the grids, but creating the key requires us to know the region
-     * ID and file format, which are not otherwise easily available.
+     * ID and file format, which are not otherwise easily available on workers that don't have a database connection.
      * This field is required for regional analyses, which always compute accessibility to destinations.
      * On the other hand, in a single point request this may be null, in which case the worker will report only
      * travel times to destinations and not accessibility figures.
@@ -209,8 +209,11 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * supplied cache. The PointSets themselves are not serialized and sent over to the worker in the task, so this
      * method is called by the worker to materialize them.
      *
+     * This should not be called for Taui sites (which have no destination point sets) so contains logic for only
+     * non-Taui single point and regional tasks.
+     *
      * If multiple grids are specified, they must be at the same zoom level, but they will all be wrapped to transform
-     * their indexes to match a single task-wide grid.
+     * them all to the same minimum bounding extents.
      */
     public void loadAndValidateDestinationPointSets (PointSetCache pointSetCache) {
         // First, validate and load the pointsets.
@@ -233,8 +236,12 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         if (freeForm){
             checkArgument(nPointSets == 1, "Only one freeform destination PointSet may be specified.");
         } else {
-            // Get a grid for this particular task (determined by dimensions in the request, or by unifying the grids).
-            // This requires the grids to already be loaded into the array, hence the two-stage loading then wrapping.
+            // If destinationPointSets does not contain a single freeform pointset, we expect one or more grids.
+            // Determine the destination grid extents for this task, which are either supplied in request (single point)
+            // or derived from the opportunity grids (regional). Grids are then transformed to match this single size.
+            // Determining the minimum bouding extents requires the grids to already be loaded into the array, hence the
+            // two-stage loading then wrapping. After this wrapping, subsequent calls to getWebMercatorExtents should
+            // still yield the same extents.
             final var taskGridExtents = this.getWebMercatorExtents();
             for (int i = 0; i < nPointSets; i++) {
                 Grid grid = (Grid) destinationPointSets[i];

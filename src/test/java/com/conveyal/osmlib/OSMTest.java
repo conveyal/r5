@@ -1,6 +1,7 @@
 package com.conveyal.osmlib;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 import org.mapdb.Fun;
 
 import java.io.IOException;
@@ -8,13 +9,17 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
 
-public class OSMTest extends TestCase {
-	public void testOSM(){
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class OSMTest {
+	@Test
+    public void testOSM(){
 		OSM osm = new OSM("./src/test/resources/tmp");
 		osm.readFromFile("./src/test/resources/bangor_maine.osm.pbf");
-		assertEquals( osm.nodes.size(), 12030 );
-		assertEquals( osm.ways.size(), 1828 );
-		assertEquals( osm.relations.size(), 2 );
+		assertEquals(osm.nodes.size(), 12030);
+		assertEquals(osm.ways.size(), 1828);
+		assertEquals(osm.relations.size(), 2);
 
 		// make sure the indices work
 		for (Map.Entry<Long, Relation> e : osm.relations.entrySet()) {
@@ -32,7 +37,8 @@ public class OSMTest extends TestCase {
 		}
 	}
 	
-	public void tearDown() throws IOException{
+	@AfterEach
+    public void tearDown() throws IOException{
 		Files.delete( Paths.get("./src/test/resources/tmp") );
 		Files.delete( Paths.get("./src/test/resources/tmp.p") );
 	}

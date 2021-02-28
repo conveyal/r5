@@ -151,7 +151,6 @@ public class Broker {
     /**
      * Enqueue a set of tasks for a regional analysis.
      * Only a single task is passed in, which the broker will expand into all the individual tasks for a regional job.
-     * We pass in the group and user only to tag any newly created workers. This should probably be done in the caller.
      */
     public synchronized void enqueueTasksForRegionalJob (RegionalAnalysis regionalAnalysis) {
 
@@ -169,9 +168,11 @@ public class Broker {
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler =
-                new MultiOriginAssembler(regionalAnalysis, job, config.resultsBucket(), fileStorage);
-
+        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
+        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
+        MultiOriginAssembler assembler = new MultiOriginAssembler(
+                regionalAnalysis, job, config.resultsBucket(), fileStorage
+        );
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {
@@ -211,6 +212,8 @@ public class Broker {
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);
+            // FIXME this is using a network service in a method called from a synchronized broker method.
+            //  Move file into storage before entering the synchronized block.
             fileStorage.moveIntoStorage(fileStorageKey, localScenario);
         } catch (IOException e) {
             LOG.error("Error storing scenario for retrieval by workers.", e);
@@ -443,7 +446,6 @@ public class Broker {
             job = findJob(workResult.jobId);
             assembler = resultAssemblers.get(workResult.jobId);
         }
-
         if (assembler == null) {
             LOG.error("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
         } else {
@@ -462,19 +464,16 @@ public class Broker {
     }
 
     private void requestExtraWorkersIfAppropriate(Job job) {
-        if (job.originPointSet == null) {
-           // Don't autoscale for freeform pointset analyses until they are tested more thoroughly.
-            WorkerCategory workerCategory = job.workerCategory;
-            int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
-            if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-                // Start a number of workers that scales with the number of total tasks, up to a fixed number.
-                // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
-                int nSpot = Math.min(
-                                MAX_WORKERS_PER_CATEGORY,
-                                job.nTasksTotal / TARGET_TASKS_PER_WORKER
-                            ) - categoryWorkersAlreadyRunning;
-                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
-            }
+        WorkerCategory workerCategory = job.workerCategory;
+        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
+        if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
+            // Start a number of workers that scales with the number of total tasks, up to a fixed number.
+            // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
+            int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
+            // Guardrail until freeform pointsets are tested more thoroughly
+            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
+            int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
+            createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }
     }
 
@@ -495,18 +494,18 @@ public class Broker {
         if (resultAssembler == null) {
             return null;
         } else {
-            return resultAssembler.getGridBufferFile();
+            return null; // Was: resultAssembler.getGridBufferFile(); TODO implement fetching partially completed?
         }
     }
 
-    public boolean anyJobsActive () {
+    public synchronized boolean anyJobsActive () {
         for (Job job : jobs.values()) {
             if (!job.isComplete()) return true;
         }
         return false;
     }
 
-    public void logJobStatus() {
+    public synchronized void logJobStatus() {
         for (Job job : jobs.values()) {
             LOG.info(job.toString());
         }

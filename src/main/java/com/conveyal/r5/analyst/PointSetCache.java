@@ -71,7 +71,9 @@ public class PointSetCache {
     // FIXME total hack to make freeform pointset loading available statically on the backend for use within constructors.
     //      We should definitely refactor things so this is not necessary to hit network services inside constructors.
     //      Maybe fill in the freeform pointset on a transient field in request the way we do with the destination Grid.
-    //      RegionalTask.originPointSetKey can produce transient RegionalTalk.originPointSet.
+    //      RegionalTask.originPointSetKey can produce transient RegionalTask.originPointSet.
+    //      The field and methods below can then be made non-static by holding the PointSetCache instance in
+    //      something like RegionalAnalysisController.
     private static PointSetCache instance;
 
     public static void initializeStatically (FileStorage fileStorage, String gridBucket) {

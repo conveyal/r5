@@ -1,6 +1,5 @@
 package com.conveyal.file;
 
-import com.google.common.io.ByteStreams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,9 +15,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import static com.conveyal.r5.common.Util.human;
 
 public abstract class FileUtils {
     private static final Logger LOG = LoggerFactory.getLogger(FileUtils.class);
@@ -115,33 +111,6 @@ public abstract class FileUtils {
         try {
             return new BufferedOutputStream(new FileOutputStream(file));
         } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * GZip a file
-     */
-    public static File gzip (File inputFile) {
-        try {
-            File gzippedFile = FileUtils.createScratchFile();
-
-            // There's probably a more elegant way to do this with NIO and without closing the buffer.
-            // That would be Files.copy(File.toPath(),X) or ByteStreams.copy.
-            InputStream is = new BufferedInputStream(new FileInputStream(inputFile));
-            OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedFile)));
-            ByteStreams.copy(is, os);
-            is.close();
-            os.close();
-
-            LOG.info("GZIP compression reduced size from {} to {} ({}x compression)",
-                    human(inputFile.length(), "B"),
-                    human(gzippedFile.length(), "B"),
-                    (double) inputFile.length() / gzippedFile.length()
-            );
-
-            return gzippedFile;
-        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

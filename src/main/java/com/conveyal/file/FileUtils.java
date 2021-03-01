@@ -1,8 +1,5 @@
 package com.conveyal.file;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -17,8 +14,6 @@ import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
 
 public abstract class FileUtils {
-    private static final Logger LOG = LoggerFactory.getLogger(FileUtils.class);
-
     /**
      * When a zip file needs to be expanded and the individual files are parsed, it's useful to create a temporary
      * directory to help facilitate that.

@@ -1,8 +1,6 @@
 package com.conveyal.file;
 
 import java.io.File;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 /**
  * Most interactions with the FileStore use a specific "bucket". To avoid passing a "bucket" everywhere the file store

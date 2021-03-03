@@ -44,7 +44,7 @@ public class UserActivityController implements HttpController {
     private ResponseModel getActivity (Request req, Response res) {
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         ResponseModel responseModel = new ResponseModel();
-        // responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
+        responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
         return responseModel;
     }
 

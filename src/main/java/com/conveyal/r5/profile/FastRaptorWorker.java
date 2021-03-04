@@ -483,7 +483,7 @@ public class FastRaptorWorker {
              patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
             TripPattern pattern = transit.tripPatterns.get(patternIndex);
-            int onTrip = -1;
+            int onTrip = -1; // Used as index into list of active scheduled trips running on this pattern
             int waitTime = 0;
             int boardTime = 0;
             int boardStop = -1;
@@ -512,14 +512,13 @@ public class FastRaptorWorker {
                     pattern.pickups[stopPositionInPattern] != PickDropType.NONE
                 ) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
+                    List<TripSchedule> candidateSchedules = pattern.activeScheduledTrips(servicesActive);
                     if (onTrip == -1) {
                         int candidateTripIndex = -1;
-                        for (TripSchedule candidateSchedule : pattern.tripSchedules) {
+                        for (TripSchedule candidateSchedule : candidateSchedules) {
+                            // Iterate through schedules of active scheduled trips on this pattern, in ascending order
+                            // of departure time from first stop of the pattern
                             candidateTripIndex++;
-                            if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
-                                // frequency trip or not running
-                                continue;
-                            }
                             if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
                                 // board this trip (the earliest trip that can be boarded on this pattern at this stop)
                                 onTrip = candidateTripIndex;
@@ -541,12 +540,8 @@ public class FastRaptorWorker {
                                 // The tripSchedules in a given pattern are sorted by time of departure from the first
                                 // stop. So they are sorted by time of departure at this stop, if the possibility
                                 // of overtaking is ignored.
-                                TripSchedule earlierTripSchedule = pattern.tripSchedules.get(earlierTripIdx);
+                                TripSchedule earlierTripSchedule = candidateSchedules.get(earlierTripIdx);
 
-                                if (earlierTripSchedule.headwaySeconds != null || !servicesActive.get(earlierTripSchedule.serviceCode)) {
-                                    // This is a frequency trip or it is not running on the day of the search.
-                                    continue;
-                                }
                                 // The assertion below is a sanity check, but not a complete check that all the
                                 // tripSchedules are sorted, because later tripSchedules are not considered.
                                 checkState(earlierTripSchedule.departures[0] <= schedule.departures[0],

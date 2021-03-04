@@ -226,4 +226,15 @@ public class TripPattern implements Serializable, Cloneable {
         return geometries;
     }
 
+    /**
+     * Returns list of trips in this pattern that have a service code in the supplied set of service codes (e.g. for a
+     * particular date) and fully specified timetables (i.e. not frequency-based).
+     */
+    public List<TripSchedule> activeScheduledTrips (BitSet servicesActive) {
+        return this.tripSchedules.stream().filter(
+                schedule -> servicesActive.get(schedule.serviceCode) && // Trip running on service day
+                schedule.headwaySeconds == null // Not a frequency trip
+        ).collect(Collectors.toList());
+    }
+
 }

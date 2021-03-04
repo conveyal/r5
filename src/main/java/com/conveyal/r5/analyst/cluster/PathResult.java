@@ -155,6 +155,8 @@ public class PathResult {
             this.egress = pathTemplate.stopSequence.egress == null ? null : pathTemplate.stopSequence.egress.toString();
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
             this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
+            iterations.forEach(pathTemplate.stopSequence::transferTime); // Sense check that travel time components
+            // do not exceed total travel time TODO report transfer times in single-point responses?
         }
     }
 

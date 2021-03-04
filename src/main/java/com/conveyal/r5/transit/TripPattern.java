@@ -249,7 +249,7 @@ public class TripPattern implements Serializable, Cloneable {
     public boolean departuresInOrder(List<TripSchedule> tripsToCheck, int stopOffset) {
         for (int i = 0; i < tripsToCheck.size() - 1; i++) {
             if (tripsToCheck.get(i).departures[stopOffset] > tripsToCheck.get(i + 1).departures[stopOffset]) {
-                LOG.warn("Overtaking: route {}, pattern {}, upstream of stop {}", routeId, originalId, stopOffset);
+                LOG.debug("Overtaking: route {}, pattern {}, upstream of stop {}", routeId, originalId, stopOffset);
                 return false;
             }
         }

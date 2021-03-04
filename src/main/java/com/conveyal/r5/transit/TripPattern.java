@@ -239,6 +239,13 @@ public class TripPattern implements Serializable, Cloneable {
         ).collect(Collectors.toList());
     }
 
+    /**
+     * Checks whether departure times at a specified stop are in ascending order. We generally expect this to be true
+     * for trips in a pattern, because they are sorted by departure time from the first stop. But this is not
+     * guaranteed to be true, because a trip on a pattern could be overtaken by another.
+     * @param tripsToCheck caller is responsible for ensuring all are active on a given date
+     * @return true if the departure times at this stop are in ascending order, false otherwise
+     */
     public boolean departuresInOrder(List<TripSchedule> tripsToCheck, int stopOffset) {
         for (int i = 0; i < tripsToCheck.size() - 1; i++) {
             if (tripsToCheck.get(i).departures[stopOffset] > tripsToCheck.get(i + 1).departures[stopOffset]) {

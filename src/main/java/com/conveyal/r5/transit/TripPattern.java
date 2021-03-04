@@ -132,6 +132,8 @@ public class TripPattern implements Serializable, Cloneable {
     /**
      * Linear search.
      * @return null if no departure is possible.
+     * FIXME this is unused. And is active true by definition (this.servicesActive is a BitSet with serviceCode set for
+     * every one of this.tripSchedules)?
      */
     TripSchedule findNextDeparture (int time, int stopOffset) {
         TripSchedule bestSchedule = null;
@@ -235,6 +237,16 @@ public class TripPattern implements Serializable, Cloneable {
                 schedule -> servicesActive.get(schedule.serviceCode) && // Trip running on service day
                 schedule.headwaySeconds == null // Not a frequency trip
         ).collect(Collectors.toList());
+    }
+
+    public boolean departuresInOrder(List<TripSchedule> tripsToCheck, int stopOffset) {
+        for (int i = 0; i < tripsToCheck.size() - 1; i++) {
+            if (tripsToCheck.get(i).departures[stopOffset] > tripsToCheck.get(i + 1).departures[stopOffset]) {
+                LOG.warn("Overtaking: route {}, pattern {}, upstream of stop {}", routeId, originalId, stopOffset);
+                return false;
+            }
+        }
+        return true;
     }
 
 }

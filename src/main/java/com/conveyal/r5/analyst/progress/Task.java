@@ -89,7 +89,7 @@ public class Task implements Runnable, ProgressListener {
     public Task nextTask;
 
     /** Private constructor to encourage use of fluent methods. */
-    public Task (UserPermissions userPermissions) {
+    private Task (UserPermissions userPermissions) {
         user = userPermissions.email;
         group = userPermissions.accessGroup;
         markEnqueued(); // not strictly accurate, but this avoids calling the method from outside.

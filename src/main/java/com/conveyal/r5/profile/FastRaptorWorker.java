@@ -1,11 +1,9 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.transit.FilteredPattern;
 import com.conveyal.r5.transit.PickDropType;
-import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.conveyal.r5.transit.path.Path;
 import gnu.trove.iterator.TIntIterator;
@@ -111,12 +109,6 @@ public class FastRaptorWorker {
     /** The routing parameters. */
     private final AnalysisWorkerTask request;
 
-    /** The indexes of the trip patterns running on a given day with frequency-based trips of selected modes. */
-    private final BitSet runningFrequencyPatterns = new BitSet();
-
-    /** The indexes of the trip patterns running on a given day with scheduled trips of selected modes. */
-    private final BitSet runningScheduledPatterns = new BitSet();
-
     /** Generates and stores departure time offsets for every frequency-based set of trips. */
     private final FrequencyRandomOffsets offsets;
 
@@ -171,7 +163,7 @@ public class FastRaptorWorker {
      */
     public int[][] route () {
         raptorTimer.fullSearch.start();
-        prefilterPatterns();
+        filterPatternsAndTripsIfNeeded();
         // Initialize result storage. Results are one arrival time at each stop, for every raptor iteration.
         final int nStops = transit.getStopCount();
         final int nIterations = iterationsPerMinute * nMinutes;
@@ -239,25 +231,21 @@ public class FastRaptorWorker {
     }
 
     /**
-     * Before routing, filter the set of patterns down to only the ones that are actually running on the search date.
-     * We can also filter down to only those modes enabled in the search request, because all trips in a pattern are
-     * defined to be on same route, and GTFS allows only one mode per route.
+     * Before routing, filter the set of patterns and trips to only the ones relevant for the search request (date
+     * and transit modes). We set the filtered patterns and trips on the transitLayer, in effect caching them for
+     * repeated searches on the same date with the same modes.
      */
-    private void prefilterPatterns () {
-        for (int patternIndex = 0; patternIndex < transit.tripPatterns.size(); patternIndex++) {
-            TripPattern pattern = transit.tripPatterns.get(patternIndex);
-            RouteInfo routeInfo = transit.routes.get(pattern.routeIndex);
-            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
-            if (pattern.servicesActive.intersects(servicesActive) && request.transitModes.contains(mode)) {
-                // At least one trip on this pattern is relevant, based on the profile request's date and modes.
-                if (pattern.hasFrequencies) {
-                    runningFrequencyPatterns.set(patternIndex);
-                }
-                // Schedule case is not an "else" clause because we support patterns with both frequency and schedule.
-                if (pattern.hasSchedules) {
-                    runningScheduledPatterns.set(patternIndex);
-                }
-            }
+    private void filterPatternsAndTripsIfNeeded() {
+        boolean performFiltering;
+        if (transit.filteredTripPatterns == null) {
+            // Trip filtering has not yet been performed.
+            performFiltering = true;
+        } else {
+            // Trip filtering was already performed, but the filtering criteria may have changed.
+            performFiltering = !transit.filteredTripPatterns.matchesRequest(request.transitModes, servicesActive);
+        }
+        if (performFiltering) {
+            transit.filterPatternsAndTrips(request.transitModes, servicesActive);
         }
     }
 
@@ -477,12 +465,14 @@ public class FastRaptorWorker {
      */
     private void doScheduledSearchForRound (RaptorState outputState) {
         final RaptorState inputState = outputState.previous;
-        BitSet patternsToExplore = patternsToExploreInNextRound(inputState, runningScheduledPatterns, true);
+        BitSet patternsToExplore = patternsToExploreInNextRound(inputState,
+                transit.filteredTripPatterns.runningScheduledPatterns,
+                true);
         for (int patternIndex = patternsToExplore.nextSetBit(0);
              patternIndex >= 0;
              patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            TripPattern pattern = transit.tripPatterns.get(patternIndex);
+            FilteredPattern pattern = transit.filteredTripPatterns.patterns.get(patternIndex);
             int onTrip = -1; // Used as index into list of active scheduled trips running on this pattern
             int waitTime = 0;
             int boardTime = Integer.MAX_VALUE;
@@ -512,7 +502,7 @@ public class FastRaptorWorker {
                     pattern.pickups[stopPositionInPattern] != PickDropType.NONE
                 ) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
-                    List<TripSchedule> candidateSchedules = pattern.activeScheduledTrips(servicesActive);
+                    List<TripSchedule> candidateSchedules = pattern.runningScheduledTrips;
                     if (onTrip == -1) {
                         int candidateTripIndex = -1;
                         for (TripSchedule candidateSchedule : candidateSchedules) {
@@ -529,7 +519,7 @@ public class FastRaptorWorker {
                                 waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStop = stop;
                                 // Check that all remaining trips depart this stop after the trip we boarded.
-                                if (pattern.noOvertakingConfirmed) {
+                                if (pattern.noScheduledOvertaking) {
                                     // We are confident of being on the earliest feasible departure.
                                     break;
                                 }
@@ -541,7 +531,7 @@ public class FastRaptorWorker {
                         // this stop instead.
                         if (earliestBoardTime < schedule.departures[stopPositionInPattern]) {
                             // First, it might be possible to board an earlier trip at this stop.
-                            int candidateTripIndex = pattern.noOvertakingConfirmed ? onTrip : candidateSchedules.size() - 1;
+                            int candidateTripIndex = pattern.noScheduledOvertaking ? onTrip : candidateSchedules.size() - 1;
                             while (--candidateTripIndex >= 0) {
                                 // The tripSchedules in a given pattern are sorted by time of departure from the first
                                 // stop of the pattern. For now, we assume no overtaking so the tripSchedules are
@@ -561,7 +551,7 @@ public class FastRaptorWorker {
                                 } else {
                                     // The trip under consideration arrives at this stop earlier than one could feasibly
                                     // board. Check that all remaining trips depart this stop at least as early.
-                                    if (pattern.noOvertakingConfirmed) {
+                                    if (pattern.noScheduledOvertaking) {
                                         // We are confident of being on the earliest feasible departure.
                                         break;
                                     }
@@ -618,21 +608,17 @@ public class FastRaptorWorker {
         // are applying randomized schedules that are not present in the accumulated range-raptor upper bound state.
         // Those randomized frequency routes may cascade improvements from updates made at previous departure minutes.
         final boolean withinMinute = (frequencyBoardingMode == UPPER_BOUND);
-        BitSet patternsToExplore = patternsToExploreInNextRound(inputState, runningFrequencyPatterns, withinMinute);
+        BitSet patternsToExplore = patternsToExploreInNextRound(inputState,
+                transit.filteredTripPatterns.runningFrequencyPatterns,
+                withinMinute);
         for (int patternIndex = patternsToExplore.nextSetBit(0);
                  patternIndex >= 0;
                  patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            TripPattern pattern = transit.tripPatterns.get(patternIndex);
-
+            FilteredPattern pattern = transit.filteredTripPatterns.patterns.get(patternIndex);
             int tripScheduleIndex = -1; // First loop iteration will immediately increment to 0.
-            for (TripSchedule schedule : pattern.tripSchedules) {
+            for (TripSchedule schedule : pattern.runningFrequencyTrips) {
                 tripScheduleIndex++;
-
-                // If this trip's service is inactive (it's not running) or it's a scheduled (non-freq) trip, skip it.
-                if (!servicesActive.get(schedule.serviceCode) || schedule.headwaySeconds == null) {
-                    continue;
-                }
                 // Loop through all the entries for this trip (time windows with service at a given frequency).
                 for (int frequencyEntryIdx = 0;
                          frequencyEntryIdx < schedule.headwaySeconds.length;

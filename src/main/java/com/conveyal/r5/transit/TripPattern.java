@@ -63,8 +63,6 @@ public class TripPattern implements Serializable, Cloneable {
     /** does this trip pattern have any scheduled trips */
     public boolean hasSchedules;
 
-    public boolean noOvertakingConfirmed = false;
-
     // This set includes the numeric codes for all services on which at least one trip in this pattern is active.
     public BitSet servicesActive = new BitSet();
 
@@ -107,6 +105,10 @@ public class TripPattern implements Serializable, Cloneable {
             dropoffs[s] = PickDropType.forGtfsCode(st.drop_off_type);
         }
         this.routeId = routeId;
+    }
+
+    public TripPattern() {
+        // no-arg
     }
 
     public void addTrip (TripSchedule tripSchedule) {

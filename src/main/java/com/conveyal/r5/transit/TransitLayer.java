@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,64 @@ public class TransitLayer implements Serializable, Cloneable {
     public static final int TYPICAL_NUMBER_OF_STOPS_PER_TRIP = 30;
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
+
+    /** Stores the relevant patterns and trips based on the transit modes and date in an analysis request */
+    public transient FilteredPatterns filteredTripPatterns;
+
+    /** Associate filtered patterns with the criteria (modes and service) used to filter them */
+    public static class FilteredPatterns {
+        /**
+         * Transit modes in the analysis request. We filter down to only those modes enabled in the search request,
+         * because all trips in a pattern are defined to be on same route, and GTFS allows only one mode per route.
+         */
+        private final EnumSet<TransitModes> modes;
+
+        /** GTFS services, e.g. active on a specific date */
+        private final BitSet services;
+
+        /**
+         * List with the same length and indexes as full tripPatterns. Patterns that do not meed the mode/services
+         * filtering criteria are recorded as null.
+         */
+        public List<FilteredPattern> patterns = new ArrayList<>();
+        /**
+         * The indexes of the trip patterns running on a given day with frequency-based trips of selected modes. */
+        public BitSet runningFrequencyPatterns = new BitSet();
+
+        /** The indexes of the trip patterns running on a given day with scheduled trips of selected modes. */
+        public BitSet runningScheduledPatterns = new BitSet();
+
+        FilteredPatterns(EnumSet<TransitModes> modes, BitSet services) {
+            this.modes = modes;
+            this.services = services;
+        }
+
+        public boolean matchesRequest(EnumSet<TransitModes> modes, BitSet services) {
+            return this.modes.equals(modes) && this.services.equals(services);
+        }
+    }
+
+    public void filterPatternsAndTrips(EnumSet<TransitModes> modes, BitSet services) {
+        this.filteredTripPatterns = new FilteredPatterns(modes, services);
+        for (int patternIndex = 0; patternIndex < this.tripPatterns.size(); patternIndex++) {
+            TripPattern pattern = this.tripPatterns.get(patternIndex);
+            RouteInfo routeInfo = this.routes.get(pattern.routeIndex);
+            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+            if (pattern.servicesActive.intersects(services) && modes.contains(mode)) {
+                this.filteredTripPatterns.patterns.add(new FilteredPattern(pattern, services));
+                // At least one trip on this pattern is relevant, based on the profile request's date and modes.
+                if (pattern.hasFrequencies) {
+                    this.filteredTripPatterns.runningFrequencyPatterns.set(patternIndex);
+                }
+                // Schedule case is not an "else" clause because we support patterns with both frequency and schedule.
+                if (pattern.hasSchedules) {
+                    this.filteredTripPatterns.runningScheduledPatterns.set(patternIndex);
+                }
+            } else {
+                this.filteredTripPatterns.patterns.add(null);
+            }
+        }
+    }
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();

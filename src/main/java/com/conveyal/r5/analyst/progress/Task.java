@@ -1,10 +1,13 @@
 package com.conveyal.r5.analyst.progress;
 
+import com.conveyal.analysis.UserPermissions;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * This is a draft for a more advanced task progress system. It is not yet complete or functional.
@@ -23,14 +26,19 @@ import java.util.List;
  */
 public class Task implements Runnable, ProgressListener {
 
+    /** Every has an ID so the UI can update tasks it already knows about with new information after polling. */
+    public final UUID id = UUID.randomUUID();
+
     // User and group are only relevant on the backend. On workers, we want to show network or cost table build progress
     // to everyone in the organization, even if someone else's action kicked off the process.
+    // We could also store the full UserPermissions object instead of breaking it into fields.
 
-    private String user;
+    @JsonIgnore
+    public final String user;
 
-    private String group;
+    private final String group;
 
-    // Timestamps to track execution time and wait time.
+    // Timestamps to track elapsed execution time and wait time.
 
     private Instant enqueued;
 
@@ -48,6 +56,12 @@ public class Task implements Runnable, ProgressListener {
 
     public int currentWorkUnit;
 
+    public static enum State {
+        QUEUED, ACTIVE, DONE, ERROR
+    }
+
+    public State state;
+
     /** To be on the safe side all tasks are considered heavyweight unless we explicitly set them to be lightweight. */
     private boolean isHeavy = true;
 
@@ -58,8 +72,6 @@ public class Task implements Runnable, ProgressListener {
     // Maybe instead we should just always pre-calculate how many fast copies will happen, log that before even starting,
     // and only track progress on the slow ones.
     public int nWorkUnitsSkipped;
-
-    public boolean errored;
 
     private Throwable throwable;
 
@@ -76,25 +88,38 @@ public class Task implements Runnable, ProgressListener {
     // to prevent simultaneous execution of sequential tasks.
     public Task nextTask;
 
+    /** Private constructor to encourage use of fluent methods. */
+    private Task (UserPermissions userPermissions) {
+        user = userPermissions.email;
+        group = userPermissions.accessGroup;
+        markEnqueued(); // not strictly accurate, but this avoids calling the method from outside.
+    }
+
     public double getPercentComplete() {
         return (currentWorkUnit * 100D) / totalWorkUnits;
     }
 
     List<Task> subtasks = new ArrayList<>();
 
-    /**
-     * Private constructor to encourage use of fluent methods.
-     */
-    private Task () {}
-
     public void addSubtask (Task subtask) {
 
     }
 
+    private void markEnqueued () {
+        enqueued = Instant.now();
+        this.state = State.QUEUED;
+    }
+
+    private void markActive () {
+        began = Instant.now();
+        this.state = State.ACTIVE;
+    }
+
     // Because of the subtask / next task mechanism, we don't let the actions mark tasks complete.
     // This is another reason to pass the actions only a limited progress reporting interface.
-    private void markComplete () {
-        this.completed = Instant.now();
+    private void markComplete (State newState) {
+        completed = Instant.now();
+        state = newState;
     }
 
     public boolean isHeavy () {
@@ -108,7 +133,7 @@ public class Task implements Runnable, ProgressListener {
     public void abort (Throwable throwable) {
         this.throwable = throwable;
         // LOG?
-        this.markComplete();
+        markComplete(State.ERROR);
     }
 
     protected void bubbleUpProgress() {
@@ -142,12 +167,13 @@ public class Task implements Runnable, ProgressListener {
         // The main action is run before the subtasks. It may not make sense progress reporting-wise for tasks to have
         // both their own actions and subtasks with their own actions. Perhaps series of tasks are a special kind of
         // action, which should encapsulate the bubble-up progress computation.
+        // TODO catch exceptions and set error status on Task
+        markActive();
         this.action.action(this);
         for (Task subtask : subtasks) {
             subtask.run();
         }
-        this.markComplete();
-        this.nextTask.run();
+        markComplete(State.DONE);
     }
 
     @Override
@@ -160,21 +186,43 @@ public class Task implements Runnable, ProgressListener {
     public void increment () {
         this.currentWorkUnit += 1;
         // Occasionally bubble up progress to parent tasks, log to console, etc.
-        if (this.bubbleUpdateFrequency > 0 && (currentWorkUnit % bubbleUpdateFrequency == 0)) {
-            parentTask.bubbleUpProgress();
+        if (parentTask != null) {
+            if (this.bubbleUpdateFrequency > 0 && (currentWorkUnit % bubbleUpdateFrequency == 0)) {
+                parentTask.bubbleUpProgress();
+            }
         }
         if (this.logFrequency > 0 && (currentWorkUnit % logFrequency == 0)) {
             // LOG.info...
         }
     }
 
+    // Methods for reporting elapsed times over API
+
+    public long getSecondsInQueue () {
+        return durationInQueue().toSeconds();
+    }
+
+    public long getSecondsExecuting () {
+        return durationExecuting().toSeconds();
+    }
+
+    public Duration durationInQueue () {
+        Instant endTime = (began == null) ? Instant.now() : began;
+        return Duration.between(enqueued, endTime);
+    }
+
+    public Duration durationExecuting () {
+        if (began == null) return Duration.ZERO;
+        Instant endTime = (completed == null) ? Instant.now() : completed;
+        return Duration.between(began, endTime);
+    }
+
     // FLUENT METHODS FOR CONFIGURING
 
-    // Really we should make a User object that combines user and group fields.
-    public Task forUser (String user, String group) {
-        this.user = user;
-        this.group = group;
-        return this;
+    /** Call this static factory to begin building a task. */
+    public static Task forUser (UserPermissions userPermissions) {
+        Task task = new Task(userPermissions);
+        return task;
     }
 
     public Task withDescription (String description) {
@@ -183,7 +231,9 @@ public class Task implements Runnable, ProgressListener {
     }
 
     /**
-     * We may actually want the TaskAction to set the total work units via its restricted ProgressReporter interface.
+     * TODO have the TaskAction set the total work units via the restricted ProgressListener interface.
+     * The number of work units is meaningless until we're calculating and showing progress.
+     * Allow both setting and incrementing the number of work units for convenience.
      */
     public Task withTotalWorkUnits (int totalWorkUnits) {
         this.totalWorkUnits = totalWorkUnits;
@@ -199,10 +249,6 @@ public class Task implements Runnable, ProgressListener {
     public Task setHeavy (boolean heavy) {
         this.isHeavy = heavy;
         return this;
-    }
-
-    public static Task newTask () {
-        return new Task();
     }
 
 }

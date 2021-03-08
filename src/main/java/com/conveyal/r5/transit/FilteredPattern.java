@@ -54,7 +54,8 @@ public class FilteredPattern extends TripPattern {
                 if (runningScheduledTrips.get(i).departures[stopOffset] >
                         runningScheduledTrips.get(i + 1).departures[stopOffset]
                 ) {
-                    LOG.warn("Overtaking: route {}, pattern {}, upstream of stop {}", routeId, originalId, stopOffset);
+                    LOG.warn("Overtaking: route {} pattern {} stop #{} time {}",
+                            routeId, originalId, stopOffset, runningScheduledTrips.get(i + 1).departures[stopOffset]);
                     noScheduledOvertaking = false;
                     break loopOverStops;
                 }

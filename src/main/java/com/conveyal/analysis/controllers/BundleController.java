@@ -1,6 +1,7 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.Components;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
@@ -14,6 +15,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.QueryBuilder;
@@ -37,6 +39,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -135,8 +138,16 @@ public class BundleController implements HttpController {
         Persistence.bundles.create(bundle);
 
         // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
-        taskScheduler.enqueueHeavyTask(() -> {
-            try {
+        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        taskScheduler.enqueue(Task.forUser(userPermissions)
+            .withDescription("Process OSM and GTFS")
+            .setHeavy(true)
+            .withTotalWorkUnits(
+                ((bundle.osmId == null) ? 1: 0) +
+                ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0)
+            )
+            .withAction(progressListener -> {
+              try {
                 if (bundle.osmId == null) {
                     // Process uploaded OSM.
                     bundle.status = Bundle.Status.PROCESSING_OSM;
@@ -149,6 +160,7 @@ public class BundleController implements HttpController {
                     osm.readPbf(fi.getInputStream());
 
                     bundleBucket.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
+                    progressListener.increment();
                 }
 
                 if (bundle.feedGroupId == null) {
@@ -202,6 +214,7 @@ public class BundleController implements HttpController {
 
                         // Done in a loop the nonce and updatedAt would be changed repeatedly
                         Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+                        progressListener.increment();
                     }
 
                     // TODO Handle crossing the antimeridian
@@ -213,7 +226,7 @@ public class BundleController implements HttpController {
 
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
-            } catch (Exception e) {
+              } catch (Exception e) {
                 // This catches any error while processing a feed with the GTFS Api and needs to be more
                 // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
                 // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
@@ -222,10 +235,10 @@ public class BundleController implements HttpController {
                 LOG.error("Error creating bundle", e);
                 bundle.status = Bundle.Status.ERROR;
                 bundle.statusText = ExceptionUtils.asString(e);
-            } finally {
+              } finally {
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-            }
-        });
+              }
+        }));
 
         return bundle;
     }

@@ -15,6 +15,7 @@ import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
 import com.conveyal.analysis.controllers.TimetableController;
+import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.Bucket;
 import com.conveyal.file.LocalFileStorage;
@@ -78,6 +79,7 @@ public class LocalComponents extends Components {
                 // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
                 new BrokerController(components.broker, components.eventBus),
+                new UserActivityController(components.taskScheduler),
                 new GtfsTileController(components.gtfsCache)
         );
         return httpControllers;

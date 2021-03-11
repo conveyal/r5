@@ -195,10 +195,6 @@ dependencies {
     // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
     implementation 'com.google.guava:guava:28.2-jre'
 
-    // Dagger compile-time dependency injection framework FIXME why does "api" not work here?
-    implementation 'com.google.dagger:dagger:2.30.1'
-    annotationProcessor 'com.google.dagger:dagger-compiler:2.30.1'
-
     // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
     //capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
     implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'

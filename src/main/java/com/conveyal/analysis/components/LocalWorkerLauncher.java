@@ -1,5 +1,6 @@
 package com.conveyal.analysis.components;
 
+import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
@@ -80,9 +81,10 @@ public class LocalWorkerLauncher implements WorkerLauncher {
         }
         int nTotal = nOnDemand + nSpot;
         LOG.info("Number of workers requested is {}.", nTotal);
-        nTotal = nWorkers;
-        LOG.info("Ignoring that and starting {} local Analysis workers...", nTotal);
-
+        if (nTotal != nWorkers) {
+            nTotal = nWorkers;
+            LOG.info("Ignoring that and starting {} local Analysis workers...", nTotal);
+        }
         for (int i = 0; i < nTotal; i++) {
             Properties singleWorkerConfig = new Properties(workerConfig);
             // singleWorkerConfig.setProperty("initial-graph-id", category.graphId);
@@ -90,7 +92,9 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             if (i > 0) {
                 singleWorkerConfig.setProperty("listen-for-single-point", "false");
             }
-            AnalysisWorker worker = new AnalysisWorker(singleWorkerConfig, fileStorage, transportNetworkCache);
+            WorkerConfig config = new WorkerConfig(singleWorkerConfig);
+            WorkerComponents components = new WorkerComponents(config);
+            AnalysisWorker worker = components.analysisWorker;
             Thread workerThread = new Thread(worker, "WORKER " + i);
             workerThreads.add(workerThread);
             workerThread.start();

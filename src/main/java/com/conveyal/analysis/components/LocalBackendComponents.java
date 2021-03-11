@@ -26,10 +26,13 @@ import java.util.List;
 
 /**
  * Wires up the components for a local backend instance (as opposed to a cloud cluster).
+ * This establishes the implementations and dependencies between them, and supplies configuration.
+ * No conditional logic should be present here. Differences in implementation or configuration are handled by the
+ * Components themselves.
  */
-public class LocalComponents extends BackendComponents {
+public class LocalBackendComponents extends BackendComponents {
 
-    public LocalComponents () {
+    public LocalBackendComponents () {
         config = new BackendConfig();
         taskScheduler = new TaskScheduler(config);
         fileStorage = new LocalFileStorage(
@@ -57,6 +60,7 @@ public class LocalComponents extends BackendComponents {
      * injecting custom controllers in other deployment environments. This also avoids bulk-passing the entire set
      * of components into the HttpApi constructor, ensuring clear declaration of each component's dependencies.
      * Such bulk-passing of components should only occur in this wiring-up code, not in component code.
+     * TODO make non-static to avoid repeating "components." everywhere, as long as that's compatible with Cluster.
      */
      public static List<HttpController> standardHttpControllers (BackendComponents components) {
         final List<HttpController> httpControllers = Arrays.asList(

@@ -1,7 +1,7 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.BackendComponents;
-import com.conveyal.analysis.components.LocalComponents;
+import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.gtfs.api.ApiMain;
@@ -31,7 +31,7 @@ public abstract class BackendMain {
     private static final InetAddress privateServerAddress = discoverPrivateInetAddress();
 
     public static void main (String... args) {
-        final BackendComponents components = new LocalComponents();
+        final BackendComponents components = new LocalBackendComponents();
         startServer(components);
     }
 

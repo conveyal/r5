@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.analysis.BackendVersion;
+import com.conveyal.analysis.WorkerConfig;
+import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.file.S3FileStorage;
@@ -17,6 +19,7 @@ import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.common.Util;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -66,15 +69,81 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- * This is a main class run by worker machines in our Analysis computation cluster.
- * It polls a broker requesting work over HTTP, telling the broker what networks and scenarios it has loaded.
- * When it receives some work from the broker it does the necessary work and returns the results back to the front
- * end via the broker.
- *
- * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
- * intended for interactive single point requests that should return as fast as possible.
+ * This is a main class run by worker machines in our Analysis computation cluster. It polls a broker requesting work
+ * over HTTP, telling the broker what networks and scenarios it has loaded. When it receives some work from the broker
+ * it does the necessary work and returns the results back to the front end via the broker.
+ * The worker may also listen for interactive single point requests that should return as fast as possible.
  */
 public class AnalysisWorker implements Runnable {
+
+    /**
+     * All parameters needed to configure an AnalysisWorker instance.
+     * This config interface is kind of huge and includes most things in the WorkerConfig.
+     * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
+     */
+    public static interface Config {
+
+        /** Whether this worker should shut down automatically when idle. */
+        boolean autoShutdown();
+
+        /**
+         * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
+         * Setting this to false before running creates a regional-only cluster worker.
+         * This is useful in testing when running many workers on the same machine.
+         */
+        boolean listenForSinglePoint();
+
+        /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
+        boolean workOffline();
+
+        /**
+         * If this is true, the worker will not actually do any work. It will just report all tasks as completed
+         * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
+         * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
+         */
+        boolean testTaskRedelivery();
+        String cacheDirectory();
+        String baseBucket();
+        String graphsBucket();
+        String awsRegion(); // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
+        String brokerAddress();
+        String brokerPort();
+        String pointsetsBucket();
+        String initialGraphId();
+
+    }
+
+    // CONSTANTS
+
+    private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
+    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
+    private static final String DEFAULT_BROKER_PORT = "7070";
+    public static final int POLL_WAIT_SECONDS = 15;
+    public static final int POLL_MAX_RANDOM_WAIT = 5;
+
+    /** The amount of time (in minutes) a worker will stay alive after starting certain work */
+    private static final int PRELOAD_KEEPALIVE_MINUTES = 90;
+    private static final int REGIONAL_KEEPALIVE_MINUTES = 5;
+    private static final int SINGLE_KEEPALIVE_MINUTES = 60;
+
+    /**
+     * This timeout should be longer than the longest expected worker calculation for a single-point request.
+     * Preparing networks or linking grids will take longer, but those cases are now handled with
+     * WorkerNotReadyException.
+     */
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
+
+    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
+    public static final int WORKER_LISTEN_PORT = 7080;
+
+    /**
+     * When testTaskRedelivery=true, how often the worker will fail to return a result for a task.
+     * TODO merge this with the boolean config parameter to enable intentional failure.
+     */
+    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
+
+
+    // STATIC FIELDS
 
     /**
      * Worker ID - just a random ID so we can differentiate machines used for computation.
@@ -92,46 +161,24 @@ public class AnalysisWorker implements Runnable {
      */
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
-    private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
-
-    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
-
-    private static final String DEFAULT_BROKER_PORT = "7070";
-
-    public static final int POLL_WAIT_SECONDS = 15;
-
-    public static final int POLL_MAX_RANDOM_WAIT = 5;
-
-    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
-    public static final int WORKER_LISTEN_PORT = 7080;
-
-    // TODO make non-static and make implementations swappable
-    // This is very ugly because it's static but initialized at class instantiation.
+    // TODO combine this with FileStorage - currently used for TAUI result uploads and polygon downloads
+    // FIXME it's ugly that this is initialized statically
     public static FilePersistence filePersistence;
+
+
+    // INSTANCE FIELDS
+
+    /** Hold a reference to the config object to avoid copying the many config values. */
+    private final Config config;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final NetworkPreloader networkPreloader;
 
-    /**
-     * If this is true, the worker will not actually do any work. It will just report all tasks as completed
-     * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
-     * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
-     */
-    private final boolean testTaskRedelivery;
+    /** Clock time (milliseconds since epoch) at which the worker should be considered idle. */
+    private long shutdownAfter;
+    private boolean inPreloading;
 
-    /** In the type of tests described above, this is how often the worker will fail to return a result for a task. */
-    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
-
-    /** The amount of time (in minutes) a worker will stay alive after starting certain work */
-    static final int PRELOAD_KEEPALIVE_MINUTES = 90;
-    static final int REGIONAL_KEEPALIVE_MINUTES = 5;
-    static final int SINGLE_KEEPALIVE_MINUTES = 60;
-
-    /** Clock time (milliseconds since epoch) at which the worker should be considered idle */
-    long shutdownAfter;
-    boolean inPreloading;
-
-    void adjustShutdownClock (int keepAliveMinutes) {
+    private void adjustShutdownClock (int keepAliveMinutes) {
         long t = System.currentTimeMillis() + keepAliveMinutes * 60 * 1000;
         if (inPreloading) {
             inPreloading = false;
@@ -141,47 +188,28 @@ public class AnalysisWorker implements Runnable {
         }
     }
 
-    /** Whether this worker should shut down automatically when idle. */
-    public final boolean autoShutdown;
-
-    public static final Random random = new Random();
+    private final Random random = new Random();
 
     /** The common root of all API URLs contacted by this worker, e.g. http://localhost:7070/api/ */
-    protected String brokerBaseUrl;
+    protected final String brokerBaseUrl;
 
     /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
-    static final HttpClient httpClient = makeHttpClient();
-
-    /**
-     * This timeout should be longer than the longest expected worker calculation for a single-point request.
-     * Preparing networks or linking grids will take longer, but those cases are now handled with
-     * WorkerNotReadyException.
-     */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
+    private final HttpClient httpClient = makeHttpClient();
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
-    private List<RegionalWorkResult> workResults = new ArrayList<>();
+    private final List<RegionalWorkResult> workResults = new ArrayList<>();
 
     /** The last time (in milliseconds since the epoch) that we polled for work. */
     private long lastPollingTime;
 
     /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
-    ThroughputTracker throughputTracker = new ThroughputTracker();
+    private final ThroughputTracker throughputTracker = new ThroughputTracker();
 
-    /**
-     * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
-     * Setting this to false before running creates a regional-only cluster worker. This is useful in testing when
-     * running many workers on the same machine.
-     */
-    protected boolean listenForSinglePointRequests;
-
-    /**
-     * This has been pulled out into a method so the broker can also make a similar http client.
-     */
+    /** Convenience method allowing the backend broker and the worker to make similar HTTP clients. */
     public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
@@ -199,86 +227,58 @@ public class AnalysisWorker implements Runnable {
      * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
      * TODO use the WebMercatorGridExtents in these Grids.
      */
-    PointSetCache pointSetCache;
-
-    /** The transport network this worker already has loaded, and therefore prefers to work on. */
-    String networkId = null;
+    private final PointSetCache pointSetCache;
 
     /** Information about the EC2 instance (if any) this worker is running on. */
-    EC2Info ec2info;
+    protected final EC2Info ec2info;
 
-    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
-    private boolean workOffline;
+    /** The transport network this worker already has loaded, and therefore prefers to work on. */
+    protected String networkId = null;
 
     /**
      * A queue to hold a backlog of regional analysis tasks.
      * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
      * but one of the tasks takes much longer than all the rest.
      * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
+     * TODO use the standard TaskScheduler for this
      */
     private ThreadPoolExecutor regionalTaskExecutor;
 
-    /** The HTTP server that receives single-point requests. */
+    /** The HTTP server that receives single-point requests. TODO make this more consistent with the backend HTTP API components. */
     private spark.Service sparkHttpService;
 
-    public static AnalysisWorker forConfig (Properties config) {
-        // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
-        // FIXME why is some configuration done here and some in the constructor?
-        boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
-        String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
-        FileStorage fileStore;
-        if (workOffline) {
-            fileStore = new LocalFileStorage(graphDirectory);
-        } else {
-            fileStore = new S3FileStorage(config.getProperty("aws-region"), graphDirectory);
-        }
-
-        // TODO worker config classes structured like BackendConfig
-        String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
-        OSMCache osmCache = new OSMCache(fileStore, () -> graphsBucket);
-        GTFSCache gtfsCache = new GTFSCache(fileStore, () -> graphsBucket);
-
-        TransportNetworkCache cache = new TransportNetworkCache(fileStore, gtfsCache, osmCache, graphsBucket);
-        return new AnalysisWorker(config, fileStore, cache);
-    }
-
-    // TODO merge this constructor with the forConfig factory method, so we don't have different logic for local and cluster workers
-    public AnalysisWorker (Properties config, FileStorage fileStore, TransportNetworkCache transportNetworkCache) {
-        // print out date on startup so that CloudWatch logs has a unique fingerprint
+    /** Constructor that takes injected components. */
+    public AnalysisWorker (
+            FileStorage fileStore,
+            TransportNetworkCache transportNetworkCache,
+            NetworkPreloader networkPreloader,
+            Config config
+    ) {
+        // Print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
-
-        testTaskRedelivery = Boolean.parseBoolean(config.getProperty("test-task-redelivery", "false"));
+        this.config = config;
 
         // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
         // TODO Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
         //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
-        filePersistence = new S3FilePersistence(config.getProperty("aws-region"), config.getProperty("base-bucket", "analysis-staging"));
+        filePersistence = new S3FilePersistence(config.awsRegion(), config.baseBucket());
 
-        // First, check whether we are running Analyst offline.
-        workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
-        if (workOffline) {
+        if (config.workOffline()) {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
 
-        {
-            String brokerAddress = config.getProperty("broker-address", DEFAULT_BROKER_ADDRESS);
-            String brokerPort = config.getProperty("broker-port", DEFAULT_BROKER_PORT);
-            this.brokerBaseUrl = String.format("http://%s:%s/internal", brokerAddress, brokerPort);
-        }
+        this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
         // set to null, i.e. no graph affinity)
         // we don't actually build the graph now; this is just a hint to the broker as to what
         // graph this machine was intended to analyze.
-        this.networkId = config.getProperty("initial-graph-id");
+        this.networkId = config.initialGraphId();
 
-        this.pointSetCache = new PointSetCache(fileStore, config.getProperty("pointsets-bucket"));
+        this.pointSetCache = new PointSetCache(fileStore, config.pointsetsBucket());
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
-        this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
-        this.listenForSinglePointRequests = Boolean.parseBoolean(config.getProperty("listen-for-single-point", "true"));
 
         // Keep the worker alive for an initial window to prepare for analysis
         inPreloading = true;
@@ -288,7 +288,7 @@ public class AnalysisWorker implements Runnable {
         // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
         // the new request signing v4 requires you to know the region where the S3 objects are.
         ec2info = new EC2Info();
-        if (!workOffline) {
+        if (!config.workOffline()) {
             ec2info.fetchMetadata();
         }
         if (ec2info.region == null) {
@@ -351,7 +351,7 @@ public class AnalysisWorker implements Runnable {
         // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
         // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
         // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-        if (listenForSinglePointRequests) {
+        if (config.listenForSinglePoint()) {
             // Use the newer non-static Spark framework syntax.
             sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
@@ -372,7 +372,7 @@ public class AnalysisWorker implements Runnable {
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
-                if (autoShutdown) {considerShuttingDown();}
+                if (config.autoShutdown()) {considerShuttingDown();}
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
                 LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
@@ -504,7 +504,7 @@ public class AnalysisWorker implements Runnable {
 
         // If this worker is being used in a test of the task redelivery mechanism. Report most work as completed
         // without actually doing anything, but fail to report results a certain percentage of the time.
-        if (testTaskRedelivery) {
+        if (config.testTaskRedelivery()) {
             pretendToDoWork(task);
             return;
         }
@@ -776,34 +776,17 @@ public class AnalysisWorker implements Runnable {
     }
 
     /**
-     * Requires a worker configuration, which is a Java Properties file with the following
-     * attributes.
-     *
-     * graphs-bucket      S3 bucket in which graphs are stored.
-     * pointsets-bucket   S3 bucket in which pointsets are stored
-     * auto-shutdown      Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
-     * initial-graph-id   The graph ID for this worker to load immediately upon startup
+     * Worker configuration (Java Properties file) is now hard-wired to be worker.conf in the current working directory.
      */
     public static void main (String[] args) {
-        LOG.info("Starting R5 Analyst Worker version {}", BackendVersion.instance.version);
+        LOG.info("Starting Conveyal Analysis Worker with R5 version {}", BackendVersion.instance.version);
         LOG.info("R5 git commit is {}", BackendVersion.instance.commit);
         LOG.info("R5 git branch is {}", BackendVersion.instance.branch);
-
-        String configFileName = "worker.conf";
-        if (args.length > 0) {
-            configFileName = args[0];
-        }
-        Properties config = new Properties();
-        try (InputStream configInputStream = new FileInputStream(new File(configFileName))) {
-            config.load(configInputStream);
-        } catch (Exception e) {
-            LOG.error("Error loading worker configuration, shutting down. " + ExceptionUtils.asString(e));
-            return;
-        }
         try {
-            AnalysisWorker.forConfig(config).run();
+            WorkerComponents components = new WorkerComponents();
+            components.analysisWorker.run();
         } catch (Exception e) {
-            LOG.error("Unhandled error in analyst worker, shutting down. " + ExceptionUtils.asString(e));
+            LOG.error("Unhandled error in Conveyal Analysis Worker, shutting down. " + ExceptionUtils.asString(e));
         }
     }
 

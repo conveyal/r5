@@ -12,6 +12,8 @@ import java.util.Properties;
  * We use this to allow the backend to report the exact version of the code it is running via an API. This is useful
  * in automated deployment, testing, and debugging situations. Note that when building the code in an IDE, the version
  * information may not be supplied to this class. It may only be provided in a command line Maven build.
+ *
+ * TODO rename to R5Version, this is now both the backend and worker version, but not the cluster version.
  */
 public class BackendVersion {
 

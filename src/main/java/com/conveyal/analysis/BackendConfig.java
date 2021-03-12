@@ -42,16 +42,15 @@ public class BackendConfig extends ConfigBase implements
 
     // If true, this backend instance should shut itself down after a period of inactivity.
     private final boolean offline;
-    public final boolean autoShutdown;
-    private final String bundleBucket;
     private final String databaseName;
     private final String databaseUri;
     private final String localCacheDirectory;
+    private final String bundleBucket;
+    private final String gridBucket;
+    private final String resultsBucket;
     private final int serverPort;
     private final String seamlessCensusBucket;
     private final String seamlessCensusRegion;
-    private final String gridBucket;
-    private final String resultsBucket;
     private final int lightThreads;
     private final int heavyThreads;
     private final int maxWorkers;
@@ -71,18 +70,17 @@ public class BackendConfig extends ConfigBase implements
         super(properties);
         // We intentionally don't supply any defaults here.
         // Any 'defaults' should be shipped in an example config file.
-        autoShutdown = boolProp("auto-shutdown");
         immediateShutdown = boolProp("immediate-shutdown");
-        bundleBucket = strProp("bundle-bucket");
         databaseName = strProp("database-name");
         databaseUri = strProp("database-uri");
         localCacheDirectory = strProp("local-cache");
+        bundleBucket = strProp("bundle-bucket");
+        gridBucket = strProp("grid-bucket");
+        resultsBucket = strProp("results-bucket");
         serverPort = intProp("server-port");
         offline = boolProp("offline");
         seamlessCensusBucket = strProp("seamless-census-bucket");
         seamlessCensusRegion = strProp("seamless-census-region");
-        gridBucket = strProp("grid-bucket");
-        resultsBucket = strProp("results-bucket");
         lightThreads = intProp("light-threads");
         heavyThreads = intProp("heavy-threads");
         maxWorkers = intProp("max-workers");
@@ -97,14 +95,14 @@ public class BackendConfig extends ConfigBase implements
     @Override public int     heavyThreads()         { return heavyThreads; }
     @Override public String  databaseUri()          { return databaseUri; }
     @Override public String  databaseName()         { return databaseName; }
+    @Override public String  localCacheDirectory()  { return localCacheDirectory;}
+    @Override public String  bundleBucket()         { return bundleBucket; }
+    @Override public String  gridBucket()           { return gridBucket; }
     @Override public String  resultsBucket()        { return resultsBucket; }
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
-    @Override public String  gridBucket()           { return gridBucket; }
     @Override public String  seamlessCensusRegion() { return seamlessCensusRegion; }
     @Override public String  seamlessCensusBucket() { return seamlessCensusBucket; }
     @Override public int     serverPort()           { return serverPort; }
-    @Override public String  localCacheDirectory()  { return localCacheDirectory;}
-    @Override public String  bundleBucket()         { return bundleBucket; }
     @Override public boolean offline()              { return offline; }
     @Override public int     maxWorkers()           { return maxWorkers; }
 

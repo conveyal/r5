@@ -5,6 +5,8 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.streets.OSMCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
@@ -17,22 +19,29 @@ public class WorkerConfig extends ConfigBase implements
         AnalysisWorker.Config
 {
 
-    public static final String WORKER_CONFIG_FILE = "worker.conf";
+    // CONSTANTS
+
+    private static final Logger LOG = LoggerFactory.getLogger(ConfigBase.class);
+    private static final String WORKER_CONFIG_FILE = "worker.conf";
+
+    // INSTANCE FIELDS
 
     private final boolean workOffline;
-    private final String  cacheDirectory;
-    private final String  graphsBucket;
     private final String  awsRegion; // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
     private final String  baseBucket;
-    private final boolean testTaskRedelivery;
+    private final String  bundleBucket;
+    private final String  pointsetsBucket;
+    private final String  initialGraphId;
+    private final String  cacheDirectory;
     private final String  brokerAddress;
     private final String  brokerPort;
-    private final String  pointsetsBucket;
     private final boolean autoShutdown;
-    private final boolean listenForSinglePoint;
-    private final String  initialGraphId;
     private final int     lightThreads;
     private final int     heavyThreads;
+    private final boolean testTaskRedelivery;
+    private final boolean listenForSinglePoint;
+
+    // CONSTRUCTORS
 
     private WorkerConfig (String filename) {
         this(propsFromFile(filename));
@@ -41,50 +50,54 @@ public class WorkerConfig extends ConfigBase implements
     private WorkerConfig (Properties props) {
         super(props);
         workOffline = boolProp("work-offline");
-        cacheDirectory = strProp("cache-dir");
-        graphsBucket = workOffline ? null : strProp("graphs-bucket");
-        awsRegion = workOffline ? null : strProp("aws-region");
+        if (workOffline) {
+            // Candidates for separate offline worker config - but might not be worth it for 2 options.
+            awsRegion = initialGraphId = null;
+        } else {
+            awsRegion = strProp("aws-region");
+            initialGraphId = strProp("initial-graph-id");
+        }
+        // These bucket names are used even in local operation as cache subdirectories.
         baseBucket = strProp("base-bucket");
-        testTaskRedelivery = boolProp("test-task-redelivery");
+        bundleBucket = strProp("bundle-bucket");
+        pointsetsBucket = strProp("pointsets-bucket");
+        cacheDirectory = strProp("cache-dir");
         brokerAddress = strProp("broker-address");
         brokerPort = strProp("broker-port");
-        pointsetsBucket = strProp("pointsets-bucket");
         autoShutdown = boolProp("auto-shutdown");
+        {
+            // Should we supply these in properties, or should this be done elsewhere?
+            int availableProcessors = Runtime.getRuntime().availableProcessors();
+            LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+            lightThreads = availableProcessors;
+            heavyThreads = availableProcessors;
+        }
+        testTaskRedelivery = boolProp("test-task-redelivery");
         listenForSinglePoint = boolProp("listen-for-single-point");
-        initialGraphId = strProp("initial-graph-id");
-        lightThreads = intProp("light-threads");
-        heavyThreads = intProp("heavy-threads");
         exitIfErrors();
     }
 
-    // Implementations of Component and HttpController Config interfaces
+    // INTERFACE IMPLEMENTATIONS
+    // Methods implementing Component and HttpController Config interfaces.
     // Note that one method can implement several Config interfaces at once.
 
-    // TaskScheduler Config Interface
-
-    @Override public int lightThreads () { return lightThreads; }
-    @Override public int heavyThreads () { return heavyThreads; }
-
-    // OSM abd GTFS cache config (eventually revise for consistent naming of method and variable)
-
-    @Override public String bundleBucket() { return graphsBucket; }
-
-    // AnalysisWorker Configuration Interface
-
     @Override public boolean workOffline()     { return workOffline; }
-    @Override public String  cacheDirectory()  { return cacheDirectory; }
-    @Override public String  graphsBucket()    { return graphsBucket; }
     @Override public String  awsRegion()       { return awsRegion; }
     @Override public String  baseBucket()      { return baseBucket; }
+    @Override public String  bundleBucket()    { return bundleBucket; }
+    @Override public String  pointsetsBucket() { return pointsetsBucket; }
+    @Override public String  initialGraphId()  { return initialGraphId; }
+    @Override public String  cacheDirectory()  { return cacheDirectory; }
     @Override public String  brokerAddress()   { return brokerAddress; }
     @Override public String  brokerPort()      { return brokerPort; }
-    @Override public String  pointsetsBucket() { return pointsetsBucket; }
     @Override public boolean autoShutdown()    { return autoShutdown; }
-    @Override public String  initialGraphId()  { return initialGraphId; }
+    @Override public int     lightThreads ()   { return lightThreads; }
+    @Override public int     heavyThreads ()   { return heavyThreads; }
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public boolean listenForSinglePoint() { return listenForSinglePoint; }
 
-    // Public factory methods - use these to construct WorkerConfig objects for readability
+    // STATIC FACTORY METHODS
+    // Use these to construct WorkerConfig objects for readability.
 
     public static WorkerConfig fromDefaultFile () {
         return new WorkerConfig(WORKER_CONFIG_FILE);

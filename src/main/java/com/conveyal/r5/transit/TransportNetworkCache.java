@@ -208,7 +208,7 @@ public class TransportNetworkCache {
     private TransportNetwork buildNetworkFromBundleZip (String networkId) {
         // The location of the inputs that will be used to build this graph
         File dataDirectory = FileUtils.createScratchDirectory();
-        FileStorageKey zipKey = new FileStorageKey(bucket,networkId + ".zip");
+        FileStorageKey zipKey = new FileStorageKey(bucket, networkId + ".zip");
         File zipFile = fileStorage.getFile(zipKey);
 
         try {

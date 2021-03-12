@@ -32,6 +32,7 @@ import java.util.List;
  */
 public class LocalBackendComponents extends BackendComponents {
 
+
     public LocalBackendComponents () {
         config = BackendConfig.fromDefaultFile();
         taskScheduler = new TaskScheduler(config);
@@ -45,6 +46,7 @@ public class LocalBackendComponents extends BackendComponents {
         database = new AnalysisDB(config);
         eventBus = new EventBus(taskScheduler);
         authentication = new LocalAuthentication();
+        // TODO add nested LocalWorkerComponents here, to reuse some components, and pass it into the LocalWorkerLauncher?
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.

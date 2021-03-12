@@ -104,7 +104,6 @@ public class AnalysisWorker implements Runnable {
         boolean testTaskRedelivery();
         String cacheDirectory();
         String baseBucket();
-        String graphsBucket();
         String awsRegion(); // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
         String brokerAddress();
         String brokerPort();

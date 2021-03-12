@@ -1,7 +1,10 @@
 # This file contains the configuration options for Conveyal Analysis Backend
 
-# The host and port of the remote Mongo server (if any). Comment out for local Mongo instance.
+immediate-shutdown=false
+
+# The host and port of the Mongo server.
 # database-uri=mongodb://127.0.0.1:27017
+database-uri=mongodb://localhost
 
 # The name of the database in the Mongo instance.
 database-name=analysis

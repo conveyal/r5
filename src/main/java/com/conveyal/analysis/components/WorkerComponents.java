@@ -59,14 +59,15 @@ public class WorkerComponents {
         // Eventually, this conditional wiring may be replaced with polymorphism (subclasses) and Config interfaces.
         if (config.workOffline()) {
             fileStorage = new LocalFileStorage(config);
+            filePersistence = null; // FIXME Needs local implementation (merge with FileStorage)
         } else {
             fileStorage = new S3FileStorage(config);
+            filePersistence = new S3FilePersistence(config);
         }
         osmCache = new OSMCache(fileStorage, config);
         gtfsCache = new GTFSCache(fileStorage, config);
         taskScheduler = new TaskScheduler(config);
         eventBus = new EventBus(taskScheduler);
-        filePersistence = new S3FilePersistence(config);
         transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache, config.bundleBucket());
         networkPreloader = new NetworkPreloader(transportNetworkCache);
         analysisWorker = new AnalysisWorker(fileStorage, filePersistence, transportNetworkCache, networkPreloader, config);

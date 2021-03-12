@@ -42,6 +42,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
     public LocalWorkerLauncher (Config config, FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         LOG.info("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
         this.fileStorage = fileStorage;
+        // FIXME get this cache into the workers launched below - they're going to create their own.
         transportNetworkCache = new TransportNetworkCache(
                 fileStorage,
                 gtfsCache,
@@ -50,13 +51,16 @@ public class LocalWorkerLauncher implements WorkerLauncher {
         );
         // Create configuration for the locally running worker
         workerConfig.setProperty("work-offline", "true");
-        // Do not auto-shutdown the local machine
         workerConfig.setProperty("auto-shutdown", "false");
         workerConfig.setProperty("broker-address", "localhost");
         workerConfig.setProperty("broker-port", Integer.toString(config.serverPort()));
         workerConfig.setProperty("cache-dir", config.localCacheDirectory());
+        workerConfig.setProperty("test-task-redelivery", "false");
+        // NOTE all bucket name params are slated for removal.
+        // Really we should be sharing these cache instances with the local worker rather than configuring new ones.
+        workerConfig.setProperty("base-bucket", "NONE"); // The worker only uses this for saving TAUI data and fetching polygons.
+        workerConfig.setProperty("bundle-bucket", config.bundleBucket()); // The worker uses this for the network/osm/gtfs cache directory.
         workerConfig.setProperty("pointsets-bucket", config.gridBucket());
-        workerConfig.setProperty("aws-region", "eu-west-1"); // TODO remove? Should not be necessary with local worker.
 
         // From a throughput perspective there is no point in running more than one worker locally, since each worker
         // has at least as many threads as there are processor cores. But for testing purposes (e.g. testing that task
@@ -85,13 +89,14 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             nTotal = nWorkers;
             LOG.info("Ignoring that and starting {} local Analysis workers...", nTotal);
         }
+        if (category.graphId != null) {
+            // Category is null when pre-starting local workers, but can be used when launching on demand.
+            workerConfig.setProperty("initial-graph-id", category.graphId);
+        }
         for (int i = 0; i < nTotal; i++) {
             Properties singleWorkerConfig = new Properties(workerConfig);
-            // singleWorkerConfig.setProperty("initial-graph-id", category.graphId);
             // Avoid starting more than one worker on the same machine trying to listen on the same port.
-            if (i > 0) {
-                singleWorkerConfig.setProperty("listen-for-single-point", "false");
-            }
+            singleWorkerConfig.setProperty("listen-for-single-point", Boolean.toString(i == 0).toLowerCase());
             WorkerConfig config = WorkerConfig.fromProperties(singleWorkerConfig);
             WorkerComponents components = new WorkerComponents(config);
             AnalysisWorker worker = components.analysisWorker;

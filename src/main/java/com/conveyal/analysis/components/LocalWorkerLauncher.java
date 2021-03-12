@@ -92,7 +92,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             if (i > 0) {
                 singleWorkerConfig.setProperty("listen-for-single-point", "false");
             }
-            WorkerConfig config = new WorkerConfig(singleWorkerConfig);
+            WorkerConfig config = WorkerConfig.fromProperties(singleWorkerConfig);
             WorkerComponents components = new WorkerComponents(config);
             AnalysisWorker worker = components.analysisWorker;
             Thread workerThread = new Thread(worker, "WORKER " + i);

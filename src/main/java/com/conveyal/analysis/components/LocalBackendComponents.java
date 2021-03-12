@@ -33,7 +33,7 @@ import java.util.List;
 public class LocalBackendComponents extends BackendComponents {
 
     public LocalBackendComponents () {
-        config = new BackendConfig();
+        config = BackendConfig.fromDefaultFile();
         taskScheduler = new TaskScheduler(config);
         fileStorage = new LocalFileStorage(
                 config.localCacheDirectory(),

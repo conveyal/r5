@@ -58,16 +58,16 @@ public class WorkerComponents {
     public final NetworkPreloader networkPreloader;
 
     public WorkerComponents () {
-        this(WorkerConfig.load());
+        this(WorkerConfig.fromDefaultFile());
     }
 
     public WorkerComponents (WorkerConfig config) {
         this.config = config;
         // Eventually, conditional wiring may be replaced with polymorphism (subclasses) and Config interfaces.
-        if (config.workOffline) {
-            fileStorage = new LocalFileStorage(config.cacheDirectory);
+        if (config.workOffline()) {
+            fileStorage = new LocalFileStorage(config.cacheDirectory());
         } else {
-            fileStorage = new S3FileStorage(config.awsRegion, config.cacheDirectory);
+            fileStorage = new S3FileStorage(config.awsRegion(), config.cacheDirectory());
         }
         osmCache = new OSMCache(fileStorage, config);
         gtfsCache = new GTFSCache(fileStorage, config);

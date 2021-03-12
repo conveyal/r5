@@ -55,14 +55,14 @@ public class LocalFileStorage implements FileStorage {
     }
 
     public File getFile(FileStorageKey key) {
-        return new File(String.join("/", directory, key.bucket, key.path));
+        return new File(String.join("/", directory, key.category.directoryName(), key.path));
     }
 
     /**
      * This will only get called in offline mode.
      */
     public String getURL (FileStorageKey key) {
-        return String.join("/", urlPrefix, key.bucket, key.path);
+        return String.join("/", urlPrefix, key.category.directoryName(), key.path);
     }
 
     public void delete (FileStorageKey key) {

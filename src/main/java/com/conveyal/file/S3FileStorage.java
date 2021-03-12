@@ -20,14 +20,25 @@ public class S3FileStorage implements FileStorage {
 
     private final LocalFileStorage localFileStorage;
 
+    /**
+     * This allows us to use different sets of buckets for different deployment environments.
+     * For a given file category, the end of the bucket name is identical in all environments but this prefix changes.
+     */
+    private final String bucketPrefix;
+
     public S3FileStorage (Config config) {
         localFileStorage = new LocalFileStorage(config);
         s3 = AmazonS3ClientBuilder.standard().withRegion(config.awsRegion()).build();
+        bucketPrefix = config.bucketPrefix();
+    }
+
+    private String bucket (FileStorageKey key) {
+        return bucketPrefix + key.category.directoryName();
     }
 
     /** Move the file into S3 and then into local file storage. */
     public void moveIntoStorage(FileStorageKey key, File file) {
-        PutObjectRequest putObjectRequest = new PutObjectRequest(key.bucket, key.path, file);
+        PutObjectRequest putObjectRequest = new PutObjectRequest(bucket(key), key.path, file);
         if (FileUtils.isGzip(file)) {
             ObjectMetadata metadata = new ObjectMetadata();
             String contentType;
@@ -54,7 +65,7 @@ public class S3FileStorage implements FileStorage {
             // Before writing, ensure that the directory exists
             localFile.getParentFile().mkdirs();
 
-            S3Object s3Object = s3.getObject(key.bucket, key.path);
+            S3Object s3Object = s3.getObject(bucket(key), key.path);
             try {
                 OutputStream fileOutputStream = FileUtils.getOutputStream(localFile);
                 s3Object.getObjectContent().transferTo(fileOutputStream);
@@ -74,7 +85,7 @@ public class S3FileStorage implements FileStorage {
         int signedUrlTimeout = 3600 * 1000 * 24 * 7;
         expiration.setTime(expiration.getTime() + signedUrlTimeout);
 
-        GeneratePresignedUrlRequest presigned = new GeneratePresignedUrlRequest(key.bucket, key.path)
+        GeneratePresignedUrlRequest presigned = new GeneratePresignedUrlRequest(bucket(key), key.path)
                 .withMethod(HttpMethod.GET)
                 .withExpiration(expiration);
 
@@ -83,13 +94,13 @@ public class S3FileStorage implements FileStorage {
 
     public void delete(FileStorageKey key) {
         localFileStorage.delete(key);
-        s3.deleteObject(key.bucket, key.path);
+        s3.deleteObject(bucket(key), key.path);
     }
 
     public boolean exists(FileStorageKey key) {
         if (localFileStorage.exists(key)) {
             return true;
         }
-        return s3.doesObjectExist(key.bucket, key.path);
+        return s3.doesObjectExist(bucket(key), key.path);
     }
 }

@@ -8,6 +8,7 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -42,6 +43,7 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.BUNDLES;
 
 /**
  * This Controller provides HTTP REST endpoints for manipulating Bundles. Bundles are sets of GTFS feeds and OSM
@@ -58,16 +60,15 @@ public class BundleController implements HttpController {
 
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
+    // FIXME The backend appears to use an osmcache purely to get a file key at which to store incoming OSM. Refactor.
     private final OSMCache osmCache;
     private final TaskScheduler taskScheduler;
-    private final String bundleBucket;
 
     public BundleController (BackendComponents components) {
         this.fileStorage = components.fileStorage;
         this.gtfsCache = components.gtfsCache;
         this.osmCache = components.osmCache;
         this.taskScheduler = components.taskScheduler;
-        this.bundleBucket = components.config.bundleBucket();
     }
 
     // INTERFACE METHOD
@@ -81,10 +82,6 @@ public class BundleController implements HttpController {
             sparkService.put("/:_id", this::update, toJson);
             sparkService.delete("/:_id", this::deleteBundle, toJson);
         });
-    }
-
-    public interface Config {
-        String bundleBucket ();
     }
 
     // HTTP REQUEST HANDLERS
@@ -162,6 +159,7 @@ public class BundleController implements HttpController {
                     Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
 
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
+                    // Here we perform minimal validation by loading the OSM, but don't retain the resulting MapDB.
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
                     osm.readPbf(fi.getInputStream());
@@ -259,13 +257,13 @@ public class BundleController implements HttpController {
         File manifestFile = FileUtils.createScratchFile("json");
         JsonUtil.objectMapper.writeValue(manifestFile, manifest);
 
-        FileStorageKey key = new FileStorageKey(bundleBucket, manifestFileName);
+        FileStorageKey key = new FileStorageKey(BUNDLES, manifestFileName);
         fileStorage.moveIntoStorage(key, manifestFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
         Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
-        FileStorageKey key = new FileStorageKey(bundleBucket, bundle._id + ".zip");
+        FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
         fileStorage.delete(key);
 
         return bundle;

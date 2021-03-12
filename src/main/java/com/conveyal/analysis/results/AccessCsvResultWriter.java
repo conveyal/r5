@@ -10,8 +10,8 @@ import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
 
-    public AccessCsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) throws IOException {
-        super(task, outputBucket, fileStorage);
+    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+        super(task, fileStorage);
     }
 
     @Override

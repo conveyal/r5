@@ -40,8 +40,8 @@ public class LocalBackendComponents extends BackendComponents {
                 config.localCacheDirectory(),
                 String.format("http://localhost:%s/files", config.serverPort())
         );
-        gtfsCache = new GTFSCache(fileStorage, config);
-        osmCache = new OSMCache(fileStorage, config);
+        gtfsCache = new GTFSCache(fileStorage);
+        osmCache = new OSMCache(fileStorage);
         // New (October 2019) DB layer, this should progressively replace the Persistence class
         database = new AnalysisDB(config);
         eventBus = new EventBus(taskScheduler);
@@ -73,8 +73,8 @@ public class LocalBackendComponents extends BackendComponents {
                 new GTFSGraphQLController(components.gtfsCache),
                 new BundleController(components),
                 new OpportunityDatasetController(components.fileStorage, components.taskScheduler, components.config),
-                new RegionalAnalysisController(components.broker, components.fileStorage, components.config),
-                new AggregationAreaController(components.fileStorage, components.config),
+                new RegionalAnalysisController(components.broker, components.fileStorage),
+                new AggregationAreaController(components.fileStorage),
                 new TimetableController(),
                 new FileStorageController(components.fileStorage, components.database),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which

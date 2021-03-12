@@ -4,6 +4,7 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -36,6 +37,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.GRIDS;
 
 /**
  * Stores vector aggregationAreas (used to define the region of a weighted average accessibility metric).
@@ -52,22 +54,13 @@ public class AggregationAreaController implements HttpController {
     private static int MAX_FEATURES = 100;
 
     private final FileStorage fileStorage;
-    private final Config config;
 
-    public interface Config {
-        // TODO this could be eliminated by hard-wiring file types to bucket subdirectories in the FileStorage.
-        String gridBucket ();
-    }
-
-    public AggregationAreaController (FileStorage fileStorage, Config config) {
+    public AggregationAreaController (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
-        this.config = config;
     }
-
-
 
     private FileStorageKey getStoragePath (AggregationArea area) {
-        return new FileStorageKey(config.gridBucket(), area.getS3Key());
+        return new FileStorageKey(GRIDS, area.getS3Key());
     }
 
     /**

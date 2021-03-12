@@ -85,9 +85,7 @@ public class MultiOriginAssembler {
      *      file up to an umbrella location where a single reference to the file storage can be used to
      *      store all of them.
      */
-    public MultiOriginAssembler (
-            RegionalAnalysis regionalAnalysis, Job job, String outputBucket, FileStorage fileStorage
-    ) {
+    public MultiOriginAssembler (RegionalAnalysis regionalAnalysis, Job job, FileStorage fileStorage) {
         this.regionalAnalysis = regionalAnalysis;
         this.job = job;
         this.nOriginsTotal = job.nTasksTotal;
@@ -114,20 +112,18 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
-                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
-                    resultWriters.add( new MultiGridResultWriter(
-                        regionalAnalysis, job.templateTask, outputBucket, fileStorage
-                    ));
+                    resultWriters.add( new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
                 }
             }
 
             if (job.templateTask.recordTimes) {
-                resultWriters.add(new TimeCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new TimeCsvResultWriter(job.templateTask, fileStorage));
             }
 
             if (job.templateTask.includePathResults) {
-                resultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
             }
 
             if (resultWriters.isEmpty() && !job.templateTask.makeTauiSite) {

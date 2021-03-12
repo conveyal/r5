@@ -9,6 +9,7 @@ import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -41,6 +42,7 @@ import static com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent.St
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUESTED;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
+import static com.conveyal.file.FileCategory.BUNDLES;
 
 /**
  * This class distributes the tasks making up regional jobs to workers.
@@ -84,8 +86,6 @@ public class Broker {
         // TODO Really these first two should be WorkerLauncher / Compute config
         boolean offline ();
         int maxWorkers ();
-        String resultsBucket ();
-        String bundleBucket ();
         boolean testTaskRedelivery ();
     }
 
@@ -170,9 +170,7 @@ public class Broker {
         // TODO encapsulate MultiOriginAssemblers in a new Component
         // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
         // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
-        MultiOriginAssembler assembler = new MultiOriginAssembler(
-                regionalAnalysis, job, config.resultsBucket(), fileStorage
-        );
+        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {
@@ -208,7 +206,7 @@ public class Broker {
         // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
         templateTask.scenario = null;
         String fileName = String.format("%s_%s.json", regionalAnalysis.bundleId, scenario.id);
-        FileStorageKey fileStorageKey = new FileStorageKey(config.bundleBucket(), fileName);
+        FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);

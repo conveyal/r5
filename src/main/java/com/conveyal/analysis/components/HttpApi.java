@@ -9,6 +9,7 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * This Component is a web server that serves up our HTTP API endpoints, both to the UI and to the workers.
@@ -139,9 +141,10 @@ public class HttpApi implements Component {
         // Expose all files in storage while in offline mode.
         // Not done with static file serving because it automatically gzips our already gzipped files.
         if (config.offline()) {
-            sparkService.get("/files/:bucket/*", (req, res) -> {
+            sparkService.get("/files/:category/*", (req, res) -> {
                 String filename = req.splat()[0];
-                FileStorageKey key = new FileStorageKey(req.params("bucket"), filename);
+                FileCategory category = FileCategory.valueOf(req.params("category").toUpperCase(Locale.ROOT));
+                FileStorageKey key = new FileStorageKey(category, filename);
                 File file = fileStorage.getFile(key);
                 FileStorageFormat format = FileStorageFormat.fromFilename(filename);
                 res.type(format.mimeType);

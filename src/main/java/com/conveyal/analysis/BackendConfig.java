@@ -22,12 +22,7 @@ public class BackendConfig extends ConfigBase implements
         TaskScheduler.Config,
         AnalysisDB.Config,
         Broker.Config,
-        BundleController.Config,
-        OSMCache.Config,
-        GTFSCache.Config,
         HttpApi.Config,
-        RegionalAnalysisController.Config,
-        AggregationAreaController.Config,
         OpportunityDatasetController.Config,
         SeamlessCensusGridExtractor.Config,
         LocalWorkerLauncher.Config
@@ -45,9 +40,6 @@ public class BackendConfig extends ConfigBase implements
     private final String databaseName;
     private final String databaseUri;
     private final String localCacheDirectory;
-    private final String bundleBucket;
-    private final String gridBucket;
-    private final String resultsBucket;
     private final int serverPort;
     private final String seamlessCensusBucket;
     private final String seamlessCensusRegion;
@@ -74,9 +66,6 @@ public class BackendConfig extends ConfigBase implements
         databaseName = strProp("database-name");
         databaseUri = strProp("database-uri");
         localCacheDirectory = strProp("local-cache");
-        bundleBucket = strProp("bundle-bucket");
-        gridBucket = strProp("grid-bucket");
-        resultsBucket = strProp("results-bucket");
         serverPort = intProp("server-port");
         offline = boolProp("offline");
         seamlessCensusBucket = strProp("seamless-census-bucket");
@@ -96,9 +85,6 @@ public class BackendConfig extends ConfigBase implements
     @Override public String  databaseUri()          { return databaseUri; }
     @Override public String  databaseName()         { return databaseName; }
     @Override public String  localCacheDirectory()  { return localCacheDirectory;}
-    @Override public String  bundleBucket()         { return bundleBucket; }
-    @Override public String  gridBucket()           { return gridBucket; }
-    @Override public String  resultsBucket()        { return resultsBucket; }
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public String  seamlessCensusRegion() { return seamlessCensusRegion; }
     @Override public String  seamlessCensusBucket() { return seamlessCensusBucket; }

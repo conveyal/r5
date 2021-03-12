@@ -43,8 +43,9 @@ public class S3FilePersistence extends FilePersistence {
      * Example: if baseBucket is "analysis-staging", files of type POLYGON will be in bucket "analysis-staging-polygons".
      * NOTE: For now this only applies to reading files using S3FilePersistence, not writing them.
      * TODO if this works well, extend to all other bucket names and file loading / saving.
+     *      This should not be hard-wired, eliminate that problem when merging with FileStorage.
      */
-    private final String baseBucket;
+    private final String baseBucket = "analysis-staging";
 
     /** Manage transfers to S3 in the background, so we can continue calculating while uploading. */
     private final TransferManager transferManager;
@@ -57,14 +58,9 @@ public class S3FilePersistence extends FilePersistence {
 
         this.amazonS3 = AmazonS3ClientBuilder.standard()
                 // .enableAccelerateMode() // this fails looking up s3-accelerate.amazonaws.com
-                .withRegion(config.awsRegion())
-                .build();
+                .withRegion(config.awsRegion()).build();
 
-        this.transferManager = TransferManagerBuilder.standard()
-                .withS3Client(amazonS3)
-                .build();
-
-        this.baseBucket = config.baseBucket();
+        this.transferManager = TransferManagerBuilder.standard().withS3Client(amazonS3).build();
     }
 
     @Override

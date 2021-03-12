@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.analysis.BackendVersion;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -31,6 +32,8 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import static com.conveyal.file.FileCategory.BUNDLES;
+
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
@@ -52,7 +55,6 @@ public class TransportNetworkCache {
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
     private final OSMCache osmCache;
-    private final String bucket;
 
     /**
      * A table of already seen scenarios, avoiding downloading them repeatedly from S3 and allowing us to replace
@@ -61,10 +63,9 @@ public class TransportNetworkCache {
     private final ScenarioCache scenarioCache = new ScenarioCache();
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
-    public TransportNetworkCache(FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache, String bucket) {
+    public TransportNetworkCache (FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         this.osmCache = osmCache;
         this.gtfsCache = gtfsCache;
-        this.bucket = bucket;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
         this.fileStorage = fileStorage;
     }
@@ -162,7 +163,7 @@ public class TransportNetworkCache {
     }
 
     private FileStorageKey getR5NetworkFileStorageKey (String networkId) {
-        return new FileStorageKey(bucket, getR5NetworkFilename(networkId));
+        return new FileStorageKey(BUNDLES, getR5NetworkFilename(networkId));
     }
 
     /** If we did not find a cached network, build one */
@@ -170,7 +171,7 @@ public class TransportNetworkCache {
         TransportNetwork network;
 
         // check if we have a new-format bundle with a JSON manifest
-        FileStorageKey manifestFileKey = new FileStorageKey(bucket,GTFSCache.cleanId(networkId) + ".json");
+        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
         if (fileStorage.exists(manifestFileKey)) {
             LOG.info("Detected new-format bundle with manifest.");
             network = buildNetworkFromManifest(networkId);
@@ -208,7 +209,7 @@ public class TransportNetworkCache {
     private TransportNetwork buildNetworkFromBundleZip (String networkId) {
         // The location of the inputs that will be used to build this graph
         File dataDirectory = FileUtils.createScratchDirectory();
-        FileStorageKey zipKey = new FileStorageKey(bucket, networkId + ".zip");
+        FileStorageKey zipKey = new FileStorageKey(BUNDLES, networkId + ".zip");
         File zipFile = fileStorage.getFile(zipKey);
 
         try {
@@ -254,7 +255,7 @@ public class TransportNetworkCache {
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
     private TransportNetwork buildNetworkFromManifest (String networkId) {
-        FileStorageKey manifestFileKey = new FileStorageKey(bucket, getManifestFilename(networkId));
+        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, getManifestFilename(networkId));
         File manifestFile = fileStorage.getFile(manifestFileKey);
         BundleManifest manifest;
 
@@ -359,7 +360,7 @@ public class TransportNetworkCache {
         // If a scenario ID is supplied, it overrides any supplied full scenario.
         // There is no intermediate cache here for the scenario objects - we read them from disk files.
         // This is not a problem, they're only read once before cacheing the resulting scenario-network.
-        FileStorageKey scenarioFileKey = new FileStorageKey(bucket, getScenarioFilename(networkId, scenarioId));
+        FileStorageKey scenarioFileKey = new FileStorageKey(BUNDLES, getScenarioFilename(networkId, scenarioId));
         try {
             File scenarioFile = fileStorage.getFile(scenarioFileKey);
             LOG.info("Loading scenario from disk file {}", scenarioFile);

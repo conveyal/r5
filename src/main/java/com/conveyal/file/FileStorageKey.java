@@ -5,33 +5,27 @@ package com.conveyal.file;
  * separate `String.join("/", ...)`s.
  */
 public class FileStorageKey {
-    public final String bucket; // Rather than a bucket, this could be just a folder in a cache directory.
+
+    public final FileCategory category;
     public final String path;
 
-    public FileStorageKey(String fullPath) {
-        checkForDirectoryTraversal(fullPath);
-        int slashIndex = fullPath.indexOf("/");
-        bucket = fullPath.substring(0, slashIndex);
-        path = fullPath.substring(slashIndex + 1);
-    }
-
-    public FileStorageKey(String bucket, String path) {
+    public FileStorageKey(FileCategory category, String path) {
         checkForDirectoryTraversal(path);
-        this.bucket = bucket;
+        this.category = category;
         this.path = path;
     }
 
-    public FileStorageKey(String bucket, String path, String ext) {
-        this(bucket, path + "." + ext);
+    public FileStorageKey(FileCategory category, String path, String ext) {
+        this(category, path + "." + ext);
     }
 
     public String getFullPath() {
-        return String.join("/", bucket, path);
+        return String.join("/", category.directoryName(), path);
     }
 
     @Override
     public String toString () {
-        return String.format("[File storage key: bucket='%s', key='%s']", bucket, path);
+        return String.format("[File storage key: category='%s', key='%s']", category, path);
     }
 
     /**

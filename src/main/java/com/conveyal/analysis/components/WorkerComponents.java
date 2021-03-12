@@ -55,6 +55,7 @@ public class WorkerComponents {
         this(WorkerConfig.fromDefaultFile());
     }
 
+    // TODO pass in already constructed gtfs and osm caches to share them with the backend.
     public WorkerComponents (WorkerConfig config) {
         // Eventually, this conditional wiring may be replaced with polymorphism (subclasses) and Config interfaces.
         if (config.workOffline()) {
@@ -64,11 +65,11 @@ public class WorkerComponents {
             fileStorage = new S3FileStorage(config);
             filePersistence = new S3FilePersistence(config);
         }
-        osmCache = new OSMCache(fileStorage, config);
-        gtfsCache = new GTFSCache(fileStorage, config);
+        osmCache = new OSMCache(fileStorage);
+        gtfsCache = new GTFSCache(fileStorage);
         taskScheduler = new TaskScheduler(config);
         eventBus = new EventBus(taskScheduler);
-        transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache, config.bundleBucket());
+        transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache);
         networkPreloader = new NetworkPreloader(transportNetworkCache);
         analysisWorker = new AnalysisWorker(fileStorage, filePersistence, transportNetworkCache, networkPreloader, config);
     }

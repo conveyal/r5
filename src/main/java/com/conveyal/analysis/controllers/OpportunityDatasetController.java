@@ -7,6 +7,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -57,6 +58,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.GRIDS;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -74,7 +76,6 @@ public class OpportunityDatasetController implements HttpController {
     private final Config config;
 
     public interface Config {
-        String gridBucket ();
         String seamlessCensusBucket();
         boolean offline ();
     }
@@ -202,7 +203,11 @@ public class OpportunityDatasetController implements HttpController {
             dataset.accessGroup = accessGroup;
             dataset.totalPoints = pointSet.featureCount();
             dataset.regionId = regionId;
-            dataset.bucketName = config.gridBucket();
+            // FIXME this is known to end in "grids" but is dependent on the storage implementation and deployment
+            //       environment. This coupling is why I was averse to storing full bucket names in the database.
+            //       Ideally we can just drop this field from the database. The backend will always know where to
+            //       find the files based on deployment environment and file category.
+            dataset.bucketName = GRIDS.directoryName();
             dataset.totalOpportunities = pointSet.sumTotalOpportunities();
             dataset.format = getFormatCode(pointSet);
             if (dataset.format == FileStorageFormat.FREEFORM) {
@@ -239,7 +244,7 @@ public class OpportunityDatasetController implements HttpController {
                     fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
-                    FileStorageKey fileStorageKey = new FileStorageKey(config.gridBucket(), regionId + "/" + dataset._id + ".pointset");
+                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, regionId + "/" + dataset._id + ".pointset");
                     File pointsetFile = FileUtils.createScratchFile("pointset");
 
                     OutputStream os = new GZIPOutputStream(new FileOutputStream(pointsetFile));
@@ -698,7 +703,7 @@ public class OpportunityDatasetController implements HttpController {
             // get("/api/opportunities/:regionId/:gridKey") is the same signature as this endpoint.
             String regionId = req.params("_id");
             String gridKey = req.params("format");
-            FileStorageKey storageKey = new FileStorageKey(config.gridBucket(), String.format("%s/%s.grid", regionId, gridKey));
+            FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
             return getJSONURL(storageKey);
         }
 

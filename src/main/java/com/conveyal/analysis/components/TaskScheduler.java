@@ -68,6 +68,7 @@ public class TaskScheduler implements Component {
     // Synchronized because multiple users may add things to this map from multiple HTTP server threads.
     private final SetMultimap<String, Task> tasksForUser = Multimaps.synchronizedSetMultimap(HashMultimap.create());
 
+    // Maybe the number of threads should always be auto-set from the number of processor cores (considering SMT).
     public interface Config {
         int lightThreads ();
         int heavyThreads ();

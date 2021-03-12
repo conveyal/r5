@@ -12,8 +12,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
 
-    public TimeCsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) throws IOException {
-        super(task, outputBucket, fileStorage);
+    public TimeCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+        super(task, fileStorage);
     }
 
     @Override

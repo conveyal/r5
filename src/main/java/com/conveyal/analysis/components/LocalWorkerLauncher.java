@@ -25,10 +25,8 @@ public class LocalWorkerLauncher implements WorkerLauncher {
     private static final int N_WORKERS_LOCAL_TESTING = 4;
 
     public interface Config {
-        String bundleBucket ();
         int serverPort ();
         String localCacheDirectory ();
-        String gridBucket ();
         boolean testTaskRedelivery();
     }
 
@@ -43,12 +41,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
         LOG.info("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
         this.fileStorage = fileStorage;
         // FIXME get this cache into the workers launched below - they're going to create their own.
-        transportNetworkCache = new TransportNetworkCache(
-                fileStorage,
-                gtfsCache,
-                osmCache,
-                config.bundleBucket()
-        );
+        transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache);
         // Create configuration for the locally running worker
         workerConfig.setProperty("work-offline", "true");
         workerConfig.setProperty("auto-shutdown", "false");
@@ -56,11 +49,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
         workerConfig.setProperty("broker-port", Integer.toString(config.serverPort()));
         workerConfig.setProperty("cache-dir", config.localCacheDirectory());
         workerConfig.setProperty("test-task-redelivery", "false");
-        // NOTE all bucket name params are slated for removal.
-        // Really we should be sharing these cache instances with the local worker rather than configuring new ones.
-        workerConfig.setProperty("base-bucket", "NONE"); // The worker only uses this for saving TAUI data and fetching polygons.
-        workerConfig.setProperty("bundle-bucket", config.bundleBucket()); // The worker uses this for the network/osm/gtfs cache directory.
-        workerConfig.setProperty("pointsets-bucket", config.gridBucket());
+
 
         // From a throughput perspective there is no point in running more than one worker locally, since each worker
         // has at least as many threads as there are processor cores. But for testing purposes (e.g. testing that task
@@ -98,6 +87,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             // Avoid starting more than one worker on the same machine trying to listen on the same port.
             singleWorkerConfig.setProperty("listen-for-single-point", Boolean.toString(i == 0).toLowerCase());
             WorkerConfig config = WorkerConfig.fromProperties(singleWorkerConfig);
+            // FIXME Really we should be sharing cache instances with the local worker rather than configuring new ones.
             WorkerComponents components = new WorkerComponents(config);
             AnalysisWorker worker = components.analysisWorker;
             Thread workerThread = new Thread(worker, "WORKER " + i);

@@ -13,8 +13,6 @@ import java.util.Properties;
 /** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
 public class WorkerConfig extends ConfigBase implements
         TaskScheduler.Config,
-        OSMCache.Config,
-        GTFSCache.Config,
         FileStorage.Config,
         AnalysisWorker.Config
 {
@@ -28,9 +26,7 @@ public class WorkerConfig extends ConfigBase implements
 
     private final boolean workOffline;
     private final String  awsRegion; // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
-    private final String  baseBucket;
-    private final String  bundleBucket;
-    private final String  pointsetsBucket;
+    private final String  bucketPrefix;
     private final String  initialGraphId;
     private final String  cacheDirectory;
     private final String  brokerAddress;
@@ -53,14 +49,13 @@ public class WorkerConfig extends ConfigBase implements
         if (workOffline) {
             // Candidates for separate offline worker config - but might not be worth it for 2 options.
             awsRegion = initialGraphId = null;
+            bucketPrefix = null;
         } else {
             awsRegion = strProp("aws-region");
             initialGraphId = strProp("initial-graph-id");
+            bucketPrefix = strProp("bucket-prefix");
         }
         // These bucket names are used even in local operation as cache subdirectories.
-        baseBucket = strProp("base-bucket");
-        bundleBucket = strProp("bundle-bucket");
-        pointsetsBucket = strProp("pointsets-bucket");
         cacheDirectory = strProp("cache-dir");
         brokerAddress = strProp("broker-address");
         brokerPort = strProp("broker-port");
@@ -83,9 +78,7 @@ public class WorkerConfig extends ConfigBase implements
 
     @Override public boolean workOffline()     { return workOffline; }
     @Override public String  awsRegion()       { return awsRegion; }
-    @Override public String  baseBucket()      { return baseBucket; }
-    @Override public String  bundleBucket()    { return bundleBucket; }
-    @Override public String  pointsetsBucket() { return pointsetsBucket; }
+    @Override public String  bucketPrefix()    { return bucketPrefix; }
     @Override public String  initialGraphId()  { return initialGraphId; }
     @Override public String  cacheDirectory()  { return cacheDirectory; }
     @Override public String  brokerAddress()   { return brokerAddress; }

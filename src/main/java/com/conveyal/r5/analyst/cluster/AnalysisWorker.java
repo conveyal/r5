@@ -103,11 +103,9 @@ public class AnalysisWorker implements Runnable {
          */
         boolean testTaskRedelivery();
         String cacheDirectory();
-        String baseBucket();
         String awsRegion(); // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
         String brokerAddress();
         String brokerPort();
-        String pointsetsBucket();
         String initialGraphId();
 
     }
@@ -276,7 +274,7 @@ public class AnalysisWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.initialGraphId();
 
-        this.pointSetCache = new PointSetCache(fileStore, config.pointsetsBucket()); // Make this cache a component?
+        this.pointSetCache = new PointSetCache(fileStore); // Make this cache a component?
         this.networkPreloader = networkPreloader;
 
         // Keep the worker alive for an initial window to prepare for analysis

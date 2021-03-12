@@ -11,6 +11,7 @@ import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.RESULTS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -65,17 +67,10 @@ public class RegionalAnalysisController implements HttpController {
 
     private final Broker broker;
     private final FileStorage fileStorage;
-    private final Config config;
 
-    public interface Config {
-        String resultsBucket ();
-        String bundleBucket ();
-    }
-
-    public RegionalAnalysisController (Broker broker, FileStorage fileStorage, Config config) {
+    public RegionalAnalysisController (Broker broker, FileStorage fileStorage) {
         this.broker = broker;
         this.fileStorage = fileStorage;
-        this.config = config;
     }
 
     private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, String accessGroup) {
@@ -281,7 +276,7 @@ public class RegionalAnalysisController implements HttpController {
                     String.format("%s_%s_P%d_C%d.%s", regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, fileFormatExtension);
 
             // A lot of overhead here - UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
-            FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(config.resultsBucket(), singleCutoffKey);
+            FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
             if (!fileStorage.exists(singleCutoffFileStorageKey)) {
                 // An accessibility grid for this particular cutoff has apparently never been extracted from the
                 // regional results file before. Extract one and save it for future reuse. Older regional analyses
@@ -301,7 +296,7 @@ public class RegionalAnalysisController implements HttpController {
                     }
                 }
                 LOG.info("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
-                FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(config.resultsBucket(), multiCutoffKey);
+                FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
 
                 InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
                 Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
@@ -350,7 +345,7 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
         }
 
-        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), storageKey);
+        FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, storageKey);
 
         res.type("text/plain");
         return fileStorage.getURL(fileStorageKey);

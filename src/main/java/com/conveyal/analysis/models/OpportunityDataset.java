@@ -1,9 +1,12 @@
 package com.conveyal.analysis.models;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import static com.conveyal.file.FileCategory.GRIDS;
 
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
@@ -25,6 +28,7 @@ public class OpportunityDataset extends Model {
     public String sourceId;
 
     /** Bucket name on S3 where the opportunity data itself is persisted. */
+    @Deprecated
     public String bucketName;
 
     /**
@@ -88,12 +92,12 @@ public class OpportunityDataset extends Model {
     @JsonIgnore
     public FileStorageKey getStorageKey () {
         String path = storageLocation(this.format.extension);
-        return new FileStorageKey(this.bucketName, path);
+        return new FileStorageKey(GRIDS, path);
     }
 
     @JsonIgnore
     public FileStorageKey getStorageKey (FileStorageFormat fileFormat) {
-        return new FileStorageKey(this.bucketName, storageLocation(fileFormat.extension));
+        return new FileStorageKey(GRIDS, storageLocation(fileFormat.extension));
     }
 
     @JsonIgnore

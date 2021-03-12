@@ -8,6 +8,7 @@ import com.conveyal.file.S3FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.NetworkPreloader;
+import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -27,56 +28,48 @@ public class WorkerComponents {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkerComponents.class);
 
-    public final WorkerConfig config;
+    // INSTANCE FIELDS
+    // These are all refereces to singleton components making up a worker.
 
     public final FileStorage fileStorage;
-
-    // We could actually read things like scenarios or even job descriptions directly from the database.
-    // Currently workers never contact the database themselves (that would add hundreds or thousands of db connections).
-    // public AnalysisDB database;
-
-    // This will be used for regularly recurring status reports to the backend and any asynchronous tasks.
-    public final TaskScheduler taskScheduler;
-
+    public final TaskScheduler taskScheduler; // TODO use for regularly recurring backend polling + all worker tasks.
     public final EventBus eventBus;
-
     public final OSMCache osmCache;
-
     public final GTFSCache gtfsCache;
-
     public final TransportNetworkCache transportNetworkCache;
-
-    // TODO rename to AnalystWorker in subsequent commit
-    public final AnalysisWorker analysisWorker;
+    public final AnalysisWorker analysisWorker; // TODO rename to AnalystWorker in subsequent commit
+    public final NetworkPreloader networkPreloader;
 
     // This should eventually be merged with FileStorage, which mostly serves the same purpose.
     // Although we should rethink the idea of PersistenceBuffers at the same time (which provide buffering and
     // compression so file size is known before uploads, as required by some HTTP APIs).
+    // TODO is this supposed to be static?
     public final FilePersistence filePersistence;
 
-    /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
-    public final NetworkPreloader networkPreloader;
+
+    // CONSTRUCTORS
+    // Having these two constructors allows either loading from a file or programmatically passing in config properties.
+    // We do the latter when when launching local workers.
 
     public WorkerComponents () {
         this(WorkerConfig.fromDefaultFile());
     }
 
     public WorkerComponents (WorkerConfig config) {
-        this.config = config;
-        // Eventually, conditional wiring may be replaced with polymorphism (subclasses) and Config interfaces.
+        // Eventually, this conditional wiring may be replaced with polymorphism (subclasses) and Config interfaces.
         if (config.workOffline()) {
-            fileStorage = new LocalFileStorage(config.cacheDirectory());
+            fileStorage = new LocalFileStorage(config);
         } else {
-            fileStorage = new S3FileStorage(config.awsRegion(), config.cacheDirectory());
+            fileStorage = new S3FileStorage(config);
         }
         osmCache = new OSMCache(fileStorage, config);
         gtfsCache = new GTFSCache(fileStorage, config);
         taskScheduler = new TaskScheduler(config);
         eventBus = new EventBus(taskScheduler);
-        filePersistence = null;
-        networkPreloader = null;
+        filePersistence = new S3FilePersistence(config);
         transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache, config.bundleBucket());
-        analysisWorker = new AnalysisWorker(fileStorage, transportNetworkCache, networkPreloader, config);
+        networkPreloader = new NetworkPreloader(transportNetworkCache);
+        analysisWorker = new AnalysisWorker(fileStorage, filePersistence, transportNetworkCache, networkPreloader, config);
     }
 
 }

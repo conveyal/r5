@@ -1,28 +1,19 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.streets.OSMCache;
 
 import java.util.Properties;
 
-/**
- * This holds the configuration options read in from the worker.conf properties file.
- * It exposes these configuration options via all the Config interfaces specified by the Components used by the worker.
- * Some validation could be performed here, but any interpretation or conditional logic should be provided in Components
- * themselves, or in alternate WorkerComponents implementations.
- *
- * Since we always supply a machine-generated config file to the worker, we should avoid having any defaults applied
- * here (which would create multiple levels of defaults interacting with each other).
- *
- * However, we currently always supply the same worker.conf independent of whether we're on the cluster or running
- * offline locally. So we will proceed incrementally in removing or relocating conditional logic.
- */
+/** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
 public class WorkerConfig extends ConfigBase implements
         TaskScheduler.Config,
         OSMCache.Config,
         GTFSCache.Config,
+        FileStorage.Config,
         AnalysisWorker.Config
 {
 

@@ -17,9 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
-/**
- * Represents config information for the Analysis backend server.
- */
+/** Loads config information for the Analysis backend server and exposes it to the Components and HttpControllers. */
 public class BackendConfig extends ConfigBase implements
         TaskScheduler.Config,
         AnalysisDB.Config,
@@ -32,7 +30,8 @@ public class BackendConfig extends ConfigBase implements
         AggregationAreaController.Config,
         OpportunityDatasetController.Config,
         SeamlessCensusGridExtractor.Config,
-        LocalWorkerLauncher.Config {
+        LocalWorkerLauncher.Config
+{
 
     // CONSTANTS AND STATIC FIELDS
 

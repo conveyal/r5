@@ -11,6 +11,7 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.TransferProgress;
 import com.amazonaws.services.s3.transfer.Upload;
+import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,18 +52,19 @@ public class S3FilePersistence extends FilePersistence {
     // Low-level client, for now we're trying the high-level TransferManager TODO maybe use this so we don't have to shut down the transferManager
     private final AmazonS3 amazonS3;
 
-    public S3FilePersistence (String region, String baseBucket) {
+    // Really S3FilePersistence should have its own Config interface but we're going to eliminate it so leaving it alone.
+    public S3FilePersistence (AnalysisWorker.Config config) {
 
         this.amazonS3 = AmazonS3ClientBuilder.standard()
                 // .enableAccelerateMode() // this fails looking up s3-accelerate.amazonaws.com
-                .withRegion(region)
+                .withRegion(config.awsRegion())
                 .build();
 
         this.transferManager = TransferManagerBuilder.standard()
                 .withS3Client(amazonS3)
                 .build();
 
-        this.baseBucket = baseBucket;
+        this.baseBucket = config.baseBucket();
     }
 
     @Override

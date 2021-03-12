@@ -16,8 +16,8 @@ public class LocalFileStorage implements FileStorage {
     public final String directory;
     private final String urlPrefix;
 
-    public LocalFileStorage (String localCacheDirectory) {
-        this(localCacheDirectory, "http://localhost:7070");
+    public LocalFileStorage (Config config) {
+        this(config.cacheDirectory(), "http://localhost:7070");
     }
 
     public LocalFileStorage (String localCacheDirectory, String urlPrefix) {

@@ -20,14 +20,12 @@ public class S3FileStorage implements FileStorage {
 
     private final LocalFileStorage localFileStorage;
 
-    public S3FileStorage (String region, String localCacheDirectory) {
-        localFileStorage = new LocalFileStorage(localCacheDirectory);
-        s3 = AmazonS3ClientBuilder.standard().withRegion(region).build();
+    public S3FileStorage (Config config) {
+        localFileStorage = new LocalFileStorage(config);
+        s3 = AmazonS3ClientBuilder.standard().withRegion(config.awsRegion()).build();
     }
 
-    /**
-     * Move the file into S3 and then into local file storage.
-     */
+    /** Move the file into S3 and then into local file storage. */
     public void moveIntoStorage(FileStorageKey key, File file) {
         PutObjectRequest putObjectRequest = new PutObjectRequest(key.bucket, key.path, file);
         if (FileUtils.isGzip(file)) {

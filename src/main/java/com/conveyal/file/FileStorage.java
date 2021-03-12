@@ -19,6 +19,14 @@ import java.io.File;
  * content type.
  */
 public interface FileStorage {
+
+    public interface Config {
+        // The local directory where files will be stored, even if they are being mirrored to a remote storage service.
+        String cacheDirectory();
+        // This is actually only needed for one subclass, but leaving it alone because I expect to remove it entirely.
+        String awsRegion();
+    }
+
     /**
      * Takes an already existing file on the local filesystem and registers it as a permanent, immutable file to be
      * made available to all analysis components including workers and future backends.

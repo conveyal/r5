@@ -11,8 +11,15 @@ import java.util.Properties;
 import java.util.Set;
 
 /**
- * Shared functionality for classes that load properties containing configuration information
- * and expose them via Component Config interfaces.
+ * Shared functionality for classes that load properties containing configuration information and expose these options
+ * via the Config interfaces of Components and HttpControllers. Subclasses are defined for Worker and Backend config.
+ *
+ * Some validation may be performed here, but any interpretation or conditional logic should be provided in Components
+ * themselves, or possibly in alternate Components implementations.
+ *
+ * Example backend config files are shipped in the repo and we always supply a machine-generated config to the workers,
+ * so it's easy to see an exhaustive list of all parameters. All configuration parameters are therefore required to
+ * avoid any confusion due to merging layers of defaults.
  */
 public class ConfigBase {
 
@@ -41,6 +48,7 @@ public class ConfigBase {
         setPropertiesFromMap(System.getProperties(), "system properties");
     }
 
+    /** Static convenience method to uniformly load files into properties and catch errors. */
     protected static Properties propsFromFile (String filename) {
         try (Reader propsReader = new FileReader(filename)) {
             Properties properties = new Properties();
@@ -51,9 +59,9 @@ public class ConfigBase {
         }
     }
 
-    // Always use these *Prop methods to read properties.
-    // Exceptions and missing keys are caught so config loading can continue,
-    // reporting as many problems as possible at once.
+    // Always use the following *Prop methods to read properties. This will catch and log missing keys or parse
+    // exceptions, allowing config loading to continue and reporting as many problems as possible at once.
+
     protected String strProp (String key) {
         String value = properties.getProperty(key);
         if (value == null) {
@@ -93,7 +101,7 @@ public class ConfigBase {
         return false;
     }
 
-    // Call this after reading all properties to enforce the presence of all configuration options.
+    /** Call this after reading all properties to enforce the presence of all configuration options. */
     protected void exitIfErrors () {
         if (!keysWithErrors.isEmpty()) {
             LOG.error("You must provide these configuration properties: {}", String.join(", ", keysWithErrors));

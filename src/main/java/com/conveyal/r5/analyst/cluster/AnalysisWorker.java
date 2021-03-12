@@ -250,6 +250,7 @@ public class AnalysisWorker implements Runnable {
     /** Constructor that takes injected components. */
     public AnalysisWorker (
             FileStorage fileStore,
+            FilePersistence filePersistence,
             TransportNetworkCache transportNetworkCache,
             NetworkPreloader networkPreloader,
             Config config
@@ -259,15 +260,14 @@ public class AnalysisWorker implements Runnable {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         this.config = config;
-
-        // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
-        // TODO Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
-        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
-        filePersistence = new S3FilePersistence(config.awsRegion(), config.baseBucket());
-
         if (config.workOffline()) {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
+
+        // TODO Merge with FileStorage.
+        //      Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
+        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
+        this.filePersistence = filePersistence;
 
         this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 
@@ -277,8 +277,8 @@ public class AnalysisWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.initialGraphId();
 
-        this.pointSetCache = new PointSetCache(fileStore, config.pointsetsBucket());
-        this.networkPreloader = new NetworkPreloader(transportNetworkCache);
+        this.pointSetCache = new PointSetCache(fileStore, config.pointsetsBucket()); // Make this cache a component?
+        this.networkPreloader = networkPreloader;
 
         // Keep the worker alive for an initial window to prepare for analysis
         inPreloading = true;
@@ -287,12 +287,12 @@ public class AnalysisWorker implements Runnable {
         // Discover information about what EC2 instance / region we're running on, if any.
         // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
         // the new request signing v4 requires you to know the region where the S3 objects are.
+        // TODO once offline mode completely avoids S3, just leave ec2Info null when offline.
         ec2info = new EC2Info();
         if (!config.workOffline()) {
             ec2info.fetchMetadata();
         }
         if (ec2info.region == null) {
-            // We're working offline and/or not running on EC2. Set a default region rather than detecting one.
             ec2info.region = Regions.EU_WEST_1.getName();
         }
     }
@@ -304,28 +304,27 @@ public class AnalysisWorker implements Runnable {
      */
     public void considerShuttingDown() {
         long now = System.currentTimeMillis();
-
         if (now > shutdownAfter) {
-            LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
-                    "shutting down.", SINGLE_KEEPALIVE_MINUTES , REGIONAL_KEEPALIVE_MINUTES);
+            LOG.info(
+                "Machine has been idle for at least {} minutes (single point) and {} minutes (regional), shutting down.",
+                SINGLE_KEEPALIVE_MINUTES , REGIONAL_KEEPALIVE_MINUTES
+            );
             // Stop accepting any new single-point requests while shutdown is happening.
-            // TODO maybe actively tell the broker this worker is shutting down.
+            // TODO make a best-effort, short-timeout call to inform the broker this worker is shutting down.
             sparkHttpService.stop();
             try {
                 Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
                 process.waitFor();
             } catch (Exception ex) {
                 LOG.error("Unable to terminate worker", ex);
-                // TODO email us or something
+                // TODO fire a message to slack or throw an exception to warn us of zombie workers
             } finally {
                 System.exit(0);
             }
         }
     }
 
-    /**
-     * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
-     */
+    /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
     @Override
     public void run() {
 
@@ -373,6 +372,7 @@ public class AnalysisWorker implements Runnable {
                 // Either there was no work, or some kind of error occurred.
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
                 if (config.autoShutdown()) {considerShuttingDown();}
+                // TODO only randomize delay on the first round, after that it's excessive.
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
                 LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
@@ -396,12 +396,10 @@ public class AnalysisWorker implements Runnable {
         }
     }
 
-    /**
-     * Bypass idiotic java checked exceptions.
-     */
+    /** Bypass idiotic java checked exceptions. */
     public static void sleepSeconds (int seconds) {
         try {
-            Thread.sleep(seconds * 1000);
+            Thread.sleep(seconds * 1000L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

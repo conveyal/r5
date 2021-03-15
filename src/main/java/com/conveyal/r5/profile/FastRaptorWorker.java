@@ -531,7 +531,7 @@ public class FastRaptorWorker {
                         // this stop instead.
                         if (earliestBoardTime < schedule.departures[stopPositionInPattern]) {
                             // First, it might be possible to board an earlier trip at this stop.
-                            int candidateTripIndex = pattern.noScheduledOvertaking ? onTrip : candidateSchedules.size() - 1;
+                            int candidateTripIndex = pattern.noScheduledOvertaking ? onTrip : candidateSchedules.size();
                             while (--candidateTripIndex >= 0) {
                                 // The tripSchedules in a given pattern are sorted by time of departure from the first
                                 // stop of the pattern. For now, we assume no overtaking so the tripSchedules are

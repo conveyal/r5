@@ -4,6 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
@@ -192,6 +193,13 @@ public class GridLayout {
             Arrays.fill(grid.grid[c], density);
         }
         return grid;
+    }
+
+    public int pointIndex(AnalysisWorkerTask task, int x, int y) {
+        Coordinate destLatLon = this.getIntersectionLatLon(x, y);
+        // Here is a bit of awkwardness where WebMercatorGridPointSet and Grid both extend PointSet, but don't share
+        // their grid referencing code, so one would have to be converted to the other to get the point index.
+        return new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
     }
 
     public String nextIntegerId() {

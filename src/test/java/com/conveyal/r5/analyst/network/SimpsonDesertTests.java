@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
@@ -51,16 +50,8 @@ public class SimpsonDesertTests {
         // Write travel times to Geotiff for debugging visualization in desktop GIS:
         // toGeotiff(oneOriginResult, task);
 
-        // TODO move this into reproducible method, perhaps on GridLayout
-        // Now to verify the results. We have only our 5 percentiles here, not the full list of travel times.
-        // They are also arranged on a grid. This grid does not match the full extents of the network, rather it
-        // matches the extents set in the task, which must exactly match those of the opportunity grid.
-        Coordinate destLatLon = gridLayout.getIntersectionLatLon(40, 40);
-        // Here is a bit of awkwardness where WebMercatorGridPointSet and Grid both extend PointSet, but don't share
-        // their grid referencing code, so one would have to be converted to the other to get the point index.
-        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
-
-        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
+        int destination = gridLayout.pointIndex(task, 40, 40);
+        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(destination);
 
         // Transit takes 30 seconds per block. Mean wait time is 10 minutes. Any trip takes one transfer.
         // 20+20 blocks at 30 seconds each = 20 minutes. Two waits at 0-20 minutes each, mean is 20 minutes.
@@ -94,11 +85,8 @@ public class SimpsonDesertTests {
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-        // This should be factored out into a method eventually
-        Coordinate destLatLon = gridLayout.getIntersectionLatLon(40, 40);
-        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
-        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
+        int destination = gridLayout.pointIndex(task, 40, 40);
+        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(destination);
 
         // Frequency travel time reasoning is similar to scheduled test method.
         // But transfer time is variable from 0...20 minutes.
@@ -133,12 +121,8 @@ public class SimpsonDesertTests {
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-        // This should be factored out into a method eventually
-        Coordinate destLatLon = gridLayout.getIntersectionLatLon(40, 40);
-        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
-        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
-
+        int destination = gridLayout.pointIndex(task, 40, 40);
+        int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(destination);
 
         // FIXME convolving new Distribution(2, 10) with itself and delaying 20 minutes is not the same
         //       as convolving new Distribution(2, 10).delay(10) with itself, but it should be.
@@ -149,7 +133,7 @@ public class SimpsonDesertTests {
         Distribution twoAlternatives = Distribution.or(twoRideAsAndWalk, twoRideBsAndWalk).delay(3);
 
         // Compare expected and actual
-        Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, pointIndex);
+        Distribution observed = Distribution.fromTravelTimeResult(oneOriginResult.travelTimes, destination);
 
         twoAlternatives.assertSimilar(observed);
         DistributionTester.assertExpectedDistribution(twoAlternatives, travelTimePercentiles);
@@ -175,12 +159,8 @@ public class SimpsonDesertTests {
                 .monteCarloDraws(4000)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-        // This should be factored out into a method eventually
-        Coordinate destLatLon = gridLayout.getIntersectionLatLon(80, 80);
-        int pointIndex = new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
+        OneOriginResult oneOriginResult = new TravelTimeComputer(task, network).computeTravelTimes();
+        int pointIndex = gridLayout.pointIndex(task, 80, 80);
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
 
         // Each 60-block ride should take 30 minutes (across and up).

@@ -3,14 +3,18 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.TimeGridWriter;
-import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
 
 import java.io.FileOutputStream;
+import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This is a collection of tests using roads and transit lines laid out in a large perfect grid in the desert.
@@ -137,6 +141,75 @@ public class SimpsonDesertTests {
 
         twoAlternatives.assertSimilar(observed);
         DistributionTester.assertExpectedDistribution(twoAlternatives, travelTimePercentiles);
+    }
+
+    /**
+     * Test that the router correctly handles overtaking trips on the same route. Consider Trip A and Trip B, on a
+     * horizontal route where each hop time is 30 seconds, except when Trip A slows to 10 minutes/hop for hops 20 and
+     * 21. If Trip A leaves the first stop at 7:10 and Trip B leaves the first stop at 7:20, Trip A runs 10 minutes
+     * ahead of Trip B until stop 20, is passed around stop 21, and runs 9 minutes behind Trip B for the remaining
+     * stops. This example is tested with 3 cases for a rider traveling to stop 42 (well downstream of the overtaking
+     * point):
+     *
+     * 1. Standard rider, departing stop 30 between 7:00 and 7:05, who always rides Trip B (the earliest feasible
+     * departure from that stop)
+     * 2. Naive rider, departing stop 10 between 7:00 and 7:05, who always rides Trip A (the earliest feasible
+     * departure from that stop)
+     * 3. Savvy rider, departing stop 10 between 7:13 and 7:18, who always rides Trip B (avoiding boarding the
+     * slower Trip A thanks to the "look-ahead" abilities when ENABLE_OPTIMIZATION_RANGE_RAPTOR is true)
+     */
+    @Test
+    public void testOvertakingCases () throws  Exception {
+        GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
+        gridLayout.addHorizontalRoute(50);
+        gridLayout.routes.get(0).startTimes = new int[] {
+                LocalTime.of(7, 10).toSecondOfDay(), // Trip A
+                LocalTime.of(7, 20).toSecondOfDay()  // Trip B
+        };
+        Map<GridRoute.TripHop, Double> hopTimeScaling = new HashMap<>();
+        // Trip A slows down from stop 20 to 22, allowing Trip B to overtake it.
+        hopTimeScaling.put(new GridRoute.TripHop(0, 20), 20.0);
+        hopTimeScaling.put(new GridRoute.TripHop(0, 21), 20.0);
+        gridLayout.routes.get(0).hopTimeScaling = hopTimeScaling;
+        TransportNetwork network = gridLayout.generateNetwork();
+
+        // 1. Standard rider: upstream overtaking means Trip B departs origin first and is fastest to destination.
+        AnalysisWorkerTask standardRider = gridLayout.newTaskBuilder()
+                .departureTimeWindow(7, 0, 5)
+                .maxRides(1)
+                .setOrigin(30, 50)
+                .setDestination(42, 50)
+                .uniformOpportunityDensity(10)
+                .build();
+
+        OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes();
+        List<PathResult.PathIterations> standardPaths = standardResult.paths.getPathIterationsForDestination();
+        int[] standardTimes = standardPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus ~5 minute ride and ~5 minute egress leg
+        DistributionTester.assertEqualValues(new int[]{45, 44, 43, 42, 41}, standardTimes);
+
+        // 2. Naive rider: downstream overtaking means Trip A departs origin first but is not fastest to destination.
+        AnalysisWorkerTask naiveRider = gridLayout.copyTask(standardRider)
+                .setOrigin(10, 50)
+                .build();
+
+        OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes();
+        List<PathResult.PathIterations> naivePaths = naiveResult.paths.getPathIterationsForDestination();
+        int[] naiveTimes = naivePaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus ~35 minute ride and ~5 minute egress leg
+        DistributionTester.assertEqualValues(new int[]{54, 53, 52, 51, 50}, naiveTimes);
+
+        // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
+        // when boarding Trip A is possible
+        AnalysisWorkerTask savvyRider = gridLayout.copyTask(naiveRider)
+                .departureTimeWindow(7, 13, 5)
+                .build();
+
+        OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
+        List<PathResult.PathIterations> savvyPaths = savvyResult.paths.getPathIterationsForDestination();
+        int[] savvyTimes = savvyPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        // Trip B departs stop 10 at 7:25. So 8-12 minute wait, plus ~16 minute ride and ~5 minute egress leg
+        DistributionTester.assertEqualValues(new int[]{32, 31, 30, 29, 28}, savvyTimes);
     }
 
     /**

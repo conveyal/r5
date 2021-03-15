@@ -163,7 +163,7 @@ public class PathResult {
     /**
      * Returns human-readable details of path iterations, for JSON representation (e.g. in the UI console).
      */
-    List<PathIterations> getPathIterationsForDestination() {
+    public List<PathIterations> getPathIterationsForDestination() {
         checkState(iterationsForPathTemplates.length == 1, "Paths were stored for multiple " +
                 "destinations, but only one is being requested");
         List<PathIterations> detailsForDestination = new ArrayList<>();

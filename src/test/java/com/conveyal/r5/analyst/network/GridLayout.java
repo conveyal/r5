@@ -2,9 +2,13 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
@@ -13,11 +17,10 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Envelope;
 
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -25,7 +28,7 @@ import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 
 /**
  * This is used in testing, to represent and create gridded transport systems with very regular spacing of roads and
- * transit stops, yieling highly predictable travel times that can be tested against actual output from the router.
+ * transit stops, yielding highly predictable travel times that can be tested against actual output from the router.
  *
  * A square grid of points is established to the north and east of a specified origin point, and roads are constructed
  * running horizontally and vertically through the points. Each grid point is then a road intersection. These grid
@@ -146,6 +149,13 @@ public class GridLayout {
         this.routes.add(GridRoute.newHorizontalRoute(this, row, headwayMinutes));
     }
 
+    /** Add an east-west route at the given row of the grid, running at the default speed. Explicit schedules must be
+     set separately via startTimes *  */
+    public void addHorizontalRoute (int row) {
+        this.routes.add(GridRoute.newHorizontalRoute(this, row, -1));
+    }
+
+
     /** Add a north-south route at the given column of the grid, running at the default speed and the given headway. */
     public void addVerticalRoute (int col, int headwayMinutes) {
         this.routes.add(GridRoute.newVerticalRoute(this, col, headwayMinutes));
@@ -163,6 +173,10 @@ public class GridLayout {
     /** Creates a builder for analysis worker tasks, which represent searches on this grid network. */
     public GridSinglePointTaskBuilder newTaskBuilder() {
         return new GridSinglePointTaskBuilder(this);
+    }
+
+    public GridSinglePointTaskBuilder copyTask(AnalysisWorkerTask task) {
+        return new GridSinglePointTaskBuilder(this, task);
     }
 
     /** Get the minimum envelope containing all the points in this grid. */

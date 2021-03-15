@@ -277,7 +277,10 @@ public class FastRaptorWorker {
     /**
      * Set the departure time in the scheduled search to the given departure time, and prepare for the scheduled
      * search at the next-earlier minute. This is reusing results from one departure time as an upper bound on
-     * arrival times for an earlier departure time (i.e. range raptor).
+     * arrival times for an earlier departure time (i.e. range raptor). Note that this reuse can give riders
+     * "look-ahead" abilities about trips that will be overtaken, depending on the departure time window; they will
+     * not board the first feasible departure from a stop if a later one (that has been ridden in a later departure
+     * minute) will arrive at their destination stop earlier.
      */
     private void advanceScheduledSearchToPreviousMinute (int nextMinuteDepartureTime) {
         for (RaptorState state : this.scheduleState) {
@@ -518,9 +521,10 @@ public class FastRaptorWorker {
                                 boardTime = candidateSchedule.departures[stopPositionInPattern];
                                 waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStop = stop;
-                                // Check that all remaining trips depart this stop after the trip we boarded.
                                 if (pattern.noScheduledOvertaking) {
-                                    // We are confident of being on the earliest feasible departure.
+                                    // All remaining candidateSchedules depart this stop after the one we are
+                                    // considering, because we are iterating in ascending order of departure time
+                                    // from the first stop of the pattern and there is no overtaking.
                                     break;
                                 }
                             }
@@ -531,11 +535,16 @@ public class FastRaptorWorker {
                         // this stop instead.
                         if (earliestBoardTime < schedule.departures[stopPositionInPattern]) {
                             // First, it might be possible to board an earlier trip at this stop.
+                            // If trips are well-sorted on this pattern (no overtaking), the only trips that need to be
+                            // checked are the ones that depart the first stop of the pattern before the trip we are
+                            // on does, and we can break out of the loop once the departures are too early to board.
+                            // If there is overtaking, all candidate trip schedules need to be checked.
                             int candidateTripIndex = pattern.noScheduledOvertaking ? onTrip : candidateSchedules.size();
+                            // Note decrement below (otherwise, we'd use candidateSchedules.size() - 1 above)
                             while (--candidateTripIndex >= 0) {
                                 // The tripSchedules in a given pattern are sorted by time of departure from the first
-                                // stop of the pattern. For now, we assume no overtaking so the tripSchedules are
-                                // also sorted by time of departure at this stop. The predicate for the break
+                                // stop of the pattern. In this first step, we assume no overtaking so the tripSchedules
+                                // are also sorted by time of departure at this stop. The predicate for the break
                                 // statement at the end of this loop handles overtaking.
                                 TripSchedule candidateSchedule = candidateSchedules.get(candidateTripIndex);
 
@@ -550,7 +559,7 @@ public class FastRaptorWorker {
                                     boardStop = stop;
                                 } else {
                                     // The trip under consideration arrives at this stop earlier than one could feasibly
-                                    // board. Check that all remaining trips depart this stop at least as early.
+                                    // board.
                                     if (pattern.noScheduledOvertaking) {
                                         // We are confident of being on the earliest feasible departure.
                                         break;

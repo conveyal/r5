@@ -80,18 +80,18 @@ public class LodesSource {
         colNames.put("CS02", "female");
 
         // only in workplace characteristics
-        colNames.put("CFA01", "at firms aged 0-1 years");
-        colNames.put("CFA02", "at firms aged 2-3 years");
-        colNames.put("CFA03", "at firms aged 4-5 years");
-        colNames.put("CFA04", "at firms aged 6-10 years");
-        colNames.put("CFA05", "at firms aged 11 or more years");
+        // colNames.put("CFA01", "at firms aged 0-1 years");
+        // colNames.put("CFA02", "at firms aged 2-3 years");
+        // colNames.put("CFA03", "at firms aged 4-5 years");
+        // colNames.put("CFA04", "at firms aged 6-10 years");
+        // colNames.put("CFA05", "at firms aged 11 or more years");
 
-        colNames.put("CFS01", "at firms with 0-19 employees");
-        colNames.put("CFS02", "at firms with 20-49 employees");
-        colNames.put("CFS03", "at firms with 50-249 employees");
-        colNames.put("CFS04", "at firms with 250-499 employees");
-        colNames.put("CFS05", "at firms with 500 or more employees");
-        colNames.put("createdate", "Data creation date");
+        // colNames.put("CFS01", "at firms with 0-19 employees");
+        // colNames.put("CFS02", "at firms with 20-49 employees");
+        // colNames.put("CFS03", "at firms with 50-249 employees");
+        // colNames.put("CFS04", "at firms with 250-499 employees");
+        // colNames.put("CFS05", "at firms with 500 or more employees");
+        // colNames.put("createdate", "Data creation date");
 
         reader.readHeaders();
         String[] headers = reader.getHeaders();

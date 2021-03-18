@@ -148,7 +148,8 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         final String regionId = req.params("regionId");
-        final int zoom = req.params("zoom") != null ? req.attribute("zoom") : 11; // TODO replace with ZOOM default
+        final int zoom = req.params("zoom") != null ? Integer.parseInt(req.params("zoom")) : ZOOM;
+        // default
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);

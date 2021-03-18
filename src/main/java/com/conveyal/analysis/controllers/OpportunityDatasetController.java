@@ -148,9 +148,9 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         final String regionId = req.params("regionId");
+        final int zoom = req.params("zoom") != null ? req.attribute("zoom") : 11; // TODO replace with ZOOM default
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
-        final int zoom = req.attribute("zoom") != null ? req.attribute("zoom") : ZOOM;
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet)

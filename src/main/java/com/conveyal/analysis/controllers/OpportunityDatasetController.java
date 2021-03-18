@@ -150,6 +150,7 @@ public class OpportunityDatasetController implements HttpController {
         final String regionId = req.params("regionId");
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
+        final int zoom = req.attribute("zoom") != null ? req.attribute("zoom") : ZOOM;
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet)
@@ -161,7 +162,7 @@ public class OpportunityDatasetController implements HttpController {
         taskScheduler.enqueueHeavyTask(() -> {
             try {
                 status.message = "Extracting census data for region";
-                List<Grid> grids = SeamlessCensusGridExtractor.retrieveAndExtractCensusDataForBounds(region.bounds);
+                List<Grid> grids = SeamlessCensusGridExtractor.censusDataForBounds(region.bounds, zoom);
                 createDatasetsFromPointSets(email, accessGroup, config.seamlessCensusBucket(),
                                             downloadBatchId, regionId, status, grids);
             } catch (IOException e) {

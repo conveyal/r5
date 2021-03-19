@@ -2,6 +2,8 @@ package com.conveyal.r5.util;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Convenience functions for working with exceptions (or more generally throwables).
@@ -18,6 +20,26 @@ public abstract class ExceptionUtils {
     public static String asString(Throwable throwable) {
         StringWriter sw = new StringWriter();
         throwable.printStackTrace(new PrintWriter(sw));
+        return sw.toString();
+    }
+
+    /**
+     * Short-form exception summary that includes the chain of causality.
+     * We might want to add line numbers of one stack frame with class simple names.
+     */
+    public static String shortCauseString (Throwable throwable) {
+        StringWriter sw = new StringWriter();
+        Set<Throwable> seen = new HashSet<>();
+        while (throwable != null && !seen.contains(throwable)) {
+            if (!seen.isEmpty()) {
+                sw.append("\n Caused by ");
+            }
+            sw.append(throwable.getClass().getSimpleName());
+            sw.append(": ");
+            sw.append(throwable.getMessage());
+            seen.add(throwable);
+            throwable = throwable.getCause();
+        }
         return sw.toString();
     }
 

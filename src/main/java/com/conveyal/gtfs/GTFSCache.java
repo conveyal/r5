@@ -9,6 +9,7 @@ import com.github.benmanes.caffeine.cache.RemovalListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipFile;
@@ -87,8 +88,17 @@ public class GTFSCache {
         cache.put(id, feed);
     }
 
-    public GTFSFeed get(String id) {
+    /**
+     * Retrieve the feed with the given id, lazily creating it if it's not yet loaded or built. This is expected to
+     * always return a non-null GTFSFeed. If it can't it will always throw an exception with a cause. The returned feed
+     * must be closed manually to avoid corruption, so it's preferable to have a single synchronized component managing
+     * when files shared between threads are opened and closed.
+     */
+    public @Nonnull GTFSFeed get(String id) {
         GTFSFeed feed = cache.get(id);
+        // The cache can in principle return null, but only if its loader method returns null.
+        // This should never happen in normal use - the loader should be revised to throw a clear exception.
+        if (feed == null) throw new IllegalStateException("Cache should always return a feed or throw an exception.");
         // The feedId of the GTFSFeed objects may not be unique - we can have multiple versions of the same feed
         // covering different time periods, uploaded by different users. Therefore we record another ID here that is
         // known to be unique across the whole application - the ID used to fetch the feed.
@@ -96,48 +106,44 @@ public class GTFSCache {
         return feed;
     }
 
-    // This should only ever be called by the cache loader. The returned feed must be closed, and
-    // it's preferable to have a single component managing when files shared between threads are opened and closed.
-    private GTFSFeed retrieveAndProcessFeed(String id) {
+    /** This method should only ever be called by the cache loader. */
+    private @Nonnull GTFSFeed retrieveAndProcessFeed(String id) throws GtfsLibException {
         FileStorageKey dbKey = getFileKey(id, "db");
         FileStorageKey dbpKey = getFileKey(id, "db.p");
 
         if (fileStore.exists(dbKey) && fileStore.exists(dbpKey)) {
-            // Ensure both files are local
+            // Ensure both MapDB files are local, pulling them down from remote storage as needed.
+            fileStore.getFile(dbKey);
             fileStore.getFile(dbpKey);
             return new GTFSFeed(fileStore.getFile(dbKey));
         }
 
         FileStorageKey zipKey = getFileKey(id, "zip");
-        LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
-        if (fileStore.exists(zipKey)) {
-            try {
-                File tempDbFile = FileUtils.createScratchFile("db");
-                File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-                ZipFile zipFile = new ZipFile(fileStore.getFile(zipKey));
-
-                GTFSFeed feed = new GTFSFeed(tempDbFile);
-                feed.loadFromFile(zipFile);
-                feed.findPatterns();
-
-                // Close the DB and flush to disk before we start moving and copying files around.
-                feed.close();
-
-                // Ensure the DB and DB.p files have been fully stored.
-                fileStore.moveIntoStorage(dbKey, tempDbFile);
-                fileStore.moveIntoStorage(dbpKey, tempDbpFile);
-
-                return new GTFSFeed(fileStore.getFile(dbKey));
-            } catch (Exception e) {
-                LOG.error("Error loading Zip file for GTFS Feed from {}", zipKey, e);
-                throw new RuntimeException(e);
-            }
-        } else {
-            LOG.error("Original GTFS ZIP for {} could not be found.", zipKey);
+        if (!fileStore.exists(zipKey)) {
+            throw new GtfsLibException("Original GTFS zip file could not be found: " + zipKey);
         }
 
-        LOG.error("GTFS Feed {} could not be loaded.", id);
-        return null;
+        LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
+        try {
+            File tempDbFile = FileUtils.createScratchFile("db");
+            File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
+            ZipFile zipFile = new ZipFile(fileStore.getFile(zipKey));
+
+            GTFSFeed feed = new GTFSFeed(tempDbFile);
+            feed.loadFromFile(zipFile);
+            feed.findPatterns();
+
+            // Close the DB and flush to disk before we start moving and copying files around.
+            feed.close();
+
+            // Ensure the DB and DB.p files have been fully stored.
+            fileStore.moveIntoStorage(dbKey, tempDbFile);
+            fileStore.moveIntoStorage(dbpKey, tempDbpFile);
+
+            return new GTFSFeed(fileStore.getFile(dbKey));
+        } catch (Exception e) {
+            throw new GtfsLibException("Error loading zip file for GTFS feed: " + zipKey, e);
+        }
     }
 
 }

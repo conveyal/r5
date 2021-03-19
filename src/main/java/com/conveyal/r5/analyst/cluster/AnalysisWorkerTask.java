@@ -221,8 +221,8 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         checkNotNull(destinationPointSetKeys);
         int nPointSets = destinationPointSetKeys.length;
         checkState(
-            nPointSets > 0 && nPointSets <= 10,
-            "You must specify at least 1 destination PointSet, but no more than 10."
+            nPointSets > 0 && nPointSets <= 12,
+            "You must specify at least 1 destination PointSet, but no more than 12."
         );
         destinationPointSets = new PointSet[nPointSets];
         for (int i = 0; i < nPointSets; i++) {

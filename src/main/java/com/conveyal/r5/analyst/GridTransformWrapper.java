@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import org.locationtech.jts.geom.Envelope;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This wraps a gridded destination pointset (the "source"), remapping its point indexes to match those of another grid.
@@ -15,17 +16,27 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class GridTransformWrapper extends PointSet {
 
     /** Defer to this PointSet for everything but opportunity counts, including grid dimensions and lat/lon. */
-    private WebMercatorGridPointSet targetGrid;
+    private final WebMercatorGridPointSet targetGrid;
 
     /** Defer to this PointSet to get opportunity counts (transforming indexes to those of targetPointSet). */
-    private Grid sourceGrid;
+    private final Grid sourceGrid;
 
+    /** The difference in zoom levels between the source and target grids. Constrained positive (only upsample). */
     private final int dz;
 
     /**
+     * The fraction of opportunities in a sourceGrid cell that are allocated to each targetGrid cell it contains.
+     * We uniformly distribute opportunities when upsampling, so by the definition of map tile zoom levels this should
+     * always be the inverse of a power of two, in the range (0...1]. Total opportunities should be exactly conserved
+     * because floating point division by powers of two is exact: in base 2 it just moves the decimal point N places.
+     */
+    private final double targetCellFraction;
+
+    /**
      * Wraps the sourceGrid such that the opportunity count is read from the geographic locations of indexes in the
-     * targetGrid. For the time being, both pointsets must be at the same zoom level. Any opportunities outside the
-     * targetGrid cannot be indexed so are effectively zero for the purpose of accessibility calculations.
+     * targetGrid. The targetGrid may be at a higher zoom level than the source grid, in which case opportunities will
+     * be distributed equally among the higher-resolution cells. Any opportunities outside the targetGrid cannot be
+     * indexed so are effectively zero for the purpose of accessibility calculations.
      */
     public GridTransformWrapper (WebMercatorExtents targetGridExtents, Grid sourceGrid) {
         checkArgument(targetGridExtents.zoom >= sourceGrid.zoom, "We only upsample grids, not downsample them.");
@@ -33,6 +44,9 @@ public class GridTransformWrapper extends PointSet {
         this.targetGrid = new WebMercatorGridPointSet(targetGridExtents);
         this.sourceGrid = sourceGrid;
         dz = targetGrid.zoom - sourceGrid.zoom;
+        targetCellFraction = 1.0 / (1 << (dz * 2));
+        checkState(dz >= 0 && dz <= 3, "Difference in zoom levels out of acceptable range: " + dz);
+        checkState(targetCellFraction > 0 && targetCellFraction <= 1, "Opportunity scaling factor out of range.");
     }
 
     // Given an index in the targetGrid, return the corresponding 1D index into the sourceGrid or -1 if the target
@@ -80,7 +94,7 @@ public class GridTransformWrapper extends PointSet {
         if (sourceindex < 0) {
             return 0;
         } else {
-            return sourceGrid.getOpportunityCount(sourceindex) / (1 << (dz * 2));
+            return sourceGrid.getOpportunityCount(sourceindex) * targetCellFraction;
         }
     }
 

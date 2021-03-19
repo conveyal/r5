@@ -22,11 +22,12 @@ import java.util.zip.ZipFile;
  * policy is discussed in Javadoc on the class fields and methods.
  */
 public class GTFSCache {
+
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
     private final LoadingCache<String, GTFSFeed> cache;
 
-    public final String bucket;
-    public final FileStorage fileStore;
+    private final String bucket;
+    private final FileStorage fileStore;
 
     public interface Config {
         String bundleBucket ();
@@ -82,10 +83,6 @@ public class GTFSCache {
 
     public FileStorageKey getFileKey (String id, String extension) {
         return new FileStorageKey(this.bucket, String.join(".", cleanId(id), extension));
-    }
-
-    public void add (String id, GTFSFeed feed) {
-        cache.put(id, feed);
     }
 
     /**

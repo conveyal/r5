@@ -1,8 +1,13 @@
 package com.conveyal.r5.util;
 
+import com.google.common.collect.Lists;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -24,23 +29,23 @@ public abstract class ExceptionUtils {
     }
 
     /**
-     * Short-form exception summary that includes the chain of causality.
+     * Short-form exception summary that includes the chain of causality, reversed such that the root cause comes first.
      * We might want to add line numbers of one stack frame with class simple names.
      */
     public static String shortCauseString (Throwable throwable) {
-        StringWriter sw = new StringWriter();
-        Set<Throwable> seen = new HashSet<>();
+        List<String> items = new ArrayList<>();
+        Set<Throwable> seen = new HashSet<>(); // Bail out if there are cycles in the cause chain
         while (throwable != null && !seen.contains(throwable)) {
-            if (!seen.isEmpty()) {
-                sw.append("\n Caused by ");
+            String item = throwable.getClass().getSimpleName();
+            if (throwable.getMessage() != null) {
+                item += ": " + throwable.getMessage();
             }
-            sw.append(throwable.getClass().getSimpleName());
-            sw.append(": ");
-            sw.append(throwable.getMessage());
+            items.add(item);
             seen.add(throwable);
             throwable = throwable.getCause();
         }
-        return sw.toString();
+        Collections.reverse(items);
+        return String.join(" Caused ", items);
     }
 
 }

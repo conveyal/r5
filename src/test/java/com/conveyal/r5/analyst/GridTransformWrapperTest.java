@@ -17,12 +17,14 @@ class GridTransformWrapperTest {
     @Test
     void testTwoAdjacentGrids () {
 
+        final int baseZoom = 10;
+
         // Two grids side by side, right one bigger than than the left, with top 20 pixels lower
-        Grid leftGrid = new Grid(10, 200, 300, 1000, 2000);
-        Grid rightGrid = new Grid(10, 300, 400, 1020, 2200);
+        Grid leftGrid = new Grid(baseZoom, 200, 300, 1000, 2000);
+        Grid rightGrid = new Grid(baseZoom, 300, 400, 1020, 2200);
 
         // One minimum bounding grid exactly encompassing the other two.
-        Grid superGrid = new Grid(10, 500, 400, 1000, 2000);
+        Grid superGrid = new Grid(baseZoom, 500, 400, 1000, 2000);
 
         // Make a column of pixel weights 2 pixels wide and 26 pixels high.
         List<Grid.PixelWeight> weights = new ArrayList<>();
@@ -45,34 +47,28 @@ class GridTransformWrapperTest {
         superGrid.incrementFromPixelWeights(weights, 1);
         superGrid.incrementFromPixelWeights(rightTranslatedWeights, 2);
 
-        // Make some extents even bigger than the merged supergrid
-        WebMercatorExtents superSuperExtents = new WebMercatorExtents(1900, 950, 600, 500, 10);
+        // Make some extents even bigger than the merged supergrid, at several increasing zoom levels.
+        for (int upsample = 0; upsample < 3; upsample++) {
+            WebMercatorExtents superSuperExtents = new WebMercatorExtents(
+                    1900 << upsample, 950 << upsample, 600 << upsample, 500 << upsample, baseZoom + upsample
+            );
+            GridTransformWrapper leftWrapper = new GridTransformWrapper(superSuperExtents, leftGrid);
+            GridTransformWrapper rightWrapper = new GridTransformWrapper(superSuperExtents, rightGrid);
+            GridTransformWrapper superWrapper = new GridTransformWrapper(superSuperExtents, superGrid);
 
-        GridTransformWrapper leftWrapper = new GridTransformWrapper(superSuperExtents, leftGrid);
-        GridTransformWrapper rightWrapper = new GridTransformWrapper(superSuperExtents, rightGrid);
-        GridTransformWrapper superWrapper = new GridTransformWrapper(superSuperExtents, superGrid);
-
-        double totalWeight = 0;
-        final int superSuperCellCount = superSuperExtents.width * superSuperExtents.height;
-        for (int i = 0; i < superSuperCellCount; i++) {
-            double superCount = superWrapper.getOpportunityCount(i);
-            double leftCount = leftWrapper.getOpportunityCount(i);
-            double rightCount = rightWrapper.getOpportunityCount(i);
-            double mergedCount = leftCount + rightCount;
-            totalWeight += mergedCount;
-            assertEquals(superCount, mergedCount, "Supergrid should contain the sum of left and right");
+            double totalWeight = 0;
+            final int superSuperCellCount = superSuperExtents.width * superSuperExtents.height;
+            for (int i = 0; i < superSuperCellCount; i++) {
+                double superCount = superWrapper.getOpportunityCount(i);
+                double leftCount = leftWrapper.getOpportunityCount(i);
+                double rightCount = rightWrapper.getOpportunityCount(i);
+                double mergedCount = leftCount + rightCount;
+                totalWeight += mergedCount;
+                assertEquals(superCount, mergedCount, "Supergrid should contain the sum of left and right");
+            }
+            // Summed weight should be exactly conserved at different zoom levels, as all upscaling is by powers of 2.
+            assertEquals(weights.stream().mapToDouble(pw -> pw.weight).sum() * 3, totalWeight);
         }
-        assertEquals(weights.stream().mapToDouble(pw -> pw.weight).sum() * 3, totalWeight);
-    }
-
-    /**
-     * Ensure that we refuse to create a transform wrapper that attempts to transform across zoom levels.
-     */
-    @Test
-    void testMismatchedZoomLevels () {
-        Grid grid = new Grid(10, 10, 10, 10, 10);
-        WebMercatorExtents webMercatorExtents = new WebMercatorExtents(10, 10, 10, 10, 11);
-        assertThrows(IllegalArgumentException.class, () -> new GridTransformWrapper(webMercatorExtents, grid));
     }
 
     /*

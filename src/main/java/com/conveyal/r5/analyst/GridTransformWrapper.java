@@ -20,30 +20,33 @@ public class GridTransformWrapper extends PointSet {
     /** Defer to this PointSet to get opportunity counts (transforming indexes to those of targetPointSet). */
     private Grid sourceGrid;
 
+    private final int dz;
+
     /**
      * Wraps the sourceGrid such that the opportunity count is read from the geographic locations of indexes in the
      * targetGrid. For the time being, both pointsets must be at the same zoom level. Any opportunities outside the
      * targetGrid cannot be indexed so are effectively zero for the purpose of accessibility calculations.
      */
     public GridTransformWrapper (WebMercatorExtents targetGridExtents, Grid sourceGrid) {
-        checkArgument(targetGridExtents.zoom == sourceGrid.zoom, "Zoom levels must be identical.");
+        checkArgument(targetGridExtents.zoom >= sourceGrid.zoom, "We only upsample grids, not downsample them.");
         // Make a pointset for these extents so we can defer to its methods for lat/lon lookup, size, etc.
         this.targetGrid = new WebMercatorGridPointSet(targetGridExtents);
         this.sourceGrid = sourceGrid;
+        dz = targetGrid.zoom - sourceGrid.zoom;
     }
 
-    // Given an index in the targetPointSet, return the corresponding 1D index into the sourceGrid or -1 if the target
+    // Given an index in the targetGrid, return the corresponding 1D index into the sourceGrid or -1 if the target
     // index is for a point outside the source grid.
     // This could certainly be made more efficient (but complex) by forcing sequential iteration over opportunity counts
     // and disallowing random access, using a new PointSetIterator class that allows reading lat, lon, and counts.
-    private int transformIndex (int i) {
-        final int x = (i % targetGrid.width) + targetGrid.west - sourceGrid.west;
-        final int y = (i / targetGrid.width) + targetGrid.north - sourceGrid.north;
-        if (x < 0 || x >= sourceGrid.width || y < 0 || y >= sourceGrid.height) {
+    private int transformIndex (int ti) {
+        final int sx = ((ti % targetGrid.width) + targetGrid.west - (sourceGrid.west << dz)) >> dz;
+        final int sy = ((ti / targetGrid.width) + targetGrid.north - (sourceGrid.north << dz)) >> dz;
+        if (sx < 0 || sx >= sourceGrid.width || sy < 0 || sy >= sourceGrid.height) {
             // Point in target grid lies outside source grid, there is no valid index. Return special value.
             return -1;
         }
-        return y * sourceGrid.width + x;
+        return sy * sourceGrid.width + sx;
     }
 
     @Override
@@ -77,7 +80,7 @@ public class GridTransformWrapper extends PointSet {
         if (sourceindex < 0) {
             return 0;
         } else {
-            return sourceGrid.getOpportunityCount(sourceindex);
+            return sourceGrid.getOpportunityCount(sourceindex) / (1 << (dz * 2));
         }
     }
 

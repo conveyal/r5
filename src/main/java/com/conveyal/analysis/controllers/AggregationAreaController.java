@@ -132,7 +132,7 @@ public class AggregationAreaController implements HttpController {
 
         boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
 
-        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : 11;
+        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : ZOOM;
 
         if (!unionRequested && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +

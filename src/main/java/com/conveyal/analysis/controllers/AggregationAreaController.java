@@ -132,6 +132,8 @@ public class AggregationAreaController implements HttpController {
 
         boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
 
+        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : 11;
+
         if (!unionRequested && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +
                     "which exceeds the limit of {1}", features.size(), MAX_FEATURES));
@@ -152,7 +154,7 @@ public class AggregationAreaController implements HttpController {
         // 3. Convert to raster grids, then store them. ================================================================
         areas.forEach((String name, Geometry geometry) -> {
             Envelope env = geometry.getEnvelopeInternal();
-            Grid maskGrid = new Grid(ZOOM, env);
+            Grid maskGrid = new Grid(zoom, env);
 
             // Store the percentage each cell overlaps the mask, scaled as 0 to 100,000
             List<Grid.PixelWeight> weights = maskGrid.getPixelWeights(geometry, true);

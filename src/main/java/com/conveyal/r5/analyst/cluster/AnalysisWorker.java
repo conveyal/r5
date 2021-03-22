@@ -215,6 +215,8 @@ public class AnalysisWorker implements Runnable {
      * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
      * but one of the tasks takes much longer than all the rest.
      * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
+     * Can this be replaced with the general purpose TaskScheduler component?
+     * That will depend whether all TaskScheduler Tasks are tracked in a way intended to be visible to users.
      */
     private ThreadPoolExecutor regionalTaskExecutor;
 

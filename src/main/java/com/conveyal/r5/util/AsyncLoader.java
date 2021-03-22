@@ -46,6 +46,7 @@ public abstract class AsyncLoader<K,V> {
      * Each cache has its own executor, so tiny things like loading grids are not held up by slower things like
      * linking or distance calculations. This also avoids deadlocks where one cache loads values from another cache
      * as part of its building process, but the sub-task can never happen because the parent task is hogging a thread.
+     * We may want to consider using the single TaskScheduler component which has separate heavy and light executors.
      */
     private Executor executor = Executors.newFixedThreadPool(2);
 

@@ -48,4 +48,8 @@ public abstract class ExceptionUtils {
         return String.join(" Caused ", items);
     }
 
+    public static String shortAndLongString (Throwable throwable) {
+        return shortCauseString(throwable) + "\n[detail follows]\n" + asString(throwable);
+    }
+
 }

@@ -381,16 +381,30 @@ public class AnalysisWorker implements Runnable {
                 continue;
             }
             for (RegionalTask task : tasks) {
+                // Try to enqueue each task for execution, repeatedly failing until the queue is not full.
+                // The list of fetched tasks essentially serves as a secondary queue, which is awkward. This is using
+                // exceptions for normal flow control, which is nasty. We should do this differently (#596).
                 while (true) {
                     try {
                         // TODO define non-anonymous runnable class to instantiate here, specifically for async regional tasks.
-                        regionalTaskExecutor.execute(() -> this.handleOneRegionalTask(task));
+                        regionalTaskExecutor.execute(() -> {
+                            try {
+                                this.handleOneRegionalTask(task);
+                            } catch (Throwable t) {
+                                LOG.error(
+                                    "An error occurred while handling a regional task, reporting to backend. {}",
+                                    ExceptionUtils.asString(t)
+                                );
+                                synchronized (workResults) {
+                                    workResults.add(new RegionalWorkResult(t, task));
+                                }
+                            }
+                        });
                         break;
                     } catch (RejectedExecutionException e) {
-                        // Queue is full, wait a bit and try to feed it more tasks.
-                        // FIXME if we burn through the internal queue in less than 1 second this is a speed bottleneck.
-                        // This happens with regions unconnected to transit and with very small travel time cutoffs.
-                        // FIXME this is really using the list of fetched tasks as a secondary queue, it's awkward.
+                        // Queue is full, wait a bit and try to feed it more tasks. If worker handles all tasks in its
+                        // internal queue in less than 1 second, this is a speed bottleneck. This happens with regions
+                        // unconnected to transit and with very small travel time cutoffs.
                         sleepSeconds(1);
                     }
                 }
@@ -498,9 +512,10 @@ public class AnalysisWorker implements Runnable {
      * Handle one task representing one of many origins within a regional analysis.
      * This method is generally being executed asynchronously, handling a large number of tasks on a pool of worker
      * threads. It stockpiles results as they are produced, so they can be returned to the backend in batches when the
-     * worker polls the backend.
+     * worker polls the backend. If any problem is encountered, the Throwable may be allowed to propagate up as all
+     * Throwables will be caught and reported to the backend, causing the regional job to end.
      */
-    protected void handleOneRegionalTask(RegionalTask task) {
+    protected void handleOneRegionalTask (RegionalTask task) throws Throwable {
 
         LOG.info("Handling regional task {}", task.toString());
 
@@ -534,79 +549,74 @@ public class AnalysisWorker implements Runnable {
                     maxCutoffMinutes, maxTripDurationMinutes, task.decayFunction.getClass().getSimpleName());
         }
 
-        try {
-            // TODO (re)validate multi-percentile and multi-cutoff parameters. Validation currently in TravelTimeReducer.
-            //  This version should require both arrays to be present, and single values to be missing.
-            // Using a newer backend, the task should have been normalized to use arrays not single values.
-            checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
-            checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
-            checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
-            checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
+        // TODO (re)validate multi-percentile and multi-cutoff parameters. Validation currently in TravelTimeReducer.
+        //  This version should require both arrays to be present, and single values to be missing.
+        // Using a newer backend, the task should have been normalized to use arrays not single values.
+        checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
+        checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
+        checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
+        checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
 
-            // Get the graph object for the ID given in the task, fetching inputs and building as needed.
-            // All requests handled together are for the same graph, and this call is synchronized so the graph will
-            // only be built once.
-            // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
-            networkId = task.graphId;
-            // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
-            // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
-            // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-            TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
-                    .graphId, task.scenarioId);
+        // Get the graph object for the ID given in the task, fetching inputs and building as needed.
+        // All requests handled together are for the same graph, and this call is synchronized so the graph will
+        // only be built once.
+        // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+        networkId = task.graphId;
+        // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
+        // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
+        // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
+        TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
+                .graphId, task.scenarioId);
 
-            // Static site tasks do not specify destinations, but all other regional tasks should.
-            // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.
-            // The presence of these grids in the task will then trigger the computation of accessibility values.
-            if (!task.makeTauiSite) {
-                task.loadAndValidateDestinationPointSets(pointSetCache);
-            }
-
-            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
-            // Arbitrarily we create this metadata as part of the first task in the job.
-            if (task.makeTauiSite && task.taskId == 0) {
-                LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                saveStaticSiteMetadata(task, transportNetwork);
-            }
-
-            // Advance the shutdown clock to reflect that the worker is performing regional work.
-            adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
-
-            // Perform the core travel time and accessibility computations.
-            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-            OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-            if (task.makeTauiSite) {
-                // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
-                // value because we're generating a set of time grids for a static site. We only save a file if it has
-                // non-default contents, as a way to save storage and bandwidth.
-                // TODO eventually carry out actions based on what's present in the result, not on the request type.
-                if (oneOriginResult.travelTimes.anyCellReached()) {
-                    TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
-                    PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
-                    String timesFileName = task.taskId + "_times.dat";
-                    filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
-                } else {
-                    LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
-                }
-                // Overwrite with an empty set of results to send back to the backend, allowing it to track job
-                // progress. This avoids crashing the backend by sending back massive 2 million element travel times
-                // that have already been written to S3, and throwing exceptions on old backends that can't deal with
-                // null AccessibilityResults.
-                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
-            }
-
-            // Accumulate accessibility results, which will be returned to the backend in batches.
-            // For most regional analyses, this is an accessibility indicator value for one of many origins,
-            // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
-            // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
-            synchronized (workResults) {
-                workResults.add(new RegionalWorkResult(oneOriginResult, task));
-            }
-            throughputTracker.recordTaskCompletion(task.jobId);
-        } catch (Exception ex) {
-            LOG.error("An error occurred while handling a regional task: {}", ExceptionUtils.asString(ex));
-            // TODO communicate regional analysis errors to the backend (in workResults)
+        // Static site tasks do not specify destinations, but all other regional tasks should.
+        // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.
+        // The presence of these grids in the task will then trigger the computation of accessibility values.
+        if (!task.makeTauiSite) {
+            task.loadAndValidateDestinationPointSets(pointSetCache);
         }
+
+        // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+        // Arbitrarily we create this metadata as part of the first task in the job.
+        if (task.makeTauiSite && task.taskId == 0) {
+            LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+            saveStaticSiteMetadata(task, transportNetwork);
+        }
+
+        // Advance the shutdown clock to reflect that the worker is performing regional work.
+        adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
+
+        // Perform the core travel time and accessibility computations.
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        if (task.makeTauiSite) {
+            // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
+            // value because we're generating a set of time grids for a static site. We only save a file if it has
+            // non-default contents, as a way to save storage and bandwidth.
+            // TODO eventually carry out actions based on what's present in the result, not on the request type.
+            if (oneOriginResult.travelTimes.anyCellReached()) {
+                TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
+                PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
+                String timesFileName = task.taskId + "_times.dat";
+                filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
+            } else {
+                LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
+            }
+            // Overwrite with an empty set of results to send back to the backend, allowing it to track job
+            // progress. This avoids crashing the backend by sending back massive 2 million element travel times
+            // that have already been written to S3, and throwing exceptions on old backends that can't deal with
+            // null AccessibilityResults.
+            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+        }
+
+        // Accumulate accessibility results, which will be returned to the backend in batches.
+        // For most regional analyses, this is an accessibility indicator value for one of many origins,
+        // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
+        // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
+        synchronized (workResults) {
+            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+        }
+        throughputTracker.recordTaskCompletion(task.jobId);
     }
 
     /**

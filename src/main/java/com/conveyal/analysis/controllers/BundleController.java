@@ -241,7 +241,7 @@ public class BundleController implements HttpController {
                 // flow.
                 LOG.error("Error creating bundle", t);
                 bundle.status = Bundle.Status.ERROR;
-                bundle.statusText = ExceptionUtils.shortCauseString(t) + "\n[detail follows]\n" + ExceptionUtils.asString(t);
+                bundle.statusText = ExceptionUtils.shortAndLongString(t);
               } finally {
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }

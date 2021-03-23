@@ -2,12 +2,15 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.GTFSError;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a transport Bundle (GTFS and OSM).
@@ -53,6 +56,33 @@ public class Bundle extends Model implements Cloneable {
         }
     }
 
+    /** Simplified model for storing the first N errors of each type in Mongo. */
+    public static class GtfsErrorSummary {
+        public String file;
+        public Integer line;
+        public String field;
+        public String message;
+        public GtfsErrorSummary () { /* For deserialization. */ }
+        public GtfsErrorSummary (GTFSError error) {
+            file = error.file;
+            line = error.line > 0 ? (int)(error.line) : null;
+            field = error.field;
+            message = error.getMessage();
+        }
+    }
+
+    /** Simplified model for storing the first N errors of each type in Mongo. */
+    public static class GtfsErrorTypeSummary {
+        public String type;
+        public int count;
+        public List<GtfsErrorSummary> someErrors = new ArrayList<>();
+        public GtfsErrorTypeSummary () { /* For deserialization. */ }
+        public GtfsErrorTypeSummary (String type) {
+            this.type = type;
+        }
+    }
+
+    /** Model for storing summany info in Mongo. Bundle contains one instance of FeedSummary per feed in the Bundle. */
     public static class FeedSummary implements Cloneable {
         public String feedId;
         public String name;
@@ -65,14 +95,18 @@ public class Bundle extends Model implements Cloneable {
         public LocalDate serviceStart;
         public LocalDate serviceEnd;
         public long checksum;
+        public List<GtfsErrorTypeSummary> errors;
+
+        /** Default empty constructor needed for JSON mapping. */
+        public FeedSummary () { }
 
         public FeedSummary(GTFSFeed feed, String feedGroupId) {
             feedId = feed.feedId;
             bundleScopedFeedId = Bundle.bundleScopeFeedId(feed.feedId, feedGroupId);
             name = feed.agency.size() > 0 ? feed.agency.values().iterator().next().agency_name : feed.feedId;
             checksum = feed.checksum;
-
-            setServiceDates(feed);
+            setServiceDates(feed); // TODO expand to record hours per day by mode.
+            summarizeErrors(feed);
         }
 
         /**
@@ -91,9 +125,26 @@ public class Bundle extends Model implements Cloneable {
         }
 
         /**
-         * Default empty constructor needed for JSON mapping
+         * This summarization could be done on the fly during loading.
+         * However some users will want the whole pile of errors.
          */
-        public FeedSummary () { }
+        private void summarizeErrors (GTFSFeed feed) {
+            final int maxErrorsPerType = 10;
+            Map<String, GtfsErrorTypeSummary> sortedErrors = new HashMap<>();
+            for (GTFSError error : feed.errors) {
+                String type = error.errorType;
+                GtfsErrorTypeSummary summary = sortedErrors.get(type);
+                if (summary == null) {
+                    summary = new GtfsErrorTypeSummary(type);
+                    sortedErrors.put(type, summary);
+                }
+                summary.count += 1;
+                if (summary.someErrors.size() < maxErrorsPerType) {
+                    summary.someErrors.add(new GtfsErrorSummary(error));
+                }
+            }
+            errors = new ArrayList<>(sortedErrors.values());
+        }
 
         public FeedSummary clone () {
             try {

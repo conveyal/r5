@@ -3,6 +3,8 @@ package com.conveyal.analysis.models;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.FeedInfo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -11,6 +13,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Represents a transport Bundle (GTFS and OSM).
@@ -103,10 +106,41 @@ public class Bundle extends Model implements Cloneable {
         public FeedSummary(GTFSFeed feed, String feedGroupId) {
             feedId = feed.feedId;
             bundleScopedFeedId = Bundle.bundleScopeFeedId(feed.feedId, feedGroupId);
-            name = feed.agency.size() > 0 ? feed.agency.values().iterator().next().agency_name : feed.feedId;
+            name = createFeedName(feed);
             checksum = feed.checksum;
             setServiceDates(feed); // TODO expand to record hours per day by mode.
             summarizeErrors(feed);
+        }
+
+        /** This seems to only be used for display purposes. */
+        private static String createFeedName (GTFSFeed feed) {
+            if (feed.feedInfo.size() == 1) {
+                FeedInfo feedInfo = feed.feedInfo.values().iterator().next();
+                String name = "";
+                if (feedInfo.feed_id != null) {
+                    name = feedInfo.feed_id;
+                }
+                if (feedInfo.feed_start_date != null) {
+                    if (name.length() > 0) {
+                        name += " starting ";
+                    }
+                    name += feedInfo.feed_start_date.toString(); // ISO-8601
+                }
+                if (name.length() > 0) {
+                    return name;
+                }
+            }
+            int nAgencies = feed.agency.size();
+            if (nAgencies > 0) {
+                final int limit = 3;
+                String agencyNames = feed.agency.values().stream().limit(limit)
+                        .map(a -> a.agency_name).collect(Collectors.joining(", "));
+                if (nAgencies > limit) {
+                    agencyNames += String.format(", +%d more", nAgencies - limit);
+                }
+                return agencyNames;
+            }
+            return "(unknown)";
         }
 
         /**

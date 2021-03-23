@@ -231,15 +231,15 @@ public class BundleController implements HttpController {
 
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
-              } catch (Exception e) {
+              } catch (Throwable t) {
                 // This catches any error while processing a feed with the GTFS Api and needs to be more
                 // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
                 // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
                 // "bundle" at a later point. This updated error handling is a stopgap until we improve that
                 // flow.
-                LOG.error("Error creating bundle", e);
+                LOG.error("Error creating bundle", t);
                 bundle.status = Bundle.Status.ERROR;
-                bundle.statusText = ExceptionUtils.asString(e);
+                bundle.statusText = ExceptionUtils.shortAndLongString(t);
               } finally {
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }

@@ -9,6 +9,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +18,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * This assembles regional results arriving from workers into one or more files per regional analysis on
@@ -48,9 +52,6 @@ public class MultiOriginAssembler {
 
     // One writer per CSV/Grids we're outputting
     private List<RegionalResultWriter> resultWriters = new ArrayList<>();
-
-    /** TODO check if error is true before all results are received (when receiving each result?) and cancel job. */
-    private boolean error = false;
 
     /**
      * The number of distinct origin points for which we've received at least one result. If for
@@ -86,11 +87,11 @@ public class MultiOriginAssembler {
      *      store all of them.
      */
     public MultiOriginAssembler (RegionalAnalysis regionalAnalysis, Job job, FileStorage fileStorage) {
-        this.regionalAnalysis = regionalAnalysis;
-        this.job = job;
-        this.nOriginsTotal = job.nTasksTotal;
-        this.originsReceived = new BitSet(job.nTasksTotal);
         try {
+            this.regionalAnalysis = regionalAnalysis;
+            this.job = job;
+            this.nOriginsTotal = job.nTasksTotal;
+            this.originsReceived = new BitSet(job.nTasksTotal);
             // Check that origin and destination sets are not too big for generating CSV files.
             if (!job.templateTask.makeTauiSite &&
                  job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
@@ -101,7 +102,6 @@ public class MultiOriginAssembler {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
                     ) {
-                        error = true;
                         throw new AnalysisServerException(String.format(
                             "Freeform requests limited to %d destinations and %d origin-destination pairs.",
                             MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
@@ -126,11 +126,8 @@ public class MultiOriginAssembler {
                 resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
             }
 
-            if (resultWriters.isEmpty() && !job.templateTask.makeTauiSite) {
-                // TODO handle all error conditions of this form with a single method that also cancels the job
-                error = true;
-                throw new ParameterException("A regional analysis should always create at least one grid or CSV file.");
-            }
+            checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),
+                "A non-Taui regional analysis should always create at least one grid or CSV file.");
 
             // Record the paths of any CSV files that will be produced by this analysis.
             // The caller must flush the RegionalAnalysis back out to the database to retain this information.
@@ -142,10 +139,8 @@ public class MultiOriginAssembler {
                     regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
                 }
             }
-
-        } catch (IOException e) {
-            error = true;
-            LOG.error("Exception while creating multi-origin assembler: " + e.toString());
+        } catch (Exception e) {
+            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.asString(e));
         }
     }
 
@@ -173,26 +168,21 @@ public class MultiOriginAssembler {
      * dimension checks) but those should take a trivial amount of time. For safety and simplicity
      * we will synchronize the whole method. The downside is that this prevents one thread from
      * writing accessibility while another was writing travel time CSV, but this should not be
-     * assumed to have any impact on performance unless measured. The writeOneValue methods are also
-     * synchronized for good measure. There should be no cost to retaining the lock.
+     * assumed to have any impact on performance unless measured. The writeOneValue methods are also synchronized
+     * for good measure. There should be no additional cost to retaining the lock when entering those methods.
      */
-    public synchronized void handleMessage (RegionalWorkResult workResult) {
-        try {
-            for (RegionalResultWriter writer : resultWriters) {
-                writer.writeOneWorkResult(workResult);
-            }
-            // Don't double-count origins if we receive them more than once. Atomic get-and-increment requires
-            // synchronization, currently achieved by synchronizing this entire method.
-            if (!originsReceived.get(workResult.taskId)) {
-                originsReceived.set(workResult.taskId);
-                nComplete += 1;
-            }
-            if (nComplete == nOriginsTotal && !error) {
-                finish();
-            }
-        } catch (Exception e) {
-            error = true;
-            LOG.error("Error assembling results for query {}", job.jobId, e);
+    public synchronized void handleMessage (RegionalWorkResult workResult) throws Exception {
+        for (RegionalResultWriter writer : resultWriters) {
+            writer.writeOneWorkResult(workResult);
+        }
+        // Don't double-count origins if we receive them more than once. Atomic get-and-increment requires
+        // synchronization, currently achieved by synchronizing this entire method.
+        if (!originsReceived.get(workResult.taskId)) {
+            originsReceived.set(workResult.taskId);
+            nComplete += 1;
+        }
+        if (nComplete == nOriginsTotal) {
+            finish();
         }
     }
 

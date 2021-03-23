@@ -46,7 +46,10 @@ import java.util.concurrent.TimeUnit;
  * workers to the UI in the same data structures.
  *
  * So we're moving toward a programming API where you submit Tasks with attached Actions.
- * TODO state that all components should be threadsafe, i.e. should not fail if used by multiple HTTP handler threads.
+ * TODO state that all Components should be threadsafe, i.e. should not fail if used by multiple HTTP handler threads.
+ *
+ * Eventually every asynchronous task should be handled by this one mechanism, to ensure every Throwable is caught and
+ * cannot kill threads, as well as standardized reporting and tracking of backend and worker activity.
  */
 public class TaskScheduler implements Component {
 

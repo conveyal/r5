@@ -1,7 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.RegionalAnalysisStatus;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
@@ -18,6 +17,7 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import gnu.trove.TCollections;
@@ -43,6 +43,7 @@ import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUE
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * This class distributes the tasks making up regional jobs to workers.
@@ -320,14 +321,10 @@ public class Broker {
      *
      * @return whether the task was found and removed.
      */
-    public synchronized void markTaskCompleted (String jobId, int taskId) {
-        Job job = findJob(jobId);
-        if (job == null) {
-            LOG.error("Could not find a job with ID {} and therefore could not mark the task as completed.", jobId);
-            return;
-        }
+    public synchronized void markTaskCompleted (Job job, int taskId) {
+        checkNotNull(job);
         if (!job.markTaskCompleted(taskId)) {
-            LOG.error("Failed to mark task {} completed on job {}.", taskId, jobId);
+            LOG.error("Failed to mark task {} completed on job {}.", taskId, job.jobId);
         }
         // Once the last task is marked as completed, the job is finished.
         // Purge it from the list to free memory.
@@ -336,9 +333,14 @@ public class Broker {
             jobs.remove(job.workerCategory, job);
             // This method is called after the regional work results are handled, finishing and closing the local file.
             // So we can harmlessly remove the MultiOriginAssembler now that the job is removed.
-            resultAssemblers.remove(jobId);
+            resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
+    }
+
+    /** This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler. */
+    private synchronized void recordJobError (Job job, String error) {
+        job.errors.add(error);
     }
 
     /**
@@ -444,21 +446,32 @@ public class Broker {
             job = findJob(workResult.jobId);
             assembler = resultAssemblers.get(workResult.jobId);
         }
-        if (assembler == null) {
-            LOG.error("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
-        } else {
-            // FIXME this is building up to 5 grids and uploading them to S3, this should not be done synchronously in
-            //       an HTTP handler.
-            assembler.handleMessage(workResult);
-            // When results for the task with the magic number are received, consider boosting the job by starting EC2
-            // spot instances
-            if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
-                requestExtraWorkersIfAppropriate(job);
-            }
+        if (job == null || assembler == null) {
+            // This will happen naturally for all delivered tasks when a job is deleted by the user.
+            LOG.debug("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
+            return;
         }
-
-        markTaskCompleted(workResult.jobId, workResult.taskId);
-
+        if (workResult.error != null) {
+            // Just record the error reported by the worker and don't pass the result on to regional result assembly.
+            // The Job will stop delivering tasks, allowing workers to shut down. User will need to manually delete it.
+            recordJobError(job, workResult.error);
+            return;
+        }
+        // When the last task is received, this will build up to 5 grids and upload them to S3. That should probably
+        // not be done synchronously in an HTTP handler called by the worker (likewise for starting workers below).
+        try {
+            assembler.handleMessage(workResult);
+            markTaskCompleted(job, workResult.taskId);
+        } catch (Throwable t) {
+            LOG.error("Error assembling results for job {}", job.jobId);
+            recordJobError(job, ExceptionUtils.asString(t));
+            return;
+        }
+        // When non-error results are received for several tasks we assume the regional analysis is running smoothly.
+        // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
+        if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
+            requestExtraWorkersIfAppropriate(job);
+        }
     }
 
     private void requestExtraWorkersIfAppropriate(Job job) {
@@ -475,18 +488,6 @@ public class Broker {
         }
     }
 
-    /**
-     * Returns a simple status object intended to inform the UI of job progress.
-     */
-    public RegionalAnalysisStatus getJobStatus (String jobId) {
-        MultiOriginAssembler resultAssembler = resultAssemblers.get(jobId);
-        if (resultAssembler == null) {
-            return null;
-        } else {
-            return new RegionalAnalysisStatus(resultAssembler);
-        }
-    }
-
     public File getPartialRegionalAnalysisResults (String jobId) {
         MultiOriginAssembler resultAssembler = resultAssemblers.get(jobId);
         if (resultAssembler == null) {
@@ -498,7 +499,7 @@ public class Broker {
 
     public synchronized boolean anyJobsActive () {
         for (Job job : jobs.values()) {
-            if (!job.isComplete()) return true;
+            if (job.isActive()) return true;
         }
         return false;
     }

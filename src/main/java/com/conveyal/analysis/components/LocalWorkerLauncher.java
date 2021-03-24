@@ -38,7 +38,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
     private final List<Thread> workerThreads = new ArrayList<>();
 
     public LocalWorkerLauncher (Config config, FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
-        LOG.info("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
+        LOG.debug("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
         this.fileStorage = fileStorage;
         // FIXME get this cache into the workers launched below - they're going to create their own.
         transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache);
@@ -73,10 +73,10 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             return;
         }
         int nTotal = nOnDemand + nSpot;
-        LOG.info("Number of workers requested is {}.", nTotal);
+        LOG.debug("Number of workers requested is {}.", nTotal);
         if (nTotal != nWorkers) {
             nTotal = nWorkers;
-            LOG.info("Ignoring that and starting {} local Analysis workers...", nTotal);
+            LOG.debug("Ignoring that and starting {} local Analysis workers...", nTotal);
         }
         if (category.graphId != null) {
             // Category is null when pre-starting local workers, but can be used when launching on demand.

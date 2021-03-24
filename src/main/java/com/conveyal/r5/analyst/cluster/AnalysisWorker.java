@@ -318,10 +318,10 @@ public class AnalysisWorker implements Runnable {
         // The default task rejection policy is "Abort".
         // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+        LOG.debug("Java reports the number of available processors is: {}", availableProcessors);
         int maxThreads = availableProcessors;
         int taskQueueLength = availableProcessors * 6;
-        LOG.info("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
+        LOG.debug("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
         regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
@@ -406,7 +406,7 @@ public class AnalysisWorker implements Runnable {
     }
 
     protected byte[] handleAndSerializeOneSinglePointTask (TravelTimeSurfaceTask task) throws IOException {
-        LOG.info("Handling single-point task {}", task.toString());
+        LOG.debug("Handling single-point task {}", task.toString());
         // Get all the data needed to run one analysis task, or at least begin preparing it.
         final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
@@ -499,7 +499,7 @@ public class AnalysisWorker implements Runnable {
      */
     protected void handleOneRegionalTask (RegionalTask task) throws Throwable {
 
-        LOG.info("Handling regional task {}", task.toString());
+        LOG.debug("Handling regional task {}", task.toString());
 
         // If this worker is being used in a test of the task redelivery mechanism. Report most work as completed
         // without actually doing anything, but fail to report results a certain percentage of the time.
@@ -527,7 +527,7 @@ public class AnalysisWorker implements Runnable {
                 maxTripDurationMinutes = 120;
             }
             task.maxTripDurationMinutes = maxTripDurationMinutes;
-            LOG.info("Maximum cutoff was {} minutes, limiting trip duration to {} minutes based on decay function {}.",
+            LOG.debug("Maximum cutoff was {} minutes, limiting trip duration to {} minutes based on decay function {}.",
                     maxCutoffMinutes, maxTripDurationMinutes, task.decayFunction.getClass().getSimpleName());
         }
 
@@ -582,7 +582,7 @@ public class AnalysisWorker implements Runnable {
                 String timesFileName = task.taskId + "_times.dat";
                 filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
             } else {
-                LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
+                LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
             // Overwrite with an empty set of results to send back to the backend, allowing it to track job
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
@@ -678,11 +678,11 @@ public class AnalysisWorker implements Runnable {
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
         jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
-        LOG.info("Travel time surface written, appending {}.", jsonBlock);
+        LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.
         JsonUtilities.objectMapper.writeValue(outputStream, jsonBlock);
-        LOG.info("Done writing");
+        LOG.debug("Done writing");
     }
 
     /**

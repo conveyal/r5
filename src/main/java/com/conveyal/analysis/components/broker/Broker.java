@@ -269,7 +269,7 @@ public class Broker {
         // If workers have already been started up, don't repeat the operation.
         if (recentlyRequestedWorkers.containsKey(category)
                 && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
-            LOG.info("Workers still starting on {}, not starting more", category);
+            LOG.debug("Workers still starting on {}, not starting more", category);
             return;
         }
 

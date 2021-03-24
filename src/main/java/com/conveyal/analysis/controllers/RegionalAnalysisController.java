@@ -132,7 +132,7 @@ public class RegionalAnalysisController implements HttpController {
         if (!analysis.complete) {
             String jobId = analysis._id;
             if (broker.deleteJob(jobId)) {
-                LOG.info("Deleted job {} from broker.", jobId);
+                LOG.debug("Deleted job {} from broker.", jobId);
             } else {
                 LOG.error("Deleting job {} from broker failed.", jobId);
             }
@@ -240,7 +240,7 @@ public class RegionalAnalysisController implements HttpController {
             // FIXME we need to do the equivalent of the SelectingGridReducer here.
             // The job is still being processed. There is a probably harmless race condition if the job happens to be
             // completed at the very moment we're in this block, because the file will be deleted at that moment.
-            LOG.info("Analysis {} is not complete, attempting to return the partial results grid.", regionalAnalysisId);
+            LOG.debug("Analysis {} is not complete, attempting to return the partial results grid.", regionalAnalysisId);
             if (!"GRID".equalsIgnoreCase(fileFormatExtension)) {
                 throw AnalysisServerException.badRequest(
                         "For partially completed regional analyses, we can only return grid files, not images.");
@@ -262,7 +262,7 @@ public class RegionalAnalysisController implements HttpController {
             }
         } else {
             // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
-            LOG.info("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
+            LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
                     cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
             FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
             if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.TIFF.equals(format)) {
@@ -295,7 +295,7 @@ public class RegionalAnalysisController implements HttpController {
                         multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
                     }
                 }
-                LOG.info("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
+                LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
                 FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
 
                 InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));

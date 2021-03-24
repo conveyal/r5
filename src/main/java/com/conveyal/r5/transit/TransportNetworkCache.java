@@ -123,7 +123,7 @@ public class TransportNetworkCache {
         TransportNetwork scenarioNetwork =  baseNetwork.scenarios.get(scenarioId);
         if (scenarioNetwork == null) {
             // The network for this scenario was not found in the cache. Create that scenario network and cache it.
-            LOG.info("Applying scenario to base network...");
+            LOG.debug("Applying scenario to base network...");
             // Fetch the full scenario if an ID was specified.
             Scenario scenario = resolveScenario(networkId, scenarioId);
             // Apply any scenario modifications to the network before use, performing protective copies where necessary.
@@ -132,10 +132,10 @@ public class TransportNetworkCache {
             // the InactiveTripsFilter. The solution may be to cache linked point sets based on scenario ID but always
             // apply scenarios every time.
             scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
-            LOG.info("Done applying scenario. Caching the resulting network.");
+            LOG.debug("Done applying scenario. Caching the resulting network.");
             baseNetwork.scenarios.put(scenario.id, scenarioNetwork);
         } else {
-            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenarioId);
+            LOG.debug("Reusing cached TransportNetwork for scenario {}.", scenarioId);
         }
         return scenarioNetwork;
     }
@@ -162,7 +162,7 @@ public class TransportNetworkCache {
         // Check if we have a new-format bundle with a JSON manifest.
         FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
         if (fileStorage.exists(manifestFileKey)) {
-            LOG.info("Detected new-format bundle with manifest.");
+            LOG.debug("Detected new-format bundle with manifest.");
             network = buildNetworkFromManifest(networkId);
         } else {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
@@ -216,7 +216,7 @@ public class TransportNetworkCache {
             zis.close();
         } catch (Exception e) {
             // TODO delete cache dir which is probably corrupted.
-            LOG.info("Error retrieving transportation network input files", e);
+            LOG.warn("Error retrieving transportation network input files", e);
             return null;
         }
 
@@ -300,7 +300,7 @@ public class TransportNetworkCache {
      * This should always return a usable TransportNetwork not null, and should throw an exception whenever it can't.
      */
     private @Nonnull TransportNetwork loadNetwork(String networkId) throws TransportNetworkException {
-        LOG.info(
+        LOG.debug(
             "Finding or building a TransportNetwork for ID {} and R5 version {}",
             networkId, BackendVersion.instance.version
         );
@@ -308,10 +308,10 @@ public class TransportNetworkCache {
             FileStorageKey r5Key = getR5NetworkFileStorageKey(networkId);
             if (fileStorage.exists(r5Key)) {
                 File networkFile = fileStorage.getFile(r5Key);
-                LOG.info("Loading cached transport network at {}", networkFile);
+                LOG.debug("Loading cached transport network at {}", networkFile);
                 return KryoNetworkSerializer.read(networkFile);
             } else {
-                LOG.info(
+                LOG.debug(
                     "Cached transport network for id {} and R5 version {} was not found. Building from scratch.",
                     networkId, BackendVersion.instance.version
                 );
@@ -359,7 +359,7 @@ public class TransportNetworkCache {
         FileStorageKey scenarioFileKey = new FileStorageKey(BUNDLES, getScenarioFilename(networkId, scenarioId));
         try {
             File scenarioFile = fileStorage.getFile(scenarioFileKey);
-            LOG.info("Loading scenario from disk file {}", scenarioFile);
+            LOG.debug("Loading scenario from disk file {}", scenarioFile);
             return JsonUtilities.lenientObjectMapper.readValue(scenarioFile, Scenario.class);
         } catch (Exception e) {
             LOG.error("Could not fetch scenario {} or read it from from disk: {}", scenarioId, e.toString());

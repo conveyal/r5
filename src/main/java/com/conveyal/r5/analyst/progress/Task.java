@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * This is a draft for a more advanced task progress system. It is not yet complete or functional.
+ * This is a draft for a more advanced task progress system. It is not yet complete.
+ * Task is intended for background tasks whose progress the end user should be aware of, such as file uploads.
+ * It should not be used for automatic internal actions (such as Events) which would clutter a user's active task list.
  *
  * A Task (or some interface that it implements) could be used by the AsyncLoader to track progress. Together with some
  * AsyncLoader functionality it will be a bit like a Future with progress reporting. Use of AsyncLoader could then be
@@ -22,7 +24,7 @@ import java.util.UUID;
  * Tasks should implement ProgressListener functionality, and bubble up progress to parent tasks.
  *
  * This class serves simultaneously as an internal domain object for tracking task execution, and an external API model
- * object for communicating relevant information to the web UI (when serialized to JSON).
+ * object for communicating relevant information to the web UI (when serialized to JSON), hence JsonIgnore annotations.
  */
 public class Task implements Runnable, ProgressListener {
 

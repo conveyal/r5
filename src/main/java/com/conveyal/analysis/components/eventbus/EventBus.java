@@ -52,10 +52,15 @@ public class EventBus implements Component {
                     try {
                         handler.handleEvent(event);
                     } catch (Throwable t) {
+                        // Do not recursively fire events on errors, there is some programming mistake.
                         LOG.error("Event handler failed: {}", t.toString());
                         t.printStackTrace();
                     }
                 } else {
+                    // We do not use the full taskScheduler.Task system here because event handlers are intended to be
+                    // simple and fast and all event handlers internal details like logging that shouldn't be cluttering
+                    // up a user's progress reports until manually cleared. This may be an argument for EventBus having
+                    // its own executor, or bypassing Task.
                     taskScheduler.enqueueLightTask(() -> handler.handleEvent(event));
                 }
             }

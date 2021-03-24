@@ -3,12 +3,30 @@ package com.conveyal.analysis.components;
 import com.conveyal.analysis.BackendConfig;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.controllers.AggregationAreaController;
+import com.conveyal.analysis.controllers.BrokerController;
+import com.conveyal.analysis.controllers.BundleController;
+import com.conveyal.analysis.controllers.FileStorageController;
+import com.conveyal.analysis.controllers.GTFSGraphQLController;
+import com.conveyal.analysis.controllers.GtfsTileController;
+import com.conveyal.analysis.controllers.HttpController;
+import com.conveyal.analysis.controllers.ModificationController;
+import com.conveyal.analysis.controllers.OpportunityDatasetController;
+import com.conveyal.analysis.controllers.ProjectController;
+import com.conveyal.analysis.controllers.RegionalAnalysisController;
+import com.conveyal.analysis.controllers.TimetableController;
+import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * We are adopting a lightweight dependency injection approach, where we manually wire up our components instead of
@@ -56,5 +74,36 @@ public abstract class BackendComponents {
     public HttpApi httpApi;
     public TaskScheduler taskScheduler;
     public EventBus eventBus;
+
+    /**
+     * Create the standard list of HttpControllers used in local operation. This BackendComponents instance
+     * should already be initialized with all components except the HttpApi.
+     * We pass these controllers into the HttpApi (rather than constructing them in the HttpApi constructor) to allow
+     * injecting custom controllers in other deployment environments. This also avoids bulk-passing the entire set
+     * of components into the HttpApi constructor, ensuring clear deliniation of each component's dependencies.
+     */
+    public List<HttpController> standardHttpControllers () {
+        return Lists.newArrayList(
+                // These handlers are at paths beginning with /api
+                // and therefore subject to authentication and authorization.
+                new ModificationController(),
+                new ProjectController(),
+                new GTFSGraphQLController(gtfsCache),
+                new BundleController(this),
+                new OpportunityDatasetController(fileStorage, taskScheduler, config),
+                new RegionalAnalysisController(broker, fileStorage),
+                new AggregationAreaController(fileStorage),
+                new TimetableController(),
+                new FileStorageController(fileStorage, database),
+                // This broker controller registers at least one handler at URL paths beginning with /internal, which
+                // is exempted from authentication and authorization, but should be hidden from the world
+                // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
+                // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
+                // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
+                new BrokerController(broker, eventBus),
+                new UserActivityController(taskScheduler),
+                new GtfsTileController(gtfsCache)
+        );
+    }
 
 }

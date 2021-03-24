@@ -2,28 +2,12 @@ package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.BackendConfig;
 import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.ErrorLogger;
-import com.conveyal.analysis.controllers.AggregationAreaController;
-import com.conveyal.analysis.controllers.BrokerController;
-import com.conveyal.analysis.controllers.BundleController;
-import com.conveyal.analysis.controllers.FileStorageController;
-import com.conveyal.analysis.controllers.GTFSGraphQLController;
-import com.conveyal.analysis.controllers.GtfsTileController;
-import com.conveyal.analysis.controllers.HttpController;
-import com.conveyal.analysis.controllers.ModificationController;
-import com.conveyal.analysis.controllers.OpportunityDatasetController;
-import com.conveyal.analysis.controllers.ProjectController;
-import com.conveyal.analysis.controllers.RegionalAnalysisController;
-import com.conveyal.analysis.controllers.TimetableController;
-import com.conveyal.analysis.controllers.UserActivityController;
+import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
-
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Wires up the components for a local backend instance (as opposed to a cloud cluster).
@@ -51,45 +35,10 @@ public class LocalBackendComponents extends BackendComponents {
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
-        httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers(this));
+        httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers());
         // compute = new LocalCompute();
         // persistence = persistence(local_Mongo)
         eventBus.addHandlers(new ErrorLogger());
-    }
-
-    /**
-     * Create the standard list of HttpControllers used in local operation.
-     * The Components parameter should already be initialized with all components except the HttpApi.
-     * We pass these controllers into the HttpApi (rather than constructing them in the HttpApi constructor) to allow
-     * injecting custom controllers in other deployment environments. This also avoids bulk-passing the entire set
-     * of components into the HttpApi constructor, ensuring clear declaration of each component's dependencies.
-     * Such bulk-passing of components should only occur in this wiring-up code, not in component code.
-     * TODO make non-static to avoid repeating "components." everywhere, as long as that's compatible with Cluster.
-     *      Move up one level to BackendComponents
-     */
-     public static List<HttpController> standardHttpControllers (BackendComponents components) {
-        final List<HttpController> httpControllers = Arrays.asList(
-                // These handlers are at paths beginning with /api
-                // and therefore subject to authentication and authorization.
-                new ModificationController(),
-                new ProjectController(),
-                new GTFSGraphQLController(components.gtfsCache),
-                new BundleController(components),
-                new OpportunityDatasetController(components.fileStorage, components.taskScheduler, components.config),
-                new RegionalAnalysisController(components.broker, components.fileStorage),
-                new AggregationAreaController(components.fileStorage),
-                new TimetableController(),
-                new FileStorageController(components.fileStorage, components.database),
-                // This broker controller registers at least one handler at URL paths beginning with /internal, which
-                // is exempted from authentication and authorization, but should be hidden from the world
-                // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
-                // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
-                // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
-                new BrokerController(components.broker, components.eventBus),
-                new UserActivityController(components.taskScheduler),
-                new GtfsTileController(components.gtfsCache)
-        );
-        return httpControllers;
     }
 
 }

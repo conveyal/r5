@@ -22,7 +22,6 @@ public class SinglePointEvent extends Event {
         this.durationMsec = durationMsec;
     }
 
-
     @Override
     public String toString () {
         return "SinglePointEvent{" +

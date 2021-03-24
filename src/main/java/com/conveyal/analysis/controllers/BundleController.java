@@ -8,7 +8,6 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -132,7 +131,7 @@ public class BundleController implements HttpController {
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
         } catch (Exception e) {
-            throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
+            throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
 
         // Set `createdBy` and `accessGroup`

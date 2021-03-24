@@ -9,16 +9,8 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.joda.time.DateTime;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import spark.Request;
-import spark.Response;
-
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.util.Enumeration;
 
 /**
  * This is the main entry point for starting a Conveyal Analysis server.
@@ -26,9 +18,6 @@ import java.util.Enumeration;
 public abstract class BackendMain {
 
     private static final Logger LOG = LoggerFactory.getLogger(BackendMain.class);
-
-    /** This backend server's IP address. This is passed to the workers so they know how to reach the backend. */
-    private static final InetAddress privateServerAddress = discoverPrivateInetAddress();
 
     public static void main (String... args) {
         final BackendComponents components = new LocalBackendComponents();
@@ -41,7 +30,7 @@ public abstract class BackendMain {
         try {
             startServerInternal(components, postStartupThreads);
         } catch (Throwable throwable) {
-            LOG.error("Exception while starting up backend, shutting down JVM.\n{}", ExceptionUtils.asString(throwable));
+            LOG.error("Exception while starting up backend, shutting down JVM.\n{}", ExceptionUtils.stackTraceString(throwable));
             System.exit(1);
         }
     }
@@ -76,69 +65,6 @@ public abstract class BackendMain {
             LOG.info("Startup has completed successfully. Exiting immediately as requested.");
             System.exit(0);
         }
-    }
-
-    public static void respondToException(Exception e, Request request, Response response, String type, String message, int code) {
-        String stack = ExceptionUtils.asString(e);
-
-        LOG.error("{} {} -> {} {} by {} of {}", type, message, request.requestMethod(), request.pathInfo(), request.attribute("email"), request.attribute("accessGroup"));
-        LOG.error(stack);
-
-        JSONObject body = new JSONObject();
-        body.put("type", type);
-        body.put("message", message);
-        body.put("stackTrace", stack);
-
-        response.status(code);
-        response.type("application/json");
-        response.body(body.toJSONString());
-    }
-
-    public static String getServerIpAddress() {
-        return privateServerAddress.getHostAddress();
-    }
-
-    // InetAddress.getLocalHost() fails on EC2 because the local hostname is not in the hosts file.
-    // Anyway we don't want the default, we want to search for a stable, private interface internal to the cluster,
-    // rather than the public one which may be reassigned during startup.
-    // TODO move this to an InternalHttpApi Component.
-    private static InetAddress discoverPrivateInetAddress() {
-        InetAddress privateAddress = null;
-        Enumeration<NetworkInterface> networkInterfaces = null;
-        try {
-            networkInterfaces = NetworkInterface.getNetworkInterfaces();
-            while (networkInterfaces.hasMoreElements()) {
-                NetworkInterface networkInterface = networkInterfaces.nextElement();
-                try {
-                    if (!networkInterface.isUp() || networkInterface.isLoopback()) {
-                        continue;
-                    }
-                } catch (SocketException e) {
-                    continue;
-                }
-                Enumeration<InetAddress> addressEnumeration = networkInterface.getInetAddresses();
-                while (addressEnumeration.hasMoreElements()) {
-                    InetAddress address = addressEnumeration.nextElement();
-                    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isMulticastAddress()) {
-                        continue;
-                    }
-                    if (address.isSiteLocalAddress()) {
-                        privateAddress = address;
-                        break;
-                    }
-                }
-            }
-        } catch (SocketException e) {
-            privateAddress = null;
-        }
-        if (privateAddress == null) {
-            LOG.error("Could not determine private server IP address. Workers will not be able to contact it, making regional analysis impossible.");
-            // privateAddress = InetAddress.getLoopbackAddress();
-            // Leave the private address null to fail fast.
-        } else {
-            LOG.info("Private server IP address (which will be contacted by workers) is {}", privateAddress);
-        }
-        return privateAddress;
     }
 
 }

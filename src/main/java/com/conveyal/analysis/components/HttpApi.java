@@ -1,10 +1,9 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.BackendMain;
 import com.conveyal.analysis.BackendVersion;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.eventbus.Event;
+import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
@@ -14,6 +13,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileUploadException;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
@@ -27,6 +27,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+
+import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
+import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
+import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
 
 /**
  * This Component is a web server that serves up our HTTP API endpoints, both to the UI and to the workers.
@@ -116,9 +120,8 @@ public class HttpApi implements Component {
             // but may fail to record requests experiencing authentication problems.
             Instant requestStartTime = req.attribute(REQUEST_START_TIME_ATTRIBUTE);
             Duration elapsed = Duration.between(requestStartTime, Instant.now());
-            Event event = new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis());
-            UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-            eventBus.send(event.forUser(userPermissions));
+            eventBus.send(new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis())
+                    .forUser(req.attribute(USER_PERMISSIONS_ATTRIBUTE)));
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).
@@ -161,13 +164,14 @@ public class HttpApi implements Component {
             });
         }
 
-        // ============
+
+        // Can we consolidate all these exception handlers and get rid of the hard-wired "BAD_REQUEST" parameters?
 
         sparkService.exception(AnalysisServerException.class, (e, request, response) -> {
             // Include a stack trace, except when the error is known to be about unauthenticated or unauthorized access,
             // in which case we don't want to leak information about the server to people scanning it for weaknesses.
-            if (e.type == AnalysisServerException.TYPE.UNAUTHORIZED ||
-                e.type == AnalysisServerException.TYPE.FORBIDDEN
+            if (e.type == AnalysisServerException.Type.UNAUTHORIZED ||
+                e.type == AnalysisServerException.Type.FORBIDDEN
             ){
                 JSONObject body = new JSONObject();
                 body.put("type", e.type.toString());
@@ -176,27 +180,44 @@ public class HttpApi implements Component {
                 response.type("application/json");
                 response.body(body.toJSONString());
             } else {
-                BackendMain.respondToException(e, request, response, e.type.name(), e.message, e.httpCode);
+                respondToException(e, request, response, e.type, e.message, e.httpCode);
             }
         });
 
         sparkService.exception(IOException.class, (e, request, response) -> {
-            BackendMain.respondToException(e, request, response, "BAD_REQUEST", e.toString(), 400);
+            respondToException(e, request, response, BAD_REQUEST, e.toString(), 400);
         });
 
         sparkService.exception(FileUploadException.class, (e, request, response) -> {
-            BackendMain.respondToException(e, request, response, "BAD_REQUEST", e.toString(), 400);
+            respondToException(e, request, response, BAD_REQUEST, e.toString(), 400);
         });
 
         sparkService.exception(NullPointerException.class, (e, request, response) -> {
-            BackendMain.respondToException(e, request, response, "UNKNOWN", e.toString(), 400);
+            respondToException(e, request, response, UNKNOWN, e.toString(), 400);
         });
 
         sparkService.exception(RuntimeException.class, (e, request, response) -> {
-            BackendMain.respondToException(e, request, response, "RUNTIME", e.toString(), 400);
+            respondToException(e, request, response, RUNTIME, e.toString(), 400);
         });
 
         return sparkService;
+    }
+
+    private void respondToException(Exception e, Request request, Response response,
+                                    AnalysisServerException.Type type, String message, int code) {
+
+        // Stacktrace in ErrorEvent reused below to avoid repeatedly generating String of stacktrace.
+        ErrorEvent errorEvent = new ErrorEvent(e);
+        eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
+
+        JSONObject body = new JSONObject();
+        body.put("type", type.toString());
+        body.put("message", message);
+        body.put("stackTrace", errorEvent.stackTrace);
+
+        response.status(code);
+        response.type("application/json");
+        response.body(body.toJSONString());
     }
 
     // Maybe this should be done or called with a JVM shutdown hook

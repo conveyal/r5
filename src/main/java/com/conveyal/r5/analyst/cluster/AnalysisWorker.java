@@ -2,25 +2,17 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.analysis.BackendVersion;
-import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.LocalFileStorage;
-import com.conveyal.file.S3FileStorage;
-import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.common.Util;
-import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
@@ -40,10 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -51,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -389,7 +377,7 @@ public class AnalysisWorker implements Runnable {
                             } catch (Throwable t) {
                                 LOG.error(
                                     "An error occurred while handling a regional task, reporting to backend. {}",
-                                    ExceptionUtils.asString(t)
+                                    ExceptionUtils.stackTraceString(t)
                                 );
                                 synchronized (workResults) {
                                     workResults.add(new RegionalWorkResult(t, task));
@@ -743,7 +731,7 @@ public class AnalysisWorker implements Runnable {
             // Non-200 response code or a null entity. Something is weird.
             LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());
         } catch (Exception e) {
-            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.asString(e));
+            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.stackTraceString(e));
         } finally {
             // We have to properly close any streams so the HTTP connection is released back to the (finite) pool.
             EntityUtils.consumeQuietly(responseEntity);
@@ -776,7 +764,7 @@ public class AnalysisWorker implements Runnable {
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
             AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "transitive.json", buffer);
         } catch (Exception e) {
-            LOG.error("Exception saving static metadata: {}", ExceptionUtils.asString(e));
+            LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);
         }
     }
@@ -792,7 +780,7 @@ public class AnalysisWorker implements Runnable {
             WorkerComponents components = new WorkerComponents();
             components.analysisWorker.run();
         } catch (Exception e) {
-            LOG.error("Unhandled error in Conveyal Analysis Worker, shutting down. " + ExceptionUtils.asString(e));
+            LOG.error("Unhandled error in Conveyal Analysis Worker, shutting down. " + ExceptionUtils.stackTraceString(e));
         }
     }
 

@@ -2,13 +2,13 @@ package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.WorkerLauncher;
+import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -463,8 +463,8 @@ public class Broker {
             assembler.handleMessage(workResult);
             markTaskCompleted(job, workResult.taskId);
         } catch (Throwable t) {
-            LOG.error("Error assembling results for job {}", job.jobId);
-            recordJobError(job, ExceptionUtils.asString(t));
+            recordJobError(job, ExceptionUtils.stackTraceString(t));
+            eventBus.send(new ErrorEvent(t));
             return;
         }
         // When non-error results are received for several tasks we assume the regional analysis is running smoothly.

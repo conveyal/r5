@@ -24,7 +24,7 @@ public class TaskError {
         this.modificationId = null;
         this.title = "Unhandled error: " + throwable.getClass().getSimpleName();
         this.messages.add(ExceptionUtils.shortCauseString(throwable));
-        this.messages.add(ExceptionUtils.asString(throwable));
+        this.messages.add(ExceptionUtils.stackTraceString(throwable));
     }
 
     /**

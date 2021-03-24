@@ -7,7 +7,6 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -167,7 +166,7 @@ public class OpportunityDatasetController implements HttpController {
                                             downloadBatchId, regionId, status, grids);
             } catch (IOException e) {
                 status.completeWithError(e);
-                LOG.error("Exception processing LODES data: " + ExceptionUtils.asString(e));
+                LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
             }
         });
 
@@ -451,7 +450,7 @@ public class OpportunityDatasetController implements HttpController {
             formFields = sfu.parseParameterMap(req.raw());
         } catch (FileUploadException e) {
             // We can't even get enough information to create a status tracking object. Re-throw an exception.
-            throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.asString(e));
+            throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.stackTraceString(e));
         }
 
         // Parse required fields. Will throw a ServerException on failure.
@@ -769,7 +768,7 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         public void completeWithError (Exception e) {
-            message = "Unable to create opportunity dataset. " + ExceptionUtils.asString(e);
+            message = "Unable to create opportunity dataset. " + ExceptionUtils.stackTraceString(e);
             completed(Status.ERROR);
         }
 

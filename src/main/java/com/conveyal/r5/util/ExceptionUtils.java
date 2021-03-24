@@ -1,7 +1,5 @@
 package com.conveyal.r5.util;
 
-import com.google.common.collect.Lists;
-
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -22,7 +20,7 @@ public abstract class ExceptionUtils {
      * chain of causes showing multiple stack traces, avoiding any reference loops. The resulting string will contain
      * linefeeds and tabs which must be properly handled when displaying (e.g. in HTML).
      */
-    public static String asString(Throwable throwable) {
+    public static String stackTraceString (Throwable throwable) {
         StringWriter sw = new StringWriter();
         throwable.printStackTrace(new PrintWriter(sw));
         return sw.toString();
@@ -49,7 +47,7 @@ public abstract class ExceptionUtils {
     }
 
     public static String shortAndLongString (Throwable throwable) {
-        return shortCauseString(throwable) + "\n[detail follows]\n" + asString(throwable);
+        return shortCauseString(throwable) + "\n[detail follows]\n" + stackTraceString(throwable);
     }
 
 }

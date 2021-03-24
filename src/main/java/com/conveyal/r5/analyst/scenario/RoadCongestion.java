@@ -180,7 +180,7 @@ public class RoadCongestion extends Modification {
                 logUpdatedEdgeCounts = false;
             }
         } catch (Exception e) {
-            errors.add(ExceptionUtils.asString(e));
+            errors.add(ExceptionUtils.stackTraceString(e));
         }
         return errors.size() > 0;
     }

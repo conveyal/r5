@@ -103,20 +103,6 @@ public class ConfigBase {
         return false;
     }
 
-    protected <E extends Enum<E>> E enumProp (Class<E> enumClass, String key) {
-        String val = strProp(key);
-        if (val != null) {
-            try {
-                return Enum.valueOf(enumClass, strProp(key));
-            } catch (IllegalArgumentException e) {
-                LOG.error("Value of configuration option '{}' was not a valid {}",
-                        key, enumClass.getClass().getSimpleName());
-                keysWithErrors.add(key);
-            }
-        }
-        return null;
-    }
-
     /** Call this after reading all properties to enforce the presence of all configuration options. */
     protected void exitIfErrors () {
         if (!keysWithErrors.isEmpty()) {

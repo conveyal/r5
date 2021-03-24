@@ -7,6 +7,8 @@ import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.analyst.progress.TaskAction;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -24,24 +26,25 @@ public abstract class BackendMain {
         startServer(components);
     }
 
-    protected static void startServer (BackendComponents components, Thread... postStartupThreads) {
+    protected static void startServer (BackendComponents components, TaskAction... postStartupTasks) {
         // We have several non-daemon background thread pools which will keep the JVM alive if the main thread crashes.
         // If initialization fails, we need to catch the exception or error and force JVM shutdown.
         try {
-            startServerInternal(components, postStartupThreads);
+            startServerInternal(components, postStartupTasks);
         } catch (Throwable throwable) {
             LOG.error("Exception while starting up backend, shutting down JVM.\n{}", ExceptionUtils.stackTraceString(throwable));
             System.exit(1);
         }
     }
 
-    private static void startServerInternal (BackendComponents components, Thread... postStartupThreads) {
+    private static void startServerInternal (BackendComponents components, TaskAction... postStartupTasks) {
         LOG.info("Starting Conveyal analysis backend, the time is now {}", DateTime.now());
         LOG.info("Backend version is: {}", BackendVersion.instance.version);
         LOG.info("Connecting to database...");
 
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
-        // passing in non-static components we've already created. TODO migrate to non-static Components.
+        // passing in non-static components we've already created.
+        // TODO migrate to non-static Components.
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
         // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
@@ -56,9 +59,9 @@ public abstract class BackendMain {
         }
 
         LOG.info("Conveyal Analysis server is ready.");
-        // TODO replace postStartupThreads with something like components.taskScheduler.enqueueHeavyTask();
-        for (Thread thread : postStartupThreads) {
-            thread.start();
+        for (TaskAction taskAction : postStartupTasks) {
+            components.taskScheduler.enqueue(Task.system()
+                    .withDescription(Runnable.class.getSimpleName()).setHeavy(true).withAction(taskAction));
         }
 
         if (components.config.immediateShutdown) {

@@ -80,7 +80,7 @@ public class WorkerConfig extends ConfigBase implements
     @Override public String  awsRegion()       { return awsRegion; }
     @Override public String  bucketPrefix()    { return bucketPrefix; }
     @Override public String  initialGraphId()  { return initialGraphId; }
-    @Override public String  cacheDirectory()  { return cacheDirectory; }
+    @Override public String localCacheDirectory ()  { return cacheDirectory; }
     @Override public String  brokerAddress()   { return brokerAddress; }
     @Override public String  brokerPort()      { return brokerPort; }
     @Override public boolean autoShutdown()    { return autoShutdown; }

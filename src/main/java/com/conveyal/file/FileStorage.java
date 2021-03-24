@@ -22,7 +22,7 @@ public interface FileStorage {
 
     public interface Config {
         // The local directory where files will be stored, even if they are being mirrored to a remote storage service.
-        String cacheDirectory();
+        String localCacheDirectory ();
         // This is actually only needed for th S3 implementation,
         // but leaving it alone because I expect to remove this parameter entirely.
         String awsRegion();

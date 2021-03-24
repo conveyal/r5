@@ -90,7 +90,7 @@ public class AnalysisWorker implements Runnable {
          * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
          */
         boolean testTaskRedelivery();
-        String cacheDirectory();
+        String localCacheDirectory();
         String awsRegion(); // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
         String brokerAddress();
         String brokerPort();

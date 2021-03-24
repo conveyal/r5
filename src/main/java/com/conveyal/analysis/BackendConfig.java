@@ -10,6 +10,7 @@ import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
 import org.slf4j.Logger;
@@ -58,7 +59,7 @@ public class BackendConfig extends ConfigBase implements
         this(propsFromFile(filename));
     }
 
-    private BackendConfig (Properties properties) {
+    protected BackendConfig (Properties properties) {
         super(properties);
         // We intentionally don't supply any defaults here.
         // Any 'defaults' should be shipped in an example config file.

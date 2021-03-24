@@ -3,6 +3,7 @@ package com.conveyal.analysis.components;
 import com.conveyal.analysis.BackendConfig;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.components.eventbus.ErrorLogger;
 import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
@@ -53,6 +54,7 @@ public class LocalBackendComponents extends BackendComponents {
         httpApi = new HttpApi(fileStorage, authentication, eventBus, config, standardHttpControllers(this));
         // compute = new LocalCompute();
         // persistence = persistence(local_Mongo)
+        eventBus.addHandlers(new ErrorLogger());
     }
 
     /**
@@ -63,6 +65,7 @@ public class LocalBackendComponents extends BackendComponents {
      * of components into the HttpApi constructor, ensuring clear declaration of each component's dependencies.
      * Such bulk-passing of components should only occur in this wiring-up code, not in component code.
      * TODO make non-static to avoid repeating "components." everywhere, as long as that's compatible with Cluster.
+     *      Move up one level to BackendComponents
      */
      public static List<HttpController> standardHttpControllers (BackendComponents components) {
         final List<HttpController> httpControllers = Arrays.asList(

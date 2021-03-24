@@ -180,8 +180,13 @@ public class Task implements Runnable, ProgressListener {
 
     @Override
     public void beginTask(String description, int totalElements) {
-        // Just using an existing interface that may eventually be modified to not include this method.
-        throw new UnsupportedOperationException();
+        // This is an existing interface; we may want to modify it so number of units can be set at any time.
+        // It is much more flexible to have the TaskAction set the totalWorkUnits itself when it starts, rather
+        // than calling withTotalWorkUnits - anyway total work units is only relevant when showing active progress.
+        // On the other hand the description probably should be set ahead of time.
+        this.description = description;
+        this.totalWorkUnits = totalElements;
+        this.currentWorkUnit = 0;
     }
 
     @Override
@@ -224,6 +229,15 @@ public class Task implements Runnable, ProgressListener {
     /** Call this static factory to begin building a task. */
     public static Task forUser (UserPermissions userPermissions) {
         Task task = new Task(userPermissions);
+        return task;
+    }
+
+    /**
+     * Call this static factory to begin building a task that will not be associated with any user.
+     * TODO distinguish between "[system] (no) user" and "other user, but not visible to that user".
+     */
+    public static Task system () {
+        Task task = new Task(new UserPermissions("[system]", true, "[system]"));
         return task;
     }
 

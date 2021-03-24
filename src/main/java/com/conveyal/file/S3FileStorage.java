@@ -23,6 +23,7 @@ public class S3FileStorage implements FileStorage {
     /**
      * This allows us to use different sets of buckets for different deployment environments.
      * For a given file category, the end of the bucket name is identical in all environments but this prefix changes.
+     * TODO eventually this should be derived from the deployment-name config property (conveyal-{deployment-name})
      */
     private final String bucketPrefix;
 

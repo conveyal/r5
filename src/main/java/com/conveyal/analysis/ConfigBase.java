@@ -62,6 +62,8 @@ public class ConfigBase {
     // Always use the following *Prop methods to read properties. This will catch and log missing keys or parse
     // exceptions, allowing config loading to continue and reporting as many problems as possible at once.
 
+    // Catches and records missing values,
+    // so methods that wrap this and parse into non-String types can just ignore null values.
     protected String strProp (String key) {
         String value = properties.getProperty(key);
         if (value == null) {
@@ -99,6 +101,20 @@ public class ConfigBase {
             }
         }
         return false;
+    }
+
+    protected <E extends Enum<E>> E enumProp (Class<E> enumClass, String key) {
+        String val = strProp(key);
+        if (val != null) {
+            try {
+                return Enum.valueOf(enumClass, strProp(key));
+            } catch (IllegalArgumentException e) {
+                LOG.error("Value of configuration option '{}' was not a valid {}",
+                        key, enumClass.getClass().getSimpleName());
+                keysWithErrors.add(key);
+            }
+        }
+        return null;
     }
 
     /** Call this after reading all properties to enforce the presence of all configuration options. */

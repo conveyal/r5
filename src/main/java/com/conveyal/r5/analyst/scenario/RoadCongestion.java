@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.analyst.FileCategory;
+import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileCategory;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -27,6 +28,8 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
+
+import static com.conveyal.file.FileCategory.POLYGONS;
 
 /**
  * To simulate traffic congestion, apply a slow-down (or speed-up) factor to roads, according to attributes of polygon
@@ -108,16 +111,9 @@ public class RoadCongestion extends Modification {
         // Polygon should only need to be fetched once when the scenario is applied, then the resulting network is cached.
         // this.features = polygonLayerCache.getPolygonFeatureCollection(this.polygonLayer);
         // Note: Newer JTS now has GeoJsonReader
-        try {
-            InputStream s3InputStream = AnalysisWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
-            // To test on local files:
-            //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
-            // TODO handle gzip decompression in FilePersistence base class.
-            if (polygonLayer.endsWith(".gz")) {
-                s3InputStream = new GZIPInputStream(s3InputStream);
-            }
+        try (InputStream inputStream = WorkerComponents.fileStorage.getInputStream(POLYGONS, polygonLayer)) {
             FeatureJSON featureJSON = new FeatureJSON();
-            FeatureCollection featureCollection = featureJSON.readFeatureCollection(s3InputStream);
+            FeatureCollection featureCollection = featureJSON.readFeatureCollection(inputStream);
             LOG.info("Validating features and creating spatial index...");
             polygonSpatialIndex = new STRtree();
             FeatureType featureType = featureCollection.getSchema();

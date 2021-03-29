@@ -23,7 +23,6 @@ public class WorkerConfig extends ConfigBase implements
     // INSTANCE FIELDS
 
     private final boolean workOffline;
-    private final String  awsRegion; // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
     private final String  bucketPrefix;
     private final String  initialGraphId;
     private final String  cacheDirectory;
@@ -46,10 +45,9 @@ public class WorkerConfig extends ConfigBase implements
         workOffline = boolProp("work-offline");
         if (workOffline) {
             // Candidates for separate offline worker config - but might not be worth it for 2 options.
-            awsRegion = initialGraphId = null;
+            initialGraphId = null;
             bucketPrefix = null;
         } else {
-            awsRegion = strProp("aws-region");
             initialGraphId = strProp("initial-graph-id");
             bucketPrefix = strProp("bucket-prefix");
         }
@@ -75,7 +73,6 @@ public class WorkerConfig extends ConfigBase implements
     // Note that one method can implement several Config interfaces at once.
 
     @Override public boolean workOffline()     { return workOffline; }
-    @Override public String  awsRegion()       { return awsRegion; }
     @Override public String  bucketPrefix()    { return bucketPrefix; }
     @Override public int     serverPort()      { return -1; }
     @Override public String  initialGraphId()  { return initialGraphId; }

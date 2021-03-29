@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.path.Path;
@@ -183,8 +184,7 @@ public class PathWriter {
             throw new RuntimeException("IO exception while writing path grid.", e);
         }
         persistenceBuffer.doneWriting();
-        String pathFileName = task.taskId + "_paths.dat";
-        AnalysisWorker.filePersistence.saveStaticSiteData(task, pathFileName, persistenceBuffer);
+        WorkerComponents.fileStorage.saveTauiData(task, task.taskId + "_paths.dat", persistenceBuffer);
     }
 
 }

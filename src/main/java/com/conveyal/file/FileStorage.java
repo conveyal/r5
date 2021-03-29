@@ -3,7 +3,12 @@ package com.conveyal.file;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Store files, optionally mirroring them to cloud storage for retrieval by workers and future backend deployments.
@@ -46,9 +51,6 @@ public interface FileStorage {
      */
     File getFile(FileStorageKey fileStorageKey);
 
-    // S3FilePersistence had the following method - should we be returning streams instead of Files?
-    //     public InputStream getData(FileCategory category, String name) {
-
     /**
      * Get the URL for the File identified by the FileStorageKey. This provides a way for a browser-based UI to read
      * the file without going through the backend. This can be an S3 URL available over the web or a file:// URL when
@@ -71,17 +73,22 @@ public interface FileStorage {
     boolean exists(FileStorageKey fileStorageKey);
 
 
-    ///===
+    //// Convenience methods usable with all concrete subclasses.
 
-    /**
-     * Convenience method to ensure that all results files for a particular static site end up in the same place,
-     * which is typically a bucket on S3. The top level directory is hard-coded for now but could be configurable
-     * if and when actual use cases require it.
-     */
-    public static void saveStaticSiteData (AnalysisWorkerTask task, String fileName, PersistenceBuffer persistenceBuffer) {
-        String directoryName = "analysis-static/" + task.jobId;
-        saveData(directoryName, fileName, persistenceBuffer);
+    /** Store Taui output in subfolders by job ID. */
+    default void saveTauiData (AnalysisWorkerTask task, String fileName, PersistenceBuffer buffer) {
+        FileStorageKey key = new FileStorageKey(FileCategory.TAUI, String.join("/", task.jobId, fileName));
+        moveIntoStorage(key, buffer);
     }
 
+    /** Read from a file as a stream, decompressing if the name indicates it's gzipped. */
+    default InputStream getInputStream (FileCategory fileCategory, String fileName) throws IOException {
+        InputStream inputStream = new FileInputStream(getFile(new FileStorageKey(fileCategory, fileName)));
+        if (fileName.endsWith(".gz")) {
+            return new GZIPInputStream(inputStream);
+        } else {
+            return new BufferedInputStream(inputStream);
+        }
+    }
 
 }

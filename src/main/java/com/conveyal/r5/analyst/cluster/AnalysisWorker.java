@@ -3,7 +3,9 @@ package com.conveyal.r5.analyst.cluster;
 import com.amazonaws.regions.Regions;
 import com.conveyal.analysis.BackendVersion;
 import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
@@ -13,7 +15,6 @@ import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
 import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -97,8 +98,7 @@ public class AnalysisWorker implements Runnable {
     // CONSTANTS
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
-    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
-    private static final String DEFAULT_BROKER_PORT = "7070";
+
     public static final int POLL_WAIT_SECONDS = 15;
     public static final int POLL_MAX_RANDOM_WAIT = 5;
 
@@ -199,6 +199,8 @@ public class AnalysisWorker implements Runnable {
                 .build();
     }
 
+    private final FileStorage fileStorage;
+
     /**
      * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
      * TODO use the WebMercatorGridExtents in these Grids.
@@ -226,8 +228,7 @@ public class AnalysisWorker implements Runnable {
 
     /** Constructor that takes injected components. */
     public AnalysisWorker (
-            FileStorage fileStore,
-            TransportNetworkCache transportNetworkCache,
+            FileStorage fileStorage,
             NetworkPreloader networkPreloader,
             Config config
     ) {
@@ -248,7 +249,8 @@ public class AnalysisWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.initialGraphId();
 
-        this.pointSetCache = new PointSetCache(fileStore); // Make this cache a component?
+        this.fileStorage = fileStorage;
+        this.pointSetCache = new PointSetCache(fileStorage); // Make this cache a component?
         this.networkPreloader = networkPreloader;
 
         // Keep the worker alive for an initial window to prepare for analysis
@@ -546,7 +548,7 @@ public class AnalysisWorker implements Runnable {
         // Arbitrarily we create this metadata as part of the first task in the job.
         if (task.makeTauiSite && task.taskId == 0) {
             LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-            saveStaticSiteMetadata(task, transportNetwork);
+            saveTauiMetadata(task, transportNetwork);
         }
 
         // Advance the shutdown clock to reflect that the worker is performing regional work.
@@ -565,7 +567,7 @@ public class AnalysisWorker implements Runnable {
                 TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
                 PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
                 String timesFileName = task.taskId + "_times.dat";
-                filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
+                fileStorage.saveTauiData(task, timesFileName, persistenceBuffer);
             } else {
                 LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
@@ -733,21 +735,21 @@ public class AnalysisWorker implements Runnable {
     /**
      * Generate and write out metadata describing what's in a directory of static site output.
      */
-    public static void saveStaticSiteMetadata (AnalysisWorkerTask analysisWorkerTask, TransportNetwork network) {
+    public void saveTauiMetadata (AnalysisWorkerTask analysisWorkerTask, TransportNetwork network) {
         try {
             // Save the regional analysis request, giving the UI some context to display the results.
             // This is the request object sent to the workers to generate these static site regional results.
             PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisWorkerTask);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "request.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "request.json", buffer);
 
             // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
             buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "warnings.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "warnings.json", buffer);
 
             // Save transit route data that allows rendering paths with the Transitive library in a separate file.
             TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "transitive.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "transitive.json", buffer);
         } catch (Exception e) {
             LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);

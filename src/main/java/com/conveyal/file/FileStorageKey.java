@@ -21,10 +21,6 @@ public class FileStorageKey {
         this(category, path + "." + ext);
     }
 
-    public String getFullPath() {
-        return String.join("/", category.directoryName(), path);
-    }
-
     @Override
     public String toString () {
         return String.format("[File storage key: category='%s', key='%s']", category, path);

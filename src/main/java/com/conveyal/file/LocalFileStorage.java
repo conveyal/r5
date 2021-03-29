@@ -36,6 +36,7 @@ public class LocalFileStorage implements FileStorage {
     /**
      * Move the File into the FileStorage by moving the passed in file to the Path represented by the FileStorageKey.
      */
+    @Override
     public void moveIntoStorage(FileStorageKey key, File file) {
         // Get a pointer to the local file
         File storedFile = getFile(key);
@@ -64,6 +65,7 @@ public class LocalFileStorage implements FileStorage {
         throw new UnsupportedOperationException("In-memory buffers are only persisted to cloud storage.");
     }
 
+    @Override
     public File getFile(FileStorageKey key) {
         return new File(String.join("/", directory, key.category.directoryName(), key.path));
     }
@@ -73,14 +75,17 @@ public class LocalFileStorage implements FileStorage {
      * (Registered in HttpApi at .get("/files/:category/*"))
      * This exists to allow the same UI to work locally and in cloud deployments.
      */
+    @Override
     public String getURL (FileStorageKey key) {
         return String.join("/", urlPrefix, key.category.directoryName(), key.path);
     }
 
+    @Override
     public void delete (FileStorageKey key) {
         getFile(key).delete();
     }
 
+    @Override
     public boolean exists(FileStorageKey key) {
         return getFile(key).exists();
     }

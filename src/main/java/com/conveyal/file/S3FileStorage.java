@@ -56,6 +56,7 @@ public class S3FileStorage implements FileStorage {
     }
 
     /** Move the file into S3 and then into local file storage. */
+    @Override
     public void moveIntoStorage(FileStorageKey key, File file) {
         PutObjectRequest putObjectRequest = new PutObjectRequest(bucket(key), key.path, file);
         if (FileUtils.isGzip(file)) {
@@ -99,6 +100,7 @@ public class S3FileStorage implements FileStorage {
         }
     }
 
+    @Override
     public File getFile(FileStorageKey key) {
         File localFile = localFileStorage.getFile(key);
         // A File object can represent a filesystem path for a file that doesn't exist yet, in which case we create it.
@@ -119,6 +121,7 @@ public class S3FileStorage implements FileStorage {
         return localFile;
     }
 
+    @Override
     public String getURL (FileStorageKey key) {
         GeneratePresignedUrlRequest urlRequest = new GeneratePresignedUrlRequest(bucket(key), key.path)
                 .withMethod(HttpMethod.GET)
@@ -127,15 +130,18 @@ public class S3FileStorage implements FileStorage {
         return s3.generatePresignedUrl(urlRequest).toString();
     }
 
+    @Override
     public void delete(FileStorageKey key) {
         localFileStorage.delete(key);
         s3.deleteObject(bucket(key), key.path);
     }
 
+    @Override
     public boolean exists(FileStorageKey key) {
         if (localFileStorage.exists(key)) {
             return true;
         }
         return s3.doesObjectExist(bucket(key), key.path);
     }
+
 }

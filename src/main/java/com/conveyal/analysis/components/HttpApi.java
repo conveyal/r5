@@ -46,7 +46,7 @@ public class HttpApi implements Component {
     public static final String USER_GROUP_ATTRIBUTE = "accessGroup";
 
     public interface Config {
-        boolean offline ();
+        boolean offline (); // TODO remove this parameter, use different Components types instead
         int serverPort ();
     }
 
@@ -142,6 +142,7 @@ public class HttpApi implements Component {
 
         // Expose all files in storage while in offline mode.
         // Not done with static file serving because it automatically gzips our already gzipped files.
+        // TODO this should be an HttpController only added in LocalComponents
         if (config.offline()) {
             sparkService.get("/files/:category/*", (req, res) -> {
                 String filename = req.splat()[0];

@@ -1,10 +1,8 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.file.FileStorage;
-import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.file.S3FileStorage;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
-import com.conveyal.r5.streets.OSMCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,7 +11,7 @@ import java.util.Properties;
 /** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
 public class WorkerConfig extends ConfigBase implements
         TaskScheduler.Config,
-        FileStorage.Config,
+        S3FileStorage.Config,
         AnalysisWorker.Config
 {
 
@@ -79,8 +77,9 @@ public class WorkerConfig extends ConfigBase implements
     @Override public boolean workOffline()     { return workOffline; }
     @Override public String  awsRegion()       { return awsRegion; }
     @Override public String  bucketPrefix()    { return bucketPrefix; }
+    @Override public int     serverPort()      { return -1; }
     @Override public String  initialGraphId()  { return initialGraphId; }
-    @Override public String localCacheDirectory ()  { return cacheDirectory; }
+    @Override public String  localCacheDirectory ()  { return cacheDirectory; }
     @Override public String  brokerAddress()   { return brokerAddress; }
     @Override public String  brokerPort()      { return brokerPort; }
     @Override public boolean autoShutdown()    { return autoShutdown; }

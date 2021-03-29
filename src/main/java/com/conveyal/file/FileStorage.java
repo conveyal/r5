@@ -1,34 +1,19 @@
 package com.conveyal.file;
 
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
 import java.io.File;
 
 /**
  * Store files, optionally mirroring them to cloud storage for retrieval by workers and future backend deployments.
  * These are always used as files on the local filesystem, and are treated as immutable once put into storage.
- * <p>
- * The add/remove/etc. methods are all blocking calls now for simplicity, i.e. if you add a file, all other components
- * of the system are known to be able to see it as soon as the method returns.
- * <p>
- * This does not handle storing file metadata in MongoDB. That is a separate concern. Workers for example need to get
- * files without looking into our database. Our file metadata handling component could wrap this, so all backend file
- * operations implicitly had metadata.
- * <p>
- * In the S3-based implementation we need to set content type and compression details on S3. We plan to do that by
- * inspecting the "magic number" bytes at the beginning of the file and auto-setting the content type.
+ * For simplicity, methods that store and remove files are all blocking calls. If you add a file, all other components
+ * of the system are known to be able to see it as soon as the method returns. This does not handle storing file
+ * metadata in MongoDB. That is a separate concern. Workers need to get files without looking into our database.
+ * Our file metadata handling component could wrap FileStorage, so all backend file operations implicitly had metadata.
  */
 public interface FileStorage {
-
-    public interface Config {
-        // The local directory where files will be stored, even if they are being mirrored to a remote storage service.
-        String localCacheDirectory ();
-        // This is actually only needed for th S3 implementation,
-        // but leaving it alone because I expect to remove this parameter entirely.
-        String awsRegion();
-        // This is actually only needed for the S3 implementation, it should eventually be moved.
-        String bucketPrefix();
-    }
 
     /**
      * Takes an already existing file on the local filesystem and registers it as a permanent, immutable file to be
@@ -40,45 +25,63 @@ public interface FileStorage {
     void moveIntoStorage(FileStorageKey fileStorageKey, File file);
 
     /**
-     * Move the data in the buffer into permanent storage, much like moveIntoStorage(), but do not retain locally.
+     * Move the data in an in-memory buffer into permanent storage, much like moveIntoStorage(key, file).
      * The PersistenceBuffer must be marked 'done' before it is handed to this method.
-     * Treat the TAUI category in a special way: don't keep it locally if mirrored remotely.
-     * Unlike the other file categories, it's produced on the worker (as opposed to the backend), and it will never
-     * be read by the worker, so doesn't need to be kept once stored to S3. That could be a parameter but for now we'll
-     * do it purely based on the file type. TAUI and in the future maybe some other kinds of results.
+     * Files in the TAUI category are treated in a special way: they are not kept locally if mirrored remotely.
+     * Unlike the other file categories, these are produced on the worker (as opposed to the backend), and will never
+     * be read by the worker, so don't need to be kept once stored to S3.
      *
-     * This is a blocking call and should only return when the file is completely uploaded.
-     * That prevents our workers from producing output faster than uploads can complete,
-     * and building up a queue of waiting uploads.
+     * This is a blocking call and should only return when the file is completely uploaded. This prevents workers from
+     * producing output faster than uploads can complete, avoiding a growing queue of waiting uploads.
      *
-     * TODO use with new FileStorageKey(TAUI, analysisWorkerTask.jobId);
+     * TODO call with FileStorageKey(TAUI, analysisWorkerTask.jobId);
      * TODO eventually unify with moveIntoStorage, by wrapping File in FileStorageBuffer?
      */
-    default void moveIntoStorage(FileStorageKey fileStorageKey, PersistenceBuffer persistenceBuffer) { }
+    void moveIntoStorage(FileStorageKey fileStorageKey, PersistenceBuffer persistenceBuffer);
 
     /**
-     * This should be treated as immutable - never write to a file returned from this method.
-     * That could be enforced by making our own class with no write methods, that only allows reading the file.
-     * We may also want to set the file's access flags to read-only so exceptions will occur if we ever write.
+     * Files returned from this method must be treated as immutable. Never write to them. Immutability could be
+     * enforced by making our own class with no write methods and only allows reading the file. It may be more
+     * practical to set the file's access flags to read-only so exceptions will occur if we ever write.
      */
     File getFile(FileStorageKey fileStorageKey);
 
+    // S3FilePersistence had the following method - should we be returning streams instead of Files?
+    //     public InputStream getData(FileCategory category, String name) {
+
     /**
-     * Get the URL for the File located at the FileStorageKey. This can be a file:// URL when running locally or a URL
-     * available on the web generated by S3.
+     * Get the URL for the File identified by the FileStorageKey. This provides a way for a browser-based UI to read
+     * the file without going through the backend. This can be an S3 URL available over the web or a file:// URL when
+     * running locally.
      */
     String getURL(FileStorageKey fileStorageKey);
 
     /**
-     * Delete the File located at the FileStorageKey.
+     * Delete the File identified by the FileStorageKey, in both the local cache and any remote mirror.
      */
     void delete(FileStorageKey fileStorageKey);
 
     /**
+     * TODO explain what this method actually does.
      * When a new server is spun up there will be no local files. In instances where we derive files from other files
      * (ex: creating Tiffs from Grids) and if they are already created we only need to return a download URL and therefore
      * not need to retrieve the file at all, it would be useful to check if the file exists in the FileStorage without
      * actually retrieving it.
      */
     boolean exists(FileStorageKey fileStorageKey);
+
+
+    ///===
+
+    /**
+     * Convenience method to ensure that all results files for a particular static site end up in the same place,
+     * which is typically a bucket on S3. The top level directory is hard-coded for now but could be configurable
+     * if and when actual use cases require it.
+     */
+    public static void saveStaticSiteData (AnalysisWorkerTask task, String fileName, PersistenceBuffer persistenceBuffer) {
+        String directoryName = "analysis-static/" + task.jobId;
+        saveData(directoryName, fileName, persistenceBuffer);
+    }
+
+
 }

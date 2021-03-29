@@ -7,6 +7,7 @@ import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.LocalFileStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +21,8 @@ public class BackendConfig extends ConfigBase implements
         HttpApi.Config,
         OpportunityDatasetController.Config,
         SeamlessCensusGridExtractor.Config,
-        LocalWorkerLauncher.Config
+        LocalWorkerLauncher.Config,
+        LocalFileStorage.Config
 {
 
     // CONSTANTS AND STATIC FIELDS

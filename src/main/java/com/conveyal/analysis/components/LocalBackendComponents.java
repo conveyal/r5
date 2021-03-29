@@ -17,14 +17,10 @@ import com.conveyal.r5.streets.OSMCache;
  */
 public class LocalBackendComponents extends BackendComponents {
 
-
     public LocalBackendComponents () {
         config = BackendConfig.fromDefaultFile();
         taskScheduler = new TaskScheduler(config);
-        fileStorage = new LocalFileStorage(
-                config.localCacheDirectory(),
-                String.format("http://localhost:%s/files", config.serverPort())
-        );
+        fileStorage = new LocalFileStorage(config);
         gtfsCache = new GTFSCache(fileStorage);
         osmCache = new OSMCache(fileStorage);
         // New (October 2019) DB layer, this should progressively replace the Persistence class

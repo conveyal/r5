@@ -6,7 +6,6 @@ import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.PointSetCache;
@@ -54,7 +53,6 @@ import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This is a main class run by worker machines in our Analysis computation cluster. It polls a broker requesting work
@@ -69,7 +67,7 @@ public class AnalysisWorker implements Runnable {
      * This config interface is kind of huge and includes most things in the WorkerConfig.
      * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
      */
-    public static interface Config {
+    public interface Config {
 
         /** Whether this worker should shut down automatically when idle. */
         boolean autoShutdown();
@@ -90,8 +88,6 @@ public class AnalysisWorker implements Runnable {
          * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
          */
         boolean testTaskRedelivery();
-        String localCacheDirectory();
-        String awsRegion(); // This shouldn't be needed on recent AWS SDKs, eventually eliminate it.
         String brokerAddress();
         String brokerPort();
         String initialGraphId();
@@ -145,11 +141,6 @@ public class AnalysisWorker implements Runnable {
      * Actually by setting the thread name / creating a new thread maybe we can get around this somehow.
      */
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
-
-    // TODO combine this with FileStorage - currently used for TAUI result uploads and polygon downloads
-    // FIXME it's ugly that this is initialized statically
-    public static FilePersistence filePersistence;
-
 
     // INSTANCE FIELDS
 
@@ -236,7 +227,6 @@ public class AnalysisWorker implements Runnable {
     /** Constructor that takes injected components. */
     public AnalysisWorker (
             FileStorage fileStore,
-            FilePersistence filePersistence,
             TransportNetworkCache transportNetworkCache,
             NetworkPreloader networkPreloader,
             Config config
@@ -249,11 +239,6 @@ public class AnalysisWorker implements Runnable {
         if (config.workOffline()) {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
-
-        // TODO Merge with FileStorage.
-        //      Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
-        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
-        this.filePersistence = filePersistence;
 
         this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 

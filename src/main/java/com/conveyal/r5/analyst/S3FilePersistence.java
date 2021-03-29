@@ -20,9 +20,9 @@ import java.io.InputStream;
 import static com.conveyal.r5.common.Util.human;
 
 /**
- * An implementation of long-term file persistence using Amazon AWS S3.
  *
  * For any file whose length is not known in advance, the S3 client will buffer the whole thing in memory.
+ *
  * This obviously dangerous because it can exhaust memory. However, when we are going to gzip files, we just don't
  * know the size in advance. If the files are known to be reasonably small, we can do all the layout and compression
  * in memory buffers then upload from the buffer, whose length is known.
@@ -33,7 +33,10 @@ import static com.conveyal.r5.common.Util.human;
  * Because the entire stream contents must be buffered in memory, this can be very expensive, and should be
  * avoided whenever possible."
  *
+ * DEPRECATED: check for any comments or implementation details we want to carry over to S3FileStorage.
+ * For example, use of the S3 TransferManager. But the low level AmazonS3 client might be better for our case.
  */
+@Deprecated
 public class S3FilePersistence extends FilePersistence {
 
     public static final Logger LOG = LoggerFactory.getLogger(S3FilePersistence.class);

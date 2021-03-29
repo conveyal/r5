@@ -14,6 +14,13 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Date;
 
+/**
+ * An implementation of FileStorage which persists immutable files to AWS S3 indefinitely into the future.
+ * Most stored files are also mirrored "locally", which on AWS EC2 means EBS network-attached storage, because AWS EBS
+ * is much faster than S3 and allows random access. This local mirror is ephemeral, only expected to survive until the
+ * instance is terminated. Future deployments of the backend or workers will be able to re-mirror the same files from
+ * S3. Files in the FileCategory TAUI are an exception and are not mirrored locally, only stored on S3.
+ */
 public class S3FileStorage implements FileStorage {
 
     private final AmazonS3 s3;
@@ -54,6 +61,9 @@ public class S3FileStorage implements FileStorage {
             putObjectRequest.withMetadata(metadata);
         }
         s3.putObject(putObjectRequest);
+
+        // TODO when applying to in-memory buffers, or unified memory/disk buffers:
+        //  if (key.category != FileCategory.TAUI) { move into local file storage }
 
         // Add to the file storage after. This method moves the File.
         localFileStorage.moveIntoStorage(key, file);

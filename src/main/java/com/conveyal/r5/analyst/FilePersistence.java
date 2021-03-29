@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
 import java.io.InputStream;
@@ -8,7 +9,11 @@ import java.io.InputStream;
  * This is an abstraction for long term file storage.
  * We used to use only S3 for this, but we now provide an abstract class to allow multiple implementations.
  * Files saved by an implementation should be available to both the backend and the workers indefinitely into the future.
+ *
+ * Currently the only implementation is S3FilePersistence.
+ * This is deprecated and being merged with FileStorage.
  */
+@Deprecated
 public abstract class FilePersistence {
 
     /**
@@ -21,12 +26,7 @@ public abstract class FilePersistence {
         saveData(directoryName, fileName, persistenceBuffer);
     }
 
-    /**
-     * This is a blocking call and should only return when the file is completely uploaded.
-     * That prevents our workers from producing output faster than uploads can complete,
-     * and building up a queue of waiting uploads.
-     * The PersistenceBuffer must be marked 'done' before it is handed to this method.
-     */
+    /** This method is being migrated to FileStorage */
     public abstract void saveData (String directory, String fileName, PersistenceBuffer persistenceBuffer);
 
     /**

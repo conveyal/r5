@@ -8,7 +8,7 @@ import java.util.Locale;
  */
 public enum FileCategory {
 
-    BUNDLES, GRIDS, RESULTS, RESOURCES;
+    BUNDLES, GRIDS, RESULTS, RESOURCES, POLYGONS, TAUI;
 
     /** @return a String for the directory or sub-bucket name containing all files in this category. */
     public String directoryName () {

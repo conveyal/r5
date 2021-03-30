@@ -24,6 +24,7 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.bson.types.ObjectId;
 import org.locationtech.jts.geom.Envelope;
+import org.mongojack.DBCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -32,6 +33,7 @@ import spark.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -103,6 +105,7 @@ public class BundleController implements HttpController {
      * Or simply not have "bundles" at all, and just supply a list of OSM and GTFS unique IDs to the workers.
      */
     private Bundle create (Request req, Response res) {
+        UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         // create the bundle
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final Bundle bundle = new Bundle();
@@ -112,18 +115,19 @@ public class BundleController implements HttpController {
 
             if (files.get("osmId") != null) {
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
-                Bundle bundleWithOsm = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get()).next();
-                if (bundleWithOsm == null) {
+                DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get());
+                if (!cursor.hasNext()) {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }
             }
 
             if (files.get("feedGroupId") != null) {
                 bundle.feedGroupId = files.get("feedGroupId").get(0).getString("UTF-8");
-                Bundle bundleWithFeed = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get()).next();
-                if (bundleWithFeed == null) {
+                DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get());
+                if (!cursor.hasNext()) {
                     throw AnalysisServerException.badRequest("Selected GTFS does not exist.");
                 }
+                Bundle bundleWithFeed = cursor.next();
                 bundle.north = bundleWithFeed.north;
                 bundle.south = bundleWithFeed.south;
                 bundle.east = bundleWithFeed.east;
@@ -131,121 +135,119 @@ public class BundleController implements HttpController {
                 bundle.serviceEnd = bundleWithFeed.serviceEnd;
                 bundle.serviceStart = bundleWithFeed.serviceStart;
                 bundle.feeds = bundleWithFeed.feeds;
-                bundle.feedsComplete = bundleWithFeed.feedsComplete;
-                bundle.totalFeeds = bundleWithFeed.totalFeeds;
+            } else {
+                bundle.serviceStart = LocalDate.MAX;
+                bundle.serviceEnd = LocalDate.MIN;
+                bundle.feeds = new ArrayList<>();
             }
-        } catch (Exception e) {
+        } catch (UnsupportedEncodingException e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
         }
 
         // Set `createdBy` and `accessGroup`
-        bundle.accessGroup = req.attribute("accessGroup");
-        bundle.createdBy = req.attribute("email");
+        bundle.accessGroup = user.accessGroup;
+        bundle.createdBy = user.email;
 
         Persistence.bundles.create(bundle);
 
         // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        taskScheduler.enqueue(Task.forUser(userPermissions)
-            .withDescription("Process OSM and GTFS")
-            .setHeavy(true)
+        final Task task = taskScheduler.newTaskForUser(user)
+            .withTag("category", "bundles")
+            .withTag("title", "Process OSM and GTFS for " + bundle.name)
+            .withTag("bundleId", bundle._id)
+            .withTag("regionId", bundle.regionId)
             .withTotalWorkUnits(
+                1 + // Initial creation
+                1 + // write manifest to cache
                 ((bundle.osmId == null) ? 1: 0) +
                 ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0)
             )
-            .withAction(progressListener -> {
-              try {
-                if (bundle.osmId == null) {
-                    // Process uploaded OSM.
-                    bundle.status = Bundle.Status.PROCESSING_OSM;
-                    bundle.osmId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+            .withLogEntry("Bundle creation started");
 
-                    DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
-                    OSM osm = new OSM(null);
-                    osm.intersectionDetection = true;
-                    osm.readPbf(fi.getInputStream());
+        task.withAction(p -> {
+            task.increment();
+            if (bundle.osmId == null) {
+                bundle.osmId = new ObjectId().toString();
 
-                    fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
-                    progressListener.increment();
-                }
+                DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
+                task.logEntry("Processing " + fi.getName());
+                OSM osm = new OSM(null);
+                osm.intersectionDetection = true;
+                osm.readPbf(fi.getInputStream());
+                task.logEntry("OSM processing complete");
 
-                if (bundle.feedGroupId == null) {
-                    // Process uploaded GTFS files
-                    bundle.status = Bundle.Status.PROCESSING_GTFS;
-                    bundle.feedGroupId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+                fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
+                task.increment();
+            }
 
-                    Envelope bundleBounds = new Envelope();
-                    bundle.serviceStart = LocalDate.MAX;
-                    bundle.serviceEnd = LocalDate.MIN;
-                    bundle.feeds = new ArrayList<>();
-                    bundle.totalFeeds = files.get("feedGroup").size();
+            if (bundle.feedGroupId == null) {
+                Envelope bundleBounds = new Envelope();
 
-                    for (FileItem fileItem : files.get("feedGroup")) {
-                        File feedFile = ((DiskFileItem) fileItem).getStoreLocation();
-                        ZipFile zipFile = new ZipFile(feedFile);
-                        File tempDbFile = FileUtils.createScratchFile("db");
-                        File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
+                for (FileItem fileItem : files.get("feedGroup")) {
+                    String fileName = fileItem.getName();
+                    task.logEntry("Processing GTFS feed " + fileName);
+                    File feedFile = ((DiskFileItem) fileItem).getStoreLocation();
+                    ZipFile zipFile = new ZipFile(feedFile);
+                    File tempDbFile = FileUtils.createScratchFile("db");
+                    File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
 
-                        GTFSFeed feed = new GTFSFeed(tempDbFile);
-                        feed.loadFromFile(zipFile, new ObjectId().toString());
-                        feed.findPatterns();
+                    GTFSFeed feed = new GTFSFeed(tempDbFile);
+                    feed.loadFromFile(zipFile, new ObjectId().toString());
+                    task.logEntry("Loaded " + fileName + ", finding patterns");
+                    feed.findPatterns();
 
-                        // Populate the metadata while the feed is open
-                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
-                        bundle.feeds.add(feedSummary);
+                    // Populate the metadata while the feed is open
+                    Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
+                    bundle.feeds.add(feedSummary);
 
-                        for (Stop s : feed.stops.values()) {
-                            bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
-                        }
-
-                        if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
-                            bundle.serviceStart = feedSummary.serviceStart;
-                        }
-
-                        if (bundle.serviceEnd.isBefore(feedSummary.serviceEnd)) {
-                            bundle.serviceEnd = feedSummary.serviceEnd;
-                        }
-
-                        // Flush db files to disk
-                        feed.close();
-
-                        // Ensure all files have been stored.
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
-
-                        // Increment feeds complete for the progress handler
-                        bundle.feedsComplete += 1;
-
-                        // Done in a loop the nonce and updatedAt would be changed repeatedly
-                        Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-                        progressListener.increment();
+                    for (Stop s : feed.stops.values()) {
+                        bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                     }
 
-                    // TODO Handle crossing the antimeridian
-                    bundle.north = bundleBounds.getMaxY();
-                    bundle.south = bundleBounds.getMinY();
-                    bundle.east = bundleBounds.getMaxX();
-                    bundle.west = bundleBounds.getMinX();
+                    if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
+                        bundle.serviceStart = feedSummary.serviceStart;
+                    }
+
+                    if (bundle.serviceEnd.isBefore(feedSummary.serviceEnd)) {
+                        bundle.serviceEnd = feedSummary.serviceEnd;
+                    }
+
+                    // Flush db files to disk
+                    feed.close();
+
+                    // Ensure all files have been stored.
+                    task.logEntry("Storing processed files");
+                    fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
+                    fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
+                    fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+
+                    // Indicate to the UI that a feed has been uploaded
+                    task.increment();
+                    task.logEntry("Finished processing " + feedSummary.name + " feed");
                 }
 
-                writeManifestToCache(bundle);
-                bundle.status = Bundle.Status.DONE;
-              } catch (Throwable t) {
-                // This catches any error while processing a feed with the GTFS Api and needs to be more
-                // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
-                // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
-                // "bundle" at a later point. This updated error handling is a stopgap until we improve that
-                // flow.
-                LOG.error("Error creating bundle", t);
-                bundle.status = Bundle.Status.ERROR;
-                bundle.statusText = ExceptionUtils.shortAndLongString(t);
-              } finally {
-                Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-              }
-        }));
+                // TODO Handle crossing the antimeridian
+                bundle.north = bundleBounds.getMaxY();
+                bundle.south = bundleBounds.getMinY();
+                bundle.east = bundleBounds.getMaxX();
+                bundle.west = bundleBounds.getMinX();
+            }
+
+            task.logEntry("Writing bundle manifest");
+            writeManifestToCache(bundle);
+            bundle.status = Task.State.DONE;
+            Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+            task.increment();
+            task.logEntry("Bundle creation complete");
+        });
+
+        task.onError(t -> {
+            bundle.status = Task.State.ERROR;
+            bundle.statusText = ExceptionUtils.shortAndLongString(t);
+            Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+        });
+
+        taskScheduler.enqueueHeavyTask(task);
 
         return bundle;
     }
@@ -302,7 +304,7 @@ public class BundleController implements HttpController {
      * TODO move this somewhere closer to the root of the package hierarchy to avoid cyclic dependencies
      */
     public static Bundle setBundleServiceDates (Bundle bundle, GTFSCache gtfsCache) {
-        if (bundle.status != Bundle.Status.DONE || (bundle.serviceStart != null && bundle.serviceEnd != null)) {
+        if (bundle.status != Task.State.DONE || (bundle.serviceStart != null && bundle.serviceEnd != null)) {
             return bundle;
         }
 

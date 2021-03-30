@@ -9,6 +9,7 @@ import spark.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -29,7 +30,6 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
  * Created by abyrd on 2021-03-03
  */
 public class UserActivityController implements HttpController {
-
     private final TaskScheduler taskScheduler;
 
     public UserActivityController (TaskScheduler taskScheduler) {
@@ -39,13 +39,30 @@ public class UserActivityController implements HttpController {
     @Override
     public void registerEndpoints (Service sparkService) {
         sparkService.get("/api/activity", this::getActivity, toJson);
+        sparkService.delete("/api/activity", this::clearAllCompletedTasks);
+        sparkService.delete("/api/activity/:id", this::clearTask);
     }
 
     private ResponseModel getActivity (Request req, Response res) {
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         ResponseModel responseModel = new ResponseModel();
-        responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
+        responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions);
+        responseModel.taskBacklog = responseModel.taskProgress
+            .stream()
+            .filter(t -> t.state == Task.State.QUEUED)
+            .count();
         return responseModel;
+    }
+
+    private boolean clearAllCompletedTasks (Request req, Response res) {
+        UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        taskScheduler.clearAllCompletedForUser(user);
+        return true;
+    }
+
+    private boolean clearTask (Request req, Response res) {
+        UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        return taskScheduler.clearTaskForUser(UUID.fromString(req.params("id")), user);
     }
 
     /** Only used to structure JSON messages sent back to UI. */
@@ -53,7 +70,7 @@ public class UserActivityController implements HttpController {
         /** For example: "Server going down at 17:00 GMT for maintenance" or "Working to resolve known issue [link]." */
         public List<String> systemStatusMessages = new ArrayList<>();
         /** Number of tasks in the queue until this user's start processing. Just a rough indicator of progress. */
-        public int taskBacklog;
+        public long taskBacklog;
         /** Nested list of tasks with percentage complete and any failures or error messages. */
         public List<Task> taskProgress;
     }

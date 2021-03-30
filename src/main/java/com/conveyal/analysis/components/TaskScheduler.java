@@ -2,9 +2,7 @@ package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.TaskAction;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.slf4j.Logger;
@@ -14,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -69,7 +68,7 @@ public class TaskScheduler implements Component {
 
     // Keep track of tasks submitted by each user, for reporting on their progress over the HTTP API.
     // Synchronized because multiple users may add things to this map from multiple HTTP server threads.
-    private final SetMultimap<String, Task> tasksForUser = Multimaps.synchronizedSetMultimap(HashMultimap.create());
+    private final SetMultimap<String, Task> tasks = Multimaps.synchronizedSetMultimap(HashMultimap.create());
 
     public interface Config {
         int lightThreads ();
@@ -104,14 +103,6 @@ public class TaskScheduler implements Component {
         );
     }
 
-    public void repeatRegularly (PeriodicTask... periodicTasks) {
-        for (PeriodicTask periodicTask : periodicTasks) {
-            repeatRegularly(periodicTask);
-        }
-    }
-
-    // TODO these can be eliminated in favor of the single enqueue(Task) method that gets heavy/light/periodic from the Task.
-
     public void enqueueLightTask (Runnable runnable) {
         lightExecutor.submit(new ErrorTrap(runnable));
     }
@@ -143,39 +134,49 @@ public class TaskScheduler implements Component {
         }
     }
 
-    ////// Methods for reporting active tasks for each user
+    public Task newTaskForUser (UserPermissions user) {
+        Task task = new Task()
+                .withTag("accessGroup", user.accessGroup)
+                .withTag("email", user.email);
+        tasks.put(user.email, task);
+        return task;
+    }
 
     /** Return an empty list even when no tasks have been recorded for the user (return is always non-null). */
-    public List<Task> getTasksForUser (String userEmail) {
-        Set<Task> tasks = tasksForUser.get(userEmail);
+    public List<Task> getTasksForUser(UserPermissions user) {
+        Set<Task> tasks = this.tasks.get(user.email);
         return tasks == null ? Collections.emptyList() : List.copyOf(tasks);
     }
 
-    // This raises the question of whether calling code should ever create its own Tasks, or if those are always
-    // created here inside the TaskScheduler from other raw information. The caller creating a Task seems like a good
-    // way to configure execution details like heavy/light/periodic, and submit user information without passing it in.
-    public void newTaskForUser (UserPermissions user, TaskAction taskAction) {
-        Task task = Task.forUser(user).withAction(taskAction);
-        enqueue(task);
+    // TODO save cleared tasks to MongoDB for analyzing later?
+    public void clearAllCompletedForUser(UserPermissions user) {
+        tasks.get(user.email)
+                .stream()
+                .filter(task -> task.state == Task.State.DONE || task.state == Task.State.ERROR)
+                .forEach(task -> tasks.remove(user.email, task));
     }
 
-    public void enqueue (Task task) {
-        task.validate();
-        tasksForUser.put(task.user, task);
-        // TODO if task.isPeriodic()... except that maybe user tasks should never be periodic. Document that.
-        if (task.isHeavy()) {
-            heavyExecutor.submit(new ErrorTrap(task)); // TODO replicate ErrorTrap inside Task
-        } else {
-            lightExecutor.submit(new ErrorTrap(task));
-        }
+    public boolean clearTaskForUser(UUID taskId, UserPermissions user) {
+        return tasks.get(user.email).removeIf(t -> t.id.equals(taskId));
+    }
+
+    public void clearOldTasks () {
+        tasks.entries().forEach(e -> {
+            Task task = e.getValue();
+            if (task.state == Task.State.DONE || task.state == Task.State.ERROR) {
+                if (task.durationSinceCompleted().toDays() >= 1) {
+                    tasks.remove(e.getKey(), task);
+                }
+            }
+        });
     }
 
     /**
      * Just demonstrating how this would be used.
      */
     public void example () {
-        this.enqueue(Task.forUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
-            .withDescription("Process some complicated things")
+        enqueueHeavyTask(newTaskForUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
+            .withTag("description", "Process some complicated things")
             .withTotalWorkUnits(1024)
             .withAction((progressListener -> {
                 double sum = 0;

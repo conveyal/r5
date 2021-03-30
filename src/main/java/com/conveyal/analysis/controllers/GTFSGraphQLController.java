@@ -10,6 +10,7 @@ import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.api.graphql.fetchers.RouteFetcher;
 import com.conveyal.gtfs.api.graphql.fetchers.StopFetcher;
 import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.r5.analyst.progress.Task;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.mongodb.QueryBuilder;
@@ -111,10 +112,9 @@ public class GTFSGraphQLController implements HttpController {
 
     private GraphQLEnumType bundleStatus = newEnum()
             .name("status")
-            .value("PROCESSING_GTFS", Bundle.Status.PROCESSING_GTFS)
-            .value("PROCESSING_OSM", Bundle.Status.PROCESSING_OSM)
-            .value("ERROR", Bundle.Status.ERROR)
-            .value("DONE", Bundle.Status.DONE)
+            .value("PROCESSING", Task.State.ACTIVE)
+            .value("ERROR", Task.State.ERROR)
+            .value("DONE", Task.State.DONE)
             .build();
 
     private GraphQLObjectType bundleType = newObject()

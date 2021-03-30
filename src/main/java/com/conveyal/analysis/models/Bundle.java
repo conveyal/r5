@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.r5.analyst.progress.Task;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -35,11 +36,8 @@ public class Bundle extends Model implements Cloneable {
 
     public List<FeedSummary> feeds = new ArrayList<>();
 
-    public Status status = Status.PROCESSING_OSM;
+    public Task.State status = Task.State.ACTIVE;
     public String statusText;
-
-    public int feedsComplete;
-    public int totalFeeds;
 
     public static String bundleScopeFeedId (String feedId, String feedGroupId) {
         return String.format("%s_%s", feedId, feedGroupId);
@@ -102,12 +100,5 @@ public class Bundle extends Model implements Cloneable {
                 throw AnalysisServerException.unknown(e);
             }
         }
-    }
-
-    public enum Status {
-        PROCESSING_OSM,
-        PROCESSING_GTFS,
-        DONE,
-        ERROR
     }
 }

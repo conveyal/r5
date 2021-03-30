@@ -1,13 +1,17 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.UserPermissions;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.logging.Level;
 
 /**
  * This is a draft for a more advanced task progress system. It is not yet complete or functional.
@@ -29,18 +33,9 @@ public class Task implements Runnable, ProgressListener {
     /** Every has an ID so the UI can update tasks it already knows about with new information after polling. */
     public final UUID id = UUID.randomUUID();
 
-    // User and group are only relevant on the backend. On workers, we want to show network or cost table build progress
-    // to everyone in the organization, even if someone else's action kicked off the process.
-    // We could also store the full UserPermissions object instead of breaking it into fields.
-
-    @JsonIgnore
-    public final String user;
-
-    private final String group;
-
     // Timestamps to track elapsed execution time and wait time.
 
-    private Instant enqueued;
+    private final Instant enqueued = Instant.now();
 
     private Instant began;
 
@@ -50,35 +45,47 @@ public class Task implements Runnable, ProgressListener {
 
     private int logFrequency = 0;
 
-    public String description;
+    public int totalWorkUnits = 1;
 
-    public int totalWorkUnits;
+    public int currentWorkUnit = 0;
 
-    public int currentWorkUnit;
+    public final Map<String, String> tags = new HashMap<>();
 
-    public static enum State {
+    static class LogEntry {
+        public final long time = Instant.now().toEpochMilli();
+        public final Level level;
+        public final String message;
+        public LogEntry (String message, Level level) {
+            this.message = message;
+            this.level = level;
+        }
+    }
+    public final List<LogEntry> log = new ArrayList<>();
+
+    public enum State {
         QUEUED, ACTIVE, DONE, ERROR
     }
 
-    public State state;
+    public State state = State.QUEUED;
 
-    /** To be on the safe side all tasks are considered heavyweight unless we explicitly set them to be lightweight. */
-    private boolean isHeavy = true;
-
-    /** Like a runnable, encapsulating the actual work that this task will perform. */
+    /**
+     * Like a runnable, encapsulating the actual work that this task will perform.
+     */
     private TaskAction action;
+
+    // Action to take in case of an error.
+    private Consumer<Throwable> errorHandler = (t) -> {/* TODO log by default? */};
 
     // For operations that may perform a lot of fast copies?
     // Maybe instead we should just always pre-calculate how many fast copies will happen, log that before even starting,
     // and only track progress on the slow ones.
-    public int nWorkUnitsSkipped;
+    // public int nWorkUnitsSkipped;
 
     private Throwable throwable;
 
     /** How often (every how many work units) this task will log progress on the backend. */
     private int loggingFrequency;
 
-    @JsonIgnore
     private Task parentTask;
 
     // Maybe TObjectIntMap<Task> to store subtask weights.
@@ -86,29 +93,14 @@ public class Task implements Runnable, ProgressListener {
 
     // For non-hierarchical chaining? This may be needed even if our executor is backed by a queue,
     // to prevent simultaneous execution of sequential tasks.
-    public Task nextTask;
-
-    /** Private constructor to encourage use of fluent methods. */
-    private Task (UserPermissions userPermissions) {
-        user = userPermissions.email;
-        group = userPermissions.accessGroup;
-        markEnqueued(); // not strictly accurate, but this avoids calling the method from outside.
-    }
+    // public Task nextTask;
 
     public double getPercentComplete() {
         return (currentWorkUnit * 100D) / totalWorkUnits;
     }
 
+    @JsonIgnore
     List<Task> subtasks = new ArrayList<>();
-
-    public void addSubtask (Task subtask) {
-
-    }
-
-    private void markEnqueued () {
-        enqueued = Instant.now();
-        this.state = State.QUEUED;
-    }
 
     private void markActive () {
         began = Instant.now();
@@ -122,17 +114,15 @@ public class Task implements Runnable, ProgressListener {
         state = newState;
     }
 
-    public boolean isHeavy () {
-        return this.isHeavy;
-    }
-
     /**
      * Abort the current task and cancel any subtasks or following tasks.
      * @param throwable the reason for aborting this task.
      */
     public void abort (Throwable throwable) {
+        String asString = ExceptionUtils.shortAndLongString(throwable);
+        this.log.add(new LogEntry(asString, Level.SEVERE));
         this.throwable = throwable;
-        // LOG?
+        errorHandler.accept(throwable);
         markComplete(State.ERROR);
     }
 
@@ -153,12 +143,9 @@ public class Task implements Runnable, ProgressListener {
     }
 
     /**
-     * Check that all necesary fields have been set before enqueueing for execution, and check any invariants.
+     * Check that all necessary fields have been set before enqueueing for execution, and check any invariants.
      */
     public void validate () {
-        if (this.user == null) {
-            throw new AssertionError("Task must have a defined user.");
-        }
         // etc.
     }
 
@@ -167,9 +154,14 @@ public class Task implements Runnable, ProgressListener {
         // The main action is run before the subtasks. It may not make sense progress reporting-wise for tasks to have
         // both their own actions and subtasks with their own actions. Perhaps series of tasks are a special kind of
         // action, which should encapsulate the bubble-up progress computation.
-        // TODO catch exceptions and set error status on Task
         markActive();
-        this.action.action(this);
+        try {
+            this.action.action(this);
+        } catch (Throwable t) {
+            abort(t);
+            return;
+        }
+
         for (Task subtask : subtasks) {
             subtask.run();
         }
@@ -179,7 +171,7 @@ public class Task implements Runnable, ProgressListener {
     @Override
     public void beginTask(String description, int totalElements) {
         // Just using an existing interface that may eventually be modified to not include this method.
-        throw new UnsupportedOperationException();
+        this.logEntry(description);
     }
 
     @Override
@@ -194,6 +186,10 @@ public class Task implements Runnable, ProgressListener {
         if (this.logFrequency > 0 && (currentWorkUnit % logFrequency == 0)) {
             // LOG.info...
         }
+    }
+
+    public void logEntry(String entry) {
+        this.log.add(new LogEntry(entry, Level.INFO));
     }
 
     // Methods for reporting elapsed times over API
@@ -217,16 +213,15 @@ public class Task implements Runnable, ProgressListener {
         return Duration.between(began, endTime);
     }
 
-    // FLUENT METHODS FOR CONFIGURING
-
-    /** Call this static factory to begin building a task. */
-    public static Task forUser (UserPermissions userPermissions) {
-        Task task = new Task(userPermissions);
-        return task;
+    public Duration durationSinceCompleted () {
+        if (completed == null) return Duration.ZERO;
+        return Duration.between(completed, Instant.now());
     }
 
-    public Task withDescription (String description) {
-        this.description = description;
+    // FLUENT METHODS FOR CONFIGURING
+
+    public Task withTag (String key, String value) {
+        this.tags.put(key, value);
         return this;
     }
 
@@ -241,14 +236,18 @@ public class Task implements Runnable, ProgressListener {
         return this;
     }
 
-    public Task withAction (TaskAction action) {
+    public Task withAction(TaskAction action) {
         this.action = action;
         return this;
     }
 
-    public Task setHeavy (boolean heavy) {
-        this.isHeavy = heavy;
+    public Task onError(Consumer<Throwable> errorHandler) {
+        this.errorHandler = errorHandler;
         return this;
     }
 
+    public Task withLogEntry(String message) {
+        this.logEntry(message);
+        return this;
+    }
 }

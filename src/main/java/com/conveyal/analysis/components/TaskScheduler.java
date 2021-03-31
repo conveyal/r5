@@ -150,25 +150,24 @@ public class TaskScheduler implements Component {
 
     // TODO save cleared tasks to MongoDB for analyzing later?
     public void clearAllCompletedForUser(UserPermissions user) {
-        tasks.get(user.email)
-                .stream()
-                .filter(task -> task.state == Task.State.DONE || task.state == Task.State.ERROR)
-                .forEach(task -> tasks.remove(user.email, task));
+        synchronized (tasks) {
+            tasks.get(user.email).removeIf(task -> task.state == Task.State.DONE || task.state == Task.State.ERROR);
+        }
     }
 
     public boolean clearTaskForUser(UUID taskId, UserPermissions user) {
-        return tasks.get(user.email).removeIf(t -> t.id.equals(taskId));
+        synchronized (tasks) {
+            return tasks.get(user.email).removeIf(t -> t.id.equals(taskId));
+        }
     }
 
     public void clearOldTasks () {
-        tasks.entries().forEach(e -> {
-            Task task = e.getValue();
-            if (task.state == Task.State.DONE || task.state == Task.State.ERROR) {
-                if (task.durationSinceCompleted().toDays() >= 1) {
-                    tasks.remove(e.getKey(), task);
-                }
-            }
-        });
+        synchronized (tasks) {
+            tasks.entries().removeIf(e -> {
+                Task task = e.getValue();
+                return (task.state == Task.State.DONE || task.state == Task.State.ERROR) && task.durationSinceCompleted().toDays() >= 1;
+            });
+        }
     }
 
     /**

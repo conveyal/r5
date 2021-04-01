@@ -214,7 +214,7 @@ public class Task implements Runnable, ProgressListener {
     }
 
     public Duration durationSinceCompleted () {
-        if (completed == null) return Duration.ZERO;
+        if (completed == null) return null;
         return Duration.between(completed, Instant.now());
     }
 

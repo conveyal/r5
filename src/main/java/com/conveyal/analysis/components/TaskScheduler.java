@@ -68,7 +68,7 @@ public class TaskScheduler implements Component {
 
     // Keep track of tasks submitted by each user, for reporting on their progress over the HTTP API.
     // Synchronized because multiple users may add things to this map from multiple HTTP server threads.
-    private final SetMultimap<String, Task> tasks = Multimaps.synchronizedSetMultimap(HashMultimap.create());
+    private final SetMultimap<String, Task> tasksForUser = Multimaps.synchronizedSetMultimap(HashMultimap.create());
 
     public interface Config {
         int lightThreads ();
@@ -138,36 +138,42 @@ public class TaskScheduler implements Component {
         Task task = new Task()
                 .withTag("accessGroup", user.accessGroup)
                 .withTag("email", user.email);
-        tasks.put(user.email, task);
+        tasksForUser.put(user.email, task);
         return task;
     }
 
     /** Return an empty list even when no tasks have been recorded for the user (return is always non-null). */
     public List<Task> getTasksForUser(UserPermissions user) {
-        Set<Task> tasks = this.tasks.get(user.email);
+        Set<Task> tasks = this.tasksForUser.get(user.email);
         return tasks == null ? Collections.emptyList() : List.copyOf(tasks);
     }
 
-    // TODO save cleared tasks to MongoDB for analyzing later?
-    public void clearAllCompletedForUser(UserPermissions user) {
-        synchronized (tasks) {
-            tasks.get(user.email).removeIf(task -> task.state == Task.State.DONE || task.state == Task.State.ERROR);
-        }
+
+    /**
+     * Remove all completed tasks from the task map for a given user.
+     * NB: `SynchronizedSetMultimap.get(key).removeIf()` is thread safe.
+     */
+    public void removeAllCompletedTasksForUser(UserPermissions user) {
+        tasksForUser.get(user.email).removeIf(task -> task.state == Task.State.DONE || task.state == Task.State.ERROR);
     }
 
-    public boolean clearTaskForUser(UUID taskId, UserPermissions user) {
-        synchronized (tasks) {
-            return tasks.get(user.email).removeIf(t -> t.id.equals(taskId));
-        }
+    /**
+     * Remove a specific task from the task map for a given user.
+     * NB: `SynchronizedSetMultimap.get(key).removeIf()` is thread safe.
+     */
+    public boolean removeTaskForUser(UUID taskId, UserPermissions user) {
+        return tasksForUser.get(user.email).removeIf(t -> t.id.equals(taskId));
     }
 
-    public void clearOldTasks () {
-        synchronized (tasks) {
-            tasks.entries().removeIf(e -> {
-                Task task = e.getValue();
-                return (task.state == Task.State.DONE || task.state == Task.State.ERROR) && task.durationSinceCompleted().toDays() >= 1;
-            });
-        }
+    /**
+     * Remove all tasks older than 1 day.
+     * NB: `SynchronizedSetMultimap.entries().removeIf()` is thread safe.
+     */
+    public void removeOldTasks() {
+        tasksForUser.entries().removeIf(e -> {
+            Task task = e.getValue();
+            return (task.state == Task.State.DONE || task.state == Task.State.ERROR) && task.durationSinceCompleted().toDays() >= 1;
+        });
     }
 
     /**

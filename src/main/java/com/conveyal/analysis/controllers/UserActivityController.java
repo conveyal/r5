@@ -56,13 +56,13 @@ public class UserActivityController implements HttpController {
 
     private boolean clearAllCompletedTasks (Request req, Response res) {
         UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        taskScheduler.clearAllCompletedForUser(user);
+        taskScheduler.removeAllCompletedTasksForUser(user);
         return true;
     }
 
     private boolean clearTask (Request req, Response res) {
         UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        return taskScheduler.clearTaskForUser(UUID.fromString(req.params("id")), user);
+        return taskScheduler.removeTaskForUser(UUID.fromString(req.params("id")), user);
     }
 
     /** Only used to structure JSON messages sent back to UI. */

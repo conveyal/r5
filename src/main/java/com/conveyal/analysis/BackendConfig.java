@@ -55,6 +55,7 @@ public class BackendConfig implements
     private final String localCacheDirectory;
     private final int serverPort;
     private final boolean offline;
+    private final String accessControlAllowOrigin;
     private final String seamlessCensusBucket;
     private final String seamlessCensusRegion;
     private final String gridBucket;
@@ -109,6 +110,7 @@ public class BackendConfig implements
         localCacheDirectory = getProperty("local-cache", true);
         serverPort = Integer.parseInt(getProperty("server-port", true));
         offline = Boolean.parseBoolean(getProperty("offline", true));
+        accessControlAllowOrigin = getProperty("access-control-allow-origin", false);
         seamlessCensusBucket = getProperty("seamless-census-bucket", true);
         seamlessCensusRegion = getProperty("seamless-census-region", true);
         gridBucket = getProperty("grid-bucket", true);
@@ -171,6 +173,7 @@ public class BackendConfig implements
     @Override public String localCacheDirectory () { return localCacheDirectory;}
     @Override public String bundleBucket () { return bundleBucket; }
     @Override public boolean offline () { return offline; }
+    @Override public String accessControlAllowOrigin () { return accessControlAllowOrigin; }
     @Override public int maxWorkers () { return maxWorkers; }
 
 }

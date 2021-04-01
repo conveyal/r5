@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
@@ -73,9 +72,6 @@ public class Task implements Runnable, ProgressListener {
      */
     private TaskAction action;
 
-    // Action to take in case of an error.
-    private Consumer<Throwable> errorHandler = (t) -> {/* TODO log by default? */};
-
     // For operations that may perform a lot of fast copies?
     // Maybe instead we should just always pre-calculate how many fast copies will happen, log that before even starting,
     // and only track progress on the slow ones.
@@ -122,7 +118,6 @@ public class Task implements Runnable, ProgressListener {
         String asString = ExceptionUtils.shortAndLongString(throwable);
         this.log.add(new LogEntry(asString, Level.SEVERE));
         this.throwable = throwable;
-        errorHandler.accept(throwable);
         markComplete(State.ERROR);
     }
 
@@ -238,11 +233,6 @@ public class Task implements Runnable, ProgressListener {
 
     public Task withAction(TaskAction action) {
         this.action = action;
-        return this;
-    }
-
-    public Task onError(Consumer<Throwable> errorHandler) {
-        this.errorHandler = errorHandler;
         return this;
     }
 

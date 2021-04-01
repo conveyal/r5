@@ -111,6 +111,11 @@ public class TaskScheduler implements Component {
         heavyExecutor.submit(new ErrorTrap(runnable));
     }
 
+    public void enqueueTaskForUser (Task task, UserPermissions user) {
+        tasksForUser.put(user.email, task);
+        heavyExecutor.submit(new ErrorTrap(task));
+    }
+
     /**
      * Wrap a runnable, catching any Errors or Exceptions that occur. This prevents them from propagating up to the
      * scheduled executor, which would swallow them and silently halt the periodic execution of the runnable.
@@ -132,14 +137,6 @@ public class TaskScheduler implements Component {
                 t.printStackTrace();
             }
         }
-    }
-
-    public Task newTaskForUser (UserPermissions user) {
-        Task task = new Task()
-                .withTag("accessGroup", user.accessGroup)
-                .withTag("email", user.email);
-        tasksForUser.put(user.email, task);
-        return task;
     }
 
     /** Return an empty list even when no tasks have been recorded for the user (return is always non-null). */
@@ -180,7 +177,7 @@ public class TaskScheduler implements Component {
      * Just demonstrating how this would be used.
      */
     public void example () {
-        enqueueHeavyTask(newTaskForUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
+        enqueueHeavyTask(new Task()
             .withTag("description", "Process some complicated things")
             .withTotalWorkUnits(1024)
             .withAction((progressListener -> {

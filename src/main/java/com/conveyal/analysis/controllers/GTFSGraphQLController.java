@@ -10,7 +10,6 @@ import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.api.graphql.fetchers.RouteFetcher;
 import com.conveyal.gtfs.api.graphql.fetchers.StopFetcher;
 import com.conveyal.gtfs.model.FeedInfo;
-import com.conveyal.r5.analyst.progress.Task;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.mongodb.QueryBuilder;
@@ -20,12 +19,9 @@ import graphql.GraphQL;
 import graphql.GraphQLError;
 import graphql.execution.ExecutionContext;
 import graphql.schema.DataFetchingEnvironment;
-import graphql.schema.GraphQLEnumType;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
@@ -42,7 +38,6 @@ import static com.conveyal.gtfs.api.graphql.GraphQLGtfsSchema.stopType;
 import static com.conveyal.gtfs.api.util.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.api.util.GraphQLUtil.string;
 import static graphql.Scalars.GraphQLLong;
-import static graphql.schema.GraphQLEnumType.newEnum;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
 
@@ -51,9 +46,6 @@ import static graphql.schema.GraphQLObjectType.newObject;
  * For now it just wraps the GTFS API graphql response with a bundle object.
  */
 public class GTFSGraphQLController implements HttpController {
-
-    private static final Logger LOG = LoggerFactory.getLogger(GTFSGraphQLController.class);
-
     private final GTFSCache gtfsCache;
 
     public GTFSGraphQLController (GTFSCache gtfsCache) {
@@ -63,7 +55,7 @@ public class GTFSGraphQLController implements HttpController {
     private Object handleQuery (Request req, Response res) throws IOException {
         res.type("application/json");
 
-        Map<String, Object> variables = JsonUtil.objectMapper.readValue(req.queryParams("variables"), new TypeReference<Map<String, Object>>() {
+        Map<String, Object> variables = JsonUtil.objectMapper.readValue(req.queryParams("variables"), new TypeReference<>() {
         });
 
         QueryContext context = new QueryContext();
@@ -110,23 +102,10 @@ public class GTFSGraphQLController implements HttpController {
             )
             .build();
 
-    private GraphQLEnumType bundleStatus = newEnum()
-            .name("status")
-            .value("PROCESSING", Task.State.ACTIVE)
-            .value("ERROR", Task.State.ERROR)
-            .value("DONE", Task.State.DONE)
-            .build();
-
     private GraphQLObjectType bundleType = newObject()
             .name("bundle")
             .field(string("_id"))
             .field(string("name"))
-            .field(newFieldDefinition()
-                    .name("status")
-                    .type(bundleStatus)
-                    .dataFetcher((env) -> ((Bundle) env.getSource()).status)
-                    .build()
-            )
             .field(newFieldDefinition()
                     .name("feeds")
                     .type(new GraphQLList(feedType))

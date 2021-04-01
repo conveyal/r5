@@ -2,7 +2,6 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.r5.analyst.progress.Task;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -35,9 +34,6 @@ public class Bundle extends Model implements Cloneable {
     public LocalDate serviceEnd;
 
     public List<FeedSummary> feeds = new ArrayList<>();
-
-    public Task.State status = Task.State.ACTIVE;
-    public String statusText;
 
     public static String bundleScopeFeedId (String feedId, String feedGroupId) {
         return String.format("%s_%s", feedId, feedGroupId);

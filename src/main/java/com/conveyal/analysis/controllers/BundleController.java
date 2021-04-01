@@ -104,7 +104,7 @@ public class BundleController implements HttpController {
      * TODO we may want to allow workers to connect to Mongo or the backend to avoid storing metadata in so many places.
      * Or simply not have "bundles" at all, and just supply a list of OSM and GTFS unique IDs to the workers.
      */
-    private Bundle create (Request req, Response res) {
+    private Task create (Request req, Response res) {
         UserPermissions user = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         // create the bundle
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
@@ -148,24 +148,22 @@ public class BundleController implements HttpController {
         bundle.accessGroup = user.accessGroup;
         bundle.createdBy = user.email;
 
-        Persistence.bundles.create(bundle);
-
         // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
-        final Task task = taskScheduler.newTaskForUser(user)
-            .withTag("category", "bundles")
+        final Task task = new Task()
             .withTag("title", "Process OSM and GTFS for " + bundle.name)
-            .withTag("bundleId", bundle._id)
             .withTag("regionId", bundle.regionId)
             .withTotalWorkUnits(
-                1 + // Initial creation
-                1 + // write manifest to cache
+                1 + // Initial setup
                 ((bundle.osmId == null) ? 1: 0) +
-                ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0)
+                ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0) +
+                1 + // MongoDB creation
+                1  // Write manifest to cache
             )
             .withLogEntry("Bundle creation started");
 
         task.withAction(p -> {
             task.increment();
+
             if (bundle.osmId == null) {
                 bundle.osmId = new ObjectId().toString();
 
@@ -181,6 +179,7 @@ public class BundleController implements HttpController {
             }
 
             if (bundle.feedGroupId == null) {
+                bundle.feedGroupId = new ObjectId().toString();
                 Envelope bundleBounds = new Envelope();
 
                 for (FileItem fileItem : files.get("feedGroup")) {
@@ -226,30 +225,28 @@ public class BundleController implements HttpController {
                     task.logEntry("Finished processing " + feedSummary.name + " feed");
                 }
 
-                // TODO Handle crossing the antimeridian
+                // TODO Handle crossing the anti-meridian
                 bundle.north = bundleBounds.getMaxY();
                 bundle.south = bundleBounds.getMinY();
                 bundle.east = bundleBounds.getMaxX();
                 bundle.west = bundleBounds.getMinX();
             }
 
-            task.logEntry("Writing bundle manifest");
-            writeManifestToCache(bundle);
-            bundle.status = Task.State.DONE;
-            Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+            task.logEntry("Saving bundle");
+            Persistence.bundles.create(bundle);
+            task.withTag("bundleId", bundle._id); // TODO update differently?
             task.increment();
+
+            task.logEntry("Writing bundle manifest");
+            writeManifestToCache(bundle); // Requires `bundle._id` to exist.
+            task.increment();
+
             task.logEntry("Bundle creation complete");
         });
 
-        task.onError(t -> {
-            bundle.status = Task.State.ERROR;
-            bundle.statusText = ExceptionUtils.shortAndLongString(t);
-            Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-        });
+        taskScheduler.enqueueTaskForUser(task, user);
 
-        taskScheduler.enqueueHeavyTask(task);
-
-        return bundle;
+        return task;
     }
 
     private void writeManifestToCache (Bundle bundle) throws IOException {
@@ -301,13 +298,9 @@ public class BundleController implements HttpController {
      * and end dates for pre-existing bundles that do not have them set already. A database migration wasn't done
      * due to the need to load feeds which is a heavy operation. Duplicate functionality exists in the
      * Bundle.FeedSummary constructor, so these dates will be automatically set for all new Bundles.
-     * TODO move this somewhere closer to the root of the package hierarchy to avoid cyclic dependencies
+     * TODO remove this method, 2018 was a long time ago.
      */
     public static Bundle setBundleServiceDates (Bundle bundle, GTFSCache gtfsCache) {
-        if (bundle.status != Task.State.DONE || (bundle.serviceStart != null && bundle.serviceEnd != null)) {
-            return bundle;
-        }
-
         bundle.serviceStart = LocalDate.MAX;
         bundle.serviceEnd = LocalDate.MIN;
 

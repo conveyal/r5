@@ -110,7 +110,7 @@ public class BackendConfig implements
         localCacheDirectory = getProperty("local-cache", true);
         serverPort = Integer.parseInt(getProperty("server-port", true));
         offline = Boolean.parseBoolean(getProperty("offline", true));
-        accessControlAllowOrigin = getProperty("access-control-allow-origin", false);
+        accessControlAllowOrigin = getProperty("access-control-allow-origin", true);
         seamlessCensusBucket = getProperty("seamless-census-bucket", true);
         seamlessCensusRegion = getProperty("seamless-census-region", true);
         gridBucket = getProperty("grid-bucket", true);

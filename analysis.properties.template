@@ -38,7 +38,6 @@ server-port=7070
 # since authentication is not handled through cookies, it does increase the attack surface and better practice is to set
 # this to the actual origin where the UI is hosted. This is different from frontend-url, since frontend-url is just where
 # the frontend code can be retrieved from, and may not even be a valid origin (e.g. if it has a path name).
-# Commenting this property out will result in no Access-Control-Allow-Origin header being sent.
 access-control-allow-origin=http://localhost:3000
 
 # A temporary location to store scratch files. The path can be absolute or relative.

@@ -91,6 +91,12 @@ public class HttpApi implements Component {
             // Set CORS headers, to allow requests to this API server from a frontend hosted on a different domain
             // This used to be hardwired to Access-Control-Allow-Origin: * but that leaves the server open to XSRF
             // attacks when authentication is disabled (e.g. when running locally).
+            if (config.accessControlAllowOrigin() == null || config.accessControlAllowOrigin().equals("null")) {
+                // Access-Control-Allow-Origin: null opens unintended security holes:
+                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
+                throw new IllegalArgumentException("Access-Control-Allow-Origin should not be null");
+            }
+
             res.header("Access-Control-Allow-Origin", config.accessControlAllowOrigin());
             // for caching, signal to the browser that responses may be different based on origin
             res.header("Vary", "Origin");

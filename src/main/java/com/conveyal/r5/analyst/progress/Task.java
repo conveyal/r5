@@ -217,6 +217,11 @@ public class Task implements Runnable, ProgressListener {
         return Duration.between(began, endTime);
     }
 
+    public Duration durationComplete () {
+        if (completed == null) return Duration.ZERO;
+        return Duration.between(completed, Instant.now());
+    }
+
     // FLUENT METHODS FOR CONFIGURING
 
     /** Call this static factory to begin building a task. */

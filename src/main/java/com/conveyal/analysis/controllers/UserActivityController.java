@@ -9,6 +9,7 @@ import spark.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -48,14 +49,39 @@ public class UserActivityController implements HttpController {
         return responseModel;
     }
 
-    /** Only used to structure JSON messages sent back to UI. */
+    /** API model used only to structure activity JSON messages sent back to UI. */
     public static class ResponseModel {
         /** For example: "Server going down at 17:00 GMT for maintenance" or "Working to resolve known issue [link]." */
         public List<String> systemStatusMessages = new ArrayList<>();
         /** Number of tasks in the queue until this user's start processing. Just a rough indicator of progress. */
         public int taskBacklog;
-        /** Nested list of tasks with percentage complete and any failures or error messages. */
-        public List<Task> taskProgress;
+        /** List of tasks with percentage complete, current stage of progress, and any failures or error messages. */
+        public List<ApiTask> taskProgress;
+    }
+
+    /** API model for tasks in an activity response. */
+    public static class ApiTask {
+        public UUID id;
+        public String title;
+        public String detail;
+        public Task.State state;
+        public int percentComplete;
+        public WorkProduct workProduct;
+    }
+
+    /** API model providing a unique identifier for the final product of a single task in an activity response. */
+    public static class WorkProduct {
+        public WorkProductType type;
+        public String id;
+    }
+
+    /**
+     * There is some implicit and unenforced correspondence between these values and those in FileCategory, as well
+     * as the tables in Mongo. We should probably clearly state and enforce this parallelism. No background work is
+     * done creating regions, projects, or modifications so they don't need to be represented here.
+     */
+    public static enum WorkProductType {
+        BUNDLE, REGIONAL_ANALYSIS, AGGREGATION_AREA, OPPORTUNITY_DATASET
     }
 
 }

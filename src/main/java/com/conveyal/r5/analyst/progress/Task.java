@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.analysis.controllers.UserActivityController;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.Duration;
@@ -23,8 +25,14 @@ import java.util.UUID;
  *
  * This class serves simultaneously as an internal domain object for tracking task execution, and an external API model
  * object for communicating relevant information to the web UI (when serialized to JSON).
+ *
+ * TODO rename to BackgroundTask
  */
 public class Task implements Runnable, ProgressListener {
+
+    public static enum State {
+        QUEUED, ACTIVE, DONE, ERROR
+    }
 
     /** Every has an ID so the UI can update tasks it already knows about with new information after polling. */
     public final UUID id = UUID.randomUUID();
@@ -33,10 +41,9 @@ public class Task implements Runnable, ProgressListener {
     // to everyone in the organization, even if someone else's action kicked off the process.
     // We could also store the full UserPermissions object instead of breaking it into fields.
 
-    @JsonIgnore
-    public final String user;
+    public String user;
 
-    private final String group;
+    private String group;
 
     // Timestamps to track elapsed execution time and wait time.
 
@@ -50,15 +57,15 @@ public class Task implements Runnable, ProgressListener {
 
     private int logFrequency = 0;
 
+    /** An unchanging, human readable name for this task. */
+    public final String title;
+
+    /** Text describing the current work, which changes over the course of task processing. */
     public String description;
 
     public int totalWorkUnits;
 
     public int currentWorkUnit;
-
-    public static enum State {
-        QUEUED, ACTIVE, DONE, ERROR
-    }
 
     public State state;
 
@@ -78,7 +85,6 @@ public class Task implements Runnable, ProgressListener {
     /** How often (every how many work units) this task will log progress on the backend. */
     private int loggingFrequency;
 
-    @JsonIgnore
     private Task parentTask;
 
     // Maybe TObjectIntMap<Task> to store subtask weights.
@@ -89,10 +95,11 @@ public class Task implements Runnable, ProgressListener {
     public Task nextTask;
 
     /** Private constructor to encourage use of fluent methods. */
-    private Task (UserPermissions userPermissions) {
-        user = userPermissions.email;
-        group = userPermissions.accessGroup;
-        markEnqueued(); // not strictly accurate, but this avoids calling the method from outside.
+    private Task (String title) {
+        this.title = title;
+        // It's not strictly accurate to mark the task enqueued before finish constructing it and actually submit it,
+        // but this avoids needing to expose that state transition and enforce calling it later.
+        markEnqueued();
     }
 
     public double getPercentComplete() {
@@ -107,7 +114,8 @@ public class Task implements Runnable, ProgressListener {
 
     private void markEnqueued () {
         enqueued = Instant.now();
-        this.state = State.QUEUED;
+        description = "Waiting...";
+        state = State.QUEUED;
     }
 
     private void markActive () {
@@ -117,23 +125,22 @@ public class Task implements Runnable, ProgressListener {
 
     // Because of the subtask / next task mechanism, we don't let the actions mark tasks complete.
     // This is another reason to pass the actions only a limited progress reporting interface.
-    private void markComplete (State newState) {
+    private void markComplete () {
         completed = Instant.now();
-        state = newState;
+        // Force progress bars to display 100% whenever an action completes successfully.
+        currentWorkUnit = totalWorkUnits;
+        description = "Completed.";
+        state = State.DONE;
+    }
+
+    private void markError (Throwable throwable) {
+        completed = Instant.now();
+        description = ExceptionUtils.shortCauseString(throwable);
+        state = State.ERROR;
     }
 
     public boolean isHeavy () {
         return this.isHeavy;
-    }
-
-    /**
-     * Abort the current task and cancel any subtasks or following tasks.
-     * @param throwable the reason for aborting this task.
-     */
-    public void abort (Throwable throwable) {
-        this.throwable = throwable;
-        // LOG?
-        markComplete(State.ERROR);
     }
 
     protected void bubbleUpProgress() {
@@ -169,23 +176,39 @@ public class Task implements Runnable, ProgressListener {
         // action, which should encapsulate the bubble-up progress computation.
         // TODO catch exceptions and set error status on Task
         markActive();
-        this.action.action(this);
-        for (Task subtask : subtasks) {
-            subtask.run();
+        try {
+            this.action.action(this);
+            for (Task subtask : subtasks) {
+                subtask.run();
+            }
+            markComplete();
+        } catch (Throwable t) {
+            markError(t);
         }
-        markComplete(State.DONE);
     }
 
     @Override
     public void beginTask(String description, int totalElements) {
-        // Just using an existing interface that may eventually be modified to not include this method.
-        throw new UnsupportedOperationException();
+        // In the absence of subtasks we can call this repeatedly on the same task, which will cause the UI progress
+        // bar to reset to zero at each stage, while keeping the same top level title.
+        this.description = description;
+        this.totalWorkUnits = totalElements;
+        this.currentWorkUnit = 0;
+    }
+
+    @Override
+    public void increment (int n) {
+        currentWorkUnit += n;
+        if (currentWorkUnit >= totalWorkUnits || currentWorkUnit < 0) {
+            currentWorkUnit = totalWorkUnits - 1;
+        }
     }
 
     @Override
     public void increment () {
-        this.currentWorkUnit += 1;
+        increment(1);
         // Occasionally bubble up progress to parent tasks, log to console, etc.
+        /*
         if (parentTask != null) {
             if (this.bubbleUpdateFrequency > 0 && (currentWorkUnit % bubbleUpdateFrequency == 0)) {
                 parentTask.bubbleUpProgress();
@@ -194,6 +217,7 @@ public class Task implements Runnable, ProgressListener {
         if (this.logFrequency > 0 && (currentWorkUnit % logFrequency == 0)) {
             // LOG.info...
         }
+        */
     }
 
     // Methods for reporting elapsed times over API
@@ -225,14 +249,23 @@ public class Task implements Runnable, ProgressListener {
     // FLUENT METHODS FOR CONFIGURING
 
     /** Call this static factory to begin building a task. */
-    public static Task forUser (UserPermissions userPermissions) {
-        Task task = new Task(userPermissions);
+    public static Task create (String title) {
+        Task task = new Task(title);
         return task;
     }
 
-    public Task withDescription (String description) {
-        this.description = description;
+    public Task forUser (String user) {
+        this.user = user;
         return this;
+    }
+
+    public Task inGroup (String group) {
+        this.group = group;
+        return this;
+    }
+
+    public Task forUser (UserPermissions userPermissions) {
+        return this.forUser(userPermissions.email).inGroup(userPermissions.accessGroup);
     }
 
     /**
@@ -240,11 +273,11 @@ public class Task implements Runnable, ProgressListener {
      * The number of work units is meaningless until we're calculating and showing progress.
      * Allow both setting and incrementing the number of work units for convenience.
      */
-    public Task withTotalWorkUnits (int totalWorkUnits) {
-        this.totalWorkUnits = totalWorkUnits;
-        this.bubbleUpdateFrequency = totalWorkUnits / 100;
-        return this;
-    }
+//    public Task withTotalWorkUnits (int totalWorkUnits) {
+//        this.totalWorkUnits = totalWorkUnits;
+//        this.bubbleUpdateFrequency = totalWorkUnits / 100;
+//        return this;
+//    }
 
     public Task withAction (TaskAction action) {
         this.action = action;
@@ -254,6 +287,18 @@ public class Task implements Runnable, ProgressListener {
     public Task setHeavy (boolean heavy) {
         this.isHeavy = heavy;
         return this;
+    }
+
+    /** Convert a single internal Task object to its representation for JSON serialization and return to the UI. */
+    public UserActivityController.ApiTask toApiTask () {
+        UserActivityController.ApiTask apiTask = new UserActivityController.ApiTask();
+        apiTask.id = id; // This can be the same as the workProduct ID except for cases with no Mongo document
+        apiTask.title = title;
+        apiTask.detail = description;
+        apiTask.state = state;
+        apiTask.percentComplete = (int)(getPercentComplete());
+        apiTask.workProduct = null;
+        return apiTask;
     }
 
 }

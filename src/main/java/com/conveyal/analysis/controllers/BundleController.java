@@ -8,6 +8,7 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.analysis.util.ProgressInputStream;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -19,6 +20,7 @@ import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
+import com.google.common.io.CountingInputStream;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
@@ -30,8 +32,10 @@ import spark.Request;
 import spark.Response;
 import spark.Service;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -146,17 +150,15 @@ public class BundleController implements HttpController {
 
         // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        taskScheduler.enqueue(Task.forUser(userPermissions)
-            .withDescription("Process OSM and GTFS")
+        taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
+            .forUser(userPermissions)
             .setHeavy(true)
-            .withTotalWorkUnits(
-                ((bundle.osmId == null) ? 1: 0) +
-                ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0)
-            )
             .withAction(progressListener -> {
               try {
                 if (bundle.osmId == null) {
                     // Process uploaded OSM.
+                    // TODO remove bundle updates, do automatically with some kind of EntityTaskAction
+                    //  Create all entities the same way, setting the
                     bundle.status = Bundle.Status.PROCESSING_OSM;
                     bundle.osmId = new ObjectId().toString();
                     Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
@@ -164,10 +166,11 @@ public class BundleController implements HttpController {
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
-                    osm.readPbf(fi.getInputStream());
-
+                    // Number of entities in an OSM file is unknown, so derive progress from the number of bytes read.
+                    // Wrapping in buffered input stream should reduce number of progress updates.
+                    osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
+                    // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
                     fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
-                    progressListener.increment();
                 }
 
                 if (bundle.feedGroupId == null) {
@@ -189,6 +192,7 @@ public class BundleController implements HttpController {
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
 
                         GTFSFeed feed = new GTFSFeed(tempDbFile);
+                        feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
                         feed.findPatterns();
 
@@ -234,15 +238,14 @@ public class BundleController implements HttpController {
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
               } catch (Throwable t) {
-                // This catches any error while processing a feed with the GTFS Api and needs to be more
-                // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
-                // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
-                // "bundle" at a later point. This updated error handling is a stopgap until we improve that
-                // flow.
                 LOG.error("Error creating bundle", t);
                 bundle.status = Bundle.Status.ERROR;
                 bundle.statusText = ExceptionUtils.shortAndLongString(t);
+                // Rethrow the problem so the task scheduler will attach it to the task with state ERROR.
+                // Eventually this whole catch and finally clause should be handled generically up in the task scheduler.
+                throw t;
               } finally {
+                // TODO Factor this out to Task for all cases with a workProduct
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }
         }));

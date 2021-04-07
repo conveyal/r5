@@ -162,23 +162,11 @@ public class TaskScheduler implements Component {
             Set<Task> tasks = tasksForUser.get(userEmail);
             if (tasks == null) return Collections.emptyList();
             List<ApiTask> apiTaskList = tasks.stream()
-                    .map(TaskScheduler::toApiTask)
+                    .map(Task::toApiTask)
                     .collect(Collectors.toUnmodifiableList());
             tasks.removeIf(t -> t.durationComplete().getSeconds() > 60);
             return apiTaskList;
         }
-    }
-
-    /** Convert a single internal Task object to its representation for JSON serialization and return to the UI. */
-    private static ApiTask toApiTask (Task task) {
-        ApiTask apiTask = new ApiTask();
-        apiTask.id = task.id; // This can be the same as the workProduct ID except for cases with no Mongo document
-        apiTask.title = task.description;
-        apiTask.detail = task.description;
-        apiTask.state = task.state;
-        apiTask.percentComplete = (int)(task.getPercentComplete());
-        apiTask.workProduct = null;
-        return apiTask;
     }
 
     // Q: Should the caller ever create its own Tasks, or if are tasks created here inside the TaskScheduler from
@@ -186,7 +174,7 @@ public class TaskScheduler implements Component {
     // like heavy/light/periodic, and submit user information without passing it in. That task request could be separate
     // from the internal Task object it creates, but that seems like overkill for an internal mechanism.
     public void newTaskForUser (UserPermissions user, TaskAction taskAction) {
-        Task task = Task.forUser(user).withAction(taskAction);
+        Task task = Task.create("TITLE").forUser(user).withAction(taskAction);
         enqueue(task);
     }
 
@@ -203,10 +191,9 @@ public class TaskScheduler implements Component {
 
     /** Just demonstrating how this can be used. */
     public void example () {
-        this.enqueue(Task.forUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
-            .withDescription("Process some complicated things")
-            .withTotalWorkUnits(1024)
+        this.enqueue(Task.create("Example").forUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
             .withAction((progressListener -> {
+                progressListener.beginTask("Processing complicated things...", 1024);
                 double sum = 0;
                 for (int i = 0; i < 1024; i++) {
                     sum += Math.sqrt(i);

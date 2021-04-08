@@ -4,6 +4,7 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.Components;
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.controllers.UserActivityController.WorkProduct;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
@@ -45,6 +46,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.analysis.controllers.UserActivityController.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -107,7 +109,7 @@ public class BundleController implements HttpController {
      * Or simply not have "bundles" at all, and just supply a list of OSM and GTFS unique IDs to the workers.
      */
     private Bundle create (Request req, Response res) {
-        // create the bundle
+        // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final Bundle bundle = new Bundle();
         try {
@@ -138,31 +140,28 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
+            bundle.accessGroup = req.attribute("accessGroup");
+            bundle.createdBy = req.attribute("email");
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
         }
-
-        // Set `createdBy` and `accessGroup`
-        bundle.accessGroup = req.attribute("accessGroup");
-        bundle.createdBy = req.attribute("email");
-
+        // ID and create/update times are assigned here when we push into Mongo.
+        // FIXME Ideally we'd only set and retain the ID without inserting in Mongo,
+        //  but existing create() method with side effects would overwrite the ID.
         Persistence.bundles.create(bundle);
 
-        // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
+        // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
+        // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
             .forUser(userPermissions)
             .setHeavy(true)
+            .withWorkProduct(BUNDLE, bundle._id, bundle.regionId)
             .withAction(progressListener -> {
               try {
                 if (bundle.osmId == null) {
                     // Process uploaded OSM.
-                    // TODO remove bundle updates, do automatically with some kind of EntityTaskAction
-                    //  Create all entities the same way, setting the
-                    bundle.status = Bundle.Status.PROCESSING_OSM;
                     bundle.osmId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
@@ -219,14 +218,9 @@ public class BundleController implements HttpController {
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
-
-                        // Increment feeds complete for the progress handler
-                        bundle.feedsComplete += 1;
-
-                        // Done in a loop the nonce and updatedAt would be changed repeatedly
-                        Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-                        progressListener.increment();
                     }
+                    // Set legacy progress field to indicate that all feeds have been loaded.
+                    bundle.feedsComplete = bundle.totalFeeds;
 
                     // TODO Handle crossing the antimeridian
                     bundle.north = bundleBounds.getMaxY();
@@ -234,7 +228,6 @@ public class BundleController implements HttpController {
                     bundle.east = bundleBounds.getMaxX();
                     bundle.west = bundleBounds.getMinX();
                 }
-
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
               } catch (Throwable t) {
@@ -245,11 +238,12 @@ public class BundleController implements HttpController {
                 // Eventually this whole catch and finally clause should be handled generically up in the task scheduler.
                 throw t;
               } finally {
-                // TODO Factor this out to Task for all cases with a workProduct
+                // ID and create/update times are assigned here when we push into Mongo.
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }
         }));
-
+        // TODO do we really want to return the bundle here? It should not be needed until the background work is done.
+        // We could instead return the WorkProduct instance (or BaseModel instance or null) from TaskActions.
         return bundle;
     }
 

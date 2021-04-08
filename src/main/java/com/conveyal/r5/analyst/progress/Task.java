@@ -2,6 +2,10 @@ package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.controllers.UserActivityController;
+import com.conveyal.analysis.controllers.UserActivityController.ApiTask;
+import com.conveyal.analysis.controllers.UserActivityController.WorkProduct;
+import com.conveyal.analysis.controllers.UserActivityController.WorkProductType;
+import com.conveyal.analysis.models.Model;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -22,9 +26,6 @@ import java.util.UUID;
  * Each task should be able to have subtasks, each of which represents an expected percentage of the parent task.
  * Or an expected number of "relative work units" if new sub-tasks will be added on the fly, so absolutes are not known.
  * Tasks should implement ProgressListener functionality, and bubble up progress to parent tasks.
- *
- * This class serves simultaneously as an internal domain object for tracking task execution, and an external API model
- * object for communicating relevant information to the web UI (when serialized to JSON).
  *
  * TODO rename to BackgroundTask
  */
@@ -108,6 +109,9 @@ public class Task implements Runnable, ProgressListener {
 
     List<Task> subtasks = new ArrayList<>();
 
+    // TODO find a better way to set this than directly inside a closure
+    public WorkProduct workProduct;
+
     public void addSubtask (Task subtask) {
 
     }
@@ -174,15 +178,13 @@ public class Task implements Runnable, ProgressListener {
         // The main action is run before the subtasks. It may not make sense progress reporting-wise for tasks to have
         // both their own actions and subtasks with their own actions. Perhaps series of tasks are a special kind of
         // action, which should encapsulate the bubble-up progress computation.
-        // TODO catch exceptions and set error status on Task
         markActive();
         try {
             this.action.action(this);
-            for (Task subtask : subtasks) {
-                subtask.run();
-            }
+            // for (Task subtask : subtasks) subtask.run();
             markComplete();
         } catch (Throwable t) {
+            // TODO Store error in work product and write product to Mongo uniformly
             markError(t);
         }
     }
@@ -204,31 +206,7 @@ public class Task implements Runnable, ProgressListener {
         }
     }
 
-    @Override
-    public void increment () {
-        increment(1);
-        // Occasionally bubble up progress to parent tasks, log to console, etc.
-        /*
-        if (parentTask != null) {
-            if (this.bubbleUpdateFrequency > 0 && (currentWorkUnit % bubbleUpdateFrequency == 0)) {
-                parentTask.bubbleUpProgress();
-            }
-        }
-        if (this.logFrequency > 0 && (currentWorkUnit % logFrequency == 0)) {
-            // LOG.info...
-        }
-        */
-    }
-
     // Methods for reporting elapsed times over API
-
-    public long getSecondsInQueue () {
-        return durationInQueue().toSeconds();
-    }
-
-    public long getSecondsExecuting () {
-        return durationExecuting().toSeconds();
-    }
 
     public Duration durationInQueue () {
         Instant endTime = (began == null) ? Instant.now() : began;
@@ -268,19 +246,22 @@ public class Task implements Runnable, ProgressListener {
         return this.forUser(userPermissions.email).inGroup(userPermissions.accessGroup);
     }
 
-    /**
-     * TODO have the TaskAction set the total work units via the restricted ProgressListener interface.
-     * The number of work units is meaningless until we're calculating and showing progress.
-     * Allow both setting and incrementing the number of work units for convenience.
-     */
-//    public Task withTotalWorkUnits (int totalWorkUnits) {
-//        this.totalWorkUnits = totalWorkUnits;
-//        this.bubbleUpdateFrequency = totalWorkUnits / 100;
-//        return this;
-//    }
-
     public Task withAction (TaskAction action) {
         this.action = action;
+        return this;
+    }
+
+    // We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
+    // It is also awkward to make a method to set it on ProgressListener - it's not really progress.
+    // So we set it directly on the task before submitting it. Requires pre-setting (not necessarily storing) Model._id.
+    public Task withWorkProduct (Model model) {
+        this.workProduct = WorkProduct.forModel(model);
+        return this;
+    }
+
+    /** Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel(). */
+    public Task withWorkProduct (WorkProductType type, String id, String region) {
+        this.workProduct = new WorkProduct(type, id, region);
         return this;
     }
 
@@ -290,14 +271,16 @@ public class Task implements Runnable, ProgressListener {
     }
 
     /** Convert a single internal Task object to its representation for JSON serialization and return to the UI. */
-    public UserActivityController.ApiTask toApiTask () {
-        UserActivityController.ApiTask apiTask = new UserActivityController.ApiTask();
+    public ApiTask toApiTask () {
+        ApiTask apiTask = new ApiTask();
         apiTask.id = id; // This can be the same as the workProduct ID except for cases with no Mongo document
         apiTask.title = title;
         apiTask.detail = description;
         apiTask.state = state;
         apiTask.percentComplete = (int)(getPercentComplete());
-        apiTask.workProduct = null;
+        apiTask.timeBegan = began == null ? null : began.toEpochMilli();
+        apiTask.timeCompleted = completed == null ? null : completed.toEpochMilli();
+        apiTask.workProduct = workProduct;
         return apiTask;
     }
 

@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -201,6 +202,11 @@ public class TaskScheduler implements Component {
                 }
             }))
        );
+    }
+
+    /** Get the number of slower "heavy" tasks that are queued for execution and not yet being processed. */
+    public int getBacklog() {
+        return ((ThreadPoolExecutor) heavyExecutor).getQueue().size();
     }
 
 }

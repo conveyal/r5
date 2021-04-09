@@ -46,6 +46,8 @@ public class UserActivityController implements HttpController {
     private ResponseModel getActivity (Request req, Response res) {
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         ResponseModel responseModel = new ResponseModel();
+        responseModel.systemStatusMessages = List.of();
+        responseModel.taskBacklog = taskScheduler.getBacklog();
         responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
         return responseModel;
     }
@@ -53,14 +55,14 @@ public class UserActivityController implements HttpController {
     /** API model used only to structure activity JSON messages sent back to UI. */
     public static class ResponseModel {
         /** For example: "Server going down at 17:00 GMT for maintenance" or "Working to resolve known issue [link]." */
-        public List<String> systemStatusMessages = new ArrayList<>();
+        public List<String> systemStatusMessages;
         /** Number of tasks in the queue until this user's start processing. Just a rough indicator of progress. */
         public int taskBacklog;
         /** List of tasks with percentage complete, current stage of progress, and any failures or error messages. */
         public List<ApiTask> taskProgress;
     }
 
-    /** API model for tasks in an activity response. Times are in epoch milliseconds and may be null until relevant. */
+    /** API model for tasks in an activity response. Times are durations rather than absolute to counter clock drift. */
     public static class ApiTask {
         public UUID id;
         public String title;

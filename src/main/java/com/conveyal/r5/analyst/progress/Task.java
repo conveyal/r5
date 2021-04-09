@@ -275,7 +275,7 @@ public class Task implements Runnable, ProgressListener {
         apiTask.state = state;
         apiTask.percentComplete = (int) getPercentComplete();
         apiTask.secondsActive = (int) durationExecuting().getSeconds();
-        apiTask.secondsComplete = (int) durationExecuting().getSeconds();
+        apiTask.secondsComplete = (int) durationComplete().getSeconds();
         apiTask.workProduct = workProduct;
         return apiTask;
     }

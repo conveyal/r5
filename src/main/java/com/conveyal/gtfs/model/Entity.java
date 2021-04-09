@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
-import com.conveyal.analysis.util.ProgressInputStream;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
 import com.conveyal.gtfs.error.EmptyFieldError;

@@ -1,8 +1,5 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.controllers.UserActivityController;
-import com.conveyal.analysis.controllers.UserActivityController.WorkProduct;
-
 /**
  * This represents the work actually carried out by a Task.
  * It's a single-method interface so it can be defined with lambda functions, or other objects can implement it.

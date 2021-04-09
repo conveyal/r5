@@ -1,13 +1,9 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.controllers.UserActivityController.ApiTask;
-import com.conveyal.analysis.controllers.UserActivityController.WorkProduct;
-import com.conveyal.analysis.controllers.UserActivityController.WorkProductType;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -277,9 +273,9 @@ public class Task implements Runnable, ProgressListener {
         apiTask.title = title;
         apiTask.detail = description;
         apiTask.state = state;
-        apiTask.percentComplete = (int)(getPercentComplete());
-        apiTask.timeBegan = began == null ? null : began.toEpochMilli();
-        apiTask.timeCompleted = completed == null ? null : completed.toEpochMilli();
+        apiTask.percentComplete = (int) getPercentComplete();
+        apiTask.secondsActive = (int) durationExecuting().getSeconds();
+        apiTask.secondsComplete = (int) durationExecuting().getSeconds();
         apiTask.workProduct = workProduct;
         return apiTask;
     }

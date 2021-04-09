@@ -12,6 +12,8 @@ version gitVersion()
 
 jib.to.image = 'ghcr.io/conveyal/r5:' + version
 
+
+
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11

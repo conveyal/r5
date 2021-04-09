@@ -4,12 +4,11 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.Components;
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.analysis.controllers.UserActivityController.WorkProduct;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.analysis.util.ProgressInputStream;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -21,7 +20,6 @@ import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.google.common.io.CountingInputStream;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
@@ -33,10 +31,8 @@ import spark.Request;
 import spark.Response;
 import spark.Service;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -46,7 +42,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.controllers.UserActivityController.WorkProductType.BUNDLE;
+import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -174,9 +170,7 @@ public class BundleController implements HttpController {
 
                 if (bundle.feedGroupId == null) {
                     // Process uploaded GTFS files
-                    bundle.status = Bundle.Status.PROCESSING_GTFS;
                     bundle.feedGroupId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
 
                     Envelope bundleBounds = new Envelope();
                     bundle.serviceStart = LocalDate.MAX;

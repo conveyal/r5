@@ -121,7 +121,7 @@ public class Bundle extends Model implements Cloneable {
          * This method should be called after setServiceDates().
          */
         private void createFeedName (GTFSFeed feed) {
-            String name = "";
+            String name = null;
             LocalDate startingDate = this.serviceStart;
             LocalDate endingDate = this.serviceEnd;
 
@@ -131,7 +131,7 @@ public class Bundle extends Model implements Cloneable {
                 if (feedInfo.feed_start_date != null) startingDate = feedInfo.feed_start_date;
                 if (feedInfo.feed_end_date != null) endingDate = feedInfo.feed_end_date;
             }
-            if (name.length() == 0) {
+            if (name == null) {
                 int nAgencies = feed.agency.size();
                 if (nAgencies > 0) {
                     final int limit = 3;
@@ -143,6 +143,9 @@ public class Bundle extends Model implements Cloneable {
                     name = agencyNames;
                 }
             }
+
+            if (name == null) name = "(unknown)";
+
             this.name = name + ": " + startingDate.toString() + " to " + endingDate.toString(); // ISO-8601
         }
 

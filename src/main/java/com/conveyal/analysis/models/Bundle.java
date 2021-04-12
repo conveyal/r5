@@ -85,7 +85,7 @@ public class Bundle extends Model implements Cloneable {
         }
     }
 
-    /** Model for storing summany info in Mongo. Bundle contains one instance of FeedSummary per feed in the Bundle. */
+    /** Model for storing summary info in Mongo. Bundle contains one instance of FeedSummary per feed in the Bundle. */
     public static class FeedSummary implements Cloneable {
         public String feedId;
         public String name;
@@ -106,41 +106,44 @@ public class Bundle extends Model implements Cloneable {
         public FeedSummary(GTFSFeed feed, String feedGroupId) {
             feedId = feed.feedId;
             bundleScopedFeedId = Bundle.bundleScopeFeedId(feed.feedId, feedGroupId);
-            name = createFeedName(feed);
             checksum = feed.checksum;
             setServiceDates(feed); // TODO expand to record hours per day by mode.
+            createFeedName(feed);
             summarizeErrors(feed);
         }
 
-        /** This seems to only be used for display purposes. */
-        private static String createFeedName (GTFSFeed feed) {
+        /**
+         * Set this.name, which seems to only be used for display purposes.
+         *
+         * If a FeedInfo file is present in the feed, the feed_id, feed_start_date, and feed_end_date are used for the
+         * name. If not, dates from calendar/calendar_dates files and agency_name values (up to a limit) are used.
+         *
+         * This method should be called after setServiceDates().
+         */
+        private void createFeedName (GTFSFeed feed) {
+            String name = "";
+            LocalDate startingDate = this.serviceStart;
+            LocalDate endingDate = this.serviceEnd;
+
             if (feed.feedInfo.size() == 1) {
                 FeedInfo feedInfo = feed.feedInfo.values().iterator().next();
-                String name = "";
-                if (feedInfo.feed_id != null) {
-                    name = feedInfo.feed_id;
-                }
-                if (feedInfo.feed_start_date != null) {
-                    if (name.length() > 0) {
-                        name += " starting ";
+                if (feedInfo.feed_id != null) name =  feedInfo.feed_id;
+                if (feedInfo.feed_start_date != null) startingDate = feedInfo.feed_start_date;
+                if (feedInfo.feed_end_date != null) endingDate = feedInfo.feed_end_date;
+            }
+            if (name.length() == 0) {
+                int nAgencies = feed.agency.size();
+                if (nAgencies > 0) {
+                    final int limit = 3;
+                    String agencyNames = feed.agency.values().stream().limit(limit)
+                            .map(a -> a.agency_name).collect(Collectors.joining(", "));
+                    if (nAgencies > limit) {
+                        agencyNames += String.format(", +%d more", nAgencies - limit);
                     }
-                    name += feedInfo.feed_start_date.toString(); // ISO-8601
-                }
-                if (name.length() > 0) {
-                    return name;
+                    name = agencyNames;
                 }
             }
-            int nAgencies = feed.agency.size();
-            if (nAgencies > 0) {
-                final int limit = 3;
-                String agencyNames = feed.agency.values().stream().limit(limit)
-                        .map(a -> a.agency_name).collect(Collectors.joining(", "));
-                if (nAgencies > limit) {
-                    agencyNames += String.format(", +%d more", nAgencies - limit);
-                }
-                return agencyNames;
-            }
-            return "(unknown)";
+            this.name = name + ": " + startingDate.toString() + " to " + endingDate.toString(); // ISO-8601
         }
 
         /**

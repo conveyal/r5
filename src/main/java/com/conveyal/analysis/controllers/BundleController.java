@@ -32,7 +32,9 @@ import spark.Response;
 import spark.Service;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -183,6 +185,7 @@ public class BundleController implements HttpController {
                         ZipFile zipFile = new ZipFile(feedFile);
                         File tempDbFile = FileUtils.createScratchFile("db");
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
+                        File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
                         GTFSFeed feed = new GTFSFeed(tempDbFile);
                         feed.progressListener = progressListener;
@@ -190,6 +193,7 @@ public class BundleController implements HttpController {
                         feed.findPatterns();
 
                         // Populate the metadata while the feed is open
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
                         Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
                         bundle.feeds.add(feedSummary);
 
@@ -205,6 +209,15 @@ public class BundleController implements HttpController {
                             bundle.serviceEnd = feedSummary.serviceEnd;
                         }
 
+                        // Save all errors to a file.
+                        try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
+                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        // Save some space in the MapDB after we've summarized the errors to Mongo and a JSON file.
+                        feed.errors.clear();
+
                         // Flush db files to disk
                         feed.close();
 
@@ -212,6 +225,7 @@ public class BundleController implements HttpController {
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
                     }
                     // Set legacy progress field to indicate that all feeds have been loaded.
                     bundle.feedsComplete = bundle.totalFeeds;

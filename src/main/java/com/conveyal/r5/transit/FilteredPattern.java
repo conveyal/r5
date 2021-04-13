@@ -37,27 +37,22 @@ public class FilteredPattern {
             }
         }
 
-        // Check for overtaking
-        // TODO invert loops, should be more efficient to do inner loop over contiguous arrays,
-        //      also allows factoring out a method to check two TripSchedules for overtaking.
+        // Check whether any running trip on this pattern overtakes another
         noScheduledOvertaking = true;
-        loopOverStops:
-        for (int stopOffset = 0; stopOffset < source.stops.length; stopOffset++) {
-            for (int i = 0; i < runningScheduledTrips.size() - 1; i++) {
-                if (runningScheduledTrips.get(i).departures[stopOffset] >
-                        runningScheduledTrips.get(i + 1).departures[stopOffset]
-                ) {
-                    LOG.warn(
-                            "Overtaking: route {} pattern {} stop #{} time {}",
-                            source.routeId,
-                            source.originalId,
-                            stopOffset,
-                            runningScheduledTrips.get(i + 1).departures[stopOffset]
-                    );
-                    noScheduledOvertaking = false;
-                    break loopOverStops;
-                }
+        for (int i = 0; i < runningScheduledTrips.size() - 1; i++) {
+            if (overtakes(runningScheduledTrips.get(i), runningScheduledTrips.get(i + 1))) {
+                noScheduledOvertaking = false;
+                LOG.warn("Overtaking: route {} pattern {}", source.routeId, source.originalId);
+                break;
             }
         }
     }
+
+    private static boolean overtakes (TripSchedule a, TripSchedule b) {
+        for (int s = 0; s < a.departures.length; s++) {
+            if (a.departures[s] > b.departures[s]) return true;
+        }
+        return false;
+    }
+
 }

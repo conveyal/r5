@@ -461,7 +461,8 @@ public class FastRaptorWorker {
              patternIndex >= 0;
              patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            FilteredPattern pattern = filteredPatterns.patterns.get(patternIndex);
+            FilteredPattern filteredPattern = filteredPatterns.patterns.get(patternIndex);
+            TripPattern pattern = transit.tripPatterns.get(patternIndex);
             int onTrip = -1; // Used as index into list of active scheduled trips running on this pattern
             int waitTime = 0;
             int boardTime = Integer.MAX_VALUE;
@@ -491,7 +492,7 @@ public class FastRaptorWorker {
                     pattern.pickups[stopPositionInPattern] != PickDropType.NONE
                 ) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
-                    List<TripSchedule> candidateSchedules = pattern.runningScheduledTrips;
+                    List<TripSchedule> candidateSchedules = filteredPattern.runningScheduledTrips;
                     if (onTrip == -1) {
                         int candidateTripIndex = -1;
                         for (TripSchedule candidateSchedule : candidateSchedules) {
@@ -507,7 +508,7 @@ public class FastRaptorWorker {
                                 boardTime = candidateSchedule.departures[stopPositionInPattern];
                                 waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStop = stop;
-                                if (pattern.noScheduledOvertaking) {
+                                if (filteredPattern.noScheduledOvertaking) {
                                     // All remaining candidateSchedules depart this stop after the one we are
                                     // considering, because we are iterating in ascending order of departure time
                                     // from the first stop of the pattern and there is no overtaking.
@@ -525,7 +526,7 @@ public class FastRaptorWorker {
                             // checked are the ones that depart the first stop of the pattern before the trip we are
                             // on does, and we can break out of the loop once the departures are too early to board.
                             // If there is overtaking, all candidate trip schedules need to be checked.
-                            int candidateTripIndex = pattern.noScheduledOvertaking ? onTrip : candidateSchedules.size();
+                            int candidateTripIndex = filteredPattern.noScheduledOvertaking ? onTrip : candidateSchedules.size();
                             // Note decrement below (otherwise, we'd use candidateSchedules.size() - 1 above)
                             while (--candidateTripIndex >= 0) {
                                 // The tripSchedules in a given pattern are sorted by time of departure from the first
@@ -546,7 +547,7 @@ public class FastRaptorWorker {
                                 } else {
                                     // The trip under consideration arrives at this stop earlier than one could feasibly
                                     // board.
-                                    if (pattern.noScheduledOvertaking) {
+                                    if (filteredPattern.noScheduledOvertaking) {
                                         // We are confident of being on the earliest feasible departure.
                                         break;
                                     }
@@ -610,9 +611,10 @@ public class FastRaptorWorker {
                  patternIndex >= 0;
                  patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            FilteredPattern pattern = filteredPatterns.patterns.get(patternIndex);
+            FilteredPattern filteredPattern = filteredPatterns.patterns.get(patternIndex);
+            TripPattern pattern = transit.tripPatterns.get(patternIndex);
             int tripScheduleIndex = -1; // First loop iteration will immediately increment to 0.
-            for (TripSchedule schedule : pattern.runningFrequencyTrips) {
+            for (TripSchedule schedule : filteredPattern.runningFrequencyTrips) {
                 tripScheduleIndex++;
                 // Loop through all the entries for this trip (time windows with service at a given frequency).
                 for (int frequencyEntryIdx = 0;

@@ -8,7 +8,7 @@ import java.util.BitSet;
 import java.util.List;
 
 
-public class FilteredPattern extends TripPattern {
+public class FilteredPattern {
 
     private static Logger LOG = LoggerFactory.getLogger(FilteredPattern.class);
 
@@ -27,11 +27,6 @@ public class FilteredPattern extends TripPattern {
      * scheduled and frequency trip lists. Finally, check the runningScheduledTrips for overtaking.
      */
     public FilteredPattern (TripPattern source, BitSet servicesActive) {
-        this.originalId = source.originalId;
-        this.routeId = source.routeId;
-        this.stops = source.stops;
-        this.pickups = source.pickups;
-        this.dropoffs = source.dropoffs;
         for (TripSchedule schedule : source.tripSchedules) {
             if (servicesActive.get(schedule.serviceCode)) {
                 if (schedule.headwaySeconds == null) {
@@ -41,10 +36,6 @@ public class FilteredPattern extends TripPattern {
                 }
             }
         }
-        // These could be set more strictly when looping over tripSchedules; just use the source pattern's values for
-        // now. TODO can't these be runningScheduledTrips.size() > 0?
-        this.hasFrequencies = source.hasFrequencies;
-        this.hasSchedules = source.hasSchedules;
 
         // Check for overtaking
         // TODO invert loops, should be more efficient to do inner loop over contiguous arrays,

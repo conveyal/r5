@@ -105,63 +105,12 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
 
-    /** Stores the relevant patterns and trips based on the transit modes and date in an analysis request */
-    public transient FilteredPatterns filteredTripPatterns;
-
-    /** Associate filtered patterns with the criteria (modes and service) used to filter them */
-    public static class FilteredPatterns {
-        /**
-         * Transit modes in the analysis request. We filter down to only those modes enabled in the search request,
-         * because all trips in a pattern are defined to be on same route, and GTFS allows only one mode per route.
-         */
-        private final EnumSet<TransitModes> modes;
-
-        /** GTFS services, e.g. active on a specific date */
-        private final BitSet services;
-
-        /**
-         * List with the same length and indexes as full tripPatterns. Patterns that do not meed the mode/services
-         * filtering criteria are recorded as null.
-         */
-        public List<FilteredPattern> patterns = new ArrayList<>();
-        /**
-         * The indexes of the trip patterns running on a given day with frequency-based trips of selected modes. */
-        public BitSet runningFrequencyPatterns = new BitSet();
-
-        /** The indexes of the trip patterns running on a given day with scheduled trips of selected modes. */
-        public BitSet runningScheduledPatterns = new BitSet();
-
-        FilteredPatterns(EnumSet<TransitModes> modes, BitSet services) {
-            this.modes = modes;
-            this.services = services;
-        }
-
-        public boolean matchesRequest(EnumSet<TransitModes> modes, BitSet services) {
-            return this.modes.equals(modes) && this.services.equals(services);
-        }
-    }
-
-    public void filterPatternsAndTrips(EnumSet<TransitModes> modes, BitSet services) {
-        this.filteredTripPatterns = new FilteredPatterns(modes, services);
-        for (int patternIndex = 0; patternIndex < this.tripPatterns.size(); patternIndex++) {
-            TripPattern pattern = this.tripPatterns.get(patternIndex);
-            RouteInfo routeInfo = this.routes.get(pattern.routeIndex);
-            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
-            if (pattern.servicesActive.intersects(services) && modes.contains(mode)) {
-                this.filteredTripPatterns.patterns.add(new FilteredPattern(pattern, services));
-                // At least one trip on this pattern is relevant, based on the profile request's date and modes.
-                if (pattern.hasFrequencies) {
-                    this.filteredTripPatterns.runningFrequencyPatterns.set(patternIndex);
-                }
-                // Schedule case is not an "else" clause because we support patterns with both frequency and schedule.
-                if (pattern.hasSchedules) {
-                    this.filteredTripPatterns.runningScheduledPatterns.set(patternIndex);
-                }
-            } else {
-                this.filteredTripPatterns.patterns.add(null);
-            }
-        }
-    }
+    /**
+     * Stores the relevant patterns and trips based on the transit modes and date in an analysis request.
+     * Caches the most recently generated.
+     * This should only be accessed through the synchronized accessor method.
+     */
+    private transient FilteredPatterns filteredTripPatterns;
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -897,6 +846,27 @@ public class TransitLayer implements Serializable, Cloneable {
         String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
         if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
         return stop;
+    }
+
+    /**
+     * Before routing, filter the set of patterns and trips to only the ones relevant for the search request (date
+     * and transit modes). We set the filtered patterns and trips on the transitLayer, in effect caching them for
+     * repeated searches on the same date with the same modes. Although it does not affect correctness, for efficiency
+     * the caller should retain a reference to the returned FilteredPatterns because the single cached value may change
+     * rapidly over time as other threads call this method.
+     * FIXME this will be inefficient for two dates or two sets of modes on the same scenario.
+     */
+    public FilteredPatterns getFilteredPatterns (EnumSet<TransitModes> modes, BitSet services) {
+        // Locking would not be strictly necessary here if we made a local copy of the reference.
+        // Java guarantees no tearing of reference reads and writes across threads.
+        // All threads might then perform the same filtering at the same time, but that's not necessarily a problem.
+        synchronized (this) {
+            // Check if trip filtering was not yet performed, or if the filtering criteria have changed.
+            if (filteredTripPatterns == null || !(filteredTripPatterns.matchesRequest(modes, services))) {
+                filteredTripPatterns = new FilteredPatterns(this, modes, services);
+            }
+            return filteredTripPatterns;
+        }
     }
 
 }

@@ -2,6 +2,7 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.transit.FilteredPattern;
+import com.conveyal.r5.transit.FilteredPatterns;
 import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripSchedule;
@@ -25,11 +26,11 @@ import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.UPP
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- * FastRaptorWorker is faster than the old RaptorWorker and made to be more maintainable.
- * It is simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
- * the travel times from the final transit stop of a trip out to the individual targets.
- *
- * The algorithm used herein is described in
+ * FastRaptorWorker finds stop-to-stop paths through the transit network.
+ * The PerTargetPropagater extends travel times from the final transit stop of trips out to the individual targets.
+ * This system also accounts for pure-frequency routes by using Monte Carlo methods (generating randomized schedules).
+ * There is support for saving paths, so we can report how to reach a destination rather than just how long it takes.
+ * The algorithm used herein is described in:
  *
  * Conway, Matthew Wigginton, Andrew Byrd, and Marco van der Linden. “Evidence-Based Transit and Land Use Sketch Planning
  *   Using Interactive Accessibility Methods on Combined Schedule and Headway-Based Networks.” Transportation Research
@@ -38,22 +39,15 @@ import static com.google.common.base.Preconditions.checkState;
  * Delling, Daniel, Thomas Pajor, and Renato Werneck. “Round-Based Public Transit Routing,” January 1, 2012.
  *   http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
  *
- * There is basic support for saving paths, so we can report how to reach a destination rather than just how long it takes.
  *
- * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing computation by a
- * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
- * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
- * (generating randomized schedules).
- *
- * TODO rename to remove "fast" and revise above comments, there is only one worker now.
- *      Maybe just call it TransitRouter. But then there's also McRaptor.
+ * TODO rename to remove "fast". Maybe just call it TransitRouter, but then there's also McRaptor.
  */
 public class FastRaptorWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(FastRaptorWorker.class);
 
     /**
-     * This value essentially serves as Infinity for ints - it's bigger than every other number.
+     * This value is used as positive infinity for ints - it's bigger than every other number.
      * It is the travel time to a transit stop or a target before that stop or target is ever reached.
      * Be careful when propagating travel times from stops to targets, adding anything to UNREACHED will cause overflow.
      */
@@ -68,7 +62,7 @@ public class FastRaptorWorker {
     public static final int SECONDS_PER_MINUTE = 60;
 
     /**
-     * Step for departure times. Use caution when changing this as the functions request.getTimeWindowLengthMinutes
+     * Step for departure times. Use caution when changing this, as the functions request.getTimeWindowLengthMinutes
      * and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
      */
     private static final int DEPARTURE_STEP_SEC = 60;
@@ -80,6 +74,7 @@ public class FastRaptorWorker {
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 
     // ENABLE_OPTIMIZATION_X flags enable code paths that should affect efficiency but have no effect on output.
+    // They may change results where our algorithm is not perfectly optimal, for example with respect to overtaking.
 
     public static final boolean ENABLE_OPTIMIZATION_RANGE_RAPTOR = true;
     public static final boolean ENABLE_OPTIMIZATION_FREQ_UPPER_BOUND = true;
@@ -112,8 +107,11 @@ public class FastRaptorWorker {
     /** Generates and stores departure time offsets for every frequency-based set of trips. */
     private final FrequencyRandomOffsets offsets;
 
-    /** Services active on the date of the search */
+    /** Services active on the date of the search. */
     private final BitSet servicesActive;
+
+    /** TripPatterns that have been prefiltered for the specific search date and modes. */
+    private FilteredPatterns filteredPatterns;
 
     /**
      * The state resulting from the scheduled search at a particular departure minute.
@@ -134,6 +132,10 @@ public class FastRaptorWorker {
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
+    /**
+     * Only fast initialization steps are performed in the constructor.
+     * All slower work is done in route() so timing information can be collected.
+     */
     public FastRaptorWorker (TransitLayer transitLayer, AnalysisWorkerTask request, TIntIntMap accessStops) {
         this.transit = transitLayer;
         this.request = request;
@@ -163,7 +165,7 @@ public class FastRaptorWorker {
      */
     public int[][] route () {
         raptorTimer.fullSearch.start();
-        filterPatternsAndTripsIfNeeded();
+        filteredPatterns = transit.getFilteredPatterns(request.transitModes, servicesActive);
         // Initialize result storage. Results are one arrival time at each stop, for every raptor iteration.
         final int nStops = transit.getStopCount();
         final int nIterations = iterationsPerMinute * nMinutes;
@@ -227,25 +229,6 @@ public class FastRaptorWorker {
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Before routing, filter the set of patterns and trips to only the ones relevant for the search request (date
-     * and transit modes). We set the filtered patterns and trips on the transitLayer, in effect caching them for
-     * repeated searches on the same date with the same modes.
-     */
-    private void filterPatternsAndTripsIfNeeded() {
-        boolean performFiltering;
-        if (transit.filteredTripPatterns == null) {
-            // Trip filtering has not yet been performed.
-            performFiltering = true;
-        } else {
-            // Trip filtering was already performed, but the filtering criteria may have changed.
-            performFiltering = !transit.filteredTripPatterns.matchesRequest(request.transitModes, servicesActive);
-        }
-        if (performFiltering) {
-            transit.filterPatternsAndTrips(request.transitModes, servicesActive);
         }
     }
 
@@ -468,14 +451,14 @@ public class FastRaptorWorker {
      */
     private void doScheduledSearchForRound (RaptorState outputState) {
         final RaptorState inputState = outputState.previous;
-        BitSet patternsToExplore = patternsToExploreInNextRound(inputState,
-                transit.filteredTripPatterns.runningScheduledPatterns,
-                true);
+        BitSet patternsToExplore = patternsToExploreInNextRound(
+                inputState, filteredPatterns.runningScheduledPatterns, true
+        );
         for (int patternIndex = patternsToExplore.nextSetBit(0);
              patternIndex >= 0;
              patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            FilteredPattern pattern = transit.filteredTripPatterns.patterns.get(patternIndex);
+            FilteredPattern pattern = filteredPatterns.patterns.get(patternIndex);
             int onTrip = -1; // Used as index into list of active scheduled trips running on this pattern
             int waitTime = 0;
             int boardTime = Integer.MAX_VALUE;
@@ -617,14 +600,14 @@ public class FastRaptorWorker {
         // are applying randomized schedules that are not present in the accumulated range-raptor upper bound state.
         // Those randomized frequency routes may cascade improvements from updates made at previous departure minutes.
         final boolean withinMinute = (frequencyBoardingMode == UPPER_BOUND);
-        BitSet patternsToExplore = patternsToExploreInNextRound(inputState,
-                transit.filteredTripPatterns.runningFrequencyPatterns,
-                withinMinute);
+        BitSet patternsToExplore = patternsToExploreInNextRound(
+                inputState, filteredPatterns.runningFrequencyPatterns, withinMinute
+        );
         for (int patternIndex = patternsToExplore.nextSetBit(0);
                  patternIndex >= 0;
                  patternIndex = patternsToExplore.nextSetBit(patternIndex + 1)
         ) {
-            FilteredPattern pattern = transit.filteredTripPatterns.patterns.get(patternIndex);
+            FilteredPattern pattern = filteredPatterns.patterns.get(patternIndex);
             int tripScheduleIndex = -1; // First loop iteration will immediately increment to 0.
             for (TripSchedule schedule : pattern.runningFrequencyTrips) {
                 tripScheduleIndex++;

@@ -33,6 +33,7 @@ public class TripPattern implements Serializable, Cloneable {
      * This is the ID of this trip pattern _in the original transport network_. This is important because if it were the
      * ID in this transport network the ID would depend on the order of application of scenarios, and because this ID is
      * used to map results back to the original network.
+     * TODO clarify this comment. What is the "original" transport network? This field doesn't seem to be used anywhere.
      */
     public int originalId;
 

@@ -5,6 +5,7 @@ import com.conveyal.r5.transit.FilteredPattern;
 import com.conveyal.r5.transit.FilteredPatterns;
 import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.conveyal.r5.transit.path.Path;
 import gnu.trove.iterator.TIntIterator;
@@ -165,7 +166,9 @@ public class FastRaptorWorker {
      */
     public int[][] route () {
         raptorTimer.fullSearch.start();
-        filteredPatterns = transit.getFilteredPatterns(request.transitModes, servicesActive);
+        raptorTimer.patternFiltering.start();
+        filteredPatterns = transit.filteredPatternCache.get(request.transitModes, servicesActive);
+        raptorTimer.patternFiltering.stop();
         // Initialize result storage. Results are one arrival time at each stop, for every raptor iteration.
         final int nStops = transit.getStopCount();
         final int nIterations = iterationsPerMinute * nMinutes;

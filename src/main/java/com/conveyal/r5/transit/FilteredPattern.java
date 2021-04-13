@@ -18,7 +18,7 @@ public class FilteredPattern extends TripPattern {
     /** Frequency-based trips active in a particular set of GTFS services */
     public List<TripSchedule> runningFrequencyTrips = new ArrayList<>();
 
-    /** If no active schedule-based trip of this pattern overtakes another. */
+    /** If no active schedule-based trip of this filtered pattern overtakes another. */
     public boolean noScheduledOvertaking;
 
     /**
@@ -26,7 +26,7 @@ public class FilteredPattern extends TripPattern {
      * filtered to exclude trips not active in the supplied set of services, then divided into separate
      * scheduled and frequency trip lists. Finally, check the runningScheduledTrips for overtaking.
      */
-    public FilteredPattern(TripPattern source, BitSet servicesActive) {
+    public FilteredPattern (TripPattern source, BitSet servicesActive) {
         this.originalId = source.originalId;
         this.routeId = source.routeId;
         this.stops = source.stops;
@@ -42,25 +42,31 @@ public class FilteredPattern extends TripPattern {
             }
         }
         // These could be set more strictly when looping over tripSchedules; just use the source pattern's values for
-        // now.
+        // now. TODO can't these be runningScheduledTrips.size() > 0?
         this.hasFrequencies = source.hasFrequencies;
         this.hasSchedules = source.hasSchedules;
 
         // Check for overtaking
-        boolean noScheduledOvertaking = true;
+        // TODO invert loops, should be more efficient to do inner loop over contiguous arrays,
+        //      also allows factoring out a method to check two TripSchedules for overtaking.
+        noScheduledOvertaking = true;
         loopOverStops:
         for (int stopOffset = 0; stopOffset < source.stops.length; stopOffset++) {
             for (int i = 0; i < runningScheduledTrips.size() - 1; i++) {
                 if (runningScheduledTrips.get(i).departures[stopOffset] >
                         runningScheduledTrips.get(i + 1).departures[stopOffset]
                 ) {
-                    LOG.warn("Overtaking: route {} pattern {} stop #{} time {}",
-                            routeId, originalId, stopOffset, runningScheduledTrips.get(i + 1).departures[stopOffset]);
+                    LOG.warn(
+                            "Overtaking: route {} pattern {} stop #{} time {}",
+                            source.routeId,
+                            source.originalId,
+                            stopOffset,
+                            runningScheduledTrips.get(i + 1).departures[stopOffset]
+                    );
                     noScheduledOvertaking = false;
                     break loopOverStops;
                 }
             }
         }
-        this.noScheduledOvertaking = noScheduledOvertaking;
     }
 }

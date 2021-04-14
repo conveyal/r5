@@ -108,10 +108,6 @@ public class TripPattern implements Serializable, Cloneable {
         this.routeId = routeId;
     }
 
-    public TripPattern() {
-        // no-arg
-    }
-
     public void addTrip (TripSchedule tripSchedule) {
         tripSchedules.add(tripSchedule);
         hasFrequencies = hasFrequencies || tripSchedule.headwaySeconds != null;

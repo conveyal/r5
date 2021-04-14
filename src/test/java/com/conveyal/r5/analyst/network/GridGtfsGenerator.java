@@ -34,13 +34,13 @@ public class GridGtfsGenerator {
 
     private final boolean mergeStops;
 
-    public GridGtfsGenerator(GridLayout gridLayout) {
+    public GridGtfsGenerator (GridLayout gridLayout) {
         this.gridLayout = gridLayout;
         feed = new GTFSFeed(); // Temp file db, can we do this in memory instead?
         mergeStops = true;
     }
 
-    public GTFSFeed generate() {
+    public GTFSFeed generate () {
         for (GridRoute route : gridLayout.routes) {
             addRoute(route);
         }
@@ -48,7 +48,7 @@ public class GridGtfsGenerator {
         return feed;
     }
 
-    private void addCommonTables() {
+    private void addCommonTables () {
         Agency agency = new Agency();
         agency.agency_id = AGENCY_ID;
         agency.agency_name = AGENCY_ID;
@@ -63,7 +63,7 @@ public class GridGtfsGenerator {
         feed.services.put(service.service_id, service);
     }
 
-    private void addRoute(GridRoute gridRoute) {
+    private void addRoute (GridRoute gridRoute) {
         Route route = new Route();
         route.agency_id = AGENCY_ID;
         route.route_id = gridRoute.id;
@@ -77,13 +77,13 @@ public class GridGtfsGenerator {
         }
     }
 
-    private void addRoute(GridRoute route, boolean back) {
+    private void addRoute (GridRoute route, boolean back) {
         addStopsForRoute(route, back);
         addTripsForRoute(route, back);
     }
 
     // If mergeStops is true, certain stops will be created multiple times but IDs will collide on insertion.
-    public void addStopsForRoute(GridRoute route, boolean back) {
+    public void addStopsForRoute (GridRoute route, boolean back) {
         for (int s = 0; s < route.nStops; s++) {
             String stopId = route.stopId(s, mergeStops);
             Stop stop = new Stop();
@@ -96,7 +96,7 @@ public class GridGtfsGenerator {
         }
     }
 
-    public void addTripsForRoute(GridRoute route, boolean back) {
+    public void addTripsForRoute (GridRoute route, boolean back) {
         if (route.headwayMinutes > 0) {
             int tripIndex = 0;
             int start = route.startHour * 60 * 60;
@@ -118,20 +118,20 @@ public class GridGtfsGenerator {
                 }
             }
         } else {
-            for (int i = 0; i < route.startTimes.length; i++ ) {
+            for (int i = 0; i < route.startTimes.length; i++) {
                 addTrip(route, back, route.startTimes[i], i);
             }
         }
     }
 
-    private String addTrip(GridRoute route, boolean back, int startTime, int tripIndex) {
+    private String addTrip (GridRoute route, boolean back, int startTime, int tripIndex) {
         Trip trip = new Trip();
         trip.direction_id = back ? 1 : 0;
         String tripId = String.format("%s:%d:%d", route.id, tripIndex, trip.direction_id);
         trip.trip_id = tripId;
         trip.route_id = route.id;
         trip.service_id = SERVICE_ID;
-        feed.trips.put(trip.trip_id,trip);
+        feed.trips.put(trip.trip_id, trip);
         int dwell = gridLayout.transitDwellSeconds;
         int departureTime = startTime;
         int arrivalTime = departureTime - dwell;

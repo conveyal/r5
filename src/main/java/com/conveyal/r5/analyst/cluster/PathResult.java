@@ -155,8 +155,11 @@ public class PathResult {
             this.egress = pathTemplate.stopSequence.egress == null ? null : pathTemplate.stopSequence.egress.toString();
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
             this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
-            iterations.forEach(pathTemplate.stopSequence::transferTime); // Sense check that travel time components
-            // do not exceed total travel time TODO report transfer times in single-point responses?
+            iterations.forEach(pathTemplate.stopSequence::transferTime); // The transferTime method includes an
+            // assertion that the transfer time is non-negative, i.e. that the access + egress + wait + ride times of
+            // a specific iteration do not exceed the total travel time. Perform that sense check here, even though
+            // the transfer time is not reported to the front-end for the human-readable single-point responses.
+            // TODO add transferTime to HumanReadableIteration?
         }
     }
 

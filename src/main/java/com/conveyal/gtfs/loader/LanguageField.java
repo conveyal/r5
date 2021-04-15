@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.loader;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.LANGUAGE_FORMAT;
+
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -7,21 +9,18 @@ import java.sql.PreparedStatement;
 import java.sql.SQLType;
 import java.util.Locale;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.LANGUAGE_FORMAT;
-
-/**
- * Checks a BCP47 language tag.
- */
+/** Checks a BCP47 language tag. */
 public class LanguageField extends Field {
 
-    public LanguageField (String name, Requirement requirement) {
+    public LanguageField(String name, Requirement requirement) {
         super(name, requirement);
     }
 
-    private String validate (String string) {
+    private String validate(String string) {
         Locale locale = Locale.forLanguageTag(string);
         String generatedTag = locale.toLanguageTag();
-        // This works except for hierarchical sublanguages like zh-cmn and zh-yue which get flattened to the sublanguage.
+        // This works except for hierarchical sublanguages like zh-cmn and zh-yue which get
+        // flattened to the sublanguage.
         if (!generatedTag.equalsIgnoreCase(string)) {
             throw new StorageException(LANGUAGE_FORMAT, string);
         }
@@ -29,11 +28,12 @@ public class LanguageField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert (String string) {
+    public String validateAndConvert(String string) {
         return cleanString(validate(string));
     }
 
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter(
+            PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
         } catch (Exception ex) {
@@ -45,5 +45,4 @@ public class LanguageField extends Field {
     public SQLType getSqlType() {
         return JDBCType.VARCHAR;
     }
-
 }

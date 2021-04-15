@@ -1,5 +1,8 @@
 package com.conveyal.analysis.persistence;
 
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
+
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.analysis.util.JsonUtil;
@@ -7,8 +10,10 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
 import spark.Request;
 import spark.Response;
 
@@ -16,15 +21,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
-
 public class AnalysisCollection<T extends BaseModel> {
 
     public MongoCollection<T> collection;
     private Class<T> type;
 
-    private String getAccessGroup (Request req) {
+    private String getAccessGroup(Request req) {
         return req.attribute("accessGroup");
     }
 
@@ -37,7 +39,7 @@ public class AnalysisCollection<T extends BaseModel> {
         this.type = clazz;
     }
 
-    public DeleteResult delete (T value) {
+    public DeleteResult delete(T value) {
         return collection.deleteOne(eq("_id", value._id));
     }
 
@@ -83,11 +85,13 @@ public class AnalysisCollection<T extends BaseModel> {
 
         value.nonce = new ObjectId();
 
-        UpdateResult result = collection.replaceOne(and(
-                eq("_id", value._id),
-                eq("nonce", oldNonce),
-                eq("accessGroup", accessGroup)
-        ), value);
+        UpdateResult result =
+                collection.replaceOne(
+                        and(
+                                eq("_id", value._id),
+                                eq("nonce", oldNonce),
+                                eq("accessGroup", accessGroup)),
+                        value);
 
         // If no documents were modified try to find the document to find out why
         if (result.getModifiedCount() != 1) {
@@ -106,9 +110,7 @@ public class AnalysisCollection<T extends BaseModel> {
         return value;
     }
 
-    /**
-     * Controller creation helper.
-     */
+    /** Controller creation helper. */
     public T create(Request req, Response res) throws IOException {
         T value = JsonUtil.objectMapper.readValue(req.body(), type);
 
@@ -117,9 +119,7 @@ public class AnalysisCollection<T extends BaseModel> {
         return create(value, accessGroup, email);
     }
 
-    /**
-     * Controller find by id helper.
-     */
+    /** Controller find by id helper. */
     public T findPermittedByRequestParamId(Request req, Response res) {
         String accessGroup = getAccessGroup(req);
         T value = findById(req.params("_id"));
@@ -132,9 +132,7 @@ public class AnalysisCollection<T extends BaseModel> {
         return value;
     }
 
-    /**
-     * Controller update helper.
-     */
+    /** Controller update helper. */
     public T update(Request req, Response res) throws IOException {
         T value = JsonUtil.objectMapper.readValue(req.body(), type);
 

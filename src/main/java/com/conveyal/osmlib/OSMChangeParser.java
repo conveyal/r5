@@ -2,6 +2,7 @@ package com.conveyal.osmlib;
 
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.Attributes;
@@ -9,10 +10,11 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 /**
- * A lenient streaming XML parser that reads OSM change files and applies the changes they contain to an OSM database.
- * It seems like a good idea to abstract out a ChangeSink interface that extends the basic OSM entity sink.
- * However, we need non-streaming behavior here: we want to index all the new ways after applying an entire diff
- * because we have no guarantee that the nodes and ways are coherent at some point partway through the changes.
+ * A lenient streaming XML parser that reads OSM change files and applies the changes they contain
+ * to an OSM database. It seems like a good idea to abstract out a ChangeSink interface that extends
+ * the basic OSM entity sink. However, we need non-streaming behavior here: we want to index all the
+ * new ways after applying an entire diff because we have no guarantee that the nodes and ways are
+ * coherent at some point partway through the changes.
  */
 public class OSMChangeParser extends DefaultHandler {
 
@@ -80,11 +82,12 @@ public class OSMChangeParser extends DefaultHandler {
             }
         } else if (qName.equalsIgnoreCase("WAY")) {
             if (inDelete) {
-                // Remove from index before removing the way itself. This allows the remove method to locate the way.
+                // Remove from index before removing the way itself. This allows the remove method
+                // to locate the way.
                 osm.unIndexWay(id);
                 osm.ways.remove(id);
             } else {
-                Way way = ((Way)entity);
+                Way way = ((Way) entity);
                 way.nodes = nodeRefs.toArray();
                 osm.ways.put(id, way);
                 waysModified.add(id); // record that this way was modified for later re-indexing.
@@ -107,15 +110,16 @@ public class OSMChangeParser extends DefaultHandler {
 
     @Override
     public void endDocument() {
-        // After the entire diff has been applied, re-index all the ways that were added or modified.
+        // After the entire diff has been applied, re-index all the ways that were added or
+        // modified.
         if (!waysModified.isEmpty()) {
             LOG.debug("Indexing modified ways...");
             for (int w = 0; w < waysModified.size(); w++) {
-                // TODO unless we are doing snapshots and transactions, we should unindex after indexing the new one?
+                // TODO unless we are doing snapshots and transactions, we should unindex after
+                // indexing the new one?
                 osm.unIndexWay(id);
                 osm.indexWay(waysModified.get(w), null);
             }
         }
     }
-
 }

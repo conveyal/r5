@@ -1,11 +1,12 @@
 package com.conveyal.r5.streets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
-import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
 
 public class TimeDependentRoutingTest {
 
@@ -39,23 +40,23 @@ public class TimeDependentRoutingTest {
         assertEquals(24, stateAtVertex.durationSeconds);
 
         StreetRouter anotherStreetRouter = new StreetRouter(streetLayer);
-        anotherStreetRouter.timeCalculator = new TraversalTimeCalculator() {
-            @Override
-            public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
-                return 30;
-            }
+        anotherStreetRouter.timeCalculator =
+                new TraversalTimeCalculator() {
+                    @Override
+                    public int traversalTimeSeconds(
+                            EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
+                        return 30;
+                    }
 
-            @Override
-            public int turnTimeSeconds (int fromEdge, int toEdge, StreetMode streetMode) {
-                return 0;
-            }
-        };
+                    @Override
+                    public int turnTimeSeconds(int fromEdge, int toEdge, StreetMode streetMode) {
+                        return 0;
+                    }
+                };
         anotherStreetRouter.setOrigin(one);
         anotherStreetRouter.route();
         StreetRouter.State anotherStateAtVertex = anotherStreetRouter.getStateAtVertex(three);
 
         assertEquals(60, anotherStateAtVertex.durationSeconds);
-
     }
-
 }

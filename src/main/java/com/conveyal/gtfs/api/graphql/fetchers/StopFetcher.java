@@ -6,7 +6,9 @@ import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Stop;
+
 import graphql.schema.DataFetchingEnvironment;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,9 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Created by matthewc on 3/9/16.
- */
+/** Created by matthewc on 3/9/16. */
 public class StopFetcher {
     private static final Logger LOG = LoggerFactory.getLogger(StopFetcher.class);
     private static final Double DEFAULT_RADIUS = 1.0; // default 1 km search radius
@@ -56,8 +56,7 @@ public class StopFetcher {
                         .distinct()
                         .map(stop -> new WrappedGTFSEntity(feed.uniqueId, stop))
                         .forEach(stops::add);
-            }
-            else if (args.get("route_id") != null) {
+            } else if (args.get("route_id") != null) {
                 List<String> routeId = (List<String>) args.get("route_id");
                 feed.patterns.values().stream()
                         .filter(p -> routeId.contains(p.route_id))
@@ -83,8 +82,7 @@ public class StopFetcher {
         GTFSFeed feed = ApiMain.getFeedSourceWithoutExceptions(pattern.feedUniqueId);
         if (feed == null) return null;
 
-        return feed.getOrderedStopListForTrip(pattern.entity.associatedTrips.get(0))
-                .stream()
+        return feed.getOrderedStopListForTrip(pattern.entity.associatedTrips.get(0)).stream()
                 .map(feed.stops::get)
                 .map(s -> new WrappedGTFSEntity<>(feed.uniqueId, s))
                 .collect(Collectors.toList());
@@ -101,8 +99,8 @@ public class StopFetcher {
         GTFSFeed feed = ApiMain.getFeedSourceWithoutExceptions(pattern.feedUniqueId);
         if (feed == null) return null;
 
-        return feed.getOrderedStopListForTrip(pattern.entity.associatedTrips.get(0))
-                .stream().count();
+        return feed.getOrderedStopListForTrip(pattern.entity.associatedTrips.get(0)).stream()
+                .count();
     }
 
     public static List<WrappedGTFSEntity<Stop>> fromFeed(DataFetchingEnvironment env) {

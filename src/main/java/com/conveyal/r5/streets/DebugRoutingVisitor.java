@@ -6,8 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Callbacks for debugging street routing.
- * It accumulates all the steps in routing as GeoJSON.
+ * Callbacks for debugging street routing. It accumulates all the steps in routing as GeoJSON.
  * Created by mabu on 10.12.2015.
  */
 public class DebugRoutingVisitor implements RoutingVisitor {
@@ -17,8 +16,8 @@ public class DebugRoutingVisitor implements RoutingVisitor {
 
     /**
      * Mode should be in the state itself
-     *  @param edgeStore streetLayer edgeStore
      *
+     * @param edgeStore streetLayer edgeStore
      */
     public DebugRoutingVisitor(EdgeStore edgeStore) {
         this.features = new ArrayList<>();
@@ -28,7 +27,8 @@ public class DebugRoutingVisitor implements RoutingVisitor {
     /**
      * Saves current state geometry mode and weight as geoJSON feature properties
      *
-     * in list of features. It is used in full state graph when debugging
+     * <p>in list of features. It is used in full state graph when debugging
+     *
      * @param state
      */
     @Override

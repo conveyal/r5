@@ -1,33 +1,36 @@
 package com.conveyal.gtfs.model;
 
+import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
+
 import com.conveyal.gtfs.GTFSFeed;
+
 import org.mapdb.Fun;
 
 import java.io.IOException;
 import java.util.Iterator;
 
-import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
-
 public class Frequency extends Entity implements Comparable<Frequency> {
     /**
-     * Frequency entries have no ID in GTFS so we define one based on the fields in the frequency entry.
+     * Frequency entries have no ID in GTFS so we define one based on the fields in the frequency
+     * entry.
      *
-     * It is possible to have two identical frequency entries in the GTFS, which under our understanding of the situation
-     * would mean that two sets of vehicles were randomly running the same trip at the same headway, but uncorrelated
-     * with each other, which is almost certain to be an error.
+     * <p>It is possible to have two identical frequency entries in the GTFS, which under our
+     * understanding of the situation would mean that two sets of vehicles were randomly running the
+     * same trip at the same headway, but uncorrelated with each other, which is almost certain to
+     * be an error.
      */
-     public String getId() {
+    public String getId() {
         StringBuilder sb = new StringBuilder();
-         sb.append(trip_id);
-         sb.append('_');
-         sb.append(convertToGtfsTime(start_time));
-         sb.append("_to_");
-         sb.append(convertToGtfsTime(end_time));
-         sb.append("_every_");
-         sb.append(String.format("%dm%02ds", headway_secs / 60, headway_secs % 60));
-         if (exact_times == 1) sb.append("_exact");
-         return sb.toString();
-     }
+        sb.append(trip_id);
+        sb.append('_');
+        sb.append(convertToGtfsTime(start_time));
+        sb.append("_to_");
+        sb.append(convertToGtfsTime(end_time));
+        sb.append("_every_");
+        sb.append(String.format("%dm%02ds", headway_secs / 60, headway_secs % 60));
+        if (exact_times == 1) sb.append("_exact");
+        return sb.toString();
+    }
 
     private static final long serialVersionUID = -7182161664471704133L;
     public String trip_id;
@@ -68,13 +71,16 @@ public class Frequency extends Entity implements Comparable<Frequency> {
     }
 
     public static class Writer extends Entity.Writer<Frequency> {
-        public Writer (GTFSFeed feed) {
+        public Writer(GTFSFeed feed) {
             super(feed, "frequencies");
         }
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"trip_id", "start_time", "end_time", "headway_secs", "exact_times"});
+            writer.writeRecord(
+                    new String[] {
+                        "trip_id", "start_time", "end_time", "headway_secs", "exact_times"
+                    });
         }
 
         @Override
@@ -89,12 +95,7 @@ public class Frequency extends Entity implements Comparable<Frequency> {
 
         @Override
         public Iterator<Frequency> iterator() {
-            return feed.frequencies.stream()
-                    .map(t2 -> t2.b)
-                    .iterator();
+            return feed.frequencies.stream().map(t2 -> t2.b).iterator();
         }
-
-
     }
-
 }

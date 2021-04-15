@@ -5,14 +5,14 @@ import com.conveyal.r5.profile.StreetMode;
 import java.util.EnumSet;
 import java.util.Set;
 
-/**
- * Modes of transport on access or egress legs
- */
+/** Modes of transport on access or egress legs */
 public enum LegMode {
-    WALK, BICYCLE, CAR,
-    //Renting a bicycle
+    WALK,
+    BICYCLE,
+    CAR,
+    // Renting a bicycle
     BICYCLE_RENT,
-    //Park & Ride
+    // Park & Ride
     CAR_PARK;
 
     /** Return the heaviest/fastest StreetMode for use in stop finding */
@@ -23,10 +23,10 @@ public enum LegMode {
     }
 
     /**
-     * Convert between these two enum types.
-     * Additional qualifiers (RENT and PARK) on LegMode will be lost in the conversion to StreetMode.
+     * Convert between these two enum types. Additional qualifiers (RENT and PARK) on LegMode will
+     * be lost in the conversion to StreetMode.
      */
-    public static StreetMode toStreetMode (LegMode legMode) {
+    public static StreetMode toStreetMode(LegMode legMode) {
         if (legMode == LegMode.WALK) {
             return StreetMode.WALK;
         }
@@ -36,10 +36,11 @@ public enum LegMode {
         if (legMode == LegMode.CAR || legMode == LegMode.CAR_PARK) {
             return StreetMode.CAR;
         }
-        throw new AssertionError("This enum value is not covered by a conditional branch: " + legMode);
+        throw new AssertionError(
+                "This enum value is not covered by a conditional branch: " + legMode);
     }
 
-    public static EnumSet<StreetMode> toStreetModeSet (EnumSet<LegMode>... legModeSets) {
+    public static EnumSet<StreetMode> toStreetModeSet(EnumSet<LegMode>... legModeSets) {
         EnumSet<StreetMode> streetModes = EnumSet.noneOf(StreetMode.class);
         for (EnumSet<LegMode> legModeSet : legModeSets) {
             for (LegMode legMode : legModeSet) {
@@ -48,5 +49,4 @@ public enum LegMode {
         }
         return streetModes;
     }
-
 }

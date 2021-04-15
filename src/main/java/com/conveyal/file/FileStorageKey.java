@@ -1,11 +1,12 @@
 package com.conveyal.file;
 
 /**
- * Represent S3 bucket/keys and locally cached folder/paths. Prevents multiple parameter passing or many
- * separate `String.join("/", ...)`s.
+ * Represent S3 bucket/keys and locally cached folder/paths. Prevents multiple parameter passing or
+ * many separate `String.join("/", ...)`s.
  */
 public class FileStorageKey {
-    public final String bucket; // Rather than a bucket, this could be just a folder in a cache directory.
+    public final String
+            bucket; // Rather than a bucket, this could be just a folder in a cache directory.
     public final String path;
 
     public FileStorageKey(String fullPath) {
@@ -30,18 +31,18 @@ public class FileStorageKey {
     }
 
     @Override
-    public String toString () {
+    public String toString() {
         return String.format("[File storage key: bucket='%s', key='%s']", bucket, path);
     }
 
     /**
-     * Validate user-provided paths to ensure they do not contain any sequence that would allow accessing files
-     * outside the intended file storage directory.
+     * Validate user-provided paths to ensure they do not contain any sequence that would allow
+     * accessing files outside the intended file storage directory.
      */
-    public static void checkForDirectoryTraversal (String path) {
+    public static void checkForDirectoryTraversal(String path) {
         if (path.contains("../") || path.contains("..\\")) {
-            throw new IllegalArgumentException("Path looks like it could be a directory traversal attack.");
+            throw new IllegalArgumentException(
+                    "Path looks like it could be a directory traversal attack.");
         }
     }
-
 }

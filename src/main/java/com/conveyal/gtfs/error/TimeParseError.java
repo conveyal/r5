@@ -10,8 +10,8 @@ public class TimeParseError extends GTFSError implements Serializable {
         super(file, line, field);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return "Could not parse time (format should be HH:MM:SS).";
     }
-
 }

@@ -14,11 +14,11 @@ import java.util.Map;
 public class CalendarDate extends Entity implements Cloneable, Serializable {
 
     private static final long serialVersionUID = 6936614582249119431L;
-    public String    service_id;
+    public String service_id;
     public LocalDate date;
-    public int       exception_type;
+    public int exception_type;
 
-    public CalendarDate clone () {
+    public CalendarDate clone() {
         try {
             return (CalendarDate) super.clone();
         } catch (CloneNotSupportedException e) {
@@ -31,8 +31,9 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
         private final Map<String, Service> services;
 
         /**
-         * Create a loader. The map parameter should be an in-memory map that will be modified. We can't write directly
-         * to MapDB because we modify services as we load calendar dates, and this creates concurrentmodificationexceptions.
+         * Create a loader. The map parameter should be an in-memory map that will be modified. We
+         * can't write directly to MapDB because we modify services as we load calendar dates, and
+         * this creates concurrentmodificationexceptions.
          */
         public Loader(GTFSFeed feed, Map<String, Service> services) {
             super(feed, "calendar_dates");
@@ -54,7 +55,8 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
             } else {
                 CalendarDate cd = new CalendarDate();
-                cd.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+                cd.sourceFileLine =
+                        row + 1; // offset line number by 1 to account for 0-based row index
                 cd.service_id = service_id;
                 cd.date = date;
                 cd.exception_type = getIntField("exception_type", true, 1, 2);
@@ -64,7 +66,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
     }
 
     public static class Writer extends Entity.Writer<CalendarDate> {
-        public Writer (GTFSFeed feed) {
+        public Writer(GTFSFeed feed) {
             super(feed, "calendar_dates");
         }
 
@@ -84,12 +86,15 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
         @Override
         protected Iterator<CalendarDate> iterator() {
             Iterator<Service> serviceIterator = feed.services.values().iterator();
-            return Iterators.concat(Iterators.transform(serviceIterator, new Function<Service, Iterator<CalendarDate>> () {
-                @Override
-                public Iterator<CalendarDate> apply(Service service) {
-                    return service.calendar_dates.values().iterator();
-                }
-            }));
+            return Iterators.concat(
+                    Iterators.transform(
+                            serviceIterator,
+                            new Function<Service, Iterator<CalendarDate>>() {
+                                @Override
+                                public Iterator<CalendarDate> apply(Service service) {
+                                    return service.calendar_dates.values().iterator();
+                                }
+                            }));
         }
     }
 }

@@ -12,9 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-/**
- * Data source for LODES data.
- */
+/** Data source for LODES data. */
 public class LodesSource {
     private File input;
     private LodesType type;
@@ -29,7 +27,7 @@ public class LodesSource {
         CsvReader reader = new CsvReader(new InputStreamReader(csv));
 
         // rename the columns to something useful
-        //http://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.1.pdf#page=7&zoom=auto,-266,580
+        // http://lehd.ces.census.gov/data/lodes/LODES7/LODESTechDoc7.1.pdf#page=7&zoom=auto,-266,580
         Map<String, String> colNames = new HashMap<>();
         colNames.put("C000", "total");
 
@@ -84,15 +82,16 @@ public class LodesSource {
 
         // read the file
         while (reader.readRecord()) {
-            long id = Long.parseLong(reader.get(type == LodesType.WORKPLACE ? "w_geocode" : "h_geocode"));
+            long id =
+                    Long.parseLong(
+                            reader.get(type == LodesType.WORKPLACE ? "w_geocode" : "h_geocode"));
             GeobufFeature feat = store.get(id);
 
             String[] line = reader.getValues();
             for (int i = 0; i < line.length; i++) {
                 String col = headers[i];
 
-                if (!colNames.containsKey(col))
-                    continue;
+                if (!colNames.containsKey(col)) continue;
 
                 String colName;
 
@@ -103,16 +102,12 @@ public class LodesSource {
                         colName = "Jobs employing " + colNames.get(col) + "s";
                     else if (col.startsWith("CT"))
                         colName = "Jobs employing " + colNames.get(col) + " workers";
-                    else
-                        colName = "Jobs " + colNames.get(col);
-                }
-                else if (type == LodesType.RESIDENCE) {
+                    else colName = "Jobs " + colNames.get(col);
+                } else if (type == LodesType.RESIDENCE) {
                     if (col.startsWith("CT") || col.startsWith("CS"))
                         colName = "Workers, " + colNames.get(col);
-                    else
-                        colName = "Workers " + colNames.get(col);
-                }
-                else {
+                    else colName = "Workers " + colNames.get(col);
+                } else {
                     throw new IllegalArgumentException("Invalid LODES type");
                 }
 
@@ -125,8 +120,11 @@ public class LodesSource {
         reader.close();
     }
 
-    /** supported lodes types are workplace area characteristics and residence area characteristics */
+    /**
+     * supported lodes types are workplace area characteristics and residence area characteristics
+     */
     public static enum LodesType {
-        WORKPLACE, RESIDENCE
+        WORKPLACE,
+        RESIDENCE
     }
 }

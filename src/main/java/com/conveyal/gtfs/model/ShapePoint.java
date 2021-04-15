@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+
 import org.mapdb.Fun.Tuple2;
 
 import java.io.IOException;
@@ -12,13 +13,19 @@ public class ShapePoint extends Entity {
     public String shape_id;
     public double shape_pt_lat;
     public double shape_pt_lon;
-    public int    shape_pt_sequence;
+    public int shape_pt_sequence;
     public double shape_dist_traveled;
 
-    public ShapePoint () { }
+    public ShapePoint() {}
 
-    // Similar to stoptime, we have to have a constructor, because fields are final so as to be immutable for storage in MapDB.
-    public ShapePoint(String shape_id, double shape_pt_lat, double shape_pt_lon, int shape_pt_sequence, double shape_dist_traveled) {
+    // Similar to stoptime, we have to have a constructor, because fields are final so as to be
+    // immutable for storage in MapDB.
+    public ShapePoint(
+            String shape_id,
+            double shape_pt_lat,
+            double shape_pt_lon,
+            int shape_pt_sequence,
+            double shape_dist_traveled) {
         this.shape_id = shape_id;
         this.shape_pt_lat = shape_pt_lat;
         this.shape_pt_lon = shape_pt_lon;
@@ -43,22 +50,36 @@ public class ShapePoint extends Entity {
             double shape_pt_lat = getDoubleField("shape_pt_lat", true, -90D, 90D);
             double shape_pt_lon = getDoubleField("shape_pt_lon", true, -180D, 180D);
             int shape_pt_sequence = getIntField("shape_pt_sequence", true, 0, Integer.MAX_VALUE);
-            double shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE);
+            double shape_dist_traveled =
+                    getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE);
 
-            ShapePoint s = new ShapePoint(shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled);
+            ShapePoint s =
+                    new ShapePoint(
+                            shape_id,
+                            shape_pt_lat,
+                            shape_pt_lon,
+                            shape_pt_sequence,
+                            shape_dist_traveled);
             s.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
             feed.shape_points.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
         }
     }
 
     public static class Writer extends Entity.Writer<ShapePoint> {
-        public Writer (GTFSFeed feed) {
+        public Writer(GTFSFeed feed) {
             super(feed, "shapes");
         }
 
         @Override
         protected void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence", "shape_dist_traveled"});
+            writer.writeRecord(
+                    new String[] {
+                        "shape_id",
+                        "shape_pt_lat",
+                        "shape_pt_lon",
+                        "shape_pt_sequence",
+                        "shape_dist_traveled"
+                    });
         }
 
         @Override

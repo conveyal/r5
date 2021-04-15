@@ -9,13 +9,13 @@ import java.util.Map;
 /**
  * GeoJSON Feature class
  *
- * Written because GeoJSON Feature class from geojson-jackson has different type of Geometry
- * and needs a conversion
+ * <p>Written because GeoJSON Feature class from geojson-jackson has different type of Geometry and
+ * needs a conversion
  *
- * Currently only used in TransportNetworkVisualizer
+ * <p>Currently only used in TransportNetworkVisualizer
  */
 public class GeoJsonFeature {
-    //for serialization
+    // for serialization
     private final String type = "Feature";
     private Map<String, Object> properties;
 
@@ -46,4 +46,3 @@ public class GeoJsonFeature {
         properties.put(propertyName, propertyValue);
     }
 }
-

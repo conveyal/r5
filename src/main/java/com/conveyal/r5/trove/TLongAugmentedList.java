@@ -11,8 +11,8 @@ import java.util.Collection;
 import java.util.Random;
 
 /**
- * This TLongArrayList extension wraps another TLongList, and only allows extending it and retrieving values.
- * It assumes the wrapped TIntList is immutable and treats it as such.
+ * This TLongArrayList extension wraps another TLongList, and only allows extending it and
+ * retrieving values. It assumes the wrapped TIntList is immutable and treats it as such.
  */
 public class TLongAugmentedList implements TLongList {
 
@@ -26,7 +26,7 @@ public class TLongAugmentedList implements TLongList {
     }
 
     @Override
-    public long get (int index) {
+    public long get(int index) {
         if (index < base.size()) {
             return base.get(index);
         } else {
@@ -35,7 +35,7 @@ public class TLongAugmentedList implements TLongList {
     }
 
     @Override
-    public long set (int index, long value) {
+    public long set(int index, long value) {
         if (index < base.size()) {
             throw new RuntimeException("Modifying the base graph is not allowed.");
         } else {
@@ -53,12 +53,10 @@ public class TLongAugmentedList implements TLongList {
         return base.size() + extension.size();
     }
 
-
     /**
-     *  Nominally implement the (enormous) TLongList interface.
-     *  But all of these remain unimplemented until we need them.
+     * Nominally implement the (enormous) TLongList interface. But all of these remain unimplemented
+     * until we need them.
      */
-
     @Override
     public void set(int offset, long[] values) {
         throw new UnsupportedOperationException();
@@ -333,5 +331,4 @@ public class TLongAugmentedList implements TLongList {
     public void insert(int offset, long[] values, int valOffset, int len) {
         throw new UnsupportedOperationException();
     }
-
 }

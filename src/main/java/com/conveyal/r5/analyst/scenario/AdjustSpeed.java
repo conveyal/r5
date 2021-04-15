@@ -5,8 +5,10 @@ import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.conveyal.r5.util.P2;
 import com.google.common.primitives.Booleans;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,13 +20,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Scale the speed of travel by a constant factor. That is, uniformly speed trips up or slow them down.
- * This modification can also be applied to only part of a route by specifying a series of "hops", i.e.
- * pairs of stops adjacent to one another in the pattern.
- * We do not have an absolute speed parameter, only a scale parameter, because the server does not necessarily know
- * the route alignment and the inter-stop distances to calculate travel times from speeds.
- * You can specify either routes or patterns to modify, but not both at once. Changing the speed of only some trips
- * on a pattern does not cause problems like adding or removing stops does, so you can also specify individual trips.
+ * Scale the speed of travel by a constant factor. That is, uniformly speed trips up or slow them
+ * down. This modification can also be applied to only part of a route by specifying a series of
+ * "hops", i.e. pairs of stops adjacent to one another in the pattern. We do not have an absolute
+ * speed parameter, only a scale parameter, because the server does not necessarily know the route
+ * alignment and the inter-stop distances to calculate travel times from speeds. You can specify
+ * either routes or patterns to modify, but not both at once. Changing the speed of only some trips
+ * on a pattern does not cause problems like adding or removing stops does, so you can also specify
+ * individual trips.
  */
 public class AdjustSpeed extends Modification {
 
@@ -45,44 +48,53 @@ public class AdjustSpeed extends Modification {
     public double scale = -1;
 
     /**
-     * Which stops in the route serve as the fixed points around which trips are contracted or expanded.
-     * TODO Implement.
+     * Which stops in the route serve as the fixed points around which trips are contracted or
+     * expanded. TODO Implement.
      */
     public List<String> referenceStops;
 
     /**
-     * Hops which should have their speed set or scaled. If not supplied (hops is null), all hops should be modified.
-     * Each hop is a pair of adjacent stop IDs (from/to) and the hop specification is directional.
-     * The UI produces one copy of each hop per pattern containing that hop, yielding duplicates.
-     * Even if this behavior is changed, re-running a regional analysis will reuse saved JSON for existing scenarios,
-     * so we need to tolerate duplicate hops in this field.
+     * Hops which should have their speed set or scaled. If not supplied (hops is null), all hops
+     * should be modified. Each hop is a pair of adjacent stop IDs (from/to) and the hop
+     * specification is directional. The UI produces one copy of each hop per pattern containing
+     * that hop, yielding duplicates. Even if this behavior is changed, re-running a regional
+     * analysis will reuse saved JSON for existing scenarios, so we need to tolerate duplicate hops
+     * in this field.
      */
     public List<String[]> hops;
 
     /**
-     * If true, the scale factor applies to both dwells and inter-stop rides. If false, dwells remain the
-     * same length and the scale factor only applies to rides.
+     * If true, the scale factor applies to both dwells and inter-stop rides. If false, dwells
+     * remain the same length and the scale factor only applies to rides.
      */
     public boolean scaleDwells = false;
 
     /**
-     * A deduplicated copy of the hops field. Each hop appears only once, but as a List they have a specific order.
-     * Besides being more efficient, deduplicating allows accurately reporting how many patterns are affected by each
-     * hop to better detect mistakes or errors in the scenario. All hop indexes after resolve() reference this List.
+     * A deduplicated copy of the hops field. Each hop appears only once, but as a List they have a
+     * specific order. Besides being more efficient, deduplicating allows accurately reporting how
+     * many patterns are affected by each hop to better detect mistakes or errors in the scenario.
+     * All hop indexes after resolve() reference this List.
      */
     private transient List<P2<String>> uniqueHops;
 
-    /** These are two parallel arrays of length nUniqueHops, where (hopFromStops[i], hopToStops[i]) represents one hop. */
+    /**
+     * These are two parallel arrays of length nUniqueHops, where (hopFromStops[i], hopToStops[i])
+     * represents one hop.
+     */
     private transient TIntList hopFromStops;
 
     private transient TIntList hopToStops;
 
-    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    /**
+     * For logging the effects of the modification and reporting an error when the modification has
+     * no effect.
+     */
     private transient int nTripsAffected = 0;
 
     /**
-     * For logging the effects of the modification and reporting an error when the modification has no effect. An array
-     * is more convenient than TIntList for progressively incrementing a known number of elements defaulting to zero.
+     * For logging the effects of the modification and reporting an error when the modification has
+     * no effect. An array is more convenient than TIntList for progressively incrementing a known
+     * number of elements defaulting to zero.
      */
     private transient int[] nPatternsAffectedByHop;
 
@@ -104,8 +116,10 @@ public class AdjustSpeed extends Modification {
                     P2<String> hopAsPair = new P2<String>(pair[0], pair[1]);
                     uniqueHopSet.add(hopAsPair);
                 }
-                // Copy Set into a List to maintain a predictable, indexable order. By convention we don't overwrite
-                // fields deserialized from the scenario (like hops), so we use another transient field.
+                // Copy Set into a List to maintain a predictable, indexable order. By convention we
+                // don't overwrite
+                // fields deserialized from the scenario (like hops), so we use another transient
+                // field.
                 // There is some risk here of confusing the lengths and indexes of the two lists -
                 // ensure there are no other uses of the hops field after this point.
                 uniqueHops = new ArrayList<>(uniqueHopSet);
@@ -113,7 +127,7 @@ public class AdjustSpeed extends Modification {
             hopFromStops = new TIntArrayList(uniqueHops.size());
             hopToStops = new TIntArrayList(uniqueHops.size());
             nPatternsAffectedByHop = new int[uniqueHops.size()];
-            for (P2<String> pair: uniqueHops) {
+            for (P2<String> pair : uniqueHops) {
                 int intFromId = network.transitLayer.indexForStopId.get(pair.a);
                 int intToId = network.transitLayer.indexForStopId.get(pair.b);
                 if (intFromId == -1) {
@@ -134,9 +148,10 @@ public class AdjustSpeed extends Modification {
 
     @Override
     public boolean apply(TransportNetwork network) {
-        network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
-                .map(this::processTripPattern)
-                .collect(Collectors.toList());
+        network.transitLayer.tripPatterns =
+                network.transitLayer.tripPatterns.stream()
+                        .map(this::processTripPattern)
+                        .collect(Collectors.toList());
 
         if (nTripsAffected > 0) {
             info.add(String.format("Speed was changed on %d trips.", nTripsAffected));
@@ -149,18 +164,22 @@ public class AdjustSpeed extends Modification {
                     errors.add("No patterns were affected by hop: " + uniqueHops.get(h));
                 }
             }
-            info.add("Number of patterns affected by each unique hop: " + Arrays.toString(nPatternsAffectedByHop));
+            info.add(
+                    "Number of patterns affected by each unique hop: "
+                            + Arrays.toString(nPatternsAffectedByHop));
         }
         return errors.size() > 0;
     }
 
-    private TripPattern processTripPattern (TripPattern originalPattern) {
+    private TripPattern processTripPattern(TripPattern originalPattern) {
         if (routes != null && !routes.contains(originalPattern.routeId)) {
-            // This Modification does not apply to the route this TripPattern is on, TripPattern remains unchanged.
+            // This Modification does not apply to the route this TripPattern is on, TripPattern
+            // remains unchanged.
             return originalPattern;
         }
         if (patterns != null && originalPattern.containsNoTrips(patterns)) {
-            // This TripPattern does not contain any of the example trips, so its speed is not adjusted.
+            // This TripPattern does not contain any of the example trips, so its speed is not
+            // adjusted.
             return originalPattern;
         }
         if (trips != null && originalPattern.containsNoTrips(trips)) {
@@ -187,9 +206,10 @@ public class AdjustSpeed extends Modification {
             // No hops would be modified. Keep the original pattern unchanged.
             return originalPattern;
         }
-        // There are hops that will have their speed changed. Make a shallow protective copy of this TripPattern.
+        // There are hops that will have their speed changed. Make a shallow protective copy of this
+        // TripPattern.
         TripPattern pattern = originalPattern.clone();
-        double timeScaleFactor = 1/scale; // Invert speed coefficient to get time coefficient
+        double timeScaleFactor = 1 / scale; // Invert speed coefficient to get time coefficient
         int nStops = pattern.stops.length;
         pattern.tripSchedules = new ArrayList<>();
         for (TripSchedule originalSchedule : originalPattern.tripSchedules) {
@@ -214,8 +234,10 @@ public class AdjustSpeed extends Modification {
                 }
                 newSchedule.departures[s] = (int) Math.round(seconds);
                 if (s < nStops - 1) {
-                    // We are not at the last stop in the pattern, so compute and optionally scale the following hop.
-                    int rideTime = originalSchedule.arrivals[s + 1] - originalSchedule.departures[s];
+                    // We are not at the last stop in the pattern, so compute and optionally scale
+                    // the following hop.
+                    int rideTime =
+                            originalSchedule.arrivals[s + 1] - originalSchedule.departures[s];
                     if (shouldScaleHop[s]) {
                         seconds += rideTime * timeScaleFactor;
                     } else {
@@ -223,10 +245,14 @@ public class AdjustSpeed extends Modification {
                     }
                 }
             }
-            int originalTravelTime = originalSchedule.departures[nStops - 1] - originalSchedule.arrivals[0];
+            int originalTravelTime =
+                    originalSchedule.departures[nStops - 1] - originalSchedule.arrivals[0];
             int updatedTravelTime = newSchedule.departures[nStops - 1] - newSchedule.arrivals[0];
-            LOG.debug("Total travel time on trip {} changed from {} to {} seconds.",
-                    newSchedule.tripId, originalTravelTime, updatedTravelTime);
+            LOG.debug(
+                    "Total travel time on trip {} changed from {} to {} seconds.",
+                    newSchedule.tripId,
+                    originalTravelTime,
+                    updatedTravelTime);
             nTripsAffected += 1;
             postSanityCheck(newSchedule);
         }
@@ -234,11 +260,12 @@ public class AdjustSpeed extends Modification {
         return pattern;
     }
 
-    private static void postSanityCheck (TripSchedule schedule) {
+    private static void postSanityCheck(TripSchedule schedule) {
         // TODO check that modified trips still make sense after applying the modification
         // This should be called in any Modification that changes a schedule.
     }
 
-    public int getSortOrder() { return 0; }
-
+    public int getSortOrder() {
+        return 0;
+    }
 }

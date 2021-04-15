@@ -3,6 +3,7 @@ package com.conveyal.analysis.models;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import org.bson.types.ObjectId;
 
 public class FileInfo extends BaseModel {
@@ -25,19 +26,19 @@ public class FileInfo extends BaseModel {
 
     // Get path
     @JsonIgnore
-    public FileStorageKey getKey () {
+    public FileStorageKey getKey() {
         return new FileStorageKey(bucket, path);
     }
 
     /**
-     * New objects will be stored using this path.
-     * TODO clean path?
+     * New objects will be stored using this path. TODO clean path?
+     *
      * @param accessGroup
      * @param _id
      * @param filename
      * @return
      */
-    public static String generatePath (String accessGroup, ObjectId _id, String filename) {
+    public static String generatePath(String accessGroup, ObjectId _id, String filename) {
         String fileName = String.join("-", _id.toString(), filename);
         return String.join("/", accessGroup, fileName);
     }

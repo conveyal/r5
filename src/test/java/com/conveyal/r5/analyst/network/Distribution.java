@@ -1,46 +1,49 @@
 package com.conveyal.r5.analyst.network;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 import java.util.Arrays;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 /**
- * Used to model expected travel times in testing, for comparison against actual times reported by the routing system.
- * Designed to facilitate convolution to find the distribution of a sum of random variables,
- * modeling successive waits for pure frequency routes or waits for scheduled routes given a departure time distribution.
+ * Used to model expected travel times in testing, for comparison against actual times reported by
+ * the routing system. Designed to facilitate convolution to find the distribution of a sum of
+ * random variables, modeling successive waits for pure frequency routes or waits for scheduled
+ * routes given a departure time distribution.
  */
 public class Distribution {
 
-    // For debugging and test development: display a chart in a window every time two distributions are compared.
+    // For debugging and test development: display a chart in a window every time two distributions
+    // are compared.
     private static final boolean SHOW_CHARTS = false;
 
     private int skip;
     private double[] masses; // impulse response
 
-    private Distribution () {};
+    private Distribution() {}
+    ;
 
-    public Distribution copy () {
+    public Distribution copy() {
         Distribution result = new Distribution();
         result.skip = skip;
         result.masses = masses;
         return result;
     }
 
-    public Distribution delay (int amount) {
+    public Distribution delay(int amount) {
         Distribution result = this.copy();
         result.skip += amount;
         return result;
     }
 
-    public Distribution (int skip, int width) {
+    public Distribution(int skip, int width) {
         this.skip = skip;
         masses = new double[width];
-        Arrays.fill(masses, 1.0/width);
+        Arrays.fill(masses, 1.0 / width);
     }
 
-    public static Distribution convolution (Distribution... inputs) {
+    public static Distribution convolution(Distribution... inputs) {
         Distribution output = null;
         for (Distribution d : inputs) {
             if (output == null) {
@@ -52,10 +55,7 @@ public class Distribution {
         return output;
     }
 
-    public static Distribution convolution (
-            Distribution a,
-            Distribution b
-    ) {
+    public static Distribution convolution(Distribution a, Distribution b) {
         Distribution result = new Distribution();
         result.skip = a.skip + b.skip;
         // Results only exist where the two signals overlap, shortening the output by one.
@@ -72,7 +72,7 @@ public class Distribution {
         return result;
     }
 
-    public double totalMass () {
+    public double totalMass() {
         double totalMass = 0;
         for (int i = 0; i < masses.length; i++) {
             totalMass += masses[i];
@@ -80,7 +80,7 @@ public class Distribution {
         return totalMass;
     }
 
-    public void normalize () {
+    public void normalize() {
         double totalMass = this.totalMass();
         if (totalMass == 0 || totalMass == 1) {
             return;
@@ -90,19 +90,19 @@ public class Distribution {
         }
     }
 
-    public void illustrate () {
+    public void illustrate() {
         final int width = 50;
         double max = Arrays.stream(masses).max().getAsDouble();
         double scale = width / max;
         for (int i = 0; i < fullWidth(); i++) {
-            System.out.printf("%3d %s\n", i, "=".repeat((int)(probabilityOf(i) * scale)));
+            System.out.printf("%3d %s\n", i, "=".repeat((int) (probabilityOf(i) * scale)));
         }
         for (int percentile : new int[] {5, 25, 50, 75, 95}) {
             System.out.printf("Pecentile %2d at x=%d\n", percentile, findPercentile(percentile));
         }
     }
 
-    public int findPercentile (int percentile) {
+    public int findPercentile(int percentile) {
         double sum = 0;
         double threshold = percentile / 100d;
         for (int i = 0; i < masses.length; i++) {
@@ -114,7 +114,7 @@ public class Distribution {
         return skip + masses.length;
     }
 
-    public static void main (String[] args) {
+    public static void main(String[] args) {
         Distribution a = new Distribution(2, 10);
         Distribution b = new Distribution(2, 5);
         Distribution c = new Distribution(2, 20);
@@ -123,7 +123,7 @@ public class Distribution {
         out.illustrate();
     }
 
-    public double probabilityOf (int x) {
+    public double probabilityOf(int x) {
         if (x < skip) {
             return 0;
         }
@@ -135,19 +135,19 @@ public class Distribution {
         }
     }
 
-    public int fullWidth () {
+    public int fullWidth() {
         return skip + masses.length;
     }
 
-    public int maxIndex () {
+    public int maxIndex() {
         return fullWidth() - 1;
     }
 
-    public Distribution or (Distribution other) {
+    public Distribution or(Distribution other) {
         return or(this, other);
     }
 
-    public static Distribution or (Distribution... others) {
+    public static Distribution or(Distribution... others) {
         Distribution result = null;
         for (Distribution other : others) {
             if (result == null) {
@@ -159,10 +159,8 @@ public class Distribution {
         return result;
     }
 
-    /**
-     * Find the probability at each time that one of a or b arrives for the first time.
-     */
-    public static Distribution or (Distribution a, Distribution b) {
+    /** Find the probability at each time that one of a or b arrives for the first time. */
+    public static Distribution or(Distribution a, Distribution b) {
         Distribution result = new Distribution();
         result.skip = Math.min(a.skip, b.skip);
         // The CDF of this combination reaches 1 where either input's CDF reaches 1.
@@ -174,9 +172,10 @@ public class Distribution {
             int i = m + result.skip;
             double pa = a.probabilityOf(i);
             double pb = b.probabilityOf(i);
-            double aBeatsB = pa * (1-bCumulative); // a arrives and b has not yet arrived
-            double bBeatsA = pb * (1-aCumulative); // b arrives and a has not yet arrived
-            // (a arrives and b hasn't) or (b arrives and a hasn't) considering they can both arrive at the same time.
+            double aBeatsB = pa * (1 - bCumulative); // a arrives and b has not yet arrived
+            double bBeatsA = pb * (1 - aCumulative); // b arrives and a has not yet arrived
+            // (a arrives and b hasn't) or (b arrives and a hasn't) considering they can both arrive
+            // at the same time.
             result.masses[m] = aBeatsB + bBeatsA - (pa * pb);
             aCumulative += pa;
             bCumulative += pb;
@@ -185,8 +184,7 @@ public class Distribution {
         return result;
     }
 
-
-    public static Distribution fromTravelTimeResult (TravelTimeResult travelTimeResult, int point) {
+    public static Distribution fromTravelTimeResult(TravelTimeResult travelTimeResult, int point) {
         Distribution result = new Distribution();
         int[] counts = travelTimeResult.getHistogram(point);
         result.skip = 0;
@@ -200,10 +198,11 @@ public class Distribution {
     }
 
     /**
-     * Find the probability mass of the overlapping region of the two distributions. The amount of "misplaced"
-     * probability is one minus overlap. Overlap is slightly more straightforward to calculate directly than mismatch.
+     * Find the probability mass of the overlapping region of the two distributions. The amount of
+     * "misplaced" probability is one minus overlap. Overlap is slightly more straightforward to
+     * calculate directly than mismatch.
      */
-    public double overlap (Distribution other) {
+    public double overlap(Distribution other) {
         int iMin = Math.min(this.skip, other.skip);
         int iMax = Math.max(this.fullWidth(), other.fullWidth());
         double sum = 0;
@@ -216,24 +215,26 @@ public class Distribution {
         return sum;
     }
 
-    public void assertSimilar (Distribution observed) {
+    public void assertSimilar(Distribution observed) {
         if (SHOW_CHARTS) {
             DistributionChart.showChart(this, observed);
         }
         double overlapPercent = this.overlap(observed) * 100;
-        assertTrue(overlapPercent >= 95, String.format("Overlap less than 95%% at %3f", overlapPercent));
+        assertTrue(
+                overlapPercent >= 95,
+                String.format("Overlap less than 95%% at %3f", overlapPercent));
     }
 
     // This is ugly, it should be done some other way e.g. firstNonzero
-    public int skip () {
+    public int skip() {
         return skip;
     }
 
     /**
-     * Remove any zeros from the beginning and end of the probability density array.
-     * This improves both storage space and convolution efficiency.
+     * Remove any zeros from the beginning and end of the probability density array. This improves
+     * both storage space and convolution efficiency.
      */
-    public void trim () {
+    public void trim() {
         int i = 0;
         while (i < masses.length && masses[i] == 0) {
             skip += 1;

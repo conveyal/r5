@@ -9,18 +9,18 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * This is a main method where we can consolidate some example code used to create test fixtures.
- * In this case, CSV files for testing creation and analysis of freeform pointsets.
- * The generated CSV is part of the manual full-stack integration tests so is stored outside the Git repo.
+ * This is a main method where we can consolidate some example code used to create test fixtures. In
+ * this case, CSV files for testing creation and analysis of freeform pointsets. The generated CSV
+ * is part of the manual full-stack integration tests so is stored outside the Git repo.
  */
 public class MakeFreeFormTestCSV {
 
-    public static void main (String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {
         bikepark();
         gaussian();
     }
 
-    public static void gaussian () throws Exception {
+    public static void gaussian() throws Exception {
         Writer writer = new FileWriter("pdx_gaussian.csv");
         Random random = new Random();
         final double centerLat = 45.5188691;
@@ -42,10 +42,11 @@ public class MakeFreeFormTestCSV {
     }
 
     /**
-     * Extract all points with certain tags from OSM data and export as CSV, adding in some random additional fields to
-     * test property selection. This can be changed to extract cuisine=coffee_shop or anything else.
+     * Extract all points with certain tags from OSM data and export as CSV, adding in some random
+     * additional fields to test property selection. This can be changed to extract
+     * cuisine=coffee_shop or anything else.
      */
-    private static void bikepark () throws Exception {
+    private static void bikepark() throws Exception {
         Writer writer = new FileWriter("pdx_bikepark.csv");
         Random random = new Random();
         OSM osm = new OSM(null);
@@ -57,11 +58,13 @@ public class MakeFreeFormTestCSV {
                 if (node.hasTag("capacity")) {
                     capacity = Integer.parseInt(node.getTag("capacity").split(";")[0]);
                 }
-                String line = String.format("%f,%f,%d,%d\n", node.getLat(), node.getLon(), random.nextInt(), capacity);
+                String line =
+                        String.format(
+                                "%f,%f,%d,%d\n",
+                                node.getLat(), node.getLon(), random.nextInt(), capacity);
                 writer.write(line);
             }
         }
         writer.close();
     }
-
 }

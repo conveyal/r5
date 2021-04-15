@@ -6,11 +6,10 @@ import com.conveyal.osmlib.VexInput;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -28,7 +27,11 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.concurrent.ExecutionException;
 
-class Surface extends JPanel implements ActionListener, MouseListener, MouseWheelListener, MouseMotionListener {
+import javax.imageio.ImageIO;
+import javax.swing.*;
+
+class Surface extends JPanel
+        implements ActionListener, MouseListener, MouseWheelListener, MouseMotionListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(Display.class);
 
@@ -57,34 +60,44 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
         this.addMouseWheelListener(this);
         this.addMouseMotionListener(this);
         // wgsWindow = new Rectangle.Double(-73.8,40.61,0.05, 0.05); // NYC
-        wgsWindow = new Rectangle.Double(-122.68,45.52,0.02,0.02);
+        wgsWindow = new Rectangle.Double(-122.68, 45.52, 0.02, 0.02);
         timer = new Timer(DELAY, this);
-        //timer.start();
-        tileCache = CacheBuilder.newBuilder().maximumSize(1000).build(
-            new CacheLoader<WebMercatorTile, BufferedImage>() {
-                @Override
-                public BufferedImage load(WebMercatorTile tile) throws Exception {
-                    try {
-                        URL url = new URL(String.format(tileFormat, tile.zoom, tile.x, tile.y));
-                        LOG.info("loading tile at {}", url);
-                        BufferedImage image = ImageIO.read(url);
-                        return image;
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                        return null;
-                    }
-                }
-            }
-        );
+        // timer.start();
+        tileCache =
+                CacheBuilder.newBuilder()
+                        .maximumSize(1000)
+                        .build(
+                                new CacheLoader<WebMercatorTile, BufferedImage>() {
+                                    @Override
+                                    public BufferedImage load(WebMercatorTile tile)
+                                            throws Exception {
+                                        try {
+                                            URL url =
+                                                    new URL(
+                                                            String.format(
+                                                                    tileFormat,
+                                                                    tile.zoom,
+                                                                    tile.x,
+                                                                    tile.y));
+                                            LOG.info("loading tile at {}", url);
+                                            BufferedImage image = ImageIO.read(url);
+                                            return image;
+                                        } catch (Exception ex) {
+                                            ex.printStackTrace();
+                                            return null;
+                                        }
+                                    }
+                                });
     }
 
     public Timer getTimer() {
         return timer;
     }
 
-    private static final String tileFormat = "http://a.tile.thunderforest.com/transport/%d/%d/%d.png";
+    private static final String tileFormat =
+            "http://a.tile.thunderforest.com/transport/%d/%d/%d.png";
 
-    public void drawMapTiles (Graphics2D g2d) {
+    public void drawMapTiles(Graphics2D g2d) {
         final int zoom = 15;
         int minX = WebMercatorTile.xTile(wgsWindow.getMinX(), zoom);
         int maxY = WebMercatorTile.yTile(wgsWindow.getMinY(), zoom);
@@ -94,16 +107,20 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
             for (int x = minX; x <= maxX; x++) {
                 WebMercatorTile tile = new WebMercatorTile(zoom, x, y);
                 try {
-                    // TODO if cache is not warm, place the tile drawing action in a queue or trigger
+                    // TODO if cache is not warm, place the tile drawing action in a queue or
+                    // trigger
                     // redraw when it's loaded (perhaps on a timer).
                     // Thus, maybe a loadingCache is not the right tool here.
                     BufferedImage tileImage = tileCache.get(tile);
                     // TODO make a get rect convenience method on the tile
                     Rectangle2D box = WebMercatorTile.getRectangle(x, y, zoom);
-                    // The last transform function called is the first to be applied to the image coordinate space.
+                    // The last transform function called is the first to be applied to the image
+                    // coordinate space.
                     // Use _max_ Y rather than min because we're going to flip the y coordinates
-                    AffineTransform transform = AffineTransform.getTranslateInstance(box.getMinX(), box.getMaxY());
-                    // Scale the image to the interval [0, widthDegrees) horizontally and [0, -heightDegrees) vertically.
+                    AffineTransform transform =
+                            AffineTransform.getTranslateInstance(box.getMinX(), box.getMaxY());
+                    // Scale the image to the interval [0, widthDegrees) horizontally and [0,
+                    // -heightDegrees) vertically.
                     transform.scale(box.getWidth() / 256, box.getHeight() / -256);
                     g2d.drawImage(tileImage, transform, null);
                 } catch (ExecutionException e) {
@@ -114,11 +131,16 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
     }
 
     /** Very crude test -- just fetch the entire window from VEX and draw the nodes. */
-    public void drawOsm (Graphics2D g2d) {
+    public void drawOsm(Graphics2D g2d) {
         try {
             LOG.info("world window coordinates: {}", wgsWindow);
-            String urlString = String.format("http://localhost:9001/%f,%f,%f,%f.vex",
-                    wgsWindow.getMinY(),wgsWindow.getMinX(),wgsWindow.getMaxY(),wgsWindow.getMaxX());
+            String urlString =
+                    String.format(
+                            "http://localhost:9001/%f,%f,%f,%f.vex",
+                            wgsWindow.getMinY(),
+                            wgsWindow.getMinX(),
+                            wgsWindow.getMaxY(),
+                            wgsWindow.getMaxX());
             URL url = new URL(urlString);
             InputStream vexStream = url.openStream();
             OSMEntitySink graphicsSink = new GraphicsSink(g2d);
@@ -141,11 +163,12 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
         g2d.scale(pixelsPerDegreeLat, -pixelsPerDegreeLat); // TODO cos scaling, tricky
         // Subtract _max_ Y because we're going to flip the coordinate system vertically
         g2d.translate(-wgsWindow.getMinX(), -wgsWindow.getMaxY());
-        //g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        //g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        // g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        // g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+        // RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.setPaint(Color.blue);
         g2d.setStroke(new BasicStroke(0.0001f));
-        //g2d.setStroke(new BasicStroke(2));
+        // g2d.setStroke(new BasicStroke(2));
         drawMapTiles(g2d);
         drawOsm(g2d); // SLOW
         g2d.setTransform(savedTransform);
@@ -157,8 +180,7 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
     }
 
     @Override
-    public void mouseClicked(MouseEvent e) {
-    }
+    public void mouseClicked(MouseEvent e) {}
 
     @Override
     public void mousePressed(MouseEvent e) {
@@ -167,19 +189,13 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
     }
 
     @Override
-    public void mouseReleased(MouseEvent e) {
-
-    }
+    public void mouseReleased(MouseEvent e) {}
 
     @Override
-    public void mouseEntered(MouseEvent e) {
-
-    }
+    public void mouseEntered(MouseEvent e) {}
 
     @Override
-    public void mouseExited(MouseEvent e) {
-
-    }
+    public void mouseExited(MouseEvent e) {}
 
     @Override
     public void mouseWheelMoved(MouseWheelEvent e) {
@@ -187,8 +203,11 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
         int y = e.getY();
         // TODO metersPerPixel *= (1 + (0.1 * e.getWheelRotation()));
         double scale = 1 + (0.05 * e.getWheelRotation());
-        wgsWindow.setRect(wgsWindow.getX(), wgsWindow.getY(),
-                wgsWindow.getWidth() * scale, wgsWindow.getHeight() * scale);
+        wgsWindow.setRect(
+                wgsWindow.getX(),
+                wgsWindow.getY(),
+                wgsWindow.getWidth() * scale,
+                wgsWindow.getHeight() * scale);
         repaint();
     }
 
@@ -205,9 +224,7 @@ class Surface extends JPanel implements ActionListener, MouseListener, MouseWhee
     }
 
     @Override
-    public void mouseMoved(MouseEvent e) {
-
-    }
+    public void mouseMoved(MouseEvent e) {}
 }
 
 public class Display extends JFrame {
@@ -219,13 +236,14 @@ public class Display extends JFrame {
     private void initUI() {
         final Surface surface = new Surface();
         this.add(surface);
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                Timer timer = surface.getTimer();
-                timer.stop();
-            }
-        });
+        addWindowListener(
+                new WindowAdapter() {
+                    @Override
+                    public void windowClosing(WindowEvent e) {
+                        Timer timer = surface.getTimer();
+                        timer.stop();
+                    }
+                });
         setTitle("Points");
         setSize(350, 250);
         setLocationRelativeTo(null);
@@ -233,13 +251,13 @@ public class Display extends JFrame {
     }
 
     public static void main(String[] args) {
-        EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                Display ex = new Display();
-                ex.setVisible(true);
-            }
-        });
+        EventQueue.invokeLater(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        Display ex = new Display();
+                        ex.setVisible(true);
+                    }
+                });
     }
-
 }

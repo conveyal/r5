@@ -1,7 +1,8 @@
 package com.conveyal.osmlib;
 
 // Conveyal variable-width integer utilities based on Google Protocol Buffers.
-// This file is an adapted subset of CodedInputStream.java and therefore includes the original license below.
+// This file is an adapted subset of CodedInputStream.java and therefore includes the original
+// license below.
 //
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
@@ -46,7 +47,7 @@ public class VarIntInputStream {
     }
 
     public byte readRawByte() throws IOException {
-        return (byte)(inputStream.read());
+        return (byte) (inputStream.read());
     }
 
     public String readString() throws IOException {
@@ -57,7 +58,10 @@ public class VarIntInputStream {
     /** Implements the same read loop found in DataInputStream.readFully(). */
     public byte[] readBytes(int len) throws IOException {
         if (len > 1024) {
-            throw new RuntimeException(String.format("Attempted to read %d bytes at once, file is probably corrupted.", len));
+            throw new RuntimeException(
+                    String.format(
+                            "Attempted to read %d bytes at once, file is probably corrupted.",
+                            len));
         }
         byte[] buf = new byte[len];
         int n = 0;
@@ -89,26 +93,26 @@ public class VarIntInputStream {
 
     public int readUInt32() throws IOException {
         byte tmp = this.readRawByte();
-        if(tmp >= 0) {
+        if (tmp >= 0) {
             return tmp;
         } else {
             int result = tmp & 127;
-            if((tmp = this.readRawByte()) >= 0) {
+            if ((tmp = this.readRawByte()) >= 0) {
                 result |= tmp << 7;
             } else {
                 result |= (tmp & 127) << 7;
-                if((tmp = this.readRawByte()) >= 0) {
+                if ((tmp = this.readRawByte()) >= 0) {
                     result |= tmp << 14;
                 } else {
                     result |= (tmp & 127) << 14;
-                    if((tmp = this.readRawByte()) >= 0) {
+                    if ((tmp = this.readRawByte()) >= 0) {
                         result |= tmp << 21;
                     } else {
                         result |= (tmp & 127) << 21;
                         result |= (tmp = this.readRawByte()) << 28;
-                        if(tmp < 0) {
-                            for(int i = 0; i < 5; ++i) {
-                                if(this.readRawByte() >= 0) {
+                        if (tmp < 0) {
+                            for (int i = 0; i < 5; ++i) {
+                                if (this.readRawByte() >= 0) {
                                     return result;
                                 }
                             }
@@ -123,14 +127,13 @@ public class VarIntInputStream {
 
     public long readUInt64() throws IOException {
         int shift = 0;
-        for(long result = 0L; shift < 64; shift += 7) {
+        for (long result = 0L; shift < 64; shift += 7) {
             byte b = readRawByte();
-            result |= (long)(b & 127) << shift;
-            if((b & 128) == 0) {
+            result |= (long) (b & 127) << shift;
+            if ((b & 128) == 0) {
                 return result;
             }
         }
         throw new NumberFormatException();
     }
-
 }

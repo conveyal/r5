@@ -42,19 +42,27 @@ public class FareAttribute extends Entity {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "fare_id"));
             } else {
                 FareAttribute fa = new FareAttribute();
-                fa.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+                fa.sourceFileLine =
+                        row + 1; // offset line number by 1 to account for 0-based row index
                 fa.fare_id = fareId;
                 fa.price = getDoubleField("price", true, 0, Integer.MAX_VALUE);
                 fa.currency_type = getStringField("currency_type", true);
                 fa.payment_method = getIntField("payment_method", true, 0, 1);
-                fa.transfers = getIntField("transfers", false, 0, 10, UNLIMITED_TRANSFERS); // in the GTFS spec, a missing value means "unlimited", so we default to UNLIMITED_TRANSFERS (or MAX_INT) when no value is found
+                fa.transfers =
+                        getIntField(
+                                "transfers",
+                                false,
+                                0,
+                                10,
+                                UNLIMITED_TRANSFERS); // in the GTFS spec, a missing value means
+                                                      // "unlimited", so we default to
+                                                      // UNLIMITED_TRANSFERS (or MAX_INT) when no
+                                                      // value is found
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
                 fa.feed_id = feed.feedId;
                 fare.fare_attribute = fa;
             }
-
         }
-
     }
 
     public static class Writer extends Entity.Writer<FareAttribute> {
@@ -64,8 +72,15 @@ public class FareAttribute extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"fare_id", "price", "currency_type", "payment_method",
-                    "transfers", "transfer_duration"});
+            writer.writeRecord(
+                    new String[] {
+                        "fare_id",
+                        "price",
+                        "currency_type",
+                        "payment_method",
+                        "transfers",
+                        "transfer_duration"
+                    });
         }
 
         @Override
@@ -81,10 +96,7 @@ public class FareAttribute extends Entity {
 
         @Override
         public Iterator<FareAttribute> iterator() {
-            return feed.fares.values().stream()
-                    .map(f -> f.fare_attribute)
-                    .iterator();
+            return feed.fares.values().stream().map(f -> f.fare_attribute).iterator();
         }
     }
-
 }

@@ -4,9 +4,7 @@ import com.conveyal.analysis.models.RegionalAnalysis;
 
 import java.util.Set;
 
-/**
- * Describes the status of a Job in a REST API response.
- */
+/** Describes the status of a Job in a REST API response. */
 public class JobStatus {
 
     /** The ID of this job. */
@@ -27,13 +25,19 @@ public class JobStatus {
     /** The number of tasks no worker has yet marked complete. */
     public int incomplete;
 
-    /** The total number of task deliveries that have occurred. Tasks will be counted more than once if redelivered. */
+    /**
+     * The total number of task deliveries that have occurred. Tasks will be counted more than once
+     * if redelivered.
+     */
     public int deliveries;
 
-    /** The number of times we have started over at the beginning to redeliver tasks never marked complete. */
+    /**
+     * The number of times we have started over at the beginning to redeliver tasks never marked
+     * complete.
+     */
     public int deliveryPass;
 
-    /** Active instances working on this job. **/
+    /** Active instances working on this job. * */
     public int activeWorkers;
 
     /** Error messages for any problems related to this job that occurred on workers or backend. */
@@ -43,10 +47,12 @@ public class JobStatus {
     public RegionalAnalysis regionalAnalysis;
 
     /** default constructor for JSON deserialization */
-    public JobStatus () { /* do nothing */ }
+    public JobStatus() {
+        /* do nothing */
+    }
 
     /** Summarize the given job to return its status over the REST API. */
-    public JobStatus (Job job) {
+    public JobStatus(Job job) {
         this.jobId = job.jobId;
         this.graphId = job.workerCategory.graphId;
         this.workerCommit = job.workerCategory.workerVersion;

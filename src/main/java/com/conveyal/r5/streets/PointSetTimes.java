@@ -1,20 +1,20 @@
 package com.conveyal.r5.streets;
 
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.FastRaptorWorker;
 
 import java.util.Arrays;
 
-import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
-
 /**
  * The travel time to every point in a PointSet.
  *
- * This class is not really necessary.
- * Everywhere PointSetTimes is used, we always only read its travelTimes field. So this class should be deleted
- * and replaced with int[] travelTimes.
- * However it does serve to provide type context to a raw array of travel times, and to associate those travel times
- * with a specific PointSet to catch mistakes where a set of travel times is used with the wrong PointSet.
+ * <p>This class is not really necessary. Everywhere PointSetTimes is used, we always only read its
+ * travelTimes field. So this class should be deleted and replaced with int[] travelTimes. However
+ * it does serve to provide type context to a raw array of travel times, and to associate those
+ * travel times with a specific PointSet to catch mistakes where a set of travel times is used with
+ * the wrong PointSet.
  */
 public class PointSetTimes {
 
@@ -27,23 +27,21 @@ public class PointSetTimes {
         this.travelTimes = travelTimes;
     }
 
-    public static PointSetTimes allUnreached (PointSet pointSet) {
+    public static PointSetTimes allUnreached(PointSet pointSet) {
         int[] times = new int[pointSet.featureCount()];
         Arrays.fill(times, FastRaptorWorker.UNREACHED);
         return new PointSetTimes(pointSet, times);
     }
 
-    public int size()  {
+    public int size() {
         return travelTimes.length;
     }
 
-    public int getTravelTimeToPoint (int p) {
+    public int getTravelTimeToPoint(int p) {
         return travelTimes[p];
     }
 
-    /**
-     * Increment all reachable points by the given number of seconds.
-     */
+    /** Increment all reachable points by the given number of seconds. */
     public void incrementAllReachable(int seconds) {
         for (int i = 0; i < travelTimes.length; i++) {
             if (travelTimes[i] != UNREACHED) {
@@ -53,10 +51,11 @@ public class PointSetTimes {
     }
 
     /**
-     * Merge the two PointSetTimes, returning a new PointSetTimes containing the minimum value at each point.
-     * The first operand may be null, which allows iteratively accumulating into an uninitialized PointSet variable.
+     * Merge the two PointSetTimes, returning a new PointSetTimes containing the minimum value at
+     * each point. The first operand may be null, which allows iteratively accumulating into an
+     * uninitialized PointSet variable.
      */
-    public static PointSetTimes minMerge (PointSetTimes a, PointSetTimes b) {
+    public static PointSetTimes minMerge(PointSetTimes a, PointSetTimes b) {
         if (b == null) {
             throw new UnsupportedOperationException("Second operand may not be null.");
         }
@@ -64,10 +63,12 @@ public class PointSetTimes {
             return b;
         }
         if (a.pointSet != b.pointSet) {
-            throw new UnsupportedOperationException("Both PointSetTimes must be for the same PointSet.");
+            throw new UnsupportedOperationException(
+                    "Both PointSetTimes must be for the same PointSet.");
         }
         if (a.travelTimes.length != b.travelTimes.length) {
-            throw new UnsupportedOperationException("Both PointSetTimes must have the same number of times.");
+            throw new UnsupportedOperationException(
+                    "Both PointSetTimes must have the same number of times.");
         }
         int[] travelTimes = new int[b.travelTimes.length];
         for (int i = 0; i < travelTimes.length; i++) {
@@ -75,6 +76,4 @@ public class PointSetTimes {
         }
         return new PointSetTimes(b.pointSet, travelTimes);
     }
-
-
 }

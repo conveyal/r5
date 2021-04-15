@@ -13,7 +13,7 @@ public class ZoneBasedFareSystem {
         String origin_id; // zone_id of stop at start of journey stage
         String destination_id; // zone_id of stop at end of journey stage
 
-        public Pair(String origin_id, String destination_id){
+        public Pair(String origin_id, String destination_id) {
             this.origin_id = origin_id;
             this.destination_id = destination_id;
         }
@@ -24,9 +24,8 @@ public class ZoneBasedFareSystem {
         fareByZonePair.put(pair, price);
     }
 
-    public int getFare(String origin_id, String destination_id){
+    public int getFare(String origin_id, String destination_id) {
         Pair pair = new Pair(origin_id, destination_id);
         return fareByZonePair.get(pair);
     }
-
 }

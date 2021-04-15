@@ -1,6 +1,7 @@
 package com.conveyal.osmlib.serializer;
 
 import com.conveyal.osmlib.Node;
+
 import org.mapdb.Serializer;
 
 import java.io.DataInput;
@@ -30,5 +31,4 @@ public class NodeSerializer implements Serializer<Node>, Serializable {
     public int fixedSize() {
         return -1;
     }
-    
 }

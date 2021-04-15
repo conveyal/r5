@@ -1,8 +1,6 @@
 package com.conveyal.analysis.components.eventbus;
 
-/**
- * Created by abyrd on 2020-06-12
- */
+/** Created by abyrd on 2020-06-12 */
 public class SinglePointEvent extends Event {
 
     // This is somewhat redundant as it contains the projectId and variant index,
@@ -15,24 +13,33 @@ public class SinglePointEvent extends Event {
 
     public final int durationMsec;
 
-    public SinglePointEvent (String scenarioId, String projectId, int variant, int durationMsec) {
+    public SinglePointEvent(String scenarioId, String projectId, int variant, int durationMsec) {
         this.scenarioId = scenarioId;
         this.projectId = projectId;
         this.variant = variant;
         this.durationMsec = durationMsec;
     }
 
-
     @Override
-    public String toString () {
-        return "SinglePointEvent{" +
-                "scenarioId='" + scenarioId + '\'' +
-                ", projectId='" + projectId + '\'' +
-                ", variant=" + variant +
-                ", durationMsec=" + durationMsec +
-                ", user='" + user + '\'' +
-                ", accessGroup=" + accessGroup +
-                ", success=" + success +
-                '}';
+    public String toString() {
+        return "SinglePointEvent{"
+                + "scenarioId='"
+                + scenarioId
+                + '\''
+                + ", projectId='"
+                + projectId
+                + '\''
+                + ", variant="
+                + variant
+                + ", durationMsec="
+                + durationMsec
+                + ", user='"
+                + user
+                + '\''
+                + ", accessGroup="
+                + accessGroup
+                + ", success="
+                + success
+                + '}';
     }
 }

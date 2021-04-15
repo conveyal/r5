@@ -11,12 +11,10 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-/**
- * Serialize localDates to YYYY-MM-DD
- */
+/** Serialize localDates to YYYY-MM-DD */
 public class JavaLocalDateSerializer extends JsonSerializer<LocalDate> {
     /** Create a module including the serializer and deserializer for local dates */
-    public static SimpleModule makeModule () {
+    public static SimpleModule makeModule() {
         Version moduleVersion = new Version(1, 0, 0, null, null, null);
         SimpleModule module = new SimpleModule("LocalDate", moduleVersion);
         module.addSerializer(LocalDate.class, new JavaLocalDateSerializer());
@@ -24,8 +22,10 @@ public class JavaLocalDateSerializer extends JsonSerializer<LocalDate> {
         return module;
     }
 
-    @Override public void serialize(LocalDate localDate, JsonGenerator jsonGenerator,
-                                    SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+    @Override
+    public void serialize(
+            LocalDate localDate, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
+            throws IOException, JsonProcessingException {
         jsonGenerator.writeString(localDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
     }
 }

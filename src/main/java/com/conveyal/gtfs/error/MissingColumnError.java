@@ -10,8 +10,8 @@ public class MissingColumnError extends GTFSError implements Serializable {
         super(file, 1, field);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("Missing required column.");
     }
-
 }

@@ -2,13 +2,12 @@ package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.transit.RouteInfo;
+
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
-/**
- * Calculate fares in Bogotá, Colombia.
- */
+/** Calculate fares in Bogotá, Colombia. */
 public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     // base fares, all in Colombian pesos
     /** Fare to ride TPC (local service) */
@@ -36,11 +35,14 @@ public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     public String tmAgencyName;
 
     // There is some additional complexity which we're not representing here.
-    // There is a maximum of four transfers but we're limiting the analysis to four rides, so that doesn't apply
-    // There is also a maximum transfer window of 75 minutes but our analysis window is 60 minutes so it's non-binding
+    // There is a maximum of four transfers but we're limiting the analysis to four rides, so that
+    // doesn't apply
+    // There is also a maximum transfer window of 75 minutes but our analysis window is 60 minutes
+    // so it's non-binding
 
     @Override
-    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
+    public FareBounds calculateFare(
+            McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fare = 0;
 
         // extract the relevant rides
@@ -55,10 +57,11 @@ public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
 
         RouteType prevRouteType = null;
 
-        for (TIntIterator patternIt = patterns.iterator(); patternIt.hasNext();) {
+        for (TIntIterator patternIt = patterns.iterator(); patternIt.hasNext(); ) {
             int pattern = patternIt.next();
 
-            RouteInfo ri = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
+            RouteInfo ri =
+                    transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
 
             RouteType routeType = RouteType.fromAgencyName(ri.agency_name, this);
 
@@ -67,12 +70,17 @@ public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
                 if (routeType == RouteType.TPC) fare += tpcBaseFare;
                 else fare += tmBaseFare;
             } else {
-                // NB this is only considering the previous ride. A clever traveler might keep separate tickets for their
-                // TPC and TransMilenio trips in order to take advantage of the transfer rules (I haven't evaluated if this
+                // NB this is only considering the previous ride. A clever traveler might keep
+                // separate tickets for their
+                // TPC and TransMilenio trips in order to take advantage of the transfer rules (I
+                // haven't evaluated if this
                 // could save you anything, but I can imagine a fare system where it would).
-                if (prevRouteType == RouteType.TPC && routeType == RouteType.TPC) fare += tpcToTpcFare;
-                else if (prevRouteType == RouteType.TPC && routeType == RouteType.TRANSMILENIO) fare += tpcToTmFare;
-                else if (prevRouteType == RouteType.TRANSMILENIO && routeType == RouteType.TPC) fare += tmToTpcFare;
+                if (prevRouteType == RouteType.TPC && routeType == RouteType.TPC)
+                    fare += tpcToTpcFare;
+                else if (prevRouteType == RouteType.TPC && routeType == RouteType.TRANSMILENIO)
+                    fare += tpcToTmFare;
+                else if (prevRouteType == RouteType.TRANSMILENIO && routeType == RouteType.TPC)
+                    fare += tmToTpcFare;
                 else fare += tmToTmFare;
             }
 
@@ -88,9 +96,11 @@ public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     private enum RouteType {
-        TPC, TRANSMILENIO;
+        TPC,
+        TRANSMILENIO;
 
-        public static RouteType fromAgencyName (String agencyName, BogotaInRoutingFareCalculator calculator) {
+        public static RouteType fromAgencyName(
+                String agencyName, BogotaInRoutingFareCalculator calculator) {
             if (calculator.tmAgencyName.equals(agencyName)) {
                 return TRANSMILENIO;
             } else {

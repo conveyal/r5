@@ -12,8 +12,9 @@ import java.time.format.DateTimeFormatter;
 /** serializer/deserializer for LocalDates to ISO dates, YYYY-MM-DD */
 public class JavaLocalDateDeserializer extends JsonDeserializer<LocalDate> {
 
-    @Override public LocalDate deserialize(JsonParser jsonParser,
-                                           DeserializationContext deserializationContext)
+    @Override
+    public LocalDate deserialize(
+            JsonParser jsonParser, DeserializationContext deserializationContext)
             throws IOException, JsonProcessingException {
         return LocalDate.parse(jsonParser.getValueAsString(), DateTimeFormatter.ISO_LOCAL_DATE);
     }

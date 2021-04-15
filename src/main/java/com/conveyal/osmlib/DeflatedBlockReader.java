@@ -8,10 +8,10 @@ import java.io.InputStream;
 import java.util.concurrent.SynchronousQueue;
 
 /**
- * A pipeline stage that reads in deflated VEX blocks.
- * Hands off the results of decompression synchronously through a zero-length blocking "queue".
- * Constructing a DeflatedBlockReader starts up a separate thread that reads full compressed data blocks one at a time
- * into a memory buffer. Whenever a block is taken away from the reader, it will start parallel read-ahead and
+ * A pipeline stage that reads in deflated VEX blocks. Hands off the results of decompression
+ * synchronously through a zero-length blocking "queue". Constructing a DeflatedBlockReader starts
+ * up a separate thread that reads full compressed data blocks one at a time into a memory buffer.
+ * Whenever a block is taken away from the reader, it will start parallel read-ahead and
  * decompression of the next block.
  */
 public class DeflatedBlockReader implements Runnable {
@@ -26,6 +26,7 @@ public class DeflatedBlockReader implements Runnable {
 
     /**
      * Construct a new DeflatedBlockReader, which then runs itself in a parallel thread.
+     *
      * @param upstream the InputStream it will read from
      */
     public DeflatedBlockReader(InputStream upstream) {
@@ -36,6 +37,7 @@ public class DeflatedBlockReader implements Runnable {
 
     /**
      * Wait for one block to become available, then return it.
+     *
      * @return the next block or the special END_BLOCK reference if there are no more blocks.
      */
     public VEXBlock nextBlock() {
@@ -43,7 +45,9 @@ public class DeflatedBlockReader implements Runnable {
             VEXBlock block = synchronousQueue.take();
             return block;
         } catch (InterruptedException e) {
-            LOG.error("Interrupted while waiting for a block to become available. This shouldn't happen.");
+            LOG.error(
+                    "Interrupted while waiting for a block to become available. This shouldn't"
+                        + " happen.");
             return VEXBlock.END_BLOCK;
         }
     }
@@ -69,5 +73,4 @@ public class DeflatedBlockReader implements Runnable {
             throw new RuntimeException(e);
         }
     }
-
 }

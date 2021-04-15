@@ -3,8 +3,8 @@ package com.conveyal.osmlib.display;
 import java.awt.geom.Rectangle2D;
 
 /**
- * This class contains static methods for common map tile calculations.
- * It also can be instantiated to serve as a key in tables, representing an (zoom,x,y) triple.
+ * This class contains static methods for common map tile calculations. It also can be instantiated
+ * to serve as a key in tables, representing an (zoom,x,y) triple.
  */
 public class WebMercatorTile {
 
@@ -46,11 +46,18 @@ public class WebMercatorTile {
     }
 
     public static int yTile(double lat, int zoom) {
-        return (int) Math.floor((1 - Math.log(Math.tan(Math.toRadians(lat))
-                + 1 / Math.cos(Math.toRadians(lat))) / Math.PI) / 2 * (1 << zoom));
+        return (int)
+                Math.floor(
+                        (1
+                                        - Math.log(
+                                                        Math.tan(Math.toRadians(lat))
+                                                                + 1 / Math.cos(Math.toRadians(lat)))
+                                                / Math.PI)
+                                / 2
+                                * (1 << zoom));
     }
 
-    public static Rectangle2D getRectangle (final int xTile, final int yTile, final int zoom) {
+    public static Rectangle2D getRectangle(final int xTile, final int yTile, final int zoom) {
         double north = tile2lat(yTile, zoom);
         double south = tile2lat(yTile + 1, zoom);
         double west = tile2lon(xTile, zoom);
@@ -66,5 +73,4 @@ public class WebMercatorTile {
         double n = Math.PI - (2.0 * Math.PI * yTile) / Math.pow(2.0, zoom);
         return Math.toDegrees(Math.atan(Math.sinh(n)));
     }
-
 }

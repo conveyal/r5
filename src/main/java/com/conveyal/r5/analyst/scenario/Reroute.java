@@ -4,8 +4,10 @@ import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,23 +19,24 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Insert a new route segment into some trip patterns.
- * This may create new stops or reference existing ones, splicing a new chunk of timetable into/onto an existing route.
+ * Insert a new route segment into some trip patterns. This may create new stops or reference
+ * existing ones, splicing a new chunk of timetable into/onto an existing route.
  *
- * If both fromStop and toStop are specified, the part of the timetable in between those stops is replaced.
- * If fromStop is null, then the whole timetable is replaced up to the toStop.
- * If toStop in null, then the whole timetable is replaced after fromStop.
+ * <p>If both fromStop and toStop are specified, the part of the timetable in between those stops is
+ * replaced. If fromStop is null, then the whole timetable is replaced up to the toStop. If toStop
+ * in null, then the whole timetable is replaced after fromStop.
  *
- * The number of dwell times specified must always be one greater than the number of hop times.
- * That is to say we supply one dwell time before and after every hop time like so: O=O=O=O=O
- * The number of dwell times must be equal to the number of inserted stops, plus one dwell for fromStop and one dwell
- * for toStop when they are specified.
+ * <p>The number of dwell times specified must always be one greater than the number of hop times.
+ * That is to say we supply one dwell time before and after every hop time like so: O=O=O=O=O The
+ * number of dwell times must be equal to the number of inserted stops, plus one dwell for fromStop
+ * and one dwell for toStop when they are specified.
  *
- * That is to say, a dwell time is supplied for each "anchor stop" referenced in the original trip pattern,
- * and one more for each stop in the stops list. For N dwells, N-1 hops are supplied to tie them all together.
+ * <p>That is to say, a dwell time is supplied for each "anchor stop" referenced in the original
+ * trip pattern, and one more for each stop in the stops list. For N dwells, N-1 hops are supplied
+ * to tie them all together.
  *
- * Inserting stops into some trips but not others on a pattern could create new patterns. Therefore we only allow
- * applying this modification to entire routes or patterns.
+ * <p>Inserting stops into some trips but not others on a pattern could create new patterns.
+ * Therefore we only allow applying this modification to entire routes or patterns.
  */
 public class Reroute extends Modification {
 
@@ -60,8 +63,8 @@ public class Reroute extends Modification {
     public int[] dwellTimes;
 
     /**
-     * Number of seconds the vehicle will spend traveling between each of the new stops.
-     * There should be one more hop time than dwell times if both of fromStop and toStop are specified.
+     * Number of seconds the vehicle will spend traveling between each of the new stops. There
+     * should be one more hop time than dwell times if both of fromStop and toStop are specified.
      */
     public int[] hopTimes;
 
@@ -72,8 +75,8 @@ public class Reroute extends Modification {
     private int intToStop = -1;
 
     /**
-     * The internal integer IDs of all the new stops to be added.
-     * These are looked up or created and cached before the modification is applied.
+     * The internal integer IDs of all the new stops to be added. These are looked up or created and
+     * cached before the modification is applied.
      */
     private TIntList intNewStops = new TIntArrayList();
 
@@ -97,11 +100,14 @@ public class Reroute extends Modification {
 
     private int newPatternLength;
 
-    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    /**
+     * For logging the effects of the modification and reporting an error when the modification has
+     * no effect.
+     */
     private int nPatternsAffected = 0;
 
     @Override
-    public boolean resolve (TransportNetwork network) {
+    public boolean resolve(TransportNetwork network) {
         checkIds(routes, patterns, null, false, network);
         if (fromStop == null && toStop == null) {
             errors.add("At least one of from and to stop must be supplied.");
@@ -134,7 +140,9 @@ public class Reroute extends Modification {
             dwellTimes = new int[0];
         }
         if (dwellTimes.length != expectedDwells) {
-            errors.add("You must supply one dwell time per new stop, plus one for fromStop and one for toStop when they are specified.");
+            errors.add(
+                    "You must supply one dwell time per new stop, plus one for fromStop and one for"
+                        + " toStop when they are specified.");
         }
         if (hopTimes == null) {
             errors.add("You must always supply some hop times.");
@@ -148,9 +156,10 @@ public class Reroute extends Modification {
     @Override
     public boolean apply(TransportNetwork network) {
         this.network = network;
-        network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
-                .map(this::processTripPattern)
-                .collect(Collectors.toList());
+        network.transitLayer.tripPatterns =
+                network.transitLayer.tripPatterns.stream()
+                        .map(this::processTripPattern)
+                        .collect(Collectors.toList());
         if (nPatternsAffected > 0) {
             LOG.info("Rerouted {} patterns.", nPatternsAffected);
         } else {
@@ -162,12 +171,13 @@ public class Reroute extends Modification {
     private TransportNetwork network;
 
     /**
-     * Given a single TripPattern, if this Modification changes that TripPattern, return a modified copy of it.
-     * Otherwise return the original, unchanged and uncopied TripPattern.
+     * Given a single TripPattern, if this Modification changes that TripPattern, return a modified
+     * copy of it. Otherwise return the original, unchanged and uncopied TripPattern.
      */
-    private TripPattern processTripPattern (TripPattern originalTripPattern) {
+    private TripPattern processTripPattern(TripPattern originalTripPattern) {
         if (routes != null && !routes.contains(originalTripPattern.routeId)) {
-            // This pattern is not on one of the specified routes. The trip pattern should remain unchanged.
+            // This pattern is not on one of the specified routes. The trip pattern should remain
+            // unchanged.
             return originalTripPattern;
         }
         if (patterns != null && originalTripPattern.containsNoTrips(patterns)) {
@@ -175,10 +185,13 @@ public class Reroute extends Modification {
             return originalTripPattern;
         }
         nPatternsAffected += 1;
-        // The number of elements to copy from the original stops array before the new segment is spliced in.
-        // That is, the first index in the output stops array that will contain a stop from the new segment.
+        // The number of elements to copy from the original stops array before the new segment is
+        // spliced in.
+        // That is, the first index in the output stops array that will contain a stop from the new
+        // segment.
         insertBeginIndex = -1;
-        // The element of the original stops array at which copying resumes after the new segment is spliced in.
+        // The element of the original stops array at which copying resumes after the new segment is
+        // spliced in.
         insertEndIndex = -1;
         for (int s = 0; s < originalTripPattern.stops.length; s++) {
             if (originalTripPattern.stops[s] == intFromStop) {
@@ -189,24 +202,34 @@ public class Reroute extends Modification {
             }
         }
         if (intFromStop == -1) {
-            // When no fromStop is supplied, the new segment is inserted at index 0 of the output pattern.
+            // When no fromStop is supplied, the new segment is inserted at index 0 of the output
+            // pattern.
             insertBeginIndex = 0;
         }
         if (intToStop == -1) {
-            // When no toStop is supplied, no more of the original pattern will be copied after inserting the new segment.
+            // When no toStop is supplied, no more of the original pattern will be copied after
+            // inserting the new segment.
             insertEndIndex = originalTripPattern.stops.length;
         }
         if (insertBeginIndex == -1 || insertEndIndex == -1) {
-            // We are missing either the beginning or the end of the insertion slice. This TripPattern does not match.
-            String warning = String.format("The specified fromStop (%s) and/or toStop (%s) could not be matched on %s",
-                    fromStop, toStop, originalTripPattern.toStringDetailed(network.transitLayer));
+            // We are missing either the beginning or the end of the insertion slice. This
+            // TripPattern does not match.
+            String warning =
+                    String.format(
+                            "The specified fromStop (%s) and/or toStop (%s) could not be matched on"
+                                + " %s",
+                            fromStop,
+                            toStop,
+                            originalTripPattern.toStringDetailed(network.transitLayer));
             if (routes != null) {
                 // This Modification is being applied to all patterns on a route.
-                // Some of those patterns might not contain the from/to stops, and that's not necessarily a problem.
+                // Some of those patterns might not contain the from/to stops, and that's not
+                // necessarily a problem.
                 LOG.warn(warning);
             } else {
                 // This Modification is being applied to specifically chosen patterns.
-                // If one does not contain the from or to stops, it's probably a badly formed modification so fail hard.
+                // If one does not contain the from or to stops, it's probably a badly formed
+                // modification so fail hard.
                 errors.add(warning);
             }
             return originalTripPattern;
@@ -224,7 +247,8 @@ public class Reroute extends Modification {
         // First, reroute the pattern itself (the stops).
         TripPattern pattern = reroutePattern(originalTripPattern);
 
-        // Choose a stop in the new pattern and a corresponding one in the original pattern at which all trips will
+        // Choose a stop in the new pattern and a corresponding one in the original pattern at which
+        // all trips will
         // see their arrival time unchanged.
         // For now we use the first stop in the original pattern that appears in the new pattern.
         originalFixedPointStopIndex = 0;
@@ -241,21 +265,23 @@ public class Reroute extends Modification {
         }
 
         // Then perform the same rerouting operation for every individual trip on this pattern.
-        pattern.tripSchedules = originalTripPattern.tripSchedules.stream()
-                .map(this::rerouteTripSchedule)
-                .collect(Collectors.toList());
+        pattern.tripSchedules =
+                originalTripPattern.tripSchedules.stream()
+                        .map(this::rerouteTripSchedule)
+                        .collect(Collectors.toList());
 
         return pattern;
     }
 
     /**
-     * Copy the original pattern to a new one, inserting or leaving out stops as necessary.
-     * This is copying the stops, PickDropTypes, etc. shared by the whole pattern.
-     * Individual TripSchedules will be modified separately later.
+     * Copy the original pattern to a new one, inserting or leaving out stops as necessary. This is
+     * copying the stops, PickDropTypes, etc. shared by the whole pattern. Individual TripSchedules
+     * will be modified separately later.
      */
-    private TripPattern reroutePattern (TripPattern originalTripPattern) {
+    private TripPattern reroutePattern(TripPattern originalTripPattern) {
 
-        // Create a protective copy of this TripPattern whose arrays are shorter or longer as needed.
+        // Create a protective copy of this TripPattern whose arrays are shorter or longer as
+        // needed.
         TripPattern pattern = originalTripPattern.clone();
         pattern.stops = new int[newPatternLength];
         pattern.pickups = new PickDropType[newPatternLength];
@@ -273,14 +299,18 @@ public class Reroute extends Modification {
                     pattern.pickups[ts] = PickDropType.SCHEDULED;
                     pattern.dropoffs[ts] = PickDropType.SCHEDULED;
                     // Assume newly created stops are wheelchair accessible.
-                    // FIXME but we should be copying wheelchair accessibility value for existing inserted stops
+                    // FIXME but we should be copying wheelchair accessibility value for existing
+                    // inserted stops
                     pattern.wheelchairAccessible.set(ts, true);
-                    // Increment target stop but not source stop, since we have not consumed any source pattern stops.
+                    // Increment target stop but not source stop, since we have not consumed any
+                    // source pattern stops.
                     ts++;
                 }
-                // Skip over the stops in the original (source) trip pattern that are to be replaced.
+                // Skip over the stops in the original (source) trip pattern that are to be
+                // replaced.
                 ss = insertEndIndex;
-                // If the output pattern is full, we just spliced the new stops onto the end of the pattern.
+                // If the output pattern is full, we just spliced the new stops onto the end of the
+                // pattern.
                 // Quit without copying any more from the source pattern.
                 if (ts == newPatternLength) break;
             }
@@ -293,19 +323,26 @@ public class Reroute extends Modification {
 
         LOG.debug("Old stop sequence: {}", originalTripPattern.stops);
         LOG.debug("New stop sequence: {}", pattern.stops);
-        LOG.info("Old stop IDs: {}", Arrays.stream(originalTripPattern.stops)
-                .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
-        LOG.info("New stop IDs: {}", Arrays.stream(pattern.stops)
-                .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
+        LOG.info(
+                "Old stop IDs: {}",
+                Arrays.stream(originalTripPattern.stops)
+                        .mapToObj(network.transitLayer.stopIdForIndex::get)
+                        .collect(Collectors.toList()));
+        LOG.info(
+                "New stop IDs: {}",
+                Arrays.stream(pattern.stops)
+                        .mapToObj(network.transitLayer.stopIdForIndex::get)
+                        .collect(Collectors.toList()));
 
         return pattern;
     }
 
     /**
-     * TODO calculate all arrivals and departures zero-based, and then shift them at the end to maintain fixed-point stop.
-     * The fixed-point stop should be different depending on whether we are splicing onto the beginning or end of the route.
+     * TODO calculate all arrivals and departures zero-based, and then shift them at the end to
+     * maintain fixed-point stop. The fixed-point stop should be different depending on whether we
+     * are splicing onto the beginning or end of the route.
      */
-    private TripSchedule rerouteTripSchedule (TripSchedule originalSchedule) {
+    private TripSchedule rerouteTripSchedule(TripSchedule originalSchedule) {
 
         // Make a protective copy of this TripSchedule, changing the length of its arrays as needed.
         TripSchedule schedule = originalSchedule.clone();
@@ -321,11 +358,14 @@ public class Reroute extends Modification {
         // Iterate until we've filled all slots in the target pattern.
         for (int ss = 0, ts = 0; ts < newPatternLength; ss++, ts++) {
 
-            // When we reach the right place in the source pattern, splice in the new schedule fragment.
-            // When we're inserting in the middle of the pattern, consider that a dwell is supplied for the fromStop.
+            // When we reach the right place in the source pattern, splice in the new schedule
+            // fragment.
+            // When we're inserting in the middle of the pattern, consider that a dwell is supplied
+            // for the fromStop.
             if ((ss == insertBeginIndex - 1) || (ss == 0 && insertBeginIndex == 0)) {
 
-                // Calculate hop time, dealing with the fact that at stop zero there is no preceding hop.
+                // Calculate hop time, dealing with the fact that at stop zero there is no preceding
+                // hop.
                 int hopTime = originalSchedule.arrivals[ss];
                 if (ss > 0) hopTime -= originalSchedule.departures[ss - 1];
 
@@ -336,7 +376,8 @@ public class Reroute extends Modification {
                 prevOutputDeparture = schedule.departures[ts];
                 ts++; // One output slot has been filled.
 
-                // There is always one less hop than dwell, but we iterate through the two in lock-step.
+                // There is always one less hop than dwell, but we iterate through the two in
+                // lock-step.
                 for (int hop = 0, dwell = 1; dwell < dwellTimes.length; hop++, dwell++) {
                     schedule.arrivals[ts] = prevOutputDeparture + hopTimes[hop];
                     schedule.departures[ts] = schedule.arrivals[ts] + dwellTimes[dwell];
@@ -344,17 +385,20 @@ public class Reroute extends Modification {
                     ts++; // One output slot has been filled.
                 }
 
-                // Skip over the part of the source pattern that was replaced by the new schedule fragment.
-                // We have used a dwell to replace the original dwell at toStop, so step up to the following hop.
+                // Skip over the part of the source pattern that was replaced by the new schedule
+                // fragment.
+                // We have used a dwell to replace the original dwell at toStop, so step up to the
+                // following hop.
                 ss = insertEndIndex + 1;
 
-                // If the output pattern is full, we just spliced the new stops onto the end of the pattern.
+                // If the output pattern is full, we just spliced the new stops onto the end of the
+                // pattern.
                 // Do not copy any more information from the source pattern.
                 if (ts == newPatternLength) break;
-
             }
 
-            // Accumulate one ride and one dwell time from the source schedule into the target schedule.
+            // Accumulate one ride and one dwell time from the source schedule into the target
+            // schedule.
             // Deal with the fact that at stop zero there is no preceding hop.
             int hopTime = originalSchedule.arrivals[ss];
             if (ss > 0) hopTime -= originalSchedule.departures[ss - 1];
@@ -363,12 +407,14 @@ public class Reroute extends Modification {
             int dwellTime = originalSchedule.departures[ss] - originalSchedule.arrivals[ss];
             schedule.departures[ts] = schedule.arrivals[ts] + dwellTime;
             prevOutputDeparture = schedule.departures[ts];
-
         }
 
-        // Finally, shift the output pattern's times such that the arrival time at the fixed-point stop is unchanged.
+        // Finally, shift the output pattern's times such that the arrival time at the fixed-point
+        // stop is unchanged.
         // Eventually we will allow specifying a fixed-point stop in the modification parameters.
-        int timeShift = originalSchedule.arrivals[originalFixedPointStopIndex] - schedule.arrivals[newFixedPointStopIndex];
+        int timeShift =
+                originalSchedule.arrivals[originalFixedPointStopIndex]
+                        - schedule.arrivals[newFixedPointStopIndex];
         for (int i = 0; i < newPatternLength; i++) {
             schedule.arrivals[i] += timeShift;
             schedule.departures[i] += timeShift;
@@ -380,7 +426,6 @@ public class Reroute extends Modification {
             LOG.debug("Modified departures: {}", schedule.departures);
         }
         return schedule;
-
     }
 
     @Override
@@ -388,7 +433,7 @@ public class Reroute extends Modification {
         return stops.stream().anyMatch(s -> s.id == null);
     }
 
-    public int getSortOrder() { return 40; }
-
-
+    public int getSortOrder() {
+        return 40;
+    }
 }

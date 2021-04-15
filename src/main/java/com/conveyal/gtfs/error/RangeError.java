@@ -15,8 +15,8 @@ public class RangeError extends GTFSError implements Serializable {
         this.actual = actual;
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("Number %s outside of acceptable range [%s,%s].", actual, min, max);
     }
-
 }

@@ -4,9 +4,7 @@ import com.conveyal.r5.profile.StreetMode;
 
 import java.util.EnumSet;
 
-/**
- * Fields replicated from the R5 ModifyStreets modification.
- */
+/** Fields replicated from the R5 ModifyStreets modification. */
 public class ModifyStreets extends Modification {
 
     public double[][][] polygons;
@@ -23,7 +21,8 @@ public class ModifyStreets extends Modification {
 
     @Override
     public com.conveyal.r5.analyst.scenario.Modification toR5() {
-        com.conveyal.r5.analyst.scenario.ModifyStreets mod = new com.conveyal.r5.analyst.scenario.ModifyStreets();
+        com.conveyal.r5.analyst.scenario.ModifyStreets mod =
+                new com.conveyal.r5.analyst.scenario.ModifyStreets();
         mod.comment = name;
 
         mod.polygons = polygons;

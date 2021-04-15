@@ -8,16 +8,18 @@ import java.io.OutputStream;
 /**
  * Created by abyrd on 2015-05-04
  *
- * TODO intersection finder, indexing sinks (or include those optionally in the OSM storage class itself.
- * TODO tag filter sink
+ * <p>TODO intersection finder, indexing sinks (or include those optionally in the OSM storage class
+ * itself. TODO tag filter sink
  */
 public interface OSMEntitySink {
 
     public void writeBegin() throws IOException;
 
-    public void setReplicationTimestamp(long secondsSinceEpoch); // Needs to be called before any entities are written
+    public void setReplicationTimestamp(
+            long secondsSinceEpoch); // Needs to be called before any entities are written
 
-    public void writeNode(long id, Node node) throws IOException; // TODO rename id parameters to nodeId, wayId, relationId throughout
+    public void writeNode(long id, Node node)
+            throws IOException; // TODO rename id parameters to nodeId, wayId, relationId throughout
 
     public void writeWay(long id, Way way) throws IOException;
 
@@ -25,7 +27,7 @@ public interface OSMEntitySink {
 
     public void writeEnd() throws IOException;
 
-    public static OSMEntitySink forFile (String path) {
+    public static OSMEntitySink forFile(String path) {
         try {
             OutputStream outputStream = new FileOutputStream(path);
             return forStream(path, outputStream);
@@ -34,7 +36,7 @@ public interface OSMEntitySink {
         }
     }
 
-    public static OSMEntitySink forStream (String name, OutputStream outputStream) {
+    public static OSMEntitySink forStream(String name, OutputStream outputStream) {
         if (name.endsWith(".pbf")) {
             return new PBFOutput(outputStream);
         } else if (name.endsWith(".vex")) {
@@ -45,5 +47,4 @@ public interface OSMEntitySink {
             return null;
         }
     }
-
 }

@@ -10,10 +10,10 @@ import java.util.List;
 /**
  * Trip pattern information for API responses in GraphQL
  *
- * Getters are called automatically based on field names.
+ * <p>Getters are called automatically based on field names.
  */
 public class TripPattern {
-    //This is used to get stop information from transitLayer
+    // This is used to get stop information from transitLayer
     private final TransitLayer transitLayer;
     private final com.conveyal.r5.transit.TripPattern tripPattern;
     private final int tripPatternIdx;
@@ -24,37 +24,29 @@ public class TripPattern {
         this.tripPatternIdx = tripPatternIdx;
     }
 
-    /**
-     * @return Index of this trip pattern in patterns array
-     */
+    /** @return Index of this trip pattern in patterns array */
     public int getTripPatternIdx() {
         return tripPatternIdx;
     }
 
-    /**
-     * @return Direction ID of all trips in this trip pattern
-     */
+    /** @return Direction ID of all trips in this trip pattern */
     public Integer getDirectionId() {
-        return tripPattern.directionId == Integer.MIN_VALUE ? null: tripPattern.directionId;
+        return tripPattern.directionId == Integer.MIN_VALUE ? null : tripPattern.directionId;
     }
 
-    /**
-     * @return Index of route in route array
-     */
+    /** @return Index of route in route array */
     public Integer getRouteIdx() {
-        return tripPattern.routeIndex < 0 ? null: tripPattern.routeIndex;
+        return tripPattern.routeIndex < 0 ? null : tripPattern.routeIndex;
     }
 
-    /**
-     * @return GTFS route ID (Agency unique)
-     */
+    /** @return GTFS route ID (Agency unique) */
     public String getRouteId() {
         return tripPattern.routeId;
     }
 
     public List<Stop> getStops() {
         List<Stop> stops = new ArrayList<>(tripPattern.stops.length);
-        for(int i=0; i< tripPattern.stops.length; i++) {
+        for (int i = 0; i < tripPattern.stops.length; i++) {
             int stopIdx = tripPattern.stops[i];
             Stop stop = new Stop(stopIdx, transitLayer);
             stops.add(stop);
@@ -65,7 +57,7 @@ public class TripPattern {
 
     public List<Trip> getTrips() {
         List<Trip> trips = new ArrayList<>(tripPattern.tripSchedules.size());
-        for (TripSchedule tripSchedule: tripPattern.tripSchedules) {
+        for (TripSchedule tripSchedule : tripPattern.tripSchedules) {
             Trip trip = new Trip();
             trip.tripId = tripSchedule.tripId;
             trip.serviceId = transitLayer.services.get(tripSchedule.serviceCode).service_id;

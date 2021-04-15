@@ -10,8 +10,8 @@ public class MissingTableError extends GTFSError implements Serializable {
         super(file, 0, null);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("This table is required by the GTFS specification but is missing.");
     }
-
 }

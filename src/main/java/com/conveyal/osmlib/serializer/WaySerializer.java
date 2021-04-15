@@ -1,6 +1,7 @@
 package com.conveyal.osmlib.serializer;
 
 import com.conveyal.osmlib.Way;
+
 import org.mapdb.Serializer;
 
 import java.io.DataInput;
@@ -39,6 +40,7 @@ public class WaySerializer implements Serializer<Way>, Serializable {
     }
 
     @Override
-    public int fixedSize() { return -1; }
-
+    public int fixedSize() {
+        return -1;
+    }
 }

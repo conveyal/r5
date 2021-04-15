@@ -24,7 +24,8 @@ import java.util.zip.CRC32;
 
 /**
  * Request sent from the UI to the backend. It is actually distinct from the task that the broker
- * sends/forwards to R5 workers (see {@link AnalysisWorkerTask}), though it has many of the same fields.
+ * sends/forwards to R5 workers (see {@link AnalysisWorkerTask}), though it has many of the same
+ * fields.
  */
 public class AnalysisRequest {
 
@@ -95,12 +96,12 @@ public class AnalysisRequest {
     public String originPointSetId;
 
     /**
-     * The IDs of pointsets to be used as destinations in accessibility or travel time calculations. This can be
-     * one or more grids with identical extents, or a single freeform pointset.
-     * This replaces the deprecated singular opportunityDatasetId.
-     * This field is required for regional analyses, which always compute accessibility to destinations.
-     * On the other hand, in a single point request this may be null, in which case the worker will report only
-     * travel times to destinations and not accessibility figures.
+     * The IDs of pointsets to be used as destinations in accessibility or travel time calculations.
+     * This can be one or more grids with identical extents, or a single freeform pointset. This
+     * replaces the deprecated singular opportunityDatasetId. This field is required for regional
+     * analyses, which always compute accessibility to destinations. On the other hand, in a single
+     * point request this may be null, in which case the worker will report only travel times to
+     * destinations and not accessibility figures.
      */
     public String[] destinationPointSetIds;
 
@@ -108,14 +109,12 @@ public class AnalysisRequest {
     public boolean makeTauiSite = false;
 
     /**
-     * Whether to record travel times between origins and destinations.
-     * If true, requires an originPointSetId to be specified.
+     * Whether to record travel times between origins and destinations. If true, requires an
+     * originPointSetId to be specified.
      */
     public boolean recordTimes;
 
-    /**
-     * Whether to record path and travel time details
-     */
+    /** Whether to record path and travel time details */
     public boolean recordPaths;
 
     /**
@@ -142,9 +141,10 @@ public class AnalysisRequest {
     public int maxFare;
 
     /**
-     * A function mapping travel times to weighting factors for opportunities at that travel time from the origin.
-     * Classic cumulative opportunities accessibility uses a step function with all opportunities below the cutoff
-     * weighted 1.0 and all opportunities at or above the cutoff weighted 0.
+     * A function mapping travel times to weighting factors for opportunities at that travel time
+     * from the origin. Classic cumulative opportunities accessibility uses a step function with all
+     * opportunities below the cutoff weighted 1.0 and all opportunities at or above the cutoff
+     * weighted 0.
      */
     public DecayFunction decayFunction;
 
@@ -152,11 +152,8 @@ public class AnalysisRequest {
      * Get all of the modifications for a project id that are in the Variant and map them to their
      * corresponding r5 mod
      */
-    private static List<Modification> modificationsForProject (
-            String accessGroup,
-            String projectId,
-            int variantIndex)
-    {
+    private static List<Modification> modificationsForProject(
+            String accessGroup, String projectId, int variantIndex) {
         return Persistence.modifications
                 .findPermitted(QueryBuilder.start("projectId").is(projectId).get(), accessGroup)
                 .stream()
@@ -169,16 +166,18 @@ public class AnalysisRequest {
      * Finds the modifications for the specified project and variant, maps them to their
      * corresponding R5 modification types, creates a checksum from those modifications, and adds
      * them to the AnalysisTask along with the rest of the request.
-     * <p>
-     * This method takes a task as a parameter, modifies that task, and also returns that same task.
-     * This is because we have two subtypes of AnalysisTask and need to be able to create both.
      *
-     * This populates for a single-point task, and several things get overwritten for regional tasks.
+     * <p>This method takes a task as a parameter, modifies that task, and also returns that same
+     * task. This is because we have two subtypes of AnalysisTask and need to be able to create
+     * both.
      *
-     * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
-     *      to the same method on the superclass.
+     * <p>This populates for a single-point task, and several things get overwritten for regional
+     * tasks.
+     *
+     * <p>TODO arguably this should be done by a method on the task classes themselves, with common
+     * parts factored out to the same method on the superclass.
      */
-    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, Project project) {
+    public AnalysisWorkerTask populateTask(AnalysisWorkerTask task, Project project) {
 
         // Fetch the modifications associated with this project, filtering for the selected scenario
         // (denoted here as "variant"). There are no modifications in the baseline scenario
@@ -204,7 +203,8 @@ public class AnalysisRequest {
         // FIXME Job IDs need to be unique. Why are we setting this to the project and variant?
         //       This only works because the job ID is overwritten when the job is enqueued.
         //       Its main effect is to cause the scenario ID to have this same pattern!
-        //       We should probably leave the JobID null on single point tasks. Needed: polymorphic task initialization.
+        //       We should probably leave the JobID null on single point tasks. Needed: polymorphic
+        // task initialization.
         task.jobId = String.format("%s-%s-%s", projectId, variantIndex, crcValue);
         task.scenario.id = task.scenarioId = task.jobId;
         task.scenario.modifications = modifications;
@@ -217,7 +217,8 @@ public class AnalysisRequest {
         Bounds bounds = this.bounds;
         if (bounds == null) {
             // If no bounds were specified, fall back on the bounds of the entire region.
-            Region region = Persistence.regions.findByIdIfPermitted(project.regionId, project.accessGroup);
+            Region region =
+                    Persistence.regions.findByIdIfPermitted(project.regionId, project.accessGroup);
             bounds = region.bounds;
         }
 
@@ -250,10 +251,13 @@ public class AnalysisRequest {
         task.maxCarTime = maxCarTime;
         task.maxRides = maxRides;
         if (task.inRoutingFareCalculator != null) {
-            // Only overwrite the default cutoff when doing multi-criteria routing with fare constraints, which can be
+            // Only overwrite the default cutoff when doing multi-criteria routing with fare
+            // constraints, which can be
             // slow and reliant on lower temporal cutoffs to avoid timeouts.
-            // In previous versions, the default cutoff was also overwritten for non-Taui regional analyses. But
-            // with changes introduced for decay functions/multiple cutoffs, that step is no longer needed here.
+            // In previous versions, the default cutoff was also overwritten for non-Taui regional
+            // analyses. But
+            // with changes introduced for decay functions/multiple cutoffs, that step is no longer
+            // needed here.
             task.maxTripDurationMinutes = maxTripDurationMinutes;
         }
         task.minBikeTime = minBikeTime;
@@ -264,17 +268,22 @@ public class AnalysisRequest {
         task.monteCarloDraws = monteCarloDraws;
         task.percentiles = percentiles;
         task.cutoffsMinutes = cutoffsMinutes;
-        
+
         task.logRequest = logRequest;
 
         task.accessModes = getEnumSetFromString(accessModes);
         task.directModes = getEnumSetFromString(directModes);
         task.egressModes = getEnumSetFromString(egressModes);
-        task.transitModes = transitModes != null && !"".equals(transitModes)
-                ? EnumSet.copyOf(Arrays.stream(transitModes.split(",")).map(TransitModes::valueOf).collect(Collectors.toList()))
-                : EnumSet.noneOf(TransitModes.class);
+        task.transitModes =
+                transitModes != null && !"".equals(transitModes)
+                        ? EnumSet.copyOf(
+                                Arrays.stream(transitModes.split(","))
+                                        .map(TransitModes::valueOf)
+                                        .collect(Collectors.toList()))
+                        : EnumSet.noneOf(TransitModes.class);
 
-        // Use the decay function supplied by the UI, defaulting to a zero-width step function if none is supplied.
+        // Use the decay function supplied by the UI, defaulting to a zero-width step function if
+        // none is supplied.
         task.decayFunction = decayFunction;
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
@@ -285,22 +294,24 @@ public class AnalysisRequest {
 
     private static void checkZoom(Grid grid) {
         if (grid.zoom < MIN_ZOOM || grid.zoom > MAX_ZOOM) {
-            throw AnalysisServerException.badRequest(String.format(
-                    "Requested zoom (%s) is outside valid range (%s - %s)", grid.zoom, MIN_ZOOM, MAX_ZOOM
-            ));
+            throw AnalysisServerException.badRequest(
+                    String.format(
+                            "Requested zoom (%s) is outside valid range (%s - %s)",
+                            grid.zoom, MIN_ZOOM, MAX_ZOOM));
         }
         if (grid.height * grid.width > MAX_GRID_CELLS) {
-            throw AnalysisServerException.badRequest(String.format(
-                    "Requested number of destinations (%s) exceeds limit (%s). " +
-                            "Set smaller custom geographic bounds or a lower zoom level.",
-                            grid.height * grid.width, MAX_GRID_CELLS
-            ));
+            throw AnalysisServerException.badRequest(
+                    String.format(
+                            "Requested number of destinations (%s) exceeds limit (%s). "
+                                    + "Set smaller custom geographic bounds or a lower zoom level.",
+                            grid.height * grid.width, MAX_GRID_CELLS));
         }
     }
 
-    private EnumSet<LegMode> getEnumSetFromString (String s) {
+    private EnumSet<LegMode> getEnumSetFromString(String s) {
         if (s != null && !"".equals(s)) {
-            return EnumSet.copyOf(Arrays.stream(s.split(",")).map(LegMode::valueOf).collect(Collectors.toList()));
+            return EnumSet.copyOf(
+                    Arrays.stream(s.split(",")).map(LegMode::valueOf).collect(Collectors.toList()));
         } else {
             return EnumSet.noneOf(LegMode.class);
         }

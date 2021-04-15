@@ -11,7 +11,7 @@ public class MapTile {
     private final int x;
     private final int y;
 
-    public MapTile (int zoom, int x, int y) {
+    public MapTile(int zoom, int x, int y) {
         this.zoom = zoom;
         this.x = x;
         this.y = y;
@@ -19,22 +19,22 @@ public class MapTile {
 
     // Add equals and hashcode if these are serving as keys.
 
-//    public static int xTile(double lon, int zoom) {
-//        return (int) Math.floor((lon + 180) / 360 * (1 << zoom));
-//    }
-//
-//    public static int yTile(double lat, int zoom) {
-//        return (int) Math.floor((1 - Math.log(Math.tan(Math.toRadians(lat))
-//                + 1 / Math.cos(Math.toRadians(lat))) / Math.PI) / 2 * (1 << zoom));
-//    }
-//
+    //    public static int xTile(double lon, int zoom) {
+    //        return (int) Math.floor((lon + 180) / 360 * (1 << zoom));
+    //    }
+    //
+    //    public static int yTile(double lat, int zoom) {
+    //        return (int) Math.floor((1 - Math.log(Math.tan(Math.toRadians(lat))
+    //                + 1 / Math.cos(Math.toRadians(lat))) / Math.PI) / 2 * (1 << zoom));
+    //    }
+    //
 
-    public Envelope wgsEnvelope () {
+    public Envelope wgsEnvelope() {
         return wgsEnvelope(zoom, x, y);
     }
 
     // Create an envelope in WGS84 coordinates for the given map tile numbers.
-    public static Envelope wgsEnvelope (final int zoom, final int x, final int y) {
+    public static Envelope wgsEnvelope(final int zoom, final int x, final int y) {
         double north = tile2lat(y, zoom);
         double south = tile2lat(y + 1, zoom);
         double west = tile2lon(x, zoom);
@@ -50,5 +50,4 @@ public class MapTile {
         double n = Math.PI - (2.0 * Math.PI * yTile) / Math.pow(2.0, zoom);
         return Math.toDegrees(Math.atan(Math.sinh(n)));
     }
-
 }

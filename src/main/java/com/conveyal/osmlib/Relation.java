@@ -32,16 +32,15 @@ public class Relation extends OSMEntity implements Serializable {
         }
 
         @Override
-        public boolean equals (Object other) {
+        public boolean equals(Object other) {
             if (!(other instanceof Member)) return false;
             Member otherMember = (Member) other;
-            return this.type == otherMember.type &&
-                   this.id == otherMember.id &&
-                   this.role.equals(otherMember.role);
+            return this.type == otherMember.type
+                    && this.id == otherMember.id
+                    && this.role.equals(otherMember.role);
         }
-
     }
-    
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -59,7 +58,7 @@ public class Relation extends OSMEntity implements Serializable {
 
     @Override
     public boolean equals(Object other) {
-        if ( ! (other instanceof Relation)) return false;
+        if (!(other instanceof Relation)) return false;
         Relation otherRelation = (Relation) other;
         return this.members.equals(otherRelation.members) && this.tagsEqual(otherRelation);
     }
@@ -68,5 +67,4 @@ public class Relation extends OSMEntity implements Serializable {
     public Type getType() {
         return Type.RELATION;
     }
-
 }

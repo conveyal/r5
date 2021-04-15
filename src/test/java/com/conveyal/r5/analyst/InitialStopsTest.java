@@ -2,22 +2,24 @@ package com.conveyal.r5.analyst;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Test the code that finds initial transit stops.
- */
+/** Test the code that finds initial transit stops. */
 public class InitialStopsTest {
-    /** Time (in seconds) that a decrease must be greater than in order to be considered a decrease (make sure tests don't inadvertently pass due to rounding errors) */
+    /**
+     * Time (in seconds) that a decrease must be greater than in order to be considered a decrease
+     * (make sure tests don't inadvertently pass due to rounding errors)
+     */
     public static final int EPSILON = 10;
 
     /**
-     * Test that increasing the bike speed on a bike-to-transit search
-     * a) decreases or leaves unchanged all access times.
-     * b) allows access to a superset of the originally accessible stops.
+     * Test that increasing the bike speed on a bike-to-transit search a) decreases or leaves
+     * unchanged all access times. b) allows access to a superset of the originally accessible
+     * stops.
      *
-     * There was once a bug where bike speed was not correctly applied because we used the distance not the speed.
+     * <p>There was once a bug where bike speed was not correctly applied because we used the
+     * distance not the speed.
      */
     @Test
-    public void testInitialStopBikeSpeedIncrease () throws Exception {
+    public void testInitialStopBikeSpeedIncrease() throws Exception {
         /*
         Graph g = buildGraphNoTransit();
         addRegularStopGrid(g);
@@ -69,15 +71,15 @@ public class InitialStopsTest {
     }
 
     /**
-     * Test that increasing the walk speed on a walk-to-transit search
-     * a) decreases or leaves unchanged all access times.
-     * b) allows access to a superset of the originally accessible stops.
-     * c) decreases at least some access times.
+     * Test that increasing the walk speed on a walk-to-transit search a) decreases or leaves
+     * unchanged all access times. b) allows access to a superset of the originally accessible
+     * stops. c) decreases at least some access times.
      *
-     * There was once a bug where bike speed was not correctly applied because we used the distance not the speed.
+     * <p>There was once a bug where bike speed was not correctly applied because we used the
+     * distance not the speed.
      */
     @Test
-    public void testInitialStopWalkSpeedIncrease () throws Exception {
+    public void testInitialStopWalkSpeedIncrease() throws Exception {
         /*
         Graph g = buildGraphNoTransit();
         addRegularStopGrid(g);

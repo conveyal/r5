@@ -1,10 +1,7 @@
 package com.conveyal.r5.transit;
 
-/**
- * Enums are inherently serializable.
- */
+/** Enums are inherently serializable. */
 public enum TripFlag {
-
     BICYCLE(0),
     WHEELCHAIR(1);
     int flag;
@@ -12,5 +9,4 @@ public enum TripFlag {
     TripFlag(int bitNumber) {
         flag = 1 << bitNumber;
     }
-
 }

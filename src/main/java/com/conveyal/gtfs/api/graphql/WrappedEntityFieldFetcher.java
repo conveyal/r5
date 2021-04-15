@@ -5,13 +5,11 @@ import graphql.schema.DataFetchingEnvironment;
 
 import java.lang.reflect.Field;
 
-/**
- * Fetch data from wrapped GTFS entities. Modeled after graphql-java FieldDataFetcher.
- */
+/** Fetch data from wrapped GTFS entities. Modeled after graphql-java FieldDataFetcher. */
 public class WrappedEntityFieldFetcher implements DataFetcher {
     private final String field;
 
-    public WrappedEntityFieldFetcher (String field) {
+    public WrappedEntityFieldFetcher(String field) {
         this.field = field;
     }
 

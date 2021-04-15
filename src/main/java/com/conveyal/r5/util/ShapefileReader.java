@@ -30,9 +30,7 @@ import java.util.Spliterators;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-/**
- * Encapsulate Shapefile reading logic
- */
+/** Encapsulate Shapefile reading logic */
 public class ShapefileReader {
     private final FeatureCollection<SimpleFeatureType, SimpleFeature> features;
     private final DataStore store;
@@ -40,7 +38,7 @@ public class ShapefileReader {
     private final CoordinateReferenceSystem crs;
     private final MathTransform transform;
 
-    public ShapefileReader (File shapefile) throws IOException, FactoryException {
+    public ShapefileReader(File shapefile) throws IOException, FactoryException {
         // http://docs.geotools.org/stable/userguide/library/data/shape.html
         Map<String, Object> params = new HashMap();
         params.put("url", shapefile.toURI().toURL());
@@ -60,64 +58,71 @@ public class ShapefileReader {
         transform = CRS.findMathTransform(crs, DefaultGeographicCRS.WGS84, true);
     }
 
-    public Stream<SimpleFeature> stream () throws IOException {
-        Iterator<SimpleFeature> wrappedIterator = new Iterator<SimpleFeature>() {
-            FeatureIterator<SimpleFeature> wrapped = features.features();
+    public Stream<SimpleFeature> stream() throws IOException {
+        Iterator<SimpleFeature> wrappedIterator =
+                new Iterator<SimpleFeature>() {
+                    FeatureIterator<SimpleFeature> wrapped = features.features();
 
-            @Override
-            public boolean hasNext() {
-                boolean hasNext = wrapped.hasNext();
-                if (!hasNext) {
-                    // Prevent keeping a lock on the shapefile.
-                    // This doesn't help though when iteration is not completed. Ideally we need to keep a set of any
-                    // open iterators and close them all in the close method on the ShapefileReader.
-                    wrapped.close();
-                }
-                return hasNext;
-            }
+                    @Override
+                    public boolean hasNext() {
+                        boolean hasNext = wrapped.hasNext();
+                        if (!hasNext) {
+                            // Prevent keeping a lock on the shapefile.
+                            // This doesn't help though when iteration is not completed. Ideally we
+                            // need to keep a set of any
+                            // open iterators and close them all in the close method on the
+                            // ShapefileReader.
+                            wrapped.close();
+                        }
+                        return hasNext;
+                    }
 
-            @Override
-            public SimpleFeature next() {
-                return wrapped.next();
-            }
-        };
+                    @Override
+                    public SimpleFeature next() {
+                        return wrapped.next();
+                    }
+                };
 
-        return StreamSupport.stream(Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED), false);
+        return StreamSupport.stream(
+                Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED),
+                false);
     }
 
-    public ReferencedEnvelope getBounds () throws IOException {
+    public ReferencedEnvelope getBounds() throws IOException {
         return source.getBounds();
     }
 
-    public double getAreaSqKm () throws IOException, TransformException, FactoryException {
+    public double getAreaSqKm() throws IOException, TransformException, FactoryException {
         CoordinateReferenceSystem webMercatorCRS = CRS.decode("EPSG:3857");
         MathTransform webMercatorTransform = CRS.findMathTransform(crs, webMercatorCRS, true);
         Envelope mercatorEnvelope = JTS.transform(getBounds(), webMercatorTransform);
         return mercatorEnvelope.getArea() / 1000 / 1000;
-
     }
 
-    public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {
-        return stream().map(f -> {
-            Geometry g = (Geometry) f.getDefaultGeometry();
-            try {
-                // TODO does this leak beyond this function?
-                f.setDefaultGeometry(JTS.transform(g, transform));
-            } catch (TransformException e) {
-                throw new RuntimeException(e);
-            }
-            return f;
-        });
+    public Stream<SimpleFeature> wgs84Stream() throws IOException, TransformException {
+        return stream()
+                .map(
+                        f -> {
+                            Geometry g = (Geometry) f.getDefaultGeometry();
+                            try {
+                                // TODO does this leak beyond this function?
+                                f.setDefaultGeometry(JTS.transform(g, transform));
+                            } catch (TransformException e) {
+                                throw new RuntimeException(e);
+                            }
+                            return f;
+                        });
     }
 
-    public Envelope wgs84Bounds () throws IOException, TransformException {
+    public Envelope wgs84Bounds() throws IOException, TransformException {
         return JTS.transform(getBounds(), transform);
     }
 
     /**
-     * Failure to call this will leave the shapefile locked, which may mess with future attempts to use it.
+     * Failure to call this will leave the shapefile locked, which may mess with future attempts to
+     * use it.
      */
-    public void close () {
+    public void close() {
         // Note that you also have to close the iterator, see iterator wrapper code above.
         store.dispose();
     }

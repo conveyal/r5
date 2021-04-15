@@ -1,7 +1,8 @@
 package com.conveyal.r5.analyst.fare.nyc;
 
 /**
- * All LIRR stops from the current GTFS (Dec 2019). Used to make efficient comparisons in LIRRTranferAllowance.
+ * All LIRR stops from the current GTFS (Dec 2019). Used to make efficient comparisons in
+ * LIRRTranferAllowance.
  */
 public enum LIRRStop {
     LIRR237,

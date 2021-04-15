@@ -4,15 +4,17 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
+
 import org.locationtech.jts.geom.LineString;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A representation of a TransitLayer as a Transitive.js network.
- * See https://github.com/conveyal/transitive.js/wiki/Transitive-Conceptual-Overview
- * This class is intended to be serialized out as JSON for communication with web UIs that use Transitive.js.
+ * A representation of a TransitLayer as a Transitive.js network. See
+ * https://github.com/conveyal/transitive.js/wiki/Transitive-Conceptual-Overview This class is
+ * intended to be serialized out as JSON for communication with web UIs that use Transitive.js.
+ *
  * @author mattwigway
  */
 public class TransitiveNetwork {
@@ -20,9 +22,10 @@ public class TransitiveNetwork {
     public final List<TransitiveRoute> routes;
     public final List<TransitiveStop> stops;
     public final List<TransitivePattern> patterns;
-    // Transitive 'places' and 'journeys' are not currently included. These are added by the Javascript client.
+    // Transitive 'places' and 'journeys' are not currently included. These are added by the
+    // Javascript client.
 
-    public TransitiveNetwork (TransitLayer transitLayer) {
+    public TransitiveNetwork(TransitLayer transitLayer) {
         routes = convertRoutes(transitLayer);
         stops = convertStops(transitLayer);
         patterns = convertPatterns(transitLayer, routes);
@@ -40,11 +43,13 @@ public class TransitiveNetwork {
             transitiveRoute.route_id = Integer.toString(routeIndex++);
             transitiveRoute.route_type = r5route.route_type;
             transitiveRoute.route_color = r5route.color;
-            // Transitive always expects route short name to be defined, and the GTFS spec requires use of the empty
+            // Transitive always expects route short name to be defined, and the GTFS spec requires
+            // use of the empty
             // string when the field is empty. GTFS lib converts that to null, convert it back.
             if (transitiveRoute.route_long_name == null) transitiveRoute.route_long_name = "Route";
-            if (transitiveRoute.route_short_name == null) transitiveRoute.route_short_name =
-                    transitiveRoute.route_long_name.split("[^A-Za-z0-9]")[0];
+            if (transitiveRoute.route_short_name == null)
+                transitiveRoute.route_short_name =
+                        transitiveRoute.route_long_name.split("[^A-Za-z0-9]")[0];
             routes.add(transitiveRoute);
         }
         return routes;
@@ -52,9 +57,12 @@ public class TransitiveNetwork {
 
     /**
      * Convert R5 patterns to Transitive patterns.
-     * @param routes just to get the normalized Transitive route names. Pull this out into a static method.
+     *
+     * @param routes just to get the normalized Transitive route names. Pull this out into a static
+     *     method.
      */
-    private static List<TransitivePattern> convertPatterns (TransitLayer transitLayer, List<TransitiveRoute> routes) {
+    private static List<TransitivePattern> convertPatterns(
+            TransitLayer transitLayer, List<TransitiveRoute> routes) {
         List<TransitivePattern> patterns = new ArrayList<>();
         for (int patternIdx = 0; patternIdx < transitLayer.tripPatterns.size(); patternIdx++) {
             TripPattern r5pattern = transitLayer.tripPatterns.get(patternIdx);
@@ -90,10 +98,12 @@ public class TransitiveNetwork {
     }
 
     /**
-     * @return a list of Transitive stop references for all the stops in the supplied r5 pattern, including geometries
-     * for the path the vehicle takes after each stop (except the last one, which will be null).
+     * @return a list of Transitive stop references for all the stops in the supplied r5 pattern,
+     *     including geometries for the path the vehicle takes after each stop (except the last one,
+     *     which will be null).
      */
-    public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, TransitLayer transitLayer) {
+    public static List<TransitivePattern.StopIdRef> getStopRefs(
+            TripPattern r5pattern, TransitLayer transitLayer) {
         List<LineString> geometries = r5pattern.getHopGeometries(transitLayer);
         List<TransitivePattern.StopIdRef> stopRefs = new ArrayList<>();
         for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
@@ -103,5 +113,4 @@ public class TransitiveNetwork {
         }
         return stopRefs;
     }
-
 }

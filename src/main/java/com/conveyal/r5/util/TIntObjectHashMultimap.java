@@ -9,9 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Created by matthewc on 2/19/16.
- */
+/** Created by matthewc on 2/19/16. */
 public class TIntObjectHashMultimap<V> implements TIntObjectMultimap<V> {
     private TIntObjectMap<List<V>> wrapped = new TIntObjectHashMap<>();
 

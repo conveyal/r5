@@ -8,10 +8,12 @@ import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.util.ExceptionUtils;
+
 import org.joda.time.DateTime;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import spark.Request;
 import spark.Response;
 
@@ -20,40 +22,47 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.Enumeration;
 
-/**
- * This is the main entry point for starting a Conveyal Analysis server.
- */
+/** This is the main entry point for starting a Conveyal Analysis server. */
 public abstract class BackendMain {
 
     private static final Logger LOG = LoggerFactory.getLogger(BackendMain.class);
 
-    /** This backend server's IP address. This is passed to the workers so they know how to reach the backend. */
+    /**
+     * This backend server's IP address. This is passed to the workers so they know how to reach the
+     * backend.
+     */
     private static final InetAddress privateServerAddress = discoverPrivateInetAddress();
 
-    public static void main (String... args) {
+    public static void main(String... args) {
         final Components components = new LocalComponents();
         startServer(components);
     }
 
-    protected static void startServer (Components components, Thread... postStartupThreads) {
-        // We have several non-daemon background thread pools which will keep the JVM alive if the main thread crashes.
+    protected static void startServer(Components components, Thread... postStartupThreads) {
+        // We have several non-daemon background thread pools which will keep the JVM alive if the
+        // main thread crashes.
         // If initialization fails, we need to catch the exception or error and force JVM shutdown.
         try {
             startServerInternal(components, postStartupThreads);
         } catch (Throwable throwable) {
-            LOG.error("Exception while starting up backend, shutting down JVM.\n{}", ExceptionUtils.asString(throwable));
+            LOG.error(
+                    "Exception while starting up backend, shutting down JVM.\n{}",
+                    ExceptionUtils.asString(throwable));
             System.exit(1);
         }
     }
 
-    private static void startServerInternal (Components components, Thread... postStartupThreads) {
+    private static void startServerInternal(Components components, Thread... postStartupThreads) {
         LOG.info("Starting Conveyal analysis backend, the time is now {}", DateTime.now());
         LOG.info("Backend version is: {}", BackendVersion.instance.version);
         LOG.info("Connecting to database...");
 
-        // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
-        // passing in non-static components we've already created. TODO migrate to non-static Components.
-        // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
+        // Persistence, the census extractor, and ApiMain are initialized statically, without
+        // creating instances,
+        // passing in non-static components we've already created. TODO migrate to non-static
+        // Components.
+        // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in
+        // handling GraphQL queries.
         Persistence.initializeStatically(components.config);
         SeamlessCensusGridExtractor.configureStatically(components.config);
         ApiMain.initialize(components.gtfsCache);
@@ -66,7 +75,8 @@ public abstract class BackendMain {
         }
 
         LOG.info("Conveyal Analysis server is ready.");
-        // TODO replace postStartupThreads with something like components.taskScheduler.enqueueHeavyTask();
+        // TODO replace postStartupThreads with something like
+        // components.taskScheduler.enqueueHeavyTask();
         for (Thread thread : postStartupThreads) {
             thread.start();
         }
@@ -77,10 +87,23 @@ public abstract class BackendMain {
         }
     }
 
-    public static void respondToException(Exception e, Request request, Response response, String type, String message, int code) {
+    public static void respondToException(
+            Exception e,
+            Request request,
+            Response response,
+            String type,
+            String message,
+            int code) {
         String stack = ExceptionUtils.asString(e);
 
-        LOG.error("{} {} -> {} {} by {} of {}", type, message, request.requestMethod(), request.pathInfo(), request.attribute("email"), request.attribute("accessGroup"));
+        LOG.error(
+                "{} {} -> {} {} by {} of {}",
+                type,
+                message,
+                request.requestMethod(),
+                request.pathInfo(),
+                request.attribute("email"),
+                request.attribute("accessGroup"));
         LOG.error(stack);
 
         JSONObject body = new JSONObject();
@@ -98,7 +121,8 @@ public abstract class BackendMain {
     }
 
     // InetAddress.getLocalHost() fails on EC2 because the local hostname is not in the hosts file.
-    // Anyway we don't want the default, we want to search for a stable, private interface internal to the cluster,
+    // Anyway we don't want the default, we want to search for a stable, private interface internal
+    // to the cluster,
     // rather than the public one which may be reassigned during startup.
     // TODO move this to an InternalHttpApi Component.
     private static InetAddress discoverPrivateInetAddress() {
@@ -118,7 +142,9 @@ public abstract class BackendMain {
                 Enumeration<InetAddress> addressEnumeration = networkInterface.getInetAddresses();
                 while (addressEnumeration.hasMoreElements()) {
                     InetAddress address = addressEnumeration.nextElement();
-                    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isMulticastAddress()) {
+                    if (address.isAnyLocalAddress()
+                            || address.isLoopbackAddress()
+                            || address.isMulticastAddress()) {
                         continue;
                     }
                     if (address.isSiteLocalAddress()) {
@@ -131,13 +157,16 @@ public abstract class BackendMain {
             privateAddress = null;
         }
         if (privateAddress == null) {
-            LOG.error("Could not determine private server IP address. Workers will not be able to contact it, making regional analysis impossible.");
+            LOG.error(
+                    "Could not determine private server IP address. Workers will not be able to"
+                        + " contact it, making regional analysis impossible.");
             // privateAddress = InetAddress.getLoopbackAddress();
             // Leave the private address null to fail fast.
         } else {
-            LOG.info("Private server IP address (which will be contacted by workers) is {}", privateAddress);
+            LOG.info(
+                    "Private server IP address (which will be contacted by workers) is {}",
+                    privateAddress);
         }
         return privateAddress;
     }
-
 }

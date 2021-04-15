@@ -10,8 +10,8 @@ public class NumberParseError extends GTFSError implements Serializable {
         super(file, line, field);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("Error parsing a number from a string.");
     }
-
 }

@@ -3,5556 +3,5670 @@ package geobuf;
 // source: geobuf.proto
 
 public final class Geobuf {
-  private Geobuf() {}
-  public static void registerAllExtensions(
-      com.google.protobuf.ExtensionRegistryLite registry) {
-  }
-  public interface DataOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:Data)
-      com.google.protobuf.MessageLiteOrBuilder {
+    private Geobuf() {}
 
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @return A list containing the keys.
-     */
-    java.util.List<java.lang.String>
-        getKeysList();
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @return The count of keys.
-     */
-    int getKeysCount();
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param index The index of the element to return.
-     * @return The keys at the given index.
-     */
-    java.lang.String getKeys(int index);
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param index The index of the element to return.
-     * @return The keys at the given index.
-     */
-    com.google.protobuf.ByteString
-        getKeysBytes(int index);
+    public static void registerAllExtensions(com.google.protobuf.ExtensionRegistryLite registry) {}
 
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     * @return Whether the dimensions field is set.
-     */
-    boolean hasDimensions();
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     * @return The dimensions.
-     */
-    int getDimensions();
+    public interface DataOrBuilder
+            extends
+            // @@protoc_insertion_point(interface_extends:Data)
+            com.google.protobuf.MessageLiteOrBuilder {
 
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     * @return Whether the precision field is set.
-     */
-    boolean hasPrecision();
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     * @return The precision.
-     */
-    int getPrecision();
-
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     * @return Whether the featureCollection field is set.
-     */
-    boolean hasFeatureCollection();
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     * @return The featureCollection.
-     */
-    Geobuf.Data.FeatureCollection getFeatureCollection();
-
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     * @return Whether the feature field is set.
-     */
-    boolean hasFeature();
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     * @return The feature.
-     */
-    Geobuf.Data.Feature getFeature();
-
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     * @return Whether the geometry field is set.
-     */
-    boolean hasGeometry();
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     * @return The geometry.
-     */
-    Geobuf.Data.Geometry getGeometry();
-
-    public Geobuf.Data.DataTypeCase getDataTypeCase();
-  }
-  /**
-   * Protobuf type {@code Data}
-   */
-  public  static final class Data extends
-      com.google.protobuf.GeneratedMessageLite<
-          Data, Data.Builder> implements
-      // @@protoc_insertion_point(message_implements:Data)
-      DataOrBuilder {
-    private Data() {
-      keys_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-      dimensions_ = 2;
-      precision_ = 6;
-    }
-    public interface FeatureOrBuilder extends
-        // @@protoc_insertion_point(interface_extends:Data.Feature)
-        com.google.protobuf.MessageLiteOrBuilder {
-
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       * @return Whether the geometry field is set.
-       */
-      boolean hasGeometry();
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       * @return The geometry.
-       */
-      Geobuf.Data.Geometry getGeometry();
-
-      /**
-       * <code>string id = 11;</code>
-       * @return Whether the id field is set.
-       */
-      boolean hasId();
-      /**
-       * <code>string id = 11;</code>
-       * @return The id.
-       */
-      java.lang.String getId();
-      /**
-       * <code>string id = 11;</code>
-       * @return The bytes for id.
-       */
-      com.google.protobuf.ByteString
-          getIdBytes();
-
-      /**
-       * <code>sint64 int_id = 12;</code>
-       * @return Whether the intId field is set.
-       */
-      boolean hasIntId();
-      /**
-       * <code>sint64 int_id = 12;</code>
-       * @return The intId.
-       */
-      long getIntId();
-
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      java.util.List<Geobuf.Data.Value> 
-          getValuesList();
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      Geobuf.Data.Value getValues(int index);
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      int getValuesCount();
-
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @return A list containing the properties.
-       */
-      java.util.List<java.lang.Integer> getPropertiesList();
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @return The count of properties.
-       */
-      int getPropertiesCount();
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The properties at the given index.
-       */
-      int getProperties(int index);
-
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      java.util.List<java.lang.Integer> getCustomPropertiesList();
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      int getCustomPropertiesCount();
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      int getCustomProperties(int index);
-
-      public Geobuf.Data.Feature.IdTypeCase getIdTypeCase();
-    }
-    /**
-     * Protobuf type {@code Data.Feature}
-     */
-    public  static final class Feature extends
-        com.google.protobuf.GeneratedMessageLite<
-            Feature, Feature.Builder> implements
-        // @@protoc_insertion_point(message_implements:Data.Feature)
-        FeatureOrBuilder {
-      private Feature() {
-        values_ = emptyProtobufList();
-        properties_ = emptyIntList();
-        customProperties_ = emptyIntList();
-      }
-      private int bitField0_;
-      private int idTypeCase_ = 0;
-      private java.lang.Object idType_;
-      public enum IdTypeCase {
-        ID(11),
-        INT_ID(12),
-        IDTYPE_NOT_SET(0);
-        private final int value;
-        private IdTypeCase(int value) {
-          this.value = value;
-        }
         /**
-         * @deprecated Use {@link #forNumber(int)} instead.
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @return A list containing the keys.
          */
-        @java.lang.Deprecated
-        public static IdTypeCase valueOf(int value) {
-          return forNumber(value);
+        java.util.List<java.lang.String> getKeysList();
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @return The count of keys.
+         */
+        int getKeysCount();
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param index The index of the element to return.
+         * @return The keys at the given index.
+         */
+        java.lang.String getKeys(int index);
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param index The index of the element to return.
+         * @return The keys at the given index.
+         */
+        com.google.protobuf.ByteString getKeysBytes(int index);
+
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         *
+         * @return Whether the dimensions field is set.
+         */
+        boolean hasDimensions();
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         *
+         * @return The dimensions.
+         */
+        int getDimensions();
+
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         *
+         * @return Whether the precision field is set.
+         */
+        boolean hasPrecision();
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         *
+         * @return The precision.
+         */
+        int getPrecision();
+
+        /**
+         * <code>.Data.FeatureCollection feature_collection = 4;</code>
+         *
+         * @return Whether the featureCollection field is set.
+         */
+        boolean hasFeatureCollection();
+        /**
+         * <code>.Data.FeatureCollection feature_collection = 4;</code>
+         *
+         * @return The featureCollection.
+         */
+        Geobuf.Data.FeatureCollection getFeatureCollection();
+
+        /**
+         * <code>.Data.Feature feature = 5;</code>
+         *
+         * @return Whether the feature field is set.
+         */
+        boolean hasFeature();
+        /**
+         * <code>.Data.Feature feature = 5;</code>
+         *
+         * @return The feature.
+         */
+        Geobuf.Data.Feature getFeature();
+
+        /**
+         * <code>.Data.Geometry geometry = 6;</code>
+         *
+         * @return Whether the geometry field is set.
+         */
+        boolean hasGeometry();
+        /**
+         * <code>.Data.Geometry geometry = 6;</code>
+         *
+         * @return The geometry.
+         */
+        Geobuf.Data.Geometry getGeometry();
+
+        public Geobuf.Data.DataTypeCase getDataTypeCase();
+    }
+    /** Protobuf type {@code Data} */
+    public static final class Data
+            extends com.google.protobuf.GeneratedMessageLite<Data, Data.Builder>
+            implements
+            // @@protoc_insertion_point(message_implements:Data)
+            DataOrBuilder {
+        private Data() {
+            keys_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+            dimensions_ = 2;
+            precision_ = 6;
         }
 
-        public static IdTypeCase forNumber(int value) {
-          switch (value) {
-            case 11: return ID;
-            case 12: return INT_ID;
-            case 0: return IDTYPE_NOT_SET;
-            default: return null;
-          }
+        public interface FeatureOrBuilder
+                extends
+                // @@protoc_insertion_point(interface_extends:Data.Feature)
+                com.google.protobuf.MessageLiteOrBuilder {
+
+            /**
+             * <code>required .Data.Geometry geometry = 1;</code>
+             *
+             * @return Whether the geometry field is set.
+             */
+            boolean hasGeometry();
+            /**
+             * <code>required .Data.Geometry geometry = 1;</code>
+             *
+             * @return The geometry.
+             */
+            Geobuf.Data.Geometry getGeometry();
+
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return Whether the id field is set.
+             */
+            boolean hasId();
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return The id.
+             */
+            java.lang.String getId();
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return The bytes for id.
+             */
+            com.google.protobuf.ByteString getIdBytes();
+
+            /**
+             * <code>sint64 int_id = 12;</code>
+             *
+             * @return Whether the intId field is set.
+             */
+            boolean hasIntId();
+            /**
+             * <code>sint64 int_id = 12;</code>
+             *
+             * @return The intId.
+             */
+            long getIntId();
+
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            java.util.List<Geobuf.Data.Value> getValuesList();
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            Geobuf.Data.Value getValues(int index);
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            int getValuesCount();
+
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @return A list containing the properties.
+             */
+            java.util.List<java.lang.Integer> getPropertiesList();
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @return The count of properties.
+             */
+            int getPropertiesCount();
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The properties at the given index.
+             */
+            int getProperties(int index);
+
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            java.util.List<java.lang.Integer> getCustomPropertiesList();
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            int getCustomPropertiesCount();
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            int getCustomProperties(int index);
+
+            public Geobuf.Data.Feature.IdTypeCase getIdTypeCase();
         }
-        public int getNumber() {
-          return this.value;
+        /** Protobuf type {@code Data.Feature} */
+        public static final class Feature
+                extends com.google.protobuf.GeneratedMessageLite<Feature, Feature.Builder>
+                implements
+                // @@protoc_insertion_point(message_implements:Data.Feature)
+                FeatureOrBuilder {
+            private Feature() {
+                values_ = emptyProtobufList();
+                properties_ = emptyIntList();
+                customProperties_ = emptyIntList();
+            }
+
+            private int bitField0_;
+            private int idTypeCase_ = 0;
+            private java.lang.Object idType_;
+
+            public enum IdTypeCase {
+                ID(11),
+                INT_ID(12),
+                IDTYPE_NOT_SET(0);
+                private final int value;
+
+                private IdTypeCase(int value) {
+                    this.value = value;
+                }
+                /** @deprecated Use {@link #forNumber(int)} instead. */
+                @java.lang.Deprecated
+                public static IdTypeCase valueOf(int value) {
+                    return forNumber(value);
+                }
+
+                public static IdTypeCase forNumber(int value) {
+                    switch (value) {
+                        case 11:
+                            return ID;
+                        case 12:
+                            return INT_ID;
+                        case 0:
+                            return IDTYPE_NOT_SET;
+                        default:
+                            return null;
+                    }
+                }
+
+                public int getNumber() {
+                    return this.value;
+                }
+            };
+
+            @java.lang.Override
+            public IdTypeCase getIdTypeCase() {
+                return IdTypeCase.forNumber(idTypeCase_);
+            }
+
+            private void clearIdType() {
+                idTypeCase_ = 0;
+                idType_ = null;
+            }
+
+            public static final int GEOMETRY_FIELD_NUMBER = 1;
+            private Geobuf.Data.Geometry geometry_;
+            /** <code>required .Data.Geometry geometry = 1;</code> */
+            @java.lang.Override
+            public boolean hasGeometry() {
+                return ((bitField0_ & 0x00000001) != 0);
+            }
+            /** <code>required .Data.Geometry geometry = 1;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Geometry getGeometry() {
+                return geometry_ == null ? Geobuf.Data.Geometry.getDefaultInstance() : geometry_;
+            }
+            /** <code>required .Data.Geometry geometry = 1;</code> */
+            private void setGeometry(Geobuf.Data.Geometry value) {
+                value.getClass();
+                geometry_ = value;
+                bitField0_ |= 0x00000001;
+            }
+            /** <code>required .Data.Geometry geometry = 1;</code> */
+            @java.lang.SuppressWarnings({"ReferenceEquality"})
+            private void mergeGeometry(Geobuf.Data.Geometry value) {
+                value.getClass();
+                if (geometry_ != null && geometry_ != Geobuf.Data.Geometry.getDefaultInstance()) {
+                    geometry_ =
+                            Geobuf.Data.Geometry.newBuilder(geometry_)
+                                    .mergeFrom(value)
+                                    .buildPartial();
+                } else {
+                    geometry_ = value;
+                }
+                bitField0_ |= 0x00000001;
+            }
+            /** <code>required .Data.Geometry geometry = 1;</code> */
+            private void clearGeometry() {
+                geometry_ = null;
+                bitField0_ = (bitField0_ & ~0x00000001);
+            }
+
+            public static final int ID_FIELD_NUMBER = 11;
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return Whether the id field is set.
+             */
+            @java.lang.Override
+            public boolean hasId() {
+                return idTypeCase_ == 11;
+            }
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return The id.
+             */
+            @java.lang.Override
+            public java.lang.String getId() {
+                java.lang.String ref = "";
+                if (idTypeCase_ == 11) {
+                    ref = (java.lang.String) idType_;
+                }
+                return ref;
+            }
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @return The bytes for id.
+             */
+            @java.lang.Override
+            public com.google.protobuf.ByteString getIdBytes() {
+                java.lang.String ref = "";
+                if (idTypeCase_ == 11) {
+                    ref = (java.lang.String) idType_;
+                }
+                return com.google.protobuf.ByteString.copyFromUtf8(ref);
+            }
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @param value The id to set.
+             */
+            private void setId(java.lang.String value) {
+                value.getClass();
+                idTypeCase_ = 11;
+                idType_ = value;
+            }
+            /** <code>string id = 11;</code> */
+            private void clearId() {
+                if (idTypeCase_ == 11) {
+                    idTypeCase_ = 0;
+                    idType_ = null;
+                }
+            }
+            /**
+             * <code>string id = 11;</code>
+             *
+             * @param value The bytes for id to set.
+             */
+            private void setIdBytes(com.google.protobuf.ByteString value) {
+                idType_ = value.toStringUtf8();
+                idTypeCase_ = 11;
+            }
+
+            public static final int INT_ID_FIELD_NUMBER = 12;
+            /**
+             * <code>sint64 int_id = 12;</code>
+             *
+             * @return Whether the intId field is set.
+             */
+            @java.lang.Override
+            public boolean hasIntId() {
+                return idTypeCase_ == 12;
+            }
+            /**
+             * <code>sint64 int_id = 12;</code>
+             *
+             * @return The intId.
+             */
+            @java.lang.Override
+            public long getIntId() {
+                if (idTypeCase_ == 12) {
+                    return (java.lang.Long) idType_;
+                }
+                return 0L;
+            }
+            /**
+             * <code>sint64 int_id = 12;</code>
+             *
+             * @param value The intId to set.
+             */
+            private void setIntId(long value) {
+                idTypeCase_ = 12;
+                idType_ = value;
+            }
+            /** <code>sint64 int_id = 12;</code> */
+            private void clearIntId() {
+                if (idTypeCase_ == 12) {
+                    idTypeCase_ = 0;
+                    idType_ = null;
+                }
+            }
+
+            public static final int VALUES_FIELD_NUMBER = 13;
+            private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            @java.lang.Override
+            public java.util.List<Geobuf.Data.Value> getValuesList() {
+                return values_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            public java.util.List<? extends Geobuf.Data.ValueOrBuilder> getValuesOrBuilderList() {
+                return values_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            @java.lang.Override
+            public int getValuesCount() {
+                return values_.size();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            @java.lang.Override
+            public Geobuf.Data.Value getValues(int index) {
+                return values_.get(index);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(int index) {
+                return values_.get(index);
+            }
+
+            private void ensureValuesIsMutable() {
+                com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
+                if (!tmp.isModifiable()) {
+                    values_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void setValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.set(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void addValues(Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void addValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void addAllValues(java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                ensureValuesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, values_);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void clearValues() {
+                values_ = emptyProtobufList();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * unique values
+             * </pre>
+             *
+             * <code>repeated .Data.Value values = 13;</code>
+             */
+            private void removeValues(int index) {
+                ensureValuesIsMutable();
+                values_.remove(index);
+            }
+
+            public static final int PROPERTIES_FIELD_NUMBER = 14;
+            private com.google.protobuf.Internal.IntList properties_;
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @return A list containing the properties.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Integer> getPropertiesList() {
+                return properties_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @return The count of properties.
+             */
+            @java.lang.Override
+            public int getPropertiesCount() {
+                return properties_.size();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The properties at the given index.
+             */
+            @java.lang.Override
+            public int getProperties(int index) {
+                return properties_.getInt(index);
+            }
+
+            private int propertiesMemoizedSerializedSize = -1;
+
+            private void ensurePropertiesIsMutable() {
+                com.google.protobuf.Internal.IntList tmp = properties_;
+                if (!tmp.isModifiable()) {
+                    properties_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The properties to set.
+             */
+            private void setProperties(int index, int value) {
+                ensurePropertiesIsMutable();
+                properties_.setInt(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @param value The properties to add.
+             */
+            private void addProperties(int value) {
+                ensurePropertiesIsMutable();
+                properties_.addInt(value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             *
+             * @param values The properties to add.
+             */
+            private void addAllProperties(java.lang.Iterable<? extends java.lang.Integer> values) {
+                ensurePropertiesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, properties_);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * pairs of key/value indexes
+             * </pre>
+             *
+             * <code>repeated uint32 properties = 14 [packed = true];</code>
+             */
+            private void clearProperties() {
+                properties_ = emptyIntList();
+            }
+
+            public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
+            private com.google.protobuf.Internal.IntList customProperties_;
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                return customProperties_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            @java.lang.Override
+            public int getCustomPropertiesCount() {
+                return customProperties_.size();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            @java.lang.Override
+            public int getCustomProperties(int index) {
+                return customProperties_.getInt(index);
+            }
+
+            private int customPropertiesMemoizedSerializedSize = -1;
+
+            private void ensureCustomPropertiesIsMutable() {
+                com.google.protobuf.Internal.IntList tmp = customProperties_;
+                if (!tmp.isModifiable()) {
+                    customProperties_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The customProperties to set.
+             */
+            private void setCustomProperties(int index, int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.setInt(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param value The customProperties to add.
+             */
+            private void addCustomProperties(int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.addInt(value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param values The customProperties to add.
+             */
+            private void addAllCustomProperties(
+                    java.lang.Iterable<? extends java.lang.Integer> values) {
+                ensureCustomPropertiesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, customProperties_);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * arbitrary properties
+             * </pre>
+             *
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             */
+            private void clearCustomProperties() {
+                customProperties_ = emptyIntList();
+            }
+
+            public static Geobuf.Data.Feature parseFrom(java.nio.ByteBuffer data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(
+                    java.nio.ByteBuffer data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(com.google.protobuf.ByteString data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(
+                    com.google.protobuf.ByteString data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(byte[] data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(
+                    byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Feature parseDelimitedFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Feature parseDelimitedFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(com.google.protobuf.CodedInputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Feature parseFrom(
+                    com.google.protobuf.CodedInputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Builder newBuilder() {
+                return (Builder) DEFAULT_INSTANCE.createBuilder();
+            }
+
+            public static Builder newBuilder(Geobuf.Data.Feature prototype) {
+                return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
+            }
+
+            /** Protobuf type {@code Data.Feature} */
+            public static final class Builder
+                    extends com.google.protobuf.GeneratedMessageLite.Builder<
+                            Geobuf.Data.Feature, Builder>
+                    implements
+                    // @@protoc_insertion_point(builder_implements:Data.Feature)
+                    Geobuf.Data.FeatureOrBuilder {
+                // Construct using Geobuf.Data.Feature.newBuilder()
+                private Builder() {
+                    super(DEFAULT_INSTANCE);
+                }
+
+                @java.lang.Override
+                public IdTypeCase getIdTypeCase() {
+                    return instance.getIdTypeCase();
+                }
+
+                public Builder clearIdType() {
+                    copyOnWrite();
+                    instance.clearIdType();
+                    return this;
+                }
+
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                @java.lang.Override
+                public boolean hasGeometry() {
+                    return instance.hasGeometry();
+                }
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                @java.lang.Override
+                public Geobuf.Data.Geometry getGeometry() {
+                    return instance.getGeometry();
+                }
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                public Builder setGeometry(Geobuf.Data.Geometry value) {
+                    copyOnWrite();
+                    instance.setGeometry(value);
+                    return this;
+                }
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                public Builder setGeometry(Geobuf.Data.Geometry.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setGeometry(builderForValue.build());
+                    return this;
+                }
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                public Builder mergeGeometry(Geobuf.Data.Geometry value) {
+                    copyOnWrite();
+                    instance.mergeGeometry(value);
+                    return this;
+                }
+                /** <code>required .Data.Geometry geometry = 1;</code> */
+                public Builder clearGeometry() {
+                    copyOnWrite();
+                    instance.clearGeometry();
+                    return this;
+                }
+
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @return Whether the id field is set.
+                 */
+                @java.lang.Override
+                public boolean hasId() {
+                    return instance.hasId();
+                }
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @return The id.
+                 */
+                @java.lang.Override
+                public java.lang.String getId() {
+                    return instance.getId();
+                }
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @return The bytes for id.
+                 */
+                @java.lang.Override
+                public com.google.protobuf.ByteString getIdBytes() {
+                    return instance.getIdBytes();
+                }
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @param value The id to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setId(java.lang.String value) {
+                    copyOnWrite();
+                    instance.setId(value);
+                    return this;
+                }
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearId() {
+                    copyOnWrite();
+                    instance.clearId();
+                    return this;
+                }
+                /**
+                 * <code>string id = 11;</code>
+                 *
+                 * @param value The bytes for id to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setIdBytes(com.google.protobuf.ByteString value) {
+                    copyOnWrite();
+                    instance.setIdBytes(value);
+                    return this;
+                }
+
+                /**
+                 * <code>sint64 int_id = 12;</code>
+                 *
+                 * @return Whether the intId field is set.
+                 */
+                @java.lang.Override
+                public boolean hasIntId() {
+                    return instance.hasIntId();
+                }
+                /**
+                 * <code>sint64 int_id = 12;</code>
+                 *
+                 * @return The intId.
+                 */
+                @java.lang.Override
+                public long getIntId() {
+                    return instance.getIntId();
+                }
+                /**
+                 * <code>sint64 int_id = 12;</code>
+                 *
+                 * @param value The intId to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setIntId(long value) {
+                    copyOnWrite();
+                    instance.setIntId(value);
+                    return this;
+                }
+                /**
+                 * <code>sint64 int_id = 12;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearIntId() {
+                    copyOnWrite();
+                    instance.clearIntId();
+                    return this;
+                }
+
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                @java.lang.Override
+                public java.util.List<Geobuf.Data.Value> getValuesList() {
+                    return java.util.Collections.unmodifiableList(instance.getValuesList());
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                @java.lang.Override
+                public int getValuesCount() {
+                    return instance.getValuesCount();
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+
+                @java.lang.Override
+                public Geobuf.Data.Value getValues(int index) {
+                    return instance.getValues(index);
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder setValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.setValues(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder setValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setValues(index, builderForValue.build());
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder addValues(Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder addValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder addValues(Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(builderForValue.build());
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder addValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(index, builderForValue.build());
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder addAllValues(
+                        java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                    copyOnWrite();
+                    instance.addAllValues(values);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder clearValues() {
+                    copyOnWrite();
+                    instance.clearValues();
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * unique values
+                 * </pre>
+                 *
+                 * <code>repeated .Data.Value values = 13;</code>
+                 */
+                public Builder removeValues(int index) {
+                    copyOnWrite();
+                    instance.removeValues(index);
+                    return this;
+                }
+
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @return A list containing the properties.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Integer> getPropertiesList() {
+                    return java.util.Collections.unmodifiableList(instance.getPropertiesList());
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @return The count of properties.
+                 */
+                @java.lang.Override
+                public int getPropertiesCount() {
+                    return instance.getPropertiesCount();
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The properties at the given index.
+                 */
+                @java.lang.Override
+                public int getProperties(int index) {
+                    return instance.getProperties(index);
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @param value The properties to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setProperties(int index, int value) {
+                    copyOnWrite();
+                    instance.setProperties(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @param value The properties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addProperties(int value) {
+                    copyOnWrite();
+                    instance.addProperties(value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @param values The properties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllProperties(
+                        java.lang.Iterable<? extends java.lang.Integer> values) {
+                    copyOnWrite();
+                    instance.addAllProperties(values);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * pairs of key/value indexes
+                 * </pre>
+                 *
+                 * <code>repeated uint32 properties = 14 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearProperties() {
+                    copyOnWrite();
+                    instance.clearProperties();
+                    return this;
+                }
+
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return A list containing the customProperties.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                    return java.util.Collections.unmodifiableList(
+                            instance.getCustomPropertiesList());
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return The count of customProperties.
+                 */
+                @java.lang.Override
+                public int getCustomPropertiesCount() {
+                    return instance.getCustomPropertiesCount();
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The customProperties at the given index.
+                 */
+                @java.lang.Override
+                public int getCustomProperties(int index) {
+                    return instance.getCustomProperties(index);
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setCustomProperties(int index, int value) {
+                    copyOnWrite();
+                    instance.setCustomProperties(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addCustomProperties(int value) {
+                    copyOnWrite();
+                    instance.addCustomProperties(value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param values The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllCustomProperties(
+                        java.lang.Iterable<? extends java.lang.Integer> values) {
+                    copyOnWrite();
+                    instance.addAllCustomProperties(values);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * arbitrary properties
+                 * </pre>
+                 *
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearCustomProperties() {
+                    copyOnWrite();
+                    instance.clearCustomProperties();
+                    return this;
+                }
+
+                // @@protoc_insertion_point(builder_scope:Data.Feature)
+            }
+
+            private byte memoizedIsInitialized = 2;
+
+            @java.lang.Override
+            @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
+            protected final java.lang.Object dynamicMethod(
+                    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+                    java.lang.Object arg0,
+                    java.lang.Object arg1) {
+                switch (method) {
+                    case NEW_MUTABLE_INSTANCE:
+                        {
+                            return new Geobuf.Data.Feature();
+                        }
+                    case NEW_BUILDER:
+                        {
+                            return new Builder();
+                        }
+                    case BUILD_MESSAGE_INFO:
+                        {
+                            java.lang.Object[] objects =
+                                    new java.lang.Object[] {
+                                        "idType_",
+                                        "idTypeCase_",
+                                        "bitField0_",
+                                        "geometry_",
+                                        "values_",
+                                        Geobuf.Data.Value.class,
+                                        "properties_",
+                                        "customProperties_",
+                                    };
+                            java.lang.String info =
+                                    "\u0001\u0006\u0001\u0001\u0001\u000f\u0006\u0000\u0003\u0001\u0001\u1509\u0000\u000b\u103b\u0000\f\u1043\u0000\r"
+                                        + "\u001b\u000e+\u000f+";
+                            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                        }
+                        // fall through
+                    case GET_DEFAULT_INSTANCE:
+                        {
+                            return DEFAULT_INSTANCE;
+                        }
+                    case GET_PARSER:
+                        {
+                            com.google.protobuf.Parser<Geobuf.Data.Feature> parser = PARSER;
+                            if (parser == null) {
+                                synchronized (Geobuf.Data.Feature.class) {
+                                    parser = PARSER;
+                                    if (parser == null) {
+                                        parser =
+                                                new DefaultInstanceBasedParser<Geobuf.Data.Feature>(
+                                                        DEFAULT_INSTANCE);
+                                        PARSER = parser;
+                                    }
+                                }
+                            }
+                            return parser;
+                        }
+                    case GET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            return memoizedIsInitialized;
+                        }
+                    case SET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
+                            return null;
+                        }
+                }
+                throw new UnsupportedOperationException();
+            }
+
+            // @@protoc_insertion_point(class_scope:Data.Feature)
+            private static final Geobuf.Data.Feature DEFAULT_INSTANCE;
+
+            static {
+                Feature defaultInstance = new Feature();
+                // New instances are implicitly immutable so no need to make
+                // immutable.
+                DEFAULT_INSTANCE = defaultInstance;
+                com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                        Feature.class, defaultInstance);
+            }
+
+            public static Geobuf.Data.Feature getDefaultInstance() {
+                return DEFAULT_INSTANCE;
+            }
+
+            private static volatile com.google.protobuf.Parser<Feature> PARSER;
+
+            public static com.google.protobuf.Parser<Feature> parser() {
+                return DEFAULT_INSTANCE.getParserForType();
+            }
         }
-      };
 
-      @java.lang.Override
-      public IdTypeCase
-      getIdTypeCase() {
-        return IdTypeCase.forNumber(
-            idTypeCase_);
-      }
+        public interface GeometryOrBuilder
+                extends
+                // @@protoc_insertion_point(interface_extends:Data.Geometry)
+                com.google.protobuf.MessageLiteOrBuilder {
 
-      private void clearIdType() {
-        idTypeCase_ = 0;
-        idType_ = null;
-      }
+            /**
+             * <code>required .Data.Geometry.Type type = 1;</code>
+             *
+             * @return Whether the type field is set.
+             */
+            boolean hasType();
+            /**
+             * <code>required .Data.Geometry.Type type = 1;</code>
+             *
+             * @return The type.
+             */
+            Geobuf.Data.Geometry.Type getType();
 
-      public static final int GEOMETRY_FIELD_NUMBER = 1;
-      private Geobuf.Data.Geometry geometry_;
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasGeometry() {
-        return ((bitField0_ & 0x00000001) != 0);
-      }
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Geometry getGeometry() {
-        return geometry_ == null ? Geobuf.Data.Geometry.getDefaultInstance() : geometry_;
-      }
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       */
-      private void setGeometry(Geobuf.Data.Geometry value) {
-        value.getClass();
-  geometry_ = value;
-        bitField0_ |= 0x00000001;
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @return A list containing the lengths.
+             */
+            java.util.List<java.lang.Integer> getLengthsList();
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @return The count of lengths.
+             */
+            int getLengthsCount();
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The lengths at the given index.
+             */
+            int getLengths(int index);
+
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @return A list containing the coords.
+             */
+            java.util.List<java.lang.Long> getCoordsList();
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @return The count of coords.
+             */
+            int getCoordsCount();
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The coords at the given index.
+             */
+            long getCoords(int index);
+
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            java.util.List<Geobuf.Data.Geometry> getGeometriesList();
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            Geobuf.Data.Geometry getGeometries(int index);
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            int getGeometriesCount();
+
+            /** <code>repeated .Data.Value values = 13;</code> */
+            java.util.List<Geobuf.Data.Value> getValuesList();
+            /** <code>repeated .Data.Value values = 13;</code> */
+            Geobuf.Data.Value getValues(int index);
+            /** <code>repeated .Data.Value values = 13;</code> */
+            int getValuesCount();
+
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            java.util.List<java.lang.Integer> getCustomPropertiesList();
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            int getCustomPropertiesCount();
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            int getCustomProperties(int index);
         }
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       */
-      @java.lang.SuppressWarnings({"ReferenceEquality"})
-      private void mergeGeometry(Geobuf.Data.Geometry value) {
-        value.getClass();
-  if (geometry_ != null &&
-            geometry_ != Geobuf.Data.Geometry.getDefaultInstance()) {
-          geometry_ =
-            Geobuf.Data.Geometry.newBuilder(geometry_).mergeFrom(value).buildPartial();
-        } else {
-          geometry_ = value;
+        /** Protobuf type {@code Data.Geometry} */
+        public static final class Geometry
+                extends com.google.protobuf.GeneratedMessageLite<Geometry, Geometry.Builder>
+                implements
+                // @@protoc_insertion_point(message_implements:Data.Geometry)
+                GeometryOrBuilder {
+            private Geometry() {
+                lengths_ = emptyIntList();
+                coords_ = emptyLongList();
+                geometries_ = emptyProtobufList();
+                values_ = emptyProtobufList();
+                customProperties_ = emptyIntList();
+            }
+            /** Protobuf enum {@code Data.Geometry.Type} */
+            public enum Type implements com.google.protobuf.Internal.EnumLite {
+                /** <code>POINT = 0;</code> */
+                POINT(0),
+                /** <code>MULTIPOINT = 1;</code> */
+                MULTIPOINT(1),
+                /** <code>LINESTRING = 2;</code> */
+                LINESTRING(2),
+                /** <code>MULTILINESTRING = 3;</code> */
+                MULTILINESTRING(3),
+                /** <code>POLYGON = 4;</code> */
+                POLYGON(4),
+                /** <code>MULTIPOLYGON = 5;</code> */
+                MULTIPOLYGON(5),
+                /** <code>GEOMETRYCOLLECTION = 6;</code> */
+                GEOMETRYCOLLECTION(6),
+                ;
+
+                /** <code>POINT = 0;</code> */
+                public static final int POINT_VALUE = 0;
+                /** <code>MULTIPOINT = 1;</code> */
+                public static final int MULTIPOINT_VALUE = 1;
+                /** <code>LINESTRING = 2;</code> */
+                public static final int LINESTRING_VALUE = 2;
+                /** <code>MULTILINESTRING = 3;</code> */
+                public static final int MULTILINESTRING_VALUE = 3;
+                /** <code>POLYGON = 4;</code> */
+                public static final int POLYGON_VALUE = 4;
+                /** <code>MULTIPOLYGON = 5;</code> */
+                public static final int MULTIPOLYGON_VALUE = 5;
+                /** <code>GEOMETRYCOLLECTION = 6;</code> */
+                public static final int GEOMETRYCOLLECTION_VALUE = 6;
+
+                @java.lang.Override
+                public final int getNumber() {
+                    return value;
+                }
+
+                /**
+                 * @param value The number of the enum to look for.
+                 * @return The enum associated with the given number.
+                 * @deprecated Use {@link #forNumber(int)} instead.
+                 */
+                @java.lang.Deprecated
+                public static Type valueOf(int value) {
+                    return forNumber(value);
+                }
+
+                public static Type forNumber(int value) {
+                    switch (value) {
+                        case 0:
+                            return POINT;
+                        case 1:
+                            return MULTIPOINT;
+                        case 2:
+                            return LINESTRING;
+                        case 3:
+                            return MULTILINESTRING;
+                        case 4:
+                            return POLYGON;
+                        case 5:
+                            return MULTIPOLYGON;
+                        case 6:
+                            return GEOMETRYCOLLECTION;
+                        default:
+                            return null;
+                    }
+                }
+
+                public static com.google.protobuf.Internal.EnumLiteMap<Type> internalGetValueMap() {
+                    return internalValueMap;
+                }
+
+                private static final com.google.protobuf.Internal.EnumLiteMap<Type>
+                        internalValueMap =
+                                new com.google.protobuf.Internal.EnumLiteMap<Type>() {
+                                    @java.lang.Override
+                                    public Type findValueByNumber(int number) {
+                                        return Type.forNumber(number);
+                                    }
+                                };
+
+                public static com.google.protobuf.Internal.EnumVerifier internalGetVerifier() {
+                    return TypeVerifier.INSTANCE;
+                }
+
+                private static final class TypeVerifier
+                        implements com.google.protobuf.Internal.EnumVerifier {
+                    static final com.google.protobuf.Internal.EnumVerifier INSTANCE =
+                            new TypeVerifier();
+
+                    @java.lang.Override
+                    public boolean isInRange(int number) {
+                        return Type.forNumber(number) != null;
+                    }
+                }
+                ;
+
+                private final int value;
+
+                private Type(int value) {
+                    this.value = value;
+                }
+
+                // @@protoc_insertion_point(enum_scope:Data.Geometry.Type)
+            }
+
+            private int bitField0_;
+            public static final int TYPE_FIELD_NUMBER = 1;
+            private int type_;
+            /**
+             * <code>required .Data.Geometry.Type type = 1;</code>
+             *
+             * @return Whether the type field is set.
+             */
+            @java.lang.Override
+            public boolean hasType() {
+                return ((bitField0_ & 0x00000001) != 0);
+            }
+            /**
+             * <code>required .Data.Geometry.Type type = 1;</code>
+             *
+             * @return The type.
+             */
+            @java.lang.Override
+            public Geobuf.Data.Geometry.Type getType() {
+                Geobuf.Data.Geometry.Type result = Geobuf.Data.Geometry.Type.forNumber(type_);
+                return result == null ? Geobuf.Data.Geometry.Type.POINT : result;
+            }
+            /**
+             * <code>required .Data.Geometry.Type type = 1;</code>
+             *
+             * @param value The type to set.
+             */
+            private void setType(Geobuf.Data.Geometry.Type value) {
+                type_ = value.getNumber();
+                bitField0_ |= 0x00000001;
+            }
+            /** <code>required .Data.Geometry.Type type = 1;</code> */
+            private void clearType() {
+                bitField0_ = (bitField0_ & ~0x00000001);
+                type_ = 0;
+            }
+
+            public static final int LENGTHS_FIELD_NUMBER = 2;
+            private com.google.protobuf.Internal.IntList lengths_;
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @return A list containing the lengths.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Integer> getLengthsList() {
+                return lengths_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @return The count of lengths.
+             */
+            @java.lang.Override
+            public int getLengthsCount() {
+                return lengths_.size();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The lengths at the given index.
+             */
+            @java.lang.Override
+            public int getLengths(int index) {
+                return lengths_.getInt(index);
+            }
+
+            private int lengthsMemoizedSerializedSize = -1;
+
+            private void ensureLengthsIsMutable() {
+                com.google.protobuf.Internal.IntList tmp = lengths_;
+                if (!tmp.isModifiable()) {
+                    lengths_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The lengths to set.
+             */
+            private void setLengths(int index, int value) {
+                ensureLengthsIsMutable();
+                lengths_.setInt(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @param value The lengths to add.
+             */
+            private void addLengths(int value) {
+                ensureLengthsIsMutable();
+                lengths_.addInt(value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             *
+             * @param values The lengths to add.
+             */
+            private void addAllLengths(java.lang.Iterable<? extends java.lang.Integer> values) {
+                ensureLengthsIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, lengths_);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * coordinate structure in lengths
+             * </pre>
+             *
+             * <code>repeated uint32 lengths = 2 [packed = true];</code>
+             */
+            private void clearLengths() {
+                lengths_ = emptyIntList();
+            }
+
+            public static final int COORDS_FIELD_NUMBER = 3;
+            private com.google.protobuf.Internal.LongList coords_;
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @return A list containing the coords.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Long> getCoordsList() {
+                return coords_;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @return The count of coords.
+             */
+            @java.lang.Override
+            public int getCoordsCount() {
+                return coords_.size();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The coords at the given index.
+             */
+            @java.lang.Override
+            public long getCoords(int index) {
+                return coords_.getLong(index);
+            }
+
+            private int coordsMemoizedSerializedSize = -1;
+
+            private void ensureCoordsIsMutable() {
+                com.google.protobuf.Internal.LongList tmp = coords_;
+                if (!tmp.isModifiable()) {
+                    coords_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The coords to set.
+             */
+            private void setCoords(int index, long value) {
+                ensureCoordsIsMutable();
+                coords_.setLong(index, value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @param value The coords to add.
+             */
+            private void addCoords(long value) {
+                ensureCoordsIsMutable();
+                coords_.addLong(value);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             *
+             * @param values The coords to add.
+             */
+            private void addAllCoords(java.lang.Iterable<? extends java.lang.Long> values) {
+                ensureCoordsIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, coords_);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * delta-encoded integer values
+             * </pre>
+             *
+             * <code>repeated sint64 coords = 3 [packed = true];</code>
+             */
+            private void clearCoords() {
+                coords_ = emptyLongList();
+            }
+
+            public static final int GEOMETRIES_FIELD_NUMBER = 4;
+            private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Geometry> geometries_;
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            @java.lang.Override
+            public java.util.List<Geobuf.Data.Geometry> getGeometriesList() {
+                return geometries_;
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            public java.util.List<? extends Geobuf.Data.GeometryOrBuilder>
+                    getGeometriesOrBuilderList() {
+                return geometries_;
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            @java.lang.Override
+            public int getGeometriesCount() {
+                return geometries_.size();
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Geometry getGeometries(int index) {
+                return geometries_.get(index);
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            public Geobuf.Data.GeometryOrBuilder getGeometriesOrBuilder(int index) {
+                return geometries_.get(index);
+            }
+
+            private void ensureGeometriesIsMutable() {
+                com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Geometry> tmp = geometries_;
+                if (!tmp.isModifiable()) {
+                    geometries_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void setGeometries(int index, Geobuf.Data.Geometry value) {
+                value.getClass();
+                ensureGeometriesIsMutable();
+                geometries_.set(index, value);
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void addGeometries(Geobuf.Data.Geometry value) {
+                value.getClass();
+                ensureGeometriesIsMutable();
+                geometries_.add(value);
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void addGeometries(int index, Geobuf.Data.Geometry value) {
+                value.getClass();
+                ensureGeometriesIsMutable();
+                geometries_.add(index, value);
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void addAllGeometries(
+                    java.lang.Iterable<? extends Geobuf.Data.Geometry> values) {
+                ensureGeometriesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, geometries_);
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void clearGeometries() {
+                geometries_ = emptyProtobufList();
+            }
+            /** <code>repeated .Data.Geometry geometries = 4;</code> */
+            private void removeGeometries(int index) {
+                ensureGeometriesIsMutable();
+                geometries_.remove(index);
+            }
+
+            public static final int VALUES_FIELD_NUMBER = 13;
+            private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public java.util.List<Geobuf.Data.Value> getValuesList() {
+                return values_;
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            public java.util.List<? extends Geobuf.Data.ValueOrBuilder> getValuesOrBuilderList() {
+                return values_;
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public int getValuesCount() {
+                return values_.size();
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Value getValues(int index) {
+                return values_.get(index);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(int index) {
+                return values_.get(index);
+            }
+
+            private void ensureValuesIsMutable() {
+                com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
+                if (!tmp.isModifiable()) {
+                    values_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void setValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.set(index, value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addValues(Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(index, value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addAllValues(java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                ensureValuesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, values_);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void clearValues() {
+                values_ = emptyProtobufList();
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void removeValues(int index) {
+                ensureValuesIsMutable();
+                values_.remove(index);
+            }
+
+            public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
+            private com.google.protobuf.Internal.IntList customProperties_;
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                return customProperties_;
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            @java.lang.Override
+            public int getCustomPropertiesCount() {
+                return customProperties_.size();
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            @java.lang.Override
+            public int getCustomProperties(int index) {
+                return customProperties_.getInt(index);
+            }
+
+            private int customPropertiesMemoizedSerializedSize = -1;
+
+            private void ensureCustomPropertiesIsMutable() {
+                com.google.protobuf.Internal.IntList tmp = customProperties_;
+                if (!tmp.isModifiable()) {
+                    customProperties_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The customProperties to set.
+             */
+            private void setCustomProperties(int index, int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.setInt(index, value);
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param value The customProperties to add.
+             */
+            private void addCustomProperties(int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.addInt(value);
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param values The customProperties to add.
+             */
+            private void addAllCustomProperties(
+                    java.lang.Iterable<? extends java.lang.Integer> values) {
+                ensureCustomPropertiesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, customProperties_);
+            }
+            /** <code>repeated uint32 custom_properties = 15 [packed = true];</code> */
+            private void clearCustomProperties() {
+                customProperties_ = emptyIntList();
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(java.nio.ByteBuffer data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(
+                    java.nio.ByteBuffer data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(com.google.protobuf.ByteString data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(
+                    com.google.protobuf.ByteString data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(byte[] data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(
+                    byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Geometry parseDelimitedFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Geometry parseDelimitedFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(com.google.protobuf.CodedInputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Geometry parseFrom(
+                    com.google.protobuf.CodedInputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Builder newBuilder() {
+                return (Builder) DEFAULT_INSTANCE.createBuilder();
+            }
+
+            public static Builder newBuilder(Geobuf.Data.Geometry prototype) {
+                return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
+            }
+
+            /** Protobuf type {@code Data.Geometry} */
+            public static final class Builder
+                    extends com.google.protobuf.GeneratedMessageLite.Builder<
+                            Geobuf.Data.Geometry, Builder>
+                    implements
+                    // @@protoc_insertion_point(builder_implements:Data.Geometry)
+                    Geobuf.Data.GeometryOrBuilder {
+                // Construct using Geobuf.Data.Geometry.newBuilder()
+                private Builder() {
+                    super(DEFAULT_INSTANCE);
+                }
+
+                /**
+                 * <code>required .Data.Geometry.Type type = 1;</code>
+                 *
+                 * @return Whether the type field is set.
+                 */
+                @java.lang.Override
+                public boolean hasType() {
+                    return instance.hasType();
+                }
+                /**
+                 * <code>required .Data.Geometry.Type type = 1;</code>
+                 *
+                 * @return The type.
+                 */
+                @java.lang.Override
+                public Geobuf.Data.Geometry.Type getType() {
+                    return instance.getType();
+                }
+                /**
+                 * <code>required .Data.Geometry.Type type = 1;</code>
+                 *
+                 * @param value The enum numeric value on the wire for type to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setType(Geobuf.Data.Geometry.Type value) {
+                    copyOnWrite();
+                    instance.setType(value);
+                    return this;
+                }
+                /**
+                 * <code>required .Data.Geometry.Type type = 1;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearType() {
+                    copyOnWrite();
+                    instance.clearType();
+                    return this;
+                }
+
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @return A list containing the lengths.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Integer> getLengthsList() {
+                    return java.util.Collections.unmodifiableList(instance.getLengthsList());
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @return The count of lengths.
+                 */
+                @java.lang.Override
+                public int getLengthsCount() {
+                    return instance.getLengthsCount();
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The lengths at the given index.
+                 */
+                @java.lang.Override
+                public int getLengths(int index) {
+                    return instance.getLengths(index);
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @param value The lengths to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setLengths(int index, int value) {
+                    copyOnWrite();
+                    instance.setLengths(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @param value The lengths to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addLengths(int value) {
+                    copyOnWrite();
+                    instance.addLengths(value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @param values The lengths to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllLengths(
+                        java.lang.Iterable<? extends java.lang.Integer> values) {
+                    copyOnWrite();
+                    instance.addAllLengths(values);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * coordinate structure in lengths
+                 * </pre>
+                 *
+                 * <code>repeated uint32 lengths = 2 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearLengths() {
+                    copyOnWrite();
+                    instance.clearLengths();
+                    return this;
+                }
+
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @return A list containing the coords.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Long> getCoordsList() {
+                    return java.util.Collections.unmodifiableList(instance.getCoordsList());
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @return The count of coords.
+                 */
+                @java.lang.Override
+                public int getCoordsCount() {
+                    return instance.getCoordsCount();
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The coords at the given index.
+                 */
+                @java.lang.Override
+                public long getCoords(int index) {
+                    return instance.getCoords(index);
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @param value The coords to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setCoords(int index, long value) {
+                    copyOnWrite();
+                    instance.setCoords(index, value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @param value The coords to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addCoords(long value) {
+                    copyOnWrite();
+                    instance.addCoords(value);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @param values The coords to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllCoords(java.lang.Iterable<? extends java.lang.Long> values) {
+                    copyOnWrite();
+                    instance.addAllCoords(values);
+                    return this;
+                }
+                /**
+                 *
+                 *
+                 * <pre>
+                 * delta-encoded integer values
+                 * </pre>
+                 *
+                 * <code>repeated sint64 coords = 3 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearCoords() {
+                    copyOnWrite();
+                    instance.clearCoords();
+                    return this;
+                }
+
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                @java.lang.Override
+                public java.util.List<Geobuf.Data.Geometry> getGeometriesList() {
+                    return java.util.Collections.unmodifiableList(instance.getGeometriesList());
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                @java.lang.Override
+                public int getGeometriesCount() {
+                    return instance.getGeometriesCount();
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+
+                @java.lang.Override
+                public Geobuf.Data.Geometry getGeometries(int index) {
+                    return instance.getGeometries(index);
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder setGeometries(int index, Geobuf.Data.Geometry value) {
+                    copyOnWrite();
+                    instance.setGeometries(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder setGeometries(
+                        int index, Geobuf.Data.Geometry.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setGeometries(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder addGeometries(Geobuf.Data.Geometry value) {
+                    copyOnWrite();
+                    instance.addGeometries(value);
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder addGeometries(int index, Geobuf.Data.Geometry value) {
+                    copyOnWrite();
+                    instance.addGeometries(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder addGeometries(Geobuf.Data.Geometry.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addGeometries(builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder addGeometries(
+                        int index, Geobuf.Data.Geometry.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addGeometries(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder addAllGeometries(
+                        java.lang.Iterable<? extends Geobuf.Data.Geometry> values) {
+                    copyOnWrite();
+                    instance.addAllGeometries(values);
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder clearGeometries() {
+                    copyOnWrite();
+                    instance.clearGeometries();
+                    return this;
+                }
+                /** <code>repeated .Data.Geometry geometries = 4;</code> */
+                public Builder removeGeometries(int index) {
+                    copyOnWrite();
+                    instance.removeGeometries(index);
+                    return this;
+                }
+
+                /** <code>repeated .Data.Value values = 13;</code> */
+                @java.lang.Override
+                public java.util.List<Geobuf.Data.Value> getValuesList() {
+                    return java.util.Collections.unmodifiableList(instance.getValuesList());
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                @java.lang.Override
+                public int getValuesCount() {
+                    return instance.getValuesCount();
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+
+                @java.lang.Override
+                public Geobuf.Data.Value getValues(int index) {
+                    return instance.getValues(index);
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder setValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.setValues(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder setValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setValues(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addAllValues(
+                        java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                    copyOnWrite();
+                    instance.addAllValues(values);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder clearValues() {
+                    copyOnWrite();
+                    instance.clearValues();
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder removeValues(int index) {
+                    copyOnWrite();
+                    instance.removeValues(index);
+                    return this;
+                }
+
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return A list containing the customProperties.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                    return java.util.Collections.unmodifiableList(
+                            instance.getCustomPropertiesList());
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return The count of customProperties.
+                 */
+                @java.lang.Override
+                public int getCustomPropertiesCount() {
+                    return instance.getCustomPropertiesCount();
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The customProperties at the given index.
+                 */
+                @java.lang.Override
+                public int getCustomProperties(int index) {
+                    return instance.getCustomProperties(index);
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setCustomProperties(int index, int value) {
+                    copyOnWrite();
+                    instance.setCustomProperties(index, value);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addCustomProperties(int value) {
+                    copyOnWrite();
+                    instance.addCustomProperties(value);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param values The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllCustomProperties(
+                        java.lang.Iterable<? extends java.lang.Integer> values) {
+                    copyOnWrite();
+                    instance.addAllCustomProperties(values);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearCustomProperties() {
+                    copyOnWrite();
+                    instance.clearCustomProperties();
+                    return this;
+                }
+
+                // @@protoc_insertion_point(builder_scope:Data.Geometry)
+            }
+
+            private byte memoizedIsInitialized = 2;
+
+            @java.lang.Override
+            @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
+            protected final java.lang.Object dynamicMethod(
+                    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+                    java.lang.Object arg0,
+                    java.lang.Object arg1) {
+                switch (method) {
+                    case NEW_MUTABLE_INSTANCE:
+                        {
+                            return new Geobuf.Data.Geometry();
+                        }
+                    case NEW_BUILDER:
+                        {
+                            return new Builder();
+                        }
+                    case BUILD_MESSAGE_INFO:
+                        {
+                            java.lang.Object[] objects =
+                                    new java.lang.Object[] {
+                                        "bitField0_",
+                                        "type_",
+                                        Geobuf.Data.Geometry.Type.internalGetVerifier(),
+                                        "lengths_",
+                                        "coords_",
+                                        "geometries_",
+                                        Geobuf.Data.Geometry.class,
+                                        "values_",
+                                        Geobuf.Data.Value.class,
+                                        "customProperties_",
+                                    };
+                            java.lang.String info =
+                                    "\u0001\u0006\u0000\u0001\u0001\u000f\u0006\u0000\u0005\u0002\u0001\u150c\u0000\u0002+\u00030\u0004\u041b\r"
+                                        + "\u001b\u000f+";
+                            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                        }
+                        // fall through
+                    case GET_DEFAULT_INSTANCE:
+                        {
+                            return DEFAULT_INSTANCE;
+                        }
+                    case GET_PARSER:
+                        {
+                            com.google.protobuf.Parser<Geobuf.Data.Geometry> parser = PARSER;
+                            if (parser == null) {
+                                synchronized (Geobuf.Data.Geometry.class) {
+                                    parser = PARSER;
+                                    if (parser == null) {
+                                        parser =
+                                                new DefaultInstanceBasedParser<
+                                                        Geobuf.Data.Geometry>(DEFAULT_INSTANCE);
+                                        PARSER = parser;
+                                    }
+                                }
+                            }
+                            return parser;
+                        }
+                    case GET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            return memoizedIsInitialized;
+                        }
+                    case SET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
+                            return null;
+                        }
+                }
+                throw new UnsupportedOperationException();
+            }
+
+            // @@protoc_insertion_point(class_scope:Data.Geometry)
+            private static final Geobuf.Data.Geometry DEFAULT_INSTANCE;
+
+            static {
+                Geometry defaultInstance = new Geometry();
+                // New instances are implicitly immutable so no need to make
+                // immutable.
+                DEFAULT_INSTANCE = defaultInstance;
+                com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                        Geometry.class, defaultInstance);
+            }
+
+            public static Geobuf.Data.Geometry getDefaultInstance() {
+                return DEFAULT_INSTANCE;
+            }
+
+            private static volatile com.google.protobuf.Parser<Geometry> PARSER;
+
+            public static com.google.protobuf.Parser<Geometry> parser() {
+                return DEFAULT_INSTANCE.getParserForType();
+            }
         }
-        bitField0_ |= 0x00000001;
-      }
-      /**
-       * <code>required .Data.Geometry geometry = 1;</code>
-       */
-      private void clearGeometry() {  geometry_ = null;
-        bitField0_ = (bitField0_ & ~0x00000001);
-      }
 
-      public static final int ID_FIELD_NUMBER = 11;
-      /**
-       * <code>string id = 11;</code>
-       * @return Whether the id field is set.
-       */
-      @java.lang.Override
-      public boolean hasId() {
-        return idTypeCase_ == 11;
-      }
-      /**
-       * <code>string id = 11;</code>
-       * @return The id.
-       */
-      @java.lang.Override
-      public java.lang.String getId() {
-        java.lang.String ref = "";
-        if (idTypeCase_ == 11) {
-          ref = (java.lang.String) idType_;
+        public interface FeatureCollectionOrBuilder
+                extends
+                // @@protoc_insertion_point(interface_extends:Data.FeatureCollection)
+                com.google.protobuf.MessageLiteOrBuilder {
+
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            java.util.List<Geobuf.Data.Feature> getFeaturesList();
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            Geobuf.Data.Feature getFeatures(int index);
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            int getFeaturesCount();
+
+            /** <code>repeated .Data.Value values = 13;</code> */
+            java.util.List<Geobuf.Data.Value> getValuesList();
+            /** <code>repeated .Data.Value values = 13;</code> */
+            Geobuf.Data.Value getValues(int index);
+            /** <code>repeated .Data.Value values = 13;</code> */
+            int getValuesCount();
+
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            java.util.List<java.lang.Integer> getCustomPropertiesList();
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            int getCustomPropertiesCount();
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            int getCustomProperties(int index);
         }
-        return ref;
-      }
-      /**
-       * <code>string id = 11;</code>
-       * @return The bytes for id.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getIdBytes() {
-        java.lang.String ref = "";
-        if (idTypeCase_ == 11) {
-          ref = (java.lang.String) idType_;
+        /** Protobuf type {@code Data.FeatureCollection} */
+        public static final class FeatureCollection
+                extends com.google.protobuf.GeneratedMessageLite<
+                        FeatureCollection, FeatureCollection.Builder>
+                implements
+                // @@protoc_insertion_point(message_implements:Data.FeatureCollection)
+                FeatureCollectionOrBuilder {
+            private FeatureCollection() {
+                features_ = emptyProtobufList();
+                values_ = emptyProtobufList();
+                customProperties_ = emptyIntList();
+            }
+
+            public static final int FEATURES_FIELD_NUMBER = 1;
+            private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Feature> features_;
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            @java.lang.Override
+            public java.util.List<Geobuf.Data.Feature> getFeaturesList() {
+                return features_;
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            public java.util.List<? extends Geobuf.Data.FeatureOrBuilder>
+                    getFeaturesOrBuilderList() {
+                return features_;
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            @java.lang.Override
+            public int getFeaturesCount() {
+                return features_.size();
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Feature getFeatures(int index) {
+                return features_.get(index);
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            public Geobuf.Data.FeatureOrBuilder getFeaturesOrBuilder(int index) {
+                return features_.get(index);
+            }
+
+            private void ensureFeaturesIsMutable() {
+                com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Feature> tmp = features_;
+                if (!tmp.isModifiable()) {
+                    features_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void setFeatures(int index, Geobuf.Data.Feature value) {
+                value.getClass();
+                ensureFeaturesIsMutable();
+                features_.set(index, value);
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void addFeatures(Geobuf.Data.Feature value) {
+                value.getClass();
+                ensureFeaturesIsMutable();
+                features_.add(value);
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void addFeatures(int index, Geobuf.Data.Feature value) {
+                value.getClass();
+                ensureFeaturesIsMutable();
+                features_.add(index, value);
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void addAllFeatures(java.lang.Iterable<? extends Geobuf.Data.Feature> values) {
+                ensureFeaturesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, features_);
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void clearFeatures() {
+                features_ = emptyProtobufList();
+            }
+            /** <code>repeated .Data.Feature features = 1;</code> */
+            private void removeFeatures(int index) {
+                ensureFeaturesIsMutable();
+                features_.remove(index);
+            }
+
+            public static final int VALUES_FIELD_NUMBER = 13;
+            private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public java.util.List<Geobuf.Data.Value> getValuesList() {
+                return values_;
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            public java.util.List<? extends Geobuf.Data.ValueOrBuilder> getValuesOrBuilderList() {
+                return values_;
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public int getValuesCount() {
+                return values_.size();
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Value getValues(int index) {
+                return values_.get(index);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(int index) {
+                return values_.get(index);
+            }
+
+            private void ensureValuesIsMutable() {
+                com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
+                if (!tmp.isModifiable()) {
+                    values_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void setValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.set(index, value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addValues(Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addValues(int index, Geobuf.Data.Value value) {
+                value.getClass();
+                ensureValuesIsMutable();
+                values_.add(index, value);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void addAllValues(java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                ensureValuesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, values_);
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void clearValues() {
+                values_ = emptyProtobufList();
+            }
+            /** <code>repeated .Data.Value values = 13;</code> */
+            private void removeValues(int index) {
+                ensureValuesIsMutable();
+                values_.remove(index);
+            }
+
+            public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
+            private com.google.protobuf.Internal.IntList customProperties_;
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return A list containing the customProperties.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                return customProperties_;
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @return The count of customProperties.
+             */
+            @java.lang.Override
+            public int getCustomPropertiesCount() {
+                return customProperties_.size();
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index of the element to return.
+             * @return The customProperties at the given index.
+             */
+            @java.lang.Override
+            public int getCustomProperties(int index) {
+                return customProperties_.getInt(index);
+            }
+
+            private int customPropertiesMemoizedSerializedSize = -1;
+
+            private void ensureCustomPropertiesIsMutable() {
+                com.google.protobuf.Internal.IntList tmp = customProperties_;
+                if (!tmp.isModifiable()) {
+                    customProperties_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+                }
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The customProperties to set.
+             */
+            private void setCustomProperties(int index, int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.setInt(index, value);
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param value The customProperties to add.
+             */
+            private void addCustomProperties(int value) {
+                ensureCustomPropertiesIsMutable();
+                customProperties_.addInt(value);
+            }
+            /**
+             * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+             *
+             * @param values The customProperties to add.
+             */
+            private void addAllCustomProperties(
+                    java.lang.Iterable<? extends java.lang.Integer> values) {
+                ensureCustomPropertiesIsMutable();
+                com.google.protobuf.AbstractMessageLite.addAll(values, customProperties_);
+            }
+            /** <code>repeated uint32 custom_properties = 15 [packed = true];</code> */
+            private void clearCustomProperties() {
+                customProperties_ = emptyIntList();
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(java.nio.ByteBuffer data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    java.nio.ByteBuffer data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    com.google.protobuf.ByteString data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    com.google.protobuf.ByteString data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(byte[] data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseDelimitedFrom(
+                    java.io.InputStream input) throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseDelimitedFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    com.google.protobuf.CodedInputStream input) throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.FeatureCollection parseFrom(
+                    com.google.protobuf.CodedInputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Builder newBuilder() {
+                return (Builder) DEFAULT_INSTANCE.createBuilder();
+            }
+
+            public static Builder newBuilder(Geobuf.Data.FeatureCollection prototype) {
+                return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
+            }
+
+            /** Protobuf type {@code Data.FeatureCollection} */
+            public static final class Builder
+                    extends com.google.protobuf.GeneratedMessageLite.Builder<
+                            Geobuf.Data.FeatureCollection, Builder>
+                    implements
+                    // @@protoc_insertion_point(builder_implements:Data.FeatureCollection)
+                    Geobuf.Data.FeatureCollectionOrBuilder {
+                // Construct using Geobuf.Data.FeatureCollection.newBuilder()
+                private Builder() {
+                    super(DEFAULT_INSTANCE);
+                }
+
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                @java.lang.Override
+                public java.util.List<Geobuf.Data.Feature> getFeaturesList() {
+                    return java.util.Collections.unmodifiableList(instance.getFeaturesList());
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                @java.lang.Override
+                public int getFeaturesCount() {
+                    return instance.getFeaturesCount();
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+
+                @java.lang.Override
+                public Geobuf.Data.Feature getFeatures(int index) {
+                    return instance.getFeatures(index);
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder setFeatures(int index, Geobuf.Data.Feature value) {
+                    copyOnWrite();
+                    instance.setFeatures(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder setFeatures(int index, Geobuf.Data.Feature.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setFeatures(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder addFeatures(Geobuf.Data.Feature value) {
+                    copyOnWrite();
+                    instance.addFeatures(value);
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder addFeatures(int index, Geobuf.Data.Feature value) {
+                    copyOnWrite();
+                    instance.addFeatures(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder addFeatures(Geobuf.Data.Feature.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addFeatures(builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder addFeatures(int index, Geobuf.Data.Feature.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addFeatures(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder addAllFeatures(
+                        java.lang.Iterable<? extends Geobuf.Data.Feature> values) {
+                    copyOnWrite();
+                    instance.addAllFeatures(values);
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder clearFeatures() {
+                    copyOnWrite();
+                    instance.clearFeatures();
+                    return this;
+                }
+                /** <code>repeated .Data.Feature features = 1;</code> */
+                public Builder removeFeatures(int index) {
+                    copyOnWrite();
+                    instance.removeFeatures(index);
+                    return this;
+                }
+
+                /** <code>repeated .Data.Value values = 13;</code> */
+                @java.lang.Override
+                public java.util.List<Geobuf.Data.Value> getValuesList() {
+                    return java.util.Collections.unmodifiableList(instance.getValuesList());
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                @java.lang.Override
+                public int getValuesCount() {
+                    return instance.getValuesCount();
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+
+                @java.lang.Override
+                public Geobuf.Data.Value getValues(int index) {
+                    return instance.getValues(index);
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder setValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.setValues(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder setValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.setValues(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(int index, Geobuf.Data.Value value) {
+                    copyOnWrite();
+                    instance.addValues(index, value);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addValues(int index, Geobuf.Data.Value.Builder builderForValue) {
+                    copyOnWrite();
+                    instance.addValues(index, builderForValue.build());
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder addAllValues(
+                        java.lang.Iterable<? extends Geobuf.Data.Value> values) {
+                    copyOnWrite();
+                    instance.addAllValues(values);
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder clearValues() {
+                    copyOnWrite();
+                    instance.clearValues();
+                    return this;
+                }
+                /** <code>repeated .Data.Value values = 13;</code> */
+                public Builder removeValues(int index) {
+                    copyOnWrite();
+                    instance.removeValues(index);
+                    return this;
+                }
+
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return A list containing the customProperties.
+                 */
+                @java.lang.Override
+                public java.util.List<java.lang.Integer> getCustomPropertiesList() {
+                    return java.util.Collections.unmodifiableList(
+                            instance.getCustomPropertiesList());
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return The count of customProperties.
+                 */
+                @java.lang.Override
+                public int getCustomPropertiesCount() {
+                    return instance.getCustomPropertiesCount();
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param index The index of the element to return.
+                 * @return The customProperties at the given index.
+                 */
+                @java.lang.Override
+                public int getCustomProperties(int index) {
+                    return instance.getCustomProperties(index);
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setCustomProperties(int index, int value) {
+                    copyOnWrite();
+                    instance.setCustomProperties(index, value);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param value The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addCustomProperties(int value) {
+                    copyOnWrite();
+                    instance.addCustomProperties(value);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @param values The customProperties to add.
+                 * @return This builder for chaining.
+                 */
+                public Builder addAllCustomProperties(
+                        java.lang.Iterable<? extends java.lang.Integer> values) {
+                    copyOnWrite();
+                    instance.addAllCustomProperties(values);
+                    return this;
+                }
+                /**
+                 * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearCustomProperties() {
+                    copyOnWrite();
+                    instance.clearCustomProperties();
+                    return this;
+                }
+
+                // @@protoc_insertion_point(builder_scope:Data.FeatureCollection)
+            }
+
+            private byte memoizedIsInitialized = 2;
+
+            @java.lang.Override
+            @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
+            protected final java.lang.Object dynamicMethod(
+                    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+                    java.lang.Object arg0,
+                    java.lang.Object arg1) {
+                switch (method) {
+                    case NEW_MUTABLE_INSTANCE:
+                        {
+                            return new Geobuf.Data.FeatureCollection();
+                        }
+                    case NEW_BUILDER:
+                        {
+                            return new Builder();
+                        }
+                    case BUILD_MESSAGE_INFO:
+                        {
+                            java.lang.Object[] objects =
+                                    new java.lang.Object[] {
+                                        "features_",
+                                        Geobuf.Data.Feature.class,
+                                        "values_",
+                                        Geobuf.Data.Value.class,
+                                        "customProperties_",
+                                    };
+                            java.lang.String info =
+                                    "\u0001\u0003\u0000\u0000\u0001\u000f\u0003\u0000\u0003\u0001\u0001\u041b\r"
+                                        + "\u001b\u000f+";
+                            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                        }
+                        // fall through
+                    case GET_DEFAULT_INSTANCE:
+                        {
+                            return DEFAULT_INSTANCE;
+                        }
+                    case GET_PARSER:
+                        {
+                            com.google.protobuf.Parser<Geobuf.Data.FeatureCollection> parser =
+                                    PARSER;
+                            if (parser == null) {
+                                synchronized (Geobuf.Data.FeatureCollection.class) {
+                                    parser = PARSER;
+                                    if (parser == null) {
+                                        parser =
+                                                new DefaultInstanceBasedParser<
+                                                        Geobuf.Data.FeatureCollection>(
+                                                        DEFAULT_INSTANCE);
+                                        PARSER = parser;
+                                    }
+                                }
+                            }
+                            return parser;
+                        }
+                    case GET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            return memoizedIsInitialized;
+                        }
+                    case SET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
+                            return null;
+                        }
+                }
+                throw new UnsupportedOperationException();
+            }
+
+            // @@protoc_insertion_point(class_scope:Data.FeatureCollection)
+            private static final Geobuf.Data.FeatureCollection DEFAULT_INSTANCE;
+
+            static {
+                FeatureCollection defaultInstance = new FeatureCollection();
+                // New instances are implicitly immutable so no need to make
+                // immutable.
+                DEFAULT_INSTANCE = defaultInstance;
+                com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                        FeatureCollection.class, defaultInstance);
+            }
+
+            public static Geobuf.Data.FeatureCollection getDefaultInstance() {
+                return DEFAULT_INSTANCE;
+            }
+
+            private static volatile com.google.protobuf.Parser<FeatureCollection> PARSER;
+
+            public static com.google.protobuf.Parser<FeatureCollection> parser() {
+                return DEFAULT_INSTANCE.getParserForType();
+            }
         }
-        return com.google.protobuf.ByteString.copyFromUtf8(ref);
-      }
-      /**
-       * <code>string id = 11;</code>
-       * @param value The id to set.
-       */
-      private void setId(
-          java.lang.String value) {
-        value.getClass();
-  idTypeCase_ = 11;
-        idType_ = value;
-      }
-      /**
-       * <code>string id = 11;</code>
-       */
-      private void clearId() {
-        if (idTypeCase_ == 11) {
-          idTypeCase_ = 0;
-          idType_ = null;
+
+        public interface ValueOrBuilder
+                extends
+                // @@protoc_insertion_point(interface_extends:Data.Value)
+                com.google.protobuf.MessageLiteOrBuilder {
+
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return Whether the stringValue field is set.
+             */
+            boolean hasStringValue();
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return The stringValue.
+             */
+            java.lang.String getStringValue();
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return The bytes for stringValue.
+             */
+            com.google.protobuf.ByteString getStringValueBytes();
+
+            /**
+             * <code>double double_value = 2;</code>
+             *
+             * @return Whether the doubleValue field is set.
+             */
+            boolean hasDoubleValue();
+            /**
+             * <code>double double_value = 2;</code>
+             *
+             * @return The doubleValue.
+             */
+            double getDoubleValue();
+
+            /**
+             * <code>uint64 pos_int_value = 3;</code>
+             *
+             * @return Whether the posIntValue field is set.
+             */
+            boolean hasPosIntValue();
+            /**
+             * <code>uint64 pos_int_value = 3;</code>
+             *
+             * @return The posIntValue.
+             */
+            long getPosIntValue();
+
+            /**
+             * <code>uint64 neg_int_value = 4;</code>
+             *
+             * @return Whether the negIntValue field is set.
+             */
+            boolean hasNegIntValue();
+            /**
+             * <code>uint64 neg_int_value = 4;</code>
+             *
+             * @return The negIntValue.
+             */
+            long getNegIntValue();
+
+            /**
+             * <code>bool bool_value = 5;</code>
+             *
+             * @return Whether the boolValue field is set.
+             */
+            boolean hasBoolValue();
+            /**
+             * <code>bool bool_value = 5;</code>
+             *
+             * @return The boolValue.
+             */
+            boolean getBoolValue();
+
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return Whether the jsonValue field is set.
+             */
+            boolean hasJsonValue();
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return The jsonValue.
+             */
+            java.lang.String getJsonValue();
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return The bytes for jsonValue.
+             */
+            com.google.protobuf.ByteString getJsonValueBytes();
+
+            public Geobuf.Data.Value.ValueTypeCase getValueTypeCase();
         }
-      }
-      /**
-       * <code>string id = 11;</code>
-       * @param value The bytes for id to set.
-       */
-      private void setIdBytes(
-          com.google.protobuf.ByteString value) {
-        idType_ = value.toStringUtf8();
-        idTypeCase_ = 11;
-      }
+        /** Protobuf type {@code Data.Value} */
+        public static final class Value
+                extends com.google.protobuf.GeneratedMessageLite<Value, Value.Builder>
+                implements
+                // @@protoc_insertion_point(message_implements:Data.Value)
+                ValueOrBuilder {
+            private Value() {}
 
-      public static final int INT_ID_FIELD_NUMBER = 12;
-      /**
-       * <code>sint64 int_id = 12;</code>
-       * @return Whether the intId field is set.
-       */
-      @java.lang.Override
-      public boolean hasIntId() {
-        return idTypeCase_ == 12;
-      }
-      /**
-       * <code>sint64 int_id = 12;</code>
-       * @return The intId.
-       */
-      @java.lang.Override
-      public long getIntId() {
-        if (idTypeCase_ == 12) {
-          return (java.lang.Long) idType_;
+            private int bitField0_;
+            private int valueTypeCase_ = 0;
+            private java.lang.Object valueType_;
+
+            public enum ValueTypeCase {
+                STRING_VALUE(1),
+                DOUBLE_VALUE(2),
+                POS_INT_VALUE(3),
+                NEG_INT_VALUE(4),
+                BOOL_VALUE(5),
+                JSON_VALUE(6),
+                VALUETYPE_NOT_SET(0);
+                private final int value;
+
+                private ValueTypeCase(int value) {
+                    this.value = value;
+                }
+                /** @deprecated Use {@link #forNumber(int)} instead. */
+                @java.lang.Deprecated
+                public static ValueTypeCase valueOf(int value) {
+                    return forNumber(value);
+                }
+
+                public static ValueTypeCase forNumber(int value) {
+                    switch (value) {
+                        case 1:
+                            return STRING_VALUE;
+                        case 2:
+                            return DOUBLE_VALUE;
+                        case 3:
+                            return POS_INT_VALUE;
+                        case 4:
+                            return NEG_INT_VALUE;
+                        case 5:
+                            return BOOL_VALUE;
+                        case 6:
+                            return JSON_VALUE;
+                        case 0:
+                            return VALUETYPE_NOT_SET;
+                        default:
+                            return null;
+                    }
+                }
+
+                public int getNumber() {
+                    return this.value;
+                }
+            };
+
+            @java.lang.Override
+            public ValueTypeCase getValueTypeCase() {
+                return ValueTypeCase.forNumber(valueTypeCase_);
+            }
+
+            private void clearValueType() {
+                valueTypeCase_ = 0;
+                valueType_ = null;
+            }
+
+            public static final int STRING_VALUE_FIELD_NUMBER = 1;
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return Whether the stringValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasStringValue() {
+                return valueTypeCase_ == 1;
+            }
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return The stringValue.
+             */
+            @java.lang.Override
+            public java.lang.String getStringValue() {
+                java.lang.String ref = "";
+                if (valueTypeCase_ == 1) {
+                    ref = (java.lang.String) valueType_;
+                }
+                return ref;
+            }
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @return The bytes for stringValue.
+             */
+            @java.lang.Override
+            public com.google.protobuf.ByteString getStringValueBytes() {
+                java.lang.String ref = "";
+                if (valueTypeCase_ == 1) {
+                    ref = (java.lang.String) valueType_;
+                }
+                return com.google.protobuf.ByteString.copyFromUtf8(ref);
+            }
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @param value The stringValue to set.
+             */
+            private void setStringValue(java.lang.String value) {
+                value.getClass();
+                valueTypeCase_ = 1;
+                valueType_ = value;
+            }
+            /** <code>string string_value = 1;</code> */
+            private void clearStringValue() {
+                if (valueTypeCase_ == 1) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+            /**
+             * <code>string string_value = 1;</code>
+             *
+             * @param value The bytes for stringValue to set.
+             */
+            private void setStringValueBytes(com.google.protobuf.ByteString value) {
+                valueType_ = value.toStringUtf8();
+                valueTypeCase_ = 1;
+            }
+
+            public static final int DOUBLE_VALUE_FIELD_NUMBER = 2;
+            /**
+             * <code>double double_value = 2;</code>
+             *
+             * @return Whether the doubleValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasDoubleValue() {
+                return valueTypeCase_ == 2;
+            }
+            /**
+             * <code>double double_value = 2;</code>
+             *
+             * @return The doubleValue.
+             */
+            @java.lang.Override
+            public double getDoubleValue() {
+                if (valueTypeCase_ == 2) {
+                    return (java.lang.Double) valueType_;
+                }
+                return 0D;
+            }
+            /**
+             * <code>double double_value = 2;</code>
+             *
+             * @param value The doubleValue to set.
+             */
+            private void setDoubleValue(double value) {
+                valueTypeCase_ = 2;
+                valueType_ = value;
+            }
+            /** <code>double double_value = 2;</code> */
+            private void clearDoubleValue() {
+                if (valueTypeCase_ == 2) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+
+            public static final int POS_INT_VALUE_FIELD_NUMBER = 3;
+            /**
+             * <code>uint64 pos_int_value = 3;</code>
+             *
+             * @return Whether the posIntValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasPosIntValue() {
+                return valueTypeCase_ == 3;
+            }
+            /**
+             * <code>uint64 pos_int_value = 3;</code>
+             *
+             * @return The posIntValue.
+             */
+            @java.lang.Override
+            public long getPosIntValue() {
+                if (valueTypeCase_ == 3) {
+                    return (java.lang.Long) valueType_;
+                }
+                return 0L;
+            }
+            /**
+             * <code>uint64 pos_int_value = 3;</code>
+             *
+             * @param value The posIntValue to set.
+             */
+            private void setPosIntValue(long value) {
+                valueTypeCase_ = 3;
+                valueType_ = value;
+            }
+            /** <code>uint64 pos_int_value = 3;</code> */
+            private void clearPosIntValue() {
+                if (valueTypeCase_ == 3) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+
+            public static final int NEG_INT_VALUE_FIELD_NUMBER = 4;
+            /**
+             * <code>uint64 neg_int_value = 4;</code>
+             *
+             * @return Whether the negIntValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasNegIntValue() {
+                return valueTypeCase_ == 4;
+            }
+            /**
+             * <code>uint64 neg_int_value = 4;</code>
+             *
+             * @return The negIntValue.
+             */
+            @java.lang.Override
+            public long getNegIntValue() {
+                if (valueTypeCase_ == 4) {
+                    return (java.lang.Long) valueType_;
+                }
+                return 0L;
+            }
+            /**
+             * <code>uint64 neg_int_value = 4;</code>
+             *
+             * @param value The negIntValue to set.
+             */
+            private void setNegIntValue(long value) {
+                valueTypeCase_ = 4;
+                valueType_ = value;
+            }
+            /** <code>uint64 neg_int_value = 4;</code> */
+            private void clearNegIntValue() {
+                if (valueTypeCase_ == 4) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+
+            public static final int BOOL_VALUE_FIELD_NUMBER = 5;
+            /**
+             * <code>bool bool_value = 5;</code>
+             *
+             * @return Whether the boolValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasBoolValue() {
+                return valueTypeCase_ == 5;
+            }
+            /**
+             * <code>bool bool_value = 5;</code>
+             *
+             * @return The boolValue.
+             */
+            @java.lang.Override
+            public boolean getBoolValue() {
+                if (valueTypeCase_ == 5) {
+                    return (java.lang.Boolean) valueType_;
+                }
+                return false;
+            }
+            /**
+             * <code>bool bool_value = 5;</code>
+             *
+             * @param value The boolValue to set.
+             */
+            private void setBoolValue(boolean value) {
+                valueTypeCase_ = 5;
+                valueType_ = value;
+            }
+            /** <code>bool bool_value = 5;</code> */
+            private void clearBoolValue() {
+                if (valueTypeCase_ == 5) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+
+            public static final int JSON_VALUE_FIELD_NUMBER = 6;
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return Whether the jsonValue field is set.
+             */
+            @java.lang.Override
+            public boolean hasJsonValue() {
+                return valueTypeCase_ == 6;
+            }
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return The jsonValue.
+             */
+            @java.lang.Override
+            public java.lang.String getJsonValue() {
+                java.lang.String ref = "";
+                if (valueTypeCase_ == 6) {
+                    ref = (java.lang.String) valueType_;
+                }
+                return ref;
+            }
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @return The bytes for jsonValue.
+             */
+            @java.lang.Override
+            public com.google.protobuf.ByteString getJsonValueBytes() {
+                java.lang.String ref = "";
+                if (valueTypeCase_ == 6) {
+                    ref = (java.lang.String) valueType_;
+                }
+                return com.google.protobuf.ByteString.copyFromUtf8(ref);
+            }
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @param value The jsonValue to set.
+             */
+            private void setJsonValue(java.lang.String value) {
+                value.getClass();
+                valueTypeCase_ = 6;
+                valueType_ = value;
+            }
+            /** <code>string json_value = 6;</code> */
+            private void clearJsonValue() {
+                if (valueTypeCase_ == 6) {
+                    valueTypeCase_ = 0;
+                    valueType_ = null;
+                }
+            }
+            /**
+             * <code>string json_value = 6;</code>
+             *
+             * @param value The bytes for jsonValue to set.
+             */
+            private void setJsonValueBytes(com.google.protobuf.ByteString value) {
+                valueType_ = value.toStringUtf8();
+                valueTypeCase_ = 6;
+            }
+
+            public static Geobuf.Data.Value parseFrom(java.nio.ByteBuffer data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Value parseFrom(
+                    java.nio.ByteBuffer data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Value parseFrom(com.google.protobuf.ByteString data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Value parseFrom(
+                    com.google.protobuf.ByteString data,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Value parseFrom(byte[] data)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
+            }
+
+            public static Geobuf.Data.Value parseFrom(
+                    byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws com.google.protobuf.InvalidProtocolBufferException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, data, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Value parseFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Value parseFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Value parseDelimitedFrom(java.io.InputStream input)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Value parseDelimitedFrom(
+                    java.io.InputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Geobuf.Data.Value parseFrom(com.google.protobuf.CodedInputStream input)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+            }
+
+            public static Geobuf.Data.Value parseFrom(
+                    com.google.protobuf.CodedInputStream input,
+                    com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                    throws java.io.IOException {
+                return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                        DEFAULT_INSTANCE, input, extensionRegistry);
+            }
+
+            public static Builder newBuilder() {
+                return (Builder) DEFAULT_INSTANCE.createBuilder();
+            }
+
+            public static Builder newBuilder(Geobuf.Data.Value prototype) {
+                return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
+            }
+
+            /** Protobuf type {@code Data.Value} */
+            public static final class Builder
+                    extends com.google.protobuf.GeneratedMessageLite.Builder<
+                            Geobuf.Data.Value, Builder>
+                    implements
+                    // @@protoc_insertion_point(builder_implements:Data.Value)
+                    Geobuf.Data.ValueOrBuilder {
+                // Construct using Geobuf.Data.Value.newBuilder()
+                private Builder() {
+                    super(DEFAULT_INSTANCE);
+                }
+
+                @java.lang.Override
+                public ValueTypeCase getValueTypeCase() {
+                    return instance.getValueTypeCase();
+                }
+
+                public Builder clearValueType() {
+                    copyOnWrite();
+                    instance.clearValueType();
+                    return this;
+                }
+
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @return Whether the stringValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasStringValue() {
+                    return instance.hasStringValue();
+                }
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @return The stringValue.
+                 */
+                @java.lang.Override
+                public java.lang.String getStringValue() {
+                    return instance.getStringValue();
+                }
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @return The bytes for stringValue.
+                 */
+                @java.lang.Override
+                public com.google.protobuf.ByteString getStringValueBytes() {
+                    return instance.getStringValueBytes();
+                }
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @param value The stringValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setStringValue(java.lang.String value) {
+                    copyOnWrite();
+                    instance.setStringValue(value);
+                    return this;
+                }
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearStringValue() {
+                    copyOnWrite();
+                    instance.clearStringValue();
+                    return this;
+                }
+                /**
+                 * <code>string string_value = 1;</code>
+                 *
+                 * @param value The bytes for stringValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setStringValueBytes(com.google.protobuf.ByteString value) {
+                    copyOnWrite();
+                    instance.setStringValueBytes(value);
+                    return this;
+                }
+
+                /**
+                 * <code>double double_value = 2;</code>
+                 *
+                 * @return Whether the doubleValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasDoubleValue() {
+                    return instance.hasDoubleValue();
+                }
+                /**
+                 * <code>double double_value = 2;</code>
+                 *
+                 * @return The doubleValue.
+                 */
+                @java.lang.Override
+                public double getDoubleValue() {
+                    return instance.getDoubleValue();
+                }
+                /**
+                 * <code>double double_value = 2;</code>
+                 *
+                 * @param value The doubleValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setDoubleValue(double value) {
+                    copyOnWrite();
+                    instance.setDoubleValue(value);
+                    return this;
+                }
+                /**
+                 * <code>double double_value = 2;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearDoubleValue() {
+                    copyOnWrite();
+                    instance.clearDoubleValue();
+                    return this;
+                }
+
+                /**
+                 * <code>uint64 pos_int_value = 3;</code>
+                 *
+                 * @return Whether the posIntValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasPosIntValue() {
+                    return instance.hasPosIntValue();
+                }
+                /**
+                 * <code>uint64 pos_int_value = 3;</code>
+                 *
+                 * @return The posIntValue.
+                 */
+                @java.lang.Override
+                public long getPosIntValue() {
+                    return instance.getPosIntValue();
+                }
+                /**
+                 * <code>uint64 pos_int_value = 3;</code>
+                 *
+                 * @param value The posIntValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setPosIntValue(long value) {
+                    copyOnWrite();
+                    instance.setPosIntValue(value);
+                    return this;
+                }
+                /**
+                 * <code>uint64 pos_int_value = 3;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearPosIntValue() {
+                    copyOnWrite();
+                    instance.clearPosIntValue();
+                    return this;
+                }
+
+                /**
+                 * <code>uint64 neg_int_value = 4;</code>
+                 *
+                 * @return Whether the negIntValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasNegIntValue() {
+                    return instance.hasNegIntValue();
+                }
+                /**
+                 * <code>uint64 neg_int_value = 4;</code>
+                 *
+                 * @return The negIntValue.
+                 */
+                @java.lang.Override
+                public long getNegIntValue() {
+                    return instance.getNegIntValue();
+                }
+                /**
+                 * <code>uint64 neg_int_value = 4;</code>
+                 *
+                 * @param value The negIntValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setNegIntValue(long value) {
+                    copyOnWrite();
+                    instance.setNegIntValue(value);
+                    return this;
+                }
+                /**
+                 * <code>uint64 neg_int_value = 4;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearNegIntValue() {
+                    copyOnWrite();
+                    instance.clearNegIntValue();
+                    return this;
+                }
+
+                /**
+                 * <code>bool bool_value = 5;</code>
+                 *
+                 * @return Whether the boolValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasBoolValue() {
+                    return instance.hasBoolValue();
+                }
+                /**
+                 * <code>bool bool_value = 5;</code>
+                 *
+                 * @return The boolValue.
+                 */
+                @java.lang.Override
+                public boolean getBoolValue() {
+                    return instance.getBoolValue();
+                }
+                /**
+                 * <code>bool bool_value = 5;</code>
+                 *
+                 * @param value The boolValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setBoolValue(boolean value) {
+                    copyOnWrite();
+                    instance.setBoolValue(value);
+                    return this;
+                }
+                /**
+                 * <code>bool bool_value = 5;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearBoolValue() {
+                    copyOnWrite();
+                    instance.clearBoolValue();
+                    return this;
+                }
+
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @return Whether the jsonValue field is set.
+                 */
+                @java.lang.Override
+                public boolean hasJsonValue() {
+                    return instance.hasJsonValue();
+                }
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @return The jsonValue.
+                 */
+                @java.lang.Override
+                public java.lang.String getJsonValue() {
+                    return instance.getJsonValue();
+                }
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @return The bytes for jsonValue.
+                 */
+                @java.lang.Override
+                public com.google.protobuf.ByteString getJsonValueBytes() {
+                    return instance.getJsonValueBytes();
+                }
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @param value The jsonValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setJsonValue(java.lang.String value) {
+                    copyOnWrite();
+                    instance.setJsonValue(value);
+                    return this;
+                }
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @return This builder for chaining.
+                 */
+                public Builder clearJsonValue() {
+                    copyOnWrite();
+                    instance.clearJsonValue();
+                    return this;
+                }
+                /**
+                 * <code>string json_value = 6;</code>
+                 *
+                 * @param value The bytes for jsonValue to set.
+                 * @return This builder for chaining.
+                 */
+                public Builder setJsonValueBytes(com.google.protobuf.ByteString value) {
+                    copyOnWrite();
+                    instance.setJsonValueBytes(value);
+                    return this;
+                }
+
+                // @@protoc_insertion_point(builder_scope:Data.Value)
+            }
+
+            @java.lang.Override
+            @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
+            protected final java.lang.Object dynamicMethod(
+                    com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+                    java.lang.Object arg0,
+                    java.lang.Object arg1) {
+                switch (method) {
+                    case NEW_MUTABLE_INSTANCE:
+                        {
+                            return new Geobuf.Data.Value();
+                        }
+                    case NEW_BUILDER:
+                        {
+                            return new Builder();
+                        }
+                    case BUILD_MESSAGE_INFO:
+                        {
+                            java.lang.Object[] objects =
+                                    new java.lang.Object[] {
+                                        "valueType_", "valueTypeCase_", "bitField0_",
+                                    };
+                            java.lang.String info =
+                                    "\u0001\u0006\u0001\u0001\u0001\u0006\u0006\u0000\u0000\u0000\u0001\u103b\u0000\u0002"
+                                        + "\u1033\u0000\u0003\u1036\u0000\u0004\u1036\u0000\u0005\u103a\u0000\u0006\u103b\u0000";
+                            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                        }
+                        // fall through
+                    case GET_DEFAULT_INSTANCE:
+                        {
+                            return DEFAULT_INSTANCE;
+                        }
+                    case GET_PARSER:
+                        {
+                            com.google.protobuf.Parser<Geobuf.Data.Value> parser = PARSER;
+                            if (parser == null) {
+                                synchronized (Geobuf.Data.Value.class) {
+                                    parser = PARSER;
+                                    if (parser == null) {
+                                        parser =
+                                                new DefaultInstanceBasedParser<Geobuf.Data.Value>(
+                                                        DEFAULT_INSTANCE);
+                                        PARSER = parser;
+                                    }
+                                }
+                            }
+                            return parser;
+                        }
+                    case GET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            return (byte) 1;
+                        }
+                    case SET_MEMOIZED_IS_INITIALIZED:
+                        {
+                            return null;
+                        }
+                }
+                throw new UnsupportedOperationException();
+            }
+
+            // @@protoc_insertion_point(class_scope:Data.Value)
+            private static final Geobuf.Data.Value DEFAULT_INSTANCE;
+
+            static {
+                Value defaultInstance = new Value();
+                // New instances are implicitly immutable so no need to make
+                // immutable.
+                DEFAULT_INSTANCE = defaultInstance;
+                com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                        Value.class, defaultInstance);
+            }
+
+            public static Geobuf.Data.Value getDefaultInstance() {
+                return DEFAULT_INSTANCE;
+            }
+
+            private static volatile com.google.protobuf.Parser<Value> PARSER;
+
+            public static com.google.protobuf.Parser<Value> parser() {
+                return DEFAULT_INSTANCE.getParserForType();
+            }
         }
-        return 0L;
-      }
-      /**
-       * <code>sint64 int_id = 12;</code>
-       * @param value The intId to set.
-       */
-      private void setIntId(long value) {
-        idTypeCase_ = 12;
-        idType_ = value;
-      }
-      /**
-       * <code>sint64 int_id = 12;</code>
-       */
-      private void clearIntId() {
-        if (idTypeCase_ == 12) {
-          idTypeCase_ = 0;
-          idType_ = null;
-        }
-      }
 
-      public static final int VALUES_FIELD_NUMBER = 13;
-      private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public java.util.List<Geobuf.Data.Value> getValuesList() {
-        return values_;
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public java.util.List<? extends Geobuf.Data.ValueOrBuilder> 
-          getValuesOrBuilderList() {
-        return values_;
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public int getValuesCount() {
-        return values_.size();
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Value getValues(int index) {
-        return values_.get(index);
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(
-          int index) {
-        return values_.get(index);
-      }
-      private void ensureValuesIsMutable() {
-        com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
-        if (!tmp.isModifiable()) {
-          values_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
+        private int bitField0_;
+        private int dataTypeCase_ = 0;
+        private java.lang.Object dataType_;
 
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void setValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.set(index, value);
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(value);
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(index, value);
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addAllValues(
-          java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-        ensureValuesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, values_);
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void clearValues() {
-        values_ = emptyProtobufList();
-      }
-      /**
-       * <pre>
-       * unique values
-       * </pre>
-       *
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void removeValues(int index) {
-        ensureValuesIsMutable();
-        values_.remove(index);
-      }
+        public enum DataTypeCase {
+            FEATURE_COLLECTION(4),
+            FEATURE(5),
+            GEOMETRY(6),
+            DATATYPE_NOT_SET(0);
+            private final int value;
 
-      public static final int PROPERTIES_FIELD_NUMBER = 14;
-      private com.google.protobuf.Internal.IntList properties_;
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @return A list containing the properties.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Integer>
-          getPropertiesList() {
-        return properties_;
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @return The count of properties.
-       */
-      @java.lang.Override
-      public int getPropertiesCount() {
-        return properties_.size();
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The properties at the given index.
-       */
-      @java.lang.Override
-      public int getProperties(int index) {
-        return properties_.getInt(index);
-      }
-      private int propertiesMemoizedSerializedSize = -1;
-      private void ensurePropertiesIsMutable() {
-        com.google.protobuf.Internal.IntList tmp = properties_;
-        if (!tmp.isModifiable()) {
-          properties_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The properties to set.
-       */
-      private void setProperties(
-          int index, int value) {
-        ensurePropertiesIsMutable();
-        properties_.setInt(index, value);
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @param value The properties to add.
-       */
-      private void addProperties(int value) {
-        ensurePropertiesIsMutable();
-        properties_.addInt(value);
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       * @param values The properties to add.
-       */
-      private void addAllProperties(
-          java.lang.Iterable<? extends java.lang.Integer> values) {
-        ensurePropertiesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, properties_);
-      }
-      /**
-       * <pre>
-       * pairs of key/value indexes
-       * </pre>
-       *
-       * <code>repeated uint32 properties = 14 [packed = true];</code>
-       */
-      private void clearProperties() {
-        properties_ = emptyIntList();
-      }
+            private DataTypeCase(int value) {
+                this.value = value;
+            }
+            /** @deprecated Use {@link #forNumber(int)} instead. */
+            @java.lang.Deprecated
+            public static DataTypeCase valueOf(int value) {
+                return forNumber(value);
+            }
 
-      public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
-      private com.google.protobuf.Internal.IntList customProperties_;
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Integer>
-          getCustomPropertiesList() {
-        return customProperties_;
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      @java.lang.Override
-      public int getCustomPropertiesCount() {
-        return customProperties_.size();
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      @java.lang.Override
-      public int getCustomProperties(int index) {
-        return customProperties_.getInt(index);
-      }
-      private int customPropertiesMemoizedSerializedSize = -1;
-      private void ensureCustomPropertiesIsMutable() {
-        com.google.protobuf.Internal.IntList tmp = customProperties_;
-        if (!tmp.isModifiable()) {
-          customProperties_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The customProperties to set.
-       */
-      private void setCustomProperties(
-          int index, int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.setInt(index, value);
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param value The customProperties to add.
-       */
-      private void addCustomProperties(int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.addInt(value);
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param values The customProperties to add.
-       */
-      private void addAllCustomProperties(
-          java.lang.Iterable<? extends java.lang.Integer> values) {
-        ensureCustomPropertiesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, customProperties_);
-      }
-      /**
-       * <pre>
-       * arbitrary properties
-       * </pre>
-       *
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       */
-      private void clearCustomProperties() {
-        customProperties_ = emptyIntList();
-      }
+            public static DataTypeCase forNumber(int value) {
+                switch (value) {
+                    case 4:
+                        return FEATURE_COLLECTION;
+                    case 5:
+                        return FEATURE;
+                    case 6:
+                        return GEOMETRY;
+                    case 0:
+                        return DATATYPE_NOT_SET;
+                    default:
+                        return null;
+                }
+            }
 
-      public static Geobuf.Data.Feature parseFrom(
-          java.nio.ByteBuffer data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          java.nio.ByteBuffer data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          com.google.protobuf.ByteString data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          com.google.protobuf.ByteString data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Feature parseFrom(byte[] data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          byte[] data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Feature parseFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Feature parseDelimitedFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Feature parseDelimitedFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          com.google.protobuf.CodedInputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Feature parseFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-
-      public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
-      }
-      public static Builder newBuilder(Geobuf.Data.Feature prototype) {
-        return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
-      }
-
-      /**
-       * Protobuf type {@code Data.Feature}
-       */
-      public static final class Builder extends
-          com.google.protobuf.GeneratedMessageLite.Builder<
-            Geobuf.Data.Feature, Builder> implements
-          // @@protoc_insertion_point(builder_implements:Data.Feature)
-          Geobuf.Data.FeatureOrBuilder {
-        // Construct using Geobuf.Data.Feature.newBuilder()
-        private Builder() {
-          super(DEFAULT_INSTANCE);
-        }
+            public int getNumber() {
+                return this.value;
+            }
+        };
 
         @java.lang.Override
-        public IdTypeCase
-            getIdTypeCase() {
-          return instance.getIdTypeCase();
+        public DataTypeCase getDataTypeCase() {
+            return DataTypeCase.forNumber(dataTypeCase_);
         }
 
-        public Builder clearIdType() {
-          copyOnWrite();
-          instance.clearIdType();
-          return this;
+        private void clearDataType() {
+            dataTypeCase_ = 0;
+            dataType_ = null;
         }
 
-
+        public static final int KEYS_FIELD_NUMBER = 1;
+        private com.google.protobuf.Internal.ProtobufList<java.lang.String> keys_;
         /**
-         * <code>required .Data.Geometry geometry = 1;</code>
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @return A list containing the keys.
          */
+        @java.lang.Override
+        public java.util.List<java.lang.String> getKeysList() {
+            return keys_;
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @return The count of keys.
+         */
+        @java.lang.Override
+        public int getKeysCount() {
+            return keys_.size();
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param index The index of the element to return.
+         * @return The keys at the given index.
+         */
+        @java.lang.Override
+        public java.lang.String getKeys(int index) {
+            return keys_.get(index);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param index The index of the value to return.
+         * @return The bytes of the keys at the given index.
+         */
+        @java.lang.Override
+        public com.google.protobuf.ByteString getKeysBytes(int index) {
+            return com.google.protobuf.ByteString.copyFromUtf8(keys_.get(index));
+        }
+
+        private void ensureKeysIsMutable() {
+            com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp = keys_;
+            if (!tmp.isModifiable()) {
+                keys_ = com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+            }
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param index The index to set the value at.
+         * @param value The keys to set.
+         */
+        private void setKeys(int index, java.lang.String value) {
+            value.getClass();
+            ensureKeysIsMutable();
+            keys_.set(index, value);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param value The keys to add.
+         */
+        private void addKeys(java.lang.String value) {
+            value.getClass();
+            ensureKeysIsMutable();
+            keys_.add(value);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param values The keys to add.
+         */
+        private void addAllKeys(java.lang.Iterable<java.lang.String> values) {
+            ensureKeysIsMutable();
+            com.google.protobuf.AbstractMessageLite.addAll(values, keys_);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         */
+        private void clearKeys() {
+            keys_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+        }
+        /**
+         *
+         *
+         * <pre>
+         * global arrays of unique keys
+         * </pre>
+         *
+         * <code>repeated string keys = 1;</code>
+         *
+         * @param value The bytes of the keys to add.
+         */
+        private void addKeysBytes(com.google.protobuf.ByteString value) {
+            ensureKeysIsMutable();
+            keys_.add(value.toStringUtf8());
+        }
+
+        public static final int DIMENSIONS_FIELD_NUMBER = 2;
+        private int dimensions_;
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         *
+         * @return Whether the dimensions field is set.
+         */
+        @java.lang.Override
+        public boolean hasDimensions() {
+            return ((bitField0_ & 0x00000001) != 0);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         *
+         * @return The dimensions.
+         */
+        @java.lang.Override
+        public int getDimensions() {
+            return dimensions_;
+        }
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         *
+         * @param value The dimensions to set.
+         */
+        private void setDimensions(int value) {
+            bitField0_ |= 0x00000001;
+            dimensions_ = value;
+        }
+        /**
+         *
+         *
+         * <pre>
+         * max coordinate dimensions
+         * </pre>
+         *
+         * <code>optional uint32 dimensions = 2 [default = 2];</code>
+         */
+        private void clearDimensions() {
+            bitField0_ = (bitField0_ & ~0x00000001);
+            dimensions_ = 2;
+        }
+
+        public static final int PRECISION_FIELD_NUMBER = 3;
+        private int precision_;
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         *
+         * @return Whether the precision field is set.
+         */
+        @java.lang.Override
+        public boolean hasPrecision() {
+            return ((bitField0_ & 0x00000002) != 0);
+        }
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         *
+         * @return The precision.
+         */
+        @java.lang.Override
+        public int getPrecision() {
+            return precision_;
+        }
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         *
+         * @param value The precision to set.
+         */
+        private void setPrecision(int value) {
+            bitField0_ |= 0x00000002;
+            precision_ = value;
+        }
+        /**
+         *
+         *
+         * <pre>
+         * number of digits after decimal point for coordinates
+         * </pre>
+         *
+         * <code>optional uint32 precision = 3 [default = 6];</code>
+         */
+        private void clearPrecision() {
+            bitField0_ = (bitField0_ & ~0x00000002);
+            precision_ = 6;
+        }
+
+        public static final int FEATURE_COLLECTION_FIELD_NUMBER = 4;
+        /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+        @java.lang.Override
+        public boolean hasFeatureCollection() {
+            return dataTypeCase_ == 4;
+        }
+        /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+        @java.lang.Override
+        public Geobuf.Data.FeatureCollection getFeatureCollection() {
+            if (dataTypeCase_ == 4) {
+                return (Geobuf.Data.FeatureCollection) dataType_;
+            }
+            return Geobuf.Data.FeatureCollection.getDefaultInstance();
+        }
+        /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+        private void setFeatureCollection(Geobuf.Data.FeatureCollection value) {
+            value.getClass();
+            dataType_ = value;
+            dataTypeCase_ = 4;
+        }
+        /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+        private void mergeFeatureCollection(Geobuf.Data.FeatureCollection value) {
+            value.getClass();
+            if (dataTypeCase_ == 4
+                    && dataType_ != Geobuf.Data.FeatureCollection.getDefaultInstance()) {
+                dataType_ =
+                        Geobuf.Data.FeatureCollection.newBuilder(
+                                        (Geobuf.Data.FeatureCollection) dataType_)
+                                .mergeFrom(value)
+                                .buildPartial();
+            } else {
+                dataType_ = value;
+            }
+            dataTypeCase_ = 4;
+        }
+        /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+        private void clearFeatureCollection() {
+            if (dataTypeCase_ == 4) {
+                dataTypeCase_ = 0;
+                dataType_ = null;
+            }
+        }
+
+        public static final int FEATURE_FIELD_NUMBER = 5;
+        /** <code>.Data.Feature feature = 5;</code> */
+        @java.lang.Override
+        public boolean hasFeature() {
+            return dataTypeCase_ == 5;
+        }
+        /** <code>.Data.Feature feature = 5;</code> */
+        @java.lang.Override
+        public Geobuf.Data.Feature getFeature() {
+            if (dataTypeCase_ == 5) {
+                return (Geobuf.Data.Feature) dataType_;
+            }
+            return Geobuf.Data.Feature.getDefaultInstance();
+        }
+        /** <code>.Data.Feature feature = 5;</code> */
+        private void setFeature(Geobuf.Data.Feature value) {
+            value.getClass();
+            dataType_ = value;
+            dataTypeCase_ = 5;
+        }
+        /** <code>.Data.Feature feature = 5;</code> */
+        private void mergeFeature(Geobuf.Data.Feature value) {
+            value.getClass();
+            if (dataTypeCase_ == 5 && dataType_ != Geobuf.Data.Feature.getDefaultInstance()) {
+                dataType_ =
+                        Geobuf.Data.Feature.newBuilder((Geobuf.Data.Feature) dataType_)
+                                .mergeFrom(value)
+                                .buildPartial();
+            } else {
+                dataType_ = value;
+            }
+            dataTypeCase_ = 5;
+        }
+        /** <code>.Data.Feature feature = 5;</code> */
+        private void clearFeature() {
+            if (dataTypeCase_ == 5) {
+                dataTypeCase_ = 0;
+                dataType_ = null;
+            }
+        }
+
+        public static final int GEOMETRY_FIELD_NUMBER = 6;
+        /** <code>.Data.Geometry geometry = 6;</code> */
         @java.lang.Override
         public boolean hasGeometry() {
-          return instance.hasGeometry();
+            return dataTypeCase_ == 6;
         }
-        /**
-         * <code>required .Data.Geometry geometry = 1;</code>
-         */
+        /** <code>.Data.Geometry geometry = 6;</code> */
         @java.lang.Override
         public Geobuf.Data.Geometry getGeometry() {
-          return instance.getGeometry();
+            if (dataTypeCase_ == 6) {
+                return (Geobuf.Data.Geometry) dataType_;
+            }
+            return Geobuf.Data.Geometry.getDefaultInstance();
         }
-        /**
-         * <code>required .Data.Geometry geometry = 1;</code>
-         */
-        public Builder setGeometry(Geobuf.Data.Geometry value) {
-          copyOnWrite();
-          instance.setGeometry(value);
-          return this;
-          }
-        /**
-         * <code>required .Data.Geometry geometry = 1;</code>
-         */
-        public Builder setGeometry(
-            Geobuf.Data.Geometry.Builder builderForValue) {
-          copyOnWrite();
-          instance.setGeometry(builderForValue.build());
-          return this;
+        /** <code>.Data.Geometry geometry = 6;</code> */
+        private void setGeometry(Geobuf.Data.Geometry value) {
+            value.getClass();
+            dataType_ = value;
+            dataTypeCase_ = 6;
         }
-        /**
-         * <code>required .Data.Geometry geometry = 1;</code>
-         */
-        public Builder mergeGeometry(Geobuf.Data.Geometry value) {
-          copyOnWrite();
-          instance.mergeGeometry(value);
-          return this;
+        /** <code>.Data.Geometry geometry = 6;</code> */
+        private void mergeGeometry(Geobuf.Data.Geometry value) {
+            value.getClass();
+            if (dataTypeCase_ == 6 && dataType_ != Geobuf.Data.Geometry.getDefaultInstance()) {
+                dataType_ =
+                        Geobuf.Data.Geometry.newBuilder((Geobuf.Data.Geometry) dataType_)
+                                .mergeFrom(value)
+                                .buildPartial();
+            } else {
+                dataType_ = value;
+            }
+            dataTypeCase_ = 6;
         }
-        /**
-         * <code>required .Data.Geometry geometry = 1;</code>
-         */
-        public Builder clearGeometry() {  copyOnWrite();
-          instance.clearGeometry();
-          return this;
+        /** <code>.Data.Geometry geometry = 6;</code> */
+        private void clearGeometry() {
+            if (dataTypeCase_ == 6) {
+                dataTypeCase_ = 0;
+                dataType_ = null;
+            }
         }
 
-        /**
-         * <code>string id = 11;</code>
-         * @return Whether the id field is set.
-         */
-        @java.lang.Override
-        public boolean hasId() {
-          return instance.hasId();
-        }
-        /**
-         * <code>string id = 11;</code>
-         * @return The id.
-         */
-        @java.lang.Override
-        public java.lang.String getId() {
-          return instance.getId();
-        }
-        /**
-         * <code>string id = 11;</code>
-         * @return The bytes for id.
-         */
-        @java.lang.Override
-        public com.google.protobuf.ByteString
-            getIdBytes() {
-          return instance.getIdBytes();
-        }
-        /**
-         * <code>string id = 11;</code>
-         * @param value The id to set.
-         * @return This builder for chaining.
-         */
-        public Builder setId(
-            java.lang.String value) {
-          copyOnWrite();
-          instance.setId(value);
-          return this;
-        }
-        /**
-         * <code>string id = 11;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearId() {
-          copyOnWrite();
-          instance.clearId();
-          return this;
-        }
-        /**
-         * <code>string id = 11;</code>
-         * @param value The bytes for id to set.
-         * @return This builder for chaining.
-         */
-        public Builder setIdBytes(
-            com.google.protobuf.ByteString value) {
-          copyOnWrite();
-          instance.setIdBytes(value);
-          return this;
+        public static Geobuf.Data parseFrom(java.nio.ByteBuffer data)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
         }
 
-        /**
-         * <code>sint64 int_id = 12;</code>
-         * @return Whether the intId field is set.
-         */
-        @java.lang.Override
-        public boolean hasIntId() {
-          return instance.hasIntId();
-        }
-        /**
-         * <code>sint64 int_id = 12;</code>
-         * @return The intId.
-         */
-        @java.lang.Override
-        public long getIntId() {
-          return instance.getIntId();
-        }
-        /**
-         * <code>sint64 int_id = 12;</code>
-         * @param value The intId to set.
-         * @return This builder for chaining.
-         */
-        public Builder setIntId(long value) {
-          copyOnWrite();
-          instance.setIntId(value);
-          return this;
-        }
-        /**
-         * <code>sint64 int_id = 12;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearIntId() {
-          copyOnWrite();
-          instance.clearIntId();
-          return this;
+        public static Geobuf.Data parseFrom(
+                java.nio.ByteBuffer data,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                    DEFAULT_INSTANCE, data, extensionRegistry);
         }
 
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public java.util.List<Geobuf.Data.Value> getValuesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getValuesList());
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public int getValuesCount() {
-          return instance.getValuesCount();
-        }/**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public Geobuf.Data.Value getValues(int index) {
-          return instance.getValues(index);
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.setValues(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.setValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(value);
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(builderForValue.build());
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addAllValues(
-            java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-          copyOnWrite();
-          instance.addAllValues(values);
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder clearValues() {
-          copyOnWrite();
-          instance.clearValues();
-          return this;
-        }
-        /**
-         * <pre>
-         * unique values
-         * </pre>
-         *
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder removeValues(int index) {
-          copyOnWrite();
-          instance.removeValues(index);
-          return this;
+        public static Geobuf.Data parseFrom(com.google.protobuf.ByteString data)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
         }
 
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @return A list containing the properties.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Integer>
-            getPropertiesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getPropertiesList());
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @return The count of properties.
-         */
-        @java.lang.Override
-        public int getPropertiesCount() {
-          return instance.getPropertiesCount();
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The properties at the given index.
-         */
-        @java.lang.Override
-        public int getProperties(int index) {
-          return instance.getProperties(index);
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @param value The properties to set.
-         * @return This builder for chaining.
-         */
-        public Builder setProperties(
-            int index, int value) {
-          copyOnWrite();
-          instance.setProperties(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @param value The properties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addProperties(int value) {
-          copyOnWrite();
-          instance.addProperties(value);
-          return this;
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @param values The properties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllProperties(
-            java.lang.Iterable<? extends java.lang.Integer> values) {
-          copyOnWrite();
-          instance.addAllProperties(values);
-          return this;
-        }
-        /**
-         * <pre>
-         * pairs of key/value indexes
-         * </pre>
-         *
-         * <code>repeated uint32 properties = 14 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearProperties() {
-          copyOnWrite();
-          instance.clearProperties();
-          return this;
+        public static Geobuf.Data parseFrom(
+                com.google.protobuf.ByteString data,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                    DEFAULT_INSTANCE, data, extensionRegistry);
         }
 
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return A list containing the customProperties.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Integer>
-            getCustomPropertiesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getCustomPropertiesList());
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return The count of customProperties.
-         */
-        @java.lang.Override
-        public int getCustomPropertiesCount() {
-          return instance.getCustomPropertiesCount();
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The customProperties at the given index.
-         */
-        @java.lang.Override
-        public int getCustomProperties(int index) {
-          return instance.getCustomProperties(index);
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to set.
-         * @return This builder for chaining.
-         */
-        public Builder setCustomProperties(
-            int index, int value) {
-          copyOnWrite();
-          instance.setCustomProperties(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addCustomProperties(int value) {
-          copyOnWrite();
-          instance.addCustomProperties(value);
-          return this;
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param values The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllCustomProperties(
-            java.lang.Iterable<? extends java.lang.Integer> values) {
-          copyOnWrite();
-          instance.addAllCustomProperties(values);
-          return this;
-        }
-        /**
-         * <pre>
-         * arbitrary properties
-         * </pre>
-         *
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearCustomProperties() {
-          copyOnWrite();
-          instance.clearCustomProperties();
-          return this;
+        public static Geobuf.Data parseFrom(byte[] data)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, data);
         }
 
-        // @@protoc_insertion_point(builder_scope:Data.Feature)
-      }
-      private byte memoizedIsInitialized = 2;
-      @java.lang.Override
-      @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
-      protected final java.lang.Object dynamicMethod(
-          com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-          java.lang.Object arg0, java.lang.Object arg1) {
-        switch (method) {
-          case NEW_MUTABLE_INSTANCE: {
-            return new Geobuf.Data.Feature();
-          }
-          case NEW_BUILDER: {
-            return new Builder();
-          }
-          case BUILD_MESSAGE_INFO: {
-              java.lang.Object[] objects = new java.lang.Object[] {
-                "idType_",
-                "idTypeCase_",
-                "bitField0_",
-                "geometry_",
-                "values_",
-                Geobuf.Data.Value.class,
-                "properties_",
-                "customProperties_",
-              };
-              java.lang.String info =
-                  "\u0001\u0006\u0001\u0001\u0001\u000f\u0006\u0000\u0003\u0001\u0001\u1509\u0000\u000b" +
-                  "\u103b\u0000\f\u1043\u0000\r\u001b\u000e+\u000f+";
-              return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-          }
-          // fall through
-          case GET_DEFAULT_INSTANCE: {
+        public static Geobuf.Data parseFrom(
+                byte[] data, com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws com.google.protobuf.InvalidProtocolBufferException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                    DEFAULT_INSTANCE, data, extensionRegistry);
+        }
+
+        public static Geobuf.Data parseFrom(java.io.InputStream input) throws java.io.IOException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+        }
+
+        public static Geobuf.Data parseFrom(
+                java.io.InputStream input,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws java.io.IOException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                    DEFAULT_INSTANCE, input, extensionRegistry);
+        }
+
+        public static Geobuf.Data parseDelimitedFrom(java.io.InputStream input)
+                throws java.io.IOException {
+            return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+        }
+
+        public static Geobuf.Data parseDelimitedFrom(
+                java.io.InputStream input,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws java.io.IOException {
+            return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+        }
+
+        public static Geobuf.Data parseFrom(com.google.protobuf.CodedInputStream input)
+                throws java.io.IOException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(DEFAULT_INSTANCE, input);
+        }
+
+        public static Geobuf.Data parseFrom(
+                com.google.protobuf.CodedInputStream input,
+                com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+                throws java.io.IOException {
+            return com.google.protobuf.GeneratedMessageLite.parseFrom(
+                    DEFAULT_INSTANCE, input, extensionRegistry);
+        }
+
+        public static Builder newBuilder() {
+            return (Builder) DEFAULT_INSTANCE.createBuilder();
+        }
+
+        public static Builder newBuilder(Geobuf.Data prototype) {
+            return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
+        }
+
+        /** Protobuf type {@code Data} */
+        public static final class Builder
+                extends com.google.protobuf.GeneratedMessageLite.Builder<Geobuf.Data, Builder>
+                implements
+                // @@protoc_insertion_point(builder_implements:Data)
+                Geobuf.DataOrBuilder {
+            // Construct using Geobuf.Data.newBuilder()
+            private Builder() {
+                super(DEFAULT_INSTANCE);
+            }
+
+            @java.lang.Override
+            public DataTypeCase getDataTypeCase() {
+                return instance.getDataTypeCase();
+            }
+
+            public Builder clearDataType() {
+                copyOnWrite();
+                instance.clearDataType();
+                return this;
+            }
+
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @return A list containing the keys.
+             */
+            @java.lang.Override
+            public java.util.List<java.lang.String> getKeysList() {
+                return java.util.Collections.unmodifiableList(instance.getKeysList());
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @return The count of keys.
+             */
+            @java.lang.Override
+            public int getKeysCount() {
+                return instance.getKeysCount();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param index The index of the element to return.
+             * @return The keys at the given index.
+             */
+            @java.lang.Override
+            public java.lang.String getKeys(int index) {
+                return instance.getKeys(index);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param index The index of the value to return.
+             * @return The bytes of the keys at the given index.
+             */
+            @java.lang.Override
+            public com.google.protobuf.ByteString getKeysBytes(int index) {
+                return instance.getKeysBytes(index);
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param index The index to set the value at.
+             * @param value The keys to set.
+             * @return This builder for chaining.
+             */
+            public Builder setKeys(int index, java.lang.String value) {
+                copyOnWrite();
+                instance.setKeys(index, value);
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param value The keys to add.
+             * @return This builder for chaining.
+             */
+            public Builder addKeys(java.lang.String value) {
+                copyOnWrite();
+                instance.addKeys(value);
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param values The keys to add.
+             * @return This builder for chaining.
+             */
+            public Builder addAllKeys(java.lang.Iterable<java.lang.String> values) {
+                copyOnWrite();
+                instance.addAllKeys(values);
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @return This builder for chaining.
+             */
+            public Builder clearKeys() {
+                copyOnWrite();
+                instance.clearKeys();
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * global arrays of unique keys
+             * </pre>
+             *
+             * <code>repeated string keys = 1;</code>
+             *
+             * @param value The bytes of the keys to add.
+             * @return This builder for chaining.
+             */
+            public Builder addKeysBytes(com.google.protobuf.ByteString value) {
+                copyOnWrite();
+                instance.addKeysBytes(value);
+                return this;
+            }
+
+            /**
+             *
+             *
+             * <pre>
+             * max coordinate dimensions
+             * </pre>
+             *
+             * <code>optional uint32 dimensions = 2 [default = 2];</code>
+             *
+             * @return Whether the dimensions field is set.
+             */
+            @java.lang.Override
+            public boolean hasDimensions() {
+                return instance.hasDimensions();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * max coordinate dimensions
+             * </pre>
+             *
+             * <code>optional uint32 dimensions = 2 [default = 2];</code>
+             *
+             * @return The dimensions.
+             */
+            @java.lang.Override
+            public int getDimensions() {
+                return instance.getDimensions();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * max coordinate dimensions
+             * </pre>
+             *
+             * <code>optional uint32 dimensions = 2 [default = 2];</code>
+             *
+             * @param value The dimensions to set.
+             * @return This builder for chaining.
+             */
+            public Builder setDimensions(int value) {
+                copyOnWrite();
+                instance.setDimensions(value);
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * max coordinate dimensions
+             * </pre>
+             *
+             * <code>optional uint32 dimensions = 2 [default = 2];</code>
+             *
+             * @return This builder for chaining.
+             */
+            public Builder clearDimensions() {
+                copyOnWrite();
+                instance.clearDimensions();
+                return this;
+            }
+
+            /**
+             *
+             *
+             * <pre>
+             * number of digits after decimal point for coordinates
+             * </pre>
+             *
+             * <code>optional uint32 precision = 3 [default = 6];</code>
+             *
+             * @return Whether the precision field is set.
+             */
+            @java.lang.Override
+            public boolean hasPrecision() {
+                return instance.hasPrecision();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * number of digits after decimal point for coordinates
+             * </pre>
+             *
+             * <code>optional uint32 precision = 3 [default = 6];</code>
+             *
+             * @return The precision.
+             */
+            @java.lang.Override
+            public int getPrecision() {
+                return instance.getPrecision();
+            }
+            /**
+             *
+             *
+             * <pre>
+             * number of digits after decimal point for coordinates
+             * </pre>
+             *
+             * <code>optional uint32 precision = 3 [default = 6];</code>
+             *
+             * @param value The precision to set.
+             * @return This builder for chaining.
+             */
+            public Builder setPrecision(int value) {
+                copyOnWrite();
+                instance.setPrecision(value);
+                return this;
+            }
+            /**
+             *
+             *
+             * <pre>
+             * number of digits after decimal point for coordinates
+             * </pre>
+             *
+             * <code>optional uint32 precision = 3 [default = 6];</code>
+             *
+             * @return This builder for chaining.
+             */
+            public Builder clearPrecision() {
+                copyOnWrite();
+                instance.clearPrecision();
+                return this;
+            }
+
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            @java.lang.Override
+            public boolean hasFeatureCollection() {
+                return instance.hasFeatureCollection();
+            }
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            @java.lang.Override
+            public Geobuf.Data.FeatureCollection getFeatureCollection() {
+                return instance.getFeatureCollection();
+            }
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            public Builder setFeatureCollection(Geobuf.Data.FeatureCollection value) {
+                copyOnWrite();
+                instance.setFeatureCollection(value);
+                return this;
+            }
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            public Builder setFeatureCollection(
+                    Geobuf.Data.FeatureCollection.Builder builderForValue) {
+                copyOnWrite();
+                instance.setFeatureCollection(builderForValue.build());
+                return this;
+            }
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            public Builder mergeFeatureCollection(Geobuf.Data.FeatureCollection value) {
+                copyOnWrite();
+                instance.mergeFeatureCollection(value);
+                return this;
+            }
+            /** <code>.Data.FeatureCollection feature_collection = 4;</code> */
+            public Builder clearFeatureCollection() {
+                copyOnWrite();
+                instance.clearFeatureCollection();
+                return this;
+            }
+
+            /** <code>.Data.Feature feature = 5;</code> */
+            @java.lang.Override
+            public boolean hasFeature() {
+                return instance.hasFeature();
+            }
+            /** <code>.Data.Feature feature = 5;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Feature getFeature() {
+                return instance.getFeature();
+            }
+            /** <code>.Data.Feature feature = 5;</code> */
+            public Builder setFeature(Geobuf.Data.Feature value) {
+                copyOnWrite();
+                instance.setFeature(value);
+                return this;
+            }
+            /** <code>.Data.Feature feature = 5;</code> */
+            public Builder setFeature(Geobuf.Data.Feature.Builder builderForValue) {
+                copyOnWrite();
+                instance.setFeature(builderForValue.build());
+                return this;
+            }
+            /** <code>.Data.Feature feature = 5;</code> */
+            public Builder mergeFeature(Geobuf.Data.Feature value) {
+                copyOnWrite();
+                instance.mergeFeature(value);
+                return this;
+            }
+            /** <code>.Data.Feature feature = 5;</code> */
+            public Builder clearFeature() {
+                copyOnWrite();
+                instance.clearFeature();
+                return this;
+            }
+
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            @java.lang.Override
+            public boolean hasGeometry() {
+                return instance.hasGeometry();
+            }
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            @java.lang.Override
+            public Geobuf.Data.Geometry getGeometry() {
+                return instance.getGeometry();
+            }
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            public Builder setGeometry(Geobuf.Data.Geometry value) {
+                copyOnWrite();
+                instance.setGeometry(value);
+                return this;
+            }
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            public Builder setGeometry(Geobuf.Data.Geometry.Builder builderForValue) {
+                copyOnWrite();
+                instance.setGeometry(builderForValue.build());
+                return this;
+            }
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            public Builder mergeGeometry(Geobuf.Data.Geometry value) {
+                copyOnWrite();
+                instance.mergeGeometry(value);
+                return this;
+            }
+            /** <code>.Data.Geometry geometry = 6;</code> */
+            public Builder clearGeometry() {
+                copyOnWrite();
+                instance.clearGeometry();
+                return this;
+            }
+
+            // @@protoc_insertion_point(builder_scope:Data)
+        }
+
+        private byte memoizedIsInitialized = 2;
+
+        @java.lang.Override
+        @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
+        protected final java.lang.Object dynamicMethod(
+                com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+                java.lang.Object arg0,
+                java.lang.Object arg1) {
+            switch (method) {
+                case NEW_MUTABLE_INSTANCE:
+                    {
+                        return new Geobuf.Data();
+                    }
+                case NEW_BUILDER:
+                    {
+                        return new Builder();
+                    }
+                case BUILD_MESSAGE_INFO:
+                    {
+                        java.lang.Object[] objects =
+                                new java.lang.Object[] {
+                                    "dataType_",
+                                    "dataTypeCase_",
+                                    "bitField0_",
+                                    "keys_",
+                                    "dimensions_",
+                                    "precision_",
+                                    Geobuf.Data.FeatureCollection.class,
+                                    Geobuf.Data.Feature.class,
+                                    Geobuf.Data.Geometry.class,
+                                };
+                        java.lang.String info =
+                                "\u0001\u0006\u0001\u0001\u0001\u0006\u0006\u0000\u0001\u0003\u0001\u001a\u0002\u100b"
+                                    + "\u0000\u0003\u100b\u0001\u0004\u143c\u0000\u0005\u143c\u0000\u0006\u143c\u0000";
+                        return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+                    }
+                    // fall through
+                case GET_DEFAULT_INSTANCE:
+                    {
+                        return DEFAULT_INSTANCE;
+                    }
+                case GET_PARSER:
+                    {
+                        com.google.protobuf.Parser<Geobuf.Data> parser = PARSER;
+                        if (parser == null) {
+                            synchronized (Geobuf.Data.class) {
+                                parser = PARSER;
+                                if (parser == null) {
+                                    parser =
+                                            new DefaultInstanceBasedParser<Geobuf.Data>(
+                                                    DEFAULT_INSTANCE);
+                                    PARSER = parser;
+                                }
+                            }
+                        }
+                        return parser;
+                    }
+                case GET_MEMOIZED_IS_INITIALIZED:
+                    {
+                        return memoizedIsInitialized;
+                    }
+                case SET_MEMOIZED_IS_INITIALIZED:
+                    {
+                        memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
+                        return null;
+                    }
+            }
+            throw new UnsupportedOperationException();
+        }
+
+        // @@protoc_insertion_point(class_scope:Data)
+        private static final Geobuf.Data DEFAULT_INSTANCE;
+
+        static {
+            Data defaultInstance = new Data();
+            // New instances are implicitly immutable so no need to make
+            // immutable.
+            DEFAULT_INSTANCE = defaultInstance;
+            com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+                    Data.class, defaultInstance);
+        }
+
+        public static Geobuf.Data getDefaultInstance() {
             return DEFAULT_INSTANCE;
-          }
-          case GET_PARSER: {
-            com.google.protobuf.Parser<Geobuf.Data.Feature> parser = PARSER;
-            if (parser == null) {
-              synchronized (Geobuf.Data.Feature.class) {
-                parser = PARSER;
-                if (parser == null) {
-                  parser =
-                      new DefaultInstanceBasedParser<Geobuf.Data.Feature>(
-                          DEFAULT_INSTANCE);
-                  PARSER = parser;
-                }
-              }
-            }
-            return parser;
         }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return memoizedIsInitialized;
+
+        private static volatile com.google.protobuf.Parser<Data> PARSER;
+
+        public static com.google.protobuf.Parser<Data> parser() {
+            return DEFAULT_INSTANCE.getParserForType();
         }
-        case SET_MEMOIZED_IS_INITIALIZED: {
-          memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
-          return null;
-        }
-        }
-        throw new UnsupportedOperationException();
-      }
-
-
-      // @@protoc_insertion_point(class_scope:Data.Feature)
-      private static final Geobuf.Data.Feature DEFAULT_INSTANCE;
-      static {
-        Feature defaultInstance = new Feature();
-        // New instances are implicitly immutable so no need to make
-        // immutable.
-        DEFAULT_INSTANCE = defaultInstance;
-        com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-          Feature.class, defaultInstance);
-      }
-
-      public static Geobuf.Data.Feature getDefaultInstance() {
-        return DEFAULT_INSTANCE;
-      }
-
-      private static volatile com.google.protobuf.Parser<Feature> PARSER;
-
-      public static com.google.protobuf.Parser<Feature> parser() {
-        return DEFAULT_INSTANCE.getParserForType();
-      }
     }
 
-    public interface GeometryOrBuilder extends
-        // @@protoc_insertion_point(interface_extends:Data.Geometry)
-        com.google.protobuf.MessageLiteOrBuilder {
-
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       * @return Whether the type field is set.
-       */
-      boolean hasType();
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       * @return The type.
-       */
-      Geobuf.Data.Geometry.Type getType();
-
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @return A list containing the lengths.
-       */
-      java.util.List<java.lang.Integer> getLengthsList();
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @return The count of lengths.
-       */
-      int getLengthsCount();
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The lengths at the given index.
-       */
-      int getLengths(int index);
-
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @return A list containing the coords.
-       */
-      java.util.List<java.lang.Long> getCoordsList();
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @return The count of coords.
-       */
-      int getCoordsCount();
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The coords at the given index.
-       */
-      long getCoords(int index);
-
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      java.util.List<Geobuf.Data.Geometry> 
-          getGeometriesList();
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      Geobuf.Data.Geometry getGeometries(int index);
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      int getGeometriesCount();
-
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      java.util.List<Geobuf.Data.Value> 
-          getValuesList();
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      Geobuf.Data.Value getValues(int index);
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      int getValuesCount();
-
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      java.util.List<java.lang.Integer> getCustomPropertiesList();
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      int getCustomPropertiesCount();
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      int getCustomProperties(int index);
-    }
-    /**
-     * Protobuf type {@code Data.Geometry}
-     */
-    public  static final class Geometry extends
-        com.google.protobuf.GeneratedMessageLite<
-            Geometry, Geometry.Builder> implements
-        // @@protoc_insertion_point(message_implements:Data.Geometry)
-        GeometryOrBuilder {
-      private Geometry() {
-        lengths_ = emptyIntList();
-        coords_ = emptyLongList();
-        geometries_ = emptyProtobufList();
-        values_ = emptyProtobufList();
-        customProperties_ = emptyIntList();
-      }
-      /**
-       * Protobuf enum {@code Data.Geometry.Type}
-       */
-      public enum Type
-          implements com.google.protobuf.Internal.EnumLite {
-        /**
-         * <code>POINT = 0;</code>
-         */
-        POINT(0),
-        /**
-         * <code>MULTIPOINT = 1;</code>
-         */
-        MULTIPOINT(1),
-        /**
-         * <code>LINESTRING = 2;</code>
-         */
-        LINESTRING(2),
-        /**
-         * <code>MULTILINESTRING = 3;</code>
-         */
-        MULTILINESTRING(3),
-        /**
-         * <code>POLYGON = 4;</code>
-         */
-        POLYGON(4),
-        /**
-         * <code>MULTIPOLYGON = 5;</code>
-         */
-        MULTIPOLYGON(5),
-        /**
-         * <code>GEOMETRYCOLLECTION = 6;</code>
-         */
-        GEOMETRYCOLLECTION(6),
-        ;
-
-        /**
-         * <code>POINT = 0;</code>
-         */
-        public static final int POINT_VALUE = 0;
-        /**
-         * <code>MULTIPOINT = 1;</code>
-         */
-        public static final int MULTIPOINT_VALUE = 1;
-        /**
-         * <code>LINESTRING = 2;</code>
-         */
-        public static final int LINESTRING_VALUE = 2;
-        /**
-         * <code>MULTILINESTRING = 3;</code>
-         */
-        public static final int MULTILINESTRING_VALUE = 3;
-        /**
-         * <code>POLYGON = 4;</code>
-         */
-        public static final int POLYGON_VALUE = 4;
-        /**
-         * <code>MULTIPOLYGON = 5;</code>
-         */
-        public static final int MULTIPOLYGON_VALUE = 5;
-        /**
-         * <code>GEOMETRYCOLLECTION = 6;</code>
-         */
-        public static final int GEOMETRYCOLLECTION_VALUE = 6;
-
-
-        @java.lang.Override
-        public final int getNumber() {
-          return value;
-        }
-
-        /**
-         * @param value The number of the enum to look for.
-         * @return The enum associated with the given number.
-         * @deprecated Use {@link #forNumber(int)} instead.
-         */
-        @java.lang.Deprecated
-        public static Type valueOf(int value) {
-          return forNumber(value);
-        }
-
-        public static Type forNumber(int value) {
-          switch (value) {
-            case 0: return POINT;
-            case 1: return MULTIPOINT;
-            case 2: return LINESTRING;
-            case 3: return MULTILINESTRING;
-            case 4: return POLYGON;
-            case 5: return MULTIPOLYGON;
-            case 6: return GEOMETRYCOLLECTION;
-            default: return null;
-          }
-        }
-
-        public static com.google.protobuf.Internal.EnumLiteMap<Type>
-            internalGetValueMap() {
-          return internalValueMap;
-        }
-        private static final com.google.protobuf.Internal.EnumLiteMap<
-            Type> internalValueMap =
-              new com.google.protobuf.Internal.EnumLiteMap<Type>() {
-                @java.lang.Override
-                public Type findValueByNumber(int number) {
-                  return Type.forNumber(number);
-                }
-              };
-
-        public static com.google.protobuf.Internal.EnumVerifier 
-            internalGetVerifier() {
-          return TypeVerifier.INSTANCE;
-        }
-
-        private static final class TypeVerifier implements 
-             com.google.protobuf.Internal.EnumVerifier { 
-                static final com.google.protobuf.Internal.EnumVerifier           INSTANCE = new TypeVerifier();
-                @java.lang.Override
-                public boolean isInRange(int number) {
-                  return Type.forNumber(number) != null;
-                }
-              };
-
-        private final int value;
-
-        private Type(int value) {
-          this.value = value;
-        }
-
-        // @@protoc_insertion_point(enum_scope:Data.Geometry.Type)
-      }
-
-      private int bitField0_;
-      public static final int TYPE_FIELD_NUMBER = 1;
-      private int type_;
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       * @return Whether the type field is set.
-       */
-      @java.lang.Override
-      public boolean hasType() {
-        return ((bitField0_ & 0x00000001) != 0);
-      }
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       * @return The type.
-       */
-      @java.lang.Override
-      public Geobuf.Data.Geometry.Type getType() {
-        Geobuf.Data.Geometry.Type result = Geobuf.Data.Geometry.Type.forNumber(type_);
-        return result == null ? Geobuf.Data.Geometry.Type.POINT : result;
-      }
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       * @param value The type to set.
-       */
-      private void setType(Geobuf.Data.Geometry.Type value) {
-        type_ = value.getNumber();
-        bitField0_ |= 0x00000001;
-      }
-      /**
-       * <code>required .Data.Geometry.Type type = 1;</code>
-       */
-      private void clearType() {
-        bitField0_ = (bitField0_ & ~0x00000001);
-        type_ = 0;
-      }
-
-      public static final int LENGTHS_FIELD_NUMBER = 2;
-      private com.google.protobuf.Internal.IntList lengths_;
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @return A list containing the lengths.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Integer>
-          getLengthsList() {
-        return lengths_;
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @return The count of lengths.
-       */
-      @java.lang.Override
-      public int getLengthsCount() {
-        return lengths_.size();
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The lengths at the given index.
-       */
-      @java.lang.Override
-      public int getLengths(int index) {
-        return lengths_.getInt(index);
-      }
-      private int lengthsMemoizedSerializedSize = -1;
-      private void ensureLengthsIsMutable() {
-        com.google.protobuf.Internal.IntList tmp = lengths_;
-        if (!tmp.isModifiable()) {
-          lengths_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The lengths to set.
-       */
-      private void setLengths(
-          int index, int value) {
-        ensureLengthsIsMutable();
-        lengths_.setInt(index, value);
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @param value The lengths to add.
-       */
-      private void addLengths(int value) {
-        ensureLengthsIsMutable();
-        lengths_.addInt(value);
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       * @param values The lengths to add.
-       */
-      private void addAllLengths(
-          java.lang.Iterable<? extends java.lang.Integer> values) {
-        ensureLengthsIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, lengths_);
-      }
-      /**
-       * <pre>
-       * coordinate structure in lengths
-       * </pre>
-       *
-       * <code>repeated uint32 lengths = 2 [packed = true];</code>
-       */
-      private void clearLengths() {
-        lengths_ = emptyIntList();
-      }
-
-      public static final int COORDS_FIELD_NUMBER = 3;
-      private com.google.protobuf.Internal.LongList coords_;
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @return A list containing the coords.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Long>
-          getCoordsList() {
-        return coords_;
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @return The count of coords.
-       */
-      @java.lang.Override
-      public int getCoordsCount() {
-        return coords_.size();
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The coords at the given index.
-       */
-      @java.lang.Override
-      public long getCoords(int index) {
-        return coords_.getLong(index);
-      }
-      private int coordsMemoizedSerializedSize = -1;
-      private void ensureCoordsIsMutable() {
-        com.google.protobuf.Internal.LongList tmp = coords_;
-        if (!tmp.isModifiable()) {
-          coords_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The coords to set.
-       */
-      private void setCoords(
-          int index, long value) {
-        ensureCoordsIsMutable();
-        coords_.setLong(index, value);
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @param value The coords to add.
-       */
-      private void addCoords(long value) {
-        ensureCoordsIsMutable();
-        coords_.addLong(value);
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       * @param values The coords to add.
-       */
-      private void addAllCoords(
-          java.lang.Iterable<? extends java.lang.Long> values) {
-        ensureCoordsIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, coords_);
-      }
-      /**
-       * <pre>
-       * delta-encoded integer values
-       * </pre>
-       *
-       * <code>repeated sint64 coords = 3 [packed = true];</code>
-       */
-      private void clearCoords() {
-        coords_ = emptyLongList();
-      }
-
-      public static final int GEOMETRIES_FIELD_NUMBER = 4;
-      private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Geometry> geometries_;
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      @java.lang.Override
-      public java.util.List<Geobuf.Data.Geometry> getGeometriesList() {
-        return geometries_;
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      public java.util.List<? extends Geobuf.Data.GeometryOrBuilder> 
-          getGeometriesOrBuilderList() {
-        return geometries_;
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      @java.lang.Override
-      public int getGeometriesCount() {
-        return geometries_.size();
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Geometry getGeometries(int index) {
-        return geometries_.get(index);
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      public Geobuf.Data.GeometryOrBuilder getGeometriesOrBuilder(
-          int index) {
-        return geometries_.get(index);
-      }
-      private void ensureGeometriesIsMutable() {
-        com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Geometry> tmp = geometries_;
-        if (!tmp.isModifiable()) {
-          geometries_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void setGeometries(
-          int index, Geobuf.Data.Geometry value) {
-        value.getClass();
-  ensureGeometriesIsMutable();
-        geometries_.set(index, value);
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void addGeometries(Geobuf.Data.Geometry value) {
-        value.getClass();
-  ensureGeometriesIsMutable();
-        geometries_.add(value);
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void addGeometries(
-          int index, Geobuf.Data.Geometry value) {
-        value.getClass();
-  ensureGeometriesIsMutable();
-        geometries_.add(index, value);
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void addAllGeometries(
-          java.lang.Iterable<? extends Geobuf.Data.Geometry> values) {
-        ensureGeometriesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, geometries_);
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void clearGeometries() {
-        geometries_ = emptyProtobufList();
-      }
-      /**
-       * <code>repeated .Data.Geometry geometries = 4;</code>
-       */
-      private void removeGeometries(int index) {
-        ensureGeometriesIsMutable();
-        geometries_.remove(index);
-      }
-
-      public static final int VALUES_FIELD_NUMBER = 13;
-      private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public java.util.List<Geobuf.Data.Value> getValuesList() {
-        return values_;
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public java.util.List<? extends Geobuf.Data.ValueOrBuilder> 
-          getValuesOrBuilderList() {
-        return values_;
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public int getValuesCount() {
-        return values_.size();
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Value getValues(int index) {
-        return values_.get(index);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(
-          int index) {
-        return values_.get(index);
-      }
-      private void ensureValuesIsMutable() {
-        com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
-        if (!tmp.isModifiable()) {
-          values_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void setValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.set(index, value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(index, value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addAllValues(
-          java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-        ensureValuesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, values_);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void clearValues() {
-        values_ = emptyProtobufList();
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void removeValues(int index) {
-        ensureValuesIsMutable();
-        values_.remove(index);
-      }
-
-      public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
-      private com.google.protobuf.Internal.IntList customProperties_;
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Integer>
-          getCustomPropertiesList() {
-        return customProperties_;
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      @java.lang.Override
-      public int getCustomPropertiesCount() {
-        return customProperties_.size();
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      @java.lang.Override
-      public int getCustomProperties(int index) {
-        return customProperties_.getInt(index);
-      }
-      private int customPropertiesMemoizedSerializedSize = -1;
-      private void ensureCustomPropertiesIsMutable() {
-        com.google.protobuf.Internal.IntList tmp = customProperties_;
-        if (!tmp.isModifiable()) {
-          customProperties_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The customProperties to set.
-       */
-      private void setCustomProperties(
-          int index, int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.setInt(index, value);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param value The customProperties to add.
-       */
-      private void addCustomProperties(int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.addInt(value);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param values The customProperties to add.
-       */
-      private void addAllCustomProperties(
-          java.lang.Iterable<? extends java.lang.Integer> values) {
-        ensureCustomPropertiesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, customProperties_);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       */
-      private void clearCustomProperties() {
-        customProperties_ = emptyIntList();
-      }
-
-      public static Geobuf.Data.Geometry parseFrom(
-          java.nio.ByteBuffer data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          java.nio.ByteBuffer data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          com.google.protobuf.ByteString data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          com.google.protobuf.ByteString data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Geometry parseFrom(byte[] data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          byte[] data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Geometry parseFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Geometry parseDelimitedFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Geometry parseDelimitedFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          com.google.protobuf.CodedInputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Geometry parseFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-
-      public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
-      }
-      public static Builder newBuilder(Geobuf.Data.Geometry prototype) {
-        return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
-      }
-
-      /**
-       * Protobuf type {@code Data.Geometry}
-       */
-      public static final class Builder extends
-          com.google.protobuf.GeneratedMessageLite.Builder<
-            Geobuf.Data.Geometry, Builder> implements
-          // @@protoc_insertion_point(builder_implements:Data.Geometry)
-          Geobuf.Data.GeometryOrBuilder {
-        // Construct using Geobuf.Data.Geometry.newBuilder()
-        private Builder() {
-          super(DEFAULT_INSTANCE);
-        }
-
-
-        /**
-         * <code>required .Data.Geometry.Type type = 1;</code>
-         * @return Whether the type field is set.
-         */
-        @java.lang.Override
-        public boolean hasType() {
-          return instance.hasType();
-        }
-        /**
-         * <code>required .Data.Geometry.Type type = 1;</code>
-         * @return The type.
-         */
-        @java.lang.Override
-        public Geobuf.Data.Geometry.Type getType() {
-          return instance.getType();
-        }
-        /**
-         * <code>required .Data.Geometry.Type type = 1;</code>
-         * @param value The enum numeric value on the wire for type to set.
-         * @return This builder for chaining.
-         */
-        public Builder setType(Geobuf.Data.Geometry.Type value) {
-          copyOnWrite();
-          instance.setType(value);
-          return this;
-        }
-        /**
-         * <code>required .Data.Geometry.Type type = 1;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearType() {
-          copyOnWrite();
-          instance.clearType();
-          return this;
-        }
-
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @return A list containing the lengths.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Integer>
-            getLengthsList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getLengthsList());
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @return The count of lengths.
-         */
-        @java.lang.Override
-        public int getLengthsCount() {
-          return instance.getLengthsCount();
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The lengths at the given index.
-         */
-        @java.lang.Override
-        public int getLengths(int index) {
-          return instance.getLengths(index);
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @param value The lengths to set.
-         * @return This builder for chaining.
-         */
-        public Builder setLengths(
-            int index, int value) {
-          copyOnWrite();
-          instance.setLengths(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @param value The lengths to add.
-         * @return This builder for chaining.
-         */
-        public Builder addLengths(int value) {
-          copyOnWrite();
-          instance.addLengths(value);
-          return this;
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @param values The lengths to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllLengths(
-            java.lang.Iterable<? extends java.lang.Integer> values) {
-          copyOnWrite();
-          instance.addAllLengths(values);
-          return this;
-        }
-        /**
-         * <pre>
-         * coordinate structure in lengths
-         * </pre>
-         *
-         * <code>repeated uint32 lengths = 2 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearLengths() {
-          copyOnWrite();
-          instance.clearLengths();
-          return this;
-        }
-
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @return A list containing the coords.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Long>
-            getCoordsList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getCoordsList());
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @return The count of coords.
-         */
-        @java.lang.Override
-        public int getCoordsCount() {
-          return instance.getCoordsCount();
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The coords at the given index.
-         */
-        @java.lang.Override
-        public long getCoords(int index) {
-          return instance.getCoords(index);
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @param value The coords to set.
-         * @return This builder for chaining.
-         */
-        public Builder setCoords(
-            int index, long value) {
-          copyOnWrite();
-          instance.setCoords(index, value);
-          return this;
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @param value The coords to add.
-         * @return This builder for chaining.
-         */
-        public Builder addCoords(long value) {
-          copyOnWrite();
-          instance.addCoords(value);
-          return this;
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @param values The coords to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllCoords(
-            java.lang.Iterable<? extends java.lang.Long> values) {
-          copyOnWrite();
-          instance.addAllCoords(values);
-          return this;
-        }
-        /**
-         * <pre>
-         * delta-encoded integer values
-         * </pre>
-         *
-         * <code>repeated sint64 coords = 3 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearCoords() {
-          copyOnWrite();
-          instance.clearCoords();
-          return this;
-        }
-
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        @java.lang.Override
-        public java.util.List<Geobuf.Data.Geometry> getGeometriesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getGeometriesList());
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        @java.lang.Override
-        public int getGeometriesCount() {
-          return instance.getGeometriesCount();
-        }/**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        @java.lang.Override
-        public Geobuf.Data.Geometry getGeometries(int index) {
-          return instance.getGeometries(index);
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder setGeometries(
-            int index, Geobuf.Data.Geometry value) {
-          copyOnWrite();
-          instance.setGeometries(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder setGeometries(
-            int index, Geobuf.Data.Geometry.Builder builderForValue) {
-          copyOnWrite();
-          instance.setGeometries(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder addGeometries(Geobuf.Data.Geometry value) {
-          copyOnWrite();
-          instance.addGeometries(value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder addGeometries(
-            int index, Geobuf.Data.Geometry value) {
-          copyOnWrite();
-          instance.addGeometries(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder addGeometries(
-            Geobuf.Data.Geometry.Builder builderForValue) {
-          copyOnWrite();
-          instance.addGeometries(builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder addGeometries(
-            int index, Geobuf.Data.Geometry.Builder builderForValue) {
-          copyOnWrite();
-          instance.addGeometries(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder addAllGeometries(
-            java.lang.Iterable<? extends Geobuf.Data.Geometry> values) {
-          copyOnWrite();
-          instance.addAllGeometries(values);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder clearGeometries() {
-          copyOnWrite();
-          instance.clearGeometries();
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Geometry geometries = 4;</code>
-         */
-        public Builder removeGeometries(int index) {
-          copyOnWrite();
-          instance.removeGeometries(index);
-          return this;
-        }
-
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public java.util.List<Geobuf.Data.Value> getValuesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getValuesList());
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public int getValuesCount() {
-          return instance.getValuesCount();
-        }/**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public Geobuf.Data.Value getValues(int index) {
-          return instance.getValues(index);
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.setValues(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.setValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addAllValues(
-            java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-          copyOnWrite();
-          instance.addAllValues(values);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder clearValues() {
-          copyOnWrite();
-          instance.clearValues();
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder removeValues(int index) {
-          copyOnWrite();
-          instance.removeValues(index);
-          return this;
-        }
-
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return A list containing the customProperties.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Integer>
-            getCustomPropertiesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getCustomPropertiesList());
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return The count of customProperties.
-         */
-        @java.lang.Override
-        public int getCustomPropertiesCount() {
-          return instance.getCustomPropertiesCount();
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The customProperties at the given index.
-         */
-        @java.lang.Override
-        public int getCustomProperties(int index) {
-          return instance.getCustomProperties(index);
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to set.
-         * @return This builder for chaining.
-         */
-        public Builder setCustomProperties(
-            int index, int value) {
-          copyOnWrite();
-          instance.setCustomProperties(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addCustomProperties(int value) {
-          copyOnWrite();
-          instance.addCustomProperties(value);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param values The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllCustomProperties(
-            java.lang.Iterable<? extends java.lang.Integer> values) {
-          copyOnWrite();
-          instance.addAllCustomProperties(values);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearCustomProperties() {
-          copyOnWrite();
-          instance.clearCustomProperties();
-          return this;
-        }
-
-        // @@protoc_insertion_point(builder_scope:Data.Geometry)
-      }
-      private byte memoizedIsInitialized = 2;
-      @java.lang.Override
-      @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
-      protected final java.lang.Object dynamicMethod(
-          com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-          java.lang.Object arg0, java.lang.Object arg1) {
-        switch (method) {
-          case NEW_MUTABLE_INSTANCE: {
-            return new Geobuf.Data.Geometry();
-          }
-          case NEW_BUILDER: {
-            return new Builder();
-          }
-          case BUILD_MESSAGE_INFO: {
-              java.lang.Object[] objects = new java.lang.Object[] {
-                "bitField0_",
-                "type_",
-                Geobuf.Data.Geometry.Type.internalGetVerifier(),
-                "lengths_",
-                "coords_",
-                "geometries_",
-                Geobuf.Data.Geometry.class,
-                "values_",
-                Geobuf.Data.Value.class,
-                "customProperties_",
-              };
-              java.lang.String info =
-                  "\u0001\u0006\u0000\u0001\u0001\u000f\u0006\u0000\u0005\u0002\u0001\u150c\u0000\u0002" +
-                  "+\u00030\u0004\u041b\r\u001b\u000f+";
-              return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-          }
-          // fall through
-          case GET_DEFAULT_INSTANCE: {
-            return DEFAULT_INSTANCE;
-          }
-          case GET_PARSER: {
-            com.google.protobuf.Parser<Geobuf.Data.Geometry> parser = PARSER;
-            if (parser == null) {
-              synchronized (Geobuf.Data.Geometry.class) {
-                parser = PARSER;
-                if (parser == null) {
-                  parser =
-                      new DefaultInstanceBasedParser<Geobuf.Data.Geometry>(
-                          DEFAULT_INSTANCE);
-                  PARSER = parser;
-                }
-              }
-            }
-            return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return memoizedIsInitialized;
-        }
-        case SET_MEMOIZED_IS_INITIALIZED: {
-          memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
-          return null;
-        }
-        }
-        throw new UnsupportedOperationException();
-      }
-
-
-      // @@protoc_insertion_point(class_scope:Data.Geometry)
-      private static final Geobuf.Data.Geometry DEFAULT_INSTANCE;
-      static {
-        Geometry defaultInstance = new Geometry();
-        // New instances are implicitly immutable so no need to make
-        // immutable.
-        DEFAULT_INSTANCE = defaultInstance;
-        com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-          Geometry.class, defaultInstance);
-      }
-
-      public static Geobuf.Data.Geometry getDefaultInstance() {
-        return DEFAULT_INSTANCE;
-      }
-
-      private static volatile com.google.protobuf.Parser<Geometry> PARSER;
-
-      public static com.google.protobuf.Parser<Geometry> parser() {
-        return DEFAULT_INSTANCE.getParserForType();
-      }
-    }
-
-    public interface FeatureCollectionOrBuilder extends
-        // @@protoc_insertion_point(interface_extends:Data.FeatureCollection)
-        com.google.protobuf.MessageLiteOrBuilder {
-
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      java.util.List<Geobuf.Data.Feature> 
-          getFeaturesList();
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      Geobuf.Data.Feature getFeatures(int index);
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      int getFeaturesCount();
-
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      java.util.List<Geobuf.Data.Value> 
-          getValuesList();
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      Geobuf.Data.Value getValues(int index);
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      int getValuesCount();
-
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      java.util.List<java.lang.Integer> getCustomPropertiesList();
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      int getCustomPropertiesCount();
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      int getCustomProperties(int index);
-    }
-    /**
-     * Protobuf type {@code Data.FeatureCollection}
-     */
-    public  static final class FeatureCollection extends
-        com.google.protobuf.GeneratedMessageLite<
-            FeatureCollection, FeatureCollection.Builder> implements
-        // @@protoc_insertion_point(message_implements:Data.FeatureCollection)
-        FeatureCollectionOrBuilder {
-      private FeatureCollection() {
-        features_ = emptyProtobufList();
-        values_ = emptyProtobufList();
-        customProperties_ = emptyIntList();
-      }
-      public static final int FEATURES_FIELD_NUMBER = 1;
-      private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Feature> features_;
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      @java.lang.Override
-      public java.util.List<Geobuf.Data.Feature> getFeaturesList() {
-        return features_;
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      public java.util.List<? extends Geobuf.Data.FeatureOrBuilder> 
-          getFeaturesOrBuilderList() {
-        return features_;
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      @java.lang.Override
-      public int getFeaturesCount() {
-        return features_.size();
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Feature getFeatures(int index) {
-        return features_.get(index);
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      public Geobuf.Data.FeatureOrBuilder getFeaturesOrBuilder(
-          int index) {
-        return features_.get(index);
-      }
-      private void ensureFeaturesIsMutable() {
-        com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Feature> tmp = features_;
-        if (!tmp.isModifiable()) {
-          features_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void setFeatures(
-          int index, Geobuf.Data.Feature value) {
-        value.getClass();
-  ensureFeaturesIsMutable();
-        features_.set(index, value);
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void addFeatures(Geobuf.Data.Feature value) {
-        value.getClass();
-  ensureFeaturesIsMutable();
-        features_.add(value);
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void addFeatures(
-          int index, Geobuf.Data.Feature value) {
-        value.getClass();
-  ensureFeaturesIsMutable();
-        features_.add(index, value);
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void addAllFeatures(
-          java.lang.Iterable<? extends Geobuf.Data.Feature> values) {
-        ensureFeaturesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, features_);
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void clearFeatures() {
-        features_ = emptyProtobufList();
-      }
-      /**
-       * <code>repeated .Data.Feature features = 1;</code>
-       */
-      private void removeFeatures(int index) {
-        ensureFeaturesIsMutable();
-        features_.remove(index);
-      }
-
-      public static final int VALUES_FIELD_NUMBER = 13;
-      private com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> values_;
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public java.util.List<Geobuf.Data.Value> getValuesList() {
-        return values_;
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public java.util.List<? extends Geobuf.Data.ValueOrBuilder> 
-          getValuesOrBuilderList() {
-        return values_;
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public int getValuesCount() {
-        return values_.size();
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Value getValues(int index) {
-        return values_.get(index);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      public Geobuf.Data.ValueOrBuilder getValuesOrBuilder(
-          int index) {
-        return values_.get(index);
-      }
-      private void ensureValuesIsMutable() {
-        com.google.protobuf.Internal.ProtobufList<Geobuf.Data.Value> tmp = values_;
-        if (!tmp.isModifiable()) {
-          values_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void setValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.set(index, value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addValues(
-          int index, Geobuf.Data.Value value) {
-        value.getClass();
-  ensureValuesIsMutable();
-        values_.add(index, value);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void addAllValues(
-          java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-        ensureValuesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, values_);
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void clearValues() {
-        values_ = emptyProtobufList();
-      }
-      /**
-       * <code>repeated .Data.Value values = 13;</code>
-       */
-      private void removeValues(int index) {
-        ensureValuesIsMutable();
-        values_.remove(index);
-      }
-
-      public static final int CUSTOM_PROPERTIES_FIELD_NUMBER = 15;
-      private com.google.protobuf.Internal.IntList customProperties_;
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return A list containing the customProperties.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.Integer>
-          getCustomPropertiesList() {
-        return customProperties_;
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @return The count of customProperties.
-       */
-      @java.lang.Override
-      public int getCustomPropertiesCount() {
-        return customProperties_.size();
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index of the element to return.
-       * @return The customProperties at the given index.
-       */
-      @java.lang.Override
-      public int getCustomProperties(int index) {
-        return customProperties_.getInt(index);
-      }
-      private int customPropertiesMemoizedSerializedSize = -1;
-      private void ensureCustomPropertiesIsMutable() {
-        com.google.protobuf.Internal.IntList tmp = customProperties_;
-        if (!tmp.isModifiable()) {
-          customProperties_ =
-              com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-         }
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param index The index to set the value at.
-       * @param value The customProperties to set.
-       */
-      private void setCustomProperties(
-          int index, int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.setInt(index, value);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param value The customProperties to add.
-       */
-      private void addCustomProperties(int value) {
-        ensureCustomPropertiesIsMutable();
-        customProperties_.addInt(value);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       * @param values The customProperties to add.
-       */
-      private void addAllCustomProperties(
-          java.lang.Iterable<? extends java.lang.Integer> values) {
-        ensureCustomPropertiesIsMutable();
-        com.google.protobuf.AbstractMessageLite.addAll(
-            values, customProperties_);
-      }
-      /**
-       * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-       */
-      private void clearCustomProperties() {
-        customProperties_ = emptyIntList();
-      }
-
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          java.nio.ByteBuffer data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          java.nio.ByteBuffer data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          com.google.protobuf.ByteString data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          com.google.protobuf.ByteString data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(byte[] data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          byte[] data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.FeatureCollection parseDelimitedFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.FeatureCollection parseDelimitedFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          com.google.protobuf.CodedInputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.FeatureCollection parseFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-
-      public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
-      }
-      public static Builder newBuilder(Geobuf.Data.FeatureCollection prototype) {
-        return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
-      }
-
-      /**
-       * Protobuf type {@code Data.FeatureCollection}
-       */
-      public static final class Builder extends
-          com.google.protobuf.GeneratedMessageLite.Builder<
-            Geobuf.Data.FeatureCollection, Builder> implements
-          // @@protoc_insertion_point(builder_implements:Data.FeatureCollection)
-          Geobuf.Data.FeatureCollectionOrBuilder {
-        // Construct using Geobuf.Data.FeatureCollection.newBuilder()
-        private Builder() {
-          super(DEFAULT_INSTANCE);
-        }
-
-
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        @java.lang.Override
-        public java.util.List<Geobuf.Data.Feature> getFeaturesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getFeaturesList());
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        @java.lang.Override
-        public int getFeaturesCount() {
-          return instance.getFeaturesCount();
-        }/**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        @java.lang.Override
-        public Geobuf.Data.Feature getFeatures(int index) {
-          return instance.getFeatures(index);
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder setFeatures(
-            int index, Geobuf.Data.Feature value) {
-          copyOnWrite();
-          instance.setFeatures(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder setFeatures(
-            int index, Geobuf.Data.Feature.Builder builderForValue) {
-          copyOnWrite();
-          instance.setFeatures(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder addFeatures(Geobuf.Data.Feature value) {
-          copyOnWrite();
-          instance.addFeatures(value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder addFeatures(
-            int index, Geobuf.Data.Feature value) {
-          copyOnWrite();
-          instance.addFeatures(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder addFeatures(
-            Geobuf.Data.Feature.Builder builderForValue) {
-          copyOnWrite();
-          instance.addFeatures(builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder addFeatures(
-            int index, Geobuf.Data.Feature.Builder builderForValue) {
-          copyOnWrite();
-          instance.addFeatures(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder addAllFeatures(
-            java.lang.Iterable<? extends Geobuf.Data.Feature> values) {
-          copyOnWrite();
-          instance.addAllFeatures(values);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder clearFeatures() {
-          copyOnWrite();
-          instance.clearFeatures();
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Feature features = 1;</code>
-         */
-        public Builder removeFeatures(int index) {
-          copyOnWrite();
-          instance.removeFeatures(index);
-          return this;
-        }
-
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public java.util.List<Geobuf.Data.Value> getValuesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getValuesList());
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public int getValuesCount() {
-          return instance.getValuesCount();
-        }/**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        @java.lang.Override
-        public Geobuf.Data.Value getValues(int index) {
-          return instance.getValues(index);
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.setValues(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder setValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.setValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value value) {
-          copyOnWrite();
-          instance.addValues(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addValues(
-            int index, Geobuf.Data.Value.Builder builderForValue) {
-          copyOnWrite();
-          instance.addValues(index,
-              builderForValue.build());
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder addAllValues(
-            java.lang.Iterable<? extends Geobuf.Data.Value> values) {
-          copyOnWrite();
-          instance.addAllValues(values);
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder clearValues() {
-          copyOnWrite();
-          instance.clearValues();
-          return this;
-        }
-        /**
-         * <code>repeated .Data.Value values = 13;</code>
-         */
-        public Builder removeValues(int index) {
-          copyOnWrite();
-          instance.removeValues(index);
-          return this;
-        }
-
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return A list containing the customProperties.
-         */
-        @java.lang.Override
-        public java.util.List<java.lang.Integer>
-            getCustomPropertiesList() {
-          return java.util.Collections.unmodifiableList(
-              instance.getCustomPropertiesList());
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return The count of customProperties.
-         */
-        @java.lang.Override
-        public int getCustomPropertiesCount() {
-          return instance.getCustomPropertiesCount();
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param index The index of the element to return.
-         * @return The customProperties at the given index.
-         */
-        @java.lang.Override
-        public int getCustomProperties(int index) {
-          return instance.getCustomProperties(index);
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to set.
-         * @return This builder for chaining.
-         */
-        public Builder setCustomProperties(
-            int index, int value) {
-          copyOnWrite();
-          instance.setCustomProperties(index, value);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param value The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addCustomProperties(int value) {
-          copyOnWrite();
-          instance.addCustomProperties(value);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @param values The customProperties to add.
-         * @return This builder for chaining.
-         */
-        public Builder addAllCustomProperties(
-            java.lang.Iterable<? extends java.lang.Integer> values) {
-          copyOnWrite();
-          instance.addAllCustomProperties(values);
-          return this;
-        }
-        /**
-         * <code>repeated uint32 custom_properties = 15 [packed = true];</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearCustomProperties() {
-          copyOnWrite();
-          instance.clearCustomProperties();
-          return this;
-        }
-
-        // @@protoc_insertion_point(builder_scope:Data.FeatureCollection)
-      }
-      private byte memoizedIsInitialized = 2;
-      @java.lang.Override
-      @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
-      protected final java.lang.Object dynamicMethod(
-          com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-          java.lang.Object arg0, java.lang.Object arg1) {
-        switch (method) {
-          case NEW_MUTABLE_INSTANCE: {
-            return new Geobuf.Data.FeatureCollection();
-          }
-          case NEW_BUILDER: {
-            return new Builder();
-          }
-          case BUILD_MESSAGE_INFO: {
-              java.lang.Object[] objects = new java.lang.Object[] {
-                "features_",
-                Geobuf.Data.Feature.class,
-                "values_",
-                Geobuf.Data.Value.class,
-                "customProperties_",
-              };
-              java.lang.String info =
-                  "\u0001\u0003\u0000\u0000\u0001\u000f\u0003\u0000\u0003\u0001\u0001\u041b\r\u001b" +
-                  "\u000f+";
-              return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-          }
-          // fall through
-          case GET_DEFAULT_INSTANCE: {
-            return DEFAULT_INSTANCE;
-          }
-          case GET_PARSER: {
-            com.google.protobuf.Parser<Geobuf.Data.FeatureCollection> parser = PARSER;
-            if (parser == null) {
-              synchronized (Geobuf.Data.FeatureCollection.class) {
-                parser = PARSER;
-                if (parser == null) {
-                  parser =
-                      new DefaultInstanceBasedParser<Geobuf.Data.FeatureCollection>(
-                          DEFAULT_INSTANCE);
-                  PARSER = parser;
-                }
-              }
-            }
-            return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return memoizedIsInitialized;
-        }
-        case SET_MEMOIZED_IS_INITIALIZED: {
-          memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
-          return null;
-        }
-        }
-        throw new UnsupportedOperationException();
-      }
-
-
-      // @@protoc_insertion_point(class_scope:Data.FeatureCollection)
-      private static final Geobuf.Data.FeatureCollection DEFAULT_INSTANCE;
-      static {
-        FeatureCollection defaultInstance = new FeatureCollection();
-        // New instances are implicitly immutable so no need to make
-        // immutable.
-        DEFAULT_INSTANCE = defaultInstance;
-        com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-          FeatureCollection.class, defaultInstance);
-      }
-
-      public static Geobuf.Data.FeatureCollection getDefaultInstance() {
-        return DEFAULT_INSTANCE;
-      }
-
-      private static volatile com.google.protobuf.Parser<FeatureCollection> PARSER;
-
-      public static com.google.protobuf.Parser<FeatureCollection> parser() {
-        return DEFAULT_INSTANCE.getParserForType();
-      }
-    }
-
-    public interface ValueOrBuilder extends
-        // @@protoc_insertion_point(interface_extends:Data.Value)
-        com.google.protobuf.MessageLiteOrBuilder {
-
-      /**
-       * <code>string string_value = 1;</code>
-       * @return Whether the stringValue field is set.
-       */
-      boolean hasStringValue();
-      /**
-       * <code>string string_value = 1;</code>
-       * @return The stringValue.
-       */
-      java.lang.String getStringValue();
-      /**
-       * <code>string string_value = 1;</code>
-       * @return The bytes for stringValue.
-       */
-      com.google.protobuf.ByteString
-          getStringValueBytes();
-
-      /**
-       * <code>double double_value = 2;</code>
-       * @return Whether the doubleValue field is set.
-       */
-      boolean hasDoubleValue();
-      /**
-       * <code>double double_value = 2;</code>
-       * @return The doubleValue.
-       */
-      double getDoubleValue();
-
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       * @return Whether the posIntValue field is set.
-       */
-      boolean hasPosIntValue();
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       * @return The posIntValue.
-       */
-      long getPosIntValue();
-
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       * @return Whether the negIntValue field is set.
-       */
-      boolean hasNegIntValue();
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       * @return The negIntValue.
-       */
-      long getNegIntValue();
-
-      /**
-       * <code>bool bool_value = 5;</code>
-       * @return Whether the boolValue field is set.
-       */
-      boolean hasBoolValue();
-      /**
-       * <code>bool bool_value = 5;</code>
-       * @return The boolValue.
-       */
-      boolean getBoolValue();
-
-      /**
-       * <code>string json_value = 6;</code>
-       * @return Whether the jsonValue field is set.
-       */
-      boolean hasJsonValue();
-      /**
-       * <code>string json_value = 6;</code>
-       * @return The jsonValue.
-       */
-      java.lang.String getJsonValue();
-      /**
-       * <code>string json_value = 6;</code>
-       * @return The bytes for jsonValue.
-       */
-      com.google.protobuf.ByteString
-          getJsonValueBytes();
-
-      public Geobuf.Data.Value.ValueTypeCase getValueTypeCase();
-    }
-    /**
-     * Protobuf type {@code Data.Value}
-     */
-    public  static final class Value extends
-        com.google.protobuf.GeneratedMessageLite<
-            Value, Value.Builder> implements
-        // @@protoc_insertion_point(message_implements:Data.Value)
-        ValueOrBuilder {
-      private Value() {
-      }
-      private int bitField0_;
-      private int valueTypeCase_ = 0;
-      private java.lang.Object valueType_;
-      public enum ValueTypeCase {
-        STRING_VALUE(1),
-        DOUBLE_VALUE(2),
-        POS_INT_VALUE(3),
-        NEG_INT_VALUE(4),
-        BOOL_VALUE(5),
-        JSON_VALUE(6),
-        VALUETYPE_NOT_SET(0);
-        private final int value;
-        private ValueTypeCase(int value) {
-          this.value = value;
-        }
-        /**
-         * @deprecated Use {@link #forNumber(int)} instead.
-         */
-        @java.lang.Deprecated
-        public static ValueTypeCase valueOf(int value) {
-          return forNumber(value);
-        }
-
-        public static ValueTypeCase forNumber(int value) {
-          switch (value) {
-            case 1: return STRING_VALUE;
-            case 2: return DOUBLE_VALUE;
-            case 3: return POS_INT_VALUE;
-            case 4: return NEG_INT_VALUE;
-            case 5: return BOOL_VALUE;
-            case 6: return JSON_VALUE;
-            case 0: return VALUETYPE_NOT_SET;
-            default: return null;
-          }
-        }
-        public int getNumber() {
-          return this.value;
-        }
-      };
-
-      @java.lang.Override
-      public ValueTypeCase
-      getValueTypeCase() {
-        return ValueTypeCase.forNumber(
-            valueTypeCase_);
-      }
-
-      private void clearValueType() {
-        valueTypeCase_ = 0;
-        valueType_ = null;
-      }
-
-      public static final int STRING_VALUE_FIELD_NUMBER = 1;
-      /**
-       * <code>string string_value = 1;</code>
-       * @return Whether the stringValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasStringValue() {
-        return valueTypeCase_ == 1;
-      }
-      /**
-       * <code>string string_value = 1;</code>
-       * @return The stringValue.
-       */
-      @java.lang.Override
-      public java.lang.String getStringValue() {
-        java.lang.String ref = "";
-        if (valueTypeCase_ == 1) {
-          ref = (java.lang.String) valueType_;
-        }
-        return ref;
-      }
-      /**
-       * <code>string string_value = 1;</code>
-       * @return The bytes for stringValue.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getStringValueBytes() {
-        java.lang.String ref = "";
-        if (valueTypeCase_ == 1) {
-          ref = (java.lang.String) valueType_;
-        }
-        return com.google.protobuf.ByteString.copyFromUtf8(ref);
-      }
-      /**
-       * <code>string string_value = 1;</code>
-       * @param value The stringValue to set.
-       */
-      private void setStringValue(
-          java.lang.String value) {
-        value.getClass();
-  valueTypeCase_ = 1;
-        valueType_ = value;
-      }
-      /**
-       * <code>string string_value = 1;</code>
-       */
-      private void clearStringValue() {
-        if (valueTypeCase_ == 1) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-      /**
-       * <code>string string_value = 1;</code>
-       * @param value The bytes for stringValue to set.
-       */
-      private void setStringValueBytes(
-          com.google.protobuf.ByteString value) {
-        valueType_ = value.toStringUtf8();
-        valueTypeCase_ = 1;
-      }
-
-      public static final int DOUBLE_VALUE_FIELD_NUMBER = 2;
-      /**
-       * <code>double double_value = 2;</code>
-       * @return Whether the doubleValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasDoubleValue() {
-        return valueTypeCase_ == 2;
-      }
-      /**
-       * <code>double double_value = 2;</code>
-       * @return The doubleValue.
-       */
-      @java.lang.Override
-      public double getDoubleValue() {
-        if (valueTypeCase_ == 2) {
-          return (java.lang.Double) valueType_;
-        }
-        return 0D;
-      }
-      /**
-       * <code>double double_value = 2;</code>
-       * @param value The doubleValue to set.
-       */
-      private void setDoubleValue(double value) {
-        valueTypeCase_ = 2;
-        valueType_ = value;
-      }
-      /**
-       * <code>double double_value = 2;</code>
-       */
-      private void clearDoubleValue() {
-        if (valueTypeCase_ == 2) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-
-      public static final int POS_INT_VALUE_FIELD_NUMBER = 3;
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       * @return Whether the posIntValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasPosIntValue() {
-        return valueTypeCase_ == 3;
-      }
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       * @return The posIntValue.
-       */
-      @java.lang.Override
-      public long getPosIntValue() {
-        if (valueTypeCase_ == 3) {
-          return (java.lang.Long) valueType_;
-        }
-        return 0L;
-      }
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       * @param value The posIntValue to set.
-       */
-      private void setPosIntValue(long value) {
-        valueTypeCase_ = 3;
-        valueType_ = value;
-      }
-      /**
-       * <code>uint64 pos_int_value = 3;</code>
-       */
-      private void clearPosIntValue() {
-        if (valueTypeCase_ == 3) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-
-      public static final int NEG_INT_VALUE_FIELD_NUMBER = 4;
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       * @return Whether the negIntValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasNegIntValue() {
-        return valueTypeCase_ == 4;
-      }
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       * @return The negIntValue.
-       */
-      @java.lang.Override
-      public long getNegIntValue() {
-        if (valueTypeCase_ == 4) {
-          return (java.lang.Long) valueType_;
-        }
-        return 0L;
-      }
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       * @param value The negIntValue to set.
-       */
-      private void setNegIntValue(long value) {
-        valueTypeCase_ = 4;
-        valueType_ = value;
-      }
-      /**
-       * <code>uint64 neg_int_value = 4;</code>
-       */
-      private void clearNegIntValue() {
-        if (valueTypeCase_ == 4) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-
-      public static final int BOOL_VALUE_FIELD_NUMBER = 5;
-      /**
-       * <code>bool bool_value = 5;</code>
-       * @return Whether the boolValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasBoolValue() {
-        return valueTypeCase_ == 5;
-      }
-      /**
-       * <code>bool bool_value = 5;</code>
-       * @return The boolValue.
-       */
-      @java.lang.Override
-      public boolean getBoolValue() {
-        if (valueTypeCase_ == 5) {
-          return (java.lang.Boolean) valueType_;
-        }
-        return false;
-      }
-      /**
-       * <code>bool bool_value = 5;</code>
-       * @param value The boolValue to set.
-       */
-      private void setBoolValue(boolean value) {
-        valueTypeCase_ = 5;
-        valueType_ = value;
-      }
-      /**
-       * <code>bool bool_value = 5;</code>
-       */
-      private void clearBoolValue() {
-        if (valueTypeCase_ == 5) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-
-      public static final int JSON_VALUE_FIELD_NUMBER = 6;
-      /**
-       * <code>string json_value = 6;</code>
-       * @return Whether the jsonValue field is set.
-       */
-      @java.lang.Override
-      public boolean hasJsonValue() {
-        return valueTypeCase_ == 6;
-      }
-      /**
-       * <code>string json_value = 6;</code>
-       * @return The jsonValue.
-       */
-      @java.lang.Override
-      public java.lang.String getJsonValue() {
-        java.lang.String ref = "";
-        if (valueTypeCase_ == 6) {
-          ref = (java.lang.String) valueType_;
-        }
-        return ref;
-      }
-      /**
-       * <code>string json_value = 6;</code>
-       * @return The bytes for jsonValue.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getJsonValueBytes() {
-        java.lang.String ref = "";
-        if (valueTypeCase_ == 6) {
-          ref = (java.lang.String) valueType_;
-        }
-        return com.google.protobuf.ByteString.copyFromUtf8(ref);
-      }
-      /**
-       * <code>string json_value = 6;</code>
-       * @param value The jsonValue to set.
-       */
-      private void setJsonValue(
-          java.lang.String value) {
-        value.getClass();
-  valueTypeCase_ = 6;
-        valueType_ = value;
-      }
-      /**
-       * <code>string json_value = 6;</code>
-       */
-      private void clearJsonValue() {
-        if (valueTypeCase_ == 6) {
-          valueTypeCase_ = 0;
-          valueType_ = null;
-        }
-      }
-      /**
-       * <code>string json_value = 6;</code>
-       * @param value The bytes for jsonValue to set.
-       */
-      private void setJsonValueBytes(
-          com.google.protobuf.ByteString value) {
-        valueType_ = value.toStringUtf8();
-        valueTypeCase_ = 6;
-      }
-
-      public static Geobuf.Data.Value parseFrom(
-          java.nio.ByteBuffer data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          java.nio.ByteBuffer data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          com.google.protobuf.ByteString data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          com.google.protobuf.ByteString data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Value parseFrom(byte[] data)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          byte[] data,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, data, extensionRegistry);
-      }
-      public static Geobuf.Data.Value parseFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Value parseDelimitedFrom(java.io.InputStream input)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Value parseDelimitedFrom(
-          java.io.InputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          com.google.protobuf.CodedInputStream input)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input);
-      }
-      public static Geobuf.Data.Value parseFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        return com.google.protobuf.GeneratedMessageLite.parseFrom(
-            DEFAULT_INSTANCE, input, extensionRegistry);
-      }
-
-      public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
-      }
-      public static Builder newBuilder(Geobuf.Data.Value prototype) {
-        return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
-      }
-
-      /**
-       * Protobuf type {@code Data.Value}
-       */
-      public static final class Builder extends
-          com.google.protobuf.GeneratedMessageLite.Builder<
-            Geobuf.Data.Value, Builder> implements
-          // @@protoc_insertion_point(builder_implements:Data.Value)
-          Geobuf.Data.ValueOrBuilder {
-        // Construct using Geobuf.Data.Value.newBuilder()
-        private Builder() {
-          super(DEFAULT_INSTANCE);
-        }
-
-        @java.lang.Override
-        public ValueTypeCase
-            getValueTypeCase() {
-          return instance.getValueTypeCase();
-        }
-
-        public Builder clearValueType() {
-          copyOnWrite();
-          instance.clearValueType();
-          return this;
-        }
-
-
-        /**
-         * <code>string string_value = 1;</code>
-         * @return Whether the stringValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasStringValue() {
-          return instance.hasStringValue();
-        }
-        /**
-         * <code>string string_value = 1;</code>
-         * @return The stringValue.
-         */
-        @java.lang.Override
-        public java.lang.String getStringValue() {
-          return instance.getStringValue();
-        }
-        /**
-         * <code>string string_value = 1;</code>
-         * @return The bytes for stringValue.
-         */
-        @java.lang.Override
-        public com.google.protobuf.ByteString
-            getStringValueBytes() {
-          return instance.getStringValueBytes();
-        }
-        /**
-         * <code>string string_value = 1;</code>
-         * @param value The stringValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setStringValue(
-            java.lang.String value) {
-          copyOnWrite();
-          instance.setStringValue(value);
-          return this;
-        }
-        /**
-         * <code>string string_value = 1;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearStringValue() {
-          copyOnWrite();
-          instance.clearStringValue();
-          return this;
-        }
-        /**
-         * <code>string string_value = 1;</code>
-         * @param value The bytes for stringValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setStringValueBytes(
-            com.google.protobuf.ByteString value) {
-          copyOnWrite();
-          instance.setStringValueBytes(value);
-          return this;
-        }
-
-        /**
-         * <code>double double_value = 2;</code>
-         * @return Whether the doubleValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasDoubleValue() {
-          return instance.hasDoubleValue();
-        }
-        /**
-         * <code>double double_value = 2;</code>
-         * @return The doubleValue.
-         */
-        @java.lang.Override
-        public double getDoubleValue() {
-          return instance.getDoubleValue();
-        }
-        /**
-         * <code>double double_value = 2;</code>
-         * @param value The doubleValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setDoubleValue(double value) {
-          copyOnWrite();
-          instance.setDoubleValue(value);
-          return this;
-        }
-        /**
-         * <code>double double_value = 2;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearDoubleValue() {
-          copyOnWrite();
-          instance.clearDoubleValue();
-          return this;
-        }
-
-        /**
-         * <code>uint64 pos_int_value = 3;</code>
-         * @return Whether the posIntValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasPosIntValue() {
-          return instance.hasPosIntValue();
-        }
-        /**
-         * <code>uint64 pos_int_value = 3;</code>
-         * @return The posIntValue.
-         */
-        @java.lang.Override
-        public long getPosIntValue() {
-          return instance.getPosIntValue();
-        }
-        /**
-         * <code>uint64 pos_int_value = 3;</code>
-         * @param value The posIntValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setPosIntValue(long value) {
-          copyOnWrite();
-          instance.setPosIntValue(value);
-          return this;
-        }
-        /**
-         * <code>uint64 pos_int_value = 3;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearPosIntValue() {
-          copyOnWrite();
-          instance.clearPosIntValue();
-          return this;
-        }
-
-        /**
-         * <code>uint64 neg_int_value = 4;</code>
-         * @return Whether the negIntValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasNegIntValue() {
-          return instance.hasNegIntValue();
-        }
-        /**
-         * <code>uint64 neg_int_value = 4;</code>
-         * @return The negIntValue.
-         */
-        @java.lang.Override
-        public long getNegIntValue() {
-          return instance.getNegIntValue();
-        }
-        /**
-         * <code>uint64 neg_int_value = 4;</code>
-         * @param value The negIntValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setNegIntValue(long value) {
-          copyOnWrite();
-          instance.setNegIntValue(value);
-          return this;
-        }
-        /**
-         * <code>uint64 neg_int_value = 4;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearNegIntValue() {
-          copyOnWrite();
-          instance.clearNegIntValue();
-          return this;
-        }
-
-        /**
-         * <code>bool bool_value = 5;</code>
-         * @return Whether the boolValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasBoolValue() {
-          return instance.hasBoolValue();
-        }
-        /**
-         * <code>bool bool_value = 5;</code>
-         * @return The boolValue.
-         */
-        @java.lang.Override
-        public boolean getBoolValue() {
-          return instance.getBoolValue();
-        }
-        /**
-         * <code>bool bool_value = 5;</code>
-         * @param value The boolValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setBoolValue(boolean value) {
-          copyOnWrite();
-          instance.setBoolValue(value);
-          return this;
-        }
-        /**
-         * <code>bool bool_value = 5;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearBoolValue() {
-          copyOnWrite();
-          instance.clearBoolValue();
-          return this;
-        }
-
-        /**
-         * <code>string json_value = 6;</code>
-         * @return Whether the jsonValue field is set.
-         */
-        @java.lang.Override
-        public boolean hasJsonValue() {
-          return instance.hasJsonValue();
-        }
-        /**
-         * <code>string json_value = 6;</code>
-         * @return The jsonValue.
-         */
-        @java.lang.Override
-        public java.lang.String getJsonValue() {
-          return instance.getJsonValue();
-        }
-        /**
-         * <code>string json_value = 6;</code>
-         * @return The bytes for jsonValue.
-         */
-        @java.lang.Override
-        public com.google.protobuf.ByteString
-            getJsonValueBytes() {
-          return instance.getJsonValueBytes();
-        }
-        /**
-         * <code>string json_value = 6;</code>
-         * @param value The jsonValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setJsonValue(
-            java.lang.String value) {
-          copyOnWrite();
-          instance.setJsonValue(value);
-          return this;
-        }
-        /**
-         * <code>string json_value = 6;</code>
-         * @return This builder for chaining.
-         */
-        public Builder clearJsonValue() {
-          copyOnWrite();
-          instance.clearJsonValue();
-          return this;
-        }
-        /**
-         * <code>string json_value = 6;</code>
-         * @param value The bytes for jsonValue to set.
-         * @return This builder for chaining.
-         */
-        public Builder setJsonValueBytes(
-            com.google.protobuf.ByteString value) {
-          copyOnWrite();
-          instance.setJsonValueBytes(value);
-          return this;
-        }
-
-        // @@protoc_insertion_point(builder_scope:Data.Value)
-      }
-      @java.lang.Override
-      @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
-      protected final java.lang.Object dynamicMethod(
-          com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-          java.lang.Object arg0, java.lang.Object arg1) {
-        switch (method) {
-          case NEW_MUTABLE_INSTANCE: {
-            return new Geobuf.Data.Value();
-          }
-          case NEW_BUILDER: {
-            return new Builder();
-          }
-          case BUILD_MESSAGE_INFO: {
-              java.lang.Object[] objects = new java.lang.Object[] {
-                "valueType_",
-                "valueTypeCase_",
-                "bitField0_",
-              };
-              java.lang.String info =
-                  "\u0001\u0006\u0001\u0001\u0001\u0006\u0006\u0000\u0000\u0000\u0001\u103b\u0000\u0002" +
-                  "\u1033\u0000\u0003\u1036\u0000\u0004\u1036\u0000\u0005\u103a\u0000\u0006\u103b\u0000" +
-                  "";
-              return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-          }
-          // fall through
-          case GET_DEFAULT_INSTANCE: {
-            return DEFAULT_INSTANCE;
-          }
-          case GET_PARSER: {
-            com.google.protobuf.Parser<Geobuf.Data.Value> parser = PARSER;
-            if (parser == null) {
-              synchronized (Geobuf.Data.Value.class) {
-                parser = PARSER;
-                if (parser == null) {
-                  parser =
-                      new DefaultInstanceBasedParser<Geobuf.Data.Value>(
-                          DEFAULT_INSTANCE);
-                  PARSER = parser;
-                }
-              }
-            }
-            return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        case SET_MEMOIZED_IS_INITIALIZED: {
-          return null;
-        }
-        }
-        throw new UnsupportedOperationException();
-      }
-
-
-      // @@protoc_insertion_point(class_scope:Data.Value)
-      private static final Geobuf.Data.Value DEFAULT_INSTANCE;
-      static {
-        Value defaultInstance = new Value();
-        // New instances are implicitly immutable so no need to make
-        // immutable.
-        DEFAULT_INSTANCE = defaultInstance;
-        com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-          Value.class, defaultInstance);
-      }
-
-      public static Geobuf.Data.Value getDefaultInstance() {
-        return DEFAULT_INSTANCE;
-      }
-
-      private static volatile com.google.protobuf.Parser<Value> PARSER;
-
-      public static com.google.protobuf.Parser<Value> parser() {
-        return DEFAULT_INSTANCE.getParserForType();
-      }
-    }
-
-    private int bitField0_;
-    private int dataTypeCase_ = 0;
-    private java.lang.Object dataType_;
-    public enum DataTypeCase {
-      FEATURE_COLLECTION(4),
-      FEATURE(5),
-      GEOMETRY(6),
-      DATATYPE_NOT_SET(0);
-      private final int value;
-      private DataTypeCase(int value) {
-        this.value = value;
-      }
-      /**
-       * @deprecated Use {@link #forNumber(int)} instead.
-       */
-      @java.lang.Deprecated
-      public static DataTypeCase valueOf(int value) {
-        return forNumber(value);
-      }
-
-      public static DataTypeCase forNumber(int value) {
-        switch (value) {
-          case 4: return FEATURE_COLLECTION;
-          case 5: return FEATURE;
-          case 6: return GEOMETRY;
-          case 0: return DATATYPE_NOT_SET;
-          default: return null;
-        }
-      }
-      public int getNumber() {
-        return this.value;
-      }
-    };
-
-    @java.lang.Override
-    public DataTypeCase
-    getDataTypeCase() {
-      return DataTypeCase.forNumber(
-          dataTypeCase_);
-    }
-
-    private void clearDataType() {
-      dataTypeCase_ = 0;
-      dataType_ = null;
-    }
-
-    public static final int KEYS_FIELD_NUMBER = 1;
-    private com.google.protobuf.Internal.ProtobufList<java.lang.String> keys_;
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @return A list containing the keys.
-     */
-    @java.lang.Override
-    public java.util.List<java.lang.String> getKeysList() {
-      return keys_;
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @return The count of keys.
-     */
-    @java.lang.Override
-    public int getKeysCount() {
-      return keys_.size();
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param index The index of the element to return.
-     * @return The keys at the given index.
-     */
-    @java.lang.Override
-    public java.lang.String getKeys(int index) {
-      return keys_.get(index);
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param index The index of the value to return.
-     * @return The bytes of the keys at the given index.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getKeysBytes(int index) {
-      return com.google.protobuf.ByteString.copyFromUtf8(
-          keys_.get(index));
-    }
-    private void ensureKeysIsMutable() {
-      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
-          keys_;  if (!tmp.isModifiable()) {
-        keys_ =
-            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-       }
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param index The index to set the value at.
-     * @param value The keys to set.
-     */
-    private void setKeys(
-        int index, java.lang.String value) {
-      value.getClass();
-  ensureKeysIsMutable();
-      keys_.set(index, value);
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param value The keys to add.
-     */
-    private void addKeys(
-        java.lang.String value) {
-      value.getClass();
-  ensureKeysIsMutable();
-      keys_.add(value);
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param values The keys to add.
-     */
-    private void addAllKeys(
-        java.lang.Iterable<java.lang.String> values) {
-      ensureKeysIsMutable();
-      com.google.protobuf.AbstractMessageLite.addAll(
-          values, keys_);
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     */
-    private void clearKeys() {
-      keys_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-    }
-    /**
-     * <pre>
-     * global arrays of unique keys
-     * </pre>
-     *
-     * <code>repeated string keys = 1;</code>
-     * @param value The bytes of the keys to add.
-     */
-    private void addKeysBytes(
-        com.google.protobuf.ByteString value) {
-      ensureKeysIsMutable();
-      keys_.add(value.toStringUtf8());
-    }
-
-    public static final int DIMENSIONS_FIELD_NUMBER = 2;
-    private int dimensions_;
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     * @return Whether the dimensions field is set.
-     */
-    @java.lang.Override
-    public boolean hasDimensions() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     * @return The dimensions.
-     */
-    @java.lang.Override
-    public int getDimensions() {
-      return dimensions_;
-    }
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     * @param value The dimensions to set.
-     */
-    private void setDimensions(int value) {
-      bitField0_ |= 0x00000001;
-      dimensions_ = value;
-    }
-    /**
-     * <pre>
-     * max coordinate dimensions
-     * </pre>
-     *
-     * <code>optional uint32 dimensions = 2 [default = 2];</code>
-     */
-    private void clearDimensions() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      dimensions_ = 2;
-    }
-
-    public static final int PRECISION_FIELD_NUMBER = 3;
-    private int precision_;
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     * @return Whether the precision field is set.
-     */
-    @java.lang.Override
-    public boolean hasPrecision() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     * @return The precision.
-     */
-    @java.lang.Override
-    public int getPrecision() {
-      return precision_;
-    }
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     * @param value The precision to set.
-     */
-    private void setPrecision(int value) {
-      bitField0_ |= 0x00000002;
-      precision_ = value;
-    }
-    /**
-     * <pre>
-     * number of digits after decimal point for coordinates
-     * </pre>
-     *
-     * <code>optional uint32 precision = 3 [default = 6];</code>
-     */
-    private void clearPrecision() {
-      bitField0_ = (bitField0_ & ~0x00000002);
-      precision_ = 6;
-    }
-
-    public static final int FEATURE_COLLECTION_FIELD_NUMBER = 4;
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     */
-    @java.lang.Override
-    public boolean hasFeatureCollection() {
-      return dataTypeCase_ == 4;
-    }
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     */
-    @java.lang.Override
-    public Geobuf.Data.FeatureCollection getFeatureCollection() {
-      if (dataTypeCase_ == 4) {
-         return (Geobuf.Data.FeatureCollection) dataType_;
-      }
-      return Geobuf.Data.FeatureCollection.getDefaultInstance();
-    }
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     */
-    private void setFeatureCollection(Geobuf.Data.FeatureCollection value) {
-      value.getClass();
-  dataType_ = value;
-      dataTypeCase_ = 4;
-    }
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     */
-    private void mergeFeatureCollection(Geobuf.Data.FeatureCollection value) {
-      value.getClass();
-  if (dataTypeCase_ == 4 &&
-          dataType_ != Geobuf.Data.FeatureCollection.getDefaultInstance()) {
-        dataType_ = Geobuf.Data.FeatureCollection.newBuilder((Geobuf.Data.FeatureCollection) dataType_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        dataType_ = value;
-      }
-      dataTypeCase_ = 4;
-    }
-    /**
-     * <code>.Data.FeatureCollection feature_collection = 4;</code>
-     */
-    private void clearFeatureCollection() {
-      if (dataTypeCase_ == 4) {
-        dataTypeCase_ = 0;
-        dataType_ = null;
-      }
-    }
-
-    public static final int FEATURE_FIELD_NUMBER = 5;
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     */
-    @java.lang.Override
-    public boolean hasFeature() {
-      return dataTypeCase_ == 5;
-    }
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     */
-    @java.lang.Override
-    public Geobuf.Data.Feature getFeature() {
-      if (dataTypeCase_ == 5) {
-         return (Geobuf.Data.Feature) dataType_;
-      }
-      return Geobuf.Data.Feature.getDefaultInstance();
-    }
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     */
-    private void setFeature(Geobuf.Data.Feature value) {
-      value.getClass();
-  dataType_ = value;
-      dataTypeCase_ = 5;
-    }
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     */
-    private void mergeFeature(Geobuf.Data.Feature value) {
-      value.getClass();
-  if (dataTypeCase_ == 5 &&
-          dataType_ != Geobuf.Data.Feature.getDefaultInstance()) {
-        dataType_ = Geobuf.Data.Feature.newBuilder((Geobuf.Data.Feature) dataType_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        dataType_ = value;
-      }
-      dataTypeCase_ = 5;
-    }
-    /**
-     * <code>.Data.Feature feature = 5;</code>
-     */
-    private void clearFeature() {
-      if (dataTypeCase_ == 5) {
-        dataTypeCase_ = 0;
-        dataType_ = null;
-      }
-    }
-
-    public static final int GEOMETRY_FIELD_NUMBER = 6;
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     */
-    @java.lang.Override
-    public boolean hasGeometry() {
-      return dataTypeCase_ == 6;
-    }
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     */
-    @java.lang.Override
-    public Geobuf.Data.Geometry getGeometry() {
-      if (dataTypeCase_ == 6) {
-         return (Geobuf.Data.Geometry) dataType_;
-      }
-      return Geobuf.Data.Geometry.getDefaultInstance();
-    }
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     */
-    private void setGeometry(Geobuf.Data.Geometry value) {
-      value.getClass();
-  dataType_ = value;
-      dataTypeCase_ = 6;
-    }
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     */
-    private void mergeGeometry(Geobuf.Data.Geometry value) {
-      value.getClass();
-  if (dataTypeCase_ == 6 &&
-          dataType_ != Geobuf.Data.Geometry.getDefaultInstance()) {
-        dataType_ = Geobuf.Data.Geometry.newBuilder((Geobuf.Data.Geometry) dataType_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        dataType_ = value;
-      }
-      dataTypeCase_ = 6;
-    }
-    /**
-     * <code>.Data.Geometry geometry = 6;</code>
-     */
-    private void clearGeometry() {
-      if (dataTypeCase_ == 6) {
-        dataTypeCase_ = 0;
-        dataType_ = null;
-      }
-    }
-
-    public static Geobuf.Data parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static Geobuf.Data parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static Geobuf.Data parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static Geobuf.Data parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static Geobuf.Data parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static Geobuf.Data parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static Geobuf.Data parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static Geobuf.Data parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static Geobuf.Data parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-    public static Geobuf.Data parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static Geobuf.Data parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static Geobuf.Data parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(Geobuf.Data prototype) {
-      return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
-    /**
-     * Protobuf type {@code Data}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          Geobuf.Data, Builder> implements
-        // @@protoc_insertion_point(builder_implements:Data)
-        Geobuf.DataOrBuilder {
-      // Construct using Geobuf.Data.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-      @java.lang.Override
-      public DataTypeCase
-          getDataTypeCase() {
-        return instance.getDataTypeCase();
-      }
-
-      public Builder clearDataType() {
-        copyOnWrite();
-        instance.clearDataType();
-        return this;
-      }
-
-
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @return A list containing the keys.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.String>
-          getKeysList() {
-        return java.util.Collections.unmodifiableList(
-            instance.getKeysList());
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @return The count of keys.
-       */
-      @java.lang.Override
-      public int getKeysCount() {
-        return instance.getKeysCount();
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param index The index of the element to return.
-       * @return The keys at the given index.
-       */
-      @java.lang.Override
-      public java.lang.String getKeys(int index) {
-        return instance.getKeys(index);
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param index The index of the value to return.
-       * @return The bytes of the keys at the given index.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getKeysBytes(int index) {
-        return instance.getKeysBytes(index);
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param index The index to set the value at.
-       * @param value The keys to set.
-       * @return This builder for chaining.
-       */
-      public Builder setKeys(
-          int index, java.lang.String value) {
-        copyOnWrite();
-        instance.setKeys(index, value);
-        return this;
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param value The keys to add.
-       * @return This builder for chaining.
-       */
-      public Builder addKeys(
-          java.lang.String value) {
-        copyOnWrite();
-        instance.addKeys(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param values The keys to add.
-       * @return This builder for chaining.
-       */
-      public Builder addAllKeys(
-          java.lang.Iterable<java.lang.String> values) {
-        copyOnWrite();
-        instance.addAllKeys(values);
-        return this;
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearKeys() {
-        copyOnWrite();
-        instance.clearKeys();
-        return this;
-      }
-      /**
-       * <pre>
-       * global arrays of unique keys
-       * </pre>
-       *
-       * <code>repeated string keys = 1;</code>
-       * @param value The bytes of the keys to add.
-       * @return This builder for chaining.
-       */
-      public Builder addKeysBytes(
-          com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.addKeysBytes(value);
-        return this;
-      }
-
-      /**
-       * <pre>
-       * max coordinate dimensions
-       * </pre>
-       *
-       * <code>optional uint32 dimensions = 2 [default = 2];</code>
-       * @return Whether the dimensions field is set.
-       */
-      @java.lang.Override
-      public boolean hasDimensions() {
-        return instance.hasDimensions();
-      }
-      /**
-       * <pre>
-       * max coordinate dimensions
-       * </pre>
-       *
-       * <code>optional uint32 dimensions = 2 [default = 2];</code>
-       * @return The dimensions.
-       */
-      @java.lang.Override
-      public int getDimensions() {
-        return instance.getDimensions();
-      }
-      /**
-       * <pre>
-       * max coordinate dimensions
-       * </pre>
-       *
-       * <code>optional uint32 dimensions = 2 [default = 2];</code>
-       * @param value The dimensions to set.
-       * @return This builder for chaining.
-       */
-      public Builder setDimensions(int value) {
-        copyOnWrite();
-        instance.setDimensions(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * max coordinate dimensions
-       * </pre>
-       *
-       * <code>optional uint32 dimensions = 2 [default = 2];</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearDimensions() {
-        copyOnWrite();
-        instance.clearDimensions();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * number of digits after decimal point for coordinates
-       * </pre>
-       *
-       * <code>optional uint32 precision = 3 [default = 6];</code>
-       * @return Whether the precision field is set.
-       */
-      @java.lang.Override
-      public boolean hasPrecision() {
-        return instance.hasPrecision();
-      }
-      /**
-       * <pre>
-       * number of digits after decimal point for coordinates
-       * </pre>
-       *
-       * <code>optional uint32 precision = 3 [default = 6];</code>
-       * @return The precision.
-       */
-      @java.lang.Override
-      public int getPrecision() {
-        return instance.getPrecision();
-      }
-      /**
-       * <pre>
-       * number of digits after decimal point for coordinates
-       * </pre>
-       *
-       * <code>optional uint32 precision = 3 [default = 6];</code>
-       * @param value The precision to set.
-       * @return This builder for chaining.
-       */
-      public Builder setPrecision(int value) {
-        copyOnWrite();
-        instance.setPrecision(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * number of digits after decimal point for coordinates
-       * </pre>
-       *
-       * <code>optional uint32 precision = 3 [default = 6];</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearPrecision() {
-        copyOnWrite();
-        instance.clearPrecision();
-        return this;
-      }
-
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      @java.lang.Override
-      public boolean hasFeatureCollection() {
-        return instance.hasFeatureCollection();
-      }
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.FeatureCollection getFeatureCollection() {
-        return instance.getFeatureCollection();
-      }
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      public Builder setFeatureCollection(Geobuf.Data.FeatureCollection value) {
-        copyOnWrite();
-        instance.setFeatureCollection(value);
-        return this;
-      }
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      public Builder setFeatureCollection(
-          Geobuf.Data.FeatureCollection.Builder builderForValue) {
-        copyOnWrite();
-        instance.setFeatureCollection(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      public Builder mergeFeatureCollection(Geobuf.Data.FeatureCollection value) {
-        copyOnWrite();
-        instance.mergeFeatureCollection(value);
-        return this;
-      }
-      /**
-       * <code>.Data.FeatureCollection feature_collection = 4;</code>
-       */
-      public Builder clearFeatureCollection() {
-        copyOnWrite();
-        instance.clearFeatureCollection();
-        return this;
-      }
-
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      @java.lang.Override
-      public boolean hasFeature() {
-        return instance.hasFeature();
-      }
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Feature getFeature() {
-        return instance.getFeature();
-      }
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      public Builder setFeature(Geobuf.Data.Feature value) {
-        copyOnWrite();
-        instance.setFeature(value);
-        return this;
-      }
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      public Builder setFeature(
-          Geobuf.Data.Feature.Builder builderForValue) {
-        copyOnWrite();
-        instance.setFeature(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      public Builder mergeFeature(Geobuf.Data.Feature value) {
-        copyOnWrite();
-        instance.mergeFeature(value);
-        return this;
-      }
-      /**
-       * <code>.Data.Feature feature = 5;</code>
-       */
-      public Builder clearFeature() {
-        copyOnWrite();
-        instance.clearFeature();
-        return this;
-      }
-
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      @java.lang.Override
-      public boolean hasGeometry() {
-        return instance.hasGeometry();
-      }
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      @java.lang.Override
-      public Geobuf.Data.Geometry getGeometry() {
-        return instance.getGeometry();
-      }
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      public Builder setGeometry(Geobuf.Data.Geometry value) {
-        copyOnWrite();
-        instance.setGeometry(value);
-        return this;
-      }
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      public Builder setGeometry(
-          Geobuf.Data.Geometry.Builder builderForValue) {
-        copyOnWrite();
-        instance.setGeometry(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      public Builder mergeGeometry(Geobuf.Data.Geometry value) {
-        copyOnWrite();
-        instance.mergeGeometry(value);
-        return this;
-      }
-      /**
-       * <code>.Data.Geometry geometry = 6;</code>
-       */
-      public Builder clearGeometry() {
-        copyOnWrite();
-        instance.clearGeometry();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:Data)
-    }
-    private byte memoizedIsInitialized = 2;
-    @java.lang.Override
-    @java.lang.SuppressWarnings({"unchecked", "fallthrough"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new Geobuf.Data();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "dataType_",
-              "dataTypeCase_",
-              "bitField0_",
-              "keys_",
-              "dimensions_",
-              "precision_",
-              Geobuf.Data.FeatureCollection.class,
-              Geobuf.Data.Feature.class,
-              Geobuf.Data.Geometry.class,
-            };
-            java.lang.String info =
-                "\u0001\u0006\u0001\u0001\u0001\u0006\u0006\u0000\u0001\u0003\u0001\u001a\u0002\u100b" +
-                "\u0000\u0003\u100b\u0001\u0004\u143c\u0000\u0005\u143c\u0000\u0006\u143c\u0000";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        // fall through
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<Geobuf.Data> parser = PARSER;
-          if (parser == null) {
-            synchronized (Geobuf.Data.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<Geobuf.Data>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-      }
-      case GET_MEMOIZED_IS_INITIALIZED: {
-        return memoizedIsInitialized;
-      }
-      case SET_MEMOIZED_IS_INITIALIZED: {
-        memoizedIsInitialized = (byte) (arg0 == null ? 0 : 1);
-        return null;
-      }
-      }
-      throw new UnsupportedOperationException();
-    }
-
-
-    // @@protoc_insertion_point(class_scope:Data)
-    private static final Geobuf.Data DEFAULT_INSTANCE;
     static {
-      Data defaultInstance = new Data();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Data.class, defaultInstance);
     }
 
-    public static Geobuf.Data getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Data> PARSER;
-
-    public static com.google.protobuf.Parser<Data> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-
-  static {
-  }
-
-  // @@protoc_insertion_point(outer_class_scope)
+    // @@protoc_insertion_point(outer_class_scope)
 }

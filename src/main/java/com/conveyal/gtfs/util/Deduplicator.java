@@ -8,8 +8,8 @@ import java.util.BitSet;
 import java.util.Map;
 
 /**
- * Does the same thing as String.intern, but for several different types.
- * Java's String.intern uses perm gen space and is broken anyway.
+ * Does the same thing as String.intern, but for several different types. Java's String.intern uses
+ * perm gen space and is broken anyway.
  */
 public class Deduplicator implements Serializable {
     private static final long serialVersionUID = 20140524L;
@@ -27,7 +27,9 @@ public class Deduplicator implements Serializable {
         canonicalStringArrays.clear();
     }
 
-    /** Used to deduplicate time and stop sequence arrays. The same times may occur in many trips. */
+    /**
+     * Used to deduplicate time and stop sequence arrays. The same times may occur in many trips.
+     */
     public int[] deduplicateIntArray(int[] original) {
         if (original == null) return null;
         IntArray intArray = new IntArray(original);
@@ -73,15 +75,18 @@ public class Deduplicator implements Serializable {
     private class IntArray implements Serializable {
         private static final long serialVersionUID = 20140524L;
         final int[] array;
+
         IntArray(int[] array) {
             this.array = array;
         }
+
         @Override
-        public boolean equals (Object other) {
+        public boolean equals(Object other) {
             if (other instanceof IntArray) {
                 return Arrays.equals(array, ((IntArray) other).array);
             } else return false;
         }
+
         @Override
         public int hashCode() {
             return Arrays.hashCode(array);
@@ -92,6 +97,7 @@ public class Deduplicator implements Serializable {
     private class StringArray implements Serializable {
         private static final long serialVersionUID = 20140524L;
         final String[] array;
+
         StringArray(String[] array, boolean deduplicateStrings) {
             if (deduplicateStrings) {
                 this.array = new String[array.length];
@@ -100,12 +106,14 @@ public class Deduplicator implements Serializable {
                 }
             } else this.array = array;
         }
+
         @Override
-        public boolean equals (Object other) {
+        public boolean equals(Object other) {
             if (other instanceof StringArray) {
                 return Arrays.equals(array, ((StringArray) other).array);
             } else return false;
         }
+
         @Override
         public int hashCode() {
             return Arrays.hashCode(array);

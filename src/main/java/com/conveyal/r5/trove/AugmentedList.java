@@ -7,7 +7,8 @@ import java.util.List;
 import java.util.ListIterator;
 
 /**
- * This List implementation wraps another existing List, and only allows extending it and retrieving values.
+ * This List implementation wraps another existing List, and only allows extending it and retrieving
+ * values.
  */
 public class AugmentedList<T> implements List<T> {
 
@@ -21,7 +22,7 @@ public class AugmentedList<T> implements List<T> {
     }
 
     @Override
-    public T get (int index) {
+    public T get(int index) {
         if (index < base.size()) {
             return base.get(index);
         } else {
@@ -30,7 +31,7 @@ public class AugmentedList<T> implements List<T> {
     }
 
     @Override
-    public T set (int index, T value) {
+    public T set(int index, T value) {
         if (index < base.size()) {
             throw new RuntimeException("Modifying the base graph is not allowed.");
         } else {
@@ -144,6 +145,4 @@ public class AugmentedList<T> implements List<T> {
     public void clear() {
         throw new UnsupportedOperationException();
     }
-
-
 }

@@ -13,11 +13,11 @@ public class Trip extends Entity {
     public String trip_id;
     public String trip_headsign;
     public String trip_short_name;
-    public int    direction_id;
+    public int direction_id;
     public String block_id;
     public String shape_id;
-    public int    bikes_allowed;
-    public int    wheelchair_accessible;
+    public int bikes_allowed;
+    public int wheelchair_accessible;
     public String feed_id;
 
     public static class Loader extends Entity.Loader<Trip> {
@@ -35,41 +35,51 @@ public class Trip extends Entity {
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
 
-            t.sourceFileLine  = row + 1; // offset line number by 1 to account for 0-based row index
-            t.route_id        = getStringField("route_id", true);
-            t.service_id      = getStringField("service_id", true);
-            t.trip_id         = getStringField("trip_id", true);
-            t.trip_headsign   = getStringField("trip_headsign", false);
+            t.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            t.route_id = getStringField("route_id", true);
+            t.service_id = getStringField("service_id", true);
+            t.trip_id = getStringField("trip_id", true);
+            t.trip_headsign = getStringField("trip_headsign", false);
             t.trip_short_name = getStringField("trip_short_name", false);
-            t.direction_id    = getIntField("direction_id", false, 0, 1);
-            t.block_id        = getStringField("block_id", false); // make a blocks multimap
-            t.shape_id        = getStringField("shape_id", false);
-            t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
+            t.direction_id = getIntField("direction_id", false, 0, 1);
+            t.block_id = getStringField("block_id", false); // make a blocks multimap
+            t.shape_id = getStringField("shape_id", false);
+            t.bikes_allowed = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed_id = feed.feedId;
             feed.trips.put(t.trip_id, t);
 
             /*
-              Check referential integrity without storing references. Trip cannot directly reference Services or
-              Routes because they would be serialized into the MapDB.
-             */
+             Check referential integrity without storing references. Trip cannot directly reference Services or
+             Routes because they would be serialized into the MapDB.
+            */
             // TODO confirm existence of shape ID
             getRefField("service_id", true, feed.services);
             getRefField("route_id", true, feed.routes);
         }
-
     }
 
     public static class Writer extends Entity.Writer<Trip> {
-        public Writer (GTFSFeed feed) {
+        public Writer(GTFSFeed feed) {
             super(feed, "trips");
         }
 
         @Override
         protected void writeHeaders() throws IOException {
             // TODO: export shapes
-            writer.writeRecord(new String[] {"route_id", "trip_id", "trip_headsign", "trip_short_name", "direction_id", "block_id",
-                    "shape_id", "bikes_allowed", "wheelchair_accessible", "service_id"});
+            writer.writeRecord(
+                    new String[] {
+                        "route_id",
+                        "trip_id",
+                        "trip_headsign",
+                        "trip_short_name",
+                        "direction_id",
+                        "block_id",
+                        "shape_id",
+                        "bikes_allowed",
+                        "wheelchair_accessible",
+                        "service_id"
+                    });
         }
 
         @Override
@@ -91,8 +101,5 @@ public class Trip extends Entity {
         protected Iterator<Trip> iterator() {
             return feed.trips.values().iterator();
         }
-
-
     }
-
 }

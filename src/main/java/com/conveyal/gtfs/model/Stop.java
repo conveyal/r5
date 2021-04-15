@@ -16,8 +16,8 @@ public class Stop extends Entity {
     public double stop_lat;
     public double stop_lon;
     public String zone_id;
-    public URL    stop_url;
-    public int    location_type;
+    public URL stop_url;
+    public int location_type;
     public String parent_station;
     public String stop_timezone;
     // TODO should be int
@@ -25,7 +25,7 @@ public class Stop extends Entity {
     public String feed_id;
 
     @Override
-    public String getId () {
+    public String getId() {
         return stop_id;
     }
 
@@ -44,35 +44,47 @@ public class Stop extends Entity {
         public void loadOneRow() throws IOException {
             Stop s = new Stop();
             s.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
-            s.stop_id   = getStringField("stop_id", true);
+            s.stop_id = getStringField("stop_id", true);
             s.stop_code = getStringField("stop_code", false);
             s.stop_name = getStringField("stop_name", true);
             s.stop_desc = getStringField("stop_desc", false);
-            s.stop_lat  = getDoubleField("stop_lat", true, -90D, 90D);
-            s.stop_lon  = getDoubleField("stop_lon", true, -180D, 180D);
-            s.zone_id   = getStringField("zone_id", false);
-            s.stop_url  = getUrlField("stop_url", false);
-            s.location_type  = getIntField("location_type", false, 0, 1);
+            s.stop_lat = getDoubleField("stop_lat", true, -90D, 90D);
+            s.stop_lon = getDoubleField("stop_lon", true, -180D, 180D);
+            s.zone_id = getStringField("zone_id", false);
+            s.stop_url = getUrlField("stop_url", false);
+            s.location_type = getIntField("location_type", false, 0, 1);
             s.parent_station = getStringField("parent_station", false);
-            s.stop_timezone  = getStringField("stop_timezone", false);
+            s.stop_timezone = getStringField("stop_timezone", false);
             s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
             s.feed_id = feed.feedId;
             /* TODO check ref integrity later, this table self-references via parent_station */
 
             feed.stops.put(s.stop_id, s);
         }
-
     }
 
     public static class Writer extends Entity.Writer<Stop> {
-        public Writer (GTFSFeed feed) {
+        public Writer(GTFSFeed feed) {
             super(feed, "stops");
         }
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"stop_id", "stop_code", "stop_name", "stop_desc", "stop_lat", "stop_lon", "zone_id",					
-                    "stop_url", "location_type", "parent_station", "stop_timezone", "wheelchair_boarding"});
+            writer.writeRecord(
+                    new String[] {
+                        "stop_id",
+                        "stop_code",
+                        "stop_name",
+                        "stop_desc",
+                        "stop_lat",
+                        "stop_lon",
+                        "zone_id",
+                        "stop_url",
+                        "location_type",
+                        "parent_station",
+                        "stop_timezone",
+                        "wheelchair_boarding"
+                    });
         }
 
         @Override
@@ -95,6 +107,6 @@ public class Stop extends Entity {
         @Override
         public Iterator<Stop> iterator() {
             return feed.stops.values().iterator();
-        }   	
+        }
     }
 }

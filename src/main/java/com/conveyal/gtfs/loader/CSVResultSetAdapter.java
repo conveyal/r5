@@ -23,14 +23,14 @@ import java.util.Calendar;
 import java.util.Map;
 
 /**
- * This makes an incoming row of a CSV file resemble a Result object.
- * All methods are unsupported except the ones that grab a value by column index.
- * This allows us to short-circuit putting the data into an SQL database and just stuff it into maps:
- * new CSVResultSetAdapter(transformedStrings); in JdbcGtfsLoader.
- * Things get complicated though, and the benefit might be minor since we then need to handle our own ordering of
- * stop times and indexing etc.
+ * This makes an incoming row of a CSV file resemble a Result object. All methods are unsupported
+ * except the ones that grab a value by column index. This allows us to short-circuit putting the
+ * data into an SQL database and just stuff it into maps: new
+ * CSVResultSetAdapter(transformedStrings); in JdbcGtfsLoader. Things get complicated though, and
+ * the benefit might be minor since we then need to handle our own ordering of stop times and
+ * indexing etc.
  *
- * Created by abyrd on 2017-04-12
+ * <p>Created by abyrd on 2017-04-12
  */
 public class CSVResultSetAdapter implements ResultSet {
 
@@ -40,7 +40,6 @@ public class CSVResultSetAdapter implements ResultSet {
     public CSVResultSetAdapter(String[] fields) {
         this.fields = fields;
     }
-
 
     @Override
     public boolean next() throws SQLException {
@@ -543,17 +542,20 @@ public class CSVResultSetAdapter implements ResultSet {
     }
 
     @Override
-    public void updateAsciiStream(String columnLabel, InputStream x, int length) throws SQLException {
+    public void updateAsciiStream(String columnLabel, InputStream x, int length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateBinaryStream(String columnLabel, InputStream x, int length) throws SQLException {
+    public void updateBinaryStream(String columnLabel, InputStream x, int length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateCharacterStream(String columnLabel, Reader reader, int length) throws SQLException {
+    public void updateCharacterStream(String columnLabel, Reader reader, int length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
@@ -843,7 +845,8 @@ public class CSVResultSetAdapter implements ResultSet {
     }
 
     @Override
-    public void updateNCharacterStream(String columnLabel, Reader reader, long length) throws SQLException {
+    public void updateNCharacterStream(String columnLabel, Reader reader, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
@@ -853,7 +856,8 @@ public class CSVResultSetAdapter implements ResultSet {
     }
 
     @Override
-    public void updateBinaryStream(int columnIndex, InputStream x, long length) throws SQLException {
+    public void updateBinaryStream(int columnIndex, InputStream x, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
@@ -863,27 +867,32 @@ public class CSVResultSetAdapter implements ResultSet {
     }
 
     @Override
-    public void updateAsciiStream(String columnLabel, InputStream x, long length) throws SQLException {
+    public void updateAsciiStream(String columnLabel, InputStream x, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateBinaryStream(String columnLabel, InputStream x, long length) throws SQLException {
+    public void updateBinaryStream(String columnLabel, InputStream x, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateCharacterStream(String columnLabel, Reader reader, long length) throws SQLException {
+    public void updateCharacterStream(String columnLabel, Reader reader, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateBlob(int columnIndex, InputStream inputStream, long length) throws SQLException {
+    public void updateBlob(int columnIndex, InputStream inputStream, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void updateBlob(String columnLabel, InputStream inputStream, long length) throws SQLException {
+    public void updateBlob(String columnLabel, InputStream inputStream, long length)
+            throws SQLException {
         throw new UnsupportedOperationException();
     }
 

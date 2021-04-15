@@ -8,11 +8,12 @@ import org.locationtech.jts.linearref.LocationIndexedLine;
 import java.util.stream.Stream;
 
 /**
- * Wraps a location indexed line so that the supplied operations (project, extractPoint, etc.) correctly account
- * for lines of longitude getting closer together toward the poles, even though the locationIndexedLine is still
- * constructed using geographic (unprojected) coordinates.
+ * Wraps a location indexed line so that the supplied operations (project, extractPoint, etc.)
+ * correctly account for lines of longitude getting closer together toward the poles, even though
+ * the locationIndexedLine is still constructed using geographic (unprojected) coordinates.
  *
- * It just projects the coordinates when the object is constructed, and de-projects them when you get a result out.
+ * <p>It just projects the coordinates when the object is constructed, and de-projects them when you
+ * get a result out.
  */
 public class LocationIndexedLineInLocalCoordinateSystem {
 
@@ -27,11 +28,13 @@ public class LocationIndexedLineInLocalCoordinateSystem {
 
         xScale = Math.abs(Math.cos(Math.toRadians(coords[0].y)));
 
-        coords = Stream.of(coords).map(this::projectGeographicCoordinate).toArray(i -> new Coordinate[i]);
+        coords =
+                Stream.of(coords)
+                        .map(this::projectGeographicCoordinate)
+                        .toArray(i -> new Coordinate[i]);
 
         line = new LocationIndexedLine(geometryFactory.createLineString(coords));
     }
-
 
     public LinearLocation project(Coordinate coord) {
         coord = projectGeographicCoordinate(coord);
@@ -47,7 +50,7 @@ public class LocationIndexedLineInLocalCoordinateSystem {
         return new Coordinate(coord.x * xScale, coord.y);
     }
 
-    private Coordinate projectGeographicCoordinate (Coordinate coord) {
+    private Coordinate projectGeographicCoordinate(Coordinate coord) {
         return new Coordinate(coord.x / xScale, coord.y);
     }
 }

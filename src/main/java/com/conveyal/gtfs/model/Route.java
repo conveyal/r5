@@ -25,8 +25,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public String route_short_name;
     public String route_long_name;
     public String route_desc;
-    public int    route_type;
-    public URL    route_url;
+    public int route_type;
+    public URL route_url;
     public String route_color;
     public String route_text_color;
     public URL route_branding_url;
@@ -61,7 +61,10 @@ public class Route extends Entity { // implements Entity.Factory<Route>
                 r.agency_id = agency.agency_id;
             }
 
-            r.route_short_name = getStringField("route_short_name", false); // one or the other required, needs a special validator
+            r.route_short_name =
+                    getStringField(
+                            "route_short_name",
+                            false); // one or the other required, needs a special validator
             r.route_long_name = getStringField("route_long_name", false);
             r.route_desc = getStringField("route_desc", false);
             r.route_type = getIntField("route_type", true, 0, 7);
@@ -72,11 +75,10 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.feed_id = feed.feedId;
             feed.routes.put(r.route_id, r);
         }
-
     }
 
-    public static class Writer extends Entity.Writer<Route> {    	
-        public Writer (GTFSFeed feed) {
+    public static class Writer extends Entity.Writer<Route> {
+        public Writer(GTFSFeed feed) {
             super(feed, "routes");
         }
 
@@ -113,6 +115,6 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         @Override
         public Iterator<Route> iterator() {
             return feed.routes.values().iterator();
-        }   	
+        }
     }
 }

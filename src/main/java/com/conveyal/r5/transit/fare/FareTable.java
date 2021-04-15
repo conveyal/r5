@@ -5,6 +5,7 @@ import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.util.P2;
 import com.csvreader.CsvReader;
 import com.google.common.collect.Maps;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,9 +14,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Map;
 
-/**
- * Stop names are just strings. Only works on fares from a single feed.
- */
+/** Stop names are just strings. Only works on fares from a single feed. */
 public class FareTable {
 
     private static final Logger LOG = LoggerFactory.getLogger(FareTable.class);
@@ -24,11 +23,11 @@ public class FareTable {
 
     private boolean ignoreAgencyId;
 
-    public FareTable (String name) {
+    public FareTable(String name) {
         this(name, false);
     }
 
-    public FareTable (String name, boolean ignoreAgencyId) {
+    public FareTable(String name, boolean ignoreAgencyId) {
         this.ignoreAgencyId = ignoreAgencyId;
         InputStream is = FareTable.class.getClassLoader().getResourceAsStream(name);
         CsvReader reader = new CsvReader(is, ',', Charset.forName("UTF-8"));
@@ -48,11 +47,12 @@ public class FareTable {
         }
     }
 
-    public Fare lookup (String from, String to) {
-        return new Fare(fares.get(new P2<>(from, to))); // defensive copy, in case the caller discounts
+    public Fare lookup(String from, String to) {
+        return new Fare(
+                fares.get(new P2<>(from, to))); // defensive copy, in case the caller discounts
     }
 
-    public Fare lookup (Stop from, Stop to) {
+    public Fare lookup(Stop from, Stop to) {
         if (this.ignoreAgencyId) {
             String fromWithoutFeedId = from.stopId.split(":", 2)[1];
             String toWithoutFeedId = to.stopId.split(":", 2)[1];
@@ -61,5 +61,4 @@ public class FareTable {
             return lookup(from.stopId, to.stopId);
         }
     }
-
 }

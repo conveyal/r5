@@ -7,8 +7,8 @@ import java.io.Serializable;
 import java.net.URL;
 
 /**
- * Information about a route.
- * FIXME This was originally to copy GTFS Route to get rid of inter-object references. Eliminate it.
+ * Information about a route. FIXME This was originally to copy GTFS Route to get rid of
+ * inter-object references. Eliminate it.
  */
 public class RouteInfo implements Serializable {
     public static final long serialVersionUID = 1L;
@@ -22,7 +22,7 @@ public class RouteInfo implements Serializable {
     public String color;
     public URL agency_url;
 
-    public RouteInfo (Route route, Agency agency) {
+    public RouteInfo(Route route, Agency agency) {
         this.agency_id = route.agency_id;
         this.agency_name = agency.agency_name;
         this.route_id = route.route_id;
@@ -33,5 +33,7 @@ public class RouteInfo implements Serializable {
         this.agency_url = route.route_url;
     }
 
-    public RouteInfo () { /* do nothing */ }
+    public RouteInfo() {
+        /* do nothing */
+    }
 }

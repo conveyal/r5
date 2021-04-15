@@ -1,18 +1,16 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
-import gnu.trove.list.TIntList;
+
 import gnu.trove.list.TLongList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 
 /**
- * Generates a MapDB backed OSM object, not necessarily to be serialized out to OSM PBF or XML format, but to be fed
- * directly into the R5 network builder. Used to create networks with predictable characteristics in tests.
+ * Generates a MapDB backed OSM object, not necessarily to be serialized out to OSM PBF or XML
+ * format, but to be fed directly into the R5 network builder. Used to create networks with
+ * predictable characteristics in tests.
  */
 public class GridOsmGenerator {
 
@@ -22,23 +20,23 @@ public class GridOsmGenerator {
 
     private long currentWayId = 0;
 
-    public GridOsmGenerator (GridLayout gridLayout) {
+    public GridOsmGenerator(GridLayout gridLayout) {
         this.gridLayout = gridLayout;
         osm = new OSM(null);
         // osm.intersectionDetection = true;
     }
 
-    public OSM generate () {
+    public OSM generate() {
         makeNodes();
         makeWays();
         return osm;
     }
 
-    public long nodeId (int x, int y) {
+    public long nodeId(int x, int y) {
         return y * (gridLayout.widthAndHeightInBlocks + 1) + x;
     }
 
-    public void makeNodes () {
+    public void makeNodes() {
         osm.intersectionDetection = true;
         for (int x = 0; x <= gridLayout.widthAndHeightInBlocks; x++) {
             for (int y = 0; y <= gridLayout.widthAndHeightInBlocks; y++) {
@@ -47,18 +45,19 @@ public class GridOsmGenerator {
                 node.setLatLon(lat, gridLayout.getIntersectionLon(x, lat));
                 long nodeId = nodeId(x, y);
                 osm.nodes.put(nodeId, node);
-                // All nodes are intersections. Normally these are detected on loading, here we mark on creation.
+                // All nodes are intersections. Normally these are detected on loading, here we mark
+                // on creation.
                 osm.intersectionNodes.add(nodeId);
             }
         }
     }
 
-    public void makeWays () {
+    public void makeWays() {
         makeWays(false);
         makeWays(true);
     }
 
-    public void makeWays (boolean horizontal) {
+    public void makeWays(boolean horizontal) {
         for (int a = 0; a <= gridLayout.widthAndHeightInBlocks; a++) {
             TLongList nodes = new TLongArrayList();
             for (int b = 0; b <= gridLayout.widthAndHeightInBlocks; b++) {
@@ -73,5 +72,4 @@ public class GridOsmGenerator {
             currentWayId++;
         }
     }
-
 }

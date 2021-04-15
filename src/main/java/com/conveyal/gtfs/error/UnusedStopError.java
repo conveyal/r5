@@ -18,7 +18,8 @@ public class UnusedStopError extends GTFSError implements Serializable {
         this.stop = stop;
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("Stop Id %s is not used in any trips.", affectedEntityId);
     }
 }

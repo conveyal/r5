@@ -7,9 +7,7 @@ import java.io.InputStream;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * Decode a Geobuf.
- */
+/** Decode a Geobuf. */
 public class GeobufDecoder implements Iterator<GeobufFeature> {
     private int maxFeat, i = 0;
 
@@ -20,7 +18,7 @@ public class GeobufDecoder implements Iterator<GeobufFeature> {
     private double precisionDivisor;
 
     /** Create a Geobuf decoder, optionally backed by high-performance on-disk storage */
-    public GeobufDecoder (InputStream is) throws IOException {
+    public GeobufDecoder(InputStream is) throws IOException {
         // read everything into memory
         Geobuf.Data data = Geobuf.Data.parseFrom(is);
         keys = data.getKeysList();
@@ -37,11 +35,13 @@ public class GeobufDecoder implements Iterator<GeobufFeature> {
         is.close();
     }
 
-    @Override public boolean hasNext() {
+    @Override
+    public boolean hasNext() {
         return i < maxFeat;
     }
 
-    @Override public GeobufFeature next() {
+    @Override
+    public GeobufFeature next() {
         return new GeobufFeature(featureCollection.getFeatures(i++), keys, precisionDivisor);
     }
 }

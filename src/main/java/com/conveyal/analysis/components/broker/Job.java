@@ -1,8 +1,12 @@
 package com.conveyal.analysis.components.broker;
 
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,12 +16,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.google.common.base.Preconditions.checkNotNull;
-
 /**
  * A Job is a collection of tasks that represent all the origins in a regional analysis. All the
- * tasks in a Job must have the same network ID and be run against the same R5 version on the workers.
+ * tasks in a Job must have the same network ID and be run against the same R5 version on the
+ * workers.
  */
 public class Job {
 
@@ -30,14 +32,20 @@ public class Job {
 
     public static final int MAX_DELIVERY_PASSES = 5;
 
-    // In order to provide realistic estimates of job processing time, we don't want to deliver the tasks to
-    // workers in row-by-row geographic order, because spatial patterns exist in the world that make some areas
-    // much faster than others. Ideally rather than storing the entire sequence (which is O(n) in the number of
-    // tasks) you'd want to store a permutation seed that would allow instant lookup of the task in position N.
+    // In order to provide realistic estimates of job processing time, we don't want to deliver the
+    // tasks to
+    // workers in row-by-row geographic order, because spatial patterns exist in the world that make
+    // some areas
+    // much faster than others. Ideally rather than storing the entire sequence (which is O(n) in
+    // the number of
+    // tasks) you'd want to store a permutation seed that would allow instant lookup of the task in
+    // position N.
     // Essentially what we want to do is random selection (sampling) without replacement.
-    // As far as I know there's no way to do this without storing the full sequence, or taking longer and longer
+    // As far as I know there's no way to do this without storing the full sequence, or taking
+    // longer and longer
     // to find random tasks as the set of completed tasks gets larger.
-    // On the other hand, working on tasks from the same geographic area might be more efficient because
+    // On the other hand, working on tasks from the same geographic area might be more efficient
+    // because
     // they probably use all the same transit lines and roads, which will already be in cache.
     // So let's just keep track of where we're at in the sequence.
     private int nextTaskToDeliver;
@@ -52,8 +60,8 @@ public class Job {
     public final int nTasksTotal;
 
     /**
-     * Each task will be checked off when it a result is returned by the worker.
-     * Once the worker has returned a result, the task will never be redelivered.
+     * Each task will be checked off when it a result is returned by the worker. Once the worker has
+     * returned a result, the task will never be redelivered.
      */
     private final BitSet completedTasks;
 
@@ -64,12 +72,15 @@ public class Job {
     protected int nTasksCompleted;
 
     /**
-     * The total number of task deliveries that have occurred. A task may be counted more than
-     * once if it is redelivered.
+     * The total number of task deliveries that have occurred. A task may be counted more than once
+     * if it is redelivered.
      */
     protected int nTasksDelivered;
 
-    /** Every task in this job will be based on this template task, but have its origin coordinates changed. */
+    /**
+     * Every task in this job will be based on this template task, but have its origin coordinates
+     * changed.
+     */
     public final RegionalTask templateTask;
 
     /**
@@ -77,13 +88,13 @@ public class Job {
      * does not include an originPointSet, derive these coordinates from the web mercator grid
      * specified by the template task. If this job does include an originPointSet, look up the
      * coordinates from that pointset.
-     * <p>
-     * TODO make the workers calculate the coordinates, sending them a range of task numbers.
+     *
+     * <p>TODO make the workers calculate the coordinates, sending them a range of task numbers.
      *
      * @param taskNumber the task number within the job, equal to the point number within the origin
-     *                   point set.
+     *     point set.
      */
-    private RegionalTask makeOneTask (int taskNumber) {
+    private RegionalTask makeOneTask(int taskNumber) {
         RegionalTask task = templateTask.clone();
         task.taskId = taskNumber;
         if (task.originPointSet == null) {
@@ -103,15 +114,15 @@ public class Job {
     }
 
     /**
-     * The graph and r5 commit on which tasks are to be run. All tasks contained in a job must
-     * run on the same graph and r5 commit.
-     * TODO this field is kind of redundant - it's implied by the template request.
+     * The graph and r5 commit on which tasks are to be run. All tasks contained in a job must run
+     * on the same graph and r5 commit. TODO this field is kind of redundant - it's implied by the
+     * template request.
      */
     public final WorkerCategory workerCategory;
 
     /**
-     * The last time a non-empty set of tasks was delivered to a worker, in milliseconds since
-     * the epoch. Enables a quiet period after all tasks have been delivered, before we attempt any
+     * The last time a non-empty set of tasks was delivered to a worker, in milliseconds since the
+     * epoch. Enables a quiet period after all tasks have been delivered, before we attempt any
      * re-delivery.
      */
     long lastDeliveryTime = 0;
@@ -123,12 +134,13 @@ public class Job {
     public int deliveryPass = 0;
 
     /**
-     * If any error compromises the usabilty or quality of results from any origin, it is recorded here.
-     * This is a Set because identical errors are likely to be reported from many workers or individual tasks.
+     * If any error compromises the usabilty or quality of results from any origin, it is recorded
+     * here. This is a Set because identical errors are likely to be reported from many workers or
+     * individual tasks.
      */
     public final Set<String> errors = new HashSet();
 
-    public Job (RegionalTask templateTask, WorkerTags workerTags) {
+    public Job(RegionalTask templateTask, WorkerTags workerTags) {
         this.jobId = templateTask.jobId;
         this.templateTask = templateTask;
         this.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
@@ -144,7 +156,6 @@ public class Job {
 
         this.completedTasks = new BitSet(nTasksTotal);
         this.workerTags = workerTags;
-
     }
 
     public boolean markTaskCompleted(int taskId) {
@@ -170,16 +181,16 @@ public class Job {
         return nTasksCompleted == nTasksTotal;
     }
 
-    public boolean isErrored () {
+    public boolean isErrored() {
         return notNullOrEmpty(this.errors);
     }
 
     /**
      * @param maxTasks the maximum number of tasks to return.
      * @return some tasks that are not yet marked as completed and have not yet been delivered in
-     *         this delivery pass.
+     *     this delivery pass.
      */
-    public List<RegionalTask> generateSomeTasksToDeliver (int maxTasks) {
+    public List<RegionalTask> generateSomeTasksToDeliver(int maxTasks) {
         List<RegionalTask> tasks = new ArrayList<>(maxTasks);
         // TODO use special bitset iteration syntax.
         while (nextTaskToDeliver < nTasksTotal && tasks.size() < maxTasks) {
@@ -202,17 +213,27 @@ public class Job {
         if (nextTaskToDeliver < nTasksTotal) {
             return true;
         }
-        // Check whether we should start redelivering tasks - this will be triggered by workers polling.
+        // Check whether we should start redelivering tasks - this will be triggered by workers
+        // polling.
         // The method that generates more tasks to deliver knows to skip already completed tasks.
         if (System.currentTimeMillis() >= lastDeliveryTime + (REDELIVERY_WAIT_SEC * 1000)) {
             if (deliveryPass >= MAX_DELIVERY_PASSES) {
-                LOG.error("Job {} has been delivered {} times and it's still not finished. Not redelivering.", jobId, deliveryPass);
+                LOG.error(
+                        "Job {} has been delivered {} times and it's still not finished. Not"
+                            + " redelivering.",
+                        jobId,
+                        deliveryPass);
                 return false;
             }
             nextTaskToDeliver = 0;
             deliveryPass += 1;
-            LOG.warn("Delivered all tasks for job {}, but {} seconds later {} results have not been received. Starting redelivery pass {}.",
-                    jobId, REDELIVERY_WAIT_SEC, nTasksTotal - nTasksCompleted, deliveryPass);
+            LOG.warn(
+                    "Delivered all tasks for job {}, but {} seconds later {} results have not been"
+                        + " received. Starting redelivery pass {}.",
+                    jobId,
+                    REDELIVERY_WAIT_SEC,
+                    nTasksTotal - nTasksCompleted,
+                    deliveryPass);
             return true;
         }
         return false;
@@ -230,11 +251,16 @@ public class Job {
 
     @Override
     public String toString() {
-        return "Job{" +
-                "jobId='" + jobId + '\'' +
-                ", nTasksTotal=" + nTasksTotal +
-                ", nTasksCompleted=" + nTasksCompleted +
-                ", deliveryPass=" + deliveryPass +
-                '}';
+        return "Job{"
+                + "jobId='"
+                + jobId
+                + '\''
+                + ", nTasksTotal="
+                + nTasksTotal
+                + ", nTasksCompleted="
+                + nTasksCompleted
+                + ", deliveryPass="
+                + deliveryPass
+                + '}';
     }
 }

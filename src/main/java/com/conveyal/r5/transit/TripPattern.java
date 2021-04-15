@@ -3,8 +3,10 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TObjectIntMap;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.linearref.LinearLocation;
@@ -22,17 +24,18 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 /**
- * This is like a Transmodel JourneyPattern.
- * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
+ * This is like a Transmodel JourneyPattern. All the trips on the same Route that have the same
+ * sequence of stops, with the same pickup/dropoff options.
  */
 public class TripPattern implements Serializable, Cloneable {
 
     private static Logger LOG = LoggerFactory.getLogger(TripPattern.class);
 
     /**
-     * This is the ID of this trip pattern _in the original transport network_. This is important because if it were the
-     * ID in this transport network the ID would depend on the order of application of scenarios, and because this ID is
-     * used to map results back to the original network.
+     * This is the ID of this trip pattern _in the original transport network_. This is important
+     * because if it were the ID in this transport network the ID would depend on the order of
+     * application of scenarios, and because this ID is used to map results back to the original
+     * network.
      */
     public int originalId;
 
@@ -44,8 +47,10 @@ public class TripPattern implements Serializable, Cloneable {
     public PickDropType[] dropoffs;
     public BitSet wheelchairAccessible; // One bit per stop
 
-    /** TripSchedules for all trips following this pattern, sorted in ascending order by time of departure from first
-     *  stop */
+    /**
+     * TripSchedules for all trips following this pattern, sorted in ascending order by time of
+     * departure from first stop
+     */
     public List<TripSchedule> tripSchedules = new ArrayList<>();
 
     /** GTFS shape for this pattern. Should be left null in non-customer-facing applications */
@@ -63,21 +68,22 @@ public class TripPattern implements Serializable, Cloneable {
     /** does this trip pattern have any scheduled trips */
     public boolean hasSchedules;
 
-    // This set includes the numeric codes for all services on which at least one trip in this pattern is active.
+    // This set includes the numeric codes for all services on which at least one trip in this
+    // pattern is active.
     public BitSet servicesActive = new BitSet();
 
     /**
-     * index of this route in TransitLayer data. -1 if detailed route information has not been loaded
-     * TODO clarify what "this route" means. The route of this tripPattern?
+     * index of this route in TransitLayer data. -1 if detailed route information has not been
+     * loaded TODO clarify what "this route" means. The route of this tripPattern?
      */
     public int routeIndex = -1;
 
     /**
-     * Create a TripPattern based only on a list of internal integer stop IDs.
-     * This is used when creating brand new patterns in scenario modifications, rather than from GTFS.
-     * Pick up and drop off will be allowed at all stops.
+     * Create a TripPattern based only on a list of internal integer stop IDs. This is used when
+     * creating brand new patterns in scenario modifications, rather than from GTFS. Pick up and
+     * drop off will be allowed at all stops.
      */
-    public TripPattern (TIntList intStopIds) {
+    public TripPattern(TIntList intStopIds) {
         stops = intStopIds.toArray(); // Copy.
         int nStops = stops.length;
         pickups = new PickDropType[nStops];
@@ -91,8 +97,12 @@ public class TripPattern implements Serializable, Cloneable {
         routeId = "SCENARIO_MODIFICATION";
     }
 
-    public TripPattern(String routeId, Iterable<StopTime> stopTimes, TObjectIntMap<String> indexForUnscopedStopId) {
-        List<StopTime> stopTimeList = StreamSupport.stream(stopTimes.spliterator(), false).collect(Collectors.toList());
+    public TripPattern(
+            String routeId,
+            Iterable<StopTime> stopTimes,
+            TObjectIntMap<String> indexForUnscopedStopId) {
+        List<StopTime> stopTimeList =
+                StreamSupport.stream(stopTimes.spliterator(), false).collect(Collectors.toList());
         int nStops = stopTimeList.size();
         stops = new int[nStops];
         pickups = new PickDropType[nStops];
@@ -107,14 +117,14 @@ public class TripPattern implements Serializable, Cloneable {
         this.routeId = routeId;
     }
 
-    public void addTrip (TripSchedule tripSchedule) {
+    public void addTrip(TripSchedule tripSchedule) {
         tripSchedules.add(tripSchedule);
         hasFrequencies = hasFrequencies || tripSchedule.headwaySeconds != null;
         hasSchedules = hasSchedules || tripSchedule.headwaySeconds == null;
         servicesActive.set(tripSchedule.serviceCode);
     }
 
-    public void setOrVerifyDirection (int directionId) {
+    public void setOrVerifyDirection(int directionId) {
         if (this.directionId != directionId) {
             if (this.directionId == Integer.MIN_VALUE) {
                 this.directionId = directionId;
@@ -131,9 +141,10 @@ public class TripPattern implements Serializable, Cloneable {
 
     /**
      * Linear search.
+     *
      * @return null if no departure is possible.
      */
-    TripSchedule findNextDeparture (int time, int stopOffset) {
+    TripSchedule findNextDeparture(int time, int stopOffset) {
         TripSchedule bestSchedule = null;
         int bestTime = Integer.MAX_VALUE;
         for (TripSchedule schedule : tripSchedules) {
@@ -163,7 +174,7 @@ public class TripPattern implements Serializable, Cloneable {
         return "TripPattern on route " + routeId + " with stops " + Arrays.toString(stops);
     }
 
-    public String toStringDetailed (TransitLayer transitLayer) {
+    public String toStringDetailed(TransitLayer transitLayer) {
         StringBuilder sb = new StringBuilder();
         sb.append("TripPattern on route ");
         sb.append(routeId);
@@ -177,9 +188,7 @@ public class TripPattern implements Serializable, Cloneable {
         return sb.toString();
     }
 
-    /**
-     * @return true when none of the supplied tripIds are on this pattern.
-     */
+    /** @return true when none of the supplied tripIds are on this pattern. */
     public boolean containsNoTrips(Set<String> tripIds) {
         return this.tripSchedules.stream().noneMatch(ts -> tripIds.contains(ts.tripId));
     }
@@ -191,39 +200,45 @@ public class TripPattern implements Serializable, Cloneable {
     public List<LineString> getHopGeometries(TransitLayer transitLayer) {
         List<LineString> geometries = new ArrayList<>();
         if (shape != null) {
-            // This pattern has a shape. Using the segment indexes and segment fractions that were recorded for each
-            // stop when the R5 network was built, split that shape up into segments between each pair of stops.
+            // This pattern has a shape. Using the segment indexes and segment fractions that were
+            // recorded for each
+            // stop when the R5 network was built, split that shape up into segments between each
+            // pair of stops.
             LocationIndexedLine unprojectedLine = new LocationIndexedLine(shape);
             for (int stopPos = 0; stopPos < stops.length - 1; stopPos++) {
                 LinearLocation fromLocation =
                         new LinearLocation(stopShapeSegment[stopPos], stopShapeFraction[stopPos]);
                 LinearLocation toLocation =
-                        new LinearLocation(stopShapeSegment[stopPos + 1], stopShapeFraction[stopPos + 1]);
-                geometries.add((LineString)unprojectedLine.extractLine(fromLocation, toLocation));
+                        new LinearLocation(
+                                stopShapeSegment[stopPos + 1], stopShapeFraction[stopPos + 1]);
+                geometries.add((LineString) unprojectedLine.extractLine(fromLocation, toLocation));
             }
         } else {
-            // This pattern does not have a shape, but Transitive expects geometries. Use straight lines between stops.
+            // This pattern does not have a shape, but Transitive expects geometries. Use straight
+            // lines between stops.
             Coordinate previousCoordinate = null;
             VertexStore.Vertex v = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
             for (int stopIndex : stops) {
                 int vertexIndex = transitLayer.streetVertexForStop.get(stopIndex);
                 // Unlinked stops don't have coordinates. See comment in stop conversion method.
                 // A better stopgap might be to reuse the previous coordinate.
-                // TODO We should really just make sure we have coordinates for all stops, then pass the stops list into getStopRefs.
+                // TODO We should really just make sure we have coordinates for all stops, then pass
+                // the stops list into getStopRefs.
                 if (vertexIndex < 0) vertexIndex = 0;
                 v.seek(vertexIndex);
                 Coordinate currentCoordinate = new Coordinate(v.getLon(), v.getLat());
                 if (previousCoordinate != null) {
-                    geometries.add(GeometryUtils.geometryFactory.createLineString(
-                            new Coordinate[] { previousCoordinate, currentCoordinate }));
+                    geometries.add(
+                            GeometryUtils.geometryFactory.createLineString(
+                                    new Coordinate[] {previousCoordinate, currentCoordinate}));
                 }
                 previousCoordinate = currentCoordinate;
             }
         }
         if (geometries.size() != stops.length - 1) {
-            throw new AssertionError("This function should always generate one less geometry than there are stops.");
+            throw new AssertionError(
+                    "This function should always generate one less geometry than there are stops.");
         }
         return geometries;
     }
-
 }

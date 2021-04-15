@@ -5,6 +5,7 @@ import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+
 import graphql.schema.DataFetchingEnvironment;
 
 import java.util.ArrayList;
@@ -14,9 +15,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-/**
- * Created by matthewc on 3/9/16.
- */
+/** Created by matthewc on 3/9/16. */
 public class StopTimeFetcher {
     public static List<WrappedGTFSEntity<StopTime>> apex(DataFetchingEnvironment env) {
         Collection<GTFSFeed> feeds;
@@ -39,6 +38,7 @@ public class StopTimeFetcher {
 
         return stopTimes;
     }
+
     public static List<WrappedGTFSEntity<StopTime>> fromTrip(DataFetchingEnvironment env) {
         WrappedGTFSEntity<Trip> trip = (WrappedGTFSEntity<Trip>) env.getSource();
         GTFSFeed feed = ApiMain.getFeedSourceWithoutExceptions(trip.feedUniqueId);
@@ -47,18 +47,18 @@ public class StopTimeFetcher {
         List<String> stopIds = env.getArgument("stop_id");
 
         // get stop_times in order
-        Stream<StopTime> stopTimes = StreamSupport.stream(feed.getOrderedStopTimesForTrip(trip.entity.trip_id).spliterator(), false);
+        Stream<StopTime> stopTimes =
+                StreamSupport.stream(
+                        feed.getOrderedStopTimesForTrip(trip.entity.trip_id).spliterator(), false);
         if (stopIds != null) {
             return stopTimes
                     .filter(stopTime -> stopIds.contains(stopTime.stop_id))
                     .map(st -> new WrappedGTFSEntity<>(feed.uniqueId, st))
                     .collect(Collectors.toList());
-        }
-        else {
+        } else {
             return stopTimes
                     .map(st -> new WrappedGTFSEntity<>(feed.uniqueId, st))
                     .collect(Collectors.toList());
         }
     }
-
 }

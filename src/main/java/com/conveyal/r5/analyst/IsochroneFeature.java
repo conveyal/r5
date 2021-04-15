@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.common.GeometryUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.MultiPolygon;
@@ -23,11 +24,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * This is similar to the IsochroneData class in OTP, and in fact for compatibility can be serialized to JSON and
- * deserialized as such. However it uses a completely different algorithm.
+ * This is similar to the IsochroneData class in OTP, and in fact for compatibility can be
+ * serialized to JSON and deserialized as such. However it uses a completely different algorithm.
  *
- * Although we have another separate implementaion of the marching squares contour line algorithm in Javascript,
- * we're holding on to this one in case we need an R5 server to generate vector isochrones itself.
+ * <p>Although we have another separate implementaion of the marching squares contour line algorithm
+ * in Javascript, we're holding on to this one in case we need an R5 server to generate vector
+ * isochrones itself.
  */
 public class IsochroneFeature implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(IsochroneFeature.class);
@@ -37,20 +39,26 @@ public class IsochroneFeature implements Serializable {
     // maximum number of vertices in a ring
     public static final int MAX_RING_SIZE = 25000;
 
-    /** The minimum ring size (to get rid of small rings). Should be at least 4 to ensure all rings are valid */
+    /**
+     * The minimum ring size (to get rid of small rings). Should be at least 4 to ensure all rings
+     * are valid
+     */
     public static final int MIN_RING_SIZE = 12;
 
     public MultiPolygon geometry;
     public int cutoffSec;
 
-    public IsochroneFeature () { /* deserialization */ }
+    public IsochroneFeature() {
+        /* deserialization */
+    }
 
     /**
      * Create an isochrone for the given cutoff, using a Marching Squares algorithm.
      * https://en.wikipedia.org/wiki/Marching_squares
      */
-    public IsochroneFeature (int cutoffSec, WebMercatorGridPointSet points, int[] times) {
-        // slightly hacky, but simple: set all of the times around the edges of the pointset to MAX_VALUE so that
+    public IsochroneFeature(int cutoffSec, WebMercatorGridPointSet points, int[] times) {
+        // slightly hacky, but simple: set all of the times around the edges of the pointset to
+        // MAX_VALUE so that
         // the isochrone never runs off the edge of the display.
         // first, protective copy
         times = Arrays.copyOf(times, times.length);
@@ -89,7 +97,8 @@ public class IsochroneFeature implements Serializable {
             }
         }
 
-        // create a geometry. For now not doing linear interpolation. Find a cell a line crosses through and
+        // create a geometry. For now not doing linear interpolation. Find a cell a line crosses
+        // through and
         // follow that line.
         List<LinearRing> outerRings = new ArrayList<>();
         List<LinearRing> innerRings = new ArrayList<>();
@@ -111,7 +120,8 @@ public class IsochroneFeature implements Serializable {
 
                 List<Coordinate> ring = new ArrayList<>();
 
-                // keep track of clockwise/counterclockwise orientation, see http://stackoverflow.com/questions/1165647
+                // keep track of clockwise/counterclockwise orientation, see
+                // http://stackoverflow.com/questions/1165647
                 int direction = 0;
                 // skip empty cells
                 int prevy = 0, prevx = 0;
@@ -120,9 +130,14 @@ public class IsochroneFeature implements Serializable {
                 while (true) {
                     idx = contour[x][y];
 
-                    // check for intersecting rings, but know that saddles are supposed to self-intersect.
+                    // check for intersecting rings, but know that saddles are supposed to
+                    // self-intersect.
                     if (found[x][y] && idx != 5 && idx != 10) {
-                        LOG.error("Ring crosses another ring (possibly itself). This cell has index {}, the previous cell has index {}.", idx, prevIdx);
+                        LOG.error(
+                                "Ring crosses another ring (possibly itself). This cell has index"
+                                    + " {}, the previous cell has index {}.",
+                                idx,
+                                prevIdx);
                         break CELLS;
                     }
 
@@ -136,8 +151,10 @@ public class IsochroneFeature implements Serializable {
                         break CELLS;
                     }
 
-                    // save x values here, the next iteration may need to know what they were before we messed with them
-                    // NB no bounds checking is performed below, but the next iteration of the loop will try to access contour[x][y] which
+                    // save x values here, the next iteration may need to know what they were before
+                    // we messed with them
+                    // NB no bounds checking is performed below, but the next iteration of the loop
+                    // will try to access contour[x][y] which
                     // will serve as a bounds check.
                     int startx = x;
                     int starty = y;
@@ -148,7 +165,7 @@ public class IsochroneFeature implements Serializable {
                         case 1:
                             x--;
                             break;
-                        // NB: +y is down
+                            // NB: +y is down
                         case 2:
                             y++;
                             break;
@@ -165,8 +182,7 @@ public class IsochroneFeature implements Serializable {
                             else if (prevy < y)
                                 // came from top
                                 x--;
-                            else
-                                LOG.error("Entered case 5 saddle point from wrong direction!");
+                            else LOG.error("Entered case 5 saddle point from wrong direction!");
                             break;
                         case 6:
                             y++;
@@ -218,24 +234,25 @@ public class IsochroneFeature implements Serializable {
 
                     if (startx < x) {
                         // came from left
-                        // will always be positive, if numerator is negative denominator will be as well.
-                        double frac = (cutoffSec - topLeftTime) / (double) (botLeftTime - topLeftTime);
+                        // will always be positive, if numerator is negative denominator will be as
+                        // well.
+                        double frac =
+                                (cutoffSec - topLeftTime) / (double) (botLeftTime - topLeftTime);
                         lat = points.pixelToLat(points.north + y + frac);
                         lon = points.pixelToLon(points.west + x);
-                    }
-                    else if (startx > x) {
+                    } else if (startx > x) {
                         // came from right
-                        double frac = (cutoffSec - topRightTime) / (double) (botRightTime - topRightTime);
+                        double frac =
+                                (cutoffSec - topRightTime) / (double) (botRightTime - topRightTime);
                         lat = points.pixelToLat(points.north + y + frac);
                         lon = points.pixelToLon(points.west + x + 1);
-                    }
-                    else if (starty < y) {
+                    } else if (starty < y) {
                         // came from top
-                        double frac = (cutoffSec - topLeftTime) / (double) (topRightTime - topLeftTime);
+                        double frac =
+                                (cutoffSec - topLeftTime) / (double) (topRightTime - topLeftTime);
                         lat = points.pixelToLat(points.north + y);
                         lon = points.pixelToLon(points.west + x + frac);
-                    }
-                    else {
+                    } else {
                         // came from bottom
                         double frac = (cutoffSec - botLeftTime) / (botRightTime - botLeftTime);
                         lat = points.pixelToLat(points.north + y + 1);
@@ -265,8 +282,11 @@ public class IsochroneFeature implements Serializable {
                         ring.add(end);
 
                         if (ring.size() > MIN_RING_SIZE) {
-                            LinearRing lr = GeometryUtils.geometryFactory.createLinearRing(ring.toArray(new Coordinate[ring.size()]));
-                            // direction less than 0 means clockwise (NB the y-axis is backwards), since value is to left it is an outer ring
+                            LinearRing lr =
+                                    GeometryUtils.geometryFactory.createLinearRing(
+                                            ring.toArray(new Coordinate[ring.size()]));
+                            // direction less than 0 means clockwise (NB the y-axis is backwards),
+                            // since value is to left it is an outer ring
                             if (direction > 0) {
                                 // simplify so point in polygon test is tractable
                                 lr = (LinearRing) TopologyPreservingSimplifier.simplify(lr, 1e-3);
@@ -287,33 +307,44 @@ public class IsochroneFeature implements Serializable {
         Multimap<LinearRing, LinearRing> holesForRing = HashMultimap.create();
 
         // create polygons so we can test containment
-        Map<LinearRing, Polygon> polygonsForOuterRing = outerRings.stream().collect(Collectors.toMap(
-                r -> r,
-                r -> GeometryUtils.geometryFactory.createPolygon(r)
-        ));
+        Map<LinearRing, Polygon> polygonsForOuterRing =
+                outerRings.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        r -> r,
+                                        r -> GeometryUtils.geometryFactory.createPolygon(r)));
 
-        Map<LinearRing, Polygon> polygonsForInnerRing = innerRings.stream().collect(Collectors.toMap(
-                r -> r,
-                r -> GeometryUtils.geometryFactory.createPolygon(r)
-        ));
+        Map<LinearRing, Polygon> polygonsForInnerRing =
+                innerRings.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        r -> r,
+                                        r -> GeometryUtils.geometryFactory.createPolygon(r)));
 
-        // put the biggest ring first because most holes are in the biggest ring, reduces number of point in polygon tests below
-        outerRings.sort(Comparator.comparing(ring -> polygonsForOuterRing.get(ring).getArea()).reversed());
+        // put the biggest ring first because most holes are in the biggest ring, reduces number of
+        // point in polygon tests below
+        outerRings.sort(
+                Comparator.comparing(ring -> polygonsForOuterRing.get(ring).getArea()).reversed());
 
         // get rid of tiny shells
 
-
-        LOG.info("Found {} outer rings and {} inner rings for cutoff {}m", polygonsForOuterRing.size(), polygonsForInnerRing.size(), cutoffSec / 60);
+        LOG.info(
+                "Found {} outer rings and {} inner rings for cutoff {}m",
+                polygonsForOuterRing.size(),
+                polygonsForInnerRing.size(),
+                cutoffSec / 60);
 
         int holeIdx = -1;
-        HOLES: for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
+        HOLES:
+        for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
             holeIdx++;
 
             // get rid of tiny holes
             if (hole.getValue().getArea() < 1e-6) continue;
 
             for (LinearRing ring : outerRings) {
-                // fine to test membership of first coordinate only since shells and holes are disjoint, and holes
+                // fine to test membership of first coordinate only since shells and holes are
+                // disjoint, and holes
                 // nest completely in shells
                 if (polygonsForOuterRing.get(ring).contains(hole.getKey().getPointN(0))) {
                     holesForRing.put(ring, hole.getKey());
@@ -321,13 +352,22 @@ public class IsochroneFeature implements Serializable {
                 }
             }
 
-            LOG.warn("Found no fitting shell for isochrone hole {} at cutoff {}, dropping this hole.", holeIdx, cutoffSec);
+            LOG.warn(
+                    "Found no fitting shell for isochrone hole {} at cutoff {}, dropping this"
+                        + " hole.",
+                    holeIdx,
+                    cutoffSec);
         }
 
-        Polygon[] polygons = outerRings.stream().map(shell -> {
-            Collection<LinearRing> holes = holesForRing.get(shell);
-            return GeometryUtils.geometryFactory.createPolygon(shell, holes.toArray(new LinearRing[holes.size()]));
-        }).toArray(s -> new Polygon[s]);
+        Polygon[] polygons =
+                outerRings.stream()
+                        .map(
+                                shell -> {
+                                    Collection<LinearRing> holes = holesForRing.get(shell);
+                                    return GeometryUtils.geometryFactory.createPolygon(
+                                            shell, holes.toArray(new LinearRing[holes.size()]));
+                                })
+                        .toArray(s -> new Polygon[s]);
 
         // first geometry has to be an outer ring, but there may be multiple outer rings
         this.geometry = GeometryUtils.geometryFactory.createMultiPolygon(polygons);
@@ -335,14 +375,12 @@ public class IsochroneFeature implements Serializable {
         LOG.debug("Done.");
     }
 
-    /**
-     * Debug code to draw an ascii-art isochrone.
-     */
-    public void dumpContourGrid (byte[][] contour, String out) throws Exception {
+    /** Debug code to draw an ascii-art isochrone. */
+    public void dumpContourGrid(byte[][] contour, String out) throws Exception {
         FileWriter sb = new FileWriter(new File(out));
         for (int y = 0; y < contour[0].length; y++) {
             for (int x = 0; x < contour.length; x++) {
-                switch(contour[x][y]) {
+                switch (contour[x][y]) {
                     case 0:
                         sb.append("  ");
                         break;
@@ -381,7 +419,6 @@ public class IsochroneFeature implements Serializable {
                         break;
                     default:
                         sb.append("**");
-
                 }
             }
             sb.append("\n");

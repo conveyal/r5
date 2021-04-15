@@ -10,13 +10,13 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import java.io.IOException;
 import java.util.BitSet;
 
-/**
- * Serialize a BitSet to an array [true, false . . .].
- */
+/** Serialize a BitSet to an array [true, false . . .]. */
 public class BitSetSerializer extends JsonSerializer<BitSet> {
 
-    @Override public void serialize(BitSet bitSet, JsonGenerator jsonGenerator,
-            SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+    @Override
+    public void serialize(
+            BitSet bitSet, JsonGenerator jsonGenerator, SerializerProvider serializerProvider)
+            throws IOException, JsonProcessingException {
 
         jsonGenerator.writeStartArray();
 
@@ -27,7 +27,7 @@ public class BitSetSerializer extends JsonSerializer<BitSet> {
         jsonGenerator.writeEndArray();
     }
 
-    public static SimpleModule makeModule () {
+    public static SimpleModule makeModule() {
         Version moduleVersion = new Version(1, 0, 0, null, null, null);
         SimpleModule module = new SimpleModule("BitSet", moduleVersion);
         module.addSerializer(BitSet.class, new BitSetSerializer());

@@ -2,8 +2,8 @@ package com.conveyal.osmlib;
 
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.GeneratedMessageLite;
 import com.google.protobuf.GeneratedMessageV3;
+
 import org.openstreetmap.osmosis.osmbinary.Fileformat;
 import org.openstreetmap.osmosis.osmbinary.Osmformat;
 import org.slf4j.Logger;
@@ -15,8 +15,9 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.zip.Deflater;
 
 /**
- * Consumes OSM entity objects and writes a stream of PBF data blocks to the specified output stream.
- * This is neither threadsafe nor reentrant! Create one instance of this encoder per encode operation.
+ * Consumes OSM entity objects and writes a stream of PBF data blocks to the specified output
+ * stream. This is neither threadsafe nor reentrant! Create one instance of this encoder per encode
+ * operation.
  */
 public class PBFOutput implements OSMEntitySink, Runnable {
 
@@ -31,7 +32,10 @@ public class PBFOutput implements OSMEntitySink, Runnable {
     /** Values retained from one entity to the next within a block for delta decoding. */
     private long prevId, prevFixedLat, prevFixedLon;
 
-    /** The entity type of the current block to enforce grouping of entities by type. null means no type yet. */
+    /**
+     * The entity type of the current block to enforce grouping of entities by type. null means no
+     * type yet.
+     */
     private OSMEntity.Type currEntityType = null;
 
     /* Per-block state */
@@ -62,15 +66,18 @@ public class PBFOutput implements OSMEntitySink, Runnable {
     }
 
     /** We always add one primitive group of less that 8k elements to each primitive block. */
-    private void endBlock () {
+    private void endBlock() {
         if (nEntitiesInBlock > 0) {
             if (currEntityType == OSMEntity.Type.NODE) {
                 primitiveGroupBuilder.setDense(denseNodesBuilder);
             }
             // Pass the block off to the compression/writing thread
             try {
-                Osmformat.PrimitiveBlock primitiveBlock = Osmformat.PrimitiveBlock.newBuilder()
-                        .setStringtable(stringTable.toBuilder()).addPrimitivegroup(primitiveGroupBuilder).build();
+                Osmformat.PrimitiveBlock primitiveBlock =
+                        Osmformat.PrimitiveBlock.newBuilder()
+                                .setStringtable(stringTable.toBuilder())
+                                .addPrimitivegroup(primitiveGroupBuilder)
+                                .build();
                 synchronousQueue.put(primitiveBlock);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -105,8 +112,11 @@ public class PBFOutput implements OSMEntitySink, Runnable {
         }
         byte[] serializedBlob = blobBuilder.build().toByteArray();
 
-        Fileformat.BlobHeader blobHeader = Fileformat.BlobHeader.newBuilder()
-                .setType(blobTypeString).setDatasize(serializedBlob.length).build();
+        Fileformat.BlobHeader blobHeader =
+                Fileformat.BlobHeader.newBuilder()
+                        .setType(blobTypeString)
+                        .setDatasize(serializedBlob.length)
+                        .build();
         byte[] serializedBlobHeader = blobHeader.toByteArray();
         try {
             // "Returns a big-endian representation of value in a 4-element byte array"
@@ -116,13 +126,13 @@ public class PBFOutput implements OSMEntitySink, Runnable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     /**
-     * Called at the beginning of each node, way, or relation to enforce grouping of entities by type.
-     * If the entity type has changed since the last entity (except at the beginning of the first block),
-     * ends the block and starts a new one of the new type. Each block will contain entities of only a single type.
+     * Called at the beginning of each node, way, or relation to enforce grouping of entities by
+     * type. If the entity type has changed since the last entity (except at the beginning of the
+     * first block), ends the block and starts a new one of the new type. Each block will contain
+     * entities of only a single type.
      */
     private void checkBlockTransition(OSMEntity.Type eType) throws IOException {
         if (currEntityType != eType || nEntitiesInBlock++ >= 8000) {
@@ -135,15 +145,20 @@ public class PBFOutput implements OSMEntitySink, Runnable {
     }
 
     /**
-     * Deflate the given input data buffer into the given output byte buffer.
-     * Used in both PBF and VEX output.
+     * Deflate the given input data buffer into the given output byte buffer. Used in both PBF and
+     * VEX output.
+     *
      * @return the deflated size of the data, or -1 if deflate did not reduce the data size.
      */
-    public static int deflate (byte[] input, byte[] output) {
+    public static int deflate(byte[] input, byte[] output) {
         int pos = 0;
-        // Do not compress an empty data block, it will spin forever trying to fill the zero-length output buffer.
+        // Do not compress an empty data block, it will spin forever trying to fill the zero-length
+        // output buffer.
         if (input.length > 0) {
-            Deflater deflater = new Deflater(Deflater.DEFAULT_COMPRESSION, false); // include gzip header and checksum
+            Deflater deflater =
+                    new Deflater(
+                            Deflater.DEFAULT_COMPRESSION,
+                            false); // include gzip header and checksum
             deflater.setInput(input, 0, input.length);
             deflater.finish(); // There will be no more input after this byte array.
             while (!deflater.finished()) {
@@ -174,7 +189,6 @@ public class PBFOutput implements OSMEntitySink, Runnable {
         // Start another thread that will handle compression and writing in parallel.
         writerThread = new Thread(this);
         writerThread.start();
-
     }
 
     @Override
@@ -186,7 +200,8 @@ public class PBFOutput implements OSMEntitySink, Runnable {
     public void writeEnd() throws IOException {
         // Finish any partially-completed block.
         endBlock();
-        // Send a primitive block with no primitive group to the writer thread, signaling it to shut down and clean up.
+        // Send a primitive block with no primitive group to the writer thread, signaling it to shut
+        // down and clean up.
         try {
             synchronousQueue.put(Osmformat.PrimitiveBlock.getDefaultInstance());
             writerThread.join();
@@ -225,7 +240,6 @@ public class PBFOutput implements OSMEntitySink, Runnable {
             }
         }
         denseNodesBuilder.addKeysVals(0);
-
     }
 
     @Override
@@ -252,7 +266,6 @@ public class PBFOutput implements OSMEntitySink, Runnable {
 
         /* TODO Should we trigger the build here or just call with the builder? */
         primitiveGroupBuilder.addWays(builder.build());
-
     }
 
     @Override
@@ -291,18 +304,21 @@ public class PBFOutput implements OSMEntitySink, Runnable {
 
         /* TODO Should we trigger the build here or just call with the builder? */
         primitiveGroupBuilder.addRelations(builder.build());
-
     }
 
     /** A zero-length BlockingQueue that hands tasks to the compression/writing thread. */
-    private final SynchronousQueue<Osmformat.PrimitiveBlock> synchronousQueue = new SynchronousQueue<>();
+    private final SynchronousQueue<Osmformat.PrimitiveBlock> synchronousQueue =
+            new SynchronousQueue<>();
 
-    /** Runnable interface implementation that compresses and writes output blocks asynchronously. */
+    /**
+     * Runnable interface implementation that compresses and writes output blocks asynchronously.
+     */
     @Override
     public void run() {
         while (true) {
             try {
-                Osmformat.PrimitiveBlock block = synchronousQueue.take(); // block until work is available
+                Osmformat.PrimitiveBlock block =
+                        synchronousQueue.take(); // block until work is available
                 if (block.getPrimitivegroupCount() == 0) {
                     break; // a block with no primitive groups tells the writer thread to shut down.
                 }
@@ -319,5 +335,4 @@ public class PBFOutput implements OSMEntitySink, Runnable {
             throw new RuntimeException(e);
         }
     }
-
 }

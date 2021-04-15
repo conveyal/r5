@@ -21,10 +21,13 @@ public class TestUtils {
      */
     public static void dropDB(String dbName) {
         // first, terminate all other user sessions
-        executeAndClose("SELECT pg_terminate_backend(pg_stat_activity.pid) " +
-            "FROM pg_stat_activity " +
-            "WHERE pg_stat_activity.datname = '" + dbName + "' " +
-            "AND pid <> pg_backend_pid()");
+        executeAndClose(
+                "SELECT pg_terminate_backend(pg_stat_activity.pid) "
+                        + "FROM pg_stat_activity "
+                        + "WHERE pg_stat_activity.datname = '"
+                        + dbName
+                        + "' "
+                        + "AND pid <> pg_backend_pid()");
         // drop the db
         executeAndClose("DROP DATABASE " + dbName);
     }
@@ -88,7 +91,8 @@ public class TestUtils {
     }
 
     /**
-     * Generate a unique string.  Mostly copied from the uniqueId method of https://github.com/javadev/underscore-java
+     * Generate a unique string. Mostly copied from the uniqueId method of
+     * https://github.com/javadev/underscore-java
      */
     public static String uniqueString() {
         return "test_db_" + UNIQUE_ID.incrementAndGet();

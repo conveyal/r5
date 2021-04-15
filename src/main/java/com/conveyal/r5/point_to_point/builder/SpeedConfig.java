@@ -3,33 +3,24 @@ package com.conveyal.r5.point_to_point.builder;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * This class have max speed based on highway tags
- *
- */
+/** This class have max speed based on highway tags */
 public class SpeedConfig {
-    /**
-     * Can be "km/h", "kmh", "kmph", "kph" or mph.
-     */
+    /** Can be "km/h", "kmh", "kmph", "kph" or mph. */
     public SpeedUnit units;
 
-    /**
-     * Map of tags and speeds
-     */
+    /** Map of tags and speeds */
     public Map<String, Integer> values;
 
-    /**
-     * Speed for all the streets for which speed isn't specified
-     */
+    /** Speed for all the streets for which speed isn't specified */
     public int defaultSpeed;
 
     /**
      * Build a speed factory given a config node, or fallback to the default if none is specified.
      *
-     * Units can be (km/h|kmh|kmph|kph or mph or knots) all values needs to be in provided units.
-     * Values are OSM highway tag value and speed. All tags need to be provided.
-     * defaultSpeed is speed if none of tags matches and street doesn't have maxspeed.
-     * Accepts this format:
+     * <p>Units can be (km/h|kmh|kmph|kph or mph or knots) all values needs to be in provided units.
+     * Values are OSM highway tag value and speed. All tags need to be provided. defaultSpeed is
+     * speed if none of tags matches and street doesn't have maxspeed. Accepts this format:
+     *
      * <pre>
      * speeds:{
      *   units:"km/h",
@@ -56,8 +47,7 @@ public class SpeedConfig {
      * }
      * </pre>
      */
-    public SpeedConfig() {
-    }
+    public SpeedConfig() {}
 
     public static SpeedConfig defaultConfig() {
         SpeedConfig speedConfig = new SpeedConfig();

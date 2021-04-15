@@ -37,22 +37,19 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-/**
- * Variable-width integer coding. Adapted from Google Protobuf library for MapDB Serializers.
- */
+/** Variable-width integer coding. Adapted from Google Protobuf library for MapDB Serializers. */
 public class VarInt {
 
     // WRITING VARINTS
 
     /**
-     * Encode a ZigZag-encoded 32-bit value.  ZigZag encodes signed integers
-     * into values that can be efficiently encoded with varint.  (Otherwise,
-     * negative values must be sign-extended to 64 bits to be varint encoded,
-     * thus always taking 10 bytes on the wire.)
+     * Encode a ZigZag-encoded 32-bit value. ZigZag encodes signed integers into values that can be
+     * efficiently encoded with varint. (Otherwise, negative values must be sign-extended to 64 bits
+     * to be varint encoded, thus always taking 10 bytes on the wire.)
      *
      * @param n A signed 32-bit integer.
-     * @return An unsigned 32-bit integer, stored in a signed int because
-     *         Java has no explicit unsigned support.
+     * @return An unsigned 32-bit integer, stored in a signed int because Java has no explicit
+     *     unsigned support.
      */
     public static int encodeZigZag32(final int n) {
         // Note:  the right-shift must be arithmetic
@@ -60,14 +57,13 @@ public class VarInt {
     }
 
     /**
-     * Encode a ZigZag-encoded 64-bit value.  ZigZag encodes signed integers
-     * into values that can be efficiently encoded with varint.  (Otherwise,
-     * negative values must be sign-extended to 64 bits to be varint encoded,
-     * thus always taking 10 bytes on the wire.)
+     * Encode a ZigZag-encoded 64-bit value. ZigZag encodes signed integers into values that can be
+     * efficiently encoded with varint. (Otherwise, negative values must be sign-extended to 64 bits
+     * to be varint encoded, thus always taking 10 bytes on the wire.)
      *
      * @param n A signed 64-bit integer.
-     * @return An unsigned 64-bit integer, stored in a signed int because
-     *         Java has no explicit unsigned support.
+     * @return An unsigned 64-bit integer, stored in a signed int because Java has no explicit
+     *     unsigned support.
      */
     public static long encodeZigZag64(final long n) {
         // Note:  the right-shift must be arithmetic
@@ -98,8 +94,8 @@ public class VarInt {
     }
 
     /**
-     * Encode and write a varint.  {@code value} is treated as
-     * unsigned, so it won't be sign-extended if negative.
+     * Encode and write a varint. {@code value} is treated as unsigned, so it won't be sign-extended
+     * if negative.
      */
     public static void writeRawVarint32(DataOutput out, int value) throws IOException {
         while (true) {
@@ -112,7 +108,7 @@ public class VarInt {
             }
         }
     }
-    
+
     // READING VARINTS
 
     /** Read an {@code sint32} field value from the stream. */
@@ -126,13 +122,12 @@ public class VarInt {
     }
 
     /**
-     * Decode a ZigZag-encoded 32-bit value.  ZigZag encodes signed integers
-     * into values that can be efficiently encoded with varint.  (Otherwise,
-     * negative values must be sign-extended to 64 bits to be varint encoded,
-     * thus always taking 10 bytes on the wire.)
+     * Decode a ZigZag-encoded 32-bit value. ZigZag encodes signed integers into values that can be
+     * efficiently encoded with varint. (Otherwise, negative values must be sign-extended to 64 bits
+     * to be varint encoded, thus always taking 10 bytes on the wire.)
      *
-     * @param n An unsigned 32-bit integer, stored in a signed int because
-     *          Java has no explicit unsigned support.
+     * @param n An unsigned 32-bit integer, stored in a signed int because Java has no explicit
+     *     unsigned support.
      * @return A signed 32-bit integer.
      */
     public static int decodeZigZag32(final int n) {
@@ -140,23 +135,19 @@ public class VarInt {
     }
 
     /**
-     * Decode a ZigZag-encoded 64-bit value.  ZigZag encodes signed integers
-     * into values that can be efficiently encoded with varint.  (Otherwise,
-     * negative values must be sign-extended to 64 bits to be varint encoded,
-     * thus always taking 10 bytes on the wire.)
+     * Decode a ZigZag-encoded 64-bit value. ZigZag encodes signed integers into values that can be
+     * efficiently encoded with varint. (Otherwise, negative values must be sign-extended to 64 bits
+     * to be varint encoded, thus always taking 10 bytes on the wire.)
      *
-     * @param n An unsigned 64-bit integer, stored in a signed int because
-     *          Java has no explicit unsigned support.
+     * @param n An unsigned 64-bit integer, stored in a signed int because Java has no explicit
+     *     unsigned support.
      * @return A signed 64-bit integer.
      */
     public static long decodeZigZag64(final long n) {
         return (n >>> 1) ^ -(n & 1);
     }
 
-    /**
-     * Read a raw Varint from the stream.  If larger than 32 bits, discard the
-     * upper bits.
-     */
+    /** Read a raw Varint from the stream. If larger than 32 bits, discard the upper bits. */
     public static int readRawVarint32(DataInput in) throws IOException {
         byte tmp = in.readByte();
         if (tmp >= 0) {
@@ -190,14 +181,14 @@ public class VarInt {
         }
         return result;
     }
-    
+
     /** Read a raw Varint from the stream. */
     public static long readRawVarint64(DataInput in) throws IOException {
         int shift = 0;
         long result = 0;
         while (shift < 64) {
             final byte b = in.readByte();
-            result |= (long)(b & 0x7F) << shift;
+            result |= (long) (b & 0x7F) << shift;
             if ((b & 0x80) == 0) {
                 return result;
             }
@@ -209,7 +200,8 @@ public class VarInt {
     // WORKING WITH OSM TAGS
     // TODO KV serializer using common tags file from VEX
 
-    // For strings less that 128 characters in length, this will use only one byte more than the string itself
+    // For strings less that 128 characters in length, this will use only one byte more than the
+    // string itself
     public static void writeString(DataOutput out, String string) throws IOException {
         byte[] bytes = string.getBytes(Charsets.UTF_8);
         writeRawVarint32(out, bytes.length);
@@ -241,7 +233,4 @@ public class VarInt {
             tagged.addTag(readString(in), readString(in));
         }
     }
-
-
-
 }

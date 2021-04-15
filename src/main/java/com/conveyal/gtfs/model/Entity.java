@@ -16,6 +16,7 @@ import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
+
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +41,8 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 /**
- * An abstract base class that represents a row in a GTFS table, e.g. a Stop, Trip, or Agency.
- * One concrete subclass is defined for each table in a GTFS feed.
+ * An abstract base class that represents a row in a GTFS table, e.g. a Stop, Trip, or Agency. One
+ * concrete subclass is defined for each table in a GTFS feed.
  */
 // TODO K is the key type for this table
 public abstract class Entity implements Serializable {
@@ -51,36 +52,41 @@ public abstract class Entity implements Serializable {
     public int sourceFileLine;
 
     /**
-     * This method should be overridden by each Entity subtype to return the proper key field for that subtype.
-     * @return a key that according to the GTFS spec should uniquely identify this entity, either alone or together
-     *          with a sequence number. For example stop_times and shapes have no single field that uniquely
-     *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
+     * This method should be overridden by each Entity subtype to return the proper key field for
+     * that subtype.
+     *
+     * @return a key that according to the GTFS spec should uniquely identify this entity, either
+     *     alone or together with a sequence number. For example stop_times and shapes have no
+     *     single field that uniquely identifies a row, and the stop_sequence or shape_pt_sequence
+     *     must also be considered.
      */
-    public String getId () {
+    public String getId() {
         return null;
     }
 
     /**
-     * This method should be overridden by each Entity subtype to return the proper sequence field for that subtype.
+     * This method should be overridden by each Entity subtype to return the proper sequence field
+     * for that subtype.
+     *
      * @return the integer second element of a compound key, for those elements that require one.
      */
-    public Integer getSequenceNumber () {
+    public Integer getSequenceNumber() {
         return null;
     }
 
     /* A class that can produce Entities from CSV, and record errors that occur in the process. */
     // This is almost a GTFSTable... rename?
-    public static abstract class Loader<E extends Entity> {
+    public abstract static class Loader<E extends Entity> {
 
         private static final Logger LOG = LoggerFactory.getLogger(Loader.class);
         private static final Deduplicator deduplicator = new Deduplicator();
 
-        protected final GTFSFeed feed;    // the feed into which we are loading the entities
+        protected final GTFSFeed feed; // the feed into which we are loading the entities
         protected final String tableName; // name of corresponding table without .txt
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
 
         protected CsvReader reader;
-        protected int       row;
+        protected int row;
         // TODO "String column" that is set before any calls to avoid passing around the column name
 
         public Loader(GTFSFeed feed, String tableName) {
@@ -91,18 +97,23 @@ public abstract class Entity implements Serializable {
         /** @return whether the number actual is in the range [min, max] */
         protected boolean checkRangeInclusive(double min, double max, double actual) {
             if (actual < min || actual > max) {
-                feed.errors.add(new RangeError(tableName, row, null, min, max, actual)); // TODO set column name in loader so it's available in methods
+                feed.errors.add(
+                        new RangeError(
+                                tableName, row, null, min, max,
+                                actual)); // TODO set column name in loader so it's available in
+                                          // methods
                 return false;
             }
             return true;
         }
 
         /**
-         * Fetch the value from the given column of the current row. Record an error the first time a column is
-         * seen to be missing, and whenever empty values are encountered.
-         * I was originally just calling getStringField from the other getXField functions as a first step to get
-         * the missing-field check. But we don't want deduplication performed on strings that aren't being retained.
-         * Therefore the missing-field behavior is this separate function.
+         * Fetch the value from the given column of the current row. Record an error the first time
+         * a column is seen to be missing, and whenever empty values are encountered. I was
+         * originally just calling getStringField from the other getXField functions as a first step
+         * to get the missing-field check. But we don't want deduplication performed on strings that
+         * aren't being retained. Therefore the missing-field behavior is this separate function.
+         *
          * @return null if column was missing or field is empty
          */
         private String getFieldCheckRequired(String column, boolean required) throws IOException {
@@ -128,32 +139,38 @@ public abstract class Entity implements Serializable {
             return str;
         }
 
-        protected int getIntField(String column, boolean required, int min, int max) throws IOException {
+        protected int getIntField(String column, boolean required, int min, int max)
+                throws IOException {
             return getIntField(column, required, min, max, 0);
         }
 
-        protected int getIntField(String column, boolean required, int min, int max, int defaultValue) throws IOException {
+        protected int getIntField(
+                String column, boolean required, int min, int max, int defaultValue)
+                throws IOException {
             String str = getFieldCheckRequired(column, required);
             int val = INT_MISSING;
             if (str == null) {
                 val = defaultValue; // defaults to 0 per overloaded function, unless provided.
-            } else try {
-                val = Integer.parseInt(str);
-                checkRangeInclusive(min, max, val);
-            } catch (NumberFormatException nfe) {
-                feed.errors.add(new NumberParseError(tableName, row, column));
-            }
+            } else
+                try {
+                    val = Integer.parseInt(str);
+                    checkRangeInclusive(min, max, val);
+                } catch (NumberFormatException nfe) {
+                    feed.errors.add(new NumberParseError(tableName, row, column));
+                }
             return val;
         }
 
         /**
-         * Fetch the given column of the current row, and interpret it as a time in the format HH:MM:SS.
+         * Fetch the given column of the current row, and interpret it as a time in the format
+         * HH:MM:SS.
+         *
          * @return the time value in seconds since midnight
          */
         protected int getTimeField(String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             int val = INT_MISSING;
-            
+
             if (str != null) {
                 String[] fields = str.split(":");
                 if (fields.length != 3) {
@@ -163,7 +180,10 @@ public abstract class Entity implements Serializable {
                         int hours = Integer.parseInt(fields[0]);
                         int minutes = Integer.parseInt(fields[1]);
                         int seconds = Integer.parseInt(fields[2]);
-                        checkRangeInclusive(0, 72, hours); // GTFS hours can go past midnight. Some trains run for 3 days.
+                        checkRangeInclusive(
+                                0, 72,
+                                hours); // GTFS hours can go past midnight. Some trains run for 3
+                                        // days.
                         checkRangeInclusive(0, 59, minutes);
                         checkRangeInclusive(0, 59, seconds);
                         val = (hours * 60 * 60) + minutes * 60 + seconds;
@@ -172,59 +192,66 @@ public abstract class Entity implements Serializable {
                     }
                 }
             }
-            
+
             return val;
         }
 
         /**
-         * Fetch the given column of the current row, and interpret it as a date in the format YYYYMMDD.
+         * Fetch the given column of the current row, and interpret it as a date in the format
+         * YYYYMMDD.
+         *
          * @return the date value as Java LocalDate, or null if it could not be parsed.
          */
         protected LocalDate getDateField(String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             LocalDate dateTime = null;
-            if (str != null) try {
-                dateTime = LocalDate.parse(str, DateTimeFormatter.BASIC_ISO_DATE);
-                checkRangeInclusive(2000, 2100, dateTime.getYear());
-            } catch (IllegalArgumentException iae) {
-                feed.errors.add(new DateParseError(tableName, row, column));
-            }
+            if (str != null)
+                try {
+                    dateTime = LocalDate.parse(str, DateTimeFormatter.BASIC_ISO_DATE);
+                    checkRangeInclusive(2000, 2100, dateTime.getYear());
+                } catch (IllegalArgumentException iae) {
+                    feed.errors.add(new DateParseError(tableName, row, column));
+                }
             return dateTime;
         }
 
         /**
          * Fetch the given column of the current row, and interpret it as a URL.
+         *
          * @return the URL, or null if the field was missing or empty.
          */
         protected URL getUrlField(String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             URL url = null;
-            if (str != null) try {
-                url = new URL(str);
-            } catch (MalformedURLException mue) {
-                feed.errors.add(new URLParseError(tableName, row, column));
-            }
+            if (str != null)
+                try {
+                    url = new URL(str);
+                } catch (MalformedURLException mue) {
+                    feed.errors.add(new URLParseError(tableName, row, column));
+                }
             return url;
         }
 
-        protected double getDoubleField(String column, boolean required, double min, double max) throws IOException {
+        protected double getDoubleField(String column, boolean required, double min, double max)
+                throws IOException {
             String str = getFieldCheckRequired(column, required);
             double val = Double.NaN;
-            if (str != null) try {
-                val = Double.parseDouble(str);
-                checkRangeInclusive(min, max, val);
-            } catch (NumberFormatException nfe) {
-                feed.errors.add(new NumberParseError(tableName, row, column));
-            }
+            if (str != null)
+                try {
+                    val = Double.parseDouble(str);
+                    checkRangeInclusive(min, max, val);
+                } catch (NumberFormatException nfe) {
+                    feed.errors.add(new NumberParseError(tableName, row, column));
+                }
             return val;
         }
 
         /**
-         * Used to check referential integrity.
-         * Return value is not used, but could allow entities to point to each other directly rather than
-         * using indirection through string-keyed maps.
+         * Used to check referential integrity. Return value is not used, but could allow entities
+         * to point to each other directly rather than using indirection through string-keyed maps.
          */
-        protected <K, V> V getRefField(String column, boolean required, Map<K, V> target) throws IOException {
+        protected <K, V> V getRefField(String column, boolean required, Map<K, V> target)
+                throws IOException {
             String str = getFieldCheckRequired(column, required);
             V val = null;
             if (str != null) {
@@ -242,12 +269,15 @@ public abstract class Entity implements Serializable {
 
         protected abstract boolean isRequired();
 
-        /** Implemented by subclasses to read one row, produce one GTFS entity, and store that entity in a map. */
+        /**
+         * Implemented by subclasses to read one row, produce one GTFS entity, and store that entity
+         * in a map.
+         */
         protected abstract void loadOneRow() throws IOException;
 
         /**
-         * The main entry point into an Entity.Loader. Interprets each row of a CSV file within a zip file as a sinle
-         * GTFS entity, and loads them into a table.
+         * The main entry point into an Entity.Loader. Interprets each row of a CSV file within a
+         * zip file as a sinle GTFS entity, and loads them into a table.
          *
          * @param zip the zip file from which to read a table
          */
@@ -260,7 +290,10 @@ public abstract class Entity implements Serializable {
                     ZipEntry e = entries.nextElement();
                     if (e.getName().endsWith(tableName + ".txt")) {
                         entry = e;
-                        feed.errors.add(new TableInSubdirectoryError(tableName, entry.getName().replace(tableName + ".txt", "")));
+                        feed.errors.add(
+                                new TableInSubdirectoryError(
+                                        tableName,
+                                        entry.getName().replace(tableName + ".txt", "")));
                     }
                 }
                 /* This GTFS table did not exist in the zip. */
@@ -275,7 +308,8 @@ public abstract class Entity implements Serializable {
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
             InputStream zis = zip.getInputStream(entry);
             // skip any byte order mark that may be present. Files must be UTF-8,
-            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable"
+            // but the GTFS spec says that "files that include the UTF byte order mark are
+            // acceptable"
             InputStream bis = new BOMInputStream(zis);
             CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
             this.reader = reader;
@@ -284,7 +318,8 @@ public abstract class Entity implements Serializable {
                 feed.errors.add(new EmptyTableError(tableName));
             }
             while (reader.readRecord()) {
-                // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
+                // reader.getCurrentRecord() is zero-based and does not include the header line,
+                // keep our own row count
                 if (++row % 500000 == 0) {
                     LOG.info("Record number {}", human(row));
                 }
@@ -294,15 +329,16 @@ public abstract class Entity implements Serializable {
                 feed.errors.add(new EmptyTableError(tableName));
             }
         }
-
     }
 
     /**
-     * An output stream that cannot be closed. CSVWriters try to close their output streams when they are garbage-collected,
-     * which breaks if another CSV writer is still writing to the ZIP file.
+     * An output stream that cannot be closed. CSVWriters try to close their output streams when
+     * they are garbage-collected, which breaks if another CSV writer is still writing to the ZIP
+     * file.
      *
-     * Apache Commons has something similar but it seemed silly to import another large dependency. Eventually Guava will have this,
-     * see Guava issue 1367. At that point we should switch to using Guava.
+     * <p>Apache Commons has something similar but it seemed silly to import another large
+     * dependency. Eventually Guava will have this, see Guava issue 1367. At that point we should
+     * switch to using Guava.
      */
     private static class UncloseableOutputStream extends FilterOutputStream {
         public UncloseableOutputStream(OutputStream out) {
@@ -310,35 +346,33 @@ public abstract class Entity implements Serializable {
         }
 
         @Override
-        public void close () {
+        public void close() {
             // no-op
             return;
         }
     }
 
     /**
-     * Write this entity to a CSV file. This should be subclassed in subclasses of Entity.
-     * The following (abstract) methods should be overridden in a subclass:
-     * 
-     * writeHeaders(): write the headers to the CsvWriter writer.
-     * writeRow(E): write the passed-in object to the CsvWriter writer, potentially using the write*Field methods.
-     * iterator(): return an iterator over objects of this class (note that the feed is available at this.feed
-     * public Writer (GTFSFeed feed): this should super to Writer(GTFSFeed feed, String tableName), with the table name
-     * defined. 
-     * 
+     * Write this entity to a CSV file. This should be subclassed in subclasses of Entity. The
+     * following (abstract) methods should be overridden in a subclass:
+     *
+     * <p>writeHeaders(): write the headers to the CsvWriter writer. writeRow(E): write the
+     * passed-in object to the CsvWriter writer, potentially using the write*Field methods.
+     * iterator(): return an iterator over objects of this class (note that the feed is available at
+     * this.feed public Writer (GTFSFeed feed): this should super to Writer(GTFSFeed feed, String
+     * tableName), with the table name defined.
+     *
      * @author mattwigway
      */
-    public static abstract class Writer<E extends Entity> {
+    public abstract static class Writer<E extends Entity> {
         private static final Logger LOG = LoggerFactory.getLogger(Writer.class);
 
-        protected final GTFSFeed feed;    // the feed into which we are loading the entities
+        protected final GTFSFeed feed; // the feed into which we are loading the entities
         protected final String tableName; // name of corresponding table without .txt
 
         protected CsvWriter writer;
 
-        /**
-         * one-based to match reader.
-         */
+        /** one-based to match reader. */
         protected long row;
 
         protected Writer(GTFSFeed feed, String tableName) {
@@ -346,22 +380,16 @@ public abstract class Entity implements Serializable {
             this.tableName = tableName;
         }
 
-        /**
-         * Write the CSV header.
-         */
+        /** Write the CSV header. */
         protected abstract void writeHeaders() throws IOException;
 
-        /**
-         * Write one row of the CSV from the passed-in object.
-         */
+        /** Write one row of the CSV from the passed-in object. */
         protected abstract void writeOneRow(E obj) throws IOException;
 
-        /**
-         * Get an iterator over objects of this type.
-         */
+        /** Get an iterator over objects of this type. */
         protected abstract Iterator<E> iterator();
 
-        public void writeTable (ZipOutputStream zip) throws IOException {
+        public void writeTable(ZipOutputStream zip) throws IOException {
             LOG.info("Writing GTFS table {}", tableName);
 
             ZipEntry zipEntry = new ZipEntry(tableName + ".txt");
@@ -374,7 +402,7 @@ public abstract class Entity implements Serializable {
             this.writeHeaders();
 
             // write rows until there are none left.
-            row = 0;        	
+            row = 0;
             Iterator<E> iter = this.iterator();
             while (iter.hasNext()) {
                 if (++row % 500000 == 0) {
@@ -399,29 +427,29 @@ public abstract class Entity implements Serializable {
             writeStringField(obj != null ? obj.toString() : "");
         }
 
-        /**
-         * Writes date as YYYYMMDD
-         */
-        protected void writeDateField (LocalDate d) throws IOException {
+        /** Writes date as YYYYMMDD */
+        protected void writeDateField(LocalDate d) throws IOException {
             writeStringField(d.format(DateTimeFormatter.BASIC_ISO_DATE));
         }
 
         /**
-         * Take a time expressed in seconds since noon - 12h (midnight, usually) and write it in HH:MM:SS format.
+         * Take a time expressed in seconds since noon - 12h (midnight, usually) and write it in
+         * HH:MM:SS format.
          */
-        protected void writeTimeField (int secsSinceMidnight) throws IOException {
+        protected void writeTimeField(int secsSinceMidnight) throws IOException {
             if (secsSinceMidnight == INT_MISSING) {
                 writeStringField("");
                 return;
             }
-            
+
             writeStringField(convertToGtfsTime(secsSinceMidnight));
         }
 
-        public static String convertToGtfsTime (int secsSinceMidnight) {
+        public static String convertToGtfsTime(int secsSinceMidnight) {
             int seconds = secsSinceMidnight % 60;
             secsSinceMidnight -= seconds;
-            // note that the minute and hour values are still expressed in seconds until we write it out, to avoid unnecessary division.
+            // note that the minute and hour values are still expressed in seconds until we write it
+            // out, to avoid unnecessary division.
             int minutes = (secsSinceMidnight % 3600);
             // secsSinceMidnight now represents hours
             secsSinceMidnight -= minutes;
@@ -430,44 +458,37 @@ public abstract class Entity implements Serializable {
             return String.format("%02d:%02d:%02d", secsSinceMidnight / 3600, minutes / 60, seconds);
         }
 
-        protected void writeIntField (Integer val) throws IOException {
-            if (val.equals(INT_MISSING))
-                writeStringField("");
-            else
-                writeStringField(val.toString());
+        protected void writeIntField(Integer val) throws IOException {
+            if (val.equals(INT_MISSING)) writeStringField("");
+            else writeStringField(val.toString());
         }
 
-        /**
-         * Write a double value, with precision 10^-7. NaN is written as "".
-         */
-        protected void writeDoubleField (double val) throws IOException {
+        /** Write a double value, with precision 10^-7. NaN is written as "". */
+        protected void writeDoubleField(double val) throws IOException {
             // NaN's represent missing values
-            if (Double.isNaN(val))
-                writeStringField("");
-            
+            if (Double.isNaN(val)) writeStringField("");
+
             // control file size: don't use unnecessary precision
-            // This is usually used for coordinates; one ten-millionth of a degree at the equator is 1.1cm,
+            // This is usually used for coordinates; one ten-millionth of a degree at the equator is
+            // 1.1cm,
             // and smaller elsewhere on earth, plenty precise enough.
             // On Jupiter, however, it's a different story.
             // Use the US locale so that . is used as the decimal separator
-            else
-                writeStringField(String.format(Locale.US, "%.7f", val));
+            else writeStringField(String.format(Locale.US, "%.7f", val));
         }
 
         /**
-         * End a row.
-         * This is just a proxy to the writer, but could be used for hooks in the future.
+         * End a row. This is just a proxy to the writer, but could be used for hooks in the future.
          */
-        public void endRecord () throws IOException {
+        public void endRecord() throws IOException {
             writer.endRecord();
         }
     }
 
-
     // shared code between reading and writing
-    public static final String human (long n) {
-        if (n >= 1000000) return String.format("%.1fM", n/1000000.0);
-        if (n >= 1000) return String.format("%.1fk", n/1000.0);
+    public static final String human(long n) {
+        if (n >= 1000000) return String.format("%.1fM", n / 1000000.0);
+        if (n >= 1000) return String.format("%.1fk", n / 1000.0);
         else return String.format("%d", n);
     }
 }

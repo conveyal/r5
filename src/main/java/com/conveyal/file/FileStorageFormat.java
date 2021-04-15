@@ -21,7 +21,7 @@ public enum FileStorageFormat {
         this.mimeType = mimeType;
     }
 
-    public static FileStorageFormat fromFilename (String filename) {
+    public static FileStorageFormat fromFilename(String filename) {
         String extension = filename.substring(filename.lastIndexOf(".") + 1);
         return FileStorageFormat.valueOf(extension.toUpperCase());
     }

@@ -15,6 +15,7 @@ import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
+
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +27,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +35,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * This is a completely new replacement for Graph, Router etc.
- * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
+ * This is a completely new replacement for Graph, Router etc. It uses a lot less object pointers
+ * and can be built, read, and written orders of magnitude faster.
+ *
  * @author abyrd
  */
 public class TransportNetwork implements Serializable {
@@ -44,11 +45,12 @@ public class TransportNetwork implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
 
     /**
-     * Serializing this cache serializes its settings, but only its "unevictable" contents. This is intentional.
-     * TransportNetwork might not really be the right place for this though, it's part of the routing machinery.
-     * When we make a scenario copy of the network, it seems wrong that this TransportNetwork-level field is
-     * cloned. We could have fullExtentPointSet and fullExtentWalkLinkage fields which go into a worker-wide cache.
-     * However it's also convenient to have this cache garbage collected when the TransportNetwork is GC'ed.
+     * Serializing this cache serializes its settings, but only its "unevictable" contents. This is
+     * intentional. TransportNetwork might not really be the right place for this though, it's part
+     * of the routing machinery. When we make a scenario copy of the network, it seems wrong that
+     * this TransportNetwork-level field is cloned. We could have fullExtentPointSet and
+     * fullExtentWalkLinkage fields which go into a worker-wide cache. However it's also convenient
+     * to have this cache garbage collected when the TransportNetwork is GC'ed.
      */
     public LinkageCache linkageCache = new LinkageCache();
 
@@ -58,30 +60,31 @@ public class TransportNetwork implements Serializable {
 
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
-     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
-     * A single network cache at the top level could store base networks and scenarios since they all have globally
-     * unique IDs. A hierarchical cache does have the advantage of evicting all the scenarios with the associated
-     * base network, which keeps the references in the scenarios from holding on to the base network. But considering
-     * that we have never started evicting networks (other than for a "cache" of one element) this might be getting
-     * ahead of ourselves.
+     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited. A
+     * single network cache at the top level could store base networks and scenarios since they all
+     * have globally unique IDs. A hierarchical cache does have the advantage of evicting all the
+     * scenarios with the associated base network, which keeps the references in the scenarios from
+     * holding on to the base network. But considering that we have never started evicting networks
+     * (other than for a "cache" of one element) this might be getting ahead of ourselves.
      */
     public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
     /**
-     * A grid point set that covers the full extent of this transport network.
-     * This unlinked GridPointSet is not specific to any mode of travel, it's just a set of points.
-     * Once created, this point set is serialized along with the network, and its WALK linkage to the street
-     * network and associated cost tables are serialized and reloaded via the unevictable map in the LinkageCache.
-     * This makes startup much faster.
+     * A grid point set that covers the full extent of this transport network. This unlinked
+     * GridPointSet is not specific to any mode of travel, it's just a set of points. Once created,
+     * this point set is serialized along with the network, and its WALK linkage to the street
+     * network and associated cost tables are serialized and reloaded via the unevictable map in the
+     * LinkageCache. This makes startup much faster.
      */
     public WebMercatorGridPointSet fullExtentGridPointSet;
 
     /**
-     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
-     * When no scenario has been applied, this field will contain the original base networkId.
-     * When a scenario has modified a base network to produce this network, this field will be changed to the
-     * scenario ID. This allows proper caching of downstream data and results: we need a way to know what information
-     * is in the network independent of object identity, and after a round trip through serialization.
+     * A string uniquely identifying the contents of this TransportNetwork in the space of
+     * TransportNetworks. When no scenario has been applied, this field will contain the original
+     * base networkId. When a scenario has modified a base network to produce this network, this
+     * field will be changed to the scenario ID. This allows proper caching of downstream data and
+     * results: we need a way to know what information is in the network independent of object
+     * identity, and after a round trip through serialization.
      */
     public String scenarioId = null;
 
@@ -92,12 +95,15 @@ public class TransportNetwork implements Serializable {
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public transient List<TaskError> scenarioApplicationWarnings;
 
-    /** Information about the effects of apparently correct scenario application, null on a base network */
+    /**
+     * Information about the effects of apparently correct scenario application, null on a base
+     * network
+     */
     public transient List<TaskError> scenarioApplicationInfo;
 
     /**
-     * Build some simple derived index tables that are not serialized with the network.
-     * Distance tables and street spatial indexes are now serialized with the network.
+     * Build some simple derived index tables that are not serialized with the network. Distance
+     * tables and street spatial indexes are now serialized with the network.
      */
     public void rebuildTransientIndexes() {
         streetLayer.buildEdgeLists();
@@ -106,36 +112,39 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
-     * more than one PBF file into a single OSM storage object. However they might be from different points in time, so
-     * we have decided to allow only one OSM input file, loaded into a single OSM object.
-     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
-     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
-     * doesn't really matter, particularly for analytics. Loading all he feeds into memory simulataneously shouldn't be
-     * so bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap allocations etc.)
-     * Therefore we create the feeds within a stream which loads them one by one on demand.
+     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it
+     * is valid to load more than one PBF file into a single OSM storage object. However they might
+     * be from different points in time, so we have decided to allow only one OSM input file, loaded
+     * into a single OSM object. On the other hand, GTFS feeds each have their own namespace. Each
+     * GTFS object is for one specific feed, and this distinction should be maintained for various
+     * reasons. However, we use the GTFS IDs only for reference, so it doesn't really matter,
+     * particularly for analytics. Loading all he feeds into memory simulataneously shouldn't be so
+     * bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap
+     * allocations etc.) Therefore we create the feeds within a stream which loads them one by one
+     * on demand.
      */
-    public static TransportNetwork fromFiles (
-            String osmSourceFile,
-            List<String> gtfsSourceFiles,
-            TNBuilderConfig tnBuilderConfig
-    ) throws DuplicateFeedException {
+    public static TransportNetwork fromFiles(
+            String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig)
+            throws DuplicateFeedException {
         // Load OSM data into MapDB to pass into network builder.
         OSM osm = new OSM(osmSourceFile + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
-        // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
+        // Supply feeds with a stream so they do not sit open in memory while other feeds are being
+        // processed.
         Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::fromFile);
         return fromInputs(tnBuilderConfig, osm, feeds);
     }
 
     /**
-     * This is the core method for building a street and transit network. It takes osm-lib and gtfs-lib objects as
-     * parameters. It is wrapped in various other methods that create those OSM and GTFS objects from filenames, input
-     * directories etc. The supplied OSM object must have intersections already detected.
-     * The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
+     * This is the core method for building a street and transit network. It takes osm-lib and
+     * gtfs-lib objects as parameters. It is wrapped in various other methods that create those OSM
+     * and GTFS objects from filenames, input directories etc. The supplied OSM object must have
+     * intersections already detected. The GTFS feeds are supplied as a stream so that they can be
+     * loaded one by one on demand.
      */
-    public static TransportNetwork fromInputs (TNBuilderConfig tnBuilderConfig, OSM osm, Stream<GTFSFeed> gtfsFeeds) {
+    public static TransportNetwork fromInputs(
+            TNBuilderConfig tnBuilderConfig, OSM osm, Stream<GTFSFeed> gtfsFeeds) {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -149,10 +158,12 @@ public class TransportNetwork implements Serializable {
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
         // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
-        // We should probably try to delete the file when exceptions occur, or at least close it properly.
+        // We should probably try to delete the file when exceptions occur, or at least close it
+        // properly.
         osm.close();
 
-        // Build a street index to help associate transit stops and bike share stations with the street network.
+        // Build a street index to help associate transit stops and bike share stations with the
+        // street network.
         streetLayer.indexStreets();
 
         if (tnBuilderConfig.bikeRentalFile != null) {
@@ -161,24 +172,29 @@ public class TransportNetwork implements Serializable {
 
         // Load transit data
         TransitLayer transitLayer = new TransitLayer();
-        gtfsFeeds.forEach(gtfsFeed -> {
-            transitLayer.loadFromGtfs(gtfsFeed);
-            // Is there a reason we can't push this close call down into the loader method? Maybe exception handling?
-            gtfsFeed.close();
-        });
+        gtfsFeeds.forEach(
+                gtfsFeed -> {
+                    transitLayer.loadFromGtfs(gtfsFeed);
+                    // Is there a reason we can't push this close call down into the loader method?
+                    // Maybe exception handling?
+                    gtfsFeed.close();
+                });
         transportNetwork.transitLayer = transitLayer;
         transitLayer.parentNetwork = transportNetwork;
         // transitLayer.summarizeRoutesAndPatterns();
 
         // The street index is needed for associating transit stops with the street network.
-        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here.
+        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading
+        // the OSM, and here.
         streetLayer.indexStreets();
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
 
-        // This would re-build the street index and edge list, so we only rebuild indexes on the transit layer.
-        // However TransportNetworkCache#buildNetworkFromManifest does seem to call rebuild on the whole network.
+        // This would re-build the street index and edge list, so we only rebuild indexes on the
+        // transit layer.
+        // However TransportNetworkCache#buildNetworkFromManifest does seem to call rebuild on the
+        // whole network.
         // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 
@@ -195,12 +211,15 @@ public class TransportNetwork implements Serializable {
         return transportNetwork;
     }
 
-    /** Scan a directory detecting all the files that are network inputs, then build a network from those files. */
-    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
+    /**
+     * Scan a directory detecting all the files that are network inputs, then build a network from
+     * those files.
+     */
+    public static TransportNetwork fromDirectory(File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;
-        //This can exit program if json file has errors.
+        // This can exit program if json file has errors.
         builderConfig = loadJson(new File(directory, BUILDER_CONFIG_FILENAME));
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
@@ -232,17 +251,18 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Open and parse the JSON file at the given path into a Jackson JSON tree. Comments and unquoted keys are allowed.
-     * Returns default config if the file does not exist,
-     * Returns null if the file contains syntax errors or cannot be parsed for some other reason.
-     * <p>
-     * We do not require any JSON config files to be present because that would get in the way of the simplest
-     * rapid deployment workflow. Therefore we return default config if file does not exist.
+     * Open and parse the JSON file at the given path into a Jackson JSON tree. Comments and
+     * unquoted keys are allowed. Returns default config if the file does not exist, Returns null if
+     * the file contains syntax errors or cannot be parsed for some other reason.
+     *
+     * <p>We do not require any JSON config files to be present because that would get in the way of
+     * the simplest rapid deployment workflow. Therefore we return default config if file does not
+     * exist.
      */
     static TNBuilderConfig loadJson(File file) {
         try (FileInputStream jsonStream = new FileInputStream(file)) {
-            TNBuilderConfig config = JsonUtilities.objectMapper
-                .readValue(jsonStream, TNBuilderConfig.class);
+            TNBuilderConfig config =
+                    JsonUtilities.objectMapper.readValue(jsonStream, TNBuilderConfig.class);
             config.fillPath(file.getParent());
             LOG.info("Found and loaded JSON configuration file '{}'", file);
             return config;
@@ -257,28 +277,37 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Opens OSM MapDB database if it exists
-     * Otherwise it prints a warning
+     * Opens OSM MapDB database if it exists Otherwise it prints a warning
      *
-     * OSM MapDB is used for names of streets. Since they are needed only in display of paths.
+     * <p>OSM MapDB is used for names of streets. Since they are needed only in display of paths.
      * They aren't saved in street layer.
+     *
      * @param file
      */
     public void readOSM(File file) {
         if (file.exists()) {
             streetLayer.openOSM(file);
         } else {
-            LOG.info("osm.mapdb doesn't exist in graph folder. This means that street names won't be shown");
+            LOG.info(
+                    "osm.mapdb doesn't exist in graph folder. This means that street names won't be"
+                        + " shown");
         }
     }
 
     /**
-     * Represents the different types of files that might be present in a router / graph build directory.
-     * We want to detect even those that are not graph builder inputs so we can effectively warn when unrecognized file
-     * types are present. This helps point out when config files have been misnamed.
+     * Represents the different types of files that might be present in a router / graph build
+     * directory. We want to detect even those that are not graph builder inputs so we can
+     * effectively warn when unrecognized file types are present. This helps point out when config
+     * files have been misnamed.
      */
     private static enum InputFileType {
-        GTFS, OSM, DEM, CONFIG, OUTPUT, OTHER;
+        GTFS,
+        OSM,
+        DEM,
+        CONFIG,
+        OUTPUT,
+        OTHER;
+
         public static InputFileType forFile(File file) {
             String name = file.getName();
             if (name.endsWith(".zip")) {
@@ -287,22 +316,26 @@ public class TransportNetwork implements Serializable {
                     ZipEntry stopTimesEntry = zip.getEntry("stop_times.txt");
                     zip.close();
                     if (stopTimesEntry != null) return GTFS;
-                } catch (Exception e) { /* fall through */ }
+                } catch (Exception e) {
+                    /* fall through */
+                }
             }
             if (name.endsWith(".pbf") || name.endsWith(".vex")) return OSM;
-            if (name.endsWith(".tif") || name.endsWith(".tiff")) return DEM; // Digital elevation model (elevation raster)
+            if (name.endsWith(".tif") || name.endsWith(".tiff"))
+                return DEM; // Digital elevation model (elevation raster)
             if (name.endsWith("network.dat")) return OUTPUT;
             return OTHER;
         }
     }
 
     /**
-     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork. Then, for any modes
-     * supplied, we also build a linkage that is held permanently in the GridPointSet. This method is called when a
-     * network is first built.
-     * The resulting grid PointSet will cover the entire street network layer of this TransportNetwork, which should
-     * include every point we can route from or to. Any other destination grid (for the same mode, walking) can be made
-     * as a subset of this one since it includes every potentially accessible point.
+     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork.
+     * Then, for any modes supplied, we also build a linkage that is held permanently in the
+     * GridPointSet. This method is called when a network is first built. The resulting grid
+     * PointSet will cover the entire street network layer of this TransportNetwork, which should
+     * include every point we can route from or to. Any other destination grid (for the same mode,
+     * walking) can be made as a subset of this one since it includes every potentially accessible
+     * point.
      */
     public void rebuildLinkedGridPointSet(StreetMode... modes) {
         if (fullExtentGridPointSet != null) {
@@ -314,7 +347,7 @@ public class TransportNetwork implements Serializable {
         }
     }
 
-    //TODO: add transit stops to envelope
+    // TODO: add transit stops to envelope
     public Envelope getEnvelope() {
         return streetLayer.getEnvelope();
     }
@@ -322,18 +355,22 @@ public class TransportNetwork implements Serializable {
     /**
      * Gets timezone of this transportNetwork
      *
-     * If transitLayer exists returns transitLayer timezone otherwise GMT
+     * <p>If transitLayer exists returns transitLayer timezone otherwise GMT
      *
-     * It is never null
+     * <p>It is never null
+     *
      * @return TransportNetwork timezone
      */
     public ZoneId getTimeZone() {
         if (transitLayer == null) {
-            LOG.warn("TransportNetwork transit layer isn't loaded; API request times will be interpreted as GMT.");
+            LOG.warn(
+                    "TransportNetwork transit layer isn't loaded; API request times will be"
+                        + " interpreted as GMT.");
             return ZoneId.of("GMT");
         } else if (transitLayer.timeZone == null) {
             LOG.error(
-                "TransportNetwork transit layer is loaded but timezone is unknown; API request times will be interpreted as GMT.");
+                    "TransportNetwork transit layer is loaded but timezone is unknown; API request"
+                        + " times will be interpreted as GMT.");
             return ZoneId.of("GMT");
         } else {
             return transitLayer.timeZone;
@@ -341,10 +378,11 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Apply the given scenario to this TransportNetwork, copying any elements that are modified to leave the original
-     * unscathed. The scenario may be null or empty, in which case this method is a no-op.
+     * Apply the given scenario to this TransportNetwork, copying any elements that are modified to
+     * leave the original unscathed. The scenario may be null or empty, in which case this method is
+     * a no-op.
      */
-    public TransportNetwork applyScenario (Scenario scenario) {
+    public TransportNetwork applyScenario(Scenario scenario) {
         if (scenario == null || scenario.modifications.isEmpty()) {
             return this;
         }
@@ -352,39 +390,45 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
-     * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario one
-     * by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
-     * StreetLayer. The TransitLayer has a hierarchy of collections, from patterns to trips to stoptimes. We can
-     * selectively copy-on-modify these collections without much impact on performance as long as they don't become too
-     * large. This is somewhat inefficient but easy to reason about, considering we allow both additions and deletions.
-     * We don't use clone() here with the expectation that it will be more clear and maintainable to show exactly how
-     * each field is being copied. On the other hand, the StreetLayer contains a few very large lists which would be
-     * wasteful to copy. It is duplicated in such a way that it wraps the original lists, allowing them to be
-     * non-destructively extended. There will be some performance hit from wrapping these lists, but it's probably
-     * negligible.
+     * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without
+     * disrupting the original one. The approach is to make a copy of the TransportNetwork, then
+     * apply all the Modifications in the Scenario one by one to that same copy. Two very different
+     * modification strategies are used for the TransitLayer and the StreetLayer. The TransitLayer
+     * has a hierarchy of collections, from patterns to trips to stoptimes. We can selectively
+     * copy-on-modify these collections without much impact on performance as long as they don't
+     * become too large. This is somewhat inefficient but easy to reason about, considering we allow
+     * both additions and deletions. We don't use clone() here with the expectation that it will be
+     * more clear and maintainable to show exactly how each field is being copied. On the other
+     * hand, the StreetLayer contains a few very large lists which would be wasteful to copy. It is
+     * duplicated in such a way that it wraps the original lists, allowing them to be
+     * non-destructively extended. There will be some performance hit from wrapping these lists, but
+     * it's probably negligible.
      *
      * @return a copy of this TransportNetwork that is partly shallow and partly deep.
      */
     public TransportNetwork scenarioCopy(Scenario scenario) {
-        // Maybe we should be using clone() here but TransportNetwork has very few fields and most are overwritten.
+        // Maybe we should be using clone() here but TransportNetwork has very few fields and most
+        // are overwritten.
         TransportNetwork copy = new TransportNetwork();
-        // It is important to set this before making the clones of the street and transit layers below.
+        // It is important to set this before making the clones of the street and transit layers
+        // below.
         copy.scenarioId = scenario.id;
         copy.fullExtentGridPointSet = this.fullExtentGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;
-        copy.linkageCache = this.linkageCache; // <-- weirdness, TODO get this out of the TransportNetwork
+        copy.linkageCache =
+                this.linkageCache; // <-- weirdness, TODO get this out of the TransportNetwork
         return copy;
     }
 
     /**
      * FIXME why is this a long when crc32 returns an int?
-     * @return a checksum of the graph, for use in verifying whether it changed or remained the same after
-     * some operation.
+     *
+     * @return a checksum of the graph, for use in verifying whether it changed or remained the same
+     *     after some operation.
      */
-    public long checksum () {
+    public long checksum() {
         LOG.info("Calculating transport network checksum...");
         try {
             File tempFile = File.createTempFile("r5-network-checksum-", ".dat");
@@ -398,5 +442,4 @@ public class TransportNetwork implements Serializable {
             throw new RuntimeException();
         }
     }
-
 }

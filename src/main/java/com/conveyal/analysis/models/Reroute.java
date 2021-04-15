@@ -2,9 +2,7 @@ package com.conveyal.analysis.models;
 
 import java.util.List;
 
-/**
- * Created by matthewc on 3/28/16.
- */
+/** Created by matthewc on 3/28/16. */
 public class Reroute extends Modification {
     public String getType() {
         return "reroute";
@@ -29,11 +27,14 @@ public class Reroute extends Modification {
     // using Integer not int because Integers can be null
     public Integer[] dwellTimes;
 
-    public com.conveyal.r5.analyst.scenario.Reroute toR5 () {
-        com.conveyal.r5.analyst.scenario.Reroute rr = new com.conveyal.r5.analyst.scenario.Reroute();
+    public com.conveyal.r5.analyst.scenario.Reroute toR5() {
+        com.conveyal.r5.analyst.scenario.Reroute rr =
+                new com.conveyal.r5.analyst.scenario.Reroute();
         rr.comment = name;
 
-        List<ModificationStop> stops = ModificationStop.getStopsFromSegments(segments, dwellTimes, dwellTime, segmentSpeeds);
+        List<ModificationStop> stops =
+                ModificationStop.getStopsFromSegments(
+                        segments, dwellTimes, dwellTime, segmentSpeeds);
         rr.dwellTimes = ModificationStop.getDwellTimes(stops);
         rr.hopTimes = ModificationStop.getHopTimes(stops);
         rr.stops = ModificationStop.toStopSpecs(stops);

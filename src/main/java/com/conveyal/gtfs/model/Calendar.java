@@ -31,8 +31,9 @@ public class Calendar extends Entity implements Serializable {
         private final Map<String, Service> services;
 
         /**
-         * Create a loader. The map parameter should be an in-memory map that will be modified. We can't write directly
-         * to MapDB because we modify services as we load calendar dates, and this creates concurrentmodificationexceptions.
+         * Create a loader. The map parameter should be an in-memory map that will be modified. We
+         * can't write directly to MapDB because we modify services as we load calendar dates, and
+         * this creates concurrentmodificationexceptions.
          */
         public Loader(GTFSFeed feed, Map<String, Service> services) {
             super(feed, "calendar");
@@ -48,13 +49,18 @@ public class Calendar extends Entity implements Serializable {
         public void loadOneRow() throws IOException {
 
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */
-            String service_id = getStringField("service_id", true); // TODO service_id can reference either calendar or calendar_dates.
+            String service_id =
+                    getStringField(
+                            "service_id",
+                            true); // TODO service_id can reference either calendar or
+                                   // calendar_dates.
             Service service = services.computeIfAbsent(service_id, Service::new);
             if (service.calendar != null) {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "service_id"));
             } else {
                 Calendar c = new Calendar();
-                c.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+                c.sourceFileLine =
+                        row + 1; // offset line number by 1 to account for 0-based row index
                 c.service_id = service.service_id;
                 c.monday = getIntField("monday", true, 0, 1);
                 c.tuesday = getIntField("tuesday", true, 0, 1);
@@ -69,8 +75,7 @@ public class Calendar extends Entity implements Serializable {
                 c.feed_id = feed.feedId;
                 service.calendar = c;
             }
-
-        }    
+        }
     }
 
     public static class Writer extends Entity.Writer<Calendar> {
@@ -80,7 +85,19 @@ public class Calendar extends Entity implements Serializable {
 
         @Override
         protected void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"service_id", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "start_date", "end_date"});
+            writer.writeRecord(
+                    new String[] {
+                        "service_id",
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday",
+                        "sunday",
+                        "start_date",
+                        "end_date"
+                    });
         }
 
         @Override
@@ -101,22 +118,26 @@ public class Calendar extends Entity implements Serializable {
         @Override
         protected Iterator<Calendar> iterator() {
             // wrap an iterator over services
-            Iterator<Calendar> calIt = Iterators.transform(feed.services.values().iterator(), new Function<Service, Calendar> () {
-                @Override
-                public Calendar apply (Service s) {
-                    return s.calendar;
-                }
-            });
-            
+            Iterator<Calendar> calIt =
+                    Iterators.transform(
+                            feed.services.values().iterator(),
+                            new Function<Service, Calendar>() {
+                                @Override
+                                public Calendar apply(Service s) {
+                                    return s.calendar;
+                                }
+                            });
+
             // not every service has a calendar (e.g. TriMet has no calendars, just calendar dates).
             // This is legal GTFS, so skip services with no calendar
-            return Iterators.filter(calIt, new Predicate<Calendar> () {
-                @Override
-                public boolean apply(Calendar c) {
-                    return c != null;
-                }
-            });
-            
+            return Iterators.filter(
+                    calIt,
+                    new Predicate<Calendar>() {
+                        @Override
+                        public boolean apply(Calendar c) {
+                            return c != null;
+                        }
+                    });
         }
     }
 }

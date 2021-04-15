@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
+
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -16,41 +17,46 @@ import org.opengis.parameter.ParameterValueGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.media.jai.RasterFactory;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import javax.media.jai.RasterFactory;
+
 /**
- * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations, this class will write
- * them out to various file formats. Output is multi-channel: for each destination, it saves one or more percentiles of
- * the travel time distribution. Supported formats are the Conveyal internal binary format and GeoTIFF for
- * interoperability with desktop GIS.
- * <p>
- * The Conveyal binary format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel
- * values, and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
- * now says ACCESSGR instead of TIMEGRID.
- * <p>
- * TODO Unify this class with GridResultWriter in the backend, as they both write the same format now.
- *      We should be able to remove GridResultWriter from the backend and use this class imported from R5.
- *      We may eventually also be able to store opportunities in the same format.
- *      Prefiltering could aid compression (delta coding, skipping over or not delta coding UNREACHED values).
- * <p>
- * Time grids are composed of little-endian signed 4-byte ints, so the full grid can be mapped into a Javascript typed
- * array of 4-byte integers if desired. They are laid out as follows:
+ * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations,
+ * this class will write them out to various file formats. Output is multi-channel: for each
+ * destination, it saves one or more percentiles of the travel time distribution. Supported formats
+ * are the Conveyal internal binary format and GeoTIFF for interoperability with desktop GIS.
+ *
+ * <p>The Conveyal binary format is similar to the Grid format used for opportunity grids, but it
+ * uses ints for the pixel values, and allows multiple values per pixel. It is now identical to the
+ * AccessGrid format, which is why its header now says ACCESSGR instead of TIMEGRID.
+ *
+ * <p>TODO Unify this class with GridResultWriter in the backend, as they both write the same format
+ * now. We should be able to remove GridResultWriter from the backend and use this class imported
+ * from R5. We may eventually also be able to store opportunities in the same format. Prefiltering
+ * could aid compression (delta coding, skipping over or not delta coding UNREACHED values).
+ *
+ * <p>Time grids are composed of little-endian signed 4-byte ints, so the full grid can be mapped
+ * into a Javascript typed array of 4-byte integers if desired. They are laid out as follows:
+ *
  * <ol>
- * <li>(8 bytes) Magic numbers: ASCII text "ACCESSGR". This is a multiple of four bytes to maintain alignment.</li>
- * <li>(4 byte int) File format version</li>
- * <li>(4 byte int) Web mercator zoom level</li>
- * <li>(4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world</li>
- * <li>(4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top edge of the world</li>
- * <li>(4 byte int) width of the grid in pixels</li>
- * <li>(4 byte int) height of the grid in pixels</li>
- * <li>(4 byte int) number of values (channels) per pixel</li>
- * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).
- *     Values are not delta-coded.</li>
+ *   <li>(8 bytes) Magic numbers: ASCII text "ACCESSGR". This is a multiple of four bytes to
+ *       maintain alignment.
+ *   <li>(4 byte int) File format version
+ *   <li>(4 byte int) Web mercator zoom level
+ *   <li>(4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left
+ *       edge of the world
+ *   <li>(4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top
+ *       edge of the world
+ *   <li>(4 byte int) width of the grid in pixels
+ *   <li>(4 byte int) height of the grid in pixels
+ *   <li>(4 byte int) number of values (channels) per pixel
+ *   <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column,
+ *       channel). Values are not delta-coded.
  * </ol>
  */
 public class TimeGridWriter {
@@ -60,7 +66,10 @@ public class TimeGridWriter {
     /** 8 bytes long to maintain integer alignment. */
     private static final String gridType = "ACCESSGR";
 
-    /** The offset to get to the data section of the access grid file. The gridType string amounts to 2 ints. */
+    /**
+     * The offset to get to the data section of the access grid file. The gridType string amounts to
+     * 2 ints.
+     */
     public static final int HEADER_SIZE = 7 * Integer.BYTES + gridType.getBytes().length;
 
     private static final int version = 0;
@@ -76,10 +85,11 @@ public class TimeGridWriter {
     private final long nBytesInOutput; // specifically for Conveyal internal format
 
     /**
-     * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is interpreted as a
-     * rectangular grid matching the supplied WebMercatorExtents.
+     * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is
+     * interpreted as a rectangular grid matching the supplied WebMercatorExtents.
      */
-    public TimeGridWriter (TravelTimeResult travelTimeResult, AnalysisWorkerTask analysisWorkerTask) {
+    public TimeGridWriter(
+            TravelTimeResult travelTimeResult, AnalysisWorkerTask analysisWorkerTask) {
         this.travelTimeResult = travelTimeResult;
         this.analysisWorkerTask = analysisWorkerTask;
         this.extents = WebMercatorExtents.forTask(analysisWorkerTask);
@@ -94,14 +104,16 @@ public class TimeGridWriter {
     }
 
     /**
-     * Write the grid to an object implementing the DataOutput interface. Note that the endianness of the integers
-     * in the output will be dependent on the DataOutput implementation supplied. To fit our file format
-     * specification the DataOutput should be little-endian.
+     * Write the grid to an object implementing the DataOutput interface. Note that the endianness
+     * of the integers in the output will be dependent on the DataOutput implementation supplied. To
+     * fit our file format specification the DataOutput should be little-endian.
      *
-     * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
+     * <p>TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached
+     * cells.
      */
     public void writeToDataOutput(DataOutput dataOutput) {
-        LOG.info("Writing travel time surface with uncompressed size {} kiB", nBytesInOutput / 1024);
+        LOG.info(
+                "Writing travel time surface with uncompressed size {} kiB", nBytesInOutput / 1024);
         try {
             // Write header
             dataOutput.write(gridType.getBytes());
@@ -117,7 +129,8 @@ public class TimeGridWriter {
                 int prev = 0; // delta code within each percentile grid
                 for (int j = 0; j < travelTimeResult.nPoints; j++) {
                     int curr = travelTimeResult.values[i][j];
-                    // TODO try not delta-coding the "unreachable" value, and retaining the previous value across
+                    // TODO try not delta-coding the "unreachable" value, and retaining the previous
+                    // value across
                     //  unreachable areas of the grid.
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);
@@ -130,9 +143,9 @@ public class TimeGridWriter {
     }
 
     /**
-     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to
-     * save it to a local or remote storage location. Note that the PersistenceBuffer's dataOutput is
-     * little-endian.
+     * Write the grid out to a persistence buffer, an abstraction that will perform compression and
+     * allow us to save it to a local or remote storage location. Note that the PersistenceBuffer's
+     * dataOutput is little-endian.
      */
     public PersistenceBuffer writeToPersistenceBuffer() {
         PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
@@ -142,20 +155,20 @@ public class TimeGridWriter {
     }
 
     /**
-     * Write this grid out in GeoTIFF format.
-     * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.
+     * Write this grid out in GeoTIFF format. If an analysis task is supplied, add metadata to the
+     * GeoTIFF explaining what scenario it comes from.
      */
-    public void writeGeotiff (OutputStream out) {
+    public void writeGeotiff(OutputStream out) {
         LOG.info("Writing GeoTIFF file");
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
-            final WritableRaster raster = RasterFactory.createBandedRaster(
-                DataBuffer.TYPE_INT,
-                extents.width,
-                extents.height,
-                travelTimeResult.nSamplesPerPoint,
-                null
-            );
+            final WritableRaster raster =
+                    RasterFactory.createBandedRaster(
+                            DataBuffer.TYPE_INT,
+                            extents.width,
+                            extents.height,
+                            travelTimeResult.nSamplesPerPoint,
+                            null);
 
             for (int y = 0, val; y < extents.height; y++) {
                 for (int x = 0; x < extents.width; x++) {
@@ -167,28 +180,37 @@ public class TimeGridWriter {
             }
 
             GridCoverageFactory gcf = new GridCoverageFactory();
-            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, extents.getMercatorEnvelopeMeters());
+            GridCoverage2D coverage =
+                    gcf.create("TIMEGRID", raster, extents.getMercatorEnvelopeMeters());
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
             ParameterValueGroup params = new GeoTiffFormat().getWriteParameters();
-            params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
+            params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
+                    .setValue(wp);
 
             GeoTiffWriter writer = new GeoTiffWriter(out);
 
-            // If the request that produced this TimeGrid was supplied, write scenario metadata into the GeoTIFF
+            // If the request that produced this TimeGrid was supplied, write scenario metadata into
+            // the GeoTIFF
             if (analysisWorkerTask != null) {
                 AnalysisWorkerTask clonedRequest = analysisWorkerTask.clone();
-                // Save the scenario ID rather than the full scenario, to avoid making metadata too large. We're not
-                // losing information here, the scenario id used here is qualified with the CRC and is thus immutable
+                // Save the scenario ID rather than the full scenario, to avoid making metadata too
+                // large. We're not
+                // losing information here, the scenario id used here is qualified with the CRC and
+                // is thus immutable
                 // and available from S3.
                 if (clonedRequest.scenario != null) {
                     clonedRequest.scenarioId = clonedRequest.scenario.id;
                     clonedRequest.scenario = null;
                 }
-                // 270: Image Description, 305: Software (https://www.awaresystems.be/imaging/tiff/tifftags/baseline.html)
-                writer.setMetadataValue("270", JsonUtilities.objectMapper.writerWithDefaultPrettyPrinter()
-                        .writeValueAsString(clonedRequest));
+                // 270: Image Description, 305: Software
+                // (https://www.awaresystems.be/imaging/tiff/tifftags/baseline.html)
+                writer.setMetadataValue(
+                        "270",
+                        JsonUtilities.objectMapper
+                                .writerWithDefaultPrettyPrinter()
+                                .writeValueAsString(clonedRequest));
                 writer.setMetadataValue("305", "Conveyal R5");
             }
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
@@ -196,7 +218,5 @@ public class TimeGridWriter {
         } catch (Exception e) {
             throw new RuntimeException("Failed to write GeoTIFF file.", e);
         }
-
     }
-
 }

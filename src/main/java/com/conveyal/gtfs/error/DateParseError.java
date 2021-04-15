@@ -10,8 +10,8 @@ public class DateParseError extends GTFSError implements Serializable {
         super(file, line, field);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return "Could not parse date (format should be YYYYMMDD).";
     }
-
 }

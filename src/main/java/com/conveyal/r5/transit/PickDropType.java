@@ -3,11 +3,8 @@ package com.conveyal.r5.transit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
-*
-*/
+/** */
 public enum PickDropType {
-
     SCHEDULED(0),
     NONE(1),
     CALL_AGENCY(2),
@@ -31,12 +28,11 @@ public enum PickDropType {
         this.gtfsCode = gtfsCode;
     }
 
-    static PickDropType forGtfsCode (int gtfsCode) {
+    static PickDropType forGtfsCode(int gtfsCode) {
         if (gtfsCode >= forGtfsCode.length) {
             LOG.error("Pickup/dropoff code {} is invalid. Defaulting to 0 ('scheduled')", gtfsCode);
             gtfsCode = 0;
         }
         return forGtfsCode[gtfsCode];
     }
-
 }

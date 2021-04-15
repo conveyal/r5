@@ -6,20 +6,27 @@ import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
- * This is used in Modeify. "Stats" summarize the travel time for a set of similar paths, giving the minimum,
- * maximum, and average travel and wait over all those paths, over a whole departure time window.
+ * This is used in Modeify. "Stats" summarize the travel time for a set of similar paths, giving the
+ * minimum, maximum, and average travel and wait over all those paths, over a whole departure time
+ * window.
  */
 public class StatsCalculator {
     /**
-     * Compute statistics for this particular path over the time window. This is super simple,
-     * we just compute how long the path takes at every possible departure minute. There's probably an
+     * Compute statistics for this particular path over the time window. This is super simple, we
+     * just compute how long the path takes at every possible departure minute. There's probably an
      * elegant theoretical way to do this, but I prefer pragmatism over theory.
      */
-    public static StatsCollection computeStatistics (ProfileRequest req, int accessTime, int egressTime,
-                                          int nSegments, Collection<PathWithTimes.Itinerary> itineraries) {
+    public static StatsCollection computeStatistics(
+            ProfileRequest req,
+            int accessTime,
+            int egressTime,
+            int nSegments,
+            Collection<PathWithTimes.Itinerary> itineraries) {
         Stats stats = new Stats();
-        Stats[] rideStats = IntStream.range(0, nSegments).mapToObj(i -> new Stats()).toArray(Stats[]::new);
-        Stats[] waitStats = IntStream.range(0, nSegments).mapToObj(i -> new Stats()).toArray(Stats[]::new);
+        Stats[] rideStats =
+                IntStream.range(0, nSegments).mapToObj(i -> new Stats()).toArray(Stats[]::new);
+        Stats[] waitStats =
+                IntStream.range(0, nSegments).mapToObj(i -> new Stats()).toArray(Stats[]::new);
 
         for (int start = req.fromTime; start < req.toTime; start += 60) {
             // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
@@ -59,7 +66,8 @@ public class StatsCalculator {
 
                 Stats wait = waitStats[leg];
 
-                int arriveAtStopTime = leg == 0 ? timeAtOriginStop : bestItinerary.arriveAtBoardStopTimes[leg];
+                int arriveAtStopTime =
+                        leg == 0 ? timeAtOriginStop : bestItinerary.arriveAtBoardStopTimes[leg];
 
                 int waitTime = bestItinerary.boardTimes[leg] - arriveAtStopTime;
 
@@ -70,11 +78,13 @@ public class StatsCalculator {
             }
         }
 
-        if (stats.num == 0) throw new IllegalStateException("No valid itineraries found for path computed in RaptorWorker");
+        if (stats.num == 0)
+            throw new IllegalStateException(
+                    "No valid itineraries found for path computed in RaptorWorker");
 
         stats.avg /= stats.num;
 
-        for (Stats[] statSet : new Stats[][] { rideStats, waitStats }) {
+        for (Stats[] statSet : new Stats[][] {rideStats, waitStats}) {
             for (Stats s : statSet) {
                 s.avg /= s.num;
             }
@@ -88,7 +98,7 @@ public class StatsCalculator {
         public Stats[] waitStats;
         public Stats[] rideStats;
 
-        public StatsCollection (Stats stats, Stats[] waitStats, Stats[] rideStats) {
+        public StatsCollection(Stats stats, Stats[] waitStats, Stats[] rideStats) {
             this.stats = stats;
             this.rideStats = rideStats;
             this.waitStats = waitStats;

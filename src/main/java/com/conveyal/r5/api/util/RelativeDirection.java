@@ -3,14 +3,25 @@ package com.conveyal.r5.api.util;
 /**
  * Represents a turn direction, relative to the current heading.
  *
- * CIRCLE_CLOCKWISE and CIRCLE_CLOCKWISE are used to represent traffic circles.
- *
+ * <p>CIRCLE_CLOCKWISE and CIRCLE_CLOCKWISE are used to represent traffic circles.
  */
 public enum RelativeDirection {
-    DEPART, HARD_LEFT, LEFT, SLIGHTLY_LEFT, CONTINUE, SLIGHTLY_RIGHT, RIGHT, HARD_RIGHT,
-    CIRCLE_CLOCKWISE, CIRCLE_COUNTERCLOCKWISE, ELEVATOR, UTURN_LEFT, UTURN_RIGHT;
+    DEPART,
+    HARD_LEFT,
+    LEFT,
+    SLIGHTLY_LEFT,
+    CONTINUE,
+    SLIGHTLY_RIGHT,
+    RIGHT,
+    HARD_RIGHT,
+    CIRCLE_CLOCKWISE,
+    CIRCLE_COUNTERCLOCKWISE,
+    ELEVATOR,
+    UTURN_LEFT,
+    UTURN_RIGHT;
 
-    public static RelativeDirection setRelativeDirection(double lastAngle, double thisAngle, boolean roundabout) {
+    public static RelativeDirection setRelativeDirection(
+            double lastAngle, double thisAngle, boolean roundabout) {
         double turn_degree = (((thisAngle - lastAngle) + 360) % 360);
 
         double ccw_turn_degree = 360 - turn_degree;

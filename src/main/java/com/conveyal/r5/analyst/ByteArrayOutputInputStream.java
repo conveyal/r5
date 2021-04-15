@@ -5,16 +5,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
 /**
- * An OutputStream that buffers everything in memory, allowing the contents of that buffer to be read back out as an
- * InputStream. This works around the fact that ByteArrayOutputStream.toByteArray makes a copy of the backing byte
- * array, doubling memory consumption and wasting time.
+ * An OutputStream that buffers everything in memory, allowing the contents of that buffer to be
+ * read back out as an InputStream. This works around the fact that
+ * ByteArrayOutputStream.toByteArray makes a copy of the backing byte array, doubling memory
+ * consumption and wasting time.
  */
 public class ByteArrayOutputInputStream extends ByteArrayOutputStream {
 
     /**
      * @return an input stream wrapping the internal byte buffer. Further writes are not possible.
      */
-    public InputStream getInputStream () {
+    public InputStream getInputStream() {
         try {
             this.close();
             InputStream inputStream = new ByteArrayInputStream(buf);
@@ -25,5 +26,4 @@ public class ByteArrayOutputInputStream extends ByteArrayOutputStream {
             throw new RuntimeException(e);
         }
     }
-
 }

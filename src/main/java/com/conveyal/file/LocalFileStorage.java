@@ -16,11 +16,11 @@ public class LocalFileStorage implements FileStorage {
     public final String directory;
     private final String urlPrefix;
 
-    public LocalFileStorage (String localCacheDirectory) {
+    public LocalFileStorage(String localCacheDirectory) {
         this(localCacheDirectory, "http://localhost:7070");
     }
 
-    public LocalFileStorage (String localCacheDirectory, String urlPrefix) {
+    public LocalFileStorage(String localCacheDirectory, String urlPrefix) {
         this.directory = localCacheDirectory;
         this.urlPrefix = urlPrefix;
 
@@ -29,7 +29,8 @@ public class LocalFileStorage implements FileStorage {
     }
 
     /**
-     * Move the File into the FileStorage by moving the passed in file to the Path represented by the FileStorageKey.
+     * Move the File into the FileStorage by moving the passed in file to the Path represented by
+     * the FileStorageKey.
      */
     public void moveIntoStorage(FileStorageKey key, File file) {
         // Get a pointer to the local file
@@ -41,12 +42,16 @@ public class LocalFileStorage implements FileStorage {
                 // Move the temporary file to the permanent file location.
                 Files.move(file.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (FileSystemException e) {
-                // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so certain files (e.g.
-                // mapdb) cannot be moved or deleted. This workaround may cause temporary files to accumulate, but it
+                // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so
+                // certain files (e.g.
+                // mapdb) cannot be moved or deleted. This workaround may cause temporary files to
+                // accumulate, but it
                 // should not be triggered for default Linux filesystems (ext).
                 // See https://github.com/jankotek/MapDB/issues/326
                 Files.copy(file.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
+                LOG.info(
+                        "Could not move {} because of FileSystem restrictions (probably NTFS)."
+                            + " Copying instead.",
                         file.getName());
             }
         } catch (IOException e) {
@@ -58,19 +63,16 @@ public class LocalFileStorage implements FileStorage {
         return new File(String.join("/", directory, key.bucket, key.path));
     }
 
-    /**
-     * This will only get called in offline mode.
-     */
-    public String getURL (FileStorageKey key) {
+    /** This will only get called in offline mode. */
+    public String getURL(FileStorageKey key) {
         return String.join("/", urlPrefix, key.bucket, key.path);
     }
 
-    public void delete (FileStorageKey key) {
+    public void delete(FileStorageKey key) {
         getFile(key).delete();
     }
 
     public boolean exists(FileStorageKey key) {
         return getFile(key).exists();
     }
-
 }

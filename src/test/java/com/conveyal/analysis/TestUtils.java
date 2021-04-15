@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +19,7 @@ import java.util.zip.ZipOutputStream;
 public class TestUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
 
-    /**
-     * Parse a json string into an unmapped JsonNode object
-     */
+    /** Parse a json string into an unmapped JsonNode object */
     public static JsonNode parseJson(String jsonString) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.readTree(jsonString);
@@ -36,10 +35,8 @@ public class TestUtils {
         return String.format("./src/test/resources/%s", fileName);
     }
 
-    /**
-     * Recursively removes all specified keys.  This is used to make reliable snapshots.
-     */
-    public static void removeKeysAndValues (JsonNode json, String[] keysToRemove) {
+    /** Recursively removes all specified keys. This is used to make reliable snapshots. */
+    public static void removeKeysAndValues(JsonNode json, String[] keysToRemove) {
         // remove key/value pairs that are likely to have different values each test run
         for (String key : keysToRemove) {
             if (json.has(key)) {
@@ -55,16 +52,12 @@ public class TestUtils {
         }
     }
 
-    /**
-     * Recursively removes all dynamically generated keys in order to perform reliable snapshots
-     */
+    /** Recursively removes all dynamically generated keys in order to perform reliable snapshots */
     public static void removeDynamicValues(JsonNode json) {
-        removeKeysAndValues(json, new String[]{"_id", "createdAt", "nonce", "updatedAt"});
+        removeKeysAndValues(json, new String[] {"_id", "createdAt", "nonce", "updatedAt"});
     }
 
-    /**
-     * Zip files in a folder into a temporary zip file
-     */
+    /** Zip files in a folder into a temporary zip file */
     public static String zipFolderFiles(String folderName) throws IOException {
         // create temporary zip file
         File tempFile = File.createTempFile("temp-gtfs-zip-", ".zip");
@@ -83,13 +76,11 @@ public class TestUtils {
     }
 
     private static void compressDirectoryToZipfile(
-        String rootDir,
-        String sourceDir,
-        ZipOutputStream out
-    ) throws IOException {
+            String rootDir, String sourceDir, ZipOutputStream out) throws IOException {
         for (File file : new File(sourceDir).listFiles()) {
             if (file.isDirectory()) {
-                compressDirectoryToZipfile(rootDir, sourceDir + File.separator + file.getName(), out);
+                compressDirectoryToZipfile(
+                        rootDir, sourceDir + File.separator + file.getName(), out);
             } else {
                 ZipEntry entry = new ZipEntry(sourceDir.replace(rootDir, "") + file.getName());
                 out.putNextEntry(entry);
@@ -101,9 +92,7 @@ public class TestUtils {
         }
     }
 
-    /**
-     * Helper class for parsing json objects with the _id key.
-     */
+    /** Helper class for parsing json objects with the _id key. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ObjectWithId {
         public String _id;

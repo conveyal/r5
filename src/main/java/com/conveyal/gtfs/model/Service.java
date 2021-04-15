@@ -1,13 +1,5 @@
 package com.conveyal.gtfs.model;
 
-import com.google.common.collect.Maps;
-
-import java.io.Serializable;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.util.EnumSet;
-import java.util.Map;
-
 import static java.time.DayOfWeek.FRIDAY;
 import static java.time.DayOfWeek.MONDAY;
 import static java.time.DayOfWeek.SATURDAY;
@@ -16,15 +8,23 @@ import static java.time.DayOfWeek.THURSDAY;
 import static java.time.DayOfWeek.TUESDAY;
 import static java.time.DayOfWeek.WEDNESDAY;
 
+import com.google.common.collect.Maps;
+
+import java.io.Serializable;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.Map;
+
 /**
  * This table does not exist in GTFS. It is a join of calendars and calendar_dates on service_id.
- * There should only be one Calendar per service_id. There should only be one calendar_date per tuple of
- * (service_id, date), which means there can be many calendar_dates per service_id.
+ * There should only be one Calendar per service_id. There should only be one calendar_date per
+ * tuple of (service_id, date), which means there can be many calendar_dates per service_id.
  */
 public class Service implements Serializable {
 
     private static final long serialVersionUID = 7966238549509747091L;
-    public String   service_id;
+    public String service_id;
     public Calendar calendar;
     public Map<LocalDate, CalendarDate> calendar_dates = Maps.newHashMap();
 
@@ -35,35 +35,38 @@ public class Service implements Serializable {
     /**
      * @param service_id the service_id to assign to the newly created copy.
      * @param daysToRemove the days of the week on which to deactivate service in the copy.
-     * @return a copy of this Service with any service on the specified days of the week deactivated.
+     * @return a copy of this Service with any service on the specified days of the week
+     *     deactivated.
      */
     public Service removeDays(String service_id, EnumSet<DayOfWeek> daysToRemove) {
         Service service = new Service(service_id);
         // First, duplicate any Calendar in this Service, minus the specified days of the week.
         if (this.calendar != null) {
             Calendar calendar = new Calendar();
-            //  TODO calendar.getDaysOfWeek/setDaysOfWeek which allow simplifying this section and activeOn below.
-            calendar.monday    = daysToRemove.contains(MONDAY)    ? 0 : this.calendar.monday;
-            calendar.tuesday   = daysToRemove.contains(TUESDAY)   ? 0 : this.calendar.tuesday;
+            //  TODO calendar.getDaysOfWeek/setDaysOfWeek which allow simplifying this section and
+            // activeOn below.
+            calendar.monday = daysToRemove.contains(MONDAY) ? 0 : this.calendar.monday;
+            calendar.tuesday = daysToRemove.contains(TUESDAY) ? 0 : this.calendar.tuesday;
             calendar.wednesday = daysToRemove.contains(WEDNESDAY) ? 0 : this.calendar.wednesday;
-            calendar.thursday  = daysToRemove.contains(THURSDAY)  ? 0 : this.calendar.thursday;
-            calendar.friday    = daysToRemove.contains(FRIDAY)    ? 0 : this.calendar.friday;
-            calendar.saturday  = daysToRemove.contains(SATURDAY)  ? 0 : this.calendar.saturday;
-            calendar.sunday    = daysToRemove.contains(SUNDAY)    ? 0 : this.calendar.sunday;
+            calendar.thursday = daysToRemove.contains(THURSDAY) ? 0 : this.calendar.thursday;
+            calendar.friday = daysToRemove.contains(FRIDAY) ? 0 : this.calendar.friday;
+            calendar.saturday = daysToRemove.contains(SATURDAY) ? 0 : this.calendar.saturday;
+            calendar.sunday = daysToRemove.contains(SUNDAY) ? 0 : this.calendar.sunday;
             // The new calendar should cover exactly the same time range as the existing one.
             calendar.start_date = this.calendar.start_date;
-            calendar.end_date   = this.calendar.end_date;
+            calendar.end_date = this.calendar.end_date;
             // Create the bidirectional reference between Calendar and Service.
             service.calendar = calendar;
         }
         // Copy over all exceptions whose dates fall on days of the week that are retained.
-        this.calendar_dates.forEach((date, exception) -> {
-            DayOfWeek dow = date.getDayOfWeek();
-            if (!daysToRemove.contains(dow)) {
-                CalendarDate newException = exception.clone();
-                service.calendar_dates.put(date, newException);
-            }
-        });
+        this.calendar_dates.forEach(
+                (date, exception) -> {
+                    DayOfWeek dow = date.getDayOfWeek();
+                    if (!daysToRemove.contains(dow)) {
+                        CalendarDate newException = exception.clone();
+                        service.calendar_dates.put(date, newException);
+                    }
+                });
         return service;
     }
 
@@ -73,14 +76,15 @@ public class Service implements Serializable {
     public boolean hasAnyService() {
 
         // Look for any service defined in calendar (on days of the week).
-        boolean hasAnyService = calendar != null && (
-                calendar.monday == 1 ||
-                calendar.tuesday == 1 ||
-                calendar.wednesday == 1 ||
-                calendar.thursday == 1 ||
-                calendar.friday == 1 ||
-                calendar.saturday == 1 ||
-                calendar.sunday == 1 );
+        boolean hasAnyService =
+                calendar != null
+                        && (calendar.monday == 1
+                                || calendar.tuesday == 1
+                                || calendar.wednesday == 1
+                                || calendar.thursday == 1
+                                || calendar.friday == 1
+                                || calendar.saturday == 1
+                                || calendar.sunday == 1);
 
         // Also look for any exceptions of type 1 (added service).
         hasAnyService |= calendar_dates.values().stream().anyMatch(cd -> cd.exception_type == 1);
@@ -88,22 +92,18 @@ public class Service implements Serializable {
         return hasAnyService;
     }
 
-    /**
-     * Is this service active on the specified date?
-     */
-    public boolean activeOn (LocalDate date) {
+    /** Is this service active on the specified date? */
+    public boolean activeOn(LocalDate date) {
         // first check for exceptions
         CalendarDate exception = calendar_dates.get(date);
 
-        if (exception != null)
-            return exception.exception_type == 1;
-
-        else if (calendar == null)
-            return false;
-
+        if (exception != null) return exception.exception_type == 1;
+        else if (calendar == null) return false;
         else {
-            int gtfsDate = date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
-            boolean withinValidityRange = calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
+            int gtfsDate =
+                    date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
+            boolean withinValidityRange =
+                    calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
 
             if (!withinValidityRange) return false;
 
@@ -130,22 +130,24 @@ public class Service implements Serializable {
 
     /**
      * Checks for overlapping days of week between two service calendars
+     *
      * @param s1
      * @param s2
      * @return true if both calendars simultaneously operate on at least one day of the week
      */
-    public static boolean checkOverlap (Service s1, Service s2) {
+    public static boolean checkOverlap(Service s1, Service s2) {
         if (s1.calendar == null || s2.calendar == null) {
             return false;
         }
         // overlap exists if at least one day of week is shared by two calendars
-        boolean overlappingDays = s1.calendar.monday == 1 && s2.calendar.monday == 1 ||
-                s1.calendar.tuesday == 1 && s2.calendar.tuesday == 1 ||
-                s1.calendar.wednesday == 1 && s2.calendar.wednesday == 1 ||
-                s1.calendar.thursday == 1 && s2.calendar.thursday == 1 ||
-                s1.calendar.friday == 1 && s2.calendar.friday == 1 ||
-                s1.calendar.saturday == 1 && s2.calendar.saturday == 1 ||
-                s1.calendar.sunday == 1 && s2.calendar.sunday == 1;
+        boolean overlappingDays =
+                s1.calendar.monday == 1 && s2.calendar.monday == 1
+                        || s1.calendar.tuesday == 1 && s2.calendar.tuesday == 1
+                        || s1.calendar.wednesday == 1 && s2.calendar.wednesday == 1
+                        || s1.calendar.thursday == 1 && s2.calendar.thursday == 1
+                        || s1.calendar.friday == 1 && s2.calendar.friday == 1
+                        || s1.calendar.saturday == 1 && s2.calendar.saturday == 1
+                        || s1.calendar.sunday == 1 && s2.calendar.sunday == 1;
         return overlappingDays;
     }
 }

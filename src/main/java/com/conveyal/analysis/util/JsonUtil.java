@@ -5,7 +5,9 @@ import com.conveyal.geojson.GeoJsonModule;
 import com.conveyal.r5.model.json_serialization.JavaLocalDateSerializer;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.mongojack.internal.MongoJackModule;
+
 import spark.ResponseTransformer;
 
 public abstract class JsonUtil {
@@ -13,7 +15,7 @@ public abstract class JsonUtil {
     public static final ObjectMapper objectMapper = getObjectMapper(JsonViews.Api.class);
     public static final ResponseTransformer toJson = objectMapper::writeValueAsString;
 
-    public static ObjectMapper getObjectMapper (Class view) {
+    public static ObjectMapper getObjectMapper(Class view) {
         return getObjectMapper(view, false);
     }
 
@@ -32,5 +34,4 @@ public abstract class JsonUtil {
 
         return objectMapper;
     }
-
 }

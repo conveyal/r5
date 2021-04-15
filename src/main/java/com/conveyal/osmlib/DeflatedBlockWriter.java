@@ -9,28 +9,32 @@ import java.util.concurrent.SynchronousQueue;
 
 /**
  * A pipeline stage that receives uncompressed VEX blocks and writes them out in compressed form.
- * Receives blocks for compression synchronously through a zero-length blocking "queue".
- * This is meant to be run in a separate thread.
+ * Receives blocks for compression synchronously through a zero-length blocking "queue". This is
+ * meant to be run in a separate thread.
  */
 /**
- * Accumulates data in a large in-memory buffer. When a write is about to cause the buffer to overflow, the contents
- * of the buffer are handed off to a secondary thread which writes the compressed data block to a downstream
- * OutputStream, preceded by the specified header bytes, the number of messages, and the number of compressed bytes.
+ * Accumulates data in a large in-memory buffer. When a write is about to cause the buffer to
+ * overflow, the contents of the buffer are handed off to a secondary thread which writes the
+ * compressed data block to a downstream OutputStream, preceded by the specified header bytes, the
+ * number of messages, and the number of compressed bytes.
  *
- * Java's ByteArrayOutputStream makes a copy when you fetch its backing byte array. Here, the output buffer and
- * compression process are integrated directly, avoiding this copy step.
+ * <p>Java's ByteArrayOutputStream makes a copy when you fetch its backing byte array. Here, the
+ * output buffer and compression process are integrated directly, avoiding this copy step.
  */
 public class DeflatedBlockWriter extends OutputStream implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DeflatedBlockWriter.class);
 
     /**
-     * The maximum expected size of an encoded but uncompressed entity.
-     * A block will be considered finished when it is within this distance of the maximum block size.
+     * The maximum expected size of an encoded but uncompressed entity. A block will be considered
+     * finished when it is within this distance of the maximum block size.
      */
     public static final int MAX_MESSAGE_SIZE = 1024 * 64;
 
-    /** A zero-length BlockingQueue that hands tasks to the compression/writing pipeline stage without buffering them. */
+    /**
+     * A zero-length BlockingQueue that hands tasks to the compression/writing pipeline stage
+     * without buffering them.
+     */
     private final SynchronousQueue<VEXBlock> synchronousQueue = new SynchronousQueue<>();
 
     private final OutputStream downstream;
@@ -46,8 +50,8 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
     private final Thread blockWriterThread;
 
     /**
-     * Create a DeflatedBlockWriter that writes deflated data to the given OutputStream.
-     * Starts up a separate thread running the blockWriter's compression/writing loop.
+     * Create a DeflatedBlockWriter that writes deflated data to the given OutputStream. Starts up a
+     * separate thread running the blockWriter's compression/writing loop.
      */
     public DeflatedBlockWriter(OutputStream downstream) {
         this.downstream = downstream;
@@ -58,8 +62,8 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
     }
 
     /**
-     * Hand off a block for writing. Handing off a block with element type NONE signals the end of output, and
-     * will shut down the writer thread.
+     * Hand off a block for writing. Handing off a block with element type NONE signals the end of
+     * output, and will shut down the writer thread.
      */
     private void handOff(VEXBlock vexBlock) {
         try {
@@ -70,10 +74,11 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
     }
 
     /**
-     * This loop is run in a separate thread. It takes VEXBlocks one by one from the synchronous blocking queue,
-     * deflates all the bytes that have been accumulated in each block and writes the deflated result to the
-     * downstream OutputStream. The compression cannot be done incrementally or with a DeflaterOutputStream because
-     * we need to write the compressed data length to the downstream OutputStream _before_ the compressed data.
+     * This loop is run in a separate thread. It takes VEXBlocks one by one from the synchronous
+     * blocking queue, deflates all the bytes that have been accumulated in each block and writes
+     * the deflated result to the downstream OutputStream. The compression cannot be done
+     * incrementally or with a DeflaterOutputStream because we need to write the compressed data
+     * length to the downstream OutputStream _before_ the compressed data.
      */
     @Override
     public void run() {
@@ -84,17 +89,23 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
                 if (block == VEXBlock.END_BLOCK) break;
                 block.writeDeflated(downstream);
             } catch (InterruptedException ex) {
-                // Preferably, we'd like to use a thread interrupt to tell the thread to shut down when there's no more
+                // Preferably, we'd like to use a thread interrupt to tell the thread to shut down
+                // when there's no more
                 // input. It should finish writing the last block before exiting.
-                // InterruptedException should only happen during interruptable activity like sleeping or polling,
-                // and we don't expect it to happen during I/O: http://stackoverflow.com/a/10962613/778449
-                // However when writing to a PipedOutputStream, blocked write() calls can also notice the interrupt and
-                // abort with an InterruptedIOException so this is not viable. Instead we use a special sentinel block.
+                // InterruptedException should only happen during interruptable activity like
+                // sleeping or polling,
+                // and we don't expect it to happen during I/O:
+                // http://stackoverflow.com/a/10962613/778449
+                // However when writing to a PipedOutputStream, blocked write() calls can also
+                // notice the interrupt and
+                // abort with an InterruptedIOException so this is not viable. Instead we use a
+                // special sentinel block.
                 LOG.error("Block writer thread was interrupted while waiting for work.");
                 break;
             }
         }
-        // For predictability only one thread should write to a stream, and that thread should close the stream.
+        // For predictability only one thread should write to a stream, and that thread should close
+        // the stream.
         // Or at least this is what piped streams impose.
         // See https://techtavern.wordpress.com/2008/07/16/whats-this-ioexception-write-end-dead/
         try {
@@ -103,7 +114,6 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     @Override
@@ -122,16 +132,20 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
         currentEntityType = entityType;
     }
 
-    /** Add a byte to the message fragment currently being constructed, flushing out a block as needed. */
+    /**
+     * Add a byte to the message fragment currently being constructed, flushing out a block as
+     * needed.
+     */
     @Override
-    public void write (int b) {
+    public void write(int b) {
         // TODO catch out of range exceptions and warn that the message was too big.
         buffer[pos++] = (byte) b;
     }
 
     /**
-     * Declare the message fragment under construction to be complete.
-     * When there's not much space left in the buffer, this will end the block and start a new one.
+     * Declare the message fragment under construction to be complete. When there's not much space
+     * left in the buffer, this will end the block and start a new one.
+     *
      * @return whether a new block will be started after this message
      */
     public boolean endEntity() {
@@ -144,9 +158,9 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
     }
 
     /**
-     * Flush out any messages waiting in the buffer, ending the current block and starting a new one.
-     * Note that this does _not_ include any waiting message fragment. You should call endMessage() first if you want
-     * to include such a fragment.
+     * Flush out any messages waiting in the buffer, ending the current block and starting a new
+     * one. Note that this does _not_ include any waiting message fragment. You should call
+     * endMessage() first if you want to include such a fragment.
      */
     public void endBlock() {
         if (nEntitiesInBlock > 0) {
@@ -158,16 +172,14 @@ public class DeflatedBlockWriter extends OutputStream implements Runnable {
             block.entityType = currentEntityType;
             block.nEntities = nEntitiesInBlock;
 
-            // Give this block to the compression/writer thread synchronously (call blocks until thread is ready)
+            // Give this block to the compression/writer thread synchronously (call blocks until
+            // thread is ready)
             handOff(block);
 
             // Create a new buffer and reset the position and message counters
             buffer = new byte[VEXBlock.BUFFER_SIZE];
             pos = 0;
             nEntitiesInBlock = 0;
-
         }
     }
-
-
 }

@@ -1,8 +1,6 @@
 package com.conveyal.analysis.models;
 
-/**
- * Created by matthewc on 3/3/16.
- */
+/** Created by matthewc on 3/3/16. */
 public class AdjustDwellTime extends Modification {
     @Override
     public String getType() {
@@ -23,8 +21,9 @@ public class AdjustDwellTime extends Modification {
     /** the factor by which to scale, OR the new time, depending on the value of above */
     public double value;
 
-    public com.conveyal.r5.analyst.scenario.AdjustDwellTime toR5 () {
-        com.conveyal.r5.analyst.scenario.AdjustDwellTime adt = new com.conveyal.r5.analyst.scenario.AdjustDwellTime();
+    public com.conveyal.r5.analyst.scenario.AdjustDwellTime toR5() {
+        com.conveyal.r5.analyst.scenario.AdjustDwellTime adt =
+                new com.conveyal.r5.analyst.scenario.AdjustDwellTime();
         adt.comment = name;
 
         if (trips == null) {

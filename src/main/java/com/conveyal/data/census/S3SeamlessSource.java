@@ -8,9 +8,7 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * A seamless data source based on storage in Amazon S3.
- */
+/** A seamless data source based on storage in Amazon S3. */
 public class S3SeamlessSource extends SeamlessSource {
     private static AmazonS3 s3;
 
@@ -26,22 +24,20 @@ public class S3SeamlessSource extends SeamlessSource {
     public S3SeamlessSource(String region, String bucketName) {
         this.region = region;
         this.bucketName = bucketName;
-        this.s3 = AmazonS3ClientBuilder.standard()
-                .withRegion(region)
-                .build();
+        this.s3 = AmazonS3ClientBuilder.standard().withRegion(region).build();
     }
 
     @Override
     protected InputStream getInputStream(int x, int y) throws IOException {
         try {
-            GetObjectRequest req = new GetObjectRequest(bucketName, String.format("%d/%d.pbf.gz", x, y));
+            GetObjectRequest req =
+                    new GetObjectRequest(bucketName, String.format("%d/%d.pbf.gz", x, y));
             // the LODES bucket is requester-pays.
             req.setRequesterPays(true);
             return s3.getObject(req).getObjectContent();
         } catch (AmazonS3Exception e) {
             // there is no data in this tile
-            if ("NoSuchKey".equals(e.getErrorCode()))
-                return null;
+            if ("NoSuchKey".equals(e.getErrorCode())) return null;
             else
                 // re-throw, something else is amiss
                 throw e;

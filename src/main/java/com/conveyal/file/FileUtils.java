@@ -15,11 +15,12 @@ import java.util.zip.GZIPInputStream;
 
 public abstract class FileUtils {
     /**
-     * When a zip file needs to be expanded and the individual files are parsed, it's useful to create a temporary
-     * directory to help facilitate that.
+     * When a zip file needs to be expanded and the individual files are parsed, it's useful to
+     * create a temporary directory to help facilitate that.
+     *
      * @return File temporary directory
      */
-    public static File createScratchDirectory () {
+    public static File createScratchDirectory() {
         try {
             return Files.createTempDirectory("com.conveyal.file").toFile();
         } catch (IOException e) {
@@ -29,12 +30,14 @@ public abstract class FileUtils {
 
     /**
      * This is used to make files that will be written, then closed and put into the FileStorage.
-     * This method doesn't belong on the FileStorage, which deals only with immutable system-wide files.
+     * This method doesn't belong on the FileStorage, which deals only with immutable system-wide
+     * files.
      *
-     * @param type a short string revealing what kind of file this is, just to make filenames more human readable.
+     * @param type a short string revealing what kind of file this is, just to make filenames more
+     *     human readable.
      * @return File a file to write to
      */
-    public static File createScratchFile (String type) {
+    public static File createScratchFile(String type) {
         try {
             File tempFile = File.createTempFile("com.conveyal.file", type);
             // The file deletion shutdown hook applies to the temp file path, not the file contents.
@@ -48,6 +51,7 @@ public abstract class FileUtils {
 
     /**
      * Create a File from an InputStream. Closes the InputStream on completion.
+     *
      * @param inputStream Stream to read from.
      * @return File
      */
@@ -64,14 +68,16 @@ public abstract class FileUtils {
 
     /**
      * In many instances you may not know the file type. Explicitly allow passing null.
+     *
      * @return File
      */
-    public static File createScratchFile () {
+    public static File createScratchFile() {
         return createScratchFile("tmp");
     }
 
     /**
      * Write an OutputStream to a File.
+     *
      * @param file File to be written to.
      * @param os OutputStream to be consumed.
      */
@@ -87,10 +93,10 @@ public abstract class FileUtils {
     }
 
     /**
-     * Get an BufferedInputStream for a file. Read bytes from the underlying file stream without causing a system call
-     * for each byte read.
+     * Get an BufferedInputStream for a file. Read bytes from the underlying file stream without
+     * causing a system call for each byte read.
      */
-    public static BufferedInputStream getInputStream (File file) {
+    public static BufferedInputStream getInputStream(File file) {
         try {
             return new BufferedInputStream(new FileInputStream(file));
         } catch (IOException e) {
@@ -99,10 +105,10 @@ public abstract class FileUtils {
     }
 
     /**
-     * Get a BufferedOutputStream for a file. Write bytes to the underlying output stream without necessarily causing a
-     * call to the underlying system for each byte written.
+     * Get a BufferedOutputStream for a file. Write bytes to the underlying output stream without
+     * necessarily causing a call to the underlying system for each byte written.
      */
-    public static BufferedOutputStream getOutputStream (File file) {
+    public static BufferedOutputStream getOutputStream(File file) {
         try {
             return new BufferedOutputStream(new FileOutputStream(file));
         } catch (FileNotFoundException e) {
@@ -110,13 +116,13 @@ public abstract class FileUtils {
         }
     }
 
-    /**
-     * Check if a File is gzipped.
-     */
-    public static boolean isGzip (File file) {
+    /** Check if a File is gzipped. */
+    public static boolean isGzip(File file) {
         try {
             RandomAccessFile raf = new RandomAccessFile(file, "r");
-            boolean isGzip = GZIPInputStream.GZIP_MAGIC == (raf.read() & 0xff | ((raf.read() << 8) & 0xff00));
+            boolean isGzip =
+                    GZIPInputStream.GZIP_MAGIC
+                            == (raf.read() & 0xff | ((raf.read() << 8) & 0xff00));
             raf.close();
             return isGzip;
         } catch (Exception e) {

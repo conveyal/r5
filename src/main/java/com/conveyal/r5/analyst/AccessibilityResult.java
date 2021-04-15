@@ -3,13 +3,14 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
 /**
- * This holds and accumulates multiple accessibility indicator values for a single origin as they are computed.
- * The different accessibility indicator values are for different opportunity PointSets, different percentiles of travel
- * time, and different travel time cutoffs.
+ * This holds and accumulates multiple accessibility indicator values for a single origin as they
+ * are computed. The different accessibility indicator values are for different opportunity
+ * PointSets, different percentiles of travel time, and different travel time cutoffs.
  *
- * This should only be used internally by R5 workers. Values are kept as doubles while accumulating results.
- * Once accumulation is done and results are ready for use elsewhere (e.g. assembling multiple results in the broker)
- * the getIntValues method returns an array of rounded integers.
+ * <p>This should only be used internally by R5 workers. Values are kept as doubles while
+ * accumulating results. Once accumulation is done and results are ready for use elsewhere (e.g.
+ * assembling multiple results in the broker) the getIntValues method returns an array of rounded
+ * integers.
  */
 public class AccessibilityResult {
 
@@ -19,8 +20,11 @@ public class AccessibilityResult {
 
     private final double[][][] cumulativeOpportunities;
 
-    /** Construct an AccessibilityResult of the appropriate dimensions for the specified AnalysisTask. */
-    public AccessibilityResult (AnalysisWorkerTask task) {
+    /**
+     * Construct an AccessibilityResult of the appropriate dimensions for the specified
+     * AnalysisTask.
+     */
+    public AccessibilityResult(AnalysisWorkerTask task) {
         this.nPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
         this.nPercentiles = task.percentiles.length;
         this.nCutoffs = task.cutoffsMinutes.length;
@@ -28,7 +32,7 @@ public class AccessibilityResult {
     }
 
     /** Constructor for empty results, for use in testing only. */
-    public AccessibilityResult () {
+    public AccessibilityResult() {
         this.nPointSets = 0;
         this.nPercentiles = 0;
         this.nCutoffs = 0;
@@ -36,27 +40,32 @@ public class AccessibilityResult {
     }
 
     /**
-     * Increment the accessibility indicator value for the given grid, cutoff, and percentile
-     * by the given number of opportunities. This is called repeatedly to accumulate reachable
-     * destinations into different indicator values.
+     * Increment the accessibility indicator value for the given grid, cutoff, and percentile by the
+     * given number of opportunities. This is called repeatedly to accumulate reachable destinations
+     * into different indicator values.
      */
-    public void incrementAccessibility (int gridIndex, int percentileIndex, int cutoffIndex, double amount) {
+    public void incrementAccessibility(
+            int gridIndex, int percentileIndex, int cutoffIndex, double amount) {
         cumulativeOpportunities[gridIndex][percentileIndex][cutoffIndex] += amount;
     }
 
     /**
-     * As travel time cutoff increases, accessibility should increase.
-     * As percentile increases, travel time should decrease, and accessibility should decrease.
-     * If one of these invariants does not hold, there is something wrong with the calculations.
+     * As travel time cutoff increases, accessibility should increase. As percentile increases,
+     * travel time should decrease, and accessibility should decrease. If one of these invariants
+     * does not hold, there is something wrong with the calculations.
      */
-    private void checkInvariants () {
+    private void checkInvariants() {
         for (int d = 0; d < nPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
                 for (int c = 0; c < nCutoffs; c++) {
-                    if (c > 0 && cumulativeOpportunities[d][p][c] < cumulativeOpportunities[d][p][c - 1]) {
+                    if (c > 0
+                            && cumulativeOpportunities[d][p][c]
+                                    < cumulativeOpportunities[d][p][c - 1]) {
                         throw new AssertionError("Increasing travel time decreased accessibility.");
                     }
-                    if (p > 0 && cumulativeOpportunities[d][p][c] > cumulativeOpportunities[d][p - 1][c]) {
+                    if (p > 0
+                            && cumulativeOpportunities[d][p][c]
+                                    > cumulativeOpportunities[d][p - 1][c]) {
                         throw new AssertionError("Increasing percentile increased accessibility.");
                     }
                 }
@@ -65,11 +74,12 @@ public class AccessibilityResult {
     }
 
     /**
-     * Opportunity counts may be fractional because they were disaggregated from polygons, or because a weighting or
-     * rolloff function was applied to them. After accumulating many such potentially fractional opportunity counts,
-     * we round them off to whole numbers for reporting as final results.
+     * Opportunity counts may be fractional because they were disaggregated from polygons, or
+     * because a weighting or rolloff function was applied to them. After accumulating many such
+     * potentially fractional opportunity counts, we round them off to whole numbers for reporting
+     * as final results.
      */
-    public int[][][] getIntValues () {
+    public int[][][] getIntValues() {
         checkInvariants();
         int[][][] intAccessibility = new int[nPointSets][nPercentiles][nCutoffs];
         for (int d = 0; d < nPointSets; d++) {
@@ -79,6 +89,6 @@ public class AccessibilityResult {
                 }
             }
         }
-        return  intAccessibility;
+        return intAccessibility;
     }
 }

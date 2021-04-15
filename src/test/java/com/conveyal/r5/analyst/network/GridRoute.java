@@ -3,7 +3,8 @@ package com.conveyal.r5.analyst.network;
 import java.util.stream.Stream;
 
 /**
- * Represents a single transit route on a grid, used to create networks with predictable characteristics in tests.
+ * Represents a single transit route on a grid, used to create networks with predictable
+ * characteristics in tests.
  */
 public class GridRoute {
 
@@ -26,14 +27,15 @@ public class GridRoute {
     }
 
     public static enum Orientation {
-        HORIZONTAL, VERTICAL
+        HORIZONTAL,
+        VERTICAL
     }
 
-    public int nBlocksLength () {
+    public int nBlocksLength() {
         return (nStops - 1) * stopSpacingBlocks;
     }
 
-    public int getStopX (int stop) {
+    public int getStopX(int stop) {
         int stopX = startX;
         if (orientation == Orientation.HORIZONTAL) {
             stopX += stopSpacingBlocks * stop;
@@ -41,7 +43,7 @@ public class GridRoute {
         return stopX;
     }
 
-    public int getStopY (int stop) {
+    public int getStopY(int stop) {
         int stopY = startY;
         if (orientation == Orientation.VERTICAL) {
             stopY += stopSpacingBlocks * stop;
@@ -49,15 +51,15 @@ public class GridRoute {
         return stopY;
     }
 
-    public double getStopLat (int stop) {
+    public double getStopLat(int stop) {
         return gridLayout.getIntersectionLat(getStopY(stop));
     }
 
-    public double getStopLon (int stop) {
+    public double getStopLon(int stop) {
         return gridLayout.getIntersectionLon(getStopX(stop), getStopLat(stop));
     }
 
-    public String stopId (int stop, boolean mergeStops) {
+    public String stopId(int stop, boolean mergeStops) {
         if (mergeStops) {
             return String.format("X%dY%d", getStopX(stop), getStopY(stop));
         } else {
@@ -65,9 +67,12 @@ public class GridRoute {
         }
     }
 
-    private static GridRoute newBareRoute (GridLayout gridLayout, int headwayMinutes) {
+    private static GridRoute newBareRoute(GridLayout gridLayout, int headwayMinutes) {
         GridRoute route = new GridRoute();
-        route.id = gridLayout.nextIntegerId(); // Avoid collisions when same route is added multiple times
+        route.id =
+                gridLayout
+                        .nextIntegerId(); // Avoid collisions when same route is added multiple
+                                          // times
         route.stopSpacingBlocks = 1;
         route.gridLayout = gridLayout;
         route.startHour = 5;
@@ -78,7 +83,7 @@ public class GridRoute {
         return route;
     }
 
-    public static GridRoute newHorizontalRoute (GridLayout gridLayout, int row, int headwayMinutes) {
+    public static GridRoute newHorizontalRoute(GridLayout gridLayout, int row, int headwayMinutes) {
         GridRoute route = newBareRoute(gridLayout, headwayMinutes);
         route.orientation = Orientation.HORIZONTAL;
         route.startX = 0;
@@ -87,7 +92,7 @@ public class GridRoute {
         return route;
     }
 
-    public static GridRoute newVerticalRoute (GridLayout gridLayout, int col, int headwayMinutes) {
+    public static GridRoute newVerticalRoute(GridLayout gridLayout, int col, int headwayMinutes) {
         GridRoute route = newBareRoute(gridLayout, headwayMinutes);
         route.orientation = Orientation.VERTICAL;
         route.startX = col;
@@ -96,9 +101,8 @@ public class GridRoute {
         return route;
     }
 
-    public GridRoute pureFrequency () {
+    public GridRoute pureFrequency() {
         pureFrequency = true;
         return this;
     }
-
 }

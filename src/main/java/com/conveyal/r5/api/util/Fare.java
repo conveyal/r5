@@ -4,12 +4,10 @@ import com.conveyal.r5.transit.fare.RideType;
 
 import java.util.Objects;
 
-/**
- * Created by mabu on 30.10.2015.
- */
+/** Created by mabu on 30.10.2015. */
 public class Fare {
 
-    //TODO: change double to float since it has enough accuracy
+    // TODO: change double to float since it has enough accuracy
 
     public RideType type;
     public double low;
@@ -17,31 +15,31 @@ public class Fare {
     public double senior;
     public boolean transferReduction;
 
-    public Fare (Fare other) {
+    public Fare(Fare other) {
         this.accumulate(other);
     }
 
-    public Fare (double base) {
+    public Fare(double base) {
         low = peak = senior = base;
     }
 
-    public Fare (double low, double peak, double senior) {
+    public Fare(double low, double peak, double senior) {
         this.low = low;
         this.peak = peak;
         this.senior = senior;
     }
 
-    public void accumulate (Fare other) {
+    public void accumulate(Fare other) {
         if (other != null) {
-            low    += other.low;
-            peak   += other.peak;
+            low += other.low;
+            peak += other.peak;
             senior += other.senior;
         }
     }
 
     public void discount(double amount) {
-        low    -= amount;
-        peak   -= amount;
+        low -= amount;
+        peak -= amount;
         senior -= amount;
         transferReduction = true;
     }
@@ -60,16 +58,14 @@ public class Fare {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
         Fare fare = (Fare) o;
-        return Double.compare(fare.low, low) == 0 &&
-            Double.compare(fare.peak, peak) == 0 &&
-            Double.compare(fare.senior, senior) == 0 &&
-            transferReduction == fare.transferReduction &&
-            type == fare.type;
+        return Double.compare(fare.low, low) == 0
+                && Double.compare(fare.peak, peak) == 0
+                && Double.compare(fare.senior, senior) == 0
+                && transferReduction == fare.transferReduction
+                && type == fare.type;
     }
 
     @Override

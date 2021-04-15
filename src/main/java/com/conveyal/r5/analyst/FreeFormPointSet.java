@@ -1,10 +1,14 @@
 package com.conveyal.r5.analyst;
 
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+
 import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
@@ -18,11 +22,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
-
 /**
- * These are points serving as origins or destinations in an accessibility analysis which are not constrained to
- * a regular grid. Each point has an arbitrary latitude and longitude attached to it.
+ * These are points serving as origins or destinations in an accessibility analysis which are not
+ * constrained to a regular grid. Each point has an arbitrary latitude and longitude attached to it.
  * This class re-uses some of the legacy code, which was removed in R5 PR #338.
  */
 public class FreeFormPointSet extends PointSet {
@@ -43,17 +45,18 @@ public class FreeFormPointSet extends PointSet {
     // TODO check that all identifiers are unique
 
     /**
-     * Create a FreeFormPointset from a CSV file, which must have latitude and longitude columns with the values of
-     * latField and lonField in the header row. If idField is supplied, its column will be used to supply id values
-     * for the points; if not, row numbers will be used as the ids.
+     * Create a FreeFormPointset from a CSV file, which must have latitude and longitude columns
+     * with the values of latField and lonField in the header row. If idField is supplied, its
+     * column will be used to supply id values for the points; if not, row numbers will be used as
+     * the ids.
      */
-    public static FreeFormPointSet fromCsv (
+    public static FreeFormPointSet fromCsv(
             InputStreamProvider csvInputStreamProvider,
             String latField,
             String lonField,
             String idField,
-            String countField
-    ) throws IOException {
+            String countField)
+            throws IOException {
         /* First, scan through the file to count lines and check for rows with the wrong number of columns. */
         int nRecs;
         int latCol = -1;
@@ -77,22 +80,22 @@ public class FreeFormPointSet extends PointSet {
                 }
             }
             if (latCol < 0 || lonCol < 0) {
-                throw new ParameterException("CSV file did not contain the specified latitude or longitude column.");
+                throw new ParameterException(
+                        "CSV file did not contain the specified latitude or longitude column.");
             }
             if (idField != null && idCol < 0) {
                 throw new ParameterException("CSV file did not contain the specified ID column.");
             }
             if (countField != null && countCol < 0) {
-                throw new ParameterException("CSV file did not contain the specified opportunity count column.");
+                throw new ParameterException(
+                        "CSV file did not contain the specified opportunity count column.");
             }
             while (reader.readRecord()) {
                 if (reader.getColumnCount() != nCols) {
-                    String message = String.format(
-                            "CSV header has %d fields, record %d has %d fields.",
-                            nCols,
-                            reader.getCurrentRecord(),
-                            reader.getColumnCount()
-                    );
+                    String message =
+                            String.format(
+                                    "CSV header has %d fields, record %d has %d fields.",
+                                    nCols, reader.getCurrentRecord(), reader.getColumnCount());
                     throw new ParameterException(message);
                 }
             }
@@ -102,7 +105,8 @@ public class FreeFormPointSet extends PointSet {
         }
 
         /* If we reached here, the file is entirely readable. Re-read it from the beginning and record values. */
-        // Note that we're doing two passes just so we know the array size. We could just use TIntLists.
+        // Note that we're doing two passes just so we know the array size. We could just use
+        // TIntLists.
         int rec = -1;
         try (InputStream csvInputStream = csvInputStreamProvider.getInputStream()) {
             CsvReader reader = new CsvReader(csvInputStream, ',', StandardCharsets.UTF_8);
@@ -113,24 +117,24 @@ public class FreeFormPointSet extends PointSet {
                 rec = (int) reader.getCurrentRecord();
                 ret.lats[rec] = Double.parseDouble(reader.get(latCol));
                 ret.lons[rec] = Double.parseDouble(reader.get(lonCol));
-                // If ID column was specified and present, use it. Otherwise, use record number as ID.
+                // If ID column was specified and present, use it. Otherwise, use record number as
+                // ID.
                 ret.ids[rec] = idCol < 0 ? String.valueOf(rec) : reader.get(idCol);
-                // If count column was specified and present, use it. Otherwise, one opportunity per point.
+                // If count column was specified and present, use it. Otherwise, one opportunity per
+                // point.
                 ret.counts[rec] = countCol < 0 ? 1D : Double.parseDouble(reader.get(countCol));
             }
             Grid.checkWgsEnvelopeSize(ret.getWgsEnvelope());
             return ret;
         } catch (NumberFormatException nfe) {
             throw new ParameterException(
-                String.format("Improperly formatted floating point value on line %d of CSV input", rec)
-            );
+                    String.format(
+                            "Improperly formatted floating point value on line %d of CSV input",
+                            rec));
         }
     }
 
-
-    /**
-     * @param capacity expected number of features to be added to this FreeFormPointSet.
-     */
+    /** @param capacity expected number of features to be added to this FreeFormPointSet. */
     private FreeFormPointSet(int capacity) {
         ids = new String[capacity];
         lats = new double[capacity];
@@ -144,7 +148,7 @@ public class FreeFormPointSet extends PointSet {
     }
 
     @Override
-    public double sumTotalOpportunities () {
+    public double sumTotalOpportunities() {
         return Arrays.stream(counts).sum();
     }
 
@@ -159,12 +163,12 @@ public class FreeFormPointSet extends PointSet {
     }
 
     /**
-     * Write coordinates for these points, in binary format.
-     * Note that this does not save any opportunity magnitudes or densities. We do not use those yet.
-     * Note also that if we ever intend to use these directly in the UI we should switch to a
-     * fixed-width little-endian representation or JSON.
+     * Write coordinates for these points, in binary format. Note that this does not save any
+     * opportunity magnitudes or densities. We do not use those yet. Note also that if we ever
+     * intend to use these directly in the UI we should switch to a fixed-width little-endian
+     * representation or JSON.
      */
-    public void write (OutputStream outputStream) throws IOException {
+    public void write(OutputStream outputStream) throws IOException {
         DataOutputStream out = new DataOutputStream(outputStream);
         // Header
         // TODO add identifier / version for future sanity checking?
@@ -185,7 +189,7 @@ public class FreeFormPointSet extends PointSet {
         out.close();
     }
 
-    public FreeFormPointSet (InputStream inputStream) throws  IOException {
+    public FreeFormPointSet(InputStream inputStream) throws IOException {
         DataInputStream data = new DataInputStream(inputStream);
         int nPoints = data.readInt();
         this.ids = new String[nPoints];
@@ -208,32 +212,34 @@ public class FreeFormPointSet extends PointSet {
     }
 
     @Override
-    public TIntList getPointsInEnvelope (Envelope envelopeFixedDegrees) {
+    public TIntList getPointsInEnvelope(Envelope envelopeFixedDegrees) {
         // Convert fixed-degree envelope to floating
         double west = fixedDegreesToFloating(envelopeFixedDegrees.getMinX());
         double east = fixedDegreesToFloating(envelopeFixedDegrees.getMaxX());
         double north = fixedDegreesToFloating(envelopeFixedDegrees.getMaxY());
         double south = fixedDegreesToFloating(envelopeFixedDegrees.getMinY());
         TIntList pointsInEnvelope = new TIntArrayList();
-        // Pixels are truncated toward zero, and coords increase toward East and South in web Mercator, so <= south/east.
+        // Pixels are truncated toward zero, and coords increase toward East and South in web
+        // Mercator, so <= south/east.
         for (int i = 0; i < lats.length; i++) {
-            if (lats[i] < north && lats[i] > south && lons[i] < east && lons[i] > west) pointsInEnvelope.add(i);
+            if (lats[i] < north && lats[i] > south && lons[i] < east && lons[i] > west)
+                pointsInEnvelope.add(i);
         }
         return pointsInEnvelope;
     }
 
     @Override
-    public double getOpportunityCount (int i) {
+    public double getOpportunityCount(int i) {
         return counts[i];
     }
 
     @Override
-    public String getId (int i) {
+    public String getId(int i) {
         return ids[i];
     }
 
     @Override
-    public Envelope getWgsEnvelope () {
+    public Envelope getWgsEnvelope() {
         if (lats.length == 1 || lons.length == 0) {
             LOG.error("Attempt to create envelope from empty lat/lon array.");
             return null;
@@ -247,15 +253,19 @@ public class FreeFormPointSet extends PointSet {
     }
 
     @Override
-    public WebMercatorExtents getWebMercatorExtents () {
+    public WebMercatorExtents getWebMercatorExtents() {
         final int DEFAULT_ZOOM = 9;
         Envelope wgsEnvelope = this.getWgsEnvelope();
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, DEFAULT_ZOOM);
+        WebMercatorExtents webMercatorExtents =
+                WebMercatorExtents.forWgsEnvelope(wgsEnvelope, DEFAULT_ZOOM);
         return webMercatorExtents;
     }
 
-    /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */
-    public FreeFormPointSet (Coordinate... coordinates) {
+    /**
+     * Construct a freeform point set containing one opportunity at each specified geographic
+     * coordinate.
+     */
+    public FreeFormPointSet(Coordinate... coordinates) {
         this(coordinates.length);
         int i = 0;
         for (Coordinate coordinate : coordinates) {

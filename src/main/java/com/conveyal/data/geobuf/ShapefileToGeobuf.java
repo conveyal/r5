@@ -13,11 +13,9 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 
-/**
- * Convert a Shapefile to Geobuf format.
- */
+/** Convert a Shapefile to Geobuf format. */
 public class ShapefileToGeobuf {
-    public static void main (String... args) throws Exception {
+    public static void main(String... args) throws Exception {
         File inShp = new File(args[0]);
         File outGb = new File(args[1]);
 
@@ -33,7 +31,7 @@ public class ShapefileToGeobuf {
 
         Collection<GeobufFeature> features = new ArrayList<>();
 
-        for (SimpleFeatureIterator it = sfc.features(); it.hasNext();) {
+        for (SimpleFeatureIterator it = sfc.features(); it.hasNext(); ) {
             GeobufFeature feat = new GeobufFeature(it.next());
             features.add(feat);
         }

@@ -4,6 +4,7 @@ import com.conveyal.analysis.components.Components;
 import com.conveyal.analysis.components.LocalComponents;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,11 +12,12 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 /**
- * This test is not an automatic unit test. It is an integration test that must be started manually, because it takes
- * a long time to run. It will start up local analysis server with local workers, then submit a  job. The workers
- * are configured to fail to complete tasks some percentage of the time, but eventually the whole job should be finished
- * because the broker will redeliver lost tasks to the workers.
- * Progress can be followed by watching the admin page of the local server at...
+ * This test is not an automatic unit test. It is an integration test that must be started manually,
+ * because it takes a long time to run. It will start up local analysis server with local workers,
+ * then submit a job. The workers are configured to fail to complete tasks some percentage of the
+ * time, but eventually the whole job should be finished because the broker will redeliver lost
+ * tasks to the workers. Progress can be followed by watching the admin page of the local server
+ * at...
  */
 public class RedeliveryTest {
 
@@ -24,9 +26,7 @@ public class RedeliveryTest {
     static final int N_JOBS = 4;
     static final int N_TASKS_PER_JOB = 100;
 
-    /**
-     * @param params are not used.
-     */
+    /** @param params are not used. */
     public static void main(String[] params) {
 
         // Start an analysis server with the default (offline) properties.
@@ -35,12 +35,14 @@ public class RedeliveryTest {
         // BackendMain.startServer(components);
         // components.config.testTaskRedelivery = true;
 
-        // Feed several jobs to the broker, staggered in time, to ensure redelivery can deal with multiple jobs.
+        // Feed several jobs to the broker, staggered in time, to ensure redelivery can deal with
+        // multiple jobs.
         for (int j = 0; j < N_JOBS; j++) {
             sendFakeJob(components.broker);
             try {
                 Thread.sleep(2000);
-            } catch (InterruptedException e) { }
+            } catch (InterruptedException e) {
+            }
         }
 
         // Wait for all tasks to be marked finished.
@@ -49,7 +51,8 @@ public class RedeliveryTest {
             try {
                 LOG.info("Some jobs are still not complete.");
                 Thread.sleep(2000);
-            } catch (InterruptedException e) { }
+            } catch (InterruptedException e) {
+            }
         }
 
         LOG.info("All jobs finished.");
@@ -78,5 +81,4 @@ public class RedeliveryTest {
         String hex = uuid.toString().replaceAll("-", "");
         return hex;
     }
-
 }

@@ -5,7 +5,7 @@ import org.locationtech.jts.geom.Envelope;
 /**
  * Information about router
  *
- * Currently only envelope and name
+ * <p>Currently only envelope and name
  */
 public class RouterInfo {
 

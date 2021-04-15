@@ -10,22 +10,20 @@ import gnu.trove.procedure.TDoubleProcedure;
 import java.util.Collection;
 import java.util.Random;
 
-/**
- * Created by abyrd on 2020-06-04
- */
+/** Created by abyrd on 2020-06-04 */
 public class TDoubleAugmentedList implements TDoubleList {
 
     private final TDoubleList base;
 
     private final TDoubleList extension;
 
-    public TDoubleAugmentedList (TDoubleList base) {
+    public TDoubleAugmentedList(TDoubleList base) {
         this.base = base;
         this.extension = new TDoubleArrayList();
     }
 
     @Override
-    public double get (int index) {
+    public double get(int index) {
         if (index < base.size()) {
             return base.get(index);
         } else {
@@ -34,7 +32,7 @@ public class TDoubleAugmentedList implements TDoubleList {
     }
 
     @Override
-    public double set (int index, double value) {
+    public double set(int index, double value) {
         if (index < base.size()) {
             throw new RuntimeException("Modifying the base graph is not allowed.");
         } else {
@@ -53,282 +51,281 @@ public class TDoubleAugmentedList implements TDoubleList {
     }
 
     /**
-     *  Nominally implement the (enormous) TDoubleList interface.
-     *  But all of these remain unimplemented until we need them.
+     * Nominally implement the (enormous) TDoubleList interface. But all of these remain
+     * unimplemented until we need them.
      */
-
     @Override
-    public double getNoEntryValue () {
+    public double getNoEntryValue() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean isEmpty () {
+    public boolean isEmpty() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void add (double[] vals) {
+    public void add(double[] vals) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void add (double[] vals, int offset, int length) {
+    public void add(double[] vals, int offset, int length) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void insert (int offset, double value) {
+    public void insert(int offset, double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void insert (int offset, double[] values) {
+    public void insert(int offset, double[] values) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void insert (int offset, double[] values, int valOffset, int len) {
+    public void insert(int offset, double[] values, int valOffset, int len) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void set (int offset, double[] values) {
+    public void set(int offset, double[] values) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void set (int offset, double[] values, int valOffset, int length) {
+    public void set(int offset, double[] values, int valOffset, int length) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double replace (int offset, double val) {
+    public double replace(int offset, double val) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void clear () {
+    public void clear() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean remove (double value) {
+    public boolean remove(double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double removeAt (int offset) {
+    public double removeAt(int offset) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void remove (int offset, int length) {
+    public void remove(int offset, int length) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void transformValues (TDoubleFunction function) {
+    public void transformValues(TDoubleFunction function) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void reverse () {
+    public void reverse() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void reverse (int from, int to) {
+    public void reverse(int from, int to) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void shuffle (Random rand) {
+    public void shuffle(Random rand) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public TDoubleList subList (int begin, int end) {
+    public TDoubleList subList(int begin, int end) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double[] toArray () {
+    public double[] toArray() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double[] toArray (int offset, int len) {
+    public double[] toArray(int offset, int len) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double[] toArray (double[] dest) {
+    public double[] toArray(double[] dest) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double[] toArray (double[] dest, int offset, int len) {
+    public double[] toArray(double[] dest, int offset, int len) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double[] toArray (double[] dest, int source_pos, int dest_pos, int len) {
+    public double[] toArray(double[] dest, int source_pos, int dest_pos, int len) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean forEach (TDoubleProcedure procedure) {
+    public boolean forEach(TDoubleProcedure procedure) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean forEachDescending (TDoubleProcedure procedure) {
+    public boolean forEachDescending(TDoubleProcedure procedure) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void sort () {
+    public void sort() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void sort (int fromIndex, int toIndex) {
+    public void sort(int fromIndex, int toIndex) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void fill (double val) {
+    public void fill(double val) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public void fill (int fromIndex, int toIndex, double val) {
+    public void fill(int fromIndex, int toIndex, double val) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int binarySearch (double value) {
+    public int binarySearch(double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int binarySearch (double value, int fromIndex, int toIndex) {
+    public int binarySearch(double value, int fromIndex, int toIndex) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int indexOf (double value) {
+    public int indexOf(double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int indexOf (int offset, double value) {
+    public int indexOf(int offset, double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int lastIndexOf (double value) {
+    public int lastIndexOf(double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public int lastIndexOf (int offset, double value) {
+    public int lastIndexOf(int offset, double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean contains (double value) {
+    public boolean contains(double value) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public TDoubleList grep (TDoubleProcedure condition) {
+    public TDoubleList grep(TDoubleProcedure condition) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public TDoubleList inverseGrep (TDoubleProcedure condition) {
+    public TDoubleList inverseGrep(TDoubleProcedure condition) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double max () {
+    public double max() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double min () {
+    public double min() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public double sum () {
+    public double sum() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public TDoubleIterator iterator () {
+    public TDoubleIterator iterator() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean containsAll (Collection<?> collection) {
+    public boolean containsAll(Collection<?> collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean containsAll (TDoubleCollection collection) {
+    public boolean containsAll(TDoubleCollection collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean containsAll (double[] array) {
+    public boolean containsAll(double[] array) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean addAll (Collection<? extends Double> collection) {
+    public boolean addAll(Collection<? extends Double> collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean addAll (TDoubleCollection collection) {
+    public boolean addAll(TDoubleCollection collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean addAll (double[] array) {
+    public boolean addAll(double[] array) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean retainAll (Collection<?> collection) {
+    public boolean retainAll(Collection<?> collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean retainAll (TDoubleCollection collection) {
+    public boolean retainAll(TDoubleCollection collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean retainAll (double[] array) {
+    public boolean retainAll(double[] array) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean removeAll (Collection<?> collection) {
+    public boolean removeAll(Collection<?> collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean removeAll (TDoubleCollection collection) {
+    public boolean removeAll(TDoubleCollection collection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean removeAll (double[] array) {
+    public boolean removeAll(double[] array) {
         throw new UnsupportedOperationException();
     }
 }

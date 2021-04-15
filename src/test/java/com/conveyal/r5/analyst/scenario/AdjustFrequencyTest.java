@@ -1,17 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripSchedule;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.Arrays;
-import java.util.Collections;
-
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,44 +9,63 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Test converting lines to a frequency representation.
- */
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+import java.util.Collections;
+
+/** Test converting lines to a frequency representation. */
 public class AdjustFrequencyTest {
     public TransportNetwork network;
     public long checksum;
 
     @BeforeEach
-    public void setUp () {
+    public void setUp() {
         network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_PATTERNS);
         checksum = network.checksum();
     }
 
     @Test
-    public void testFrequencyConversion () {
+    public void testFrequencyConversion() {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
 
         assertEquals(2, network.transitLayer.tripPatterns.size());
 
-        network.transitLayer.tripPatterns.forEach(tp -> {
-            assertTrue(tp.hasSchedules);
-            assertFalse(tp.hasFrequencies);
-        });
+        network.transitLayer.tripPatterns.forEach(
+                tp -> {
+                    assertTrue(tp.hasSchedules);
+                    assertFalse(tp.hasFrequencies);
+                });
 
         // make an entry
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.startTime = 6 * 3600;
         entry.endTime = 16 * 3600;
-        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = entry.saturday = entry.sunday = true;
+        entry.monday =
+                entry.tuesday =
+                        entry.wednesday =
+                                entry.thursday =
+                                        entry.friday = entry.saturday = entry.sunday = true;
         entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
 
         AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
         entry2.headwaySecs = 1200;
         entry2.startTime = 16 * 3600;
         entry2.endTime = 22 * 3600;
-        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.monday =
+                entry2.tuesday =
+                        entry2.wednesday =
+                                entry2.thursday =
+                                        entry2.friday = entry2.saturday = entry2.sunday = true;
         entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
 
         af.entries = Arrays.asList(entry, entry2);
@@ -86,12 +95,12 @@ public class AdjustFrequencyTest {
             exemplar1 = originalExemplar0;
         }
 
-        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
-        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
+        assertArrayEquals(new int[] {0, 500}, exemplar0.arrivals);
+        assertArrayEquals(new int[] {0, 500}, exemplar0.departures);
 
-        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, exemplar0.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, exemplar0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
         assertEquals(entry.monday, service0.calendar.monday == 1);
@@ -103,12 +112,12 @@ public class AdjustFrequencyTest {
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
         // should be moved to have first arrival at 0
-        assertArrayEquals(new int[] { 0, 500 }, exemplar1.arrivals);
-        assertArrayEquals(new int[] { 0, 500 }, exemplar1.departures);
+        assertArrayEquals(new int[] {0, 500}, exemplar1.arrivals);
+        assertArrayEquals(new int[] {0, 500}, exemplar1.departures);
 
-        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
-        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
-        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
+        assertArrayEquals(new int[] {entry2.headwaySecs}, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] {entry2.startTime}, exemplar1.startTimes);
+        assertArrayEquals(new int[] {entry2.endTime}, exemplar1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
         assertEquals(entry2.monday, service1.calendar.monday == 1);
@@ -120,17 +129,18 @@ public class AdjustFrequencyTest {
         assertEquals(entry2.sunday, service1.calendar.sunday == 1);
 
         // make sure we didn't modify base network
-        network.transitLayer.tripPatterns.forEach(tp -> {
-            assertTrue(tp.hasSchedules);
-            assertFalse(tp.hasFrequencies);
-        });
+        network.transitLayer.tripPatterns.forEach(
+                tp -> {
+                    assertTrue(tp.hasSchedules);
+                    assertFalse(tp.hasFrequencies);
+                });
 
         assertEquals(checksum, network.checksum());
     }
 
     /** Test converting multiple patterns of a route to frequency representations */
     @Test
-    public void testConvertingMultiplePatternsToFrequency () {
+    public void testConvertingMultiplePatternsToFrequency() {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
 
@@ -138,14 +148,22 @@ public class AdjustFrequencyTest {
         entry.headwaySecs = 900;
         entry.startTime = 6 * 3600;
         entry.endTime = 16 * 3600;
-        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = entry.saturday = entry.sunday = true;
+        entry.monday =
+                entry.tuesday =
+                        entry.wednesday =
+                                entry.thursday =
+                                        entry.friday = entry.saturday = entry.sunday = true;
         entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
 
         AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
         entry2.headwaySecs = 1200;
         entry2.startTime = 16 * 3600;
         entry2.endTime = 22 * 3600;
-        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.monday =
+                entry2.tuesday =
+                        entry2.wednesday =
+                                entry2.thursday =
+                                        entry2.friday = entry2.saturday = entry2.sunday = true;
         entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25800"; // trip25800 is a three-stop trip
 
         af.entries = Arrays.asList(entry, entry2);
@@ -178,12 +196,12 @@ public class AdjustFrequencyTest {
         TripSchedule exemplar0 = twoStop.tripSchedules.get(0);
         TripSchedule exemplar1 = threeStop.tripSchedules.get(0);
 
-        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
-        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
+        assertArrayEquals(new int[] {0, 500}, exemplar0.arrivals);
+        assertArrayEquals(new int[] {0, 500}, exemplar0.departures);
 
-        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, exemplar0.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, exemplar0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
         assertEquals(entry.monday, service0.calendar.monday == 1);
@@ -194,12 +212,12 @@ public class AdjustFrequencyTest {
         assertEquals(entry.saturday, service0.calendar.saturday == 1);
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
-        assertArrayEquals(new int[] { 0, 500, 1030 }, exemplar1.arrivals);
-        assertArrayEquals(new int[] { 0, 530, 1030 }, exemplar1.departures);
+        assertArrayEquals(new int[] {0, 500, 1030}, exemplar1.arrivals);
+        assertArrayEquals(new int[] {0, 530, 1030}, exemplar1.departures);
 
-        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
-        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
-        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
+        assertArrayEquals(new int[] {entry2.headwaySecs}, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] {entry2.startTime}, exemplar1.startTimes);
+        assertArrayEquals(new int[] {entry2.endTime}, exemplar1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
         assertEquals(entry2.monday, service1.calendar.monday == 1);
@@ -211,17 +229,21 @@ public class AdjustFrequencyTest {
         assertEquals(entry2.sunday, service1.calendar.sunday == 1);
 
         // make sure we didn't modify base network
-        network.transitLayer.tripPatterns.forEach(tp -> {
-            assertTrue(tp.hasSchedules);
-            assertFalse(tp.hasFrequencies);
-        });
+        network.transitLayer.tripPatterns.forEach(
+                tp -> {
+                    assertTrue(tp.hasSchedules);
+                    assertFalse(tp.hasFrequencies);
+                });
 
         assertEquals(checksum, network.checksum());
     }
 
-    /** Test that schedules on frequency-converted lines outside of frequency-conversion window are retained */
+    /**
+     * Test that schedules on frequency-converted lines outside of frequency-conversion window are
+     * retained
+     */
     @Test
-    public void testScheduleRetention () {
+    public void testScheduleRetention() {
         AdjustFrequency af = new AdjustFrequency();
         af.retainTripsOutsideFrequencyEntries = true;
         af.route = "MULTIPLE_PATTERNS:route";
@@ -238,7 +260,11 @@ public class AdjustFrequencyTest {
         entry2.headwaySecs = 900;
         entry2.startTime = 9 * 3600;
         entry2.endTime = 10 * 3600;
-        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.monday =
+                entry2.tuesday =
+                        entry2.wednesday =
+                                entry2.thursday =
+                                        entry2.friday = entry2.saturday = entry2.sunday = true;
         entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25200";
 
         af.entries = Arrays.asList(entry, entry2);
@@ -261,14 +287,16 @@ public class AdjustFrequencyTest {
                 twoStopPatternCount++;
 
                 // this is the frequency converted pattern
-                TripSchedule[] freqSchedules = pattern.tripSchedules.stream()
-                        .filter(ts -> ts.headwaySeconds != null)
-                        .toArray(i -> new TripSchedule[i]);
+                TripSchedule[] freqSchedules =
+                        pattern.tripSchedules.stream()
+                                .filter(ts -> ts.headwaySeconds != null)
+                                .toArray(i -> new TripSchedule[i]);
 
                 // for entry and entry2
                 TripSchedule ts, ts2;
 
-                // order of the frequency networks is not important, so don't inadvertently test that.
+                // order of the frequency networks is not important, so don't inadvertently test
+                // that.
                 if (freqSchedules[0].startTimes[0] == entry.startTime) {
                     ts = freqSchedules[0];
                     ts2 = freqSchedules[1];
@@ -277,13 +305,13 @@ public class AdjustFrequencyTest {
                     ts = freqSchedules[1];
                 }
 
-                assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-                assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
-                assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
+                assertArrayEquals(new int[] {entry.startTime}, ts.startTimes);
+                assertArrayEquals(new int[] {entry.endTime}, ts.endTimes);
+                assertArrayEquals(new int[] {entry.headwaySecs}, ts.headwaySeconds);
 
-                assertArrayEquals(new int[] { entry2.startTime }, ts2.startTimes);
-                assertArrayEquals(new int[] { entry2.endTime }, ts2.endTimes);
-                assertArrayEquals(new int[] { entry2.headwaySecs }, ts2.headwaySeconds);
+                assertArrayEquals(new int[] {entry2.startTime}, ts2.startTimes);
+                assertArrayEquals(new int[] {entry2.endTime}, ts2.endTimes);
+                assertArrayEquals(new int[] {entry2.headwaySecs}, ts2.headwaySeconds);
 
                 frequencyScheduleCount += freqSchedules.length;
             } else {
@@ -292,7 +320,8 @@ public class AdjustFrequencyTest {
                 // if it doesn't have two stops it should have three
                 assertEquals(3, pattern.stops.length);
                 // should all be schedule based
-                assertTrue(pattern.tripSchedules.stream().allMatch(ts -> ts.headwaySeconds == null));
+                assertTrue(
+                        pattern.tripSchedules.stream().allMatch(ts -> ts.headwaySeconds == null));
 
                 boolean foundTripBefore9 = false;
                 boolean foundTripAfter10 = false;
@@ -318,7 +347,8 @@ public class AdjustFrequencyTest {
                         assertEquals(0, service.calendar.thursday);
                         assertEquals(0, service.calendar.friday);
 
-                        // weekend service should be retained as frequency entry is not active on the weekends
+                        // weekend service should be retained as frequency entry is not active on
+                        // the weekends
                         assertEquals(1, service.calendar.saturday);
                         assertEquals(1, service.calendar.sunday);
                     } else {
@@ -350,12 +380,12 @@ public class AdjustFrequencyTest {
 
     /** Test adding scheduled trips */
     @Test
-    public void testAddedScheduledTrips () {
+    public void testAddedScheduledTrips() {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
         af.retainTripsOutsideFrequencyEntries = true;
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.firstDepartures = new int[] { 25300, 25400 };
+        entry.firstDepartures = new int[] {25300, 25400};
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
         entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
@@ -367,25 +397,29 @@ public class AdjustFrequencyTest {
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
-        TripPattern originalTwoStopPattern = network.transitLayer.tripPatterns.stream()
-                .filter(p -> p.stops.length == 2)
-                .findFirst()
-                .orElse(null);
+        TripPattern originalTwoStopPattern =
+                network.transitLayer.tripPatterns.stream()
+                        .filter(p -> p.stops.length == 2)
+                        .findFirst()
+                        .orElse(null);
 
-        TripPattern originalThreeStopPattern = network.transitLayer.tripPatterns.stream()
-                .filter(p -> p.stops.length == 3)
-                .findFirst()
-                .orElse(null);
+        TripPattern originalThreeStopPattern =
+                network.transitLayer.tripPatterns.stream()
+                        .filter(p -> p.stops.length == 3)
+                        .findFirst()
+                        .orElse(null);
 
-        TripPattern newTwoStopPattern = mod.transitLayer.tripPatterns.stream()
-                .filter(p -> p.stops.length == 2)
-                .findFirst()
-                .orElse(null);
+        TripPattern newTwoStopPattern =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(p -> p.stops.length == 2)
+                        .findFirst()
+                        .orElse(null);
 
-        TripPattern newThreeStopPattern = mod.transitLayer.tripPatterns.stream()
-                .filter(p -> p.stops.length == 3)
-                .findFirst()
-                .orElse(null);
+        TripPattern newThreeStopPattern =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(p -> p.stops.length == 3)
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(originalTwoStopPattern);
         assertNotNull(originalThreeStopPattern);
@@ -395,20 +429,25 @@ public class AdjustFrequencyTest {
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
         // we did nothing to three stop trips, and all should be retained
-        assertEquals(originalThreeStopPattern.tripSchedules.size(), newThreeStopPattern.tripSchedules.size());
+        assertEquals(
+                originalThreeStopPattern.tripSchedules.size(),
+                newThreeStopPattern.tripSchedules.size());
         // we have added two trip schedules
-        assertEquals(originalTwoStopPattern.tripSchedules.size() + 2, newTwoStopPattern.tripSchedules.size());
+        assertEquals(
+                originalTwoStopPattern.tripSchedules.size() + 2,
+                newTwoStopPattern.tripSchedules.size());
 
         // make sure the schedules were added correctly
-        // TripSchedules should be sorted by departure, so the relevant trips should be in positions 1 and 2
+        // TripSchedules should be sorted by departure, so the relevant trips should be in positions
+        // 1 and 2
         TripSchedule added1 = newTwoStopPattern.tripSchedules.get(1);
 
         assertNull(added1.headwaySeconds);
         assertNull(added1.startTimes);
         assertNull(added1.endTimes);
 
-        assertArrayEquals(new int[] { 25300, 25800 }, added1.arrivals);
-        assertArrayEquals(new int[] { 25300, 25800 }, added1.departures);
+        assertArrayEquals(new int[] {25300, 25800}, added1.arrivals);
+        assertArrayEquals(new int[] {25300, 25800}, added1.departures);
 
         assertTrue(newTwoStopPattern.servicesActive.get(added1.serviceCode));
 
@@ -418,31 +457,35 @@ public class AdjustFrequencyTest {
         assertNull(added2.startTimes);
         assertNull(added2.endTimes);
 
-        assertArrayEquals(new int[] { 25400, 25900 }, added2.arrivals);
-        assertArrayEquals(new int[] { 25400, 25900 }, added2.departures);
+        assertArrayEquals(new int[] {25400, 25900}, added2.arrivals);
+        assertArrayEquals(new int[] {25400, 25900}, added2.departures);
 
         assertTrue(newTwoStopPattern.servicesActive.get(added2.serviceCode));
-
     }
 
     @Test
-    public void testPhasing () {
+    public void testPhasing() {
         AdjustFrequency af = new AdjustFrequency();
         af.route = "MULTIPLE_PATTERNS:route";
 
         assertEquals(2, network.transitLayer.tripPatterns.size());
 
-        network.transitLayer.tripPatterns.forEach(tp -> {
-            assertTrue(tp.hasSchedules);
-            assertFalse(tp.hasFrequencies);
-        });
+        network.transitLayer.tripPatterns.forEach(
+                tp -> {
+                    assertTrue(tp.hasSchedules);
+                    assertFalse(tp.hasFrequencies);
+                });
 
         // make an entry
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 1800;
         entry.startTime = 6 * 3600;
         entry.endTime = 16 * 3600;
-        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = entry.saturday = entry.sunday = true;
+        entry.monday =
+                entry.tuesday =
+                        entry.wednesday =
+                                entry.thursday =
+                                        entry.friday = entry.saturday = entry.sunday = true;
         entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
         entry.entryId = "SHORT_TURN";
 
@@ -450,7 +493,11 @@ public class AdjustFrequencyTest {
         entry2.headwaySecs = 1800;
         entry2.startTime = 16 * 3600;
         entry2.endTime = 22 * 3600;
-        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.monday =
+                entry2.tuesday =
+                        entry2.wednesday =
+                                entry2.thursday =
+                                        entry2.friday = entry2.saturday = entry2.sunday = true;
         entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25800"; // trip25800 is a three-stop trip
         entry2.phaseFromTimetable = "SHORT_TURN";
         entry2.phaseFromStop = "MULTIPLE_PATTERNS:s1";
@@ -463,26 +510,28 @@ public class AdjustFrequencyTest {
         scenario.modifications = Arrays.asList(af);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
-        TripSchedule ts1 = mod.transitLayer.tripPatterns.stream()
-                .flatMap(tp -> tp.tripSchedules.stream())
-                .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25200"))
-                .findFirst()
-                .orElse(null);
+        TripSchedule ts1 =
+                mod.transitLayer.tripPatterns.stream()
+                        .flatMap(tp -> tp.tripSchedules.stream())
+                        .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25200"))
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(ts1);
 
-        TripSchedule ts2 = mod.transitLayer.tripPatterns.stream()
-                .flatMap(tp -> tp.tripSchedules.stream())
-                .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25800"))
-                .findFirst()
-                .orElse(null);
+        TripSchedule ts2 =
+                mod.transitLayer.tripPatterns.stream()
+                        .flatMap(tp -> tp.tripSchedules.stream())
+                        .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25800"))
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(ts2);
 
         assertArrayEquals(ts1.frequencyEntryIds, ts2.phaseFromId);
-        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s1" }, ts2.phaseFromStop);
-        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s2" }, ts2.phaseAtStop);
-        assertArrayEquals(new int[] { 900 }, ts2.phaseSeconds);
+        assertArrayEquals(new String[] {"MULTIPLE_PATTERNS:s1"}, ts2.phaseFromStop);
+        assertArrayEquals(new String[] {"MULTIPLE_PATTERNS:s2"}, ts2.phaseAtStop);
+        assertArrayEquals(new int[] {900}, ts2.phaseSeconds);
 
         assertNull(ts1.phaseFromId);
         assertNull(ts1.phaseAtStop);
@@ -493,7 +542,7 @@ public class AdjustFrequencyTest {
     }
 
     @AfterEach
-    public void tearDown () {
+    public void tearDown() {
         network = null;
     }
 }

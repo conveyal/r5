@@ -6,8 +6,8 @@ import java.io.PrintStream;
 import java.util.Locale;
 
 /**
- * Write OSM out to a simple human-readable text format.
- * This seems to be very slow because it's using a printStream and format().
+ * Write OSM out to a simple human-readable text format. This seems to be very slow because it's
+ * using a printStream and format().
  */
 public class TextOutput implements OSMEntitySink {
 
@@ -63,9 +63,9 @@ public class TextOutput implements OSMEntitySink {
         printStream.print(' ');
         printTags(way);
         printStream.print('\n');
-//        for (long nodeId : way.nodes) {
-//            printNode(nodeId);
-//        }
+        //        for (long nodeId : way.nodes) {
+        //            printNode(nodeId);
+        //        }
     }
 
     @Override
@@ -81,5 +81,4 @@ public class TextOutput implements OSMEntitySink {
     public void writeEnd() throws IOException {
         printStream.print("--- END OF OSM TEXT OUTPUT ---");
     }
-
 }

@@ -3,16 +3,17 @@ package com.conveyal.osmlib;
  * This program is free software: you can redistribute it and/or modify it under the terms of the
  * GNU Lesser General Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
  * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with this program. If
  * not, see <http://www.gnu.org/licenses/>.
  */
 
 import com.conveyal.osmlib.OSMEntity.Type;
+
 import org.openstreetmap.osmosis.osmbinary.BinaryParser;
 import org.openstreetmap.osmosis.osmbinary.Osmformat;
 import org.openstreetmap.osmosis.osmbinary.file.BlockInputStream;
@@ -25,9 +26,9 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * An OpenStreetMap entity source that reads from the PBF Format. This class implements callbacks for
- * the crosby.binary OSMPBF library. It loads OSM data into the osm-lib model classes, then sends those
- * objects through to the specified OSM entity sink.
+ * An OpenStreetMap entity source that reads from the PBF Format. This class implements callbacks
+ * for the crosby.binary OSMPBF library. It loads OSM data into the osm-lib model classes, then
+ * sends those objects through to the specified OSM entity sink.
  */
 public class PBFInput extends BinaryParser implements OSMEntitySource {
 
@@ -39,9 +40,8 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
     private InputStream inputStream;
     private OSMEntitySink entitySink;
 
-    private static final String[] retainKeys = new String[] {
-        "highway", "parking", "bicycle", "name"
-    };
+    private static final String[] retainKeys =
+            new String[] {"highway", "parking", "bicycle", "name"};
 
     public PBFInput(InputStream inputStream) {
         this.inputStream = inputStream;
@@ -52,10 +52,10 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
     // return true; DEBUG
     private boolean retainTag(String key) {
         return true;
-//        for (String s : retainKeys) {
-//            if (s.equals(key)) return true;
-//        }
-//        return false;
+        //        for (String s : retainKeys) {
+        //            if (s.equals(key)) return true;
+        //        }
+        //        return false;
     }
 
     /** Note that in many PBF files this function is never called because all nodes are dense. */
@@ -81,8 +81,8 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
     }
 
     /**
-     * Nodes are usually stored this way. Dense nodes use parallel arrays (a column store) to defeat typical
-     * Protobuf message structure.
+     * Nodes are usually stored this way. Dense nodes use parallel arrays (a column store) to defeat
+     * typical Protobuf message structure.
      */
     @Override
     protected void parseDense(Osmformat.DenseNodes nodes) {
@@ -173,17 +173,17 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
                     member.id = mid;
                     member.role = getStringById(r.getRolesSid(m));
                     switch (r.getTypes(m)) {
-                    case NODE:
-                        member.type = Type.NODE;
-                        break;
-                    case WAY:
-                        member.type = Type.WAY;
-                        break;
-                    case RELATION:
-                        member.type = Type.RELATION;
-                        break;
-                    default:
-                        LOG.error("Relation type is unexpected.");
+                        case NODE:
+                            member.type = Type.NODE;
+                            break;
+                        case WAY:
+                            member.type = Type.WAY;
+                            break;
+                        case RELATION:
+                            member.type = Type.RELATION;
+                            break;
+                        default:
+                            LOG.error("Relation type is unexpected.");
                     }
                     rel.members.add(member);
                 }
@@ -208,7 +208,8 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
         }
         if (block.hasOsmosisReplicationTimestamp()) {
             long timestamp = block.getOsmosisReplicationTimestamp();
-            LOG.info("PBF file has a replication timestamp of {}", Instant.ofEpochSecond(timestamp));
+            LOG.info(
+                    "PBF file has a replication timestamp of {}", Instant.ofEpochSecond(timestamp));
             entitySink.setReplicationTimestamp(timestamp);
         } else {
             LOG.info("PBF file has no replication timestamp.");
@@ -222,12 +223,9 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
     }
 
     private static String human(long n) {
-        if (n > 1000000)
-            return String.format("%.1fM", n / 1000000.0);
-        if (n > 1000)
-            return String.format("%dk", n / 1000);
-        else
-            return String.format("%d", n);
+        if (n > 1000000) return String.format("%.1fM", n / 1000000.0);
+        if (n > 1000) return String.format("%dk", n / 1000);
+        else return String.format("%d", n);
     }
 
     @Override
@@ -237,5 +235,4 @@ public class PBFInput extends BinaryParser implements OSMEntitySource {
         new BlockInputStream(inputStream, this).process();
         entitySink.writeEnd();
     }
-
 }

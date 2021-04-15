@@ -6,9 +6,7 @@ import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
 
-/**
- * A field in the format HH:MM:SS, which will be stored as a number of seconds after midnight.
- */
+/** A field in the format HH:MM:SS, which will be stored as a number of seconds after midnight. */
 public class TimeField extends Field {
 
     public TimeField(String name, Requirement requirement) {
@@ -16,7 +14,8 @@ public class TimeField extends Field {
     }
 
     @Override
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter(
+            PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, getSeconds(string));
         } catch (Exception ex) {
@@ -30,7 +29,7 @@ public class TimeField extends Field {
         return Integer.toString(getSeconds(hhmmss));
     }
 
-    private static int getSeconds (String hhmmss) {
+    private static int getSeconds(String hhmmss) {
         if (hhmmss.length() != 8) {
             throw new StorageException("Time field should be 8 characters long.");
         }
@@ -42,8 +41,7 @@ public class TimeField extends Field {
     }
 
     @Override
-    public SQLType getSqlType () {
+    public SQLType getSqlType() {
         return JDBCType.INTEGER;
     }
-
 }

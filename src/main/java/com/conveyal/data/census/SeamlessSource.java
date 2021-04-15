@@ -1,7 +1,11 @@
 package com.conveyal.data.census;
 
+import static com.conveyal.data.census.ShapeDataStore.lat2tile;
+import static com.conveyal.data.census.ShapeDataStore.lon2tile;
+
 import com.conveyal.data.geobuf.GeobufDecoder;
 import com.conveyal.data.geobuf.GeobufFeature;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -19,12 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-import static com.conveyal.data.census.ShapeDataStore.lat2tile;
-import static com.conveyal.data.census.ShapeDataStore.lon2tile;
-
-/**
- * A tile source for seamless Census extracts
- */
+/** A tile source for seamless Census extracts */
 public abstract class SeamlessSource {
     // convenience
     private static final int ZOOM_LEVEL = ShapeDataStore.ZOOM_LEVEL;
@@ -34,8 +33,9 @@ public abstract class SeamlessSource {
     private static final GeometryFactory geometryFactory = new GeometryFactory();
 
     /** Extract features by bounding box */
-    public Map<Long, GeobufFeature> extract(double north, double east, double south, double west, boolean onDisk) throws
-            IOException {
+    public Map<Long, GeobufFeature> extract(
+            double north, double east, double south, double west, boolean onDisk)
+            throws IOException {
         GeometricShapeFactory factory = new GeometricShapeFactory(geometryFactory);
         factory.setCentre(new Coordinate((east + west) / 2, (north + south) / 2));
         factory.setWidth(east - west);
@@ -48,19 +48,22 @@ public abstract class SeamlessSource {
     public Map<Long, GeobufFeature> extract(Geometry bounds, boolean onDisk) throws IOException {
         Map<Long, GeobufFeature> ret;
 
-        if (onDisk)
-            ret = DBMaker.newTempTreeMap();
-        else
-            ret = new HashMap<>();
+        if (onDisk) ret = DBMaker.newTempTreeMap();
+        else ret = new HashMap<>();
 
         Envelope env = bounds.getEnvelopeInternal();
-        double west = env.getMinX(), east = env.getMaxX(), north = env.getMaxY(), south = env.getMinY();
+        double west = env.getMinX(),
+                east = env.getMaxX(),
+                north = env.getMaxY(),
+                south = env.getMinY();
 
         // TODO: use prepared polygons
 
         // figure out how many tiles we're requesting
-        int minX = lon2tile(west, ZOOM_LEVEL), maxX = lon2tile(east, ZOOM_LEVEL),
-                minY = lat2tile(north, ZOOM_LEVEL), maxY = lat2tile(south, ZOOM_LEVEL);
+        int minX = lon2tile(west, ZOOM_LEVEL),
+                maxX = lon2tile(east, ZOOM_LEVEL),
+                minY = lat2tile(north, ZOOM_LEVEL),
+                maxY = lat2tile(south, ZOOM_LEVEL);
 
         int tcount = (maxX - minX + 1) * (maxY - minY + 1);
 
@@ -78,20 +81,19 @@ public abstract class SeamlessSource {
                     continue;
 
                 // decoder closes input stream as soon as it has read the tile
-                GeobufDecoder decoder = new GeobufDecoder(new GZIPInputStream(new BufferedInputStream(is)));
+                GeobufDecoder decoder =
+                        new GeobufDecoder(new GZIPInputStream(new BufferedInputStream(is)));
 
                 while (decoder.hasNext()) {
                     GeobufFeature f = decoder.next();
                     // blocks are duplicated at the edges of tiles, no need to import twice
-                    if (ret.containsKey(f.numericId))
-                        continue;
+                    if (ret.containsKey(f.numericId)) continue;
 
                     if (!bounds.disjoint(f.geometry)) {
                         ret.put(f.numericId, f);
                         fcount++;
 
-                        if (fcount % 1000 == 0)
-                            LOG.info("Read {} features", fcount);
+                        if (fcount % 1000 == 0) LOG.info("Read {} features", fcount);
                     }
                 }
             }

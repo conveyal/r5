@@ -7,17 +7,15 @@ import gnu.trove.procedure.TIntProcedure;
 import java.util.Collection;
 import java.util.NoSuchElementException;
 
-/**
- * An immutable, empty TIntCollction.
- */
+/** An immutable, empty TIntCollction. */
 public class EmptyTIntCollection implements TIntCollection {
     private static final EmptyTIntCollection instance = new EmptyTIntCollection();
 
     /** hide constructor, this is a singleton */
-    protected EmptyTIntCollection () {}
+    protected EmptyTIntCollection() {}
 
     /** get an empty tintcollection */
-    public static EmptyTIntCollection get () {
+    public static EmptyTIntCollection get() {
         return instance;
     }
 
@@ -55,9 +53,7 @@ public class EmptyTIntCollection implements TIntCollection {
             }
 
             @Override
-            public void remove() {
-
-            }
+            public void remove() {}
         };
     }
 
@@ -142,9 +138,7 @@ public class EmptyTIntCollection implements TIntCollection {
     }
 
     @Override
-    public void clear() {
-
-    }
+    public void clear() {}
 
     @Override
     public boolean forEach(TIntProcedure tIntProcedure) {

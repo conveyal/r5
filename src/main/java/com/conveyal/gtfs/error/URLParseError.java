@@ -10,8 +10,9 @@ public class URLParseError extends GTFSError implements Serializable {
         super(file, line, field);
     }
 
-    @Override public String getMessage() {
-        return "Could not parse URL (format should be <scheme>://<authority><path>?<query>#<fragment>).";
+    @Override
+    public String getMessage() {
+        return "Could not parse URL (format should be"
+                   + " <scheme>://<authority><path>?<query>#<fragment>).";
     }
-
 }

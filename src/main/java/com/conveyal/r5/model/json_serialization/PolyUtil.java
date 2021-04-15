@@ -30,9 +30,7 @@ public class PolyUtil {
 
     private PolyUtil() {}
 
-    /**
-     * Decodes an encoded path string into a sequence of LatLngs.
-     */
+    /** Decodes an encoded path string into a sequence of LatLngs. */
     public static CoordinateSequence decode(final String encodedPath) {
         int len = encodedPath.length();
         final List<Coordinate> path = new ArrayList<>();
@@ -73,9 +71,7 @@ public class PolyUtil {
         return encode(cs.toCoordinateArray());
     }
 
-    /**
-     * Encodes a sequence of LatLngs into an encoded path string.
-     */
+    /** Encodes a sequence of LatLngs into an encoded path string. */
     public static String encode(final Coordinate[] coords) {
 
         long lastLat = 0;

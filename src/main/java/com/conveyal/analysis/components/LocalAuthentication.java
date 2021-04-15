@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.UserPermissions;
+
 import spark.Request;
 
 /**
@@ -13,8 +14,7 @@ public class LocalAuthentication implements Authentication {
     public static final String LOCAL_GROUP = LOCAL_USERNAME;
 
     @Override
-    public UserPermissions authenticate (Request request) {
+    public UserPermissions authenticate(Request request) {
         return new UserPermissions(LOCAL_USERNAME, true, LOCAL_GROUP);
     }
-
 }

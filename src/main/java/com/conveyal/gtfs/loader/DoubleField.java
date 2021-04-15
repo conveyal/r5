@@ -1,24 +1,22 @@
 package com.conveyal.gtfs.loader;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_LARGE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_SMALL;
+
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_LARGE;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_SMALL;
-
-/**
- * Created by abyrd on 2017-03-31
- */
+/** Created by abyrd on 2017-03-31 */
 public class DoubleField extends Field {
 
     private double minValue;
 
     private double maxValue;
 
-    public DoubleField (String name, Requirement requirement, double minValue, double maxValue) {
+    public DoubleField(String name, Requirement requirement, double minValue, double maxValue) {
         super(name, requirement);
         this.minValue = minValue;
         this.maxValue = maxValue;
@@ -32,7 +30,8 @@ public class DoubleField extends Field {
     }
 
     @Override
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter(
+            PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setDouble(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -47,13 +46,12 @@ public class DoubleField extends Field {
     }
 
     @Override
-    public SQLType getSqlType () {
+    public SQLType getSqlType() {
         return JDBCType.DOUBLE;
     }
 
     @Override
-    public String getSqlTypeName () {
+    public String getSqlTypeName() {
         return "double precision";
     }
-
 }

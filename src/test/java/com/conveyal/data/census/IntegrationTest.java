@@ -1,12 +1,18 @@
 package com.conveyal.data.census;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.conveyal.data.geobuf.GeobufDecoder;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.csvreader.CsvReader;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
+
 import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
@@ -22,33 +28,30 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-/**
- * Test loading, extracting, etc.
- */
+/** Test loading, extracting, etc. */
 public class IntegrationTest {
     private CsvReader reader;
     private TLongObjectMap<GeobufFeature> features;
-    
+
     /** test loading and extracting from a small state (DC) */
     @Test
-    public void testAll () throws Exception {
+    public void testAll() throws Exception {
         // extract the data
-        // note that the LODES data is fake; we replaced every value with a unique number to ensure that we detect
-        // swapped/incorrect column names; some columns are collinear in the original DC dataset (i.e. all zeros)
+        // note that the LODES data is fake; we replaced every value with a unique number to ensure
+        // that we detect
+        // swapped/incorrect column names; some columns are collinear in the original DC dataset
+        // (i.e. all zeros)
         // so they wouldn't show up in tests if we swapped them.
-        // The python script in the resources directory alongside the data file takes a LODES CSV and replaces all the
+        // The python script in the resources directory alongside the data file takes a LODES CSV
+        // and replaces all the
         // values in it with unique numbers.
         File dir = Files.createTempDir();
-        ZipInputStream zis = new ZipInputStream(getClass().getResourceAsStream("integrationTest.zip"));
+        ZipInputStream zis =
+                new ZipInputStream(getClass().getResourceAsStream("integrationTest.zip"));
 
         ZipEntry entry;
         while ((entry = zis.getNextEntry()) != null) {
-            if (entry.isDirectory())
-                continue;
+            if (entry.isDirectory()) continue;
 
             File out = new File(dir, entry.getName());
             out.getParentFile().mkdirs();
@@ -61,7 +64,13 @@ public class IntegrationTest {
         CensusLoader.main(dir.getAbsolutePath());
 
         // do an extract (this crosses a tile boundary)
-        CensusExtractor.main(new File(dir, "tiles").getAbsolutePath(), "38.9872", "-77.0378", "38.9218", "-77.1086", new File(dir, "extract.pbf").getAbsolutePath());
+        CensusExtractor.main(
+                new File(dir, "tiles").getAbsolutePath(),
+                "38.9872",
+                "-77.0378",
+                "38.9218",
+                "-77.1086",
+                new File(dir, "extract.pbf").getAbsolutePath());
 
         // load the extract
         FileInputStream fis = new FileInputStream(new File(dir, "extract.pbf"));
@@ -89,7 +98,10 @@ public class IntegrationTest {
         assertTrue(features.containsKey(110010014023009L));
 
         // read the workplace area characteristics csv
-        InputStream csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "jobs"), "dc_wac_S000_JT00_2013.csv.gz")));
+        InputStream csv =
+                new GZIPInputStream(
+                        new FileInputStream(
+                                new File(new File(dir, "jobs"), "dc_wac_S000_JT00_2013.csv.gz")));
         reader = new CsvReader(new InputStreamReader(csv));
         reader.readHeaders();
 
@@ -99,7 +111,8 @@ public class IntegrationTest {
         String[] line;
         while (reader.readRecord()) {
             // make sure everything matches, and that we got the column name mappings correct
-            foundJobsEntry = foundJobsEntry || check("Jobs employing Hispanic or Latino workers", "CT02");
+            foundJobsEntry =
+                    foundJobsEntry || check("Jobs employing Hispanic or Latino workers", "CT02");
             check("Jobs employing not Hispanic or Latino workers", "CT01");
 
             check("Jobs employing females", "CS02");
@@ -114,10 +127,15 @@ public class IntegrationTest {
             check("Jobs employing workers with some college education or Associate degree", "CD03");
             check("Jobs employing workers with Bachelor's degree or higher", "CD04");
 
-            check("Jobs employing workers with race American Indian or Alaska Native alone", "CR03");
+            check(
+                    "Jobs employing workers with race American Indian or Alaska Native alone",
+                    "CR03");
             check("Jobs employing workers with race Asian alone", "CR04");
             check("Jobs employing workers with race Black or African American alone", "CR02");
-            check("Jobs employing workers with race Native Hawaiian or Other Pacific Islander alone", "CR05");
+            check(
+                    "Jobs employing workers with race Native Hawaiian or Other Pacific Islander"
+                        + " alone",
+                    "CR05");
             check("Jobs employing workers with race White alone", "CR01");
             check("Jobs employing workers with two or more racial groups", "CR07");
 
@@ -141,9 +159,9 @@ public class IntegrationTest {
             check("Jobs in transportation and warehousing", "CNS08");
             check("Jobs in utilities", "CNS03");
             check("Jobs in wholesale trade", "CNS06");
-            
+
             check("Jobs total", "C000");
-            
+
             check("Jobs with earnings $1250 per month or less", "CE01");
             check("Jobs with earnings $1251 - $3333 per month", "CE02");
             check("Jobs with earnings greater than $3333 per month", "CE03");
@@ -153,7 +171,12 @@ public class IntegrationTest {
         assertTrue(foundJobsEntry);
 
         // read the rac csv
-        csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "workforce"), "dc_rac_S000_JT00_2013.csv.gz")));
+        csv =
+                new GZIPInputStream(
+                        new FileInputStream(
+                                new File(
+                                        new File(dir, "workforce"),
+                                        "dc_rac_S000_JT00_2013.csv.gz")));
         reader = new CsvReader(new InputStreamReader(csv));
 
         reader.readHeaders();
@@ -215,23 +238,22 @@ public class IntegrationTest {
         assertTrue(foundWorkforceEntry);
         dir.delete();
     }
-    
-    private boolean check (String colName, String colCode) throws Exception {
+
+    private boolean check(String colName, String colCode) throws Exception {
         long fid;
 
         // TODO cache?
         Set<String> headers = new HashSet<>(Arrays.asList(reader.getHeaders()));
 
-        if (headers.contains("w_geocode"))
-            fid = Long.parseLong(reader.get("w_geocode"));
-        else
-            fid = Long.parseLong(reader.get("h_geocode"));
+        if (headers.contains("w_geocode")) fid = Long.parseLong(reader.get("w_geocode"));
+        else fid = Long.parseLong(reader.get("h_geocode"));
 
         // cast to primitive long so as not to confuse Java's type inference
         if (features.containsKey(fid)) {
-            assertEquals((long) Long.parseLong(reader.get(colCode)), (long) features.get(fid).properties.get(colName));
+            assertEquals(
+                    (long) Long.parseLong(reader.get(colCode)),
+                    (long) features.get(fid).properties.get(colName));
             return true;
-        }
-        else return false;
+        } else return false;
     }
 }

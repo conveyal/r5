@@ -1,5 +1,14 @@
 package com.conveyal.r5.analyst.scenario;
 
+import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.streets.StreetRouter;
@@ -7,8 +16,10 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,47 +29,37 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-/**
- * Test adding trips.
- */
+/** Test adding trips. */
 public class AddTripsTest {
     public TransportNetwork network;
     public long checksum;
 
     @BeforeEach
-    public void setUp () {
+    public void setUp() {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
         checksum = network.checksum();
     }
 
     /** simple test of adding a unidirectional trip with one frequency entry and no added stops */
     @Test
-    public void testAddUnidirectionalTrip () {
+    public void testAddUnidirectionalTrip() {
         assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = false;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec("SINGLE_LINE:s2"),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120, 140 };
-        entry.dwellTimes = new int[] { 0, 30, 0 };
+        entry.hopTimes = new int[] {120, 140};
+        entry.dwellTimes = new int[] {0, 30, 0};
         entry.startTime = 7 * 3600;
         entry.endTime = 10 * 3600;
 
@@ -72,10 +73,11 @@ public class AddTripsTest {
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
         // find the added trip pattern
-        TripPattern pattern = mod.transitLayer.tripPatterns.stream()
-                .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
-                .findFirst()
-                .orElse(null);
+        TripPattern pattern =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
+                        .findFirst()
+                        .orElse(null);
 
         // was it added?
         assertNotNull(pattern);
@@ -99,9 +101,9 @@ public class AddTripsTest {
         assertEquals(290, ts.departures[2]);
 
         // check the frequency
-        assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, ts.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, ts.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, ts.endTimes);
 
         // check the calendar
         Service service0 = mod.transitLayer.services.get(ts.serviceCode);
@@ -118,24 +120,24 @@ public class AddTripsTest {
 
     /** simple test of adding a bidirectional trip with one frequency entry and no added stops */
     @Test
-    public void testAddBidirectionalTrip () {
+    public void testAddBidirectionalTrip() {
         assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = true;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec("SINGLE_LINE:s2"),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120, 140 };
-        entry.dwellTimes = new int[] { 0, 30, 0 };
+        entry.hopTimes = new int[] {120, 140};
+        entry.dwellTimes = new int[] {0, 30, 0};
         entry.startTime = 7 * 3600;
         entry.endTime = 10 * 3600;
 
@@ -149,16 +151,18 @@ public class AddTripsTest {
         assertEquals(3, mod.transitLayer.tripPatterns.size());
 
         // find the added trip patterns
-        List<TripPattern> patterns = mod.transitLayer.tripPatterns.stream()
-                .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
-                .collect(Collectors.toList());
+        List<TripPattern> patterns =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
+                        .collect(Collectors.toList());
 
         assertEquals(2, patterns.size());
 
         TripPattern pattern, backPattern;
 
         // sort out forward and back patterns
-        if ("SINGLE_LINE:s1".equals(mod.transitLayer.stopIdForIndex.get(patterns.get(0).stops[0]))) {
+        if ("SINGLE_LINE:s1"
+                .equals(mod.transitLayer.stopIdForIndex.get(patterns.get(0).stops[0]))) {
             pattern = patterns.get(0);
             backPattern = patterns.get(1);
         } else {
@@ -185,9 +189,9 @@ public class AddTripsTest {
         assertEquals(290, ts.departures[2]);
 
         // check the frequency
-        assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, ts.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, ts.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, ts.endTimes);
 
         // check the calendar
         Service service0 = mod.transitLayer.services.get(ts.serviceCode);
@@ -219,9 +223,9 @@ public class AddTripsTest {
         assertEquals(290, ts.departures[2]);
 
         // check the frequency
-        assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, ts.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, ts.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, ts.endTimes);
 
         // check the calendar
         service0 = mod.transitLayer.services.get(ts.serviceCode);
@@ -237,27 +241,28 @@ public class AddTripsTest {
     }
 
     /**
-     * Simple test of adding a unidirectional trip with one frequency entry and a newly created stop.
+     * Simple test of adding a unidirectional trip with one frequency entry and a newly created
+     * stop.
      */
     @Test
-    public void testAddUnidirectionalTripWithAddedStops () {
+    public void testAddUnidirectionalTripWithAddedStops() {
         assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = false;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec(-83.001, 40.012),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec(-83.001, 40.012),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120, 140 };
-        entry.dwellTimes = new int[] { 0, 30, 0 };
+        entry.hopTimes = new int[] {120, 140};
+        entry.dwellTimes = new int[] {0, 30, 0};
         entry.startTime = 7 * 3600;
         entry.endTime = 10 * 3600;
 
@@ -271,10 +276,11 @@ public class AddTripsTest {
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
         // find the added trip pattern
-        TripPattern pattern = mod.transitLayer.tripPatterns.stream()
-                .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
-                .findFirst()
-                .orElse(null);
+        TripPattern pattern =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(pat -> pat.tripSchedules.get(0).headwaySeconds != null)
+                        .findFirst()
+                        .orElse(null);
 
         // was it added?
         assertNotNull(pattern);
@@ -302,7 +308,8 @@ public class AddTripsTest {
         assertTrue(r.getReachedVertices().size() > 5);
 
         // Make sure a distance table exists for this stop.
-        TIntIntMap distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(pattern.stops[1]);
+        TIntIntMap distanceTable =
+                mod.transitLayer.stopToVertexDistanceTables.get(pattern.stops[1]);
         assertNotNull(distanceTable);
         assertFalse(distanceTable.isEmpty());
 
@@ -334,9 +341,9 @@ public class AddTripsTest {
         assertEquals(290, ts.departures[2]);
 
         // check the frequency
-        assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
-        assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
-        assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+        assertArrayEquals(new int[] {entry.headwaySecs}, ts.headwaySeconds);
+        assertArrayEquals(new int[] {entry.startTime}, ts.startTimes);
+        assertArrayEquals(new int[] {entry.endTime}, ts.endTimes);
 
         // check the calendar
         Service service0 = mod.transitLayer.services.get(ts.serviceCode);
@@ -352,22 +359,22 @@ public class AddTripsTest {
     }
 
     @Test
-    public void testMultipleFrequencyEntries () {
+    public void testMultipleFrequencyEntries() {
         AddTrips at = new AddTrips();
         at.bidirectional = false;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec("SINGLE_LINE:s2"),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry0 = new AddTrips.PatternTimetable();
         entry0.headwaySecs = 1200;
         entry0.monday = entry0.tuesday = entry0.wednesday = entry0.thursday = entry0.friday = false;
         entry0.saturday = entry0.sunday = true;
-        entry0.hopTimes = new int[] { 140, 160 };
-        entry0.dwellTimes = new int[] { 0, 30, 0 };
+        entry0.hopTimes = new int[] {140, 160};
+        entry0.dwellTimes = new int[] {0, 30, 0};
         entry0.startTime = 11 * 3600;
         entry0.endTime = 16 * 3600;
 
@@ -375,8 +382,8 @@ public class AddTripsTest {
         entry1.headwaySecs = 900;
         entry1.monday = entry1.tuesday = entry1.wednesday = entry1.thursday = entry1.friday = true;
         entry1.saturday = entry1.sunday = false;
-        entry1.hopTimes = new int[] { 120, 140 };
-        entry1.dwellTimes = new int[] { 0, 30, 0 };
+        entry1.hopTimes = new int[] {120, 140};
+        entry1.dwellTimes = new int[] {0, 30, 0};
         entry1.startTime = 7 * 3600;
         entry1.endTime = 10 * 3600;
 
@@ -390,10 +397,11 @@ public class AddTripsTest {
         // original pattern plus added pattern
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
-        TripPattern pattern = mod.transitLayer.tripPatterns.stream()
-                .filter(tp -> !"SINGLE_LINE:route".equals(tp.routeId))
-                .findFirst()
-                .orElse(null);
+        TripPattern pattern =
+                mod.transitLayer.tripPatterns.stream()
+                        .filter(tp -> !"SINGLE_LINE:route".equals(tp.routeId))
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(pattern);
 
@@ -410,12 +418,12 @@ public class AddTripsTest {
         assertNotNull(schedule0);
         assertNotNull(schedule1);
 
-        assertArrayEquals(new int[] { 0, 140, 330 }, schedule0.arrivals);
-        assertArrayEquals(new int[] { 0, 170, 330 }, schedule0.departures);
+        assertArrayEquals(new int[] {0, 140, 330}, schedule0.arrivals);
+        assertArrayEquals(new int[] {0, 170, 330}, schedule0.departures);
 
-        assertArrayEquals(new int[] { entry0.headwaySecs }, schedule0.headwaySeconds);
-        assertArrayEquals(new int[] { entry0.startTime }, schedule0.startTimes);
-        assertArrayEquals(new int[] { entry0.endTime }, schedule0.endTimes);
+        assertArrayEquals(new int[] {entry0.headwaySecs}, schedule0.headwaySeconds);
+        assertArrayEquals(new int[] {entry0.startTime}, schedule0.startTimes);
+        assertArrayEquals(new int[] {entry0.endTime}, schedule0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(schedule0.serviceCode);
         assertEquals(entry0.monday, service0.calendar.monday == 1);
@@ -426,12 +434,12 @@ public class AddTripsTest {
         assertEquals(entry0.saturday, service0.calendar.saturday == 1);
         assertEquals(entry0.sunday, service0.calendar.sunday == 1);
 
-        assertArrayEquals(new int[] { 0, 120, 290 }, schedule1.arrivals);
-        assertArrayEquals(new int[] { 0, 150, 290 }, schedule1.departures);
+        assertArrayEquals(new int[] {0, 120, 290}, schedule1.arrivals);
+        assertArrayEquals(new int[] {0, 150, 290}, schedule1.departures);
 
-        assertArrayEquals(new int[] { entry1.headwaySecs }, schedule1.headwaySeconds);
-        assertArrayEquals(new int[] { entry1.startTime }, schedule1.startTimes);
-        assertArrayEquals(new int[] { entry1.endTime }, schedule1.endTimes);
+        assertArrayEquals(new int[] {entry1.headwaySecs}, schedule1.headwaySeconds);
+        assertArrayEquals(new int[] {entry1.startTime}, schedule1.startTimes);
+        assertArrayEquals(new int[] {entry1.endTime}, schedule1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(schedule1.serviceCode);
         assertEquals(entry1.monday, service1.calendar.monday == 1);
@@ -447,24 +455,24 @@ public class AddTripsTest {
 
     /** simple test of adding two unidirectional trips with phasing */
     @Test
-    public void testAddUnidirectionalTripWithPhasing () {
+    public void testAddUnidirectionalTripWithPhasing() {
         assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = false;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec("SINGLE_LINE:s2"),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120, 140 };
-        entry.dwellTimes = new int[] { 0, 30, 0 };
+        entry.hopTimes = new int[] {120, 140};
+        entry.dwellTimes = new int[] {0, 30, 0};
         entry.startTime = 7 * 3600;
         entry.endTime = 10 * 3600;
         entry.entryId = "FREQUENCY_ENTRY_1";
@@ -473,18 +481,15 @@ public class AddTripsTest {
 
         AddTrips at2 = new AddTrips();
         at2.bidirectional = false;
-        at2.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at2.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s2"), new StopSpec("SINGLE_LINE:s3"));
         at2.mode = Route.BUS;
 
         entry = new AddTrips.PatternTimetable();
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120 };
-        entry.dwellTimes = new int[] { 0, 0 };
+        entry.hopTimes = new int[] {120};
+        entry.dwellTimes = new int[] {0, 0};
         entry.startTime = 7 * 3600;
         entry.endTime = 10 * 3600;
         entry.phaseFromTimetable = "FREQUENCY_ENTRY_1";
@@ -503,26 +508,36 @@ public class AddTripsTest {
         assertEquals(3, mod.transitLayer.tripPatterns.size());
 
         // find the relevant trip schedules
-        TripSchedule ts1 = mod.transitLayer.tripPatterns.stream()
-                .flatMap(tp -> tp.tripSchedules.stream())
-                .filter(ts -> ts.frequencyEntryIds != null && ts.frequencyEntryIds[0].equals("FREQUENCY_ENTRY_1"))
-                .findFirst()
-                .orElse(null);
+        TripSchedule ts1 =
+                mod.transitLayer.tripPatterns.stream()
+                        .flatMap(tp -> tp.tripSchedules.stream())
+                        .filter(
+                                ts ->
+                                        ts.frequencyEntryIds != null
+                                                && ts.frequencyEntryIds[0].equals(
+                                                        "FREQUENCY_ENTRY_1"))
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(ts1);
 
-        TripSchedule ts2 = mod.transitLayer.tripPatterns.stream()
-                .flatMap(tp -> tp.tripSchedules.stream())
-                .filter(ts -> ts.frequencyEntryIds != null && ts.frequencyEntryIds[0].equals("FREQUENCY_ENTRY_2"))
-                .findFirst()
-                .orElse(null);
+        TripSchedule ts2 =
+                mod.transitLayer.tripPatterns.stream()
+                        .flatMap(tp -> tp.tripSchedules.stream())
+                        .filter(
+                                ts ->
+                                        ts.frequencyEntryIds != null
+                                                && ts.frequencyEntryIds[0].equals(
+                                                        "FREQUENCY_ENTRY_2"))
+                        .findFirst()
+                        .orElse(null);
 
         assertNotNull(ts2);
 
         assertArrayEquals(ts1.frequencyEntryIds, ts2.phaseFromId);
-        assertArrayEquals(new String[] { "SINGLE_LINE:s2" }, ts2.phaseAtStop);
-        assertArrayEquals(new String[] { "SINGLE_LINE:s1" }, ts2.phaseFromStop);
-        assertArrayEquals(new int[] { 300 }, ts2.phaseSeconds);
+        assertArrayEquals(new String[] {"SINGLE_LINE:s2"}, ts2.phaseAtStop);
+        assertArrayEquals(new String[] {"SINGLE_LINE:s1"}, ts2.phaseFromStop);
+        assertArrayEquals(new int[] {300}, ts2.phaseSeconds);
 
         assertNull(ts1.phaseFromId);
         assertNull(ts1.phaseAtStop);
@@ -534,24 +549,24 @@ public class AddTripsTest {
 
     /** Test that adding exact-times trips works */
     @Test
-    public void testAddExactTimes () {
+    public void testAddExactTimes() {
         assertEquals(1, network.transitLayer.tripPatterns.size());
 
         AddTrips at = new AddTrips();
         at.bidirectional = false;
-        at.stops = Arrays.asList(
-                new StopSpec("SINGLE_LINE:s1"),
-                new StopSpec("SINGLE_LINE:s2"),
-                new StopSpec("SINGLE_LINE:s3")
-        );
+        at.stops =
+                Arrays.asList(
+                        new StopSpec("SINGLE_LINE:s1"),
+                        new StopSpec("SINGLE_LINE:s2"),
+                        new StopSpec("SINGLE_LINE:s3"));
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.firstDepartures = new int[] { 1800, 3600, 5400, 7200 };
+        entry.firstDepartures = new int[] {1800, 3600, 5400, 7200};
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
-        entry.hopTimes = new int[] { 120, 140 };
-        entry.dwellTimes = new int[] { 0, 30, 0 };
+        entry.hopTimes = new int[] {120, 140};
+        entry.dwellTimes = new int[] {0, 30, 0};
 
         at.frequencies = Arrays.asList(entry);
 
@@ -565,10 +580,8 @@ public class AddTripsTest {
         TripPattern pattern = mod.transitLayer.tripPatterns.get(1);
 
         // find all departure times, sort and make sure they match
-        int[] foundDepartures = pattern.tripSchedules.stream()
-                .mapToInt(s -> s.departures[0])
-                .sorted()
-                .toArray();
+        int[] foundDepartures =
+                pattern.tripSchedules.stream().mapToInt(s -> s.departures[0]).sorted().toArray();
 
         assertArrayEquals(entry.firstDepartures, foundDepartures);
 
@@ -584,7 +597,7 @@ public class AddTripsTest {
     }
 
     @AfterEach
-    public void tearDown () {
+    public void tearDown() {
         this.network = null;
     }
 }

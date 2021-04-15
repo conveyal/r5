@@ -4,9 +4,7 @@ import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
 
-/**
- * Created by landon on 10/14/16.
- */
+/** Created by landon on 10/14/16. */
 public class TableInSubdirectoryError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
@@ -18,7 +16,11 @@ public class TableInSubdirectoryError extends GTFSError implements Serializable 
         this.directory = directory;
     }
 
-    @Override public String getMessage() {
-        return String.format("All GTFS files (including %s.txt) should be at root of zipfile, not nested in subdirectory (%s)", file, directory);
+    @Override
+    public String getMessage() {
+        return String.format(
+                "All GTFS files (including %s.txt) should be at root of zipfile, not nested in"
+                    + " subdirectory (%s)",
+                file, directory);
     }
 }

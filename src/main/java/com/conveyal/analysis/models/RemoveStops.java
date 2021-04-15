@@ -1,8 +1,6 @@
 package com.conveyal.analysis.models;
 
-/**
- * Created by matthewc on 3/2/16.
- */
+/** Created by matthewc on 3/2/16. */
 public class RemoveStops extends Modification {
     public String getType() {
         return "remove-stops";
@@ -18,8 +16,9 @@ public class RemoveStops extends Modification {
 
     public int secondsSavedAtEachStop = 0;
 
-    public com.conveyal.r5.analyst.scenario.RemoveStops toR5 () {
-        com.conveyal.r5.analyst.scenario.RemoveStops rs = new com.conveyal.r5.analyst.scenario.RemoveStops();
+    public com.conveyal.r5.analyst.scenario.RemoveStops toR5() {
+        com.conveyal.r5.analyst.scenario.RemoveStops rs =
+                new com.conveyal.r5.analyst.scenario.RemoveStops();
         rs.comment = name;
         rs.stops = feedScopedIdSet(feed, stops);
 

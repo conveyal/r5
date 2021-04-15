@@ -9,7 +9,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * times to each destination. Several travel times to each destination are returned, representing
  * selected percentiles of all travel times from the chosen origin to that destination.
  *
- * TODO rename to something like SinglePointTask because these can now return accessibility, travel time, paths, etc.
+ * <p>TODO rename to something like SinglePointTask because these can now return accessibility,
+ * travel time, paths, etc.
  */
 public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
 
@@ -20,9 +21,11 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
         return Type.TRAVEL_TIME_SURFACE;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown=true)
+    @JsonIgnoreProperties(ignoreUnknown = true)
 
-    /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */
+    /**
+     * Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff
+     */
     public enum Format {
         /** Flat binary grid format */
         GRID,
@@ -33,11 +36,11 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
     /** Default format is a Conveyal flat binary file */
     private Format format = Format.GRID;
 
-    public void setFormat(Format format){
+    public void setFormat(Format format) {
         this.format = format;
     }
 
-    public Format getFormat(){
+    public Format getFormat() {
         return format;
     }
 
@@ -47,9 +50,9 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
     }
 
     @Override
-    public int nTargetsPerOrigin () {
-        // In TravelTimeSurfaceTasks, the set of destinations is always determined by the web mercator extents.
+    public int nTargetsPerOrigin() {
+        // In TravelTimeSurfaceTasks, the set of destinations is always determined by the web
+        // mercator extents.
         return width * height;
     }
-
 }

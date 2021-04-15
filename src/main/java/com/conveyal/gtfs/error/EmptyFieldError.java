@@ -10,8 +10,8 @@ public class EmptyFieldError extends GTFSError implements Serializable {
         super(file, line, field);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return String.format("No value supplied for a required column.");
     }
-
 }

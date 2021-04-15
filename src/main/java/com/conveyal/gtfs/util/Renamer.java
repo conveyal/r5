@@ -4,9 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Creates new unique names to give things new IDs.
- */
+/** Creates new unique names to give things new IDs. */
 public class Renamer {
 
     private Map<String, String> newNameForOldName = new HashMap<>();
@@ -24,5 +22,4 @@ public class Renamer {
         }
         return newName;
     }
-
 }

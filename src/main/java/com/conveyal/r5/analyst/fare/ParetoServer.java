@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.fare;
 
+import static spark.Spark.halt;
+
 import com.conveyal.analysis.BackendVersion;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.GeometryUtils;
@@ -10,67 +12,78 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
+
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.TIntIntMap;
+
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import spark.Request;
 import spark.Response;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.IntFunction;
 
-import static spark.Spark.halt;
-
 /**
- * Server for debug tool for fare analysis - to draw pareto surface and show combinations of travel time and fare.
+ * Server for debug tool for fare analysis - to draw pareto surface and show combinations of travel
+ * time and fare.
  */
 public class ParetoServer {
     public TransportNetwork transportNetwork;
 
     private static final Logger LOG = LoggerFactory.getLogger(ParetoServer.class);
 
-    public ParetoServer (TransportNetwork transportNetwork) {
+    public ParetoServer(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
 
-    public String handle (Request req, Response res) throws IOException {
-        ProfileRequest profileRequest = JsonUtilities.objectMapper.readValue(req.body(), ProfileRequest.class);
+    public String handle(Request req, Response res) throws IOException {
+        ProfileRequest profileRequest =
+                JsonUtilities.objectMapper.readValue(req.body(), ProfileRequest.class);
 
-        if (profileRequest.inRoutingFareCalculator != null) profileRequest.inRoutingFareCalculator.transitLayer = this.transportNetwork.transitLayer;
+        if (profileRequest.inRoutingFareCalculator != null)
+            profileRequest.inRoutingFareCalculator.transitLayer =
+                    this.transportNetwork.transitLayer;
 
         // now perform routing - always using McRaptor
         LOG.info("Performing walk search for access (other access modes not supported)");
-        Map<LegMode, TIntIntMap> accessTimes = accessEgressSearch(profileRequest.fromLat, profileRequest.fromLon, profileRequest);
+        Map<LegMode, TIntIntMap> accessTimes =
+                accessEgressSearch(profileRequest.fromLat, profileRequest.fromLon, profileRequest);
         LOG.info("Performing walk search for egress (other access modes not supported)");
-        Map<LegMode, TIntIntMap> egressTimes = accessEgressSearch(profileRequest.toLat, profileRequest.toLon, profileRequest);
+        Map<LegMode, TIntIntMap> egressTimes =
+                accessEgressSearch(profileRequest.toLat, profileRequest.toLon, profileRequest);
 
         LOG.info("Performing multiobjective transit routing");
         long startTime = System.currentTimeMillis();
         profileRequest.maxTripDurationMinutes = 120; // hack
         IntFunction<DominatingList> listSupplier =
-                (departureTime) -> new FareDominatingList(
-                        profileRequest.inRoutingFareCalculator,
-                        profileRequest.maxFare,
-                        // while I appreciate the use of symbolic constants, I certainly hope the number of seconds per
-                        // minute does not change
-                        // in fact, we have been moving in the opposite direction with leap-second smearing
-                        departureTime + profileRequest.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
-        McRaptorSuboptimalPathProfileRouter mcraptor = new McRaptorSuboptimalPathProfileRouter(
-                transportNetwork,
-                profileRequest,
-                accessTimes,
-                egressTimes,
-                listSupplier,
-                null,
-                true); // no collator - route will return states at destination
+                (departureTime) ->
+                        new FareDominatingList(
+                                profileRequest.inRoutingFareCalculator,
+                                profileRequest.maxFare,
+                                // while I appreciate the use of symbolic constants, I certainly
+                                // hope the number of seconds per
+                                // minute does not change
+                                // in fact, we have been moving in the opposite direction with
+                                // leap-second smearing
+                                departureTime
+                                        + profileRequest.maxTripDurationMinutes
+                                                * FastRaptorWorker.SECONDS_PER_MINUTE);
+        McRaptorSuboptimalPathProfileRouter mcraptor =
+                new McRaptorSuboptimalPathProfileRouter(
+                        transportNetwork,
+                        profileRequest,
+                        accessTimes,
+                        egressTimes,
+                        listSupplier,
+                        null,
+                        true); // no collator - route will return states at destination
 
         mcraptor.route();
         long totalTime = System.currentTimeMillis() - startTime;
@@ -78,7 +91,8 @@ public class ParetoServer {
         List<ParetoTrip> trips = new ArrayList<>();
 
         for (TIntObjectIterator<Collection<McRaptorSuboptimalPathProfileRouter.McRaptorState>> it =
-             mcraptor.finalStatesByDepartureTime.iterator(); it.hasNext();) {
+                        mcraptor.finalStatesByDepartureTime.iterator();
+                it.hasNext(); ) {
             it.advance();
 
             int departureTime = it.key();
@@ -95,7 +109,8 @@ public class ParetoServer {
         return JsonUtilities.objectMapper.writeValueAsString(ret);
     }
 
-    private Map<LegMode, TIntIntMap> accessEgressSearch (double fromLat, double fromLon, ProfileRequest profileRequest) {
+    private Map<LegMode, TIntIntMap> accessEgressSearch(
+            double fromLat, double fromLon, ProfileRequest profileRequest) {
         LOG.info("Performing walk search for access (other access modes not supported)");
         StreetRouter sr = new StreetRouter(transportNetwork.streetLayer);
         sr.profileRequest = profileRequest;
@@ -117,18 +132,21 @@ public class ParetoServer {
         return ret;
     }
 
-    /**
-     * Many happy returns - class to encapsulate return value.
-     */
+    /** Many happy returns - class to encapsulate return value. */
     public static final class ParetoReturn {
         public final ProfileRequest request;
         public final Collection<ParetoTrip> trips;
         public final long computeTimeMillis;
-        /** save backend version in JSON output - useful for JSON that's being pushed to fareto-examples */
+        /**
+         * save backend version in JSON output - useful for JSON that's being pushed to
+         * fareto-examples
+         */
         public BackendVersion backendVersion = BackendVersion.instance;
+
         public String generationTime = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
 
-        public ParetoReturn(ProfileRequest request, Collection<ParetoTrip> trips, long computeTimeMillis) {
+        public ParetoReturn(
+                ProfileRequest request, Collection<ParetoTrip> trips, long computeTimeMillis) {
             this.request = request;
             this.trips = trips;
             this.computeTimeMillis = computeTimeMillis;
@@ -141,7 +159,10 @@ public class ParetoServer {
         public final int fare;
         public final List<ParetoLeg> legs;
 
-        public ParetoTrip (McRaptorSuboptimalPathProfileRouter.McRaptorState state, int departureTime, TransportNetwork network) {
+        public ParetoTrip(
+                McRaptorSuboptimalPathProfileRouter.McRaptorState state,
+                int departureTime,
+                TransportNetwork network) {
             this.departureTime = departureTime;
             this.durationSeconds = state.time - departureTime;
             this.fare = state.fare.cumulativeFarePaid;
@@ -154,32 +175,43 @@ public class ParetoServer {
                         int destStopIndex = state.stop;
                         int originStopIndex = state.back.stop;
 
-                        Coordinate originStopCoord = network.transitLayer.getCoordinateForStopFixed(originStopIndex);
-                        Coordinate destStopCoord = network.transitLayer.getCoordinateForStopFixed(destStopIndex);
+                        Coordinate originStopCoord =
+                                network.transitLayer.getCoordinateForStopFixed(originStopIndex);
+                        Coordinate destStopCoord =
+                                network.transitLayer.getCoordinateForStopFixed(destStopIndex);
 
                         int originTime = state.back.time;
                         int destTime = state.time;
 
-                        LineString geom = GeometryUtils.geometryFactory.createLineString(new Coordinate[] {
-                                new Coordinate(originStopCoord.getX() / VertexStore.FIXED_FACTOR, originStopCoord.getY() / VertexStore.FIXED_FACTOR),
-                                new Coordinate(destStopCoord.getX() / VertexStore.FIXED_FACTOR, destStopCoord.getY() / VertexStore.FIXED_FACTOR),
-                        });
+                        LineString geom =
+                                GeometryUtils.geometryFactory.createLineString(
+                                        new Coordinate[] {
+                                            new Coordinate(
+                                                    originStopCoord.getX()
+                                                            / VertexStore.FIXED_FACTOR,
+                                                    originStopCoord.getY()
+                                                            / VertexStore.FIXED_FACTOR),
+                                            new Coordinate(
+                                                    destStopCoord.getX() / VertexStore.FIXED_FACTOR,
+                                                    destStopCoord.getY()
+                                                            / VertexStore.FIXED_FACTOR),
+                                        });
 
-                        legs.add(new ParetoTransferLeg(
-                                originStopCoord.getY() / VertexStore.FIXED_FACTOR,
-                                originStopCoord.getX() / VertexStore.FIXED_FACTOR,
-                                destStopCoord.getY() / VertexStore.FIXED_FACTOR,
-                                destStopCoord.getX() / VertexStore.FIXED_FACTOR,
-                                geom,
-                                originTime,
-                                destTime,
-                                network.transitLayer.stopIdForIndex.get(originStopIndex),
-                                network.transitLayer.stopNames.get(originStopIndex),
-                                network.transitLayer.stopIdForIndex.get(destStopIndex),
-                                network.transitLayer.stopNames.get(destStopIndex),
-                                state.fare.cumulativeFarePaid,
-                                state.fare.transferAllowance
-                        ));
+                        legs.add(
+                                new ParetoTransferLeg(
+                                        originStopCoord.getY() / VertexStore.FIXED_FACTOR,
+                                        originStopCoord.getX() / VertexStore.FIXED_FACTOR,
+                                        destStopCoord.getY() / VertexStore.FIXED_FACTOR,
+                                        destStopCoord.getX() / VertexStore.FIXED_FACTOR,
+                                        geom,
+                                        originTime,
+                                        destTime,
+                                        network.transitLayer.stopIdForIndex.get(originStopIndex),
+                                        network.transitLayer.stopNames.get(originStopIndex),
+                                        network.transitLayer.stopIdForIndex.get(destStopIndex),
+                                        network.transitLayer.stopNames.get(destStopIndex),
+                                        state.fare.cumulativeFarePaid,
+                                        state.fare.transferAllowance));
 
                     } else {
                         TripPattern pattern = network.transitLayer.tripPatterns.get(state.pattern);
@@ -187,70 +219,128 @@ public class ParetoServer {
                         int boardStopIndex = pattern.stops[state.boardStopPosition];
                         int alightStopIndex = pattern.stops[state.alightStopPosition];
 
-                        Coordinate boardStopCoord = network.transitLayer.getCoordinateForStopFixed(boardStopIndex);
-                        Coordinate alightStopCoord = network.transitLayer.getCoordinateForStopFixed(alightStopIndex);
+                        Coordinate boardStopCoord =
+                                network.transitLayer.getCoordinateForStopFixed(boardStopIndex);
+                        Coordinate alightStopCoord =
+                                network.transitLayer.getCoordinateForStopFixed(alightStopIndex);
 
                         List<Coordinate> coords = new ArrayList<>();
                         List<LineString> hops = pattern.getHopGeometries(network.transitLayer);
-                        for (int i = state.boardStopPosition; i < state.alightStopPosition; i++) { // hop i is from stop i to i + 1, don't include last stop index
+                        for (int i = state.boardStopPosition;
+                                i < state.alightStopPosition;
+                                i++) { // hop i is from stop i to i + 1, don't include last stop
+                                       // index
                             LineString hop = hops.get(i);
-                            for (Coordinate c : hop.getCoordinates())
-                                coords.add(c);
+                            for (Coordinate c : hop.getCoordinates()) coords.add(c);
                         }
-                        LineString shape = GeometryUtils.geometryFactory.createLineString(coords.toArray(new Coordinate[coords.size()]));
+                        LineString shape =
+                                GeometryUtils.geometryFactory.createLineString(
+                                        coords.toArray(new Coordinate[coords.size()]));
 
-                        legs.add(new ParetoTransitLeg(network.transitLayer.routes.get(pattern.routeIndex),
-                                network.transitLayer.stopIdForIndex.get(boardStopIndex), network.transitLayer.stopNames.get(boardStopIndex),
-                                network.transitLayer.stopIdForIndex.get(alightStopIndex), network.transitLayer.stopNames.get(alightStopIndex),
-                                state.boardTime, state.time, state.fare.cumulativeFarePaid,
-                                boardStopCoord.getY() / VertexStore.FIXED_FACTOR,
-                                boardStopCoord.getX() / VertexStore.FIXED_FACTOR,
-                                alightStopCoord.getY() / VertexStore.FIXED_FACTOR,
-                                alightStopCoord.getX() / VertexStore.FIXED_FACTOR, shape, state.fare.transferAllowance));
+                        legs.add(
+                                new ParetoTransitLeg(
+                                        network.transitLayer.routes.get(pattern.routeIndex),
+                                        network.transitLayer.stopIdForIndex.get(boardStopIndex),
+                                        network.transitLayer.stopNames.get(boardStopIndex),
+                                        network.transitLayer.stopIdForIndex.get(alightStopIndex),
+                                        network.transitLayer.stopNames.get(alightStopIndex),
+                                        state.boardTime,
+                                        state.time,
+                                        state.fare.cumulativeFarePaid,
+                                        boardStopCoord.getY() / VertexStore.FIXED_FACTOR,
+                                        boardStopCoord.getX() / VertexStore.FIXED_FACTOR,
+                                        alightStopCoord.getY() / VertexStore.FIXED_FACTOR,
+                                        alightStopCoord.getX() / VertexStore.FIXED_FACTOR,
+                                        shape,
+                                        state.fare.transferAllowance));
                     }
-
-
                 }
                 state = state.back;
             }
 
             Collections.reverse(legs);
         }
-
     }
 
     public static final class ParetoTransitLeg extends ParetoLeg {
         public final RouteInfo route;
 
-        public ParetoTransitLeg(RouteInfo route, String boardStopId, String boardStopName, String alightStopId, String alightStopName,
-                         int boardTime, int alightTime, int cumulativeFare, double boardStopLat, double boardStopLon,
-                         double alightStopLat, double alightStopLon, LineString geom, TransferAllowance transferAllowance) {
-            super(boardStopLat, boardStopLon, alightStopLat, alightStopLon, geom, boardTime, alightTime,
-                    boardStopId, boardStopName, alightStopId, alightStopName, cumulativeFare, transferAllowance);
+        public ParetoTransitLeg(
+                RouteInfo route,
+                String boardStopId,
+                String boardStopName,
+                String alightStopId,
+                String alightStopName,
+                int boardTime,
+                int alightTime,
+                int cumulativeFare,
+                double boardStopLat,
+                double boardStopLon,
+                double alightStopLat,
+                double alightStopLon,
+                LineString geom,
+                TransferAllowance transferAllowance) {
+            super(
+                    boardStopLat,
+                    boardStopLon,
+                    alightStopLat,
+                    alightStopLon,
+                    geom,
+                    boardTime,
+                    alightTime,
+                    boardStopId,
+                    boardStopName,
+                    alightStopId,
+                    alightStopName,
+                    cumulativeFare,
+                    transferAllowance);
             this.route = route;
         }
 
-        @Override public String getType() {
+        @Override
+        public String getType() {
             return "transit";
         }
     }
 
     public static final class ParetoTransferLeg extends ParetoLeg {
-        public ParetoTransferLeg(double originLat, double originLon, double destLat,
-                double destLon, LineString geom, int originTime, int destTime,
-                String originStopId, String originStopName, String destStopId, String destStopName,
-                int cumulativeFare, TransferAllowance transferAllowance) {
-            super(originLat, originLon, destLat, destLon, geom, originTime, destTime,
-                    originStopId, originStopName, destStopId, destStopName, cumulativeFare,
+        public ParetoTransferLeg(
+                double originLat,
+                double originLon,
+                double destLat,
+                double destLon,
+                LineString geom,
+                int originTime,
+                int destTime,
+                String originStopId,
+                String originStopName,
+                String destStopId,
+                String destStopName,
+                int cumulativeFare,
+                TransferAllowance transferAllowance) {
+            super(
+                    originLat,
+                    originLon,
+                    destLat,
+                    destLon,
+                    geom,
+                    originTime,
+                    destTime,
+                    originStopId,
+                    originStopName,
+                    destStopId,
+                    destStopName,
+                    cumulativeFare,
                     transferAllowance);
         }
 
-        @Override public String getType() {
+        @Override
+        public String getType() {
             return "transfer";
         }
     }
 
-    public static abstract class ParetoLeg {
+    public abstract static class ParetoLeg {
         public final double originLat;
         public final double originLon;
         public final double destLat;
@@ -265,9 +355,19 @@ public class ParetoServer {
         public final int cumulativeFare;
         public final TransferAllowance transferAllowance;
 
-        protected ParetoLeg(double originLat, double originLon, double destLat, double destLon,
-                LineString geom, int originTime, int destTime, String originStopId,
-                String originStopName, String destStopId, String destStopName, int cumulativeFare,
+        protected ParetoLeg(
+                double originLat,
+                double originLon,
+                double destLat,
+                double destLon,
+                LineString geom,
+                int originTime,
+                int destTime,
+                String originStopId,
+                String originStopName,
+                String destStopId,
+                String destStopName,
+                int cumulativeFare,
                 TransferAllowance transferAllowance) {
             this.originLat = originLat;
             this.originLon = originLon;

@@ -6,13 +6,14 @@ public class LaDotWalkCostSupplier implements SingleModeTraversalTimes.Supplier 
 
     private final LaDotCostTags tags;
 
-    public LaDotWalkCostSupplier (LaDotCostTags tags) {
+    public LaDotWalkCostSupplier(LaDotCostTags tags) {
         this.tags = tags;
     }
 
     @Override
-    public double perceivedLengthMultipler () {
-        // Original formula: distance + distance * (slope_penalty + unpaved_alley_penalty + busy_penalty + nbd_penalty)
+    public double perceivedLengthMultipler() {
+        // Original formula: distance + distance * (slope_penalty + unpaved_alley_penalty +
+        // busy_penalty + nbd_penalty)
         // Start at unity
         double factor = 1;
         factor += tags.slopePercent10plus * 0.99;
@@ -26,12 +27,15 @@ public class LaDotWalkCostSupplier implements SingleModeTraversalTimes.Supplier 
     }
 
     @Override
-    public int turnTimeSeconds (SingleModeTraversalTimes.TurnDirection turnDirection) {
-        return (int)(computeWalkTurnCostM(turnDirection) / STANDARD_WALK_SPEED_M_PER_SEC);
+    public int turnTimeSeconds(SingleModeTraversalTimes.TurnDirection turnDirection) {
+        return (int) (computeWalkTurnCostM(turnDirection) / STANDARD_WALK_SPEED_M_PER_SEC);
     }
 
-    /** @return the cost in effective meters of turning off the given edge in the given direction while walking. */
-    private int computeWalkTurnCostM (SingleModeTraversalTimes.TurnDirection turnDirection) {
+    /**
+     * @return the cost in effective meters of turning off the given edge in the given direction
+     *     while walking.
+     */
+    private int computeWalkTurnCostM(SingleModeTraversalTimes.TurnDirection turnDirection) {
 
         // All directions incur a fixed cost for crossing an intersection (turn_penalty)
         int penaltyMeters = 54;
@@ -42,7 +46,8 @@ public class LaDotWalkCostSupplier implements SingleModeTraversalTimes.Supplier 
             // When passing straight through, categorize the intersection by cross traffic.
             dailyTraffic = tags.crossAADT;
         } else {
-            // For left and right turns, categorize the traffic on the road itself (not the crossroad).
+            // For left and right turns, categorize the traffic on the road itself (not the
+            // crossroad).
             dailyTraffic = Math.max(tags.selfAADT, tags.parallelAADT);
         }
         if (dailyTraffic >= 13_000) {
@@ -59,5 +64,4 @@ public class LaDotWalkCostSupplier implements SingleModeTraversalTimes.Supplier 
         }
         return penaltyMeters;
     }
-
 }

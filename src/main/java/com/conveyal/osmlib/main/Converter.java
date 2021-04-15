@@ -2,6 +2,7 @@ package com.conveyal.osmlib.main;
 
 import com.conveyal.osmlib.OSMEntitySink;
 import com.conveyal.osmlib.OSMEntitySource;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,8 +13,9 @@ public class Converter {
     private static final Logger LOG = LoggerFactory.getLogger(Converter.class);
 
     /**
-     * This main method will load a file into the osm-lib representation and write it back out as a stream,
-     * without using an intermediate MapDB. File types are detected from the file name extensions.
+     * This main method will load a file into the osm-lib representation and write it back out as a
+     * stream, without using an intermediate MapDB. File types are detected from the file name
+     * extensions.
      */
     public static void main(String[] args) {
 
@@ -34,7 +36,6 @@ public class Converter {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        LOG.info("Total run time: {} sec", (System.currentTimeMillis() - startTime)/1000D);
+        LOG.info("Total run time: {} sec", (System.currentTimeMillis() - startTime) / 1000D);
     }
-
 }

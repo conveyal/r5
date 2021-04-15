@@ -7,8 +7,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonFilter("bbox")
 public abstract class Rectangle2DMixIn {
     // stored as lon, lat
-    @JsonProperty("west") public abstract double getMinX();
-    @JsonProperty("east") public abstract double getMaxX();
-    @JsonProperty("north") public abstract double getMaxY();
-    @JsonProperty("south") public abstract double getMinY();
+    @JsonProperty("west")
+    public abstract double getMinX();
+
+    @JsonProperty("east")
+    public abstract double getMaxX();
+
+    @JsonProperty("north")
+    public abstract double getMaxY();
+
+    @JsonProperty("south")
+    public abstract double getMinY();
 }

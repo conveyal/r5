@@ -5,9 +5,7 @@ import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
 
-/**
- * Created by landon on 5/6/16.
- */
+/** Created by landon on 5/6/16. */
 public class MissingShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
@@ -17,7 +15,8 @@ public class MissingShapeError extends GTFSError implements Serializable {
         super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
     }
 
-    @Override public String getMessage() {
+    @Override
+    public String getMessage() {
         return "Trip " + affectedEntityId + " is missing a shape";
     }
 }

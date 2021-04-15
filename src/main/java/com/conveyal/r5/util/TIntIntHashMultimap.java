@@ -8,9 +8,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.io.Serializable;
 
-/**
- * Created by matthewc on 2/19/16.
- */
+/** Created by matthewc on 2/19/16. */
 public class TIntIntHashMultimap implements TIntIntMultimap, Serializable {
     private long serialVersionUID = -1;
 

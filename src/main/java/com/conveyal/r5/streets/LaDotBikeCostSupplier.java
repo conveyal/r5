@@ -11,14 +11,15 @@ public class LaDotBikeCostSupplier implements SingleModeTraversalTimes.Supplier 
 
     private final LaDotCostTags tags;
 
-    public LaDotBikeCostSupplier (LaDotCostTags tags) {
+    public LaDotBikeCostSupplier(LaDotCostTags tags) {
         this.tags = tags;
     }
 
     @Override
-    public double perceivedLengthMultipler () {
+    public double perceivedLengthMultipler() {
         // Original formula:
-        // distance + distance * (bike_blvd_penalty + bike_path_penalty + slope_penalty + no_bike_penalty)
+        // distance + distance * (bike_blvd_penalty + bike_path_penalty + slope_penalty +
+        // no_bike_penalty)
         // Start at unity
         double factor = 1;
         // Reduce cost if bike infrastructure is present.
@@ -40,7 +41,8 @@ public class LaDotBikeCostSupplier implements SingleModeTraversalTimes.Supplier 
             }
         }
         // The penalty constant is for a road that is 100% in that slope bin.
-        // Percentages are given as fractional values in [0...1] with some slightly exceeding 1 due to rounding errors.
+        // Percentages are given as fractional values in [0...1] with some slightly exceeding 1 due
+        // to rounding errors.
         factor += tags.slopePercent2to4 * 0.371;
         factor += tags.slopePercent4to6 * 1.23;
         factor += tags.slopePercent6plus * 3.239;
@@ -48,12 +50,15 @@ public class LaDotBikeCostSupplier implements SingleModeTraversalTimes.Supplier 
     }
 
     @Override
-    public int turnTimeSeconds (SingleModeTraversalTimes.TurnDirection turnDirection) {
-        return (int)(computeBikeTurnCostM(turnDirection) / STANDARD_BIKE_SPEED_M_PER_SEC);
+    public int turnTimeSeconds(SingleModeTraversalTimes.TurnDirection turnDirection) {
+        return (int) (computeBikeTurnCostM(turnDirection) / STANDARD_BIKE_SPEED_M_PER_SEC);
     }
 
-    /** @return the cost in effective meters of turning off the given edge in the given direction on a bicycle. */
-    private int computeBikeTurnCostM (SingleModeTraversalTimes.TurnDirection turnDirection) {
+    /**
+     * @return the cost in effective meters of turning off the given edge in the given direction on
+     *     a bicycle.
+     */
+    private int computeBikeTurnCostM(SingleModeTraversalTimes.TurnDirection turnDirection) {
         int penaltyMeters = 0;
         // Stop signs and traffic lights add a penalty to all directions.
         if (tags.controlType == STOP) {
@@ -92,5 +97,4 @@ public class LaDotBikeCostSupplier implements SingleModeTraversalTimes.Supplier 
         }
         return penaltyMeters;
     }
-
 }

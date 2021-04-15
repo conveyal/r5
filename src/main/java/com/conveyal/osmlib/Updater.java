@@ -1,13 +1,11 @@
 package com.conveyal.osmlib;
 
 import com.google.common.collect.Lists;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.xml.bind.DatatypeConverter;
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,12 +22,15 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.zip.GZIPInputStream;
 
+import javax.xml.bind.DatatypeConverter;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+
 /**
- * Concurrency issues:
- * "MapDB should be thread safe within single JVM. So any number of parallel threads is allowed.
- * It supports parallel writes."
+ * Concurrency issues: "MapDB should be thread safe within single JVM. So any number of parallel
+ * threads is allowed. It supports parallel writes."
  *
- * However we may eventually want to apply updates in transactions.
+ * <p>However we may eventually want to apply updates in transactions.
  */
 public class Updater implements Runnable {
 
@@ -50,7 +51,10 @@ public class Updater implements Runnable {
     }
 
     public static enum Timescale {
-        DAY, HOUR, MINUTE;
+        DAY,
+        HOUR,
+        MINUTE;
+
         public String lowerCase() {
             return this.toString().toLowerCase();
         }
@@ -64,10 +68,13 @@ public class Updater implements Runnable {
 
         @Override
         public String toString() {
-            return "DiffState " +
-                    "sequenceNumber=" + sequenceNumber +
-                    ", timestamp=" + timestamp +
-                    ", url=" + url;
+            return "DiffState "
+                    + "sequenceNumber="
+                    + sequenceNumber
+                    + ", timestamp="
+                    + timestamp
+                    + ", url="
+                    + url;
         }
     }
 
@@ -107,7 +114,8 @@ public class Updater implements Runnable {
                 return null;
             }
             String dateTimeString = timestamp.replace("\\:", ":");
-            diffState.timestamp = DatatypeConverter.parseDateTime(dateTimeString).getTimeInMillis() / 1000;
+            diffState.timestamp =
+                    DatatypeConverter.parseDateTime(dateTimeString).getTimeInMillis() / 1000;
             diffState.sequenceNumber = Integer.parseInt(kvs.get("sequenceNumber"));
             diffState.timescale = timescale;
         } catch (Exception e) {
@@ -126,19 +134,21 @@ public class Updater implements Runnable {
     }
 
     /**
-     * @return a chronologically ordered list of all diffs at the given timescale with a timestamp after
-     * the database timestamp.
+     * @return a chronologically ordered list of all diffs at the given timescale with a timestamp
+     *     after the database timestamp.
      */
-    public List<Diff> findDiffs (String timescale) {
+    public List<Diff> findDiffs(String timescale) {
         List<Diff> workQueue = new ArrayList<Diff>();
         Diff latest = fetchState(timescale, 0);
         if (latest == null) {
             LOG.error("Could not find {}-scale updates from OSM!", timescale);
             return Collections.EMPTY_LIST;
         }
-        // Only check specific updates if the overall state for this timescale implies there are new ones.
+        // Only check specific updates if the overall state for this timescale implies there are new
+        // ones.
         if (latest.timestamp > osm.timestamp.get()) {
-            // Working backward, find all updates that are dated after the current database timestamp.
+            // Working backward, find all updates that are dated after the current database
+            // timestamp.
             for (int seq = latest.sequenceNumber; seq > 0; seq--) {
                 Diff diff = fetchState(timescale, seq);
                 if (diff.timestamp <= osm.timestamp.get()) break;
@@ -157,7 +167,10 @@ public class Updater implements Runnable {
             SAXParser saxParser = factory.newSAXParser();
             DefaultHandler handler = new OSMChangeParser(osm);
             for (Diff state : workQueue) {
-                LOG.info("Applying {} update for {}", state.timescale, getDateString(state.timestamp * 1000));
+                LOG.info(
+                        "Applying {} update for {}",
+                        state.timescale,
+                        getDateString(state.timestamp * 1000));
                 InputStream inputStream = new GZIPInputStream(state.url.openStream());
                 saxParser.parse(inputStream, handler);
                 // Move the DB timestamp forward to that of the update that was applied
@@ -174,12 +187,14 @@ public class Updater implements Runnable {
     // Define order on updates based on timestamp.
 
     /**
-     * This is the main entry point. Give it an OSM database and it will keep it up to date in a new thread.
+     * This is the main entry point. Give it an OSM database and it will keep it up to date in a new
+     * thread.
      */
     public static Thread spawnUpdateThread(OSM osm) {
         Thread updateThread = new Thread(new Updater(osm));
         Instant initialTimestamp = Instant.ofEpochSecond(osm.timestamp.get());
-        if (initialTimestamp.isBefore(MIN_REPLICATION_INSTANT) || initialTimestamp.isAfter(MAX_REPLICATION_INSTANT)) {
+        if (initialTimestamp.isBefore(MIN_REPLICATION_INSTANT)
+                || initialTimestamp.isAfter(MAX_REPLICATION_INSTANT)) {
             LOG.error("OSM database timestamp seems incorrect: {}", initialTimestamp.toString());
             LOG.error("Not running the minutely updater thread.");
         } else {
@@ -197,7 +212,8 @@ public class Updater implements Runnable {
     public void run() {
         while (true) {
             // long timestamp = osm.db.getAtomicLong("timestamp").get(); // UTC
-            // If more than one year ago, complain. If more than a few minutes in the future, complain.
+            // If more than one year ago, complain. If more than a few minutes in the future,
+            // complain.
             long now = System.currentTimeMillis() / 1000;
             if ((now - osm.timestamp.get()) > 60 * 60 * 24) {
                 applyDiffs(findDiffs("day"));
@@ -210,13 +226,15 @@ public class Updater implements Runnable {
             // TODO use time that file actually appeared rather than database timestamp
             int phaseErrorSeconds = 0;
             if (lastApplied != null) {
-                phaseErrorSeconds = (int) (((System.currentTimeMillis() / 1000) - lastApplied.timestamp) % 60);
+                phaseErrorSeconds =
+                        (int) (((System.currentTimeMillis() / 1000) - lastApplied.timestamp) % 60);
                 phaseErrorSeconds -= 5; // adjust for expected database export latency
             }
             if (Math.abs(phaseErrorSeconds) > 1) {
                 LOG.info("Compensating for polling phase error of {} seconds", phaseErrorSeconds);
             }
-            int sleepSeconds = 60 - phaseErrorSeconds; // reduce 1-minute polling wait by phase difference
+            int sleepSeconds =
+                    60 - phaseErrorSeconds; // reduce 1-minute polling wait by phase difference
             if (sleepSeconds > 1) {
                 LOG.debug("Sleeping {} seconds", sleepSeconds);
                 try {
@@ -228,5 +246,4 @@ public class Updater implements Runnable {
             }
         }
     }
-
 }

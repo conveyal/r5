@@ -7,9 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * This is the UI/Backend model for a freeform JSON modification.
- * It uses the JsonAnyGetter and JsonAnySetter annotations to handle all unrecognized properties, i.e. anything
- * that does not map to a field on the base class.
+ * This is the UI/Backend model for a freeform JSON modification. It uses the JsonAnyGetter and
+ * JsonAnySetter annotations to handle all unrecognized properties, i.e. anything that does not map
+ * to a field on the base class.
  */
 public class CustomModificationHolder extends Modification {
 
@@ -29,10 +29,10 @@ public class CustomModificationHolder extends Modification {
         this.freeformProperties.put(key, value);
     }
 
-    public com.conveyal.r5.analyst.scenario.CustomModificationHolder toR5 () {
+    public com.conveyal.r5.analyst.scenario.CustomModificationHolder toR5() {
         com.conveyal.r5.analyst.scenario.CustomModificationHolder customR5 =
-                new com.conveyal.r5.analyst.scenario.CustomModificationHolder(freeformProperties, name);
+                new com.conveyal.r5.analyst.scenario.CustomModificationHolder(
+                        freeformProperties, name);
         return customR5;
     }
-
 }

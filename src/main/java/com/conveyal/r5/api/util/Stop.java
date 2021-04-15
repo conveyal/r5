@@ -6,23 +6,21 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * Transit stop
- */
+/** Transit stop */
 public class Stop {
-    //GTFS Stop ID @notnull
+    // GTFS Stop ID @notnull
     @JsonProperty("id")
     public String stopId;
-    //Stop name @notnull
+    // Stop name @notnull
     public String name;
-    //Coordinate @notnull
+    // Coordinate @notnull
     public float lat, lon;
-    //Short text or number that identifies this stop to passengers
+    // Short text or number that identifies this stop to passengers
     public String code;
-    //Fare zone for stop
+    // Fare zone for stop
     public String zoneId;
     public Boolean wheelchairBoarding;
-    //Transit mode of route on first pattern that uses this stop
+    // Transit mode of route on first pattern that uses this stop
     public TransitModes mode;
 
     /**
@@ -37,18 +35,22 @@ public class Stop {
 
     /**
      * Sets stopId, stop name and latitude, longitude and wheelchairBoarding from transitLayer
+     *
      * @param stopIdx index of stop in transitLayer
      * @param transitLayer Transit Layer
      * @param fillMode if true TransitMode is filled
-     * @param jitterCoordinates if true stop coordinates are jittered with {@link PointToPointRouterServer#jitter(VertexStore.Vertex)}
+     * @param jitterCoordinates if true stop coordinates are jittered with {@link
+     *     PointToPointRouterServer#jitter(VertexStore.Vertex)}
      */
-    public Stop(int stopIdx, TransitLayer transitLayer, boolean fillMode, boolean jitterCoordinates) {
+    public Stop(
+            int stopIdx, TransitLayer transitLayer, boolean fillMode, boolean jitterCoordinates) {
         stopId = transitLayer.stopIdForIndex.get(stopIdx);
         name = transitLayer.stopNames.get(stopIdx);
         VertexStore.Vertex vertex = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
         vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
         if (jitterCoordinates) {
-            org.locationtech.jts.geom.Coordinate jitteredCoordinates = PointToPointRouterServer.jitter(vertex);
+            org.locationtech.jts.geom.Coordinate jitteredCoordinates =
+                    PointToPointRouterServer.jitter(vertex);
             lat = (float) jitteredCoordinates.y;
             lon = (float) jitteredCoordinates.x;
         } else if (vertex.index > -1) {
@@ -60,12 +62,17 @@ public class Stop {
 
         if (fillMode) {
             final int[] patternidx = new int[1];
-            transitLayer.patternsForStop.get(stopIdx).forEach(p -> {
-                patternidx[0] = p;
-                return false;
-            });
+            transitLayer
+                    .patternsForStop
+                    .get(stopIdx)
+                    .forEach(
+                            p -> {
+                                patternidx[0] = p;
+                                return false;
+                            });
 
-            com.conveyal.r5.transit.TripPattern pattern = transitLayer.tripPatterns.get(patternidx[0]);
+            com.conveyal.r5.transit.TripPattern pattern =
+                    transitLayer.tripPatterns.get(patternidx[0]);
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
             mode = TransitLayer.getTransitModes(routeInfo.route_type);
         }

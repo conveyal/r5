@@ -15,17 +15,19 @@ import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
+
 import org.mongojack.JacksonDBCollection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages a single connection to MongoDB for the entire Conveyal Analysis backend.
- * Stores and retrieves objects of various types to their corresponding Mongo collections.
+ * Manages a single connection to MongoDB for the entire Conveyal Analysis backend. Stores and
+ * retrieves objects of various types to their corresponding Mongo collections.
  *
- * TODO migrate to AnalysisDB class, which uses POJO storage from newer Mongo Java client library
- * TODO normalize database collection names, some are using kebab case and others java identifier case.
- *      we may also want to rename OpportunityDatasets to opportunity-grids (and opportunity-freeform)
+ * <p>TODO migrate to AnalysisDB class, which uses POJO storage from newer Mongo Java client library
+ * TODO normalize database collection names, some are using kebab case and others java identifier
+ * case. we may also want to rename OpportunityDatasets to opportunity-grids (and
+ * opportunity-freeform)
  */
 public class Persistence {
 
@@ -44,7 +46,7 @@ public class Persistence {
     public static MongoMap<OpportunityDataset> opportunityDatasets;
 
     // TODO progressively migrate to AnalysisDB which is non-static
-    public static void initializeStatically (AnalysisDB.Config config) {
+    public static void initializeStatically(AnalysisDB.Config config) {
         LOG.info("Connecting to MongoDB...");
         if (config.databaseUri() != null) {
             LOG.info("Connecting to remote MongoDB instance...");
@@ -64,11 +66,11 @@ public class Persistence {
     }
 
     /** Connect to a Mongo table using MongoJack, which persists Java objects into Mongo. */
-    private static <V extends Model> MongoMap<V> getTable (String name, Class clazz) {
+    private static <V extends Model> MongoMap<V> getTable(String name, Class clazz) {
         DBCollection collection = db.getCollection(name);
         ObjectMapper om = JsonUtil.getObjectMapper(JsonViews.Db.class, true);
-        JacksonDBCollection<V, String> coll = JacksonDBCollection.wrap(collection, clazz, String.class, om);
+        JacksonDBCollection<V, String> coll =
+                JacksonDBCollection.wrap(collection, clazz, String.class, om);
         return new MongoMap<>(coll, clazz);
     }
-
 }

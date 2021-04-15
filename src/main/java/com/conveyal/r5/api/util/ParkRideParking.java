@@ -2,33 +2,30 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.r5.streets.StreetRouter;
+
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 
-/**
- * Information about P+R parking lots
- * TODO rename me
- */
+/** Information about P+R parking lots TODO rename me */
 public class ParkRideParking implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(ParkRideParking.class);
-    //@notnull
+    // @notnull
     public Integer id;
 
     public String name;
 
-    //Number of all spaces
+    // Number of all spaces
     public Integer capacity;
 
     public float lat;
     public float lon;
 
-    /**
-     * List of closest stop, time
-     */
+    /** List of closest stop, time */
     public TIntObjectMap<StreetRouter.State> closestTransfers = new TIntObjectHashMap<>();
 
     public ParkRideParking(int vertexIdx, double lat, double lon, OSMEntity way) {
@@ -42,7 +39,10 @@ public class ParkRideParking implements Serializable {
                 capacity = Integer.parseInt(way.getTag("capacity"));
             } catch (NumberFormatException nex) {
                 capacity = null;
-                LOG.info("Capacity in osm node/way:{} is {} instead of a number!", way.getTag("id"), way.getTag("capacity"));
+                LOG.info(
+                        "Capacity in osm node/way:{} is {} instead of a number!",
+                        way.getTag("id"),
+                        way.getTag("capacity"));
             }
         }
         this.lat = (float) lat;

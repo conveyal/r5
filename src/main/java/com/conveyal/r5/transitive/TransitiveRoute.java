@@ -1,8 +1,6 @@
 package com.conveyal.r5.transitive;
 
-/**
- * Represents a Transitive route.
- */
+/** Represents a Transitive route. */
 public class TransitiveRoute {
     public String agency_id;
     public String route_id;

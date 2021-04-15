@@ -1,8 +1,6 @@
 package com.conveyal.r5.transit.fare;
 
-/**
- * Ride types for fares in DCDareCalculator
- */
+/** Ride types for fares in DCDareCalculator */
 public enum RideType {
     METRO_RAIL,
     METRO_BUS_LOCAL,

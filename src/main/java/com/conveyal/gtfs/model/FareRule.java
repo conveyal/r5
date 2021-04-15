@@ -38,7 +38,8 @@ public class FareRule extends Entity {
 
             /* Referential integrity check for fare id */
             if (!fares.containsKey(fareId)) {
-                this.feed.errors.add(new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
+                this.feed.errors.add(
+                        new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
             }
 
             Fare fare = fares.computeIfAbsent(fareId, Fare::new);
@@ -50,9 +51,7 @@ public class FareRule extends Entity {
             fr.destination_id = getStringField("destination_id", false);
             fr.contains_id = getStringField("contains_id", false);
             fare.fare_rules.add(fr);
-
         }
-
     }
 
     public static class Writer extends Entity.Writer<FareRule> {
@@ -62,8 +61,10 @@ public class FareRule extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"fare_id", "route_id", "origin_id", "destination_id",
-                    "contains_id"});
+            writer.writeRecord(
+                    new String[] {
+                        "fare_id", "route_id", "origin_id", "destination_id", "contains_id"
+                    });
         }
 
         @Override
@@ -84,5 +85,4 @@ public class FareRule extends Entity {
                     .iterator();
         }
     }
-
 }

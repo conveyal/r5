@@ -26,7 +26,7 @@ public class IntegerField extends Field {
         this.maxValue = maxValue;
     }
 
-    private int validate (String string) {
+    private int validate(String string) {
         int i = Integer.parseInt(string);
         if (i < minValue) throw new StorageException("integer value must be at least " + minValue);
         if (i > maxValue) throw new StorageException("integer value must be at most " + maxValue);
@@ -34,7 +34,8 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter(
+            PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -43,14 +44,13 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public String validateAndConvert (String string) {
+    public String validateAndConvert(String string) {
         validate(string);
         return string;
     }
 
     @Override
-    public SQLType getSqlType () {
+    public SQLType getSqlType() {
         return JDBCType.INTEGER;
     }
-
 }

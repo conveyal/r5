@@ -1,7 +1,8 @@
 package com.conveyal.analysis.util;
 
 /**
- * It's kind of absurd to have our own set of HTTP status code constants, but I can't find any in the Spark project.
+ * It's kind of absurd to have our own set of HTTP status code constants, but I can't find any in
+ * the Spark project.
  */
 public class HttpStatus {
 

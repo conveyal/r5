@@ -1,21 +1,21 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Base class for tests of turn costs and restrictions..
- */
+/** Base class for tests of turn costs and restrictions.. */
 public abstract class TurnTest {
     public StreetLayer streetLayer;
 
     private static final Logger LOG = LoggerFactory.getLogger(TurnTest.class);
 
-    // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
+    // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from
+    // center).
     public int vcenter, vn, vs, ve, vw, vne, vnw, vsw, en, es, ee, ew, ene, enw, esw;
 
-    public void setUp (boolean southernHemisphere) {
+    public void setUp(boolean southernHemisphere) {
         // generate a street layer that looks like this
         // vnw vn
         // |   |
@@ -23,7 +23,8 @@ public abstract class TurnTest {
         // vw--*-- ve
         // |   |
         // vsw vs
-        // Edges have the same names (ew, ee, etc), and all start from the central vertex (except enw/vsw which starts at vw)
+        // Edges have the same names (ew, ee, etc), and all start from the central vertex (except
+        // enw/vsw which starts at vw)
 
         double latOffset = southernHemisphere ? -60 : 0;
 
@@ -59,7 +60,7 @@ public abstract class TurnTest {
     }
 
     /** create a turn restriction */
-    public void restrictTurn (boolean onlyTurn, int from, int to, int... via) {
+    public void restrictTurn(boolean onlyTurn, int from, int to, int... via) {
         TurnRestriction restriction = new TurnRestriction();
         restriction.fromEdge = from;
         restriction.toEdge = to;
@@ -70,14 +71,12 @@ public abstract class TurnTest {
         streetLayer.turnRestrictions.add(restriction);
         streetLayer.edgeStore.turnRestrictions.put(restriction.fromEdge, ridx);
         streetLayer.addReverseTurnRestriction(restriction, ridx);
-
-
     }
 
     /**
      * Creates turn restriction without adding it to turnRestriction maps
      *
-     * Used to create expected turn restrictions
+     * <p>Used to create expected turn restrictions
      */
     static TurnRestriction makeTurnRestriction(boolean onlyTurn, int from, int to) {
         TurnRestriction turnRestriction = new TurnRestriction();
@@ -90,15 +89,14 @@ public abstract class TurnTest {
     /**
      * Creates turn restriction without adding it to turnRestriction maps
      *
-     * Used to create expected turn restrictions
+     * <p>Used to create expected turn restrictions
      */
-    static TurnRestriction makeTurnRestriction(boolean onlyTurn, int from, int to,
-        int viaEdge) {
+    static TurnRestriction makeTurnRestriction(boolean onlyTurn, int from, int to, int viaEdge) {
         TurnRestriction turnRestriction = new TurnRestriction();
         turnRestriction.fromEdge = from;
         turnRestriction.toEdge = to;
         turnRestriction.only = onlyTurn;
-        turnRestriction.viaEdges = new int[]{viaEdge};
-        return  turnRestriction;
+        turnRestriction.viaEdges = new int[] {viaEdge};
+        return turnRestriction;
     }
 }

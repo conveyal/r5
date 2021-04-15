@@ -1,6 +1,7 @@
 package com.conveyal.data.geobuf;
 
 import geobuf.Geobuf;
+
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
@@ -26,9 +27,7 @@ import java.util.Map;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/**
- * Encode features to GeoBuf.
- */
+/** Encode features to GeoBuf. */
 public class GeobufEncoder {
     private static final Logger LOG = LoggerFactory.getLogger(GeobufEncoder.class);
 
@@ -45,24 +44,24 @@ public class GeobufEncoder {
         this.precisionMultiplier = (long) Math.pow(10, precision);
     }
 
-    public void writeFeatureCollection (Collection<GeobufFeature> featureCollection) throws IOException {
+    public void writeFeatureCollection(Collection<GeobufFeature> featureCollection)
+            throws IOException {
         outputStream.write(makeFeatureCollection(featureCollection).toByteArray());
     }
 
-    public Geobuf.Data makeFeatureCollection (Collection<GeobufFeature> featureCollection) {
-        Geobuf.Data.Builder data = Geobuf.Data.newBuilder()
-                .setPrecision(this.precision)
-                // TODO don't hardwire
-                .setDimensions(2);
+    public Geobuf.Data makeFeatureCollection(Collection<GeobufFeature> featureCollection) {
+        Geobuf.Data.Builder data =
+                Geobuf.Data.newBuilder()
+                        .setPrecision(this.precision)
+                        // TODO don't hardwire
+                        .setDimensions(2);
 
         Geobuf.Data.FeatureCollection.Builder fc = Geobuf.Data.FeatureCollection.newBuilder();
 
         // deduplicate keys
         List<String> keys = new ArrayList<>();
 
-        featureCollection.stream()
-                .map(f -> this.makeFeature(f, keys))
-                .forEach(fc::addFeatures);
+        featureCollection.stream().map(f -> this.makeFeature(f, keys)).forEach(fc::addFeatures);
 
         fc.addAllValues(Collections.emptyList());
         fc.addAllCustomProperties(Collections.emptyList());
@@ -73,9 +72,9 @@ public class GeobufEncoder {
         return data.build();
     }
 
-    private Geobuf.Data.Feature makeFeature (GeobufFeature feature, List<String> keys) {
-        Geobuf.Data.Feature.Builder feat = Geobuf.Data.Feature.newBuilder()
-                .setGeometry(geomToGeobuf(feature.geometry));
+    private Geobuf.Data.Feature makeFeature(GeobufFeature feature, List<String> keys) {
+        Geobuf.Data.Feature.Builder feat =
+                Geobuf.Data.Feature.newBuilder().setGeometry(geomToGeobuf(feature.geometry));
 
         for (Map.Entry<String, Object> e : feature.properties.entrySet()) {
             // TODO store keys separately from features
@@ -83,29 +82,24 @@ public class GeobufEncoder {
 
             Object featVal = e.getValue();
 
-            if (featVal instanceof String)
-                val.setStringValue((String) featVal);
-            else if (featVal instanceof Boolean)
-                val.setBoolValue((Boolean) featVal);
+            if (featVal instanceof String) val.setStringValue((String) featVal);
+            else if (featVal instanceof Boolean) val.setBoolValue((Boolean) featVal);
             else if (featVal instanceof Integer) {
                 int keyInt = (Integer) featVal;
-                if (keyInt >= 0)
-                    val.setPosIntValue(keyInt);
-                else
-                    val.setNegIntValue(keyInt);
-            }
-            else if (featVal instanceof Long) {
+                if (keyInt >= 0) val.setPosIntValue(keyInt);
+                else val.setNegIntValue(keyInt);
+            } else if (featVal instanceof Long) {
                 long keyLong = (Long) featVal;
-                if (keyLong >= 0)
-                    val.setPosIntValue(keyLong);
-                else
-                    val.setNegIntValue(keyLong);
-            }
-            else if (featVal instanceof Double || featVal instanceof Float)
+                if (keyLong >= 0) val.setPosIntValue(keyLong);
+                else val.setNegIntValue(keyLong);
+            } else if (featVal instanceof Double || featVal instanceof Float)
                 val.setDoubleValue(((Number) featVal).doubleValue());
             else {
                 // TODO serialize to JSON
-                LOG.warn("Unable to save object of type {} to geobuf, falling back on toString. Deserialization will not work as expected.", featVal.getClass());
+                LOG.warn(
+                        "Unable to save object of type {} to geobuf, falling back on toString."
+                            + " Deserialization will not work as expected.",
+                        featVal.getClass());
                 val.setStringValue(featVal.toString());
             }
 
@@ -126,8 +120,7 @@ public class GeobufEncoder {
         if (feature.id != null) {
             feat.setId(feature.id);
             feat.clearIntId();
-        }
-        else {
+        } else {
             feat.setIntId(feature.numericId);
             feat.clearId();
         }
@@ -135,15 +128,14 @@ public class GeobufEncoder {
         return feat.build();
     }
 
-    public Geobuf.Data.Geometry geomToGeobuf (Geometry geometry) {
-        if (geometry instanceof Point)
-            return pointToGeobuf((Point) geometry);
-        else if (geometry instanceof Polygon)
-            return polyToGeobuf((Polygon) geometry);
+    public Geobuf.Data.Geometry geomToGeobuf(Geometry geometry) {
+        if (geometry instanceof Point) return pointToGeobuf((Point) geometry);
+        else if (geometry instanceof Polygon) return polyToGeobuf((Polygon) geometry);
         else if (geometry instanceof MultiPolygon)
             return multiPolyToGeobuf((MultiPolygon) geometry);
         else
-            throw new UnsupportedOperationException("Unsupported geometry type " + geometry.getGeometryType());
+            throw new UnsupportedOperationException(
+                    "Unsupported geometry type " + geometry.getGeometryType());
     }
 
     public Geobuf.Data.Geometry pointToGeobuf(Point point) {
@@ -154,9 +146,9 @@ public class GeobufEncoder {
                 .build();
     }
 
-    public Geobuf.Data.Geometry multiPolyToGeobuf (MultiPolygon poly) {
-        Geobuf.Data.Geometry.Builder builder = Geobuf.Data.Geometry.newBuilder()
-                .setType(Geobuf.Data.Geometry.Type.MULTIPOLYGON);
+    public Geobuf.Data.Geometry multiPolyToGeobuf(MultiPolygon poly) {
+        Geobuf.Data.Geometry.Builder builder =
+                Geobuf.Data.Geometry.newBuilder().setType(Geobuf.Data.Geometry.Type.MULTIPOLYGON);
 
         // first we specify the number of polygons
         builder.addLengths(poly.getNumGeometries());
@@ -166,8 +158,9 @@ public class GeobufEncoder {
             // how many rings there are
             builder.addLengths(p.getNumInteriorRing() + 1);
 
-            Stream<LineString> interiorRings = IntStream.range(0, p.getNumInteriorRing())
-                    .<LineString>mapToObj(p::getInteriorRingN);
+            Stream<LineString> interiorRings =
+                    IntStream.range(0, p.getNumInteriorRing())
+                            .<LineString>mapToObj(p::getInteriorRingN);
 
             Stream.concat(Stream.of(p.getExteriorRing()), interiorRings)
                     .forEach(r -> addRing(r, builder));
@@ -176,12 +169,12 @@ public class GeobufEncoder {
         return builder.build();
     }
 
-    public Geobuf.Data.Geometry polyToGeobuf (Polygon poly) {
-        Geobuf.Data.Geometry.Builder builder = Geobuf.Data.Geometry.newBuilder()
-                .setType(Geobuf.Data.Geometry.Type.POLYGON);
+    public Geobuf.Data.Geometry polyToGeobuf(Polygon poly) {
+        Geobuf.Data.Geometry.Builder builder =
+                Geobuf.Data.Geometry.newBuilder().setType(Geobuf.Data.Geometry.Type.POLYGON);
 
-        Stream<LineString> interiorRings = IntStream.range(0, poly.getNumInteriorRing())
-                .mapToObj(poly::getInteriorRingN);
+        Stream<LineString> interiorRings =
+                IntStream.range(0, poly.getNumInteriorRing()).mapToObj(poly::getInteriorRingN);
 
         Stream.concat(Stream.of(poly.getExteriorRing()), interiorRings)
                 .forEach(r -> addRing(r, builder));
@@ -210,7 +203,7 @@ public class GeobufEncoder {
         }
     }
 
-    public void close () throws IOException {
+    public void close() throws IOException {
         outputStream.close();
     }
 
@@ -219,14 +212,16 @@ public class GeobufEncoder {
 
         private transient GeobufEncoder encoder;
 
-        public GeobufFeatureSerializer (int precision) {
+        public GeobufFeatureSerializer(int precision) {
             this.precision = precision;
         }
 
         @Override
-        public void serialize(DataOutput dataOutput, GeobufFeature geobufFeature) throws IOException {
+        public void serialize(DataOutput dataOutput, GeobufFeature geobufFeature)
+                throws IOException {
             GeobufEncoder enc = getEncoder();
-            // This could be more efficient, we're wrapping a single feature in a feature collection. But that way the key/value
+            // This could be more efficient, we're wrapping a single feature in a feature
+            // collection. But that way the key/value
             // serialization all works.
             Geobuf.Data feat = enc.makeFeatureCollection(Arrays.asList(geobufFeature));
             byte[] data = feat.toByteArray();
@@ -241,16 +236,19 @@ public class GeobufEncoder {
             dataInput.readFully(feat);
             Geobuf.Data data = Geobuf.Data.parseFrom(feat);
 
-            return new GeobufFeature(data.getFeatureCollection().getFeatures(0), data.getKeysList(), Math.pow(10, data.getPrecision()));
+            return new GeobufFeature(
+                    data.getFeatureCollection().getFeatures(0),
+                    data.getKeysList(),
+                    Math.pow(10, data.getPrecision()));
         }
 
         @Override
-        public int fixedSize () {
+        public int fixedSize() {
             return -1;
         }
 
         /** get the geobuf encoder, lazy initializing if needed. JVM should inline this function */
-        private GeobufEncoder getEncoder () {
+        private GeobufEncoder getEncoder() {
             if (encoder == null) {
                 synchronized (this) {
                     if (encoder == null) {

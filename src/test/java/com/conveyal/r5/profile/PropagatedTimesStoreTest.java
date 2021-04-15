@@ -2,16 +2,14 @@ package com.conveyal.r5.profile;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Test the propagated times store.
- */
+/** Test the propagated times store. */
 public class PropagatedTimesStoreTest {
     /**
-     * Test that changing the reachability threshold works (i.e. averages are computed properly when destinations are
-     * only reachable part of the time).
+     * Test that changing the reachability threshold works (i.e. averages are computed properly when
+     * destinations are only reachable part of the time).
      */
     @Test
-    public void testReachability () throws Exception {
+    public void testReachability() throws Exception {
         /*
         ProfileRequest pr = new ProfileRequest();
         // old default: no restrictions o

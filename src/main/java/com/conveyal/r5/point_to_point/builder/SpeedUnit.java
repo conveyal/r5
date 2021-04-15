@@ -3,9 +3,7 @@ package com.conveyal.r5.point_to_point.builder;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
-/**
- * Speeds can be specified in different units
- */
+/** Speeds can be specified in different units */
 public enum SpeedUnit {
     KMH("kmh"),
     MPH("mph"),
@@ -28,18 +26,20 @@ public enum SpeedUnit {
         if (unit != null) {
             unit = unit.toLowerCase();
             switch (unit) {
-            case "km/h":
-            case "kmh":
-            case "kmph":
-            case "kph":
-                return KMH;
-            case "mph":
-                return MPH;
-            case "knots":
-                return KNOTS;
-            default:
-                throw new IllegalArgumentException("Unknown unit:" + unit
-                    + " supported units are km/h|kmh|kmph|kph, mph and knots");
+                case "km/h":
+                case "kmh":
+                case "kmph":
+                case "kph":
+                    return KMH;
+                case "mph":
+                    return MPH;
+                case "knots":
+                    return KNOTS;
+                default:
+                    throw new IllegalArgumentException(
+                            "Unknown unit:"
+                                    + unit
+                                    + " supported units are km/h|kmh|kmph|kph, mph and knots");
             }
         }
         return null;

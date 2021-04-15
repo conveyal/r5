@@ -1,9 +1,12 @@
 package com.conveyal.analysis.grids;
 
+import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
+
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.data.census.S3SeamlessSource;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.conveyal.r5.analyst.Grid;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,41 +19,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
-
 /**
- * Fetch data from the seamless-census s3 buckets and convert it from block-level vector data (polygons)
- * to raster opportunity density data (grids).
+ * Fetch data from the seamless-census s3 buckets and convert it from block-level vector data
+ * (polygons) to raster opportunity density data (grids).
  */
 public class SeamlessCensusGridExtractor {
 
     private static final Logger LOG = LoggerFactory.getLogger(SeamlessCensusGridExtractor.class);
 
-    private static final Set<String> ignoreKeys = new HashSet<>(Arrays.asList(
-            "Jobs Data creation date",
-            "Workers Data creation date"
-    ));
+    private static final Set<String> ignoreKeys =
+            new HashSet<>(Arrays.asList("Jobs Data creation date", "Workers Data creation date"));
 
     public interface Config {
-        String seamlessCensusRegion ();
-        String seamlessCensusBucket ();
+        String seamlessCensusRegion();
+
+        String seamlessCensusBucket();
     }
 
     private static S3SeamlessSource source;
 
     // TODO make this into a non-static Component
-    public static void configureStatically (Config config) {
+    public static void configureStatically(Config config) {
         source = new S3SeamlessSource(config.seamlessCensusRegion(), config.seamlessCensusBucket());
     }
 
-    /**
-     * Retrieve data for bounds and save to a bucket under a given key
-     */
-    public static List<Grid> retrieveAndExtractCensusDataForBounds (Bounds bounds) throws IOException {
+    /** Retrieve data for bounds and save to a bucket under a given key */
+    public static List<Grid> retrieveAndExtractCensusDataForBounds(Bounds bounds)
+            throws IOException {
         long startTime = System.currentTimeMillis();
 
-        // All the features are buffered in a Map in memory. This could be problematic on large areas.
-        Map<Long, GeobufFeature> features = source.extract(bounds.north, bounds.east, bounds.south, bounds.west, false);
+        // All the features are buffered in a Map in memory. This could be problematic on large
+        // areas.
+        Map<Long, GeobufFeature> features =
+                source.extract(bounds.north, bounds.east, bounds.south, bounds.west, false);
 
         if (features.isEmpty()) {
             LOG.info("No seamless census data found here, not pre-populating grids");

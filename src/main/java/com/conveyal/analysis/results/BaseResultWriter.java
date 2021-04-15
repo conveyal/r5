@@ -1,9 +1,12 @@
 package com.conveyal.analysis.results;
 
+import static com.conveyal.r5.common.Util.human;
+
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.google.common.io.ByteStreams;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,8 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
-
-import static com.conveyal.r5.common.Util.human;
 
 /**
  * This is an abstract base class for writing regional analysis results into a file for long term
@@ -34,27 +35,28 @@ public abstract class BaseResultWriter {
     protected File bufferFile;
     private String outputBucket;
 
-    public BaseResultWriter (FileStorage fileStorage) {
+    public BaseResultWriter(FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
     // Can this be merged into the constructor?
-    protected void prepare (String jobId, String outputBucket) {
+    protected void prepare(String jobId, String outputBucket) {
         this.outputBucket = outputBucket;
         try {
             bufferFile = File.createTempFile(jobId + "_", ".results");
             // On unexpected server shutdown, these files should be deleted.
-            // We could attempt to recover from shutdowns but that will take a lot of changes and persisted data.
+            // We could attempt to recover from shutdowns but that will take a lot of changes and
+            // persisted data.
             bufferFile.deleteOnExit();
         } catch (IOException e) {
-            LOG.error("Exception while creating buffer file for multi-origin assembler: " + e.toString());
+            LOG.error(
+                    "Exception while creating buffer file for multi-origin assembler: "
+                            + e.toString());
         }
     }
 
-    /**
-     * Gzip the access grid and store it.
-     */
-    protected synchronized void finish (String fileName) throws IOException {
+    /** Gzip the access grid and store it. */
+    protected synchronized void finish(String fileName) throws IOException {
         LOG.info("Compressing {} and moving into file storage.", fileName);
         FileStorageKey fileStorageKey = new FileStorageKey(outputBucket, fileName);
         File gzippedResultFile = FileUtils.createScratchFile();
@@ -62,25 +64,24 @@ public abstract class BaseResultWriter {
         // There's probably a more elegant way to do this with NIO and without closing the buffer.
         // That would be Files.copy(File.toPath(),X) or ByteStreams.copy.
         InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
-        OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedResultFile)));
+        OutputStream os =
+                new GZIPOutputStream(
+                        new BufferedOutputStream(new FileOutputStream(gzippedResultFile)));
         ByteStreams.copy(is, os);
         is.close();
         os.close();
 
-        LOG.info("GZIP compression reduced analysis results {} from {} to {} ({}x compression)",
+        LOG.info(
+                "GZIP compression reduced analysis results {} from {} to {} ({}x compression)",
                 fileName,
                 human(bufferFile.length(), "B"),
                 human(gzippedResultFile.length(), "B"),
-                (double) bufferFile.length() / gzippedResultFile.length()
-        );
+                (double) bufferFile.length() / gzippedResultFile.length());
 
         fileStorage.moveIntoStorage(fileStorageKey, gzippedResultFile);
         bufferFile.delete();
     }
 
-    /**
-     * Close all buffers and temporary files.
-     */
-    abstract void terminate () throws Exception;
-
+    /** Close all buffers and temporary files. */
+    abstract void terminate() throws Exception;
 }

@@ -1,10 +1,8 @@
 package com.conveyal.analysis.models;
 
-/**
- * Remove trips from a graph.
- */
+/** Remove trips from a graph. */
 public class RemoveTrips extends Modification {
-    public String getType () {
+    public String getType() {
         return "remove-trips";
     }
 
@@ -16,8 +14,9 @@ public class RemoveTrips extends Modification {
 
     public String[] trips;
 
-    public com.conveyal.r5.analyst.scenario.RemoveTrips toR5 () {
-        com.conveyal.r5.analyst.scenario.RemoveTrips rt = new com.conveyal.r5.analyst.scenario.RemoveTrips();
+    public com.conveyal.r5.analyst.scenario.RemoveTrips toR5() {
+        com.conveyal.r5.analyst.scenario.RemoveTrips rt =
+                new com.conveyal.r5.analyst.scenario.RemoveTrips();
         rt.comment = name;
 
         if (trips == null) {

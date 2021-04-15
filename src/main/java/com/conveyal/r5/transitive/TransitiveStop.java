@@ -2,6 +2,7 @@ package com.conveyal.r5.transitive;
 
 /**
  * Represents a Transitive stop.
+ *
  * @author mattwigway
  */
 public class TransitiveStop {

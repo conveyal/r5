@@ -10,18 +10,16 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-/**
- * A GTFS date in the numeric format YYYYMMDD
- */
+/** A GTFS date in the numeric format YYYYMMDD */
 public class DateField extends Field {
 
     private static final DateTimeFormatter gtfsDateFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    public DateField (String name, Requirement requirement) {
+    public DateField(String name, Requirement requirement) {
         super(name, requirement);
     }
 
-    private int validate (String string) {
+    private int validate(String string) {
         // Parse the date out of the supplied string.
         LocalDate date = null;
         try {
@@ -29,7 +27,8 @@ public class DateField extends Field {
         } catch (DateTimeParseException ex) {
             throw new StorageException(NewGTFSErrorType.DATE_FORMAT, string);
         }
-        // Range check on year. Parsing operation above should already have checked month and day ranges.
+        // Range check on year. Parsing operation above should already have checked month and day
+        // ranges.
         int year = date.getYear();
         if (year < 2000 || year > 2100) {
             throw new StorageException(NewGTFSErrorType.DATE_RANGE, string);
@@ -39,7 +38,8 @@ public class DateField extends Field {
     }
 
     @Override
-    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter(
+            PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -48,13 +48,12 @@ public class DateField extends Field {
     }
 
     @Override
-    public String validateAndConvert (String string) {
+    public String validateAndConvert(String string) {
         return Integer.toString(validate(string));
     }
 
     @Override
-    public SQLType getSqlType () {
+    public SQLType getSqlType() {
         return JDBCType.INTEGER;
     }
-
 }

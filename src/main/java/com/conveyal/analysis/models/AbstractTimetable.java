@@ -27,8 +27,8 @@ public abstract class AbstractTimetable {
     public String phaseAtStop;
 
     /**
-     * Phase from a timetable (frequency entry) on another modification.
-     * Syntax is `${modification._id}:${timetable._id}`
+     * Phase from a timetable (frequency entry) on another modification. Syntax is
+     * `${modification._id}:${timetable._id}`
      */
     public String phaseFromTimetable;
 
@@ -38,7 +38,7 @@ public abstract class AbstractTimetable {
     /** Amount of time to phase from the other lines frequency */
     public int phaseSeconds;
 
-    public AddTrips.PatternTimetable toBaseR5Timetable () {
+    public AddTrips.PatternTimetable toBaseR5Timetable() {
         AddTrips.PatternTimetable pt = new AddTrips.PatternTimetable();
         pt.entryId = _id;
 
@@ -51,11 +51,15 @@ public abstract class AbstractTimetable {
         pt.saturday = saturday;
         pt.sunday = sunday;
 
-        // Optionally convert the headway into a series of specific departure times regularly spaced over the time
-        // window. This timetable should then be treated as scheduled, and should not be assigned randomized schedules.
+        // Optionally convert the headway into a series of specific departure times regularly spaced
+        // over the time
+        // window. This timetable should then be treated as scheduled, and should not be assigned
+        // randomized schedules.
         if (exactTimes) {
-            // Integer division truncates toward zero, add one to make both the start and end times inclusive.
-            // i.e. a zero-width time window with the same start and end time will still have one departure.
+            // Integer division truncates toward zero, add one to make both the start and end times
+            // inclusive.
+            // i.e. a zero-width time window with the same start and end time will still have one
+            // departure.
             int nDepartureTimes = (endTime - startTime) / headwaySecs + 1;
             pt.firstDepartures = new int[nDepartureTimes];
             for (int i = 0, departureTime = startTime; i < nDepartureTimes; i++) {

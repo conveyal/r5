@@ -6,11 +6,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.text.MessageFormat;
 
-/**
- * Test hook (main class) that reads the worker startup script and substitutes in values.
- */
+/** Test hook (main class) that reads the worker startup script and substitutes in values. */
 public class WorkerStartupScriptTestHook {
-    public static void main (String... args) throws Exception {
+    public static void main(String... args) throws Exception {
         InputStream scriptIs = Broker.class.getClassLoader().getResourceAsStream("worker.sh");
         ByteArrayOutputStream scriptBaos = new ByteArrayOutputStream();
         ByteStreams.copy(scriptIs, scriptBaos);
@@ -22,7 +20,9 @@ public class WorkerStartupScriptTestHook {
         String logGroup = "test-log-group";
         String workerConfigString = "key=val\nkey2=val\n";
 
-        String script = MessageFormat.format(scriptTemplate, workerDownloadUrl, logGroup, workerConfigString);
+        String script =
+                MessageFormat.format(
+                        scriptTemplate, workerDownloadUrl, logGroup, workerConfigString);
         System.out.println(script);
     }
 }

@@ -1,5 +1,8 @@
 package com.conveyal.osmlib;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -8,9 +11,6 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RoundTripTest {
 
@@ -36,7 +36,6 @@ public class RoundTripTest {
 
         // Compare PBF data to VEX data
         compareOsm(osmOriginal, osmCopy);
-
     }
 
     @Test
@@ -59,7 +58,6 @@ public class RoundTripTest {
 
         // Compare PBF data to VEX data
         compareOsm(osmOriginal, osmCopy);
-
     }
 
     @Test
@@ -69,21 +67,23 @@ public class RoundTripTest {
         final PipedOutputStream outStream = new PipedOutputStream();
         final PipedInputStream inStream = new PipedInputStream(outStream);
 
-        // Create a separate thread that will read a PBF file and convert it directly into a VEX stream
+        // Create a separate thread that will read a PBF file and convert it directly into a VEX
+        // stream
         new Thread(
-            new Runnable() {
-                public void run() {
-                    try {
-                        OSMEntitySink vexSink = new VexOutput(outStream);
-                        FileInputStream pbfFileInputStream = new FileInputStream(TEST_FILE);
-                        OSMEntitySource pbfSource = new PBFInput(pbfFileInputStream);
-                        pbfSource.copyTo(vexSink);
-                    } catch (IOException ex) {
-                        throw new RuntimeException(ex);
-                    }
-                }
-            }
-        ).start();
+                        new Runnable() {
+                            public void run() {
+                                try {
+                                    OSMEntitySink vexSink = new VexOutput(outStream);
+                                    FileInputStream pbfFileInputStream =
+                                            new FileInputStream(TEST_FILE);
+                                    OSMEntitySource pbfSource = new PBFInput(pbfFileInputStream);
+                                    pbfSource.copyTo(vexSink);
+                                } catch (IOException ex) {
+                                    throw new RuntimeException(ex);
+                                }
+                            }
+                        })
+                .start();
 
         // Stream VEX data in from the thread and put it in a MapDB
         OSM osmCopy = new OSM(null);
@@ -95,19 +95,18 @@ public class RoundTripTest {
 
         // Compare PBF data to VEX stream
         compareOsm(osmOriginal, osmCopy);
-
     }
 
-    private void compareOsm (OSM original, OSM copy) {
+    private void compareOsm(OSM original, OSM copy) {
         System.out.println("Checking that OSM data is identical after round-trip...");
         compareMap(original.nodes, copy.nodes);
         compareMap(original.ways, copy.ways);
         compareMap(original.relations, copy.relations);
     }
 
-    private <K,V> void compareMap (Map<K,V> m1, Map<K,V> m2) {
+    private <K, V> void compareMap(Map<K, V> m1, Map<K, V> m2) {
         assertEquals(m1.size(), m2.size());
-        for (Map.Entry<K,V> entry : m1.entrySet()) {
+        for (Map.Entry<K, V> entry : m1.entrySet()) {
             V e1 = entry.getValue();
             V e2 = m2.get(entry.getKey());
             // System.out.println(e1);
@@ -115,5 +114,4 @@ public class RoundTripTest {
             assertEquals(e1, e2);
         }
     }
-
 }

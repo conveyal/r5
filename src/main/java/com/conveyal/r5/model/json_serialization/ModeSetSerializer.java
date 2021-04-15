@@ -10,13 +10,16 @@ import java.io.IOException;
 import java.util.EnumSet;
 import java.util.stream.Collectors;
 
-/**
- * Serialize a mode set as MODE,MODE,MODE
- */
+/** Serialize a mode set as MODE,MODE,MODE */
 public class ModeSetSerializer extends JsonSerializer<EnumSet<StreetMode>> {
     @Override
-    public void serialize(EnumSet<StreetMode> streetModes, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
-        String str = streetModes.stream().map(StreetMode::toString).collect(Collectors.joining(","));
+    public void serialize(
+            EnumSet<StreetMode> streetModes,
+            JsonGenerator jsonGenerator,
+            SerializerProvider serializerProvider)
+            throws IOException, JsonProcessingException {
+        String str =
+                streetModes.stream().map(StreetMode::toString).collect(Collectors.joining(","));
         jsonGenerator.writeString(str);
     }
 }

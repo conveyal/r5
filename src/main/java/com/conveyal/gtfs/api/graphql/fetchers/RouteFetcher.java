@@ -7,6 +7,7 @@ import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+
 import graphql.schema.DataFetchingEnvironment;
 
 import java.util.ArrayList;
@@ -15,11 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Created by matthewc on 3/10/16.
- */
+/** Created by matthewc on 3/10/16. */
 public class RouteFetcher {
-    public static List<WrappedGTFSEntity<Route>> apex (DataFetchingEnvironment environment) {
+    public static List<WrappedGTFSEntity<Route>> apex(DataFetchingEnvironment environment) {
         Map<String, Object> args = environment.getArguments();
 
         Collection<GTFSFeed> feeds;
@@ -38,9 +37,10 @@ public class RouteFetcher {
                         .map(feed.routes::get)
                         .map(r -> new WrappedGTFSEntity(feed.uniqueId, r))
                         .forEach(routes::add);
-            }
-            else {
-                feed.routes.values().stream().map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r)).forEach(routes::add);
+            } else {
+                feed.routes.values().stream()
+                        .map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r))
+                        .forEach(routes::add);
             }
         }
 
@@ -54,19 +54,19 @@ public class RouteFetcher {
         GTFSFeed feed = ApiMain.getFeedSourceWithoutExceptions(stop.feedUniqueId);
         if (feed == null) return null;
 
-        List<WrappedGTFSEntity<Route>> routes = feed.patterns.values().stream()
-                .filter(p -> p.orderedStops.contains(stop.entity.stop_id))
-                .map(p -> feed.routes.get(p.route_id))
-                .distinct()
-                .map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r))
-                .collect(Collectors.toList());
+        List<WrappedGTFSEntity<Route>> routes =
+                feed.patterns.values().stream()
+                        .filter(p -> p.orderedStops.contains(stop.entity.stop_id))
+                        .map(p -> feed.routes.get(p.route_id))
+                        .distinct()
+                        .map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r))
+                        .collect(Collectors.toList());
 
         if (routeIds != null) {
             return routes.stream()
                     .filter(r -> routeIds.contains(r.entity.route_id))
                     .collect(Collectors.toList());
-        }
-        else {
+        } else {
             return routes;
         }
     }
@@ -94,8 +94,7 @@ public class RouteFetcher {
                     .map(feed.routes::get)
                     .map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r))
                     .collect(Collectors.toList());
-        }
-        else {
+        } else {
             return feed.routes.values().stream()
                     .map(r -> new WrappedGTFSEntity<>(feed.uniqueId, r))
                     .collect(Collectors.toList());

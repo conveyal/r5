@@ -1,7 +1,8 @@
 package com.conveyal.osmlib;
 
 // Conveyal variable-width integer utilities based on Google Protocol Buffers.
-// This file is an adapted subset of CodedOutputStream.java and therefore includes the original license below.
+// This file is an adapted subset of CodedOutputStream.java and therefore includes the original
+// license below.
 //
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
@@ -45,7 +46,7 @@ public class VarIntOutputStream {
     }
 
     public void writeByte(int value) throws IOException {
-        os.write((byte)value);
+        os.write((byte) value);
     }
 
     public void writeBytes(byte[] bytes) throws IOException {
@@ -75,7 +76,7 @@ public class VarIntOutputStream {
     }
 
     public void writeUInt64(long value) throws IOException {
-        while((value & -128L) != 0L) {
+        while ((value & -128L) != 0L) {
             writeByte((int) value & 127 | 128);
             value >>>= 7;
         }
@@ -83,7 +84,7 @@ public class VarIntOutputStream {
     }
 
     public void writeUInt32(int value) throws IOException {
-        while((value & -128) != 0) {
+        while ((value & -128) != 0) {
             writeByte(value & 127 | 128);
             value >>>= 7;
         }
@@ -93,5 +94,4 @@ public class VarIntOutputStream {
     public void close() throws IOException {
         os.close();
     }
-
 }

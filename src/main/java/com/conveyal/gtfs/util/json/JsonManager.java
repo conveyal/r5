@@ -19,8 +19,8 @@ import java.util.Map;
 
 /**
  * Helper methods for writing REST API routines
- * @author mattwigway
  *
+ * @author mattwigway
  */
 public class JsonManager<T> {
     private ObjectWriter writer;
@@ -29,9 +29,10 @@ public class JsonManager<T> {
 
     /**
      * Create a new JsonManager
+     *
      * @param theClass The class to create a json manager for (yes, also in the diamonds).
      */
-    public JsonManager (Class<T> theClass) {
+    public JsonManager(Class<T> theClass) {
         this.theClass = theClass;
         this.mapper = new ObjectMapper();
         mapper.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
@@ -41,22 +42,24 @@ public class JsonManager<T> {
         // mapper.registerModule(new GeoJsonModule());
         SimpleModule deser = new SimpleModule();
 
-        deser.addDeserializer(LocalDate.class, new JacksonSerializers.LocalDateStringDeserializer());
+        deser.addDeserializer(
+                LocalDate.class, new JacksonSerializers.LocalDateStringDeserializer());
         deser.addSerializer(LocalDate.class, new JacksonSerializers.LocalDateStringSerializer());
 
         deser.addDeserializer(Rectangle2D.class, new Rectangle2DDeserializer());
         mapper.registerModule(deser);
-        mapper.getSerializerProvider().setNullKeySerializer(new JacksonSerializers.MyDtoNullKeySerializer());
+        mapper.getSerializerProvider()
+                .setNullKeySerializer(new JacksonSerializers.MyDtoNullKeySerializer());
         filters = new SimpleFilterProvider();
-        filters.addFilter("bbox", SimpleBeanPropertyFilter.filterOutAllExcept("west", "east", "south", "north"));
+        filters.addFilter(
+                "bbox",
+                SimpleBeanPropertyFilter.filterOutAllExcept("west", "east", "south", "north"));
         this.writer = mapper.writer(filters);
     }
 
     private Class<T> theClass;
 
-    /**
-     * Add an additional mixin for serialization with this object mapper.
-     */
+    /** Add an additional mixin for serialization with this object mapper. */
     public void addMixin(Class target, Class mixin) {
         mapper.addMixInAnnotations(target, mixin);
     }
@@ -77,6 +80,7 @@ public class JsonManager<T> {
 
     /**
      * Convert an object to its JSON representation
+     *
      * @param o the object to convert
      * @return the JSON string
      * @throws JsonProcessingException
@@ -87,23 +91,24 @@ public class JsonManager<T> {
 
     /**
      * Convert a collection of objects to their JSON representation.
+     *
      * @param c the collection
      * @return A JsonNode representing the collection
      * @throws JsonProcessingException
      */
-    public String write (Collection<T> c) throws JsonProcessingException {
+    public String write(Collection<T> c) throws JsonProcessingException {
         return writer.writeValueAsString(c);
     }
 
-    public String write (Map<String, T> map) throws JsonProcessingException {
+    public String write(Map<String, T> map) throws JsonProcessingException {
         return writer.writeValueAsString(map);
     }
 
-    public T read (String s) throws JsonParseException, JsonMappingException, IOException {
+    public T read(String s) throws JsonParseException, JsonMappingException, IOException {
         return mapper.readValue(s, theClass);
     }
 
-    public T read (JsonParser p) throws JsonParseException, JsonMappingException, IOException {
+    public T read(JsonParser p) throws JsonParseException, JsonMappingException, IOException {
         return mapper.readValue(p, theClass);
     }
 

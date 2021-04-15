@@ -9,8 +9,9 @@ import java.io.InputStream;
 import java.util.List;
 
 /**
- * Reads a stream of VEX data, constructing OSM model objects from the stream and pushing them through to a sink.
- * This is neither threadsafe nor reentrant! Create one instance of this decoder per decode operation.
+ * Reads a stream of VEX data, constructing OSM model objects from the stream and pushing them
+ * through to a sink. This is neither threadsafe nor reentrant! Create one instance of this decoder
+ * per decode operation.
  */
 public class VexInput implements OSMEntitySource {
 
@@ -64,7 +65,7 @@ public class VexInput implements OSMEntitySource {
         // Reset delta coding fields
         id = ref = prevFixedLat = prevFixedLon = 0;
         // TODO limit number of entities per block ?
-        for (int i = 0 ; i < nEntitiesExpected; i++) {
+        for (int i = 0; i < nEntitiesExpected; i++) {
             switch (entityType) {
                 case VexFormat.VEX_NODE:
                     readNode();
@@ -86,7 +87,8 @@ public class VexInput implements OSMEntitySource {
         OSMEntity tagged = new Node();
         int nTags = vin.readUInt32();
         if (nTags > 500) {
-            throw new RuntimeException(String.format("Entity has %d tags, this looks like a corrupted file.", nTags));
+            throw new RuntimeException(
+                    String.format("Entity has %d tags, this looks like a corrupted file.", nTags));
         }
         for (int i = 0; i < nTags; i++) {
             String key = vin.readString();
@@ -138,13 +140,13 @@ public class VexInput implements OSMEntitySource {
         for (int i = 0; i < nMembers; i++) {
             Relation.Member member = new Relation.Member();
             member.id = vin.readSInt64();
-            member.type = memberTypeForOrdinal[vin.readUInt32()]; // FIXME bad, assign specific numbers
+            member.type =
+                    memberTypeForOrdinal[vin.readUInt32()]; // FIXME bad, assign specific numbers
             member.role = vin.readString();
             relation.members.add(member);
         }
         nRelationsRead++;
         entitySink.writeRelation(id, relation);
-        //System.out.println(id + " " + relation.toString());
+        // System.out.println(id + " " + relation.toString());
     }
-
 }

@@ -8,10 +8,11 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * This is an API model object for reporting a single error or warning that occurred on a worker back to the UI via
- * the backend. The most common errors a user will see are problems applying scenario modifications, so this provides
- * some fields to clarify what modification caused the error, if any. But it can also contain messages from any old
- * Exception (or other Throwable such as an Error) to report more unexpected kinds of errors.
+ * This is an API model object for reporting a single error or warning that occurred on a worker
+ * back to the UI via the backend. The most common errors a user will see are problems applying
+ * scenario modifications, so this provides some fields to clarify what modification caused the
+ * error, if any. But it can also contain messages from any old Exception (or other Throwable such
+ * as an Error) to report more unexpected kinds of errors.
  */
 public class TaskError {
 
@@ -29,8 +30,9 @@ public class TaskError {
 
     /**
      * This constructor is used for errors that occur while applying a scenario to a network.
-     * messages will generally be either the errors or warnings associated with the modification, which is why there is
-     * a separate argument; otherwise we wouldn't know whether errors or warnings were desired.
+     * messages will generally be either the errors or warnings associated with the modification,
+     * which is why there is a separate argument; otherwise we wouldn't know whether errors or
+     * warnings were desired.
      */
     public TaskError(Modification modification, Collection<String> messages) {
         this.modificationId = modification.comment;
@@ -43,5 +45,4 @@ public class TaskError {
         this.title = title;
         this.messages.add(detail);
     }
-
 }

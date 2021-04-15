@@ -11,15 +11,15 @@ import java.util.Iterator;
 public class FeedInfo extends Entity implements Cloneable {
 
     private static final long serialVersionUID = 8718856987299076452L;
-    public String    feed_id = "NONE";
-    public String    feed_publisher_name;
-    public URL       feed_publisher_url;
-    public String    feed_lang;
+    public String feed_id = "NONE";
+    public String feed_publisher_name;
+    public URL feed_publisher_url;
+    public String feed_lang;
     public LocalDate feed_start_date;
     public LocalDate feed_end_date;
-    public String    feed_version;
+    public String feed_version;
 
-    public FeedInfo clone () {
+    public FeedInfo clone() {
         try {
             return (FeedInfo) super.clone();
         } catch (CloneNotSupportedException e) {
@@ -53,7 +53,9 @@ public class FeedInfo extends Entity implements Cloneable {
                 feed.feedInfo.put("NONE", fi);
                 feed.feedId = fi.feed_id;
             } else {
-                feed.errors.add(new GeneralError(tableName, row, null, "FeedInfo contains more than one record."));
+                feed.errors.add(
+                        new GeneralError(
+                                tableName, row, null, "FeedInfo contains more than one record."));
             }
         }
     }
@@ -66,8 +68,16 @@ public class FeedInfo extends Entity implements Cloneable {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"feed_id", "feed_publisher_name", "feed_publisher_url", "feed_lang",
-                    "feed_start_date", "feed_end_date", "feed_version"});
+            writer.writeRecord(
+                    new String[] {
+                        "feed_id",
+                        "feed_publisher_name",
+                        "feed_publisher_url",
+                        "feed_lang",
+                        "feed_start_date",
+                        "feed_end_date",
+                        "feed_version"
+                    });
         }
 
         @Override

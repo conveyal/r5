@@ -12,21 +12,19 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 
 /**
- * A map of a single shape_id with points indexed by shape_point_sequence.
- * Backed by a submap, but eliminates the need to refer to shape points always by shape ID.
+ * A map of a single shape_id with points indexed by shape_point_sequence. Backed by a submap, but
+ * eliminates the need to refer to shape points always by shape ID.
+ *
  * @author mattwigway
  */
 public class ShapeMap implements Map<Integer, Shape> {
     private String shapeId;
-    
+
     /** A map from (shape_id, shape_pt_sequence) to shapes */
     private Map<Tuple2, Shape> wrapped;
 
-    public ShapeMap (ConcurrentNavigableMap<Tuple2, Shape> allShapes, String shapeId) {
-        this.wrapped = allShapes.subMap(
-                new Tuple2 (shapeId, 0),
-                new Tuple2 (shapeId, Fun.HI)
-                );
+    public ShapeMap(ConcurrentNavigableMap<Tuple2, Shape> allShapes, String shapeId) {
+        this.wrapped = allShapes.subMap(new Tuple2(shapeId, 0), new Tuple2(shapeId, Fun.HI));
         this.shapeId = shapeId;
     }
 
@@ -51,7 +49,7 @@ public class ShapeMap implements Map<Integer, Shape> {
     }
 
     @Override
-    public Shape get(Object key) {		
+    public Shape get(Object key) {
         return wrapped.get(makeKey(key));
     }
 
@@ -83,7 +81,8 @@ public class ShapeMap implements Map<Integer, Shape> {
     }
 
     // these two are hard because the sets have to update the corresponding map.
-    // We currently just expose them as immutable sets in RAM, since all of the modification operations are optional. 
+    // We currently just expose them as immutable sets in RAM, since all of the modification
+    // operations are optional.
     @Override
     public Set<Integer> keySet() {
         // use a linkedhashset so values come out in order
@@ -110,8 +109,7 @@ public class ShapeMap implements Map<Integer, Shape> {
         return Collections.unmodifiableSet(ret);
     }
 
-    private Tuple2<String, Integer> makeKey (Object i) {
-        return new Tuple2<String, Integer> (this.shapeId, (Integer) i);
+    private Tuple2<String, Integer> makeKey(Object i) {
+        return new Tuple2<String, Integer>(this.shapeId, (Integer) i);
     }
-
 }

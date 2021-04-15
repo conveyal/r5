@@ -1,6 +1,12 @@
 package com.conveyal.gtfs;
 
+import static com.conveyal.gtfs.TestUtils.getResourceFileName;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.csvreader.CsvReader;
+
 import org.apache.commons.io.input.BOMInputStream;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -13,13 +19,7 @@ import java.nio.charset.Charset;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.TestUtils.getResourceFileName;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
-/**
- * Test suite for the GTFSFeed class.
- */
+/** Test suite for the GTFSFeed class. */
 public class GTFSFeedTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeedTest.class);
@@ -45,7 +45,8 @@ public class GTFSFeedTest {
     }
 
     /**
-     * Make sure a roundtrip of loading a GTFS zip file and then writing another zip file can be performed.
+     * Make sure a roundtrip of loading a GTFS zip file and then writing another zip file can be
+     * performed.
      */
     @Test
     public void canDoRoundtripLoadAndWriteToZipFile() throws IOException {
@@ -66,56 +67,50 @@ public class GTFSFeedTest {
         FileTestCase[] fileTestCases = {
             // agency.txt
             new FileTestCase(
-                "agency.txt",
-                new DataExpectation[]{
-                    new DataExpectation("agency_id", "1"),
-                    new DataExpectation("agency_name", "Fake Transit")
-                }
-            ),
+                    "agency.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("agency_id", "1"),
+                        new DataExpectation("agency_name", "Fake Transit")
+                    }),
             new FileTestCase(
-                "calendar.txt",
-                new DataExpectation[]{
-                    new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"),
-                    new DataExpectation("start_date", "20170915"),
-                    new DataExpectation("end_date", "20170917")
-                }
-            ),
+                    "calendar.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"),
+                        new DataExpectation("start_date", "20170915"),
+                        new DataExpectation("end_date", "20170917")
+                    }),
             new FileTestCase(
-                "routes.txt",
-                new DataExpectation[]{
-                    new DataExpectation("agency_id", "1"),
-                    new DataExpectation("route_id", "1"),
-                    new DataExpectation("route_long_name", "Route 1")
-                }
-            ),
+                    "routes.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("agency_id", "1"),
+                        new DataExpectation("route_id", "1"),
+                        new DataExpectation("route_long_name", "Route 1")
+                    }),
             new FileTestCase(
-                "shapes.txt",
-                new DataExpectation[]{
-                    new DataExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"),
-                    new DataExpectation("shape_pt_lat", "37.0612132"),
-                    new DataExpectation("shape_pt_lon", "-122.0074332")
-                }
-            ),
+                    "shapes.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"),
+                        new DataExpectation("shape_pt_lat", "37.0612132"),
+                        new DataExpectation("shape_pt_lon", "-122.0074332")
+                    }),
             new FileTestCase(
-                "stop_times.txt",
-                new DataExpectation[]{
-                    new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
-                    new DataExpectation("departure_time", "07:00:00"),
-                    new DataExpectation("stop_id", "4u6g")
-                }
-            ),
+                    "stop_times.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                        new DataExpectation("departure_time", "07:00:00"),
+                        new DataExpectation("stop_id", "4u6g")
+                    }),
             new FileTestCase(
-                "trips.txt",
-                new DataExpectation[]{
-                    new DataExpectation("route_id", "1"),
-                    new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
-                    new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57")
-                }
-            )
+                    "trips.txt",
+                    new DataExpectation[] {
+                        new DataExpectation("route_id", "1"),
+                        new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                        new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57")
+                    })
         };
 
         // look through all written files in the zipfile
-        for (FileTestCase fileTestCase: fileTestCases) {
+        for (FileTestCase fileTestCase : fileTestCases) {
             ZipEntry entry = zip.getEntry(fileTestCase.filename);
 
             // make sure the file exists within the zipfile
@@ -135,7 +130,8 @@ public class GTFSFeedTest {
             while (reader.readRecord() && !recordFound) {
                 boolean allExpectationsMetForThisRecord = true;
                 for (DataExpectation dataExpectation : fileTestCase.expectedColumnData) {
-                    if(!reader.get(dataExpectation.columnName).equals(dataExpectation.expectedValue)) {
+                    if (!reader.get(dataExpectation.columnName)
+                            .equals(dataExpectation.expectedValue)) {
                         allExpectationsMetForThisRecord = false;
                         break;
                     }
@@ -145,9 +141,7 @@ public class GTFSFeedTest {
                 }
             }
             assertTrue(
-                recordFound,
-                "Data Expectation record not found in " + fileTestCase.filename
-            );
+                    recordFound, "Data Expectation record not found in " + fileTestCase.filename);
         }
     }
 }

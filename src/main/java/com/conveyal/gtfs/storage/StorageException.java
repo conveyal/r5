@@ -2,9 +2,7 @@ package com.conveyal.gtfs.storage;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 
-/**
- * Created by abyrd on 2017-03-25
- */
+/** Created by abyrd on 2017-03-25 */
 public class StorageException extends RuntimeException {
 
     public NewGTFSErrorType errorType = NewGTFSErrorType.OTHER;
@@ -21,12 +19,11 @@ public class StorageException extends RuntimeException {
         super(ex);
     }
 
-    public StorageException (String message) {
+    public StorageException(String message) {
         super(message);
     }
 
     public StorageException(String message, Exception ex) {
         super(message, ex);
     }
-
 }

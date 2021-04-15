@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.WorkerCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.Sets;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +20,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This is an API data model object, used by workers to send information about themselves to the broker as JSON.
+ * This is an API data model object, used by workers to send information about themselves to the
+ * broker as JSON.
  */
 public class WorkerStatus {
 
@@ -40,8 +42,10 @@ public class WorkerStatus {
     public Set<String> scenarios = new HashSet<>();
     public double secondsSinceLastPoll;
     public Map<String, Integer> tasksPerMinuteByJobId;
+
     @JsonUnwrapped(prefix = "ec2")
     public EC2Info ec2;
+
     public long jvmStartTime;
     public long jvmUptime;
     public String jvmName;
@@ -51,21 +55,30 @@ public class WorkerStatus {
     public List<RegionalWorkResult> results;
 
     /** No-arg constructor used when deserializing. */
-    public WorkerStatus() { }
+    public WorkerStatus() {}
 
-    /** Constructor that fills in all the fields with information about the machine it's running on. */
-    public WorkerStatus (AnalysisWorker worker) {
+    /**
+     * Constructor that fills in all the fields with information about the machine it's running on.
+     */
+    public WorkerStatus(AnalysisWorker worker) {
 
         workerName = "R5";
         workerVersion = BackendVersion.instance.version;
-        workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
+        workerId =
+                worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a
+                                  // generic way
 
-        // Eventually we'll want to report all networks the worker has loaded, to give the backend hints about what kind
-        // of tasks the worker is ready to work on immediately. This is made more complicated by the fact that workers are
-        // started up with no networks loaded, but with the intent for them to work on a particular job. So currently the
+        // Eventually we'll want to report all networks the worker has loaded, to give the backend
+        // hints about what kind
+        // of tasks the worker is ready to work on immediately. This is made more complicated by the
+        // fact that workers are
+        // started up with no networks loaded, but with the intent for them to work on a particular
+        // job. So currently the
         // workers just report which network they were started up for, and this method is not used.
-        // In the future, workers should just report an empty set of loaded networks, and the back end should strategically
-        // send them tasks when they come on line to assign them to networks as needed. But this will require a new
+        // In the future, workers should just report an empty set of loaded networks, and the back
+        // end should strategically
+        // send them tasks when they come on line to assign them to networks as needed. But this
+        // will require a new
         // mechanism to fairly allocate the workers to jobs.
         // networks = worker.networkPreloader.transportNetworkCache.getLoadedNetworkIds();
         // For now we report a single network, even before it's loaded.
@@ -107,8 +120,8 @@ public class WorkerStatus {
     }
 
     /**
-     * Return a single network ID or null, rather than a list of loaded network IDs.
-     * This is a stopgap measure until workers can cache more than one loaded network.
+     * Return a single network ID or null, rather than a list of loaded network IDs. This is a
+     * stopgap measure until workers can cache more than one loaded network.
      */
     @JsonIgnore
     private String getPreferredNetwork() {
@@ -117,13 +130,12 @@ public class WorkerStatus {
     }
 
     /**
-     * Return a category for the worker which inherently has only one network ID (or null).
-     * By category we mean a tuple of (network affinity, r5 version).
-     * This is a stopgap measure until workers can cache more than one loaded network.
+     * Return a category for the worker which inherently has only one network ID (or null). By
+     * category we mean a tuple of (network affinity, r5 version). This is a stopgap measure until
+     * workers can cache more than one loaded network.
      */
     @JsonIgnore
     public WorkerCategory getWorkerCategory() {
         return new WorkerCategory(getPreferredNetwork(), workerVersion);
     }
-
 }

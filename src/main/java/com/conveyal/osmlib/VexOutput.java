@@ -9,7 +9,8 @@ import java.util.List;
 
 /**
  * Consumes OSM entity objects and writes a stream of VEX data blocks to a specified output stream.
- * This is neither threadsafe nor reentrant! Create one instance of this encoder per encode operation.
+ * This is neither threadsafe nor reentrant! Create one instance of this encoder per encode
+ * operation.
  */
 public class VexOutput implements OSMEntitySink {
 
@@ -18,7 +19,10 @@ public class VexOutput implements OSMEntitySink {
     /** The underlying output stream where VEX data will be written. */
     private OutputStream downstream;
 
-    /** A message-oriented output stream that will write out blocks of VEX data when its buffer is filled. */
+    /**
+     * A message-oriented output stream that will write out blocks of VEX data when its buffer is
+     * filled.
+     */
     private DeflatedBlockWriter blockWriter;
 
     /** The output sink for uncompressed VEX format. */
@@ -45,13 +49,15 @@ public class VexOutput implements OSMEntitySink {
     }
 
     /**
-     * Called at the beginning of each node, way, or relation.
-     * Writes the fields common to all OSM entities (ID and tags) and increments the entity counter.
+     * Called at the beginning of each node, way, or relation. Writes the fields common to all OSM
+     * entities (ID and tags) and increments the entity counter.
      */
     private void beginEntity(long id, OSMEntity osmEntity) throws IOException {
         long idDelta = id - prevId;
         if (idDelta == 0) {
-            LOG.error("The same entity ID is being written twice in a row. This will prematurely terminate a block.");
+            LOG.error(
+                    "The same entity ID is being written twice in a row. This will prematurely"
+                        + " terminate a block.");
         }
         vout.writeSInt64(idDelta);
         prevId = id;
@@ -59,8 +65,8 @@ public class VexOutput implements OSMEntitySink {
     }
 
     /**
-     * Called at the end of each node, way, or relation. Tells the downstream block writer that it has received a
-     * complete message and may now consider writing a block.
+     * Called at the end of each node, way, or relation. Tells the downstream block writer that it
+     * has received a complete message and may now consider writing a block.
      */
     private void endEntity() throws IOException {
         if (blockWriter.endEntity()) {
@@ -71,10 +77,11 @@ public class VexOutput implements OSMEntitySink {
     }
 
     /**
-     * Called at the beginning of each node, way, or relation to enforce grouping of entities by type.
-     * If the entity type has changed since the last entity (except at the beginning of the first block),
-     * ends the block and starts a new one of the new type. Each block must contain entities of only a single type.
-     * TODO react to intermixing of entity types in the input by holding one working block of each type.
+     * Called at the beginning of each node, way, or relation to enforce grouping of entities by
+     * type. If the entity type has changed since the last entity (except at the beginning of the
+     * first block), ends the block and starts a new one of the new type. Each block must contain
+     * entities of only a single type. TODO react to intermixing of entity types in the input by
+     * holding one working block of each type.
      */
     private void checkBlockTransition(int eType) throws IOException {
         if (currEntityType != eType) {
@@ -91,7 +98,8 @@ public class VexOutput implements OSMEntitySink {
     }
 
     /**
-     * Writes out a list of tags for the given OSM entity. This code is the same for all entity types.
+     * Writes out a list of tags for the given OSM entity. This code is the same for all entity
+     * types.
      */
     private void writeTags(OSMEntity tagged) throws IOException {
         List<OSMEntity.Tag> tags = tagged.tags;
@@ -146,8 +154,8 @@ public class VexOutput implements OSMEntitySink {
     }
 
     /**
-     * Delta coding node references across ways does help.
-     * Resetting the prevRef to zero for each way has been shown to increase size.
+     * Delta coding node references across ways does help. Resetting the prevRef to zero for each
+     * way has been shown to increase size.
      */
     @Override
     public void writeWay(long id, Way way) throws IOException {
@@ -168,10 +176,10 @@ public class VexOutput implements OSMEntitySink {
         vout.writeUInt32(relation.members.size());
         for (Relation.Member member : relation.members) {
             vout.writeSInt64(member.id);
-            vout.writeUInt32(member.type.ordinal()); // FIXME ordinal is bad. assign specific codes to types.
+            vout.writeUInt32(
+                    member.type.ordinal()); // FIXME ordinal is bad. assign specific codes to types.
             vout.writeString(member.role);
         }
         endEntity();
     }
-
 }

@@ -11,8 +11,8 @@ import java.util.Collection;
 import java.util.Random;
 
 /**
- * This TIntArrayList extension wraps another TIntList, and only allows extending it and retrieving values.
- * It assumes the wrapped TIntList is immutable and treats it as such.
+ * This TIntArrayList extension wraps another TIntList, and only allows extending it and retrieving
+ * values. It assumes the wrapped TIntList is immutable and treats it as such.
  */
 public class TIntAugmentedList implements TIntList {
 
@@ -26,7 +26,7 @@ public class TIntAugmentedList implements TIntList {
     }
 
     @Override
-    public int get (int index) {
+    public int get(int index) {
         if (index < base.size()) {
             return base.get(index);
         } else {
@@ -35,7 +35,7 @@ public class TIntAugmentedList implements TIntList {
     }
 
     @Override
-    public int set (int index, int value) {
+    public int set(int index, int value) {
         if (index < base.size()) {
             throw new RuntimeException("Modifying the base graph is not allowed.");
         } else {
@@ -54,10 +54,9 @@ public class TIntAugmentedList implements TIntList {
     }
 
     /**
-     *  Nominally implement the (enormous) TIntList interface.
-     *  But all of these remain unimplemented until we need them.
+     * Nominally implement the (enormous) TIntList interface. But all of these remain unimplemented
+     * until we need them.
      */
-
     @Override
     public void set(int offset, int[] values) {
         throw new UnsupportedOperationException();
@@ -332,5 +331,4 @@ public class TIntAugmentedList implements TIntList {
     public void insert(int offset, int[] values, int valOffset, int len) {
         throw new UnsupportedOperationException();
     }
-
 }

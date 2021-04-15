@@ -11,9 +11,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 
-/**
- *
- */
+/** */
 public class GraphicsSink implements OSMEntitySink {
 
     Graphics2D g2d;
@@ -23,13 +21,14 @@ public class GraphicsSink implements OSMEntitySink {
     }
 
     @Override
-    public void writeBegin() throws IOException {
-
-    }
+    public void writeBegin() throws IOException {}
 
     @Override
     public void setReplicationTimestamp(long secondsSinceEpoch) {
-        g2d.drawString(Instant.ofEpochSecond(secondsSinceEpoch).atZone(ZoneId.systemDefault()).toString(), 0, 0);
+        g2d.drawString(
+                Instant.ofEpochSecond(secondsSinceEpoch).atZone(ZoneId.systemDefault()).toString(),
+                0,
+                0);
     }
 
     @Override
@@ -39,18 +38,11 @@ public class GraphicsSink implements OSMEntitySink {
     }
 
     @Override
-    public void writeWay(long id, Way way) throws IOException {
-
-    }
+    public void writeWay(long id, Way way) throws IOException {}
 
     @Override
-    public void writeRelation(long id, Relation relation) throws IOException {
-
-    }
+    public void writeRelation(long id, Relation relation) throws IOException {}
 
     @Override
-    public void writeEnd() throws IOException {
-
-    }
-
+    public void writeEnd() throws IOException {}
 }

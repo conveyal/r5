@@ -6,6 +6,7 @@ import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Trip;
+
 import graphql.schema.DataFetchingEnvironment;
 
 import java.util.ArrayList;
@@ -15,10 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- *
- * Created by matthewc on 3/9/16.
- */
+/** Created by matthewc on 3/9/16. */
 public class PatternFetcher {
     private static final Double DEFAULT_RADIUS = 1.0; // default 1 km search radius
 
@@ -38,8 +36,7 @@ public class PatternFetcher {
                         .map(feed.patterns::get)
                         .map(pattern -> new WrappedGTFSEntity(feed.uniqueId, pattern))
                         .forEach(patterns::add);
-            }
-            else if (env.getArgument("route_id") != null) {
+            } else if (env.getArgument("route_id") != null) {
                 List<String> routeId = (List<String>) env.getArgument("route_id");
                 feed.patterns.values().stream()
                         .filter(p -> routeId.contains(p.route_id))
@@ -50,6 +47,7 @@ public class PatternFetcher {
 
         return patterns;
     }
+
     public static List<WrappedGTFSEntity<Pattern>> fromRoute(DataFetchingEnvironment env) {
         WrappedGTFSEntity<Route> route = (WrappedGTFSEntity<Route>) env.getSource();
         GTFSFeed feed = ApiMain.getFeedSourceWithoutExceptions(route.feedUniqueId);
@@ -59,10 +57,11 @@ public class PatternFetcher {
         List<String> patternId = env.getArgument("pattern_id");
         Long limit = env.getArgument("limit");
 
-        List<WrappedGTFSEntity<Pattern>> patterns = feed.patterns.values().stream()
-                .filter(p -> p.route_id.equals(route.entity.route_id))
-                .map(p -> new WrappedGTFSEntity<>(feed.uniqueId, p))
-                .collect(Collectors.toList());
+        List<WrappedGTFSEntity<Pattern>> patterns =
+                feed.patterns.values().stream()
+                        .filter(p -> p.route_id.equals(route.entity.route_id))
+                        .map(p -> new WrappedGTFSEntity<>(feed.uniqueId, p))
+                        .collect(Collectors.toList());
         if (patternId != null) {
             patterns.stream()
                     .filter(p -> patternId.contains(p.entity.pattern_id))
@@ -70,7 +69,12 @@ public class PatternFetcher {
         }
         if (stopIds != null) {
             patterns.stream()
-                    .filter(p -> !Collections.disjoint(p.entity.orderedStops, stopIds)) // disjoint returns true if no elements in common
+                    .filter(
+                            p ->
+                                    !Collections.disjoint(
+                                            p.entity.orderedStops,
+                                            stopIds)) // disjoint returns true if no elements in
+                                                      // common
                     .collect(Collectors.toList());
         }
         if (limit != null) {

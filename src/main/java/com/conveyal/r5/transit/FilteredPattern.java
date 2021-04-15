@@ -12,7 +12,10 @@ public class FilteredPattern {
 
     private static Logger LOG = LoggerFactory.getLogger(FilteredPattern.class);
 
-    /** Schedule-based (i.e. not frequency-based) trips running in a particular set of GTFS services */
+    /**
+     * Schedule-based (i.e. not frequency-based) trips running in a particular set of GTFS services, sorted in
+     * ascending order by time of departure from first stop
+     */
     public List<TripSchedule> runningScheduledTrips = new ArrayList<>();
 
     /** Frequency-based trips active in a particular set of GTFS services */

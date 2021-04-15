@@ -76,7 +76,8 @@ public class FastRaptorWorker {
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 
     // ENABLE_OPTIMIZATION_X flags enable code paths that should affect efficiency but have no effect on output.
-    // They may change results where our algorithm is not perfectly optimal, for example with respect to overtaking.
+    // They may change results where our algorithm is not perfectly optimal, for example with respect to overtaking
+    // (see discussion at #708).
 
     public static final boolean ENABLE_OPTIMIZATION_RANGE_RAPTOR = true;
     public static final boolean ENABLE_OPTIMIZATION_FREQ_UPPER_BOUND = true;
@@ -484,6 +485,7 @@ public class FastRaptorWorker {
     private int findEarliestScheduledDeparture (
             int departAfter, FilteredPattern filteredPattern, int stopInPattern
     ) {
+        // Trips are sorted in ascending order by time of departure from first stop
         List<TripSchedule> trips = filteredPattern.runningScheduledTrips;
         boolean noOvertaking = filteredPattern.noScheduledOvertaking;
         int bestTrip = -1;
@@ -494,6 +496,8 @@ public class FastRaptorWorker {
             if (departure > departAfter && departure < bestDeparture) {
                 bestTrip = t;
                 bestDeparture = departure;
+                // No overtaking plus sorting by time of departure from first stop guarantees sorting by time of
+                // departure at this stop; so we know this is the earliest departure and can break early.
                 if (noOvertaking) break;
             }
         }

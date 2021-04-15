@@ -13,9 +13,9 @@ import static com.conveyal.r5.transit.TransitLayer.getTransitModes;
 /**
  * Associate filtered patterns within a particular TransportNetwork (scenario) with the criteria (transit modes and
  * active services) used to filter them. Many patterns contain a mixture of trips from different days, and those trips
- * appear to overtake one another if we do not filter them down. Filtering allows us to more accurately flag which
- * patterns have no overtaking, because departure time searches can be optimized on trips with no overtaking.
- * All trips in a pattern are defined to be on same route, and GTFS allows only one mode per route.
+ * appear to overtake one another if we do not filter them down. Filtering allows us to flag more effectively which
+ * patterns have no overtaking, which is useful because departure time searches can be then optimized for patterns with
+ * no overtaking. All trips in a pattern are defined to be on same route, and GTFS allows only one mode per route.
  */
 public class FilteredPatterns {
 

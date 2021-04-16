@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.progress;
 
 /**
  * This interface provides simple callbacks to allow long running, asynchronous operations to report on their progress.
+ * Take care that all method implementations are very fast as the increment methods might be called in tight loops.
  */
 public interface ProgressListener {
 
@@ -16,9 +17,12 @@ public interface ProgressListener {
      */
     void beginTask(String description, int totalElements);
 
-    /**
-     * Call this method to report that one unit of work has been performed.
-     */
-    void increment();
+    /** Call this method to report that N units of work have been performed. */
+    void increment(int n);
+
+    /** Call this method to report that one unit of work has been performed. */
+    default void increment () {
+        increment(1);
+    }
 
 }

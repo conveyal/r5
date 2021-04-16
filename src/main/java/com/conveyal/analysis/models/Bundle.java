@@ -195,6 +195,7 @@ public class Bundle extends Model implements Cloneable {
         }
     }
 
+    // The first two PROCESSING_* values are essentially deprecated in favor of Task. Consider eliminating this field.
     public enum Status {
         PROCESSING_OSM,
         PROCESSING_GTFS,

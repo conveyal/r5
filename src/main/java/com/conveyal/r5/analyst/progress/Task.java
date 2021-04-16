@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.controllers.UserActivityController.ApiTask;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.r5.util.ExceptionUtils;
 

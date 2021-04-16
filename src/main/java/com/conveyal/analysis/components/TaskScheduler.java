@@ -1,22 +1,18 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.controllers.UserActivityController;
-import com.conveyal.analysis.controllers.UserActivityController.ApiTask;
+import com.conveyal.r5.analyst.progress.ApiTask;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.analyst.progress.TaskAction;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;

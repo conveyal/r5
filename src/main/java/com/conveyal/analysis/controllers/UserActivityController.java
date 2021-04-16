@@ -2,15 +2,12 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.analyst.progress.ApiTask;
 import spark.Request;
 import spark.Response;
 import spark.Service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -60,18 +57,6 @@ public class UserActivityController implements HttpController {
         public int taskBacklog;
         /** List of tasks with percentage complete, current stage of progress, and any failures or error messages. */
         public List<ApiTask> taskProgress;
-    }
-
-    /** API model for tasks in an activity response. Times are durations rather than absolute to counter clock drift. */
-    public static class ApiTask {
-        public UUID id;
-        public String title;
-        public String detail;
-        public Task.State state;
-        public int percentComplete;
-        public int secondsActive;
-        public int secondsComplete;
-        public WorkProduct workProduct;
     }
 
 }

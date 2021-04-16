@@ -11,16 +11,18 @@ import java.util.List;
 import static com.conveyal.r5.transit.TransitLayer.getTransitModes;
 
 /**
- * Associate filtered patterns within a particular TransportNetwork (scenario) with the criteria (transit modes and
- * active services) used to filter them. Many patterns contain a mixture of trips from different days, and those trips
- * appear to overtake one another if we do not filter them down. Filtering allows us to flag more effectively which
- * patterns have no overtaking, which is useful because departure time searches can be then optimized for patterns with
- * no overtaking. All trips in a pattern are defined to be on same route, and GTFS allows only one mode per route.
+ * Holds all the FilteredPatterns instances for a particular TransitLayer (scenario) given a particular set of
+ * filtering criteria (transit modes and active services). There is one FilteredPattern instance for each TripPattern
+ * that is present in the filtered TransitLayer. Many TripPatterns contain a mixture of trips from different days,
+ * and those trips appear to overtake one another if we do not filter them down. Filtering allows us to flag more
+ * effectively which patterns have no overtaking, which is useful because departure time searches can be then optimized
+ * for patterns with no overtaking. All trips in a TripPattern are defined to be on same route, and GTFS allows only one
+ * mode per route.
  */
 public class FilteredPatterns {
 
     /**
-     * List with the same length and indexes as the unfiltered tripPatterns.
+     * List with the same length and indexes as the unfiltered TripPatterns in the input TransitLayer.
      * Patterns that do not meet the mode/services filtering criteria are recorded as null.
      */
     public final List<FilteredPattern> patterns;
@@ -32,7 +34,7 @@ public class FilteredPatterns {
     public BitSet runningScheduledPatterns = new BitSet();
 
     /**
-     * Construct a FilteredPatterns from the given transitLayer, filtering for the specified modes and active services.
+     * Construct FilteredPatterns from the given TransitLayer, filtering for the specified modes and active services.
      * It's tempting to use List.of() or Collectors.toUnmodifiableList() but these cause an additional array copy.
      */
     public FilteredPatterns (TransitLayer transitLayer, EnumSet<TransitModes> modes, BitSet services) {

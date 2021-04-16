@@ -9,7 +9,7 @@ import java.util.BitSet;
 import java.util.EnumSet;
 
 /**
- * Stores the relevant patterns and trips based on the transit modes and date in an analysis request.
+ * Stores the patterns and trips relevant for routing based on the transit modes and date in an analysis request.
  * We can't just cache the single most recently used filtered patterns, because a worker might need to simultaneously
  * handle two requests for the same scenario on different dates or with different modes.
  *
@@ -21,7 +21,12 @@ import java.util.EnumSet;
  */
 public class FilteredPatternCache {
 
+    /**
+     * All FilteredPatterns stored in this cache will be derived from this single TransitLayer representing a single
+     * scenario, but for different unique combinations of (transitModes, services).
+     */
     private final TransitLayer transitLayer;
+
     private final LoadingCache<Key, FilteredPatterns> cache;
 
     public FilteredPatternCache (TransitLayer transitLayer) {
@@ -32,14 +37,14 @@ public class FilteredPatternCache {
     }
 
     // TODO replace all keys and tuples with Java 16/17 Records
-    public static class Key extends Tuple2<EnumSet<TransitModes>, BitSet> {
-        public Key (EnumSet<TransitModes> transitModes, BitSet bitSet) {
-            super(transitModes, bitSet);
+    private static class Key extends Tuple2<EnumSet<TransitModes>, BitSet> {
+        public Key (EnumSet<TransitModes> transitModes, BitSet servicesActive) {
+            super(transitModes, servicesActive);
         }
     }
 
-    public FilteredPatterns get (EnumSet<TransitModes> transitModes, BitSet bitSet) {
-        return cache.get(new Key(transitModes, bitSet));
+    public FilteredPatterns get (EnumSet<TransitModes> transitModes, BitSet servicesActive) {
+        return cache.get(new Key(transitModes, servicesActive));
     }
 
 }

@@ -7,7 +7,13 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-
+/**
+ * FilteredPatterns correspond to a single specific TripPattern, indicating all the trips running on a particular day.
+ * TripPatterns contain all the trips on a route that follow the same stop sequence. This often includes trips on
+ * different days of the week or special schedules where vehicles travel faster or slower. By filtering down to only
+ * those trips running on a particular day (a particular set of service codes), we usually get a smaller set of trips
+ * with no overtaking, which enables certain optimizations and is more efficient for routing.
+ */
 public class FilteredPattern {
 
     private static Logger LOG = LoggerFactory.getLogger(FilteredPattern.class);
@@ -25,9 +31,8 @@ public class FilteredPattern {
     public boolean noScheduledOvertaking;
 
     /**
-     * Copy a TripPattern, ignoring fields not used in Raptor routing. The source pattern's trip schedules are
-     * filtered to exclude trips not active in the supplied set of services, then divided into separate
-     * scheduled and frequency trip lists. Finally, check the runningScheduledTrips for overtaking.
+     * Filter the trips in a source TripPattern, excluding trips not active in the supplied set of services, and
+     * dividing them into separate scheduled and frequency trip lists. Check the runningScheduledTrips for overtaking.
      */
     public FilteredPattern (TripPattern source, BitSet servicesActive) {
         for (TripSchedule schedule : source.tripSchedules) {
@@ -39,7 +44,6 @@ public class FilteredPattern {
                 }
             }
         }
-
         // Check whether any running trip on this pattern overtakes another
         noScheduledOvertaking = true;
         for (int i = 0; i < runningScheduledTrips.size() - 1; i++) {

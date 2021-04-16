@@ -22,8 +22,8 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 /**
+ * All the Trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  * This is like a Transmodel JourneyPattern.
- * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  */
 public class TripPattern implements Serializable, Cloneable {
 
@@ -33,7 +33,7 @@ public class TripPattern implements Serializable, Cloneable {
      * This is the ID of this trip pattern _in the original transport network_. This is important because if it were the
      * ID in this transport network the ID would depend on the order of application of scenarios, and because this ID is
      * used to map results back to the original network.
-     * TODO clarify this comment. What is the "original" transport network? This field doesn't seem to be used anywhere.
+     * TODO This concept of an "original" transport network may be obsolete, this field doesn't seem to be used anywhere.
      */
     public int originalId;
 
@@ -45,8 +45,7 @@ public class TripPattern implements Serializable, Cloneable {
     public PickDropType[] dropoffs;
     public BitSet wheelchairAccessible; // One bit per stop
 
-    /** TripSchedules for all trips following this pattern, sorted in ascending order by time of departure from first
-     *  stop */
+    /** TripSchedules for all trips in this pattern, sorted in ascending order by time of departure from first stop. */
     public List<TripSchedule> tripSchedules = new ArrayList<>();
 
     /** GTFS shape for this pattern. Should be left null in non-customer-facing applications */
@@ -68,8 +67,8 @@ public class TripPattern implements Serializable, Cloneable {
     public BitSet servicesActive = new BitSet();
 
     /**
-     * index of this route in TransitLayer data. -1 if detailed route information has not been loaded
-     * TODO clarify what "this route" means. The route of this tripPattern?
+     * The index of this TripPatterns's route in the TransitLayer, or -1 if not yet loaded.
+     * Do we really want/need this redundant representation of routeId?
      */
     public int routeIndex = -1;
 
@@ -180,9 +179,7 @@ public class TripPattern implements Serializable, Cloneable {
         return sb.toString();
     }
 
-    /**
-     * @return true when none of the supplied tripIds are on this pattern.
-     */
+    /** @return true when none of the supplied tripIds are on this pattern. */
     public boolean containsNoTrips(Set<String> tripIds) {
         return this.tripSchedules.stream().noneMatch(ts -> tripIds.contains(ts.tripId));
     }

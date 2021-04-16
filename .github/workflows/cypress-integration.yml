@@ -38,6 +38,7 @@ jobs:
       - uses: cypress-io/github-action@v2
         env:
           NEXT_PUBLIC_BASEMAP_DISABLED: true
+          NEXT_PUBLIC_CYPRESS: true
           NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
         with:
           build: yarn build

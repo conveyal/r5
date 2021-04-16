@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
@@ -20,10 +21,14 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.util.concurrent.ExecutionError;
 import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.geom.Coordinate;
@@ -236,15 +241,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip);
-        LOG.info("{} errors", errors.size());
-        for (GTFSError error : errors) {
-            LOG.info("{}", error);
-        }
-
         zip.close();
-
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
+        LOG.info("Detected {} errors in feed.", errors.size());
     }
 
     public void loadFromFile(ZipFile zip) throws Exception {
@@ -429,7 +429,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /**
      *  Bin all trips by stop sequence and pick/drop sequences.
-     * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
+     * A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
      */
     public void findPatterns() {
         int n = 0;

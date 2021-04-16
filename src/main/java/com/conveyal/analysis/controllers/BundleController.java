@@ -31,7 +31,9 @@ import spark.Response;
 import spark.Service;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -187,12 +189,14 @@ public class BundleController implements HttpController {
                         ZipFile zipFile = new ZipFile(feedFile);
                         File tempDbFile = FileUtils.createScratchFile("db");
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
+                        File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
                         GTFSFeed feed = new GTFSFeed(tempDbFile);
                         feed.loadFromFile(zipFile, new ObjectId().toString());
                         feed.findPatterns();
 
                         // Populate the metadata while the feed is open
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
                         Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
                         bundle.feeds.add(feedSummary);
 
@@ -208,6 +212,15 @@ public class BundleController implements HttpController {
                             bundle.serviceEnd = feedSummary.serviceEnd;
                         }
 
+                        // Save all errors to a file.
+                        try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
+                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        // Save some space in the MapDB after we've summarized the errors to Mongo and a JSON file.
+                        feed.errors.clear();
+
                         // Flush db files to disk
                         feed.close();
 
@@ -215,6 +228,7 @@ public class BundleController implements HttpController {
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
 
                         // Increment feeds complete for the progress handler
                         bundle.feedsComplete += 1;
@@ -233,15 +247,15 @@ public class BundleController implements HttpController {
 
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
-              } catch (Exception e) {
+              } catch (Throwable t) {
                 // This catches any error while processing a feed with the GTFS Api and needs to be more
                 // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
                 // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
                 // "bundle" at a later point. This updated error handling is a stopgap until we improve that
                 // flow.
-                LOG.error("Error creating bundle", e);
+                LOG.error("Error creating bundle", t);
                 bundle.status = Bundle.Status.ERROR;
-                bundle.statusText = ExceptionUtils.asString(e);
+                bundle.statusText = ExceptionUtils.shortAndLongString(t);
               } finally {
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }

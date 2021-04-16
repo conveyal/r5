@@ -752,6 +752,7 @@ public class TransitLayer implements Serializable, Cloneable {
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its
             // scenarioId remains unchanged as is done in StreetLayer.
             copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.filteredPatternCache = new FilteredPatternCache(copy);
         }
         return copy;
     }

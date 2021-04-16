@@ -8,6 +8,9 @@ package com.conveyal.analysis.components;
  * Each component should encapsulate a distinct, well-defined set of functionality. Different implementations of
  * components allow running locally or in other environments like AWS or potentially other cloud service providers.
  * Currently this is a marker interface with no methods, just to indicate the role of certain classes in the project.
+ *
+ * All Components should be threadsafe: they must not fail when concurrently used by multiple HTTP handler threads.
  */
 public interface Component {
+
 }

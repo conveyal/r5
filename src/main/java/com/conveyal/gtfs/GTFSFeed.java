@@ -2,6 +2,7 @@ package com.conveyal.gtfs;
 
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -21,6 +22,8 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.conveyal.r5.analyst.progress.NoopProgressListener;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -171,6 +174,14 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /** Once a GTFSFeed has one feed loaded into it, we set this to true to block loading any additional feeds. */
     private boolean loaded = false;
+
+    /**
+     * Set this to a ProgressListener to receive updates while loading GTFS. Like OSM files we have no idea how many
+     * entities are in the GTFS before we begin, so can only report progress based on the number of bytes read.
+     * Unlike OSM, GTFS is a zip file and will usually require random access to read the tables so we report progress
+     * on each table separately. This does give nice fine-grained reporting for the larger tables like stop_times.
+     */
+    public ProgressListener progressListener = null;
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -435,7 +446,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         int n = 0;
 
         Multimap<TripPatternKey, String> tripsForPattern = HashMultimap.create();
-
         for (String trip_id : trips.keySet()) {
             if (++n % 100000 == 0) {
                 LOG.info("trip {}", human(n));
@@ -499,12 +509,17 @@ public class GTFSFeed implements Cloneable, Closeable {
             namingInfo.fromStops.put(fromName, pattern);
             namingInfo.toStops.put(toName, pattern);
 
-            pattern.orderedStops.stream().map(stops::get).forEach(stop -> {
-               if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) return;
-
+            for (String stopId : pattern.orderedStops) {
+                Stop stop = stops.get(stopId);
+                if (stop == null) {
+                    // TODO replace with ReferentialIntegrityError during stop_time loading
+                    throw new RuntimeException(String.format("No stop exists with ID '%s'", stopId));
+                }
+                if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) {
+                    continue;
+                }
                 namingInfo.vias.put(stop.stop_name, pattern);
-            });
-
+            }
             namingInfo.patternsOnRoute.add(pattern);
         }
 
@@ -793,8 +808,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .closeOnJvmShutdown()
                     .make();
         } catch (ExecutionError | IOError | Exception e) {
-            LOG.error("Could not construct db from file.", e);
-            return null;
+            throw new GtfsLibException("Could not construct db from file.", e);
         }
     }
 

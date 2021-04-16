@@ -32,11 +32,4 @@ public abstract class DistributionTester {
         }
     }
 
-    public static void assertEqualValues (int[] expected, int[] values) {
-        assertEquals(expected.length, values.length);
-        for (int i = 0; i < expected.length; i++) {
-            assertEquals(expected[i], values[i]);
-        }
-    }
-
 }

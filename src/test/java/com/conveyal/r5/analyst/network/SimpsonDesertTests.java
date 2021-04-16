@@ -12,9 +12,12 @@ import org.locationtech.jts.geom.CoordinateXY;
 
 import java.io.FileOutputStream;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This is a collection of tests using roads and transit lines laid out in a large perfect grid in the desert.
@@ -186,7 +189,7 @@ public class SimpsonDesertTests {
         List<PathResult.PathIterations> standardPaths = standardResult.paths.getPathIterationsForDestination();
         int[] standardTimes = standardPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus ~5 minute ride and ~5 minute egress leg
-        DistributionTester.assertEqualValues(new int[]{45, 44, 43, 42, 41}, standardTimes);
+        assertTrue(Arrays.equals(new int[]{45, 44, 43, 42, 41}, standardTimes));
 
         // 2. Naive rider: downstream overtaking means Trip A departs origin first but is not fastest to destination.
         AnalysisWorkerTask naiveRider = gridLayout.copyTask(standardRider)
@@ -197,7 +200,7 @@ public class SimpsonDesertTests {
         List<PathResult.PathIterations> naivePaths = naiveResult.paths.getPathIterationsForDestination();
         int[] naiveTimes = naivePaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus ~35 minute ride and ~5 minute egress leg
-        DistributionTester.assertEqualValues(new int[]{54, 53, 52, 51, 50}, naiveTimes);
+        assertTrue(Arrays.equals(new int[]{54, 53, 52, 51, 50}, naiveTimes));
 
         // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
         // when boarding Trip A is possible
@@ -209,7 +212,7 @@ public class SimpsonDesertTests {
         List<PathResult.PathIterations> savvyPaths = savvyResult.paths.getPathIterationsForDestination();
         int[] savvyTimes = savvyPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip B departs stop 10 at 7:25. So 8-12 minute wait, plus ~16 minute ride and ~5 minute egress leg
-        DistributionTester.assertEqualValues(new int[]{32, 31, 30, 29, 28}, savvyTimes);
+        assertTrue(Arrays.equals(new int[]{32, 31, 30, 29, 28}, savvyTimes));
     }
 
     /**

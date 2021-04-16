@@ -458,13 +458,11 @@ public class FastRaptorWorker {
     private int checkEarlierScheduledDeparture (
             int departAfter, FilteredPattern filteredPattern, int stopInPattern, int currentTrip
     ) {
-        TripSchedule schedule = filteredPattern.runningScheduledTrips.get(currentTrip);
-        final int scheduleDeparture = schedule.departures[stopInPattern];
-        int bestTrip  = currentTrip;
         checkArgument(filteredPattern.noScheduledOvertaking);
+        int bestTrip  = currentTrip;
         int candidateTrip = currentTrip;
         while (--candidateTrip >= 0) {
-            // The tripSchedules in a the supplied pattern are known to be sorted by departure time at all stops.
+            // The tripSchedules in the supplied pattern are known to be sorted by departure time at all stops.
             TripSchedule candidateSchedule = filteredPattern.runningScheduledTrips.get(candidateTrip);
             final int candidateDeparture = candidateSchedule.departures[stopInPattern];
             if (candidateDeparture > departAfter) {

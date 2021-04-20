@@ -5,6 +5,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.validator.model.Priority;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -79,9 +80,11 @@ public class Bundle extends Model implements Cloneable {
         public String type;
         public int count;
         public List<GtfsErrorSummary> someErrors = new ArrayList<>();
+        public Priority priority;
         public GtfsErrorTypeSummary () { /* For deserialization. */ }
-        public GtfsErrorTypeSummary (String type) {
-            this.type = type;
+        public GtfsErrorTypeSummary (GTFSError error) {
+            this.priority = error.getPriority();
+            this.type = error.errorType;
         }
     }
 
@@ -175,7 +178,7 @@ public class Bundle extends Model implements Cloneable {
                 String type = error.errorType;
                 GtfsErrorTypeSummary summary = sortedErrors.get(type);
                 if (summary == null) {
-                    summary = new GtfsErrorTypeSummary(type);
+                    summary = new GtfsErrorTypeSummary(error);
                     sortedErrors.put(type, summary);
                 }
                 summary.count += 1;

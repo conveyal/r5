@@ -13,6 +13,6 @@ public interface TaskAction {
      * The parameter is a simpler interface of Task that only allows progress reporting, to encapsulate actions and
      * prevent them from seeing or modifying the task hierarchy that triggers and manages them.
      */
-    public void action (ProgressListener progressListener);
+    public void action (ProgressListener progressListener) throws Exception;
 
 }

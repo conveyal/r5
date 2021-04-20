@@ -2,12 +2,11 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.analyst.progress.ApiTask;
 import spark.Request;
 import spark.Response;
 import spark.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
@@ -44,18 +43,20 @@ public class UserActivityController implements HttpController {
     private ResponseModel getActivity (Request req, Response res) {
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         ResponseModel responseModel = new ResponseModel();
+        responseModel.systemStatusMessages = List.of();
+        responseModel.taskBacklog = taskScheduler.getBacklog();
         responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
         return responseModel;
     }
 
-    /** Only used to structure JSON messages sent back to UI. */
+    /** API model used only to structure activity JSON messages sent back to UI. */
     public static class ResponseModel {
         /** For example: "Server going down at 17:00 GMT for maintenance" or "Working to resolve known issue [link]." */
-        public List<String> systemStatusMessages = new ArrayList<>();
+        public List<String> systemStatusMessages;
         /** Number of tasks in the queue until this user's start processing. Just a rough indicator of progress. */
         public int taskBacklog;
-        /** Nested list of tasks with percentage complete and any failures or error messages. */
-        public List<Task> taskProgress;
+        /** List of tasks with percentage complete, current stage of progress, and any failures or error messages. */
+        public List<ApiTask> taskProgress;
     }
 
 }

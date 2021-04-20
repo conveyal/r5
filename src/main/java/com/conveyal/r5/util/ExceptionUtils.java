@@ -43,7 +43,7 @@ public abstract class ExceptionUtils {
             throwable = throwable.getCause();
         }
         Collections.reverse(items);
-        return String.join(" Caused ", items);
+        return String.join(", caused ", items);
     }
 
     public static String shortAndLongString (Throwable throwable) {

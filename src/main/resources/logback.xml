@@ -18,6 +18,6 @@
     <logger name="graphql.GraphQL" level="WARN" />
     <logger name="org.mongodb.driver.connection" level="WARN" />
     <logger name="org.eclipse.jetty" level="WARN" />
-
+    <logger name="com.conveyal.r5.profile.FastRaptorWorker" level="INFO" />
 
 </configuration>

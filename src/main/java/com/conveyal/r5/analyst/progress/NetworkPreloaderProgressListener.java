@@ -60,6 +60,12 @@ public class NetworkPreloaderProgressListener implements ProgressListener {
         }
     }
 
+    @Override
+    public synchronized void increment (int n) {
+        throw new UnsupportedOperationException();
+        // TODO combined progress updating with case where n == 1
+    }
+
     private int getPercentComplete () {
         return (currentElement * 100) / totalElements;
     }

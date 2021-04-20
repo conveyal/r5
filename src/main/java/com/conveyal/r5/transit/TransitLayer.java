@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,9 @@ public class TransitLayer implements Serializable, Cloneable {
     public static final int TYPICAL_NUMBER_OF_STOPS_PER_TRIP = 30;
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
+
+    /** Stores the relevant patterns and trips based on the transit modes and date in an analysis request. */
+    public transient FilteredPatternCache filteredPatternCache = new FilteredPatternCache(this);
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -748,6 +752,7 @@ public class TransitLayer implements Serializable, Cloneable {
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its
             // scenarioId remains unchanged as is done in StreetLayer.
             copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.filteredPatternCache = new FilteredPatternCache(copy);
         }
         return copy;
     }

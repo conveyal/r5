@@ -60,8 +60,9 @@ public abstract class BackendMain {
 
         LOG.info("Conveyal Analysis server is ready.");
         for (TaskAction taskAction : postStartupTasks) {
-            components.taskScheduler.enqueue(Task.system()
-                    .withDescription(Runnable.class.getSimpleName()).setHeavy(true).withAction(taskAction));
+            components.taskScheduler.enqueue(
+                    Task.create(Runnable.class.getSimpleName()).setHeavy(true).withAction(taskAction)
+            );
         }
 
         if (components.config.immediateShutdown) {

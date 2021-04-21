@@ -111,6 +111,12 @@ public class TaskScheduler implements Component {
         );
     }
 
+    public void repeatRegularly (PeriodicTask... periodicTasks) {
+        for (PeriodicTask task : periodicTasks) {
+            repeatRegularly(task);
+        }
+    }
+
     // TODO these methods can be eliminated in favor of the single enqueue method that gets information about
     //      heavy/light/periodic from its Task parameter.
 

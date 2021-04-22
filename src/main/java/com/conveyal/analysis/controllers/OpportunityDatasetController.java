@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
+import static com.conveyal.analysis.models.OpportunityDataset.DEFAULT_ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -148,7 +148,7 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         final String regionId = req.params("regionId");
-        final int zoom = req.params("zoom") != null ? Integer.parseInt(req.params("zoom")) : ZOOM;
+        final int zoom = req.params("zoom") != null ? Integer.parseInt(req.params("zoom")) : DEFAULT_ZOOM;
         // default
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
@@ -507,7 +507,7 @@ public class OpportunityDatasetController implements HttpController {
                         // This newer process creates a FreeFormPointSet only for the specified count fields,
                         // as well as a Grid to assist in visualization of the uploaded data.
                         for (FreeFormPointSet freeForm : createFreeFormPointSetsFromCsv(csvFileItem, parameters)) {
-                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, ZOOM);
+                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, DEFAULT_ZOOM);
                             pointsets.add(freeForm);
                             pointsets.add(gridFromFreeForm);
                         }
@@ -617,11 +617,11 @@ public class OpportunityDatasetController implements HttpController {
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
         InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, ZOOM, status);
+        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, DEFAULT_ZOOM, status);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
             ignoreFields = Arrays.asList(idField, latField, lonField);
-            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, ZOOM, status));
+            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, DEFAULT_ZOOM, status));
         }
 
         return grids;

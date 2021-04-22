@@ -34,7 +34,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
+import static com.conveyal.analysis.models.OpportunityDataset.DEFAULT_ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -132,7 +132,7 @@ public class AggregationAreaController implements HttpController {
 
         boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
 
-        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : ZOOM;
+        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : DEFAULT_ZOOM;
 
         if (!unionRequested && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +

@@ -13,10 +13,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  */
 public class OpportunityDataset extends Model {
 
-    /** For now all web Mercator grids are zoom level 9. Level 10 is probably ideal but will quadruple calculation.
-     * TODO make adjustable
+    /**
+     * Default Web Mercator zoom level 9 for grids (origin/destination layers, aggregation area masks, etc.).
+     * Level 10 is probably ideal but will quadruple calculation.
      * */
-    public static final int ZOOM = 9;
+    public static final int DEFAULT_ZOOM = 9;
 
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
@@ -98,7 +99,7 @@ public class OpportunityDataset extends Model {
 
     @JsonIgnore
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, ZOOM);
+        return new WebMercatorExtents(west, north, width, height, DEFAULT_ZOOM);
     }
 
     /** Analysis region this dataset was uploaded in. */

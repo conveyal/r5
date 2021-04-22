@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
@@ -11,12 +10,10 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import org.locationtech.jts.geom.Coordinate;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.GTFS_DATE;
 
 /**
@@ -59,6 +56,11 @@ public class GridSinglePointTaskBuilder {
         task.recordTravelTimeHistograms = true;
     }
 
+    public GridSinglePointTaskBuilder (GridLayout layout, AnalysisWorkerTask task) {
+        this.gridLayout = layout;
+        this.task = task.clone();
+    }
+
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
         Coordinate origin = gridLayout.getIntersectionLatLon(gridX, gridY);
         task.fromLat = origin.y;
@@ -70,12 +72,26 @@ public class GridSinglePointTaskBuilder {
         Coordinate destination = gridLayout.getIntersectionLatLon(gridX, gridY);
         task.destinationPointSets = new PointSet[] { new FreeFormPointSet(destination) };
         task.destinationPointSetKeys = new String[] { "ID" };
+        task.toLat = destination.y;
+        task.toLon = destination.x;
+        task.includePathResults = true;
         return this;
     }
 
     public GridSinglePointTaskBuilder morningPeak () {
         task.fromTime = LocalTime.of(7, 00).toSecondOfDay();
         task.toTime = LocalTime.of(9, 00).toSecondOfDay();
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder departureTimeWindow(int startHour, int startMinute, int durationMinutes) {
+        task.fromTime = LocalTime.of(startHour, startMinute).toSecondOfDay();
+        task.toTime = LocalTime.of(startHour, startMinute + durationMinutes).toSecondOfDay();
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder maxRides(int rides) {
+        task.maxRides = rides;
         return this;
     }
 

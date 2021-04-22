@@ -8,6 +8,7 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -31,7 +32,9 @@ import spark.Response;
 import spark.Service;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.Writer;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,6 +44,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -103,7 +107,7 @@ public class BundleController implements HttpController {
      * Or simply not have "bundles" at all, and just supply a list of OSM and GTFS unique IDs to the workers.
      */
     private Bundle create (Request req, Response res) {
-        // create the bundle
+        // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final Bundle bundle = new Bundle();
         try {
@@ -134,47 +138,41 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
+            bundle.accessGroup = req.attribute("accessGroup");
+            bundle.createdBy = req.attribute("email");
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
         }
-
-        // Set `createdBy` and `accessGroup`
-        bundle.accessGroup = req.attribute("accessGroup");
-        bundle.createdBy = req.attribute("email");
-
+        // ID and create/update times are assigned here when we push into Mongo.
+        // FIXME Ideally we'd only set and retain the ID without inserting in Mongo,
+        //  but existing create() method with side effects would overwrite the ID.
         Persistence.bundles.create(bundle);
 
-        // Process OSM first, then each feed sequentially. Asynchronous so we can respond to the HTTP API call.
+        // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
+        // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        taskScheduler.enqueue(Task.forUser(userPermissions)
-            .withDescription("Process OSM and GTFS")
+        taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
+            .forUser(userPermissions)
             .setHeavy(true)
-            .withTotalWorkUnits(
-                ((bundle.osmId == null) ? 1: 0) +
-                ((bundle.feedGroupId == null) ? files.get("feedGroup").size() : 0)
-            )
+            .withWorkProduct(BUNDLE, bundle._id, bundle.regionId)
             .withAction(progressListener -> {
               try {
                 if (bundle.osmId == null) {
                     // Process uploaded OSM.
-                    bundle.status = Bundle.Status.PROCESSING_OSM;
                     bundle.osmId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
-                    osm.readPbf(fi.getInputStream());
-
+                    // Number of entities in an OSM file is unknown, so derive progress from the number of bytes read.
+                    // Wrapping in buffered input stream should reduce number of progress updates.
+                    osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
+                    // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
                     fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
-                    progressListener.increment();
                 }
 
                 if (bundle.feedGroupId == null) {
                     // Process uploaded GTFS files
-                    bundle.status = Bundle.Status.PROCESSING_GTFS;
                     bundle.feedGroupId = new ObjectId().toString();
-                    Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
 
                     Envelope bundleBounds = new Envelope();
                     bundle.serviceStart = LocalDate.MAX;
@@ -187,12 +185,15 @@ public class BundleController implements HttpController {
                         ZipFile zipFile = new ZipFile(feedFile);
                         File tempDbFile = FileUtils.createScratchFile("db");
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
+                        File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
                         GTFSFeed feed = new GTFSFeed(tempDbFile);
+                        feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
                         feed.findPatterns();
 
                         // Populate the metadata while the feed is open
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
                         Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
                         bundle.feeds.add(feedSummary);
 
@@ -208,6 +209,15 @@ public class BundleController implements HttpController {
                             bundle.serviceEnd = feedSummary.serviceEnd;
                         }
 
+                        // Save all errors to a file.
+                        try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
+                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        // Save some space in the MapDB after we've summarized the errors to Mongo and a JSON file.
+                        feed.errors.clear();
+
                         // Flush db files to disk
                         feed.close();
 
@@ -215,14 +225,10 @@ public class BundleController implements HttpController {
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
                         fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
-
-                        // Increment feeds complete for the progress handler
-                        bundle.feedsComplete += 1;
-
-                        // Done in a loop the nonce and updatedAt would be changed repeatedly
-                        Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
-                        progressListener.increment();
+                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
                     }
+                    // Set legacy progress field to indicate that all feeds have been loaded.
+                    bundle.feedsComplete = bundle.totalFeeds;
 
                     // TODO Handle crossing the antimeridian
                     bundle.north = bundleBounds.getMaxY();
@@ -230,23 +236,22 @@ public class BundleController implements HttpController {
                     bundle.east = bundleBounds.getMaxX();
                     bundle.west = bundleBounds.getMinX();
                 }
-
                 writeManifestToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
-              } catch (Exception e) {
-                // This catches any error while processing a feed with the GTFS Api and needs to be more
-                // robust in bubbling up the specific errors to the UI. Really, we need to separate out the
-                // idea of bundles, track uploads of single feeds at a time, and allow the creation of a
-                // "bundle" at a later point. This updated error handling is a stopgap until we improve that
-                // flow.
-                LOG.error("Error creating bundle", e);
+              } catch (Throwable t) {
+                LOG.error("Error creating bundle", t);
                 bundle.status = Bundle.Status.ERROR;
-                bundle.statusText = ExceptionUtils.asString(e);
+                bundle.statusText = ExceptionUtils.shortAndLongString(t);
+                // Rethrow the problem so the task scheduler will attach it to the task with state ERROR.
+                // Eventually this whole catch and finally clause should be handled generically up in the task scheduler.
+                throw t;
               } finally {
+                // ID and create/update times are assigned here when we push into Mongo.
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }
         }));
-
+        // TODO do we really want to return the bundle here? It should not be needed until the background work is done.
+        // We could instead return the WorkProduct instance (or BaseModel instance or null) from TaskActions.
         return bundle;
     }
 

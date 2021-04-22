@@ -1,4 +1,4 @@
-<configuration debug="true">
+<configuration>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <!-- encoders are  by default assigned the type
@@ -15,5 +15,6 @@
     <logger name="com.conveyal.osmlib" level="INFO" />
     <logger name="com.conveyal.gtfs" level="INFO" />
     <logger name="com.conveyal.r5.profile.ExecutionTimer" level="INFO"/>
+    <logger name="com.conveyal.r5.profile.FastRaptorWorker" level="INFO" />
 
 </configuration>

@@ -1,8 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.slf4j.Logger;
@@ -10,8 +8,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -121,6 +122,12 @@ public class Job {
      */
     public int deliveryPass = 0;
 
+    /**
+     * If any error compromises the usabilty or quality of results from any origin, it is recorded here.
+     * This is a Set because identical errors are likely to be reported from many workers or individual tasks.
+     */
+    public final Set<String> errors = new HashSet();
+
     public Job (RegionalTask templateTask, WorkerTags workerTags) {
         this.jobId = templateTask.jobId;
         this.templateTask = templateTask;
@@ -155,8 +162,16 @@ public class Job {
         }
     }
 
+    public boolean isActive() {
+        return !(isComplete() || isErrored());
+    }
+
     public boolean isComplete() {
         return nTasksCompleted == nTasksTotal;
+    }
+
+    public boolean isErrored () {
+        return notNullOrEmpty(this.errors);
     }
 
     /**
@@ -181,7 +196,7 @@ public class Job {
     }
 
     public boolean hasTasksToDeliver() {
-        if (this.isComplete()) {
+        if (!(this.isActive())) {
             return false;
         }
         if (nextTaskToDeliver < nTasksTotal) {

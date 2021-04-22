@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.network;
 
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -18,6 +20,12 @@ public class GridRoute {
     public boolean bidirectional;
     public int startHour;
     public int endHour;
+    /** Explicit departure times from first stop; if set, startHour and endHour will be ignored*/
+    public int[] startTimes;
+    /**
+     * Override default hop times. Map of (trip, stopAtStartOfHop) to factor by which default hop is multiplied
+     */
+    public Map<TripHop, Double> hopTimeScaling;
     public int headwayMinutes;
     public boolean pureFrequency;
 
@@ -65,6 +73,16 @@ public class GridRoute {
         }
     }
 
+    public double hopTime (TripHop tripHop) {
+        double scale;
+        if (hopTimeScaling != null && hopTimeScaling.get(tripHop) != null) {
+            scale = hopTimeScaling.get(tripHop);
+        } else {
+            scale = 1;
+        }
+        return scale * stopSpacingBlocks * gridLayout.transitBlockTraversalTimeSeconds;
+    }
+
     private static GridRoute newBareRoute (GridLayout gridLayout, int headwayMinutes) {
         GridRoute route = new GridRoute();
         route.id = gridLayout.nextIntegerId(); // Avoid collisions when same route is added multiple times
@@ -99,6 +117,30 @@ public class GridRoute {
     public GridRoute pureFrequency () {
         pureFrequency = true;
         return this;
+    }
+
+    public static class TripHop{
+        int trip;
+        int hop;
+
+        public TripHop(int trip, int hop){
+            this.trip = trip;
+            this.hop = hop;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            TripHop tripHop = (TripHop) o;
+            return trip == tripHop.trip &&
+                    hop == tripHop.hop;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(trip, hop);
+        }
     }
 
 }

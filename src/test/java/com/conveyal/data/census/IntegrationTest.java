@@ -99,19 +99,7 @@ public class IntegrationTest {
         String[] line;
         while (reader.readRecord()) {
             // make sure everything matches, and that we got the column name mappings correct
-            foundJobsEntry = foundJobsEntry || check("Jobs at firms aged 0-1 years", "CFA01");
-            check("Jobs at firms aged 2-3 years", "CFA02");
-            check("Jobs at firms aged 4-5 years", "CFA03");
-            check("Jobs at firms aged 6-10 years", "CFA04");
-            check("Jobs at firms aged 11 or more years", "CFA05");
-
-            check("Jobs at firms with 0-19 employees", "CFS01");
-            check("Jobs at firms with 20-49 employees", "CFS02");
-            check("Jobs at firms with 50-249 employees", "CFS03");
-            check("Jobs at firms with 250-499 employees", "CFS04");
-            check("Jobs at firms with 500 or more employees", "CFS05");
-
-            check("Jobs employing Hispanic or Latino workers", "CT02");
+            foundJobsEntry = foundJobsEntry || check("Jobs employing Hispanic or Latino workers", "CT02");
             check("Jobs employing not Hispanic or Latino workers", "CT01");
 
             check("Jobs employing females", "CS02");

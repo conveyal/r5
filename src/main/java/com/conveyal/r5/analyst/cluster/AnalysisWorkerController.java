@@ -1,11 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.google.common.io.LittleEndianDataOutputStream;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,39 +42,33 @@ public class AnalysisWorkerController {
         TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         // TODO do not return raw binary data from method, return better typed response.
         // TODO possibly move data preloading to this point, to allow returning different HTTP status codes.
-
         if (task.logRequest){
             LOG.info(request.body());
         }
-
         try {
-            try {
-                byte[] binaryResult = analysisWorker.handleAndSerializeOneSinglePointTask(task);
-                response.status(HttpStatus.OK_200);
-                if (task.getFormat().equals(GEOTIFF)) {
-                    response.header("Content-Type", "application/x-geotiff");
-                } else {
-                    response.header("Content-Type", "application/octet-stream");
-                }
-                return binaryResult;
-            } catch (WorkerNotReadyException workerNotReadyException) {
-                // We're using exceptions for flow control here, which is kind of ugly. Define a ResultOrError<T> class?
-                if (workerNotReadyException.isError()) {
-                    if (workerNotReadyException.asyncLoaderState.exception instanceof ScenarioApplicationException) {
-                        return reportTaskErrors(response,
-                                ((ScenarioApplicationException)workerNotReadyException.asyncLoaderState.exception).taskErrors);
-                    } else {
-                        return jsonResponse(response, HttpStatus.BAD_REQUEST_400,
-                                ExceptionUtils.asString(workerNotReadyException.asyncLoaderState.exception));
-                    }
-                } else {
-                    return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.asyncLoaderState.message);
-                }
+            byte[] binaryResult = analysisWorker.handleAndSerializeOneSinglePointTask(task);
+            response.status(HttpStatus.OK_200);
+            if (task.getFormat().equals(GEOTIFF)) {
+                response.header("Content-Type", "application/x-geotiff");
+            } else {
+                response.header("Content-Type", "application/octet-stream");
             }
-        } catch (Exception exception) {
-            // Handle any uncaught exceptions in any of the above code.
-            // TODO shouldn't some of these serious uncaught errors be 500s?
-            return jsonResponse(response, HttpStatus.BAD_REQUEST_400, ExceptionUtils.asString(exception));
+            return binaryResult;
+        } catch (WorkerNotReadyException workerNotReadyException) {
+            // We're using exceptions for flow control here, which is kind of ugly. Define a ResultOrError<T> class?
+            if (workerNotReadyException.isError()) {
+                Throwable t = workerNotReadyException.asyncLoaderState.throwable;
+                if (t instanceof ScenarioApplicationException) {
+                    return reportTaskErrors(response, ((ScenarioApplicationException)t).taskErrors);
+                } else {
+                    return reportTaskErrors(response, List.of(new TaskError(t)));
+                }
+            } else {
+                return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.asyncLoaderState.message);
+            }
+        } catch (Throwable throwable) {
+            // Handle any uncaught exceptions in any of the above code. Should some serious uncaught errors be 500s?
+            return reportTaskErrors(response, List.of(new TaskError(throwable)));
         }
     }
 

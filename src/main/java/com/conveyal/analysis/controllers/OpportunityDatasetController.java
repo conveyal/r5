@@ -442,6 +442,7 @@ public class OpportunityDatasetController implements HttpController {
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
+        final int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : DEFAULT_ZOOM;
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
@@ -488,7 +489,7 @@ public class OpportunityDatasetController implements HttpController {
                     pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
                 } else if (uploadFormat == UploadFormat.SHAPEFILE) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
-                    pointsets.addAll(createGridsFromShapefile(fileItems, status));
+                    pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
                 } else if (uploadFormat == UploadFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
@@ -507,13 +508,13 @@ public class OpportunityDatasetController implements HttpController {
                         // This newer process creates a FreeFormPointSet only for the specified count fields,
                         // as well as a Grid to assist in visualization of the uploaded data.
                         for (FreeFormPointSet freeForm : createFreeFormPointSetsFromCsv(csvFileItem, parameters)) {
-                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, DEFAULT_ZOOM);
+                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, zoom);
                             pointsets.add(freeForm);
                             pointsets.add(gridFromFreeForm);
                         }
                     } else {
                         // This is the common default process: create a grid for every non-ignored field in the CSV.
-                        pointsets.addAll(createGridsFromCsv(csvFileItem, formFields, status));
+                        pointsets.addAll(createGridsFromCsv(csvFileItem, formFields, zoom, status));
                     }
                 }
                 if (pointsets.isEmpty()) {
@@ -604,6 +605,7 @@ public class OpportunityDatasetController implements HttpController {
      */
     private List<Grid> createGridsFromCsv(FileItem csvFileItem,
                                                  Map<String, List<FileItem>> query,
+                                                 int zoom,
                                                  OpportunityDatasetUploadStatus status) throws Exception {
 
         String latField = getFormField(query, "latField", true);
@@ -617,11 +619,11 @@ public class OpportunityDatasetController implements HttpController {
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
         InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, DEFAULT_ZOOM, status);
+        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, status);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
             ignoreFields = Arrays.asList(idField, latField, lonField);
-            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, DEFAULT_ZOOM, status));
+            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, zoom, status));
         }
 
         return grids;
@@ -654,6 +656,7 @@ public class OpportunityDatasetController implements HttpController {
      * same base name, and should not contain any other files but these three or four.
      */
     private List<Grid> createGridsFromShapefile(List<FileItem> fileItems,
+                                                       int zoom,
                                                        OpportunityDatasetUploadStatus status) throws Exception {
 
         // In the caller, we should have already verified that all files have the same base name and have an extension.
@@ -682,7 +685,7 @@ public class OpportunityDatasetController implements HttpController {
             filesByExtension.get("SHX").write(shxFile);
         }
 
-        List<Grid> grids = Grid.fromShapefile(shpFile, ZOOM, status);
+        List<Grid> grids = Grid.fromShapefile(shpFile, zoom, status);
         tempDir.delete();
         return grids;
     }

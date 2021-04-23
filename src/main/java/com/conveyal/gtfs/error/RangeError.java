@@ -11,7 +11,7 @@ public class RangeError extends GTFSError implements Serializable {
     final double min, max, actual;
 
     public RangeError(String file, long line, String field, double min, double max, double actual) {
-        super(file, line, field, Priority.MEDIUM);
+        super(file, line, field, Priority.LOW);
         this.min = min;
         this.max = max;
         this.actual = actual;

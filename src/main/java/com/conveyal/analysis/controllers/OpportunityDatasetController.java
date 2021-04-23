@@ -55,8 +55,9 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.DEFAULT_ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -148,7 +149,8 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         final String regionId = req.params("regionId");
-        final int zoom = req.params("zoom") != null ? Integer.parseInt(req.params("zoom")) : DEFAULT_ZOOM;
+        final int zoom = parseZoom(req.queryParams("zoom"));
+
         // default
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
@@ -442,7 +444,6 @@ public class OpportunityDatasetController implements HttpController {
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
-        final int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : DEFAULT_ZOOM;
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
@@ -455,6 +456,7 @@ public class OpportunityDatasetController implements HttpController {
         // Parse required fields. Will throw a ServerException on failure.
         final String sourceName = getFormField(formFields, "Name", true);
         final String regionId = getFormField(formFields, "regionId", true);
+        final int zoom = parseZoom(getFormField(formFields, "zoom", false));
 
         // Create a region-wide status object tracking the processing of opportunity data.
         // Create the status object before doing anything including input and parameter validation, so that any problems

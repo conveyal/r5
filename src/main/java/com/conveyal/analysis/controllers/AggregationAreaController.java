@@ -34,8 +34,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.DEFAULT_ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 
 /**
  * Stores vector aggregationAreas (used to define the region of a weighted average accessibility metric).
@@ -131,8 +131,7 @@ public class AggregationAreaController implements HttpController {
         Map<String, Geometry> areas = new HashMap<>();
 
         boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
-
-        int zoom = req.attribute("zoom") != null ? Integer.parseInt(req.attribute("zoom")) : DEFAULT_ZOOM;
+        final int zoom = parseZoom(query.get("zoom").get(0).getString());
 
         if (!unionRequested && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +

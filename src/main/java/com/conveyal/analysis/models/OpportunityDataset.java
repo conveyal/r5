@@ -5,6 +5,8 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
  * The actual contents of the opportunity datasets are persisted to files on S3 and/or in a directory of the local
@@ -12,12 +14,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * longer strictly opportunity datasets - they may be sets of points with no attached opportunity densities.
  */
 public class OpportunityDataset extends Model {
-
-    /**
-     * Default Web Mercator zoom level 9 for grids (origin/destination layers, aggregation area masks, etc.).
-     * Level 10 is probably ideal but will quadruple calculation.
-     * */
-    public static final int DEFAULT_ZOOM = 9;
 
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;

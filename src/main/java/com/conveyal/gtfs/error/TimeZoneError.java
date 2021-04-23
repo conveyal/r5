@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /**
@@ -20,7 +22,7 @@ public class TimeZoneError extends GTFSError implements Serializable {
      * @param message description of issue with timezone reference
      */
     public TimeZoneError(String tableName, long line, String field, String affectedEntityId, String message) {
-        super(tableName, line, field, affectedEntityId);
+        super(tableName, line, field, Priority.MEDIUM, affectedEntityId);
         this.message = message;
     }
 

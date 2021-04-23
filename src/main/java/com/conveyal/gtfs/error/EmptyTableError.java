@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /**
@@ -9,7 +11,7 @@ public class EmptyTableError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public EmptyTableError(String file) {
-        super(file, 0, null);
+        super(file, 0, null, Priority.MEDIUM);
     }
 
     @Override public String getMessage() {

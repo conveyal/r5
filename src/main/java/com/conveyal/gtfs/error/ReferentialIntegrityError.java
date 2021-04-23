@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Indicates that an entity referenced another entity that does not exist. */
@@ -10,7 +12,7 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
     public final String badReference;
 
     public ReferentialIntegrityError(String tableName, long row, String field, String badReference) {
-        super(tableName, row, field);
+        super(tableName, row, field, Priority.HIGH);
         this.badReference = badReference;
     }
 
@@ -25,5 +27,4 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
     @Override public String getMessage() {
         return String.format(badReference);
     }
-
 }

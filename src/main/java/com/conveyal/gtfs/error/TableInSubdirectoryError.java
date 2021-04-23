@@ -11,10 +11,9 @@ public class TableInSubdirectoryError extends GTFSError implements Serializable 
     public static final long serialVersionUID = 1L;
 
     public final String directory;
-    public final Priority priority = Priority.HIGH;
 
     public TableInSubdirectoryError(String file, String directory) {
-        super(file, 0, null);
+        super(file, 0, null, Priority.HIGH);
         this.directory = directory;
     }
 

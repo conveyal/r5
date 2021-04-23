@@ -15,7 +15,7 @@ public class MisplacedStopError extends GTFSError implements Serializable {
     public final Stop stop;
 
     public MisplacedStopError(String affectedEntityId, long line, Stop stop) {
-        super("stops", line, "stop_id", affectedEntityId);
+        super("stops", line, "stop_id", Priority.MEDIUM, affectedEntityId);
         this.priority = Priority.HIGH;
         this.stop = stop;
     }

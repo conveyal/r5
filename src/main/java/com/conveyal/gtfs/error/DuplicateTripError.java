@@ -11,7 +11,6 @@ import java.io.Serializable;
 public class DuplicateTripError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority = Priority.LOW;
     public final String duplicateTripId;
     public final String patternName;
     public final String routeId;
@@ -21,7 +20,7 @@ public class DuplicateTripError extends GTFSError implements Serializable {
     String lastArrival;
 
     public DuplicateTripError(Trip trip, long line, String duplicateTripId, String patternName, String firstDeparture, String lastArrival) {
-        super("trips", line, "trip_id", trip.trip_id);
+        super("trips", line, "trip_id", Priority.MEDIUM, trip.trip_id);
         this.duplicateTripId = duplicateTripId;
         this.patternName = patternName;
         this.routeId = trip.route_id;

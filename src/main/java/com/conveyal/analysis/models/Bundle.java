@@ -3,7 +3,6 @@ package com.conveyal.analysis.models;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.validator.model.Priority;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -83,7 +82,7 @@ public class Bundle extends Model implements Cloneable {
         public Priority priority;
         public GtfsErrorTypeSummary () { /* For deserialization. */ }
         public GtfsErrorTypeSummary (GTFSError error) {
-            this.priority = error.getPriority();
+            this.priority = error.priority;
             this.type = error.errorType;
         }
     }

@@ -11,11 +11,10 @@ import java.io.Serializable;
 public class ReversedTripShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority = Priority.HIGH;
     public final String shapeId;
 
     public ReversedTripShapeError(Trip trip) {
-        super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
+        super("trips", trip.sourceFileLine, "shape_id", Priority.HIGH, trip.trip_id);
         this.shapeId = trip.shape_id;
     }
 

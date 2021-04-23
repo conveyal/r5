@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.validator.model.DuplicateStops;
+import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
 
@@ -12,7 +13,7 @@ public class DuplicateStopError extends GTFSError implements Serializable {
     public final DuplicateStops duplicateStop;
 
     public DuplicateStopError(DuplicateStops duplicateStop) {
-        super("stop", duplicateStop.getDuplicatedStop().sourceFileLine, "stop_lat,stop_lon", duplicateStop.getDuplicatedStop().stop_id);
+        super("stop", duplicateStop.getDuplicatedStop().sourceFileLine, "stop_lat,stop_lon", Priority.MEDIUM, duplicateStop.getDuplicatedStop().stop_id);
         this.message = duplicateStop.toString();
         this.duplicateStop = duplicateStop;
     }
@@ -20,5 +21,4 @@ public class DuplicateStopError extends GTFSError implements Serializable {
     @Override public String getMessage() {
         return message;
     }
-
 }

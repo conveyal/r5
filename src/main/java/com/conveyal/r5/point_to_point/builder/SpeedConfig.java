@@ -68,8 +68,10 @@ public class SpeedConfig {
         speedConfig.addCarSpeed("trunk_link", 35);
         speedConfig.addCarSpeed("primary", 45);
         speedConfig.addCarSpeed("primary_link", 25);
+        speedConfig.addCarSpeed("residential", 25);
         speedConfig.addCarSpeed("secondary", 35);
         speedConfig.addCarSpeed("secondary_link", 25);
+        speedConfig.addCarSpeed("service", 10);
         speedConfig.addCarSpeed("tertiary", 25);
         speedConfig.addCarSpeed("tertiary_link", 25);
         speedConfig.addCarSpeed("living_street", 5);

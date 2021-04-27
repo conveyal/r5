@@ -9,11 +9,14 @@ public class MissingColumnError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public MissingColumnError(String file, String field) {
-        super(file, 1, field, Priority.MEDIUM);
+        super(file, 1, field);
     }
 
     @Override public String getMessage() {
         return String.format("Missing required column.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

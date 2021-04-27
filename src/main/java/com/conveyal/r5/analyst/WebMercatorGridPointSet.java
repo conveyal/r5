@@ -22,6 +22,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
+    /**
+     * Default Web Mercator zoom level for grids (origin/destination layers, aggregation area masks, etc.).
+     * Level 10 is probably ideal but will quadruple calculation relative to 9.
+     */
     public static final int DEFAULT_ZOOM = 9;
 
     /** web mercator zoom level */
@@ -223,6 +227,14 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
         return new WebMercatorExtents(west, north, width, height, zoom);
+    }
+
+    public static int parseZoom(String zoom) {
+        if (zoom != null) {
+            return Integer.parseInt(zoom);
+        } else {
+            return DEFAULT_ZOOM;
+        }
     }
 
 }

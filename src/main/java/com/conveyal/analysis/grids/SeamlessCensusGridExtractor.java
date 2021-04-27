@@ -17,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
-
 /**
  * Fetch data from the seamless-census s3 buckets and convert it from block-level vector data (polygons)
  * to raster opportunity density data (grids).
@@ -50,7 +48,7 @@ public class SeamlessCensusGridExtractor implements Component {
     /**
      * Retrieve data for bounds and save to a bucket under a given key
      */
-    public List<Grid> retrieveAndExtractCensusDataForBounds (Bounds bounds) throws IOException {
+    public List<Grid> censusDataForBounds (Bounds bounds, int zoom) throws IOException {
         long startTime = System.currentTimeMillis();
 
         // All the features are buffered in a Map in memory. This could be problematic on large areas.
@@ -74,7 +72,7 @@ public class SeamlessCensusGridExtractor implements Component {
                 // Note, the following is assuming each property has a unique name.
                 Grid grid = grids.get(key);
                 if (grid == null) {
-                    grid = new Grid(ZOOM, bounds.envelope());
+                    grid = new Grid(zoom, bounds.envelope());
                     grid.name = key;
                     grids.put(key, grid);
                 }

@@ -1,12 +1,12 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import static com.conveyal.file.FileCategory.GRIDS;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
@@ -15,11 +15,6 @@ import static com.conveyal.file.FileCategory.GRIDS;
  * longer strictly opportunity datasets - they may be sets of points with no attached opportunity densities.
  */
 public class OpportunityDataset extends Model {
-
-    /** For now all web Mercator grids are zoom level 9. Level 10 is probably ideal but will quadruple calculation.
-     * TODO make adjustable
-     * */
-    public static final int ZOOM = 9;
 
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
@@ -102,7 +97,7 @@ public class OpportunityDataset extends Model {
 
     @JsonIgnore
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, ZOOM);
+        return new WebMercatorExtents(west, north, width, height, DEFAULT_ZOOM);
     }
 
     /** Analysis region this dataset was uploaded in. */

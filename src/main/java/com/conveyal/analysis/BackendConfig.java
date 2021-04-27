@@ -19,7 +19,6 @@ public class BackendConfig extends ConfigBase implements
         AnalysisDB.Config,
         Broker.Config,
         HttpApi.Config,
-        OpportunityDatasetController.Config,
         SeamlessCensusGridExtractor.Config,
         LocalWorkerLauncher.Config,
         LocalFileStorage.Config

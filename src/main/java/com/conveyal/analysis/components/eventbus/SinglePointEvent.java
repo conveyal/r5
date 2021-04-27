@@ -1,7 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
 /**
- * Created by abyrd on 2020-06-12
+ * Fired when the Backend is handling a single point request (forwarding it to a worker).
  */
 public class SinglePointEvent extends Event {
 

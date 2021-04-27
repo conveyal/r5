@@ -10,12 +10,11 @@ import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.analyst.progress.TaskAction;
 import com.conveyal.r5.util.ExceptionUtils;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is the main entry point for starting a Conveyal Analysis server.
+ * This is the main entry point for starting a local (non-cloud) Conveyal Analysis server.
  */
 public abstract class BackendMain {
 
@@ -38,8 +37,7 @@ public abstract class BackendMain {
     }
 
     private static void startServerInternal (BackendComponents components, TaskAction... postStartupTasks) {
-        LOG.info("Starting Conveyal analysis backend, the time is now {}", DateTime.now());
-        LOG.info("Backend version is: {}", BackendVersion.instance.version);
+        LOG.info("Starting Conveyal analysis backend version: {}", BackendVersion.instance.version);
         LOG.info("Connecting to database...");
 
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
@@ -48,10 +46,10 @@ public abstract class BackendMain {
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
         // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
-        SeamlessCensusGridExtractor.configureStatically(components.config);
         ApiMain.initialize(components.gtfsCache);
         PointSetCache.initializeStatically(components.fileStorage);
 
+        // TODO handle this via components without explicit "if (offline)"
         if (components.config.offline()) {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");

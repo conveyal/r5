@@ -140,31 +140,6 @@ public class HttpApi implements Component {
                 JsonUtil.objectMapper::writeValueAsString
         );
 
-        // Expose all files in storage while in offline mode.
-        // Not done with static file serving because it automatically gzips our already gzipped files.
-        // TODO this should be an HttpController only added in LocalComponents
-        if (config.offline()) {
-            sparkService.get("/files/:category/*", (req, res) -> {
-                String filename = req.splat()[0];
-                FileCategory category = FileCategory.valueOf(req.params("category").toUpperCase(Locale.ROOT));
-                FileStorageKey key = new FileStorageKey(category, filename);
-                File file = fileStorage.getFile(key);
-                FileStorageFormat format = FileStorageFormat.fromFilename(filename);
-                res.type(format.mimeType);
-
-                // If the content-encoding is set to gzip, Spark automatically gzips the response. This mangles data
-                // that was already gzipped. Therefore, check if it's gzipped and pipe directly to the raw OutputStream.
-                res.header("Content-Encoding", "gzip");
-                if (FileUtils.isGzip(file)) {
-                    FileUtils.transferFromFileTo(file, res.raw().getOutputStream());
-                    return null;
-                } else {
-                    return FileUtils.getInputStream(file);
-                }
-            });
-        }
-
-
         // Can we consolidate all these exception handlers and get rid of the hard-wired "BAD_REQUEST" parameters?
 
         sparkService.exception(AnalysisServerException.class, (e, request, response) -> {

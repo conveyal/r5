@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkState;
+
 /**
  * Sometimes a custom component needs to receive notifications from standard components. The standard component does
  * not know about the custom component, so cannot call it directly. The standard component can export a listener
@@ -33,8 +35,9 @@ public class EventBus implements Component {
         this.taskScheduler = taskScheduler;
     }
 
-    /** This is not synchronized, so you should add all handlers at once before any events are fired. */
+    /** This class is not synchronized, so you should add all handlers at once before any events are fired. */
     public void addHandlers (EventHandler... handlers) {
+        checkState(this.handlers.isEmpty());
         for (EventHandler handler : handlers) {
             LOG.info("An instance of {} will receive events.", handler.getClass().getSimpleName());
             this.handlers.add(handler);

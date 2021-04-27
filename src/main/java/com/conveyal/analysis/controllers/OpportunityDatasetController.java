@@ -72,21 +72,16 @@ public class OpportunityDatasetController implements HttpController {
 
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
-    private final Config config;
-
-    public interface Config {
-        String seamlessCensusBucket();
-        boolean offline ();
-    }
+    private final SeamlessCensusGridExtractor extractor;
 
     public OpportunityDatasetController (
             FileStorage fileStorage,
             TaskScheduler taskScheduler,
-            Config config
+            SeamlessCensusGridExtractor extractor
     ) {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
-        this.config = config;
+        this.extractor = extractor;
     }
 
     /** Store upload status objects FIXME trivial Javadoc */
@@ -142,11 +137,6 @@ public class OpportunityDatasetController implements HttpController {
     }
 
     private OpportunityDatasetUploadStatus downloadLODES(Request req, Response res) {
-        // FIXME conditionals should not be necessary, should be handled by pluggable components
-        if (config.offline()) {
-            throw AnalysisServerException.badRequest("Cannot download LODES in offline mode.");
-        }
-
         final String regionId = req.params("regionId");
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
@@ -155,15 +145,15 @@ public class OpportunityDatasetController implements HttpController {
         // deleted as a batch using deleteSourceSet)
         final String downloadBatchId = new ObjectId().toString();
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
-        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, config.seamlessCensusBucket());
+        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
         taskScheduler.enqueueHeavyTask(() -> {
             try {
                 status.message = "Extracting census data for region";
-                List<Grid> grids = SeamlessCensusGridExtractor.retrieveAndExtractCensusDataForBounds(region.bounds);
-                createDatasetsFromPointSets(email, accessGroup, config.seamlessCensusBucket(),
-                                            downloadBatchId, regionId, status, grids);
+                List<Grid> grids = extractor.retrieveAndExtractCensusDataForBounds(region.bounds);
+                createDatasetsFromPointSets(
+                        email, accessGroup, extractor.sourceName, downloadBatchId, regionId, status, grids);
             } catch (IOException e) {
                 status.completeWithError(e);
                 LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));

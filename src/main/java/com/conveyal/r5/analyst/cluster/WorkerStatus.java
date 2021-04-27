@@ -92,8 +92,8 @@ public class WorkerStatus {
         memoryTotal = runtime.totalMemory();
         memoryFree = runtime.freeMemory();
 
-        if (ec2.privateIp != null) {
-            // Give priority to the private IP address if running on EC2
+        if (ec2 != null && ec2.privateIp != null) {
+            // Give priority to the private IP address if running in cloud compute environment.
             ipAddress = ec2.privateIp;
         } else {
             // Get whatever is the default IP address

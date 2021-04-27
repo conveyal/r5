@@ -1,7 +1,6 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.file.S3FileStorage;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,26 +8,14 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 /** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
-public class WorkerConfig extends ConfigBase implements
-        TaskScheduler.Config,
-        S3FileStorage.Config,
-        AnalysisWorker.Config
-{
-
-    // CONSTANTS
+public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.Config, AnalysisWorker.Config {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigBase.class);
-    private static final String WORKER_CONFIG_FILE = "worker.conf";
 
     // INSTANCE FIELDS
 
-    private final boolean workOffline;
-    private final String  bucketPrefix;
-    private final String  initialGraphId;
-    private final String  cacheDirectory;
     private final String  brokerAddress;
     private final String  brokerPort;
-    private final boolean autoShutdown;
     private final int     lightThreads;
     private final int     heavyThreads;
     private final boolean testTaskRedelivery;
@@ -36,26 +23,10 @@ public class WorkerConfig extends ConfigBase implements
 
     // CONSTRUCTORS
 
-    private WorkerConfig (String filename) {
-        this(propsFromFile(filename));
-    }
-
-    private WorkerConfig (Properties props) {
+    protected WorkerConfig (Properties props) {
         super(props);
-        workOffline = boolProp("work-offline");
-        if (workOffline) {
-            // Candidates for separate offline worker config - but might not be worth it for 2 options.
-            initialGraphId = null;
-            bucketPrefix = null;
-        } else {
-            initialGraphId = strProp("initial-graph-id");
-            bucketPrefix = strProp("bucket-prefix");
-        }
-        // These bucket names are used even in local operation as cache subdirectories.
-        cacheDirectory = strProp("cache-dir");
         brokerAddress = strProp("broker-address");
         brokerPort = strProp("broker-port");
-        autoShutdown = boolProp("auto-shutdown");
         {
             // Should we supply these in properties, or should this be done elsewhere?
             int availableProcessors = Runtime.getRuntime().availableProcessors();
@@ -72,28 +43,11 @@ public class WorkerConfig extends ConfigBase implements
     // Methods implementing Component and HttpController Config interfaces.
     // Note that one method can implement several Config interfaces at once.
 
-    @Override public boolean workOffline()     { return workOffline; }
-    @Override public String  bucketPrefix()    { return bucketPrefix; }
-    @Override public int     serverPort()      { return -1; }
-    @Override public String  initialGraphId()  { return initialGraphId; }
-    @Override public String  localCacheDirectory ()  { return cacheDirectory; }
     @Override public String  brokerAddress()   { return brokerAddress; }
     @Override public String  brokerPort()      { return brokerPort; }
-    @Override public boolean autoShutdown()    { return autoShutdown; }
     @Override public int     lightThreads ()   { return lightThreads; }
     @Override public int     heavyThreads ()   { return heavyThreads; }
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public boolean listenForSinglePoint() { return listenForSinglePoint; }
-
-    // STATIC FACTORY METHODS
-    // Use these to construct WorkerConfig objects for readability.
-
-    public static WorkerConfig fromDefaultFile () {
-        return new WorkerConfig(WORKER_CONFIG_FILE);
-    }
-
-    public static WorkerConfig fromProperties (Properties properties) {
-        return new WorkerConfig(properties);
-    }
 
 }

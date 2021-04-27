@@ -198,7 +198,7 @@ dependencies {
     implementation 'com.google.guava:guava:28.2-jre'
 
     // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
-    //capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
+    // capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
     implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'
 
     implementation ('org.apache.httpcomponents:httpclient:4.5.6') {
@@ -207,6 +207,7 @@ dependencies {
     }
 
     // Persistent storage of files / objects on Amazon S3.
+    // Now used only for Seamless Census TODO eliminate this final AWS dependency
     implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
 
     // Old version of GraphQL-Java used by legacy gtfs-api embedded in analysis-backend.

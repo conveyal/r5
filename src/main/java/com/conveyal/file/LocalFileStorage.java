@@ -21,7 +21,8 @@ public class LocalFileStorage implements FileStorage {
     public interface Config {
         // The local directory where files will be stored, even if they are being mirrored to a remote storage service.
         String localCacheDirectory ();
-        int serverPort (); // FIXME the serverPort parameter doesn't apply when backing an S3FileStorage
+        // The port where the browser can fetch files. Parameter name aligned with the HttpApi server port parameter.
+        int serverPort ();
     }
 
     public final String directory;

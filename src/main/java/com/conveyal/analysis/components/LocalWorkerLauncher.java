@@ -1,5 +1,6 @@
 package com.conveyal.analysis.components;
 
+import com.conveyal.analysis.LocalWorkerConfig;
 import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.file.FileStorage;
@@ -31,7 +32,6 @@ public class LocalWorkerLauncher implements WorkerLauncher {
     }
 
     private final TransportNetworkCache transportNetworkCache;
-    private final FileStorage fileStorage;
 
     private final Properties workerConfig = new Properties();
     private final int nWorkers;
@@ -39,8 +39,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
 
     public LocalWorkerLauncher (Config config, FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         LOG.debug("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
-        this.fileStorage = fileStorage;
-        // FIXME get this cache into the workers launched below - they're going to create their own.
+        WorkerComponents.fileStorage = fileStorage; // Note this is a static field for now, should eventually be changed.
         transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache);
         // Create configuration for the locally running worker
         workerConfig.setProperty("work-offline", "true");
@@ -86,9 +85,8 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             Properties singleWorkerConfig = new Properties(workerConfig);
             // Avoid starting more than one worker on the same machine trying to listen on the same port.
             singleWorkerConfig.setProperty("listen-for-single-point", Boolean.toString(i == 0).toLowerCase());
-            WorkerConfig config = WorkerConfig.fromProperties(singleWorkerConfig);
-            // FIXME Really we should be sharing cache instances with the local worker rather than configuring new ones.
-            WorkerComponents components = new WorkerComponents(config);
+            WorkerConfig config = LocalWorkerConfig.fromProperties(singleWorkerConfig);
+            WorkerComponents components = new LocalWorkerComponents(transportNetworkCache, config);
             AnalysisWorker worker = components.analysisWorker;
             Thread workerThread = new Thread(worker, "WORKER " + i);
             workerThreads.add(workerThread);

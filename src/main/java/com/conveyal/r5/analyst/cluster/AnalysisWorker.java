@@ -1,11 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Regions;
-import com.conveyal.analysis.BackendVersion;
-import com.conveyal.analysis.components.WorkerComponents;
-import com.conveyal.file.FileCategory;
+import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
+import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
@@ -15,6 +13,7 @@ import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
 import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -70,18 +69,12 @@ public class AnalysisWorker implements Runnable {
      */
     public interface Config {
 
-        /** Whether this worker should shut down automatically when idle. */
-        boolean autoShutdown();
-
         /**
          * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
          * Setting this to false before running creates a regional-only cluster worker.
          * This is useful in testing when running many workers on the same machine.
          */
         boolean listenForSinglePoint();
-
-        /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
-        boolean workOffline();
 
         /**
          * If this is true, the worker will not actually do any work. It will just report all tasks as completed
@@ -101,11 +94,6 @@ public class AnalysisWorker implements Runnable {
 
     public static final int POLL_WAIT_SECONDS = 15;
     public static final int POLL_MAX_RANDOM_WAIT = 5;
-
-    /** The amount of time (in minutes) a worker will stay alive after starting certain work */
-    private static final int PRELOAD_KEEPALIVE_MINUTES = 90;
-    private static final int REGIONAL_KEEPALIVE_MINUTES = 5;
-    private static final int SINGLE_KEEPALIVE_MINUTES = 60;
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.
@@ -149,20 +137,6 @@ public class AnalysisWorker implements Runnable {
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final NetworkPreloader networkPreloader;
-
-    /** Clock time (milliseconds since epoch) at which the worker should be considered idle. */
-    private long shutdownAfter;
-    private boolean inPreloading;
-
-    private void adjustShutdownClock (int keepAliveMinutes) {
-        long t = System.currentTimeMillis() + keepAliveMinutes * 60 * 1000;
-        if (inPreloading) {
-            inPreloading = false;
-            shutdownAfter = t;
-        } else {
-            shutdownAfter = Math.max(shutdownAfter, t);
-        }
-    }
 
     private final Random random = new Random();
 
@@ -208,7 +182,7 @@ public class AnalysisWorker implements Runnable {
     private final PointSetCache pointSetCache;
 
     /** Information about the EC2 instance (if any) this worker is running on. */
-    protected final EC2Info ec2info;
+    public EC2Info ec2info;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     protected String networkId = null;
@@ -226,10 +200,13 @@ public class AnalysisWorker implements Runnable {
     /** The HTTP server that receives single-point requests. TODO make this more consistent with the backend HTTP API components. */
     private spark.Service sparkHttpService;
 
+    private final EventBus eventBus;
+
     /** Constructor that takes injected components. */
     public AnalysisWorker (
             FileStorage fileStorage,
-            NetworkPreloader networkPreloader,
+            TransportNetworkCache transportNetworkCache,
+            EventBus eventBus,
             Config config
     ) {
         // Print out date on startup so that CloudWatch logs has a unique fingerprint
@@ -237,64 +214,16 @@ public class AnalysisWorker implements Runnable {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         this.config = config;
-        if (config.workOffline()) {
-            LOG.info("Working offline. Avoiding internet connections and hosted services.");
-        }
-
         this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 
-        // set the initial graph affinity of this worker (if it is not in the config file it will be
-        // set to null, i.e. no graph affinity)
-        // we don't actually build the graph now; this is just a hint to the broker as to what
-        // graph this machine was intended to analyze.
+        // Set the initial graph affinity of this worker (which will be null in local operation).
+        // We don't actually build / load / process the TransportNetwork until we receive the first task.
+        // This just provides a hint to the broker as to what network this machine was intended to analyze.
         this.networkId = config.initialGraphId();
-
         this.fileStorage = fileStorage;
         this.pointSetCache = new PointSetCache(fileStorage); // Make this cache a component?
-        this.networkPreloader = networkPreloader;
-
-        // Keep the worker alive for an initial window to prepare for analysis
-        inPreloading = true;
-        shutdownAfter = System.currentTimeMillis() + PRELOAD_KEEPALIVE_MINUTES * 60 * 1000;
-
-        // Discover information about what EC2 instance / region we're running on, if any.
-        // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
-        // the new request signing v4 requires you to know the region where the S3 objects are.
-        // TODO once offline mode completely avoids S3, just leave ec2Info null when offline.
-        ec2info = new EC2Info();
-        if (!config.workOffline()) {
-            ec2info.fetchMetadata();
-        }
-        if (ec2info.region == null) {
-            ec2info.region = Regions.EU_WEST_1.getName();
-        }
-    }
-
-    /**
-     * Shut down if enough time has passed since certain events (startup or handling an analysis request). When EC2
-     * billing was in hourly increments, the worker would only consider shutting down every 60 minutes. But EC2
-     * billing is now by the second, so we check more frequently (during regular polling).
-     */
-    public void considerShuttingDown() {
-        long now = System.currentTimeMillis();
-        if (now > shutdownAfter) {
-            LOG.info(
-                "Machine has been idle for at least {} minutes (single point) and {} minutes (regional), shutting down.",
-                SINGLE_KEEPALIVE_MINUTES , REGIONAL_KEEPALIVE_MINUTES
-            );
-            // Stop accepting any new single-point requests while shutdown is happening.
-            // TODO make a best-effort, short-timeout call to inform the broker this worker is shutting down.
-            sparkHttpService.stop();
-            try {
-                Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
-                process.waitFor();
-            } catch (Exception ex) {
-                LOG.error("Unable to terminate worker", ex);
-                // TODO fire a message to slack or throw an exception to warn us of zombie workers
-            } finally {
-                System.exit(0);
-            }
-        }
+        this.networkPreloader = new NetworkPreloader(transportNetworkCache);
+        this.eventBus = eventBus;
     }
 
     /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
@@ -344,7 +273,6 @@ public class AnalysisWorker implements Runnable {
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
-                if (config.autoShutdown()) {considerShuttingDown();}
                 // TODO only randomize delay on the first round, after that it's excessive.
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
                 LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
@@ -430,9 +358,9 @@ public class AnalysisWorker implements Runnable {
             task.loadAndValidateDestinationPointSets(pointSetCache);
         }
 
-        // After the AsyncLoader has reported all required data are ready for analysis, advance the shutdown clock to
-        // reflect that the worker is performing single-point work.
-        adjustShutdownClock(SINGLE_KEEPALIVE_MINUTES);
+        // After the AsyncLoader has reported all required data are ready for analysis,
+        // signal that we will begin processing the task.
+        eventBus.send(new HandleSinglePointEvent());
 
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
@@ -551,8 +479,8 @@ public class AnalysisWorker implements Runnable {
             saveTauiMetadata(task, transportNetwork);
         }
 
-        // Advance the shutdown clock to reflect that the worker is performing regional work.
-        adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
+        // After the TransportNetwork has been loaded, signal that we will begin processing the task.
+        eventBus.send(new HandleRegionalEvent());
 
         // Perform the core travel time and accessibility computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
@@ -753,21 +681,6 @@ public class AnalysisWorker implements Runnable {
         } catch (Exception e) {
             LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Worker configuration (Java Properties file) is now hard-wired to be worker.conf in the current working directory.
-     */
-    public static void main (String[] args) {
-        LOG.info("Starting Conveyal Analysis Worker with R5 version {}", BackendVersion.instance.version);
-        LOG.info("R5 git commit is {}", BackendVersion.instance.commit);
-        LOG.info("R5 git branch is {}", BackendVersion.instance.branch);
-        try {
-            WorkerComponents components = new WorkerComponents();
-            components.analysisWorker.run();
-        } catch (Exception e) {
-            LOG.error("Unhandled error in Conveyal Analysis Worker, shutting down. " + ExceptionUtils.stackTraceString(e));
         }
     }
 

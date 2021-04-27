@@ -1,6 +1,5 @@
 package com.conveyal.analysis.controllers;
 
-import com.amazonaws.services.s3.Headers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
@@ -28,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
+import com.sun.net.httpserver.Headers;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -195,7 +195,7 @@ public class BrokerController implements HttpController {
             response.status(workerResponse.getStatusLine().getStatusCode());
             // Mimic headers sent by the worker. We're mostly interested in Content-Type, maybe Content-Encoding.
             // We do not want to mimic all headers like Date, Server etc.
-            Header contentTypeHeader = workerResponse.getFirstHeader(Headers.CONTENT_TYPE);
+            Header contentTypeHeader = workerResponse.getFirstHeader("Content-Type");
             response.header(contentTypeHeader.getName(), contentTypeHeader.getValue());
             LOG.debug("Returning worker response to UI with status code {} and content type {}",
                     workerResponse.getStatusLine(), contentTypeHeader.getValue());

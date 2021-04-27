@@ -16,6 +16,7 @@ import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
 import com.conveyal.analysis.controllers.TimetableController;
 import com.conveyal.analysis.controllers.UserActivityController;
+import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
@@ -24,8 +25,6 @@ import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -73,6 +72,7 @@ public abstract class BackendComponents {
     public AnalysisDB database;
     public HttpApi httpApi;
     public TaskScheduler taskScheduler;
+    public SeamlessCensusGridExtractor censusExtractor;
     public EventBus eventBus;
 
     /**
@@ -80,7 +80,7 @@ public abstract class BackendComponents {
      * should already be initialized with all components except the HttpApi.
      * We pass these controllers into the HttpApi (rather than constructing them in the HttpApi constructor) to allow
      * injecting custom controllers in other deployment environments. This also avoids bulk-passing the entire set
-     * of components into the HttpApi constructor, ensuring clear deliniation of each component's dependencies.
+     * of components into the HttpApi constructor, ensuring clear delineation of each component's dependencies.
      */
     public List<HttpController> standardHttpControllers () {
         return Lists.newArrayList(
@@ -90,7 +90,7 @@ public abstract class BackendComponents {
                 new ProjectController(),
                 new GTFSGraphQLController(gtfsCache),
                 new BundleController(this),
-                new OpportunityDatasetController(fileStorage, taskScheduler, config),
+                new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),
                 new AggregationAreaController(fileStorage),
                 new TimetableController(),

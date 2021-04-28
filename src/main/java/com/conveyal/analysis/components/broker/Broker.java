@@ -43,6 +43,7 @@ import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUE
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -100,8 +101,11 @@ public class Broker {
     private final ListMultimap<WorkerCategory, Job> jobs =
             MultimapBuilder.hashKeys().arrayListValues().build();
 
-    /** The most tasks to deliver to a worker at a time. */
-    public final int MAX_TASKS_PER_WORKER = 16;
+    /** The number of tasks to deliver to workers that don't specify how many they want. */
+    public final int DEFAULT_TASKS_PER_WORKER = 16;
+
+    /** The absolute maximum number of tasks to deliver to a worker, even if it asks for more. */
+    public final int MAX_TASKS_PER_WORKER = 32;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
@@ -291,8 +295,19 @@ public class Broker {
     /**
      * Attempt to find some tasks that match what a worker is requesting.
      * Always returns a list, which may be empty if there is nothing to deliver.
+     * @param maxTasks The maximum quantity of tasks that the worker wants to receive. May be zero when the worker is
+     *                 too busy to accept more tasks. If negative, apply a default value (for older workers).
      */
-    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory) {
+    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory, int maxTasks) {
+        if (maxTasks == 0) {
+            return Collections.EMPTY_LIST;
+        }
+        if (maxTasks < 0) {
+            maxTasks = DEFAULT_TASKS_PER_WORKER;
+        }
+        if (maxTasks > MAX_TASKS_PER_WORKER) {
+            maxTasks = MAX_TASKS_PER_WORKER;
+        }
         Job job;
         if (config.offline()) {
             // Working in offline mode; get tasks from the first job that has any tasks to deliver.
@@ -308,7 +323,7 @@ public class Broker {
             return Collections.EMPTY_LIST;
         }
         // Return up to N tasks that are waiting to be processed.
-        return job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
+        return job.generateSomeTasksToDeliver(maxTasks);
     }
 
     /**

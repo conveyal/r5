@@ -610,6 +610,8 @@ public class AnalysisWorker implements Runnable {
         String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus(this);
+        workerStatus.tasksRequested = regionalTaskExecutor.getQueue().remainingCapacity();
+
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {

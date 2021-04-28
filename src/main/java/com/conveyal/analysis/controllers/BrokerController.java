@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
-import com.sun.net.httpserver.Headers;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -343,8 +342,8 @@ public class BrokerController implements HttpController {
         // Add this worker to our catalog, tracking its graph affinity and the last time it was seen among other things.
         broker.recordWorkerObservation(workerStatus);
         WorkerCategory workerCategory = workerStatus.getWorkerCategory();
-        // See if any appropriate tasks exist for this worker.
-        List<RegionalTask> tasks = broker.getSomeWork(workerCategory);
+        // See if any appropriate tasks exist for this worker, applying backpressure.
+        List<RegionalTask> tasks = broker.getSomeWork(workerCategory, workerStatus.tasksRequested);
         // If there is no work for the worker, signal this clearly with a "no content" code,
         // so the worker can sleep a while before the next polling attempt.
         if (tasks.isEmpty()) {

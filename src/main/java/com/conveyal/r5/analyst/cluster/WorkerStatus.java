@@ -50,6 +50,13 @@ public class WorkerStatus {
     public String ipAddress;
     public List<RegionalWorkResult> results;
 
+    /**
+     * The maximum number of tasks this worker would like to receive to fill its internal work queue.
+     * Workers older than late April 2021 will not supply this field.
+     * This is conceptually similar to backpressure in reactive streams.
+     */
+    public int tasksRequested = -1;
+
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }
 
@@ -104,6 +111,7 @@ public class WorkerStatus {
                 ipAddress = "127.0.0.1";
             }
         }
+
     }
 
     /**

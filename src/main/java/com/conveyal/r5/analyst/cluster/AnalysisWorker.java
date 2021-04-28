@@ -270,15 +270,6 @@ public class AnalysisWorker implements Runnable {
         // then fetch more work only when the queue is getting empty.
         while (true) {
             List<RegionalTask> tasks = getSomeWork();
-            if (tasks == null || tasks.isEmpty()) {
-                // Either there was no work, or some kind of error occurred.
-                // Sleep for a while before polling again, adding a random component to spread out the polling load.
-                // TODO only randomize delay on the first round, after that it's excessive.
-                int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
-                LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
-                sleepSeconds(POLL_WAIT_SECONDS + randomWait);
-                continue;
-            }
             for (RegionalTask task : tasks) {
                 // Try to enqueue each task for execution, repeatedly failing until the queue is not full.
                 // The list of fetched tasks essentially serves as a secondary queue, which is awkward. This is using
@@ -308,6 +299,14 @@ public class AnalysisWorker implements Runnable {
                     }
                 }
             }
+            // At this point, either a) we have inserted all tasks into the work queue, b) no work was returned because
+            // the backend had no work to give us, or we requested no work because the queue was full, or c) some kind
+            // of error occurred. In all cases, limit the rate of polling by sleeping for a while before polling again,
+            // adding a random delay to spread out the polling load.
+            // TODO only randomize delay on the first round, after that it's excessive.
+            int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
+            LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+            sleepSeconds(POLL_WAIT_SECONDS + randomWait);
         }
     }
 
@@ -604,7 +603,7 @@ public class AnalysisWorker implements Runnable {
      * Ask the backend if it has any work for this worker, considering its software version and loaded networks.
      * Also report the worker status to the backend, serving as a heartbeat so the backend knows this worker is alive.
      * Also returns any accumulated work results to the backend.
-     * @return a list of work tasks, or null if there was no work to do, or if no work could be fetched.
+     * @return a non-null list of work tasks, or empty list if there was no work to do, or if no work could be fetched.
      */
     public List<RegionalTask> getSomeWork () {
         String url = brokerBaseUrl + "/poll";
@@ -636,7 +635,7 @@ public class AnalysisWorker implements Runnable {
             responseEntity = response.getEntity();
             if (response.getStatusLine().getStatusCode() == 204) {
                 // Broker said there's no work to do.
-                return null;
+                return Collections.EMPTY_LIST;
             }
             if (response.getStatusLine().getStatusCode() == 200 && responseEntity != null) {
                 // Broker returned some work. Use the lenient object mapper to decode it in case the broker is a
@@ -659,7 +658,7 @@ public class AnalysisWorker implements Runnable {
             // TODO check here that results are not piling up too much?
             workResults.addAll(workerStatus.results);
         }
-        return null;
+        return Collections.EMPTY_LIST;
     }
 
     /**

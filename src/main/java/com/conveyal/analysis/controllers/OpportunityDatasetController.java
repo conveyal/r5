@@ -196,11 +196,6 @@ public class OpportunityDatasetController implements HttpController {
             dataset.accessGroup = accessGroup;
             dataset.totalPoints = pointSet.featureCount();
             dataset.regionId = regionId;
-            // FIXME this is known to end in "grids" but is dependent on the storage implementation and deployment
-            //       environment. This coupling is why I was averse to storing full bucket names in the database.
-            //       Ideally we can just drop this field from the database. The backend will always know where to
-            //       find the files based on deployment environment and file category.
-            dataset.bucketName = GRIDS.directoryName();
             dataset.totalOpportunities = pointSet.sumTotalOpportunities();
             dataset.format = getFormatCode(pointSet);
             if (dataset.format == FileStorageFormat.FREEFORM) {

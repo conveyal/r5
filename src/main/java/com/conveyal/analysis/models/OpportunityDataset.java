@@ -22,7 +22,10 @@ public class OpportunityDataset extends Model {
     /** The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived. */
     public String sourceId;
 
-    /** Bucket name on S3 where the opportunity data itself is persisted. */
+    /**
+     * Bucket name on S3 where the opportunity data itself is persisted. Deprecated: as of April 2021, the FileStorage
+     * system encapsulates how local or remote storage coordinates are derived from the FileCategory.
+     */
     @Deprecated
     public String bucketName;
 

@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Represents a problem parsing a URL field from a GTFS feed. */
@@ -14,4 +16,7 @@ public class URLParseError extends GTFSError implements Serializable {
         return "Could not parse URL (format should be <scheme>://<authority><path>?<query>#<fragment>).";
     }
 
+    @Override public Priority getPriority() {
+        return Priority.LOW;
+    }
 }

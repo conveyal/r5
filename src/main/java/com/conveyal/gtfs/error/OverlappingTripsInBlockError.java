@@ -23,4 +23,8 @@ public class OverlappingTripsInBlockError extends GTFSError implements Serializa
     @Override public String getMessage() {
         return String.format("Trip Ids %s overlap (route: %s) and share block ID %s", String.join(" & ", tripIds), routeId, affectedEntityId);
     }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

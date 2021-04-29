@@ -512,8 +512,9 @@ public class GTFSFeed implements Cloneable, Closeable {
             for (String stopId : pattern.orderedStops) {
                 Stop stop = stops.get(stopId);
                 if (stop == null) {
-                    // TODO replace with ReferentialIntegrityError during stop_time loading
-                    throw new RuntimeException(String.format("No stop exists with ID '%s'", stopId));
+                    // A ReferentialIntegrityError should have been recorded during stop_time loading and naming should
+                    // be halted.
+                   return;
                 }
                 if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) {
                     continue;

@@ -11,7 +11,6 @@ import java.io.Serializable;
 public class DuplicateTripError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority = Priority.LOW;
     public final String duplicateTripId;
     public final String patternName;
     public final String routeId;
@@ -33,5 +32,9 @@ public class DuplicateTripError extends GTFSError implements Serializable {
 
     @Override public String getMessage() {
         return String.format("Trip Ids %s & %s (route %s) are duplicates (pattern: %s, calendar: %s, from %s to %s)", duplicateTripId, affectedEntityId, routeId, patternName, serviceId, firstDeparture, lastArrival);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

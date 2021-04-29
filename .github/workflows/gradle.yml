@@ -41,6 +41,8 @@ jobs:
       with:
         path: ~/.gradle/caches
         key: gradle-caches
+    - name: Show version string
+      run: gradle -q printVersion | head -n1
     - name: Build and Test
       run: gradle build
     - name: Ensure shadow JAR is runnable as local backend
@@ -52,5 +54,3 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: gradle publish
-    - name: Show version string
-      run: gradle -q printVersion | head -n1

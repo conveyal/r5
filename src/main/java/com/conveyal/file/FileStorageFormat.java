@@ -5,10 +5,10 @@ public enum FileStorageFormat {
     GRID("grid", "application/octet-stream"),
     POINTSET("pointset", "application/octet-stream"),
     PNG("png", "image/png"),
-    TIFF("tiff", "image/tiff");
+    TIFF("tiff", "image/tiff"),
+    CSV("csv", "text/csv");
 
     // These are not currently used but plan to be in the future. Exact types need to be determined
-    // CSV("csv", "text/csv"),
     // GTFS("zip", "application/zip"),
     // PBF("pbf", "application/octet-stream"),
     // SHP("shp", "application/octet-stream") // This type does not work as is, it should be a zip?

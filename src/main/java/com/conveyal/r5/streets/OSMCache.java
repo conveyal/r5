@@ -3,22 +3,21 @@ package com.conveyal.r5.streets;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.osmlib.OsmLibException;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.concurrent.ExecutionException;
 
 /**
- * TODO this should be moved out of osm-lib and R5 into Analysis, and better integrated with TransportNetworkCache
- * so we don't need to have a dependency on AWS S3 SDK and multiple S3 clients.
+ * TODO this should be moved so we don't need to have a dependency on AWS S3 SDK and multiple S3 clients.
  * Maybe a general local+S3 object storage mechanism for externalizable objects, using the TransferManager.
- * We are currently getting AWS SDK dependency transitively through gtfs-lib. Future versions of gtfs-lib will not
- * have this functionality.
  */
 public class OSMCache {
 
-    public final String bucket;
+    private final String bucket;
     private final FileStorage fileStorage;
 
     public interface Config {
@@ -43,11 +42,13 @@ public class OSMCache {
     }
 
     public FileStorageKey getKey (String id) {
+        // FIXME Transforming IDs each time they're used seems problematic. They should probably only be validated here.
         String cleanId = cleanId(id);
         return new FileStorageKey(bucket, cleanId + ".pbf");
     }
 
-    public OSM get (String id) {
+    /** This should always return an OSM object, not null. If something prevents that, it should throw an exception. */
+    public @Nonnull OSM get (String id) throws OsmLibException {
         try {
             return osmCache.get(id, () -> {
                 File osmFile = fileStorage.getFile(getKey(id));
@@ -57,7 +58,7 @@ public class OSMCache {
                 return ret;
             });
         } catch (ExecutionException e) {
-            throw new RuntimeException(e);
+            throw new OsmLibException("Exception in OSM MapDB CacheLoader.", e.getCause());
         }
     }
 }

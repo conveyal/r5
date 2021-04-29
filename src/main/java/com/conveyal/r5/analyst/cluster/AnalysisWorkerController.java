@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.r5.analyst.cluster.AnalysisWorker.addJsonToGrid;
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
@@ -41,39 +42,33 @@ public class AnalysisWorkerController {
         TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         // TODO do not return raw binary data from method, return better typed response.
         // TODO possibly move data preloading to this point, to allow returning different HTTP status codes.
-
         if (task.logRequest){
             LOG.info(request.body());
         }
-
         try {
-            try {
-                byte[] binaryResult = analysisWorker.handleOneSinglePointTask(task);
-                response.status(HttpStatus.OK_200);
-                if (task.getFormat().equals(TravelTimeSurfaceTask.Format.GEOTIFF)) {
-                    response.header("Content-Type", "application/x-geotiff");
-                } else {
-                    response.header("Content-Type", "application/octet-stream");
-                }
-                return binaryResult;
-            } catch (WorkerNotReadyException workerNotReadyException) {
-                // We're using exceptions for flow control here, which is kind of ugly. Define a ResultOrError<T> class?
-                if (workerNotReadyException.isError()) {
-                    if (workerNotReadyException.asyncLoaderState.exception instanceof ScenarioApplicationException) {
-                        return reportTaskErrors(response,
-                                ((ScenarioApplicationException)workerNotReadyException.asyncLoaderState.exception).taskErrors);
-                    } else {
-                        return jsonResponse(response, HttpStatus.BAD_REQUEST_400,
-                                ExceptionUtils.asString(workerNotReadyException.asyncLoaderState.exception));
-                    }
-                } else {
-                    return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.asyncLoaderState.message);
-                }
+            byte[] binaryResult = analysisWorker.handleAndSerializeOneSinglePointTask(task);
+            response.status(HttpStatus.OK_200);
+            if (task.getFormat().equals(GEOTIFF)) {
+                response.header("Content-Type", "application/x-geotiff");
+            } else {
+                response.header("Content-Type", "application/octet-stream");
             }
-        } catch (Exception exception) {
-            // Handle any uncaught exceptions in any of the above code.
-            // TODO shouldn't some of these serious uncaught errors be 500s?
-            return jsonResponse(response, HttpStatus.BAD_REQUEST_400, ExceptionUtils.asString(exception));
+            return binaryResult;
+        } catch (WorkerNotReadyException workerNotReadyException) {
+            // We're using exceptions for flow control here, which is kind of ugly. Define a ResultOrError<T> class?
+            if (workerNotReadyException.isError()) {
+                Throwable t = workerNotReadyException.asyncLoaderState.throwable;
+                if (t instanceof ScenarioApplicationException) {
+                    return reportTaskErrors(response, ((ScenarioApplicationException)t).taskErrors);
+                } else {
+                    return reportTaskErrors(response, List.of(new TaskError(t)));
+                }
+            } else {
+                return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.asyncLoaderState.message);
+            }
+        } catch (Throwable throwable) {
+            // Handle any uncaught exceptions in any of the above code. Should some serious uncaught errors be 500s?
+            return reportTaskErrors(response, List.of(new TaskError(throwable)));
         }
     }
 

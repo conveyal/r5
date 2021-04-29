@@ -99,6 +99,9 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      */
     public boolean includePathResults = false;
 
+    /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
+    public boolean recordTravelTimeHistograms = false;
+
     /**
      * Which percentiles of travel time to calculate.
      * These should probably just be integers, but there are already a lot of them in Mongo as floats.
@@ -137,7 +140,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     /**
      * The storage keys for the pointsets we will compute access to. The format is regionId/datasetId.fileFormat.
      * Ideally we'd just provide the IDs of the grids, but creating the key requires us to know the region
-     * ID and file format, which are not otherwise easily available.
+     * ID and file format, which are not otherwise easily available on workers that don't have a database connection.
      * This field is required for regional analyses, which always compute accessibility to destinations.
      * On the other hand, in a single point request this may be null, in which case the worker will report only
      * travel times to destinations and not accessibility figures.
@@ -206,8 +209,11 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * supplied cache. The PointSets themselves are not serialized and sent over to the worker in the task, so this
      * method is called by the worker to materialize them.
      *
+     * This should not be called for Taui sites (which have no destination point sets) so contains logic for only
+     * non-Taui single point and regional tasks.
+     *
      * If multiple grids are specified, they must be at the same zoom level, but they will all be wrapped to transform
-     * their indexes to match a single task-wide grid.
+     * them all to the same minimum bounding extents.
      */
     public void loadAndValidateDestinationPointSets (PointSetCache pointSetCache) {
         // First, validate and load the pointsets.
@@ -215,8 +221,8 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         checkNotNull(destinationPointSetKeys);
         int nPointSets = destinationPointSetKeys.length;
         checkState(
-            nPointSets > 0 && nPointSets <= 10,
-            "You must specify at least 1 destination PointSet, but no more than 10."
+            nPointSets > 0 && nPointSets <= 12,
+            "You must specify at least 1 destination PointSet, but no more than 12."
         );
         destinationPointSets = new PointSet[nPointSets];
         for (int i = 0; i < nPointSets; i++) {
@@ -230,8 +236,12 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         if (freeForm){
             checkArgument(nPointSets == 1, "Only one freeform destination PointSet may be specified.");
         } else {
-            // Get a grid for this particular task (determined by dimensions in the request, or by unifying the grids).
-            // This requires the grids to already be loaded into the array, hence the two-stage loading then wrapping.
+            // If destinationPointSets does not contain a single freeform pointset, we expect one or more grids.
+            // Determine the destination grid extents for this task, which are either supplied in request (single point)
+            // or derived from the opportunity grids (regional). Grids are then transformed to match this single size.
+            // Determining the minimum bouding extents requires the grids to already be loaded into the array, hence the
+            // two-stage loading then wrapping. After this wrapping, subsequent calls to getWebMercatorExtents should
+            // still yield the same extents.
             final var taskGridExtents = this.getWebMercatorExtents();
             for (int i = 0; i < nPointSets; i++) {
                 Grid grid = (Grid) destinationPointSets[i];

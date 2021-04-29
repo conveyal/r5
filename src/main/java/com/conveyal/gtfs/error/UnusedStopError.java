@@ -9,16 +9,18 @@ import java.io.Serializable;
 public class UnusedStopError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority;
     public final Stop stop;
 
     public UnusedStopError(Stop stop) {
         super("stops", stop.sourceFileLine, "stop_id", stop.stop_id);
-        this.priority = Priority.LOW;
         this.stop = stop;
     }
 
     @Override public String getMessage() {
         return String.format("Stop Id %s is not used in any trips.", affectedEntityId);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.LOW;
     }
 }

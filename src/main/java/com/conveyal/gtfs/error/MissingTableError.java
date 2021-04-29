@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Indicates that a table marked as required is not present in a GTFS feed. */
@@ -14,4 +16,7 @@ public class MissingTableError extends GTFSError implements Serializable {
         return String.format("This table is required by the GTFS specification but is missing.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

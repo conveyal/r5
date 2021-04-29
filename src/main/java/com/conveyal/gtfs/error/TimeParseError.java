@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Represents a problem parsing a time of day field of GTFS feed. */
@@ -14,4 +16,7 @@ public class TimeParseError extends GTFSError implements Serializable {
         return "Could not parse time (format should be HH:MM:SS).";
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

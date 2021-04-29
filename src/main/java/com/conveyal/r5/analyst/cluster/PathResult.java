@@ -7,6 +7,7 @@ import com.conveyal.r5.transit.path.RouteSequence;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
@@ -61,8 +62,9 @@ public class PathResult {
             // In regional analyses, return paths to all destinations
             nDestinations = task.nTargetsPerOrigin();
             // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinations > 5000) throw new UnsupportedOperationException("Path results are limited to 5000 " +
-                    "destinations");
+            if (nDestinations > 5000) {
+                throw new UnsupportedOperationException("Path results are limited to 5000 destinations");
+            }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
@@ -149,17 +151,22 @@ public class PathResult {
         public Collection<HumanReadableIteration> iterations;
 
         PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
-            this.access = pathTemplate.stopSequence.access.toString();
-            this.egress = pathTemplate.stopSequence.egress.toString();
+            this.access = pathTemplate.stopSequence.access == null ? null : pathTemplate.stopSequence.access.toString();
+            this.egress = pathTemplate.stopSequence.egress == null ? null : pathTemplate.stopSequence.egress.toString();
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
             this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
+            iterations.forEach(pathTemplate.stopSequence::transferTime); // The transferTime method includes an
+            // assertion that the transfer time is non-negative, i.e. that the access + egress + wait + ride times of
+            // a specific iteration do not exceed the total travel time. Perform that sense check here, even though
+            // the transfer time is not reported to the front-end for the human-readable single-point responses.
+            // TODO add transferTime to HumanReadableIteration?
         }
     }
 
     /**
      * Returns human-readable details of path iterations, for JSON representation (e.g. in the UI console).
      */
-    List<PathIterations> getPathIterationsForDestination() {
+    public List<PathIterations> getPathIterationsForDestination() {
         checkState(iterationsForPathTemplates.length == 1, "Paths were stored for multiple " +
                 "destinations, but only one is being requested");
         List<PathIterations> detailsForDestination = new ArrayList<>();
@@ -189,6 +196,14 @@ public class PathResult {
             this.waitTimes = path.waitTimes;
             this.totalTime = totalTime;
         }
+
+        /**
+         * Constructor for paths with no transit boardings (and therefore no wait times).
+         */
+        public Iteration(int totalTime) {
+            this.waitTimes = new TIntArrayList();
+            this.totalTime = totalTime;
+        }
     }
 
     /**
@@ -200,6 +215,7 @@ public class PathResult {
         public double totalTime;
 
         HumanReadableIteration(Iteration iteration) {
+            // TODO track departure time for non-transit paths (so direct trips don't show departure time 00:00).
             this.departureTime =
                     String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
                             (int) (iteration.departureTime / 60.0 % 60));

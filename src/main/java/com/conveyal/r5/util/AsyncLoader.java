@@ -46,6 +46,7 @@ public abstract class AsyncLoader<K,V> {
      * Each cache has its own executor, so tiny things like loading grids are not held up by slower things like
      * linking or distance calculations. This also avoids deadlocks where one cache loads values from another cache
      * as part of its building process, but the sub-task can never happen because the parent task is hogging a thread.
+     * We may want to consider using the single TaskScheduler component which has separate heavy and light executors.
      */
     private Executor executor = Executors.newFixedThreadPool(2);
 
@@ -72,22 +73,22 @@ public abstract class AsyncLoader<K,V> {
         public final String message;
         public final int percentComplete;
         public final V value;
-        public final Exception exception;
+        public final Throwable throwable;
 
         private LoaderState(Status status, String message, int percentComplete, V value) {
             this.status = status;
             this.message = message;
             this.percentComplete = percentComplete;
             this.value = value;
-            this.exception = null;
+            this.throwable = null;
         }
 
-        private LoaderState(Exception exception) {
+        private LoaderState(Throwable throwable) {
             this.status = Status.ERROR;
-            this.message = exception.toString();
+            this.message = throwable.toString();
             this.percentComplete = 0;
             this.value = null;
-            this.exception = exception;
+            this.throwable = throwable;
         }
 
         @Override
@@ -113,7 +114,7 @@ public abstract class AsyncLoader<K,V> {
                 enqueueLoadTask = true;
             }
         }
-        // TODO maybe use futures and get() with timeout, so fast scenario applications don't need to be retried
+        // TODO maybe use futures and get() with timeout, so fast scenario applications don't require re-polling
         // Enqueue task outside the above block (synchronizing the fewest lines possible).
         if (enqueueLoadTask) {
             executor.execute(() -> {
@@ -123,9 +124,11 @@ public abstract class AsyncLoader<K,V> {
                     synchronized (map) {
                         map.put(key, new LoaderState(Status.PRESENT, null, 100, value));
                     }
-                } catch (Exception ex) {
-                    setError(key, ex);
-                    LOG.error(ExceptionUtils.asString(ex));
+                } catch (Throwable t) {
+                    // It's essential to trap Throwable rather than just Exception.
+                    // Otherwise the executor threads can be killed by any Error that happens, stalling the executor.
+                    setError(key, t);
+                    LOG.error(ExceptionUtils.asString(t));
                 }
             });
         }
@@ -151,12 +154,12 @@ public abstract class AsyncLoader<K,V> {
     }
 
     /**
-     * Call this method inside the buildValue method to indicate progress.
+     * Call this method inside the buildValue method to indicate that an unrecoverable error has happened.
      * FIXME this will permanently associate an error with the key. No further attempt will ever be made to create the value.
      */
-    protected void setError (K key, Exception exception) {
+    protected void setError (K key, Throwable throwable) {
         synchronized (map) {
-            map.put(key, new LoaderState(exception));
+            map.put(key, new LoaderState(throwable));
         }
     }
 }

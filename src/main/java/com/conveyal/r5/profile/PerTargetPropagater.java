@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.StreetTimesAndModes;
@@ -9,11 +10,13 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,24 +154,32 @@ public class PerTargetPropagater {
         this.request = task;
         this.travelTimesToStopsForIteration = travelTimesToStopsForIteration;
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
+        this.oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
 
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         if (task.makeTauiSite) {
             savePaths = SavePaths.WRITE_TAUI;
         } else if (task.includePathResults) {
-            savePaths = task instanceof RegionalTask ? SavePaths.ALL_DESTINATIONS : SavePaths.ONE_DESTINATION;
+            if (task instanceof TravelTimeSurfaceTask || oneToOne) {
+                savePaths = SavePaths.ONE_DESTINATION;
+            } else {
+                savePaths = SavePaths.ALL_DESTINATIONS;
+            }
         } else {
             savePaths = SavePaths.NONE;
         }
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
-        oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+
         if (savePaths == SavePaths.ONE_DESTINATION){
-            destinationIndexForPaths = ((WebMercatorGridPointSet) targets).indexFromWgsCoordinates(
+            if (targets instanceof WebMercatorGridPointSet) {
+                destinationIndexForPaths = ((WebMercatorGridPointSet) targets).getPointIndexContaining(
                     task.toLon,
-                    task.toLat,
-                    task.zoom
-            );
+                    task.toLat
+                );
+            } else if (targets instanceof FreeFormPointSet) {
+                destinationIndexForPaths = task.taskId;
+            }
         }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -247,14 +258,15 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                // FIXME commenting out the line below causes Taui site creation to fail
-                // pathScorer = new PathScorer(perIterationPaths, perIterationTravelTimes);
+                pathScorer = new PathScorer(perIterationTravelTimes, perIterationPaths, perIterationEgress);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
+                // Typically used with freeform destinations fewer in number than gridded destinations.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
                         perIterationEgress);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
-                // For single point tasks, return paths to the one target destination specified by toLat/toLon.
+                // Return paths to the single target destination specified (by toLat/toLon in a single-point
+                // analysis, or by the origin-destination pairing implied by a oneToOne regional analysis).
                 travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths,
                         perIterationEgress);
             }
@@ -271,7 +283,9 @@ public class PerTargetPropagater {
                 //      that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // The perIterationTravelTimes are sorted as a side effect of the above travelTimeReducer call.
                 // NOTE this is currently using only the first (lowest) travel time.
-                Set<com.conveyal.r5.profile.Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, perIterationTravelTimes[0]);
+                Set<PatternSequence> selectedPaths = pathScorer.getTopPaths(
+                        pathWriter.nPathsPerTarget, perIterationTravelTimes[0]
+                );
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

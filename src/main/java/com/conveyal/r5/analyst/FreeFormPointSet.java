@@ -5,6 +5,7 @@ import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,8 +145,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double sumTotalOpportunities () {
-        // For now we always have one opportunity per point.
-        return featureCount();
+        return Arrays.stream(counts).sum();
     }
 
     @Override
@@ -224,9 +224,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double getOpportunityCount (int i) {
-        // For now, these points do not have attached opportunity counts.
-        // We consider them to all have a count of 1.
-        return 1D;
+        return counts[i];
     }
 
     @Override
@@ -256,4 +254,16 @@ public class FreeFormPointSet extends PointSet {
         return webMercatorExtents;
     }
 
+    /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */
+    public FreeFormPointSet (Coordinate... coordinates) {
+        this(coordinates.length);
+        int i = 0;
+        for (Coordinate coordinate : coordinates) {
+            ids[i] = Integer.toString(i);
+            lons[i] = coordinate.x;
+            lats[i] = coordinate.y;
+            counts[i] = 1;
+            i++;
+        }
+    }
 }

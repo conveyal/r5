@@ -9,14 +9,15 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.CsvResultWriter;
-import com.conveyal.analysis.results.CsvResultWriter.Result;
+import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -331,7 +332,8 @@ public class RegionalAnalysisController implements HttpController {
 
     private String getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
-        final Result resultType = Result.valueOf(req.params("resultType").toUpperCase());
+        final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
+        // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
 
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(regionalAnalysisId).get(),
@@ -343,23 +345,14 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
 
-        if (resultType == Result.ACCESS && !analysis.request.recordAccessibility) {
-            throw AnalysisServerException.notFound("Accessibility results were not recorded for this analysis");
+        String storageKey = analysis.resultStorage.get(resultType);
+        if (storageKey == null) {
+            throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
         }
 
-        if (resultType == Result.TIMES && !analysis.request.recordTimes) {
-            throw AnalysisServerException.notFound("Travel time results were not recorded for this analysis");
-        }
+        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), storageKey);
 
-        if (resultType == Result.PATHS && !analysis.request.includePathResults) {
-            throw AnalysisServerException.notFound("Path results were not recorded for this analysis");
-        }
-
-        // TODO result path is stored in model, use that?
-        String key = regionalAnalysisId + '_' + resultType + ".csv.gz";
-        FileStorageKey fileStorageKey = new FileStorageKey(config.resultsBucket(), key);
-
-        res.type("text");
+        res.type("text/plain");
         return fileStorage.getURL(fileStorageKey);
     }
 
@@ -417,8 +410,9 @@ public class RegionalAnalysisController implements HttpController {
             if (nPointSets == 1) {
                 task.grid = task.destinationPointSetKeys[0];
             }
-            // Preflight check that all destination pointsets are exactly the same size. Equivalent to worker-side
-            // checks in AnalysisWorkerTask.loadAndValidateDestinationPointSets and WebMercatorExtents.forPointsets.
+            // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
+            // The worker will perform equivalent checks via the GridTransformWrapper constructor,
+            // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
             for (OpportunityDataset dataset : opportunityDatasets) {
                 if (dataset.format == FileStorageFormat.FREEFORM) {
                     checkArgument(
@@ -427,8 +421,8 @@ public class RegionalAnalysisController implements HttpController {
                     );
                 } else {
                     checkArgument(
-                        dataset.getWebMercatorExtents().equals(opportunityDatasets.get(0).getWebMercatorExtents()),
-                        "If multiple grids are specified as destinations, they must have identical extents."
+                        dataset.getWebMercatorExtents().zoom == opportunityDatasets.get(0).getWebMercatorExtents().zoom,
+                        "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
                     );
                 }
             }
@@ -437,10 +431,12 @@ public class RegionalAnalysisController implements HttpController {
             task.validatePercentiles();
         }
 
-        // Set the origin pointset if one is specified.
+        // Set the origin pointset key if an ID is specified. Currently this will always be a freeform pointset.
+        // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
                     .findByIdIfPermitted(analysisRequest.originPointSetId, accessGroup).storageLocation();
+            task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
 
         task.oneToOne = analysisRequest.oneToOne;
@@ -453,6 +449,17 @@ public class RegionalAnalysisController implements HttpController {
         if (analysisRequest.makeTauiSite) {
             task.makeTauiSite = true;
             task.recordAccessibility = false;
+        }
+
+        // If our destinations are freeform, pre-load the destination pointset on the backend.
+        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
+        // Initialization order is important here: task fields makeTauiSite and destinationPointSetKeys must already be
+        // set above.
+        if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+            checkArgument(task.destinationPointSetKeys.length == 1);
+            task.destinationPointSets = new PointSet[] {
+                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
+            };
         }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.
@@ -508,15 +515,17 @@ public class RegionalAnalysisController implements HttpController {
         task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
         task.percentiles = regionalAnalysis.travelTimePercentiles;
 
-        // Persist this newly created RegionalAnalysis to Mongo, which assigns it an id and creation/update time stamps.
+        // Persist this newly created RegionalAnalysis to Mongo.
+        // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
-        if (analysisRequest.recordTimes) regionalAnalysis.addCsvStoragePath(Result.TIMES, config.resultsBucket());
-        if (analysisRequest.recordPaths) regionalAnalysis.addCsvStoragePath(Result.PATHS, config.resultsBucket());
-        if (analysisRequest.recordAccessibility) regionalAnalysis.addCsvStoragePath(Result.ACCESS, config.resultsBucket());
-        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);
+
+        // Flush to the database any information added to the RegionalAnalysis object when it was enqueued.
+        // This includes the paths of any CSV files that will be produced by this analysis.
+        // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock() or put().
+        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
 
         return regionalAnalysis;
     }

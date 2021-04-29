@@ -154,26 +154,6 @@ public class PointToPointRouterServer {
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
         ParetoServer paretoServer = new ParetoServer(transportNetwork);
 
-        // add cors header
-        before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
-
-        options("/*", (request, response) -> {
-
-            String accessControlRequestHeaders = request
-                .headers("Access-Control-Request-Headers");
-            if (accessControlRequestHeaders != null) {
-                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
-            }
-
-            String accessControlRequestMethod = request
-                .headers("Access-Control-Request-Method");
-            if (accessControlRequestMethod != null) {
-                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
-            }
-
-            return "OK";
-        });
-
         get("/metadata", (request, response) -> {
             response.header("Content-Type", "application/json");
             RouterInfo routerInfo = new RouterInfo();

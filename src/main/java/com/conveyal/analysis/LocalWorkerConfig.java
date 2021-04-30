@@ -16,6 +16,7 @@ public class LocalWorkerConfig extends WorkerConfig implements LocalFileStorage.
         super(props);
         // Actually this is not used directly, backend storage component is passed in to local worker constructor.
         cacheDirectory = strProp("cache-dir");
+        exitIfErrors();
     }
 
     // INTERFACE IMPLEMENTATIONS

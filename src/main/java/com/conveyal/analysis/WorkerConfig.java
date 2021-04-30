@@ -36,7 +36,7 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
         }
         testTaskRedelivery = boolProp("test-task-redelivery");
         listenForSinglePoint = boolProp("listen-for-single-point");
-        exitIfErrors();
+        // No call to exitIfErrors() here, that should be done in concrete subclasses.
     }
 
     // INTERFACE IMPLEMENTATIONS

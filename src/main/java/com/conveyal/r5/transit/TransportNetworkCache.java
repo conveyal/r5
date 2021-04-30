@@ -145,7 +145,7 @@ public class TransportNetworkCache {
     }
 
     private String getR5NetworkFilename(String networkId) {
-        return networkId + "_" + BackendVersion.instance.version + ".dat";
+        return String.format("%s_%s.dat", networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
     }
 
     private FileStorageKey getR5NetworkFileStorageKey (String networkId) {
@@ -301,8 +301,8 @@ public class TransportNetworkCache {
      */
     private @Nonnull TransportNetwork loadNetwork(String networkId) throws TransportNetworkException {
         LOG.debug(
-            "Finding or building a TransportNetwork for ID {} and R5 version {}",
-            networkId, BackendVersion.instance.version
+            "Finding or building a TransportNetwork for ID {} with file format version {}.",
+            networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION
         );
         try {
             FileStorageKey r5Key = getR5NetworkFileStorageKey(networkId);
@@ -312,8 +312,8 @@ public class TransportNetworkCache {
                 return KryoNetworkSerializer.read(networkFile);
             } else {
                 LOG.debug(
-                    "Cached transport network for id {} and R5 version {} was not found. Building from scratch.",
-                    networkId, BackendVersion.instance.version
+                    "Cached transport network for ID {} with file format version {} was not found. Building from scratch.",
+                    networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION
                 );
                 return buildNetwork(networkId);
             }

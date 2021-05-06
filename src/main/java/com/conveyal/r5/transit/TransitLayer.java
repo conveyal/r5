@@ -190,7 +190,8 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
-     * The feed is not closed after being loaded.
+     * The supplied feed is treated as read-only, and is not closed after being loaded.
+     * This method requires findPatterns() to have been called on the feed before it's passed in.
      */
     public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
@@ -230,11 +231,6 @@ public class TransitLayer implements Serializable, Cloneable {
             serviceCodeNumber.put(serviceId, serviceIndex);
             LOG.debug("Service {} has ID {}", serviceIndex, serviceId);
         });
-
-        // Group trips by stop pattern (including pickup/dropoff type) and fill stop times into patterns.
-        // Also group trips by the blockId they belong to, and chain them together if they allow riders to stay on board
-        // the vehicle from one trip to the next, even if it changes routes or directions. This is called "interlining".
-        gtfs.findPatterns();
 
         LOG.info("Creating trip patterns and schedules.");
 

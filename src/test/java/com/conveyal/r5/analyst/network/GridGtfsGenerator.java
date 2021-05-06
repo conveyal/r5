@@ -36,7 +36,7 @@ public class GridGtfsGenerator {
 
     public GridGtfsGenerator (GridLayout gridLayout) {
         this.gridLayout = gridLayout;
-        feed = new GTFSFeed(); // Temp file db, can we do this in memory instead?
+        feed = GTFSFeed.newWritableInMemory();
         mergeStops = true;
     }
 
@@ -45,6 +45,7 @@ public class GridGtfsGenerator {
             addRoute(route);
         }
         addCommonTables();
+        feed.findPatterns();
         return feed;
     }
 

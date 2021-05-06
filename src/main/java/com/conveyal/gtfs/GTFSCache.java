@@ -1,6 +1,5 @@
 package com.conveyal.gtfs;
 
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -13,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipFile;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 
@@ -108,7 +106,7 @@ public class GTFSCache {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
             fileStorage.getFile(dbKey);
             fileStorage.getFile(dbpKey);
-            return new GTFSFeed(fileStorage.getFile(dbKey));
+            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
         }
         FileStorageKey zipKey = getFileKey(id, "zip");
         if (!fileStorage.exists(zipKey)) {
@@ -118,20 +116,13 @@ public class GTFSCache {
         try {
             File tempDbFile = FileUtils.createScratchFile("db");
             File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-            ZipFile zipFile = new ZipFile(fileStorage.getFile(zipKey));
-
-            GTFSFeed feed = new GTFSFeed(tempDbFile);
-            feed.loadFromFile(zipFile);
-            feed.findPatterns();
-
-            // Close the DB and flush to disk before we start moving and copying files around.
-            feed.close();
-
+            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey));
+            // The DB file should already be closed and flushed to disk.
             // Put the DB and DB.p files in local cache, and mirror to remote storage if configured.
             fileStorage.moveIntoStorage(dbKey, tempDbFile);
             fileStorage.moveIntoStorage(dbpKey, tempDbpFile);
-
-            return new GTFSFeed(fileStorage.getFile(dbKey));
+            // Reopen the feed in its new location, enforcing read-only access to avoid file corruption.
+            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
         } catch (Exception e) {
             throw new GtfsLibException("Error loading zip file for GTFS feed: " + zipKey, e);
         }

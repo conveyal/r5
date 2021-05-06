@@ -55,7 +55,7 @@ public class GTFSFeedTest {
         // delete file to make sure we can assert that this program created the file
         outZip.delete();
 
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.writableTempFileFromGtfs(getResourceFileName("fake-agency.zip"));
         feed.toFile(outZip.getAbsolutePath());
         feed.close();
         assertTrue(outZip.exists());

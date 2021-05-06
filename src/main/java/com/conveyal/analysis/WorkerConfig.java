@@ -28,7 +28,7 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
         brokerAddress = strProp("broker-address");
         brokerPort = strProp("broker-port");
         {
-            // Should we supply these in properties, or should this be done elsewhere?
+            // Should we supply these in properties, or should this be inferred from CPU cores elsewhere?
             int availableProcessors = Runtime.getRuntime().availableProcessors();
             LOG.info("Java reports the number of available processors is: {}", availableProcessors);
             lightThreads = availableProcessors;

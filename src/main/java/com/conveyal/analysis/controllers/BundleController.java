@@ -184,10 +184,9 @@ public class BundleController implements HttpController {
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
                         File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
-                        GTFSFeed feed = new GTFSFeed(tempDbFile);
+                        GTFSFeed feed = GTFSFeed.newWritableFile(tempDbFile);
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
-                        feed.findPatterns();
 
                         // Populate the metadata while the feed is open
                         // TODO also get service range, hours per day etc. and error summary (and complete error JSON).

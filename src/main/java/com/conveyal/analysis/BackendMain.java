@@ -2,9 +2,9 @@ package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
-import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.gtfs.api.ApiMain;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.progress.Task;
@@ -37,7 +37,7 @@ public abstract class BackendMain {
     }
 
     private static void startServerInternal (BackendComponents components, TaskAction... postStartupTasks) {
-        LOG.info("Starting Conveyal analysis backend version: {}", BackendVersion.instance.version);
+        LOG.info("Starting Conveyal analysis backend version {}", SoftwareVersion.instance.version);
         LOG.info("Connecting to database...");
 
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,

@@ -1,4 +1,4 @@
-package com.conveyal.analysis;
+package com.conveyal.r5;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,15 +12,15 @@ import java.util.Properties;
  * We use this to allow the backend to report the exact version of the code it is running via an API. This is useful
  * in automated deployment, testing, and debugging situations. Note that when building the code in an IDE, the version
  * information may not be supplied to this class. It may only be provided in a command line Maven build.
- *
- * TODO rename to R5Version, this is now both the backend and worker version, but not the cluster version.
  */
-public class BackendVersion {
+public class SoftwareVersion {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BackendVersion.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SoftwareVersion.class);
+    private static final String VERSION_PROPERTIES_FILE = "version.properties";
     private static final String UNKNOWN = "UNKNOWN";
 
-    public static final BackendVersion instance = new BackendVersion();
+    // This could potentially be made into a Component so it's non-static
+    public static SoftwareVersion instance = new SoftwareVersion();
 
     private final Properties properties = new Properties();
 
@@ -29,13 +29,11 @@ public class BackendVersion {
     public final String commit;
     public final String branch;
 
-    private BackendVersion () {
-        try {
-            InputStream is = BackendVersion.class.getClassLoader().getResourceAsStream("version.properties");
+    protected SoftwareVersion () {
+        try (InputStream is = getClass().getResourceAsStream(VERSION_PROPERTIES_FILE)) {
             properties.load(is);
-            is.close();
         } catch (IOException | NullPointerException e) {
-            LOG.error("Error loading version and commit information for Analysis Backend: {}", e.toString());
+            LOG.error("Error loading version and commit information: {}", e.toString());
         }
         version = getPropertyOrUnknown("version");
         commit = getPropertyOrUnknown("commit");

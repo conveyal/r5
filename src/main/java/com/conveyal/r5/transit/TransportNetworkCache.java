@@ -1,7 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.analysis.BackendVersion;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;

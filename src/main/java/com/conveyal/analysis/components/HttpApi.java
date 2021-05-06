@@ -1,18 +1,14 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageFormat;
-import com.conveyal.file.FileStorageKey;
-import com.conveyal.file.FileUtils;
 import org.apache.commons.fileupload.FileUploadException;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
@@ -20,12 +16,10 @@ import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
@@ -136,7 +130,7 @@ public class HttpApi implements Component {
         // Allow client to fetch information about the backend build version.
         sparkService.get(
                 "/version",
-                (Request req, Response res) -> BackendVersion.instance,
+                (Request req, Response res) -> SoftwareVersion.instance,
                 JsonUtil.objectMapper::writeValueAsString
         );
 

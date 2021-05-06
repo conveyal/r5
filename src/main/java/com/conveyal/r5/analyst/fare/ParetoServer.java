@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.fare;
 
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -13,7 +13,6 @@ import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.TIntIntMap;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,6 @@ import spark.Request;
 import spark.Response;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -125,7 +123,7 @@ public class ParetoServer {
         public final Collection<ParetoTrip> trips;
         public final long computeTimeMillis;
         /** save backend version in JSON output - useful for JSON that's being pushed to fareto-examples */
-        public BackendVersion backendVersion = BackendVersion.instance;
+        public SoftwareVersion backendVersion = SoftwareVersion.instance;
         public String generationTime = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
 
         public ParetoReturn(ProfileRequest request, Collection<ParetoTrip> trips, long computeTimeMillis) {

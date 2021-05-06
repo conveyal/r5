@@ -1,6 +1,6 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.kryo.InstanceCountingClassResolver;
 import com.conveyal.kryo.TIntArrayListSerializer;
 import com.conveyal.kryo.TIntIntHashMapSerializer;
@@ -99,7 +99,7 @@ public abstract class KryoNetworkSerializer {
         Kryo kryo = makeKryo();
         output.write(HEADER);
         kryo.writeObject(output, NETWORK_FORMAT_VERSION);
-        kryo.writeObject(output, BackendVersion.instance.commit);
+        kryo.writeObject(output, SoftwareVersion.instance.commit);
         kryo.writeObject(output, network);
         output.close();
         LOG.info("Done writing.");

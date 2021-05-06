@@ -94,7 +94,9 @@ task testShadowJarRunnable(type: JavaExec) {
 task createVersionProperties(dependsOn: processResources) {
     doLast {
         def details = versionDetails()
-        new File(buildDir, "resources/main/version.properties").withWriter { w ->
+        def dir = new File(buildDir, "resources/main/com/conveyal/r5/")
+        mkdir(dir)
+        new File(dir, "version.properties").withWriter { w ->
             Properties p = new Properties()
             p['version'] = project.version.toString()
             p['commit'] = details.gitHashFull
@@ -102,7 +104,7 @@ task createVersionProperties(dependsOn: processResources) {
             p.store w, null
         }
         // Also make a simple one-line version.txt for scripts to use
-        new File(buildDir, "version.txt").text = "$version"
+        new File(dir, "version.txt").text = "$version"
     }
 }
 

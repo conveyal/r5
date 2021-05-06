@@ -20,6 +20,7 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -431,6 +432,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         if (this.patterns.size() > 0) {
             throw new GtfsLibException("Patterns should only be found once, after all trips are loaded.");
         }
+        if (progressListener != null) progressListener.beginTask("Grouping trips into patterns.", trips.size());
         int n = 0;
         Multimap<TripPatternKey, String> tripsForPattern = HashMultimap.create();
         for (String trip_id : trips.keySet()) {
@@ -447,6 +449,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .forEach(key::addStopTime);
 
             tripsForPattern.put(key, trip_id);
+            if (progressListener != null) progressListener.increment();
         }
 
         // create an in memory list because we will rename them and they need to be immutable once they hit mapdb
@@ -455,6 +458,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .map((e) -> new Pattern(this, e.getKey().stops, new ArrayList<>(e.getValue())))
                 .collect(Collectors.toList());
 
+        if (progressListener != null) progressListener.beginTask("Naming and indexing patterns.", patterns.size() * 3);
         namePatterns(patterns);
 
         // Index patterns by ID and by the trips they contain.
@@ -463,6 +467,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             for (String tripid : pattern.associatedTrips) {
                 this.patternForTrip.put(tripid, pattern.pattern_id);
             }
+            if (progressListener != null) progressListener.increment();
         }
 
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
@@ -509,6 +514,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                 namingInfo.vias.put(stop.stop_name, pattern);
             }
             namingInfo.patternsOnRoute.add(pattern);
+            if (progressListener != null) progressListener.increment();
+
         }
 
         // name the patterns on each route
@@ -516,29 +523,8 @@ public class GTFSFeed implements Cloneable, Closeable {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
 
-                String headsign = trips.get(pattern.associatedTrips.get(0)).trip_headsign;
-
                 String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
                 String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
-
-
-                /* We used to use this code but decided it is better to just always have the from/to info, with via if necessary.
-                if (headsign != null && info.headsigns.get(headsign).size() == 1) {
-                    // easy, unique headsign, we're done
-                    pattern.name = headsign;
-                    continue;
-                }
-
-                if (info.toStops.get(toName).size() == 1) {
-                    pattern.name = String.format(Locale.US, "to %s", toName);
-                    continue;
-                }
-
-                if (info.fromStops.get(fromName).size() == 1) {
-                    pattern.name = String.format(Locale.US, "from %s", fromName);
-                    continue;
-                }
-                */
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -580,6 +566,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     // give up
                     pattern.name = String.format(Locale.US, "from %s to %s like trip %s", fromName, toName, pattern.associatedTrips.get(0));
                 }
+                if (progressListener != null) progressListener.increment();
             }
 
             // attach a stop and trip count to each

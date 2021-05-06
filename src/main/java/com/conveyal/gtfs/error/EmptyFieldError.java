@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Indicates that a field marked as required is not present in a GTFS feed on a particular line. */
@@ -14,4 +16,7 @@ public class EmptyFieldError extends GTFSError implements Serializable {
         return String.format("No value supplied for a required column.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

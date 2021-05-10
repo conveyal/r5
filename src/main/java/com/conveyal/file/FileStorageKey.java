@@ -1,37 +1,29 @@
 package com.conveyal.file;
 
 /**
- * Represent S3 bucket/keys and locally cached folder/paths. Prevents multiple parameter passing or many
- * separate `String.join("/", ...)`s.
+ * A unique identifier for a file within a namespace drawn from an enum of known categories.
+ * This maps to a subdirectory and filename in local storage, and a bucket and object key in S3-style cloud storage.
+ * While keeping stored files in multiple distinct categories, this avoids passing around a lot of directory/bucket
+ * names as strings, and avoids mistakes where such strings are mismatched accross different function calls.
  */
 public class FileStorageKey {
-    public final String bucket; // Rather than a bucket, this could be just a folder in a cache directory.
-    public final String path;
 
-    public FileStorageKey(String fullPath) {
-        checkForDirectoryTraversal(fullPath);
-        int slashIndex = fullPath.indexOf("/");
-        bucket = fullPath.substring(0, slashIndex);
-        path = fullPath.substring(slashIndex + 1);
-    }
+    public final FileCategory category;
+    public final String path; // rename field to id or name? these are not usually (never?) paths, just object names.
 
-    public FileStorageKey(String bucket, String path) {
+    public FileStorageKey(FileCategory category, String path) {
         checkForDirectoryTraversal(path);
-        this.bucket = bucket;
+        this.category = category;
         this.path = path;
     }
 
-    public FileStorageKey(String bucket, String path, String ext) {
-        this(bucket, path + "." + ext);
-    }
-
-    public String getFullPath() {
-        return String.join("/", bucket, path);
+    public FileStorageKey(FileCategory category, String path, String ext) {
+        this(category, path + "." + ext);
     }
 
     @Override
     public String toString () {
-        return String.format("[File storage key: bucket='%s', key='%s']", bucket, path);
+        return String.format("[File storage key: category='%s', key='%s']", category, path);
     }
 
     /**

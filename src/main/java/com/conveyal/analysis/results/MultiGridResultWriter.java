@@ -29,7 +29,7 @@ public class MultiGridResultWriter implements RegionalResultWriter {
 
     /** Constructor */
     public MultiGridResultWriter (
-            RegionalAnalysis regionalAnalysis, RegionalTask task, String outputBucket, FileStorage fileStorage
+            RegionalAnalysis regionalAnalysis, RegionalTask task, FileStorage fileStorage
     ) {
         // We are storing the regional analysis just to get its pointset IDs (not keys) and its own ID.
         this.regionalAnalysis = regionalAnalysis;
@@ -40,7 +40,7 @@ public class MultiGridResultWriter implements RegionalResultWriter {
         accessibilityGridWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
         for (int d = 0; d < nDestinationPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
-                accessibilityGridWriters[d][p] = new GridResultWriter(task, outputBucket, fileStorage);
+                accessibilityGridWriters[d][p] = new GridResultWriter(task, fileStorage);
             }
         }
     }

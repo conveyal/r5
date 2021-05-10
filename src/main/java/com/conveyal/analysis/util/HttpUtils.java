@@ -24,7 +24,7 @@ public abstract class HttpUtils {
         try {
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
-            throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
+            throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
     }
 }

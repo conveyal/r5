@@ -12,7 +12,8 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipFile;
+
+import static com.conveyal.file.FileCategory.BUNDLES;
 
 /**
  * Cache for GTFSFeed objects, a disk-backed (MapDB) representation of data from one GTFS feed. The source GTFS
@@ -26,21 +27,15 @@ public class GTFSCache {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
     private final LoadingCache<String, GTFSFeed> cache;
 
-    private final String bucket;
-    private final FileStorage fileStore;
-
-    public interface Config {
-        String bundleBucket ();
-    }
+    public final FileStorage fileStorage;
 
     public static String cleanId(String id) {
         return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
 
-    public GTFSCache(FileStorage fileStore, Config config) {
+    public GTFSCache (FileStorage fileStorage) {
         LOG.info("Initializing the GTFS cache...");
-        this.fileStore = fileStore;
-        this.bucket = config.bundleBucket();
+        this.fileStorage = fileStorage;
         this.cache = makeCaffeineCache();
     }
 
@@ -82,7 +77,7 @@ public class GTFSCache {
     }
 
     public FileStorageKey getFileKey (String id, String extension) {
-        return new FileStorageKey(this.bucket, String.join(".", cleanId(id), extension));
+        return new FileStorageKey(BUNDLES, String.join(".", cleanId(id), extension));
     }
 
     /**
@@ -107,37 +102,27 @@ public class GTFSCache {
     private @Nonnull GTFSFeed retrieveAndProcessFeed(String id) throws GtfsLibException {
         FileStorageKey dbKey = getFileKey(id, "db");
         FileStorageKey dbpKey = getFileKey(id, "db.p");
-
-        if (fileStore.exists(dbKey) && fileStore.exists(dbpKey)) {
+        if (fileStorage.exists(dbKey) && fileStorage.exists(dbpKey)) {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
-            fileStore.getFile(dbKey);
-            fileStore.getFile(dbpKey);
-            return new GTFSFeed(fileStore.getFile(dbKey));
+            fileStorage.getFile(dbKey);
+            fileStorage.getFile(dbpKey);
+            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
         }
-
         FileStorageKey zipKey = getFileKey(id, "zip");
-        if (!fileStore.exists(zipKey)) {
+        if (!fileStorage.exists(zipKey)) {
             throw new GtfsLibException("Original GTFS zip file could not be found: " + zipKey);
         }
-
         LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
         try {
             File tempDbFile = FileUtils.createScratchFile("db");
             File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-            ZipFile zipFile = new ZipFile(fileStore.getFile(zipKey));
-
-            GTFSFeed feed = new GTFSFeed(tempDbFile);
-            feed.loadFromFile(zipFile);
-            feed.findPatterns();
-
-            // Close the DB and flush to disk before we start moving and copying files around.
-            feed.close();
-
-            // Ensure the DB and DB.p files have been fully stored.
-            fileStore.moveIntoStorage(dbKey, tempDbFile);
-            fileStore.moveIntoStorage(dbpKey, tempDbpFile);
-
-            return new GTFSFeed(fileStore.getFile(dbKey));
+            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey));
+            // The DB file should already be closed and flushed to disk.
+            // Put the DB and DB.p files in local cache, and mirror to remote storage if configured.
+            fileStorage.moveIntoStorage(dbKey, tempDbFile);
+            fileStorage.moveIntoStorage(dbpKey, tempDbpFile);
+            // Reopen the feed in its new location, enforcing read-only access to avoid file corruption.
+            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
         } catch (Exception e) {
             throw new GtfsLibException("Error loading zip file for GTFS feed: " + zipKey, e);
         }

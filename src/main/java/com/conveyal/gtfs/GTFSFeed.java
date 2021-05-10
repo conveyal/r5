@@ -1,8 +1,6 @@
 package com.conveyal.gtfs;
 
-import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -22,17 +20,12 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.conveyal.r5.analyst.progress.NoopProgressListener;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
-import com.google.common.util.concurrent.ExecutionError;
 import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
@@ -53,9 +46,9 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -192,6 +185,8 @@ public class GTFSFeed implements Cloneable, Closeable {
      * us to associate a line number with errors in objects that don't have any other clear identifier.
      *
      * Interestingly, all references are resolvable when tables are loaded in alphabetical order.
+     *
+     * @param zip the source ZIP file to load, which will be closed when done loading.
      */
     public void loadFromFile(ZipFile zip, String fid) throws Exception {
         if (this.loaded) throw new UnsupportedOperationException("Attempt to load GTFS into existing database");
@@ -253,6 +248,12 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip);
         zip.close();
+
+        // There are conceivably cases where the extra step of identifying and naming patterns is not necessary.
+        // In current usage we do always need them, and performing this step during load allows enforcing subsequent
+        // read-only access.
+        findPatterns();
+
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
         LOG.info("Detected {} errors in feed.", errors.size());
@@ -292,24 +293,6 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("GTFS file written");
         } catch (Exception e) {
             LOG.error("Error saving GTFS: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Static factory method returning a new instance of GTFSFeed containing the contents of
-     * the GTFS file at the supplied filesystem path.
-     */
-    public static GTFSFeed fromFile(String file) {
-        GTFSFeed feed = new GTFSFeed();
-        ZipFile zip;
-        try {
-            zip = new ZipFile(file);
-            feed.loadFromFile(zip);
-            zip.close();
-            return feed;
-        } catch (Exception e) {
-            LOG.error("Error loading GTFS: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -439,12 +422,18 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     *  Bin all trips by stop sequence and pick/drop sequences.
+     * Bin all trips by stop sequence and pick/drop sequences.
      * A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
+     * This changes the contents of the GTFSFeed (writes to it) so should be done once when the feed is first loaded.
+     * In normal usage this will be called automatically at the end of the feed loading process.
+     * The method is only public for special cases like tests where we programmatically build feeds.
      */
     public void findPatterns() {
+        if (this.patterns.size() > 0) {
+            throw new GtfsLibException("Patterns should only be found once, after all trips are loaded.");
+        }
+        if (progressListener != null) progressListener.beginTask("Grouping trips into patterns.", trips.size());
         int n = 0;
-
         Multimap<TripPatternKey, String> tripsForPattern = HashMultimap.create();
         for (String trip_id : trips.keySet()) {
             if (++n % 100000 == 0) {
@@ -460,6 +449,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .forEach(key::addStopTime);
 
             tripsForPattern.put(key, trip_id);
+            if (progressListener != null) progressListener.increment();
         }
 
         // create an in memory list because we will rename them and they need to be immutable once they hit mapdb
@@ -468,6 +458,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .map((e) -> new Pattern(this, e.getKey().stops, new ArrayList<>(e.getValue())))
                 .collect(Collectors.toList());
 
+        if (progressListener != null) progressListener.beginTask("Naming and indexing patterns.", patterns.size() * 3);
         namePatterns(patterns);
 
         // Index patterns by ID and by the trips they contain.
@@ -476,6 +467,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             for (String tripid : pattern.associatedTrips) {
                 this.patternForTrip.put(tripid, pattern.pattern_id);
             }
+            if (progressListener != null) progressListener.increment();
         }
 
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
@@ -522,6 +514,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                 namingInfo.vias.put(stop.stop_name, pattern);
             }
             namingInfo.patternsOnRoute.add(pattern);
+            if (progressListener != null) progressListener.increment();
+
         }
 
         // name the patterns on each route
@@ -529,29 +523,8 @@ public class GTFSFeed implements Cloneable, Closeable {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
 
-                String headsign = trips.get(pattern.associatedTrips.get(0)).trip_headsign;
-
                 String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
                 String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
-
-
-                /* We used to use this code but decided it is better to just always have the from/to info, with via if necessary.
-                if (headsign != null && info.headsigns.get(headsign).size() == 1) {
-                    // easy, unique headsign, we're done
-                    pattern.name = headsign;
-                    continue;
-                }
-
-                if (info.toStops.get(toName).size() == 1) {
-                    pattern.name = String.format(Locale.US, "to %s", toName);
-                    continue;
-                }
-
-                if (info.fromStops.get(fromName).size() == 1) {
-                    pattern.name = String.format(Locale.US, "from %s", fromName);
-                    continue;
-                }
-                */
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -593,6 +566,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     // give up
                     pattern.name = String.format(Locale.US, "from %s to %s like trip %s", fromName, toName, pattern.associatedTrips.get(0));
                 }
+                if (progressListener != null) progressListener.increment();
             }
 
             // attach a stop and trip count to each
@@ -771,46 +745,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         List<Pattern> patternsOnRoute = new ArrayList<>();
     }
 
-    /** Create a GTFS feed in a temp file */
-    public GTFSFeed () {
-        // calls to this must be first operation in constructor - why, Java?
-        this(DBMaker.newTempFileDB()
-                .transactionDisable()
-                .mmapFileEnable()
-                .asyncWriteEnable()
-                .deleteFilesAfterClose()
-                .compressionEnable()
-                .closeOnJvmShutdown()
-                .make());
-    }
 
-    /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
-    public GTFSFeed (File dbFile) {
-        this(constructDB(dbFile));
-    }
+    /// CONSTRUCTORS and associated helper methods
+    /// These are private, use static factory methods to create instances.
 
-    // One critical point when constructing the MapDB is the instance cache type and size.
-    // The instance cache is how MapDB keeps some instances in memory to avoid deserializing them repeatedly from disk.
-    // We perform referential integrity checks against tables which in some feeds have hundreds of thousands of rows.
-    // We have observed that the referential integrity checks are very slow with the instance cache disabled.
-    // MapDB's default cache type is a hash table, which is very sensitive to the cache size.
-    // It defaults to 2^15 (32ki) and only seems to run smoothly at other powers of two, so we use 2^16 (64ki).
-    // This might have something to do with compiler optimizations on the hash code calculations.
-    // Initial tests show similar speeds for the default hashtable cache of 64k or 32k size and the hardRef cache.
-    // By not calling any of the cacheEnable or cacheSize methods on the DB builder, we use the default values
-    // that seem to perform well.
-    private static DB constructDB(File dbFile) {
-        try{
-            return DBMaker.newFileDB(dbFile)
-                    .transactionDisable()
-                    .mmapFileEnable()
-                    .asyncWriteEnable()
-                    .compressionEnable()
-                    .closeOnJvmShutdown()
-                    .make();
-        } catch (ExecutionError | IOError | Exception e) {
-            throw new GtfsLibException("Could not construct db from file.", e);
-        }
+    /** @param dbFile the file to create or connect to, or null if a temporary file should be used. */
+    private GTFSFeed (File dbFile, boolean writable) {
+        this(constructMapDb(dbFile, writable));
     }
 
     private GTFSFeed (DB db) {
@@ -844,4 +785,117 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         errors = db.getTreeSet("errors");
     }
+
+    // One critical point when constructing the MapDB is the instance cache type and size.
+    // The instance cache is how MapDB keeps some instances in memory to avoid deserializing them repeatedly from disk.
+    // We perform referential integrity checks against tables which in some feeds have hundreds of thousands of rows.
+    // We have observed that the referential integrity checks are very slow with the instance cache disabled.
+    // MapDB's default cache type is a hash table, which is very sensitive to the cache size.
+    // It defaults to 2^15 (32ki) and only seems to run smoothly at other powers of two, so we use 2^16 (64ki).
+    // This might have something to do with compiler optimizations on the hash code calculations.
+    // Initial tests show similar speeds for the default hashtable cache of 64k or 32k size and the hardRef cache.
+    // By not calling any of the cacheEnable or cacheSize methods on the DB builder, we use the default values
+    // that seem to perform well.
+    private static DB constructMapDb (File dbFile, boolean readOnly) {
+        DBMaker dbMaker;
+        // TODO also allow for in-memory
+        if (dbFile == null) {
+            dbMaker = DBMaker.newTempFileDB();
+        } else {
+            dbMaker = DBMaker.newFileDB(dbFile);
+        }
+        if (readOnly) {
+            dbMaker.readOnly();
+        } else {
+            dbMaker.asyncWriteEnable();
+        }
+        try{
+            return dbMaker
+                    .transactionDisable()
+                    .mmapFileEnable()
+                    .compressionEnable()
+                    .closeOnJvmShutdown()
+                    .make();
+        } catch (Exception e) {
+            throw new GtfsLibException("Could not construct db.", e);
+        }
+    }
+
+
+    /// STATIC FACTORY METHODS
+    /// Use these rather than constructors to create GTFSFeed objects in a more fluent way.
+
+
+    public static GTFSFeed reopenReadOnly (File file) {
+        if (file.exists()) {
+            return new GTFSFeed(file, true);
+        } else {
+            throw new GtfsLibException("Cannot reopen file, it does not exist.");
+        }
+    }
+
+    /**
+     * Create a new DB file and load the specified GTFS ZIP into it. The resulting writable feed object is not returned
+     * and must be reopened for subsequent read-only access.
+     * @param dbFile the new file in which to store the database, or null to use a temporary file
+     */
+    public static void newFileFromGtfs (File dbFile, File gtfsFile) {
+        if (gtfsFile == null || !gtfsFile.exists()) {
+            throw new GtfsLibException("Cannot load from GTFS feed, file does not exist.");
+        }
+        try {
+            GTFSFeed feed = newWritableFile(dbFile);
+            feed.loadFromFile(new ZipFile(gtfsFile));
+            feed.close();
+        } catch (Exception e) {
+            throw new GtfsLibException("Cannot load GTFS from feed ZIP.", e);
+        }
+    }
+
+    /**
+     * Ideally we wouldn't expose any readable feeds after loading them, but we need to inject progress listeners, clear
+     * out errors, and build some indexes. Be sure to close feeds and reopen them read-only as early as is feasible.
+     * Ideally we'd somehow encapsulate all that so we never reveal a writable GTFSFeed object.
+     * @param dbFile the new database file (which must be empty or not yet exist), or null to use a new temp file.
+     */
+    public static GTFSFeed newWritableFile (File dbFile) {
+        // Length check is for cases where a newly created empty temp file is passed in.
+        if (dbFile != null && dbFile.exists() && dbFile.length() > 0) {
+            throw new GtfsLibException("Cannot create new file, it already exists.");
+        }
+        return new GTFSFeed(dbFile, false);
+    }
+
+    /**
+     * Static factory method returning a new instance of GTFSFeed containing the contents of
+     * the GTFS file at the supplied filesystem path. This could probably be combined with some other factory methods.
+     */
+    public static GTFSFeed writableTempFileFromGtfs (String file) {
+        GTFSFeed feed = new GTFSFeed(null, false);
+        try {
+            ZipFile zip = new ZipFile(file);
+            feed.loadFromFile(zip);
+            zip.close();
+            return feed;
+        } catch (Exception e) {
+            LOG.error("Error loading GTFS: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static GTFSFeed readOnlyTempFileFromGtfs (String fileName) {
+        try {
+            File tempFile = File.createTempFile("com.conveyal.gtfs.", ".db");
+            tempFile.deleteOnExit();
+            GTFSFeed.newFileFromGtfs(tempFile, new File(fileName));
+            return GTFSFeed.reopenReadOnly(tempFile);
+        } catch (Exception e) {
+            throw new GtfsLibException("Error loading GTFS.", e);
+        }
+    }
+
+    public static GTFSFeed newWritableInMemory () {
+        return new GTFSFeed(DBMaker.newMemoryDB().transactionDisable().make());
+    }
+
 }

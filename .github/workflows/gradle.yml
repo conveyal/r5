@@ -26,17 +26,12 @@ jobs:
     #   image: mherwig/docker-alpine-java-mongo:latest
     #   env:
     #     BUILD_TARGET:staging
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      GPR_USERNAME: ${{ secrets.GPR_USERNAME }}
-      GPR_TOKEN: ${{ secrets.GPR_TOKEN }}
     steps:
     # Starting in v2.2 checkout action fetches all tags when fetch-depth=0, for auto-versioning.
     - uses: actions/checkout@v2.3.2
       with:
         fetch-depth: 0
-    # Java setup step completes very fast, no need to run in a preconfigured docker container
+    # Java setup step completes very fast, no need to run in a preconfigured docker container.
     - name: Set up JDK 11
       uses: actions/setup-java@v1
       with:
@@ -46,29 +41,16 @@ jobs:
       with:
         path: ~/.gradle/caches
         key: gradle-caches
+    - name: Show version string
+      run: gradle -q printVersion | head -n1
     - name: Build and Test
       run: gradle build
-    - name: Ensure shadow JAR is runnable as backend
+    - name: Ensure shadow JAR is runnable as local backend
       run: |
         cp analysis.properties.template analysis.properties
         gradle testShadowJarRunnable
     - name: Publish to GH Packages
+      # Supply access token to build.gradle (used in publishing.repositories.maven.credentials)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: gradle publish
-    - name: Upload to S3
-      # Use git describe to get a similar string to the Gradle project version (possibly missing .dirty).
-      run: |
-        VERSION=$(gradle -q printVersion | head -n1)
-        LOCAL_FILE=$(ls build/libs/*-all.jar | head -n1)
-        aws s3 cp --no-progress --region eu-west-1 $LOCAL_FILE s3://r5-builds/${VERSION}.jar
-    - name: Publish Docker image to GH Container Registry
-      run: |
-        echo $GPR_TOKEN | docker login ghcr.io -u $GPR_USERNAME --password-stdin
-        gradle jib
-    # If we are on the head of dev or master, also copy to branch-latest.jar. 'aws s3 cp' will overwrite by default.
-    - name: Copy to branch-latest.jar on S3
-      if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
-      run: |
-        VERSION=$(gradle -q printVersion | head -n1)
-        BRANCH=${GITHUB_REF#refs/heads/}
-        echo VERSION is $VERSION, BRANCH is $BRANCH
-        aws s3 cp --no-progress --region eu-west-1 s3://r5-builds/${VERSION}.jar s3://r5-builds/${BRANCH}-latest.jar

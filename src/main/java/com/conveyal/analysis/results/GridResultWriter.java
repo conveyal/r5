@@ -64,7 +64,7 @@ public class GridResultWriter extends BaseResultWriter {
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) {
+    GridResultWriter (RegionalTask task, FileStorage fileStorage) {
         super(fileStorage);
         int width = task.width;
         int height = task.height;
@@ -75,7 +75,7 @@ public class GridResultWriter extends BaseResultWriter {
             height,
             channels
         );
-        super.prepare(task.jobId, outputBucket);
+        super.prepare(task.jobId);
 
         try {
             // Write the access grid file header to the temporary file.

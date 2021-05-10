@@ -1,6 +1,5 @@
 package com.conveyal.analysis.controllers;
 
-import com.amazonaws.services.s3.Headers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
@@ -28,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
+import com.sun.net.httpserver.Headers;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -181,7 +181,7 @@ public class BrokerController implements HttpController {
             broker.recentlyRequestedWorkers.remove(workerCategory);
         }
         String workerUrl = "http://" + address + ":7080/single"; // TODO remove hard-coded port number.
-        LOG.info("Re-issuing HTTP request from UI to worker at {}", workerUrl);
+        LOG.debug("Re-issuing HTTP request from UI to worker at {}", workerUrl);
         HttpPost httpPost = new HttpPost(workerUrl);
         // httpPost.setHeader("Accept", "application/x-analysis-time-grid");
         // TODO Explore: is this unzipping and re-zipping the result from the worker?
@@ -195,9 +195,9 @@ public class BrokerController implements HttpController {
             response.status(workerResponse.getStatusLine().getStatusCode());
             // Mimic headers sent by the worker. We're mostly interested in Content-Type, maybe Content-Encoding.
             // We do not want to mimic all headers like Date, Server etc.
-            Header contentTypeHeader = workerResponse.getFirstHeader(Headers.CONTENT_TYPE);
+            Header contentTypeHeader = workerResponse.getFirstHeader("Content-Type");
             response.header(contentTypeHeader.getName(), contentTypeHeader.getValue());
-            LOG.info("Returning worker response to UI with status code {} and content type {}",
+            LOG.debug("Returning worker response to UI with status code {} and content type {}",
                     workerResponse.getStatusLine(), contentTypeHeader.getValue());
             // This header will cause the Spark Framework to gzip the data automatically if requested by the client.
             response.header("Content-Encoding", "gzip");
@@ -221,7 +221,7 @@ public class BrokerController implements HttpController {
             // probably degrades the perceived responsiveness of single-point requests.
             return ByteStreams.toByteArray(entity.getContent());
         } catch (SocketTimeoutException ste) {
-            LOG.info("Timeout waiting for response from worker.");
+            LOG.warn("Timeout waiting for response from worker.");
             // Aborting the request might help release resources - we had problems with exhausting connection pools here.
             httpPost.abort();
             return jsonResponse(response, HttpStatus.BAD_REQUEST_400, "Routing server timed out. For the " +
@@ -229,7 +229,7 @@ public class BrokerController implements HttpController {
                     "using Routing Engine version < 4.5.1, your scenario may still be in preparation and you should " +
                     "try again in a few minutes.");
         } catch (NoRouteToHostException nrthe){
-            LOG.info("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
+            LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
                     "user made a single-point request within WORKER_RECORD_DURATION_MSEC after shutdown.", workerCategory);
             httpPost.abort();
             broker.unregisterSinglePointWorker(workerCategory);

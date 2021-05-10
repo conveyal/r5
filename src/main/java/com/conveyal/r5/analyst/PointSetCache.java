@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -16,6 +17,8 @@ import java.io.InputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.zip.GZIPInputStream;
 
+import static com.conveyal.file.FileCategory.GRIDS;
+
 /**
  * A local in-memory cache for PointSets, which are loaded from persistent storage on S3.
  * It will load either gridded or freeform pointsets, depending on the file extension of the S3 key.
@@ -28,7 +31,6 @@ public class PointSetCache {
     private static final int CACHE_SIZE = 200;
 
     private final FileStorage fileStore;
-    private final String bucket;
 
     private LoadingCache<String, PointSet> cache = CacheBuilder.newBuilder()
                 .maximumSize(CACHE_SIZE)
@@ -40,13 +42,12 @@ public class PointSetCache {
                     }
                 });
 
-    public PointSetCache(FileStorage fileStore, String bucket) {
-        this.bucket = bucket;
+    public PointSetCache(FileStorage fileStore) {
         this.fileStore = fileStore;
     }
 
     private PointSet loadPointSet(String key) throws IOException {
-        File file = fileStore.getFile(new FileStorageKey(bucket, key));
+        File file = fileStore.getFile(new FileStorageKey(GRIDS, key));
         // If the object does not exist on S3, getObject will throw an exception which will be caught in the
         // PointSetCache.get method. Grids are gzipped on S3.
         InputStream is = new GZIPInputStream(FileUtils.getInputStream(file));
@@ -76,8 +77,8 @@ public class PointSetCache {
     //      something like RegionalAnalysisController.
     private static PointSetCache instance;
 
-    public static void initializeStatically (FileStorage fileStorage, String gridBucket) {
-        instance = new PointSetCache(fileStorage, gridBucket);
+    public static void initializeStatically (FileStorage fileStorage) {
+        instance = new PointSetCache(fileStorage);
     }
 
     public static FreeFormPointSet readFreeFormFromFileStore (String key) {

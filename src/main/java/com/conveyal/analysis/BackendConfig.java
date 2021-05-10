@@ -31,7 +31,6 @@ public class BackendConfig extends ConfigBase implements
 
     // INSTANCE FIELDS
 
-    // If true, this backend instance should shut itself down after a period of inactivity.
     private final boolean offline;
     private final String databaseName;
     private final String databaseUri;

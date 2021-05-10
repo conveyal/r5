@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 /**
  * API data model class to hold information about the cloud compute instance a worker is running on (if any).
  */
+@Deprecated
 public class EC2Info {
 
     private static final Logger LOG = LoggerFactory.getLogger(EC2Info.class);

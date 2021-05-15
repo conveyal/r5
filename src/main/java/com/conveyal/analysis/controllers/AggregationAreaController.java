@@ -34,8 +34,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.GRIDS;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 
 /**
  * Stores vector aggregationAreas (used to define the region of a weighted average accessibility metric).
@@ -52,22 +53,13 @@ public class AggregationAreaController implements HttpController {
     private static int MAX_FEATURES = 100;
 
     private final FileStorage fileStorage;
-    private final Config config;
 
-    public interface Config {
-        // TODO this could be eliminated by hard-wiring file types to bucket subdirectories in the FileStorage.
-        String gridBucket ();
-    }
-
-    public AggregationAreaController (FileStorage fileStorage, Config config) {
+    public AggregationAreaController (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
-        this.config = config;
     }
-
-
 
     private FileStorageKey getStoragePath (AggregationArea area) {
-        return new FileStorageKey(config.gridBucket(), area.getS3Key());
+        return new FileStorageKey(GRIDS, area.getS3Key());
     }
 
     /**
@@ -131,6 +123,8 @@ public class AggregationAreaController implements HttpController {
         Map<String, Geometry> areas = new HashMap<>();
 
         boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
+        String zoomString = query.get("zoom") == null ? null : query.get("zoom").get(0).getString();
+        final int zoom = parseZoom(zoomString);
 
         if (!unionRequested && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +
@@ -152,7 +146,7 @@ public class AggregationAreaController implements HttpController {
         // 3. Convert to raster grids, then store them. ================================================================
         areas.forEach((String name, Geometry geometry) -> {
             Envelope env = geometry.getEnvelopeInternal();
-            Grid maskGrid = new Grid(ZOOM, env);
+            Grid maskGrid = new Grid(zoom, env);
 
             // Store the percentage each cell overlaps the mask, scaled as 0 to 100,000
             List<Grid.PixelWeight> weights = maskGrid.getPixelWeights(geometry, true);

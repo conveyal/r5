@@ -1,23 +1,17 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Regions;
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
+import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.LocalFileStorage;
-import com.conveyal.file.S3FileStorage;
-import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
@@ -37,10 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -48,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
@@ -63,18 +53,66 @@ import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
- * This is a main class run by worker machines in our Analysis computation cluster.
- * It polls a broker requesting work over HTTP, telling the broker what networks and scenarios it has loaded.
- * When it receives some work from the broker it does the necessary work and returns the results back to the front
- * end via the broker.
- *
- * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
- * intended for interactive single point requests that should return as fast as possible.
+ * This is a main class run by worker machines in our Analysis computation cluster. It polls a broker requesting work
+ * over HTTP, telling the broker what networks and scenarios it has loaded. When it receives some work from the broker
+ * it does the necessary work and returns the results back to the front end via the broker.
+ * The worker may also listen for interactive single point requests that should return as fast as possible.
  */
 public class AnalysisWorker implements Runnable {
+
+    /**
+     * All parameters needed to configure an AnalysisWorker instance.
+     * This config interface is kind of huge and includes most things in the WorkerConfig.
+     * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
+     */
+    public interface Config {
+
+        /**
+         * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
+         * Setting this to false before running creates a regional-only cluster worker.
+         * This is useful in testing when running many workers on the same machine.
+         */
+        boolean listenForSinglePoint();
+
+        /**
+         * If this is true, the worker will not actually do any work. It will just report all tasks as completed
+         * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
+         * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
+         */
+        boolean testTaskRedelivery();
+        String brokerAddress();
+        String brokerPort();
+        String initialGraphId();
+
+    }
+
+    // CONSTANTS
+
+    private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
+
+    public static final int POLL_WAIT_SECONDS = 15;
+    public static final int POLL_MAX_RANDOM_WAIT = 5;
+
+    /**
+     * This timeout should be longer than the longest expected worker calculation for a single-point request.
+     * Preparing networks or linking grids will take longer, but those cases are now handled with
+     * WorkerNotReadyException.
+     */
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
+
+    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
+    public static final int WORKER_LISTEN_PORT = 7080;
+
+    /**
+     * When testTaskRedelivery=true, how often the worker will fail to return a result for a task.
+     * TODO merge this with the boolean config parameter to enable intentional failure.
+     */
+    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
+
+
+    // STATIC FIELDS
 
     /**
      * Worker ID - just a random ID so we can differentiate machines used for computation.
@@ -92,96 +130,36 @@ public class AnalysisWorker implements Runnable {
      */
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
-    private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
+    // INSTANCE FIELDS
 
-    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
-
-    private static final String DEFAULT_BROKER_PORT = "7070";
-
-    public static final int POLL_WAIT_SECONDS = 15;
-
-    public static final int POLL_MAX_RANDOM_WAIT = 5;
-
-    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
-    public static final int WORKER_LISTEN_PORT = 7080;
-
-    // TODO make non-static and make implementations swappable
-    // This is very ugly because it's static but initialized at class instantiation.
-    public static FilePersistence filePersistence;
+    /** Hold a reference to the config object to avoid copying the many config values. */
+    private final Config config;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final NetworkPreloader networkPreloader;
 
-    /**
-     * If this is true, the worker will not actually do any work. It will just report all tasks as completed
-     * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
-     * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
-     */
-    private final boolean testTaskRedelivery;
-
-    /** In the type of tests described above, this is how often the worker will fail to return a result for a task. */
-    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
-
-    /** The amount of time (in minutes) a worker will stay alive after starting certain work */
-    static final int PRELOAD_KEEPALIVE_MINUTES = 90;
-    static final int REGIONAL_KEEPALIVE_MINUTES = 5;
-    static final int SINGLE_KEEPALIVE_MINUTES = 60;
-
-    /** Clock time (milliseconds since epoch) at which the worker should be considered idle */
-    long shutdownAfter;
-    boolean inPreloading;
-
-    void adjustShutdownClock (int keepAliveMinutes) {
-        long t = System.currentTimeMillis() + keepAliveMinutes * 60 * 1000;
-        if (inPreloading) {
-            inPreloading = false;
-            shutdownAfter = t;
-        } else {
-            shutdownAfter = Math.max(shutdownAfter, t);
-        }
-    }
-
-    /** Whether this worker should shut down automatically when idle. */
-    public final boolean autoShutdown;
-
-    public static final Random random = new Random();
+    private final Random random = new Random();
 
     /** The common root of all API URLs contacted by this worker, e.g. http://localhost:7070/api/ */
-    protected String brokerBaseUrl;
+    protected final String brokerBaseUrl;
 
     /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
-    static final HttpClient httpClient = makeHttpClient();
-
-    /**
-     * This timeout should be longer than the longest expected worker calculation for a single-point request.
-     * Preparing networks or linking grids will take longer, but those cases are now handled with
-     * WorkerNotReadyException.
-     */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
+    private final HttpClient httpClient = makeHttpClient();
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
-    private List<RegionalWorkResult> workResults = new ArrayList<>();
+    private final List<RegionalWorkResult> workResults = new ArrayList<>();
 
     /** The last time (in milliseconds since the epoch) that we polled for work. */
     private long lastPollingTime;
 
     /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
-    ThroughputTracker throughputTracker = new ThroughputTracker();
+    private final ThroughputTracker throughputTracker = new ThroughputTracker();
 
-    /**
-     * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
-     * Setting this to false before running creates a regional-only cluster worker. This is useful in testing when
-     * running many workers on the same machine.
-     */
-    protected boolean listenForSinglePointRequests;
-
-    /**
-     * This has been pulled out into a method so the broker can also make a similar http client.
-     */
+    /** Convenience method allowing the backend broker and the worker to make similar HTTP clients. */
     public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
@@ -195,137 +173,60 @@ public class AnalysisWorker implements Runnable {
                 .build();
     }
 
+    private final FileStorage fileStorage;
+
     /**
      * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
      * TODO use the WebMercatorGridExtents in these Grids.
      */
-    PointSetCache pointSetCache;
-
-    /** The transport network this worker already has loaded, and therefore prefers to work on. */
-    String networkId = null;
+    private final PointSetCache pointSetCache;
 
     /** Information about the EC2 instance (if any) this worker is running on. */
-    EC2Info ec2info;
+    public EC2Info ec2info;
 
-    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
-    private boolean workOffline;
+    /** The transport network this worker already has loaded, and therefore prefers to work on. */
+    protected String networkId = null;
 
     /**
      * A queue to hold a backlog of regional analysis tasks.
      * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
      * but one of the tasks takes much longer than all the rest.
      * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
+     * Can this be replaced with the general purpose TaskScheduler component?
+     * That will depend whether all TaskScheduler Tasks are tracked in a way intended to be visible to users.
      */
     private ThreadPoolExecutor regionalTaskExecutor;
 
-    /** The HTTP server that receives single-point requests. */
+    /** The HTTP server that receives single-point requests. TODO make this more consistent with the backend HTTP API components. */
     private spark.Service sparkHttpService;
 
-    public static AnalysisWorker forConfig (Properties config) {
-        // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
-        // FIXME why is some configuration done here and some in the constructor?
-        boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
-        String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
-        FileStorage fileStore;
-        if (workOffline) {
-            fileStore = new LocalFileStorage(graphDirectory);
-        } else {
-            fileStore = new S3FileStorage(config.getProperty("aws-region"), graphDirectory);
-        }
+    private final EventBus eventBus;
 
-        // TODO worker config classes structured like BackendConfig
-        String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
-        OSMCache osmCache = new OSMCache(fileStore, () -> graphsBucket);
-        GTFSCache gtfsCache = new GTFSCache(fileStore, () -> graphsBucket);
-
-        TransportNetworkCache cache = new TransportNetworkCache(fileStore, gtfsCache, osmCache, graphsBucket);
-        return new AnalysisWorker(config, fileStore, cache);
-    }
-
-    // TODO merge this constructor with the forConfig factory method, so we don't have different logic for local and cluster workers
-    public AnalysisWorker (Properties config, FileStorage fileStore, TransportNetworkCache transportNetworkCache) {
-        // print out date on startup so that CloudWatch logs has a unique fingerprint
+    /** Constructor that takes injected components. */
+    public AnalysisWorker (
+            FileStorage fileStorage,
+            TransportNetworkCache transportNetworkCache,
+            EventBus eventBus,
+            Config config
+    ) {
+        // Print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
+        this.config = config;
+        this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 
-        testTaskRedelivery = Boolean.parseBoolean(config.getProperty("test-task-redelivery", "false"));
-
-        // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
-        // TODO Eliminate this default base-bucket value "analysis-staging" and set it properly when the backend starts workers.
-        //      It's currently harmless to hard-wire it because it only affects polygon downloads for experimental modifications.
-        filePersistence = new S3FilePersistence(config.getProperty("aws-region"), config.getProperty("base-bucket", "analysis-staging"));
-
-        // First, check whether we are running Analyst offline.
-        workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
-        if (workOffline) {
-            LOG.info("Working offline. Avoiding internet connections and hosted services.");
-        }
-
-        {
-            String brokerAddress = config.getProperty("broker-address", DEFAULT_BROKER_ADDRESS);
-            String brokerPort = config.getProperty("broker-port", DEFAULT_BROKER_PORT);
-            this.brokerBaseUrl = String.format("http://%s:%s/internal", brokerAddress, brokerPort);
-        }
-
-        // set the initial graph affinity of this worker (if it is not in the config file it will be
-        // set to null, i.e. no graph affinity)
-        // we don't actually build the graph now; this is just a hint to the broker as to what
-        // graph this machine was intended to analyze.
-        this.networkId = config.getProperty("initial-graph-id");
-
-        this.pointSetCache = new PointSetCache(fileStore, config.getProperty("pointsets-bucket"));
+        // Set the initial graph affinity of this worker (which will be null in local operation).
+        // We don't actually build / load / process the TransportNetwork until we receive the first task.
+        // This just provides a hint to the broker as to what network this machine was intended to analyze.
+        this.networkId = config.initialGraphId();
+        this.fileStorage = fileStorage;
+        this.pointSetCache = new PointSetCache(fileStorage); // Make this cache a component?
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
-        this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
-        this.listenForSinglePointRequests = Boolean.parseBoolean(config.getProperty("listen-for-single-point", "true"));
-
-        // Keep the worker alive for an initial window to prepare for analysis
-        inPreloading = true;
-        shutdownAfter = System.currentTimeMillis() + PRELOAD_KEEPALIVE_MINUTES * 60 * 1000;
-
-        // Discover information about what EC2 instance / region we're running on, if any.
-        // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
-        // the new request signing v4 requires you to know the region where the S3 objects are.
-        ec2info = new EC2Info();
-        if (!workOffline) {
-            ec2info.fetchMetadata();
-        }
-        if (ec2info.region == null) {
-            // We're working offline and/or not running on EC2. Set a default region rather than detecting one.
-            ec2info.region = Regions.EU_WEST_1.getName();
-        }
+        this.eventBus = eventBus;
     }
 
-    /**
-     * Shut down if enough time has passed since certain events (startup or handling an analysis request). When EC2
-     * billing was in hourly increments, the worker would only consider shutting down every 60 minutes. But EC2
-     * billing is now by the second, so we check more frequently (during regular polling).
-     */
-    public void considerShuttingDown() {
-        long now = System.currentTimeMillis();
-
-        if (now > shutdownAfter) {
-            LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
-                    "shutting down.", SINGLE_KEEPALIVE_MINUTES , REGIONAL_KEEPALIVE_MINUTES);
-            // Stop accepting any new single-point requests while shutdown is happening.
-            // TODO maybe actively tell the broker this worker is shutting down.
-            sparkHttpService.stop();
-            try {
-                Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
-                process.waitFor();
-            } catch (Exception ex) {
-                LOG.error("Unable to terminate worker", ex);
-                // TODO email us or something
-            } finally {
-                System.exit(0);
-            }
-        }
-    }
-
-    /**
-     * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
-     */
+    /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
     @Override
     public void run() {
 
@@ -333,10 +234,10 @@ public class AnalysisWorker implements Runnable {
         // The default task rejection policy is "Abort".
         // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+        LOG.debug("Java reports the number of available processors is: {}", availableProcessors);
         int maxThreads = availableProcessors;
         int taskQueueLength = availableProcessors * 6;
-        LOG.info("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
+        LOG.debug("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
         regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
@@ -351,7 +252,7 @@ public class AnalysisWorker implements Runnable {
         // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
         // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
         // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-        if (listenForSinglePointRequests) {
+        if (config.listenForSinglePoint()) {
             // Use the newer non-static Spark framework syntax.
             sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
@@ -372,23 +273,37 @@ public class AnalysisWorker implements Runnable {
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
-                if (autoShutdown) {considerShuttingDown();}
+                // TODO only randomize delay on the first round, after that it's excessive.
                 int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
                 LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
             for (RegionalTask task : tasks) {
+                // Try to enqueue each task for execution, repeatedly failing until the queue is not full.
+                // The list of fetched tasks essentially serves as a secondary queue, which is awkward. This is using
+                // exceptions for normal flow control, which is nasty. We should do this differently (#596).
                 while (true) {
                     try {
                         // TODO define non-anonymous runnable class to instantiate here, specifically for async regional tasks.
-                        regionalTaskExecutor.execute(() -> this.handleOneRegionalTask(task));
+                        regionalTaskExecutor.execute(() -> {
+                            try {
+                                this.handleOneRegionalTask(task);
+                            } catch (Throwable t) {
+                                LOG.error(
+                                    "An error occurred while handling a regional task, reporting to backend. {}",
+                                    ExceptionUtils.stackTraceString(t)
+                                );
+                                synchronized (workResults) {
+                                    workResults.add(new RegionalWorkResult(t, task));
+                                }
+                            }
+                        });
                         break;
                     } catch (RejectedExecutionException e) {
-                        // Queue is full, wait a bit and try to feed it more tasks.
-                        // FIXME if we burn through the internal queue in less than 1 second this is a speed bottleneck.
-                        // This happens with regions unconnected to transit and with very small travel time cutoffs.
-                        // FIXME this is really using the list of fetched tasks as a secondary queue, it's awkward.
+                        // Queue is full, wait a bit and try to feed it more tasks. If worker handles all tasks in its
+                        // internal queue in less than 1 second, this is a speed bottleneck. This happens with regions
+                        // unconnected to transit and with very small travel time cutoffs.
                         sleepSeconds(1);
                     }
                 }
@@ -396,19 +311,17 @@ public class AnalysisWorker implements Runnable {
         }
     }
 
-    /**
-     * Bypass idiotic java checked exceptions.
-     */
+    /** Bypass idiotic java checked exceptions. */
     public static void sleepSeconds (int seconds) {
         try {
-            Thread.sleep(seconds * 1000);
+            Thread.sleep(seconds * 1000L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
     protected byte[] handleAndSerializeOneSinglePointTask (TravelTimeSurfaceTask task) throws IOException {
-        LOG.info("Handling single-point task {}", task.toString());
+        LOG.debug("Handling single-point task {}", task.toString());
         // Get all the data needed to run one analysis task, or at least begin preparing it.
         final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
@@ -445,9 +358,9 @@ public class AnalysisWorker implements Runnable {
             task.loadAndValidateDestinationPointSets(pointSetCache);
         }
 
-        // After the AsyncLoader has reported all required data are ready for analysis, advance the shutdown clock to
-        // reflect that the worker is performing single-point work.
-        adjustShutdownClock(SINGLE_KEEPALIVE_MINUTES);
+        // After the AsyncLoader has reported all required data are ready for analysis,
+        // signal that we will begin processing the task.
+        eventBus.send(new HandleSinglePointEvent());
 
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
@@ -496,15 +409,16 @@ public class AnalysisWorker implements Runnable {
      * Handle one task representing one of many origins within a regional analysis.
      * This method is generally being executed asynchronously, handling a large number of tasks on a pool of worker
      * threads. It stockpiles results as they are produced, so they can be returned to the backend in batches when the
-     * worker polls the backend.
+     * worker polls the backend. If any problem is encountered, the Throwable may be allowed to propagate up as all
+     * Throwables will be caught and reported to the backend, causing the regional job to end.
      */
-    protected void handleOneRegionalTask(RegionalTask task) {
+    protected void handleOneRegionalTask (RegionalTask task) throws Throwable {
 
-        LOG.info("Handling regional task {}", task.toString());
+        LOG.debug("Handling regional task {}", task.toString());
 
         // If this worker is being used in a test of the task redelivery mechanism. Report most work as completed
         // without actually doing anything, but fail to report results a certain percentage of the time.
-        if (testTaskRedelivery) {
+        if (config.testTaskRedelivery()) {
             pretendToDoWork(task);
             return;
         }
@@ -528,83 +442,78 @@ public class AnalysisWorker implements Runnable {
                 maxTripDurationMinutes = 120;
             }
             task.maxTripDurationMinutes = maxTripDurationMinutes;
-            LOG.info("Maximum cutoff was {} minutes, limiting trip duration to {} minutes based on decay function {}.",
+            LOG.debug("Maximum cutoff was {} minutes, limiting trip duration to {} minutes based on decay function {}.",
                     maxCutoffMinutes, maxTripDurationMinutes, task.decayFunction.getClass().getSimpleName());
         }
 
-        try {
-            // TODO (re)validate multi-percentile and multi-cutoff parameters. Validation currently in TravelTimeReducer.
-            //  This version should require both arrays to be present, and single values to be missing.
-            // Using a newer backend, the task should have been normalized to use arrays not single values.
-            checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
-            checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
-            checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
-            checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
+        // TODO (re)validate multi-percentile and multi-cutoff parameters. Validation currently in TravelTimeReducer.
+        //  This version should require both arrays to be present, and single values to be missing.
+        // Using a newer backend, the task should have been normalized to use arrays not single values.
+        checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
+        checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
+        checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
+        checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
 
-            // Get the graph object for the ID given in the task, fetching inputs and building as needed.
-            // All requests handled together are for the same graph, and this call is synchronized so the graph will
-            // only be built once.
-            // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
-            networkId = task.graphId;
-            // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
-            // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
-            // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-            TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
-                    .graphId, task.scenarioId);
+        // Get the graph object for the ID given in the task, fetching inputs and building as needed.
+        // All requests handled together are for the same graph, and this call is synchronized so the graph will
+        // only be built once.
+        // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+        networkId = task.graphId;
+        // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
+        // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
+        // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
+        TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
+                .graphId, task.scenarioId);
 
-            // Static site tasks do not specify destinations, but all other regional tasks should.
-            // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.
-            // The presence of these grids in the task will then trigger the computation of accessibility values.
-            if (!task.makeTauiSite) {
-                task.loadAndValidateDestinationPointSets(pointSetCache);
-            }
-
-            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
-            // Arbitrarily we create this metadata as part of the first task in the job.
-            if (task.makeTauiSite && task.taskId == 0) {
-                LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                saveStaticSiteMetadata(task, transportNetwork);
-            }
-
-            // Advance the shutdown clock to reflect that the worker is performing regional work.
-            adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
-
-            // Perform the core travel time and accessibility computations.
-            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-            OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-            if (task.makeTauiSite) {
-                // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
-                // value because we're generating a set of time grids for a static site. We only save a file if it has
-                // non-default contents, as a way to save storage and bandwidth.
-                // TODO eventually carry out actions based on what's present in the result, not on the request type.
-                if (oneOriginResult.travelTimes.anyCellReached()) {
-                    TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
-                    PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
-                    String timesFileName = task.taskId + "_times.dat";
-                    filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
-                } else {
-                    LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
-                }
-                // Overwrite with an empty set of results to send back to the backend, allowing it to track job
-                // progress. This avoids crashing the backend by sending back massive 2 million element travel times
-                // that have already been written to S3, and throwing exceptions on old backends that can't deal with
-                // null AccessibilityResults.
-                oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
-            }
-
-            // Accumulate accessibility results, which will be returned to the backend in batches.
-            // For most regional analyses, this is an accessibility indicator value for one of many origins,
-            // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
-            // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
-            synchronized (workResults) {
-                workResults.add(new RegionalWorkResult(oneOriginResult, task));
-            }
-            throughputTracker.recordTaskCompletion(task.jobId);
-        } catch (Exception ex) {
-            LOG.error("An error occurred while handling a regional task: {}", ExceptionUtils.asString(ex));
-            // TODO communicate regional analysis errors to the backend (in workResults)
+        // Static site tasks do not specify destinations, but all other regional tasks should.
+        // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.
+        // The presence of these grids in the task will then trigger the computation of accessibility values.
+        if (!task.makeTauiSite) {
+            task.loadAndValidateDestinationPointSets(pointSetCache);
         }
+
+        // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+        // Arbitrarily we create this metadata as part of the first task in the job.
+        if (task.makeTauiSite && task.taskId == 0) {
+            LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+            saveTauiMetadata(task, transportNetwork);
+        }
+
+        // After the TransportNetwork has been loaded, signal that we will begin processing the task.
+        eventBus.send(new HandleRegionalEvent());
+
+        // Perform the core travel time and accessibility computations.
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        if (task.makeTauiSite) {
+            // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
+            // value because we're generating a set of time grids for a static site. We only save a file if it has
+            // non-default contents, as a way to save storage and bandwidth.
+            // TODO eventually carry out actions based on what's present in the result, not on the request type.
+            if (oneOriginResult.travelTimes.anyCellReached()) {
+                TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
+                PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
+                String timesFileName = task.taskId + "_times.dat";
+                fileStorage.saveTauiData(task, timesFileName, persistenceBuffer);
+            } else {
+                LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
+            }
+            // Overwrite with an empty set of results to send back to the backend, allowing it to track job
+            // progress. This avoids crashing the backend by sending back massive 2 million element travel times
+            // that have already been written to S3, and throwing exceptions on old backends that can't deal with
+            // null AccessibilityResults.
+            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+        }
+
+        // Accumulate accessibility results, which will be returned to the backend in batches.
+        // For most regional analyses, this is an accessibility indicator value for one of many origins,
+        // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
+        // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
+        synchronized (workResults) {
+            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+        }
+        throughputTracker.recordTaskCompletion(task.jobId);
     }
 
     /**
@@ -684,11 +593,11 @@ public class AnalysisWorker implements Runnable {
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
         jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
-        LOG.info("Travel time surface written, appending {}.", jsonBlock);
+        LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.
         JsonUtilities.objectMapper.writeValue(outputStream, jsonBlock);
-        LOG.info("Done writing");
+        LOG.debug("Done writing");
     }
 
     /**
@@ -737,7 +646,7 @@ public class AnalysisWorker implements Runnable {
             // Non-200 response code or a null entity. Something is weird.
             LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());
         } catch (Exception e) {
-            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.asString(e));
+            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.stackTraceString(e));
         } finally {
             // We have to properly close any streams so the HTTP connection is released back to the (finite) pool.
             EntityUtils.consumeQuietly(responseEntity);
@@ -754,56 +663,24 @@ public class AnalysisWorker implements Runnable {
     /**
      * Generate and write out metadata describing what's in a directory of static site output.
      */
-    public static void saveStaticSiteMetadata (AnalysisWorkerTask analysisWorkerTask, TransportNetwork network) {
+    public void saveTauiMetadata (AnalysisWorkerTask analysisWorkerTask, TransportNetwork network) {
         try {
             // Save the regional analysis request, giving the UI some context to display the results.
             // This is the request object sent to the workers to generate these static site regional results.
             PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisWorkerTask);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "request.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "request.json", buffer);
 
             // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
             buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "warnings.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "warnings.json", buffer);
 
             // Save transit route data that allows rendering paths with the Transitive library in a separate file.
             TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
-            AnalysisWorker.filePersistence.saveStaticSiteData(analysisWorkerTask, "transitive.json", buffer);
+            fileStorage.saveTauiData(analysisWorkerTask, "transitive.json", buffer);
         } catch (Exception e) {
-            LOG.error("Exception saving static metadata: {}", ExceptionUtils.asString(e));
+            LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Requires a worker configuration, which is a Java Properties file with the following
-     * attributes.
-     *
-     * graphs-bucket      S3 bucket in which graphs are stored.
-     * pointsets-bucket   S3 bucket in which pointsets are stored
-     * auto-shutdown      Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
-     * initial-graph-id   The graph ID for this worker to load immediately upon startup
-     */
-    public static void main (String[] args) {
-        LOG.info("Starting R5 Analyst Worker version {}", BackendVersion.instance.version);
-        LOG.info("R5 git commit is {}", BackendVersion.instance.commit);
-        LOG.info("R5 git branch is {}", BackendVersion.instance.branch);
-
-        String configFileName = "worker.conf";
-        if (args.length > 0) {
-            configFileName = args[0];
-        }
-        Properties config = new Properties();
-        try (InputStream configInputStream = new FileInputStream(new File(configFileName))) {
-            config.load(configInputStream);
-        } catch (Exception e) {
-            LOG.error("Error loading worker configuration, shutting down. " + ExceptionUtils.asString(e));
-            return;
-        }
-        try {
-            AnalysisWorker.forConfig(config).run();
-        } catch (Exception e) {
-            LOG.error("Unhandled error in analyst worker, shutting down. " + ExceptionUtils.asString(e));
         }
     }
 

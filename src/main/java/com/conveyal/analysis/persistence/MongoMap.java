@@ -25,6 +25,7 @@ import java.util.Collection;
  * TODO this is using org.mongojack.JacksonDBCollection. I believe Mongo Java client library now provides POJO storage.
  */
 public class MongoMap<V extends Model> {
+
     private static Logger LOG = LoggerFactory.getLogger(MongoMap.class);
 
     private JacksonDBCollection<V, String> wrappedCollection;
@@ -212,9 +213,7 @@ public class MongoMap<V extends Model> {
                 throw AnalysisServerException.forbidden("The data you attempted to update is not in your access group.");
             }
         }
-
-        // Log the result
-        LOG.info("{} {} updated by {} ({})", result.toString(), result.name, result.updatedBy, result.accessGroup);
+        LOG.debug("{} of {} updated {} ({})", result.updatedBy, result.accessGroup, result.name, result._id);
 
         // Return the object that was updated
         return result;

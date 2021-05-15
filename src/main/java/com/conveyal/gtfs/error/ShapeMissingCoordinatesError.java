@@ -11,7 +11,6 @@ import java.io.Serializable;
 public class ShapeMissingCoordinatesError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority = Priority.MEDIUM;
     public final String[] tripIds;
 
     public ShapeMissingCoordinatesError(ShapePoint shapePoint, String[] tripIds) {
@@ -21,5 +20,9 @@ public class ShapeMissingCoordinatesError extends GTFSError implements Serializa
 
     @Override public String getMessage() {
         return "Shape " + affectedEntityId + " is missing coordinates (affects " + tripIds.length + " trips)";
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

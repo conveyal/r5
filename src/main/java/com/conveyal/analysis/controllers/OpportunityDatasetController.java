@@ -55,8 +55,9 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.models.OpportunityDataset.ZOOM;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.GRIDS;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -71,22 +72,16 @@ public class OpportunityDatasetController implements HttpController {
 
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
-    private final Config config;
-
-    public interface Config {
-        String gridBucket ();
-        String seamlessCensusBucket();
-        boolean offline ();
-    }
+    private final SeamlessCensusGridExtractor extractor;
 
     public OpportunityDatasetController (
             FileStorage fileStorage,
             TaskScheduler taskScheduler,
-            Config config
+            SeamlessCensusGridExtractor extractor
     ) {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
-        this.config = config;
+        this.extractor = extractor;
     }
 
     /** Store upload status objects FIXME trivial Javadoc */
@@ -142,12 +137,10 @@ public class OpportunityDatasetController implements HttpController {
     }
 
     private OpportunityDatasetUploadStatus downloadLODES(Request req, Response res) {
-        // FIXME conditionals should not be necessary, should be handled by pluggable components
-        if (config.offline()) {
-            throw AnalysisServerException.badRequest("Cannot download LODES in offline mode.");
-        }
-
         final String regionId = req.params("regionId");
+        final int zoom = parseZoom(req.queryParams("zoom"));
+
+        // default
         final String accessGroup = req.attribute("accessGroup");
         final String email = req.attribute("email");
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);
@@ -155,18 +148,19 @@ public class OpportunityDatasetController implements HttpController {
         // deleted as a batch using deleteSourceSet)
         final String downloadBatchId = new ObjectId().toString();
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
-        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, config.seamlessCensusBucket());
+        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
         taskScheduler.enqueueHeavyTask(() -> {
             try {
                 status.message = "Extracting census data for region";
-                List<Grid> grids = SeamlessCensusGridExtractor.retrieveAndExtractCensusDataForBounds(region.bounds);
-                createDatasetsFromPointSets(email, accessGroup, config.seamlessCensusBucket(),
-                                            downloadBatchId, regionId, status, grids);
+                List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
+                createDatasetsFromPointSets(
+                        email, accessGroup, extractor.sourceName, downloadBatchId, regionId, status, grids
+                );
             } catch (IOException e) {
                 status.completeWithError(e);
-                LOG.error("Exception processing LODES data: " + ExceptionUtils.asString(e));
+                LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
             }
         });
 
@@ -202,7 +196,6 @@ public class OpportunityDatasetController implements HttpController {
             dataset.accessGroup = accessGroup;
             dataset.totalPoints = pointSet.featureCount();
             dataset.regionId = regionId;
-            dataset.bucketName = config.gridBucket();
             dataset.totalOpportunities = pointSet.sumTotalOpportunities();
             dataset.format = getFormatCode(pointSet);
             if (dataset.format == FileStorageFormat.FREEFORM) {
@@ -239,7 +232,7 @@ public class OpportunityDatasetController implements HttpController {
                     fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
-                    FileStorageKey fileStorageKey = new FileStorageKey(config.gridBucket(), regionId + "/" + dataset._id + ".pointset");
+                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, regionId + "/" + dataset._id + ".pointset");
                     File pointsetFile = FileUtils.createScratchFile("pointset");
 
                     OutputStream os = new GZIPOutputStream(new FileOutputStream(pointsetFile));
@@ -446,12 +439,13 @@ public class OpportunityDatasetController implements HttpController {
             formFields = sfu.parseParameterMap(req.raw());
         } catch (FileUploadException e) {
             // We can't even get enough information to create a status tracking object. Re-throw an exception.
-            throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.asString(e));
+            throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.stackTraceString(e));
         }
 
         // Parse required fields. Will throw a ServerException on failure.
         final String sourceName = getFormField(formFields, "Name", true);
         final String regionId = getFormField(formFields, "regionId", true);
+        final int zoom = parseZoom(getFormField(formFields, "zoom", false));
 
         // Create a region-wide status object tracking the processing of opportunity data.
         // Create the status object before doing anything including input and parameter validation, so that any problems
@@ -486,7 +480,7 @@ public class OpportunityDatasetController implements HttpController {
                     pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
                 } else if (uploadFormat == UploadFormat.SHAPEFILE) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
-                    pointsets.addAll(createGridsFromShapefile(fileItems, status));
+                    pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
                 } else if (uploadFormat == UploadFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
@@ -505,13 +499,13 @@ public class OpportunityDatasetController implements HttpController {
                         // This newer process creates a FreeFormPointSet only for the specified count fields,
                         // as well as a Grid to assist in visualization of the uploaded data.
                         for (FreeFormPointSet freeForm : createFreeFormPointSetsFromCsv(csvFileItem, parameters)) {
-                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, ZOOM);
+                            Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, zoom);
                             pointsets.add(freeForm);
                             pointsets.add(gridFromFreeForm);
                         }
                     } else {
                         // This is the common default process: create a grid for every non-ignored field in the CSV.
-                        pointsets.addAll(createGridsFromCsv(csvFileItem, formFields, status));
+                        pointsets.addAll(createGridsFromCsv(csvFileItem, formFields, zoom, status));
                     }
                 }
                 if (pointsets.isEmpty()) {
@@ -602,6 +596,7 @@ public class OpportunityDatasetController implements HttpController {
      */
     private List<Grid> createGridsFromCsv(FileItem csvFileItem,
                                                  Map<String, List<FileItem>> query,
+                                                 int zoom,
                                                  OpportunityDatasetUploadStatus status) throws Exception {
 
         String latField = getFormField(query, "latField", true);
@@ -615,11 +610,11 @@ public class OpportunityDatasetController implements HttpController {
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
         InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, ZOOM, status);
+        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, status);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
             ignoreFields = Arrays.asList(idField, latField, lonField);
-            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, ZOOM, status));
+            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, zoom, status));
         }
 
         return grids;
@@ -652,6 +647,7 @@ public class OpportunityDatasetController implements HttpController {
      * same base name, and should not contain any other files but these three or four.
      */
     private List<Grid> createGridsFromShapefile(List<FileItem> fileItems,
+                                                       int zoom,
                                                        OpportunityDatasetUploadStatus status) throws Exception {
 
         // In the caller, we should have already verified that all files have the same base name and have an extension.
@@ -680,7 +676,7 @@ public class OpportunityDatasetController implements HttpController {
             filesByExtension.get("SHX").write(shxFile);
         }
 
-        List<Grid> grids = Grid.fromShapefile(shpFile, ZOOM, status);
+        List<Grid> grids = Grid.fromShapefile(shpFile, zoom, status);
         tempDir.delete();
         return grids;
     }
@@ -698,7 +694,7 @@ public class OpportunityDatasetController implements HttpController {
             // get("/api/opportunities/:regionId/:gridKey") is the same signature as this endpoint.
             String regionId = req.params("_id");
             String gridKey = req.params("format");
-            FileStorageKey storageKey = new FileStorageKey(config.gridBucket(), String.format("%s/%s.grid", regionId, gridKey));
+            FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
             return getJSONURL(storageKey);
         }
 
@@ -764,7 +760,7 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         public void completeWithError (Exception e) {
-            message = "Unable to create opportunity dataset. " + ExceptionUtils.asString(e);
+            message = "Unable to create opportunity dataset. " + ExceptionUtils.stackTraceString(e);
             completed(Status.ERROR);
         }
 

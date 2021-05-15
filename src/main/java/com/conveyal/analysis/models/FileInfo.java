@@ -1,5 +1,6 @@
 package com.conveyal.analysis.models;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -9,7 +10,8 @@ public class FileInfo extends BaseModel {
     public String regionId = null;
 
     // What is the bucket or folder that this file is stored in?
-    public String bucket = null;
+    // TODO database migration. category = bucket.toUpperCase and without the deployment environment prefix.
+    public FileCategory category = null;
 
     // The path to create a FileStorageKey
     public String path = null;
@@ -26,7 +28,7 @@ public class FileInfo extends BaseModel {
     // Get path
     @JsonIgnore
     public FileStorageKey getKey () {
-        return new FileStorageKey(bucket, path);
+        return new FileStorageKey(category, path);
     }
 
     /**

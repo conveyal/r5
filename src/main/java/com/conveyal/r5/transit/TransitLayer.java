@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +104,9 @@ public class TransitLayer implements Serializable, Cloneable {
     public static final int TYPICAL_NUMBER_OF_STOPS_PER_TRIP = 30;
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
+
+    /** Stores the relevant patterns and trips based on the transit modes and date in an analysis request. */
+    public transient FilteredPatternCache filteredPatternCache = new FilteredPatternCache(this);
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -186,7 +190,8 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
-     * The feed is not closed after being loaded.
+     * The supplied feed is treated as read-only, and is not closed after being loaded.
+     * This method requires findPatterns() to have been called on the feed before it's passed in.
      */
     public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
@@ -226,11 +231,6 @@ public class TransitLayer implements Serializable, Cloneable {
             serviceCodeNumber.put(serviceId, serviceIndex);
             LOG.debug("Service {} has ID {}", serviceIndex, serviceId);
         });
-
-        // Group trips by stop pattern (including pickup/dropoff type) and fill stop times into patterns.
-        // Also group trips by the blockId they belong to, and chain them together if they allow riders to stay on board
-        // the vehicle from one trip to the next, even if it changes routes or directions. This is called "interlining".
-        gtfs.findPatterns();
 
         LOG.info("Creating trip patterns and schedules.");
 
@@ -748,6 +748,7 @@ public class TransitLayer implements Serializable, Cloneable {
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its
             // scenarioId remains unchanged as is done in StreetLayer.
             copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.filteredPatternCache = new FilteredPatternCache(copy);
         }
         return copy;
     }

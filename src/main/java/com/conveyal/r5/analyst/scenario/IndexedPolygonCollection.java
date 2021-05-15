@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.analyst.FileCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.analysis.components.WorkerComponents;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geojson.feature.FeatureJSON;
@@ -22,7 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.GZIPInputStream;
+
+import static com.conveyal.file.FileCategory.POLYGONS;
 
 /**
  * This is an abstraction for the polygons used to configure the road congestion modification type and the ride hailing
@@ -104,14 +104,9 @@ public class IndexedPolygonCollection {
     }
 
     public void loadFromS3GeoJson() throws Exception {
-        InputStream s3InputStream = AnalysisWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
-        // To test on local files:
-        //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
-        if (polygonLayer.endsWith(".gz")) {
-            s3InputStream = new GZIPInputStream(s3InputStream);
-        }
+        InputStream polygonInputStream = WorkerComponents.fileStorage.getInputStream(POLYGONS, polygonLayer);
         FeatureJSON featureJSON = new FeatureJSON();
-        FeatureCollection featureCollection = featureJSON.readFeatureCollection(s3InputStream);
+        FeatureCollection featureCollection = featureJSON.readFeatureCollection(polygonInputStream);
         LOG.info("Validating features and creating spatial index...");
         FeatureType featureType = featureCollection.getSchema();
         CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();

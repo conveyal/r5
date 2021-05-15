@@ -241,13 +241,12 @@ public class OSM implements OSMEntitySource, OSMEntitySink {
         }
     }
 
-    public void readPbf(InputStream inputStream) {
+    public void readPbf(InputStream inputStream) throws OsmLibException {
         try {
             OSMEntitySource source = new PBFInput(inputStream);
             source.copyTo(this);
-        } catch (IOException ex) {
-            LOG.error("Error occurred while parsing VEX stream.");
-            ex.printStackTrace();
+        } catch (Exception exception) {
+            throw new OsmLibException("Failed to read OSM PBF file.", exception);
         }
     }
 

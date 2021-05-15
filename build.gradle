@@ -3,14 +3,11 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '6.0.0'
     id 'maven-publish'
     id 'com.palantir.git-version' version '0.12.3'
-    id 'com.google.cloud.tools.jib' version '2.6.0'
 }
 
 group = 'com.conveyal'
 // set version to `git describe --tags --always --first-parent`, plus '.dirty' if local changes are present.
 version gitVersion()
-
-jib.to.image = 'ghcr.io/conveyal/r5:' + version
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -20,12 +17,12 @@ java {
 jar {
     // For Java 11 Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
-    // Main-Class R5Main will start a worker, BackendMain must be specified on JVM command line to start backend.
+    // Main-Class BackendMain will start a local backend.
     // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.
     // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.analysis',
-            'Main-Class': 'com.conveyal.r5.R5Main',
+            'Main-Class': 'com.conveyal.analysis.BackendMain',
             'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
             'Implementation-Title': 'Conveyal Analysis Backend',
             'Implementation-Vendor': 'Conveyal LLC',
@@ -42,14 +39,15 @@ test {
 }
 
 // `gradle publish` will upload both shadow and simple JAR to Github Packages
+// On GH Actions, GITHUB_ACTOR env variable is supplied without specifying it in action yml.
 publishing {
     repositories {
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/conveyal/r5")
             credentials {
-                username = System.getenv("GPR_USERNAME")
-                password = System.getenv("GPR_TOKEN")
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
             }
         }
     }
@@ -74,21 +72,14 @@ task copyDependencies(type: Copy) {
     into 'dependencies'
 }
 
-// Run R5 as an analysis backend with all dependencies on the classpath, without building a shadowJar.
+// Run R5 as a local analysis backend with all dependencies on the classpath, without building a shadowJar.
 task runBackend (type: JavaExec) {
    dependsOn(build)
    classpath(sourceSets.main.runtimeClasspath)
    main("com.conveyal.analysis.BackendMain")
 }
 
-// Run R5 as an analysis worker with all dependencies on the classpath, without building a shadowJar.
-task runWorker (type: JavaExec) {
-   dependsOn(build)
-   classpath(sourceSets.main.runtimeClasspath)
-   main("com.conveyal.r5.R5Main")
-}
-
-// Start up the analysis backend from a shaded JAR and ask it to shut down immediately.
+// Start up an analysis local backend from a shaded JAR and ask it to shut down immediately.
 // This is used to check in the automated build that the JAR is usable before we keep it.
 // Create a configuration properties file (by copying the template) before running this task.
 task testShadowJarRunnable(type: JavaExec) {
@@ -103,7 +94,9 @@ task testShadowJarRunnable(type: JavaExec) {
 task createVersionProperties(dependsOn: processResources) {
     doLast {
         def details = versionDetails()
-        new File(buildDir, "resources/main/version.properties").withWriter { w ->
+        def dir = new File(buildDir, "resources/main/com/conveyal/r5/")
+        mkdir(dir)
+        new File(dir, "version.properties").withWriter { w ->
             Properties p = new Properties()
             p['version'] = project.version.toString()
             p['commit'] = details.gitHashFull
@@ -111,7 +104,7 @@ task createVersionProperties(dependsOn: processResources) {
             p.store w, null
         }
         // Also make a simple one-line version.txt for scripts to use
-        new File(buildDir, "version.txt").text = "$version"
+        new File(dir, "version.txt").text = "$version"
     }
 }
 
@@ -172,7 +165,7 @@ dependencies {
     // Provides the EPSG coordinate reference system catalog as an HSQL database.
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-epsg-hsql'
 
-    compile 'com.wdtinc:mapbox-vector-tile:3.1.0'
+    implementation 'com.wdtinc:mapbox-vector-tile:3.1.0'
 
     // Legacy JTS with com.vividsolutions package name. Newer Geotools compatible with Java 11 uses a newer version of
     // JTS with the org.locationtech package name. But our MapDB format includes serialized JTS geometries with the
@@ -196,7 +189,7 @@ dependencies {
     implementation 'com.google.guava:guava:28.2-jre'
 
     // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
-    //capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
+    // capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
     implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'
 
     implementation ('org.apache.httpcomponents:httpclient:4.5.6') {
@@ -205,6 +198,7 @@ dependencies {
     }
 
     // Persistent storage of files / objects on Amazon S3.
+    // Now used only for Seamless Census TODO eliminate this final AWS dependency
     implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
 
     // Old version of GraphQL-Java used by legacy gtfs-api embedded in analysis-backend.

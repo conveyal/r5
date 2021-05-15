@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,7 +124,7 @@ public class TransportNetwork implements Serializable {
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
         // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
-        Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::fromFile);
+        Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
         return fromInputs(tnBuilderConfig, osm, feeds);
     }
 

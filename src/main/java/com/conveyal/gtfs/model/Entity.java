@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
 import com.conveyal.gtfs.error.EmptyFieldError;
@@ -246,12 +247,12 @@ public abstract class Entity implements Serializable {
         protected abstract void loadOneRow() throws IOException;
 
         /**
-         * The main entry point into an Entity.Loader. Interprets each row of a CSV file within a zip file as a sinle
+         * The main entry point into an Entity.Loader. Interprets each row of a CSV file within a zip file as a single
          * GTFS entity, and loads them into a table.
          *
          * @param zip the zip file from which to read a table
          */
-        public void loadTable(ZipFile zip) throws IOException {
+        public void loadTable (ZipFile zip) throws IOException {
             ZipEntry entry = zip.getEntry(tableName + ".txt");
             if (entry == null) {
                 Enumeration<? extends ZipEntry> entries = zip.entries();
@@ -269,15 +270,19 @@ public abstract class Entity implements Serializable {
                 } else {
                     LOG.info("Table {} was missing but it is not required.", tableName);
                 }
-
                 if (entry == null) return;
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
-            InputStream zis = zip.getInputStream(entry);
+            InputStream inStream = zip.getInputStream(entry);
             // skip any byte order mark that may be present. Files must be UTF-8,
             // but the GTFS spec says that "files that include the UTF byte order mark are acceptable"
-            InputStream bis = new BOMInputStream(zis);
-            CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
+            inStream = new BOMInputStream(inStream);
+            // TODO Would this benefit from buffering,especially considering progress reporting? Try and measure speed.
+            if (feed.progressListener != null) {
+                inStream = new ProgressInputStream(feed.progressListener, inStream);
+                feed.progressListener.beginTask("Loading GTFS table " + entry.getName(), (int)(entry.getSize()));
+            }
+            CsvReader reader = new CsvReader(inStream, ',', Charset.forName("UTF8"));
             this.reader = reader;
             boolean hasHeaders = reader.readHeaders();
             if (!hasHeaders) {

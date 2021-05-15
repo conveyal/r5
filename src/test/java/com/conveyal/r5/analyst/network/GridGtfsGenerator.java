@@ -36,7 +36,7 @@ public class GridGtfsGenerator {
 
     public GridGtfsGenerator (GridLayout gridLayout) {
         this.gridLayout = gridLayout;
-        feed = new GTFSFeed(); // Temp file db, can we do this in memory instead?
+        feed = GTFSFeed.newWritableInMemory();
         mergeStops = true;
     }
 
@@ -45,6 +45,7 @@ public class GridGtfsGenerator {
             addRoute(route);
         }
         addCommonTables();
+        feed.findPatterns();
         return feed;
     }
 
@@ -97,47 +98,60 @@ public class GridGtfsGenerator {
     }
 
     public void addTripsForRoute (GridRoute route, boolean back) {
-        int tripIndex = 0;
-        int start = route.startHour * 60 * 60;
-        int end = route.endHour * 60 * 60;
-        int headway = route.headwayMinutes * 60;
-        int dwell = gridLayout.transitDwellSeconds;
-        int interstop = route.stopSpacingBlocks * gridLayout.transitBlockTraversalTimeSeconds;
-        // Maybe we should use exact_times = 1 instead of generating individual trips.
-        for (int intialDeparture = start; intialDeparture < end; intialDeparture += headway, tripIndex++) {
-            Trip trip = new Trip();
-            trip.direction_id = back ? 1 : 0;
-            trip.trip_id = String.format("%s:%d:%d", route.id, tripIndex, trip.direction_id);
-            trip.route_id = route.id;
-            trip.service_id = SERVICE_ID;
-            feed.trips.put(trip.trip_id, trip);
-            int departureTime = intialDeparture;
-            int arrivalTime = departureTime - dwell;
-            for (int stopSequence = 0; stopSequence < route.nStops; stopSequence++) {
-                int stopInRoute = back ? route.nStops - 1 - stopSequence: stopSequence;
-                StopTime stopTime = new StopTime();
-                stopTime.stop_id = route.stopId(stopInRoute, mergeStops);
-                stopTime.stop_sequence = stopSequence;
-                stopTime.arrival_time = arrivalTime;
-                stopTime.departure_time = departureTime;
-                stopTime.trip_id = trip.trip_id;
-                feed.stop_times.put(new Fun.Tuple2<>(stopTime.trip_id, stopTime.stop_sequence), stopTime);
-                arrivalTime += interstop;
-                departureTime += interstop;
+        if (route.headwayMinutes > 0) {
+            int tripIndex = 0;
+            int start = route.startHour * 60 * 60;
+            int end = route.endHour * 60 * 60;
+            int headway = route.headwayMinutes * 60;
+
+            // Maybe we should use exact_times = 1 instead of generating individual trips.
+            for (int startTime = start; startTime < end; startTime += headway, tripIndex++) {
+                String tripId = addTrip(route, back, startTime, tripIndex);
+                if (route.pureFrequency) {
+                    Frequency frequency = new Frequency();
+                    frequency.start_time = start;
+                    frequency.end_time = end;
+                    frequency.headway_secs = headway;
+                    frequency.exact_times = 0;
+                    feed.frequencies.add(new Fun.Tuple2<>(tripId, frequency));
+                    // Do not make any additional trips, frequency entry represents them.
+                    break;
+                }
             }
-            if (route.pureFrequency) {
-                Frequency frequency = new Frequency();
-                frequency.start_time = start;
-                frequency.end_time = end;
-                frequency.headway_secs = headway;
-                frequency.exact_times = 0;
-                feed.frequencies.add(new Fun.Tuple2<>(trip.trip_id, frequency));
-                // Do not make any additional trips, frequency entry represents them.
-                break;
+        } else {
+            for (int i = 0; i < route.startTimes.length; i++) {
+                addTrip(route, back, route.startTimes[i], i);
             }
         }
+    }
 
-
+    private String addTrip (GridRoute route, boolean back, int startTime, int tripIndex) {
+        Trip trip = new Trip();
+        trip.direction_id = back ? 1 : 0;
+        String tripId = String.format("%s:%d:%d", route.id, tripIndex, trip.direction_id);
+        trip.trip_id = tripId;
+        trip.route_id = route.id;
+        trip.service_id = SERVICE_ID;
+        feed.trips.put(trip.trip_id, trip);
+        int dwell = gridLayout.transitDwellSeconds;
+        int departureTime = startTime;
+        int arrivalTime = departureTime - dwell;
+        for (int stopSequence = 0; stopSequence < route.nStops; stopSequence++) {
+            int stopInRoute = back ? route.nStops - 1 - stopSequence : stopSequence;
+            StopTime stopTime = new StopTime();
+            stopTime.stop_id = route.stopId(stopInRoute, mergeStops);
+            stopTime.stop_sequence = stopSequence;
+            stopTime.arrival_time = arrivalTime;
+            stopTime.departure_time = departureTime;
+            stopTime.trip_id = tripId;
+            feed.stop_times.put(new Fun.Tuple2<>(tripId, stopTime.stop_sequence), stopTime);
+            if (stopSequence < route.nStops - 1) {
+                int hopTime = (int) route.hopTime(new GridRoute.TripHop(tripIndex, stopSequence));
+                arrivalTime += hopTime;
+                departureTime += hopTime;
+            }
+        }
+        return tripId;
     }
 
 }

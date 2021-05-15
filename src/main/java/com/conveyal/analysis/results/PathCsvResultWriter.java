@@ -14,8 +14,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathCsvResultWriter extends CsvResultWriter {
 
-    public PathCsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) throws IOException {
-        super(task, outputBucket, fileStorage);
+    public PathCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+        super(task, fileStorage);
     }
 
     @Override

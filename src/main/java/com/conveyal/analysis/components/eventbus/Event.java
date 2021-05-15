@@ -6,8 +6,9 @@ import java.util.Date;
 import java.util.Set;
 
 /**
- * This could extend BaseModel, but it's not a domain model class (describing transit or land use data or analysis),
- * it's metadata about server operation and user activity.
+ * This could extend BaseModel, but it's not a domain model class (describing transit or land use data or analysis).
+ * It's metadata about server operation and user activity. These are intended to be serialized into a database or log,
+ * so the field visibility and types of every subclass should take that into consideration.
  */
 public abstract class Event {
 
@@ -28,6 +29,8 @@ public abstract class Event {
 
     /**
      * Set the user and groups from the supplied userPermissions object (if any) and return the modified instance.
+     * These fluent setter methods return this abstract supertype instead of the specific subtype, which can be a
+     * little awkward. But the alternative of declaring Event <S extends Event> and casting is more ugly.
      * @param userPermissions if this is null, the call will have no effect.
      */
     public Event forUser (UserPermissions userPermissions) {

@@ -5,6 +5,9 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import static com.conveyal.file.FileCategory.GRIDS;
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
  * The actual contents of the opportunity datasets are persisted to files on S3 and/or in a directory of the local
@@ -13,18 +16,17 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  */
 public class OpportunityDataset extends Model {
 
-    /** For now all web Mercator grids are zoom level 9. Level 10 is probably ideal but will quadruple calculation.
-     * TODO make adjustable
-     * */
-    public static final int ZOOM = 9;
-
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
 
     /** The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived. */
     public String sourceId;
 
-    /** Bucket name on S3 where the opportunity data itself is persisted. */
+    /**
+     * Bucket name on S3 where the opportunity data itself is persisted. Deprecated: as of April 2021, the FileStorage
+     * system encapsulates how local or remote storage coordinates are derived from the FileCategory.
+     */
+    @Deprecated
     public String bucketName;
 
     /**
@@ -88,17 +90,17 @@ public class OpportunityDataset extends Model {
     @JsonIgnore
     public FileStorageKey getStorageKey () {
         String path = storageLocation(this.format.extension);
-        return new FileStorageKey(this.bucketName, path);
+        return new FileStorageKey(GRIDS, path);
     }
 
     @JsonIgnore
     public FileStorageKey getStorageKey (FileStorageFormat fileFormat) {
-        return new FileStorageKey(this.bucketName, storageLocation(fileFormat.extension));
+        return new FileStorageKey(GRIDS, storageLocation(fileFormat.extension));
     }
 
     @JsonIgnore
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, ZOOM);
+        return new WebMercatorExtents(west, north, width, height, DEFAULT_ZOOM);
     }
 
     /** Analysis region this dataset was uploaded in. */

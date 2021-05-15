@@ -1,5 +1,6 @@
 package com.conveyal.analysis.results;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -17,6 +18,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.file.FileCategory.RESULTS;
 import static com.conveyal.r5.common.Util.human;
 
 /**
@@ -32,15 +34,13 @@ public abstract class BaseResultWriter {
     private final FileStorage fileStorage;
 
     protected File bufferFile;
-    private String outputBucket;
 
     public BaseResultWriter (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
     // Can this be merged into the constructor?
-    protected void prepare (String jobId, String outputBucket) {
-        this.outputBucket = outputBucket;
+    protected void prepare (String jobId) {
         try {
             bufferFile = File.createTempFile(jobId + "_", ".results");
             // On unexpected server shutdown, these files should be deleted.
@@ -56,7 +56,7 @@ public abstract class BaseResultWriter {
      */
     protected synchronized void finish (String fileName) throws IOException {
         LOG.info("Compressing {} and moving into file storage.", fileName);
-        FileStorageKey fileStorageKey = new FileStorageKey(outputBucket, fileName);
+        FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, fileName);
         File gzippedResultFile = FileUtils.createScratchFile();
 
         // There's probably a more elegant way to do this with NIO and without closing the buffer.

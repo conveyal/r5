@@ -8,10 +8,10 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * This is an API model object for reporting a single error or warning that occurred on a worker back to the client via the broker.
- * The most common errors a user will see are problems applying scenario modifications, so this provides some fields
- * to clarify what modification caused the error.
- * But it can also wrap any old Exception to report more unexpected kinds of errors.
+ * This is an API model object for reporting a single error or warning that occurred on a worker back to the UI via
+ * the backend. The most common errors a user will see are problems applying scenario modifications, so this provides
+ * some fields to clarify what modification caused the error, if any. But it can also contain messages from any old
+ * Exception (or other Throwable such as an Error) to report more unexpected kinds of errors.
  */
 public class TaskError {
 
@@ -20,10 +20,11 @@ public class TaskError {
     public final List<String> messages = new ArrayList<>();
 
     /** This constructor is used when an unexpected, unhandled error is encountered. */
-    public TaskError(Exception ex) {
+    public TaskError(Throwable throwable) {
         this.modificationId = null;
-        this.title = "Unhandled error: " + ex.toString();
-        this.messages.add(ExceptionUtils.asString(ex));
+        this.title = "Unhandled error: " + throwable.getClass().getSimpleName();
+        this.messages.add(ExceptionUtils.shortCauseString(throwable));
+        this.messages.add(ExceptionUtils.stackTraceString(throwable));
     }
 
     /**

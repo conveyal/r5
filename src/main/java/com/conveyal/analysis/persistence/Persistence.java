@@ -45,10 +45,10 @@ public class Persistence {
 
     // TODO progressively migrate to AnalysisDB which is non-static
     public static void initializeStatically (AnalysisDB.Config config) {
-        LOG.info("Connecting to MongoDB...");
-        if (config.databaseUri() != null) {
-            LOG.info("Connecting to remote MongoDB instance...");
-            mongo = new MongoClient(new MongoClientURI(config.databaseUri()));
+        String uri = config.databaseUri();
+        if (uri != null) {
+            LOG.info("Connecting to MongoDB instance at {}...", uri);
+            mongo = new MongoClient(new MongoClientURI(uri));
         } else {
             LOG.info("Connecting to local MongoDB instance...");
             mongo = new MongoClient();

@@ -100,7 +100,7 @@ task createVersionProperties(dependsOn: processResources) {
             Properties p = new Properties()
             p['version'] = project.version.toString()
             p['commit'] = details.gitHashFull
-            p['branch'] = details.branchName
+            p['branch'] = details.branchName ?: "NONE" // avoid NPE when building pushed tag
             p.store w, null
         }
         // Also make a simple one-line version.txt for scripts to use

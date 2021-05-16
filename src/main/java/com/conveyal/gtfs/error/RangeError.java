@@ -11,7 +11,7 @@ public class RangeError extends GTFSError implements Serializable {
     final double min, max, actual;
 
     public RangeError(String file, long line, String field, double min, double max, double actual) {
-        super(file, line, field);
+        super(file, line, field, Priority.LOW);
         this.min = min;
         this.max = max;
         this.actual = actual;
@@ -21,7 +21,4 @@ public class RangeError extends GTFSError implements Serializable {
         return String.format("Number %s outside of acceptable range [%s,%s].", actual, min, max);
     }
 
-    @Override public Priority getPriority() {
-        return Priority.LOW;
-    }
 }

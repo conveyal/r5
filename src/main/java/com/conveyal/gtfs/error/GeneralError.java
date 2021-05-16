@@ -11,7 +11,7 @@ public class GeneralError extends GTFSError implements Serializable {
     private String message;
 
     public GeneralError(String file, long line, String field, String message) {
-        super(file, line, field);
+        super(file, line, field, Priority.UNKNOWN);
         this.message = message;
     }
 
@@ -19,7 +19,4 @@ public class GeneralError extends GTFSError implements Serializable {
         return message;
     }
 
-    @Override public Priority getPriority() {
-        return Priority.UNKNOWN;
-    }
 }

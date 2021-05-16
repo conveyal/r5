@@ -9,14 +9,11 @@ public class EmptyFieldError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public EmptyFieldError(String file, long line, String field) {
-        super(file, line, field);
+        super(file, line, field, Priority.MEDIUM);
     }
 
     @Override public String getMessage() {
         return String.format("No value supplied for a required column.");
     }
 
-    @Override public Priority getPriority() {
-        return Priority.MEDIUM;
-    }
 }

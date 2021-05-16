@@ -14,15 +14,11 @@ public class ShapeMissingCoordinatesError extends GTFSError implements Serializa
     public final String[] tripIds;
 
     public ShapeMissingCoordinatesError(ShapePoint shapePoint, String[] tripIds) {
-        super("shapes", shapePoint.sourceFileLine, "shape_id", shapePoint.shape_id);
+        super("shapes", shapePoint.sourceFileLine, "shape_id", Priority.MEDIUM, shapePoint.shape_id);
         this.tripIds = tripIds;
     }
 
     @Override public String getMessage() {
         return "Shape " + affectedEntityId + " is missing coordinates (affects " + tripIds.length + " trips)";
-    }
-
-    @Override public Priority getPriority() {
-        return Priority.MEDIUM;
     }
 }

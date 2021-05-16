@@ -18,6 +18,8 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
     public final String field;
     public final String affectedEntityId;
     public final String errorType;
+    // NOTE: Do not remove this field. Though this field is somewhat redundant (since every instance of each class has
+    // the same priority) we have old MapDB files around that contain serialized errors. They would all break.
     public final Priority priority;
 
     public GTFSError(String file, long line, String field, Priority priority) {

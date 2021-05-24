@@ -186,6 +186,9 @@ public class AnalysisRequest {
         List<Modification> modifications = new ArrayList<>();
         String scenarioName;
         if (variantIndex > -1) {
+            if (variantIndex >= project.variants.length) {
+                throw AnalysisServerException.badRequest("Scenario does not exist. Please select a new scenario.");
+            }
             modifications = modificationsForProject(project.accessGroup, projectId, variantIndex);
             scenarioName = project.variants[variantIndex];
         } else {

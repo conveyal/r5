@@ -13,6 +13,7 @@ import java.util.Random;
 import java.util.stream.DoubleStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the Grid class, which holds destination counts in tiled spherical mercator pixels.
@@ -107,8 +108,8 @@ public class GridTest {
         int height = random.nextInt(MAX_GRID_WIDTH_PIXELS) + 1;
 
         Grid grid = new Grid(zoom, width, height, north, west);
-        for (int y = 0; y < grid.height; y++) {
-            for (int x = 0; x < grid.width; x++) {
+        for (int y = 0; y < grid.extents.height; y++) {
+            for (int x = 0; x < grid.extents.width; x++) {
                 double amount = random.nextDouble() * MAX_AMOUNT;
                 if (wholeNumbersOnly) {
                     amount = Math.round(amount);
@@ -121,11 +122,7 @@ public class GridTest {
 
     private static void assertGridSemanticEquals(Grid g1, Grid g2, boolean tolerateRounding) {
         // Note that the name field is excluded because it does not survive serialization.
-        assertEquals(g1.zoom, g2.zoom);
-        assertEquals(g1.north, g2.north);
-        assertEquals(g1.west, g2.west);
-        assertEquals(g1.width, g2.width);
-        assertEquals(g1.height, g2.height);
+        assertTrue(g1.hasEqualExtents(g2));
         assertArrayEquals(g1.grid, g2.grid, tolerateRounding);
     }
 

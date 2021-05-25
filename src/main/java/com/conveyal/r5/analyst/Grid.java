@@ -85,25 +85,7 @@ public class Grid extends PointSet {
 
     public static final String COUNT_COLUMN_NAME = "[COUNT]";
 
-    /** The web mercator zoom level for this grid. */
-    public final int zoom;
-
-    /* The following fields establish the position of this sub-grid within the full worldwide web mercator grid. */
-
-    /**
-     * The pixel number of the northernmost pixel in this grid (smallest y value in web Mercator,
-     * because y increases from north to south in web Mercator).
-     */
-    public final int north;
-
-    /** The pixel number of the westernmost pixel in this grid (smallest x value). */
-    public final int west;
-
-    /** The width of the grid in web Mercator pixels. */
-    public final int width;
-
-    /** The height of the grid in web Mercator pixels. */
-    public final int height;
+    public final WebMercatorExtents extents;
 
     /**
      * The data values for each pixel within this grid. Dimension order is (x, y), with range [0, width) and [0, height).
@@ -116,20 +98,15 @@ public class Grid extends PointSet {
     /** Maximum area allowed for features in a shapefile upload */
     private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
 
-    /**
-     * Used when reading a saved grid.
-     */
+    /** Used when reading a saved grid. */
     public Grid (int zoom, int width, int height, int north, int west) {
-        this.zoom = zoom;
-        this.width = width;
-        this.height = height;
-        this.north = north;
-        this.west = west;
+        this.extents = new WebMercatorExtents(west, north, width, height, zoom);
         this.grid = new double[width][height];
     }
 
     public Grid (WebMercatorExtents extents) {
-        this(extents.zoom, extents.width, extents.height, extents.north, extents.west);
+        this.extents = extents;
+        this.grid = new double[extents.width][extents.height];
     }
 
     /**
@@ -137,14 +114,9 @@ public class Grid extends PointSet {
      * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
     public Grid (int zoom, Envelope wgsEnvelope) {
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
-        // TODO actually store a reference to an immutable WebMercatorExtents instead of inlining the fields in Grid.
-        this.zoom = webMercatorExtents.zoom;
-        this.west = webMercatorExtents.west;
-        this.north = webMercatorExtents.north;
-        this.width = webMercatorExtents.width;
-        this.height = webMercatorExtents.height;
-        this.grid = new double[width][height];
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        this.extents = extents;
+        this.grid = new double[extents.width][extents.height];
     }
 
     public static class PixelWeight {
@@ -205,21 +177,21 @@ public class Grid extends PointSet {
 
         Envelope env = geometry.getEnvelopeInternal();
 
-        for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
+        for (int worldy = latToPixel(env.getMaxY(), extents.zoom); worldy <= latToPixel(env.getMinY(), extents.zoom); worldy++) {
             // NB web mercator Y is reversed relative to latitude.
             // Iterate over longitude (x) in the inner loop to avoid repeat calculations of pixel areas, which should be
             // equal at a given latitude (y)
 
             double pixelAreaAtLat = -1; //Set to -1 to recalculate pixelArea at each latitude.
 
-            for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
+            for (int worldx = lonToPixel(env.getMinX(), extents.zoom); worldx <= lonToPixel(env.getMaxX(), extents.zoom); worldx++) {
 
-                int x = worldx - west;
-                int y = worldy - north;
+                int x = worldx - extents.west;
+                int y = worldy - extents.north;
 
-                if (x < 0 || x >= width || y < 0 || y >= height) continue; // off the grid
+                if (x < 0 || x >= extents.width || y < 0 || y >= extents.height) continue; // off the grid
 
-                Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
+                Geometry pixel = getPixelGeometry(x , y , extents);
                 if (pixelAreaAtLat == -1) pixelAreaAtLat = pixel.getArea(); //Recalculate for a new latitude.
 
                 // Pixel completely within feature:
@@ -268,11 +240,11 @@ public class Grid extends PointSet {
      * Burn point data into the grid.
      */
     private void incrementPoint (double lat, double lon, double amount) {
-        int worldx = lonToPixel(lon, zoom);
-        int worldy = latToPixel(lat, zoom);
-        int x = worldx - west;
-        int y = worldy - north;
-        if (x >= 0 && x < width && y >= 0 && y < height) {
+        int worldx = lonToPixel(lon, extents.zoom);
+        int worldy = latToPixel(lat, extents.zoom);
+        int x = worldx - extents.west;
+        int y = worldy - extents.north;
+        if (x >= 0 && x < extents.width && y >= 0 && y < extents.height) {
             grid[x][y] += amount;
         } else {
             LOG.warn("{} opportunities are outside regional bounds, at {}, {}", amount, lon, lat);
@@ -306,19 +278,19 @@ public class Grid extends PointSet {
         // On almost all current hardware this is little-endian. Guava saves us again.
         LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(outputStream);
         // A header consisting of six 4-byte integers specifying the zoom level and bounds.
-        out.writeInt(zoom);
-        out.writeInt(west);
-        out.writeInt(north);
-        out.writeInt(width);
-        out.writeInt(height);
+        out.writeInt(extents.zoom);
+        out.writeInt(extents.west);
+        out.writeInt(extents.north);
+        out.writeInt(extents.width);
+        out.writeInt(extents.height);
         // The rest of the file is 32-bit integers in row-major order (x changes faster than y), delta-coded.
         // Delta coding and error diffusion are reset on each row to avoid wrapping.
         int prev = 0;
-        for (int y = 0; y < height; y++) {
+        for (int y = 0; y < extents.height; y++) {
             // Reset error on each row to avoid diffusing to distant locations.
             // An alternative is to use serpentine iteration or iterative diffusion.
             double error = 0;
-            for (int x = 0; x < width; x++) {
+            for (int x = 0; x < extents.width; x++) {
                 double val = grid[x][y];
                 checkState(val >= 0, "Opportunity density should never be negative.");
                 val += error;
@@ -336,9 +308,9 @@ public class Grid extends PointSet {
     /** Write this grid out in GeoTIFF format */
     public void writeGeotiff (OutputStream out) {
         try {
-            float[][] data = new float[height][width];
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
+            float[][] data = new float[extents.height][extents.width];
+            for (int x = 0; x < extents.width; x++) {
+                for (int y = 0; y < extents.height; y++) {
                     data[y][x] = (float) grid[x][y];
                 }
             }
@@ -395,11 +367,11 @@ public class Grid extends PointSet {
             }
         }
 
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        BufferedImage img = new BufferedImage(extents.width, extents.height, BufferedImage.TYPE_BYTE_GRAY);
         byte[] imgPixels = ((DataBufferByte) img.getRaster().getDataBuffer()).getData();
         int p = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (int y = 0; y < extents.height; y++) {
+            for (int x = 0; x < extents.width; x++) {
                 double density = grid[x][y];
                 imgPixels[p++] = (byte)(density * 255 / maxPixel);
             }
@@ -422,13 +394,13 @@ public class Grid extends PointSet {
             store.createSchema(gridCell);
             Transaction transaction = new DefaultTransaction("Save Grid");
             FeatureWriter writer = store.getFeatureWriterAppend(transaction);
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
+            for (int x = 0; x < extents.width; x++) {
+                for (int y = 0; y < extents.height; y++) {
                     try {
                         double value = grid[x][y];
                         if (value > 0) {
                             SimpleFeature feature = (SimpleFeature) writer.next();
-                            Polygon pixelPolygon = getPixelGeometry(x + west, y + north, zoom);
+                            Polygon pixelPolygon = getPixelGeometry(x, y, extents);
                             feature.setDefaultGeometry(pixelPolygon);
                             feature.setAttribute(fieldName, value);
                             writer.write();
@@ -447,7 +419,7 @@ public class Grid extends PointSet {
     }
 
     public boolean hasEqualExtents(Grid comparisonGrid){
-        return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
+        return this.extents.equals(comparisonGrid.extents);
     }
 
     /**
@@ -460,8 +432,8 @@ public class Grid extends PointSet {
      */
     public double getLat(int i) {
         // Integer division of linear index to find vertical integer intra-grid pixel coordinate
-        int y = i / width;
-        return pixelToCenterLat(north + y, zoom);
+        int y = i / extents.width;
+        return pixelToCenterLat(extents.north + y, extents.zoom);
     }
 
     /**
@@ -472,12 +444,12 @@ public class Grid extends PointSet {
      */
     public double getLon(int i) {
         // Remainder of division yields horizontal integer intra-grid pixel coordinate
-        int x = i % width;
-        return pixelToCenterLon(west + x, zoom);
+        int x = i % extents.width;
+        return pixelToCenterLon(extents.west + x, extents.zoom);
     }
 
     public int featureCount() {
-        return width * height;
+        return extents.width * extents.height;
     }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
@@ -530,16 +502,20 @@ public class Grid extends PointSet {
     }
 
     /**
-     * @param x absolute (world) x pixel number at the given zoom level.
-     * @param y absolute (world) y pixel number at the given zoom level.
-     * @return a JTS Polygon in WGS84 coordinates for the given absolute (world) pixel.
+     * Given a pixel's local coordinates in the supplied WebMercatorExtents, return its geometry in absolute (world)
+     * coordinates
+     * @param localX x pixel number within the given extents.
+     * @param localY y pixel number within the given extents.
+     * @return a JTS Polygon in WGS84 coordinates for the given pixel.
      */
-    public static Polygon getPixelGeometry (int x, int y, int zoom) {
-        double minLon = pixelToLon(x, zoom);
-        double maxLon = pixelToLon(x + 1, zoom);
+    public static Polygon getPixelGeometry (int localX, int localY, WebMercatorExtents extents) {
+        int x = localX + extents.west;
+        int y = localY + extents.north;
+        double minLon = pixelToLon(x, extents.zoom);
+        double maxLon = pixelToLon(x + 1, extents.zoom);
         // The y axis increases from north to south in web Mercator.
-        double minLat = pixelToLat(y + 1, zoom);
-        double maxLat = pixelToLat(y, zoom);
+        double minLat = pixelToLat(y + 1, extents.zoom);
+        double maxLat = pixelToLat(y, extents.zoom);
         return GeometryUtils.geometryFactory.createPolygon(new Coordinate[] {
                 new Coordinate(minLon, minLat),
                 new Coordinate(minLon, maxLat),
@@ -763,8 +739,8 @@ public class Grid extends PointSet {
 
     @Override
     public double getOpportunityCount (int i) {
-        int x = i % this.width;
-        int y = i / this.width;
+        int x = i % extents.width;
+        int y = i / extents.width;
         return grid[x][y];
     }
 
@@ -793,7 +769,7 @@ public class Grid extends PointSet {
 
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(this.west, this.north, this.width, this.height, this.zoom);
+        return extents;
     }
 
     /**

@@ -114,9 +114,7 @@ public class Grid extends PointSet {
      * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
     public Grid (int zoom, Envelope wgsEnvelope) {
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
-        this.extents = extents;
-        this.grid = new double[extents.width][extents.height];
+        this(WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom));
     }
 
     public static class PixelWeight {

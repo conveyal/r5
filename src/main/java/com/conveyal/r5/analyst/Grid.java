@@ -584,11 +584,11 @@ public class Grid extends PointSet {
             for (Iterator<String> it = numericColumns.iterator(); it.hasNext();) {
                 String field = it.next();
                 String value = reader.get(field);
-                if (value == null || "".equals(value)) continue; // allow missing data
+                if (value == null || "".equals(value)) continue; // allow missing data TODO add "N/A" etc.?
                 try {
                     double dv = parseDouble(value);
                     if (!(Double.isFinite(dv) || dv < 0)) {
-                        it.remove();
+                        it.remove(); // TODO track removed columns and report to UI?
                     }
                 } catch (NumberFormatException e) {
                     it.remove();
@@ -599,9 +599,6 @@ public class Grid extends PointSet {
         // This will also close the InputStreams.
         reader.close();
 
-        if (numericColumns.isEmpty()) {
-            throw new IllegalArgumentException("CSV file contained no entirely finite, non-negative numeric columns.");
-        }
         checkWgsEnvelopeSize(envelope);
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
         checkPixelCount(extents, numericColumns.size());

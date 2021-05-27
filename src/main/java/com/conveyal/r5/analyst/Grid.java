@@ -34,6 +34,7 @@ import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
@@ -98,10 +99,13 @@ public class Grid extends PointSet {
     /** Maximum area allowed for features in a shapefile upload */
     private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
 
+    /** Limit on number of pixels, to prevent OOME when multiple large grids are being created (width * height *
+     * number of layers/attributes) */
+    private static final int MAX_PIXELS = 100_000_000 * 10;
+
     /** Used when reading a saved grid. */
     public Grid (int zoom, int width, int height, int north, int west) {
-        this.extents = new WebMercatorExtents(west, north, width, height, zoom);
-        this.grid = new double[width][height];
+        this(new WebMercatorExtents(west, north, width, height, zoom));
     }
 
     public Grid (WebMercatorExtents extents) {
@@ -599,6 +603,8 @@ public class Grid extends PointSet {
             throw new IllegalArgumentException("CSV file contained no entirely finite, non-negative numeric columns.");
         }
         checkWgsEnvelopeSize(envelope);
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        checkPixelCount(extents, numericColumns.size());
 
         if (progressListener != null) {
             progressListener.setTotalItems(total);
@@ -607,14 +613,14 @@ public class Grid extends PointSet {
         // We now have an envelope and know which columns are numeric. Make a grid for each numeric column.
         Map<String, Grid> grids = new HashMap<>();
         for (String columnName : numericColumns) {
-            Grid grid = new Grid(zoom, envelope);
+            Grid grid = new Grid(extents);
             grid.name = columnName;
             grids.put(grid.name, grid);
         }
 
         // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
         // This assumes there is no column called "[COUNT]" in the source file, which is validated above.
-        Grid countGrid = new Grid(zoom, envelope);
+        Grid countGrid = new Grid(extents);
         countGrid.name = COUNT_COLUMN_NAME;
         grids.put(countGrid.name, countGrid);
 
@@ -666,20 +672,24 @@ public class Grid extends PointSet {
     public static List<Grid> fromShapefile (File shapefile, int zoom, ProgressListener progressListener)
             throws IOException, FactoryException, TransformException {
 
-        Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
-
-
         Envelope envelope = reader.wgs84Bounds();
-        int total = reader.getFeatureCount();
-
         checkWgsEnvelopeSize(envelope);
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        List<String> numericAttributes = reader.numericAttributes();
+        Set<String> uniqueNumericAttributes = new HashSet<>(numericAttributes);
+        if (uniqueNumericAttributes.size() != numericAttributes.size()) {
+            throw new IllegalArgumentException("Shapefile has duplicate numeric attributes");
+        }
+        checkPixelCount(extents, numericAttributes.size());
 
+        int total = reader.getFeatureCount();
         if (progressListener != null) {
             progressListener.setTotalItems(total);
         }
 
         AtomicInteger count = new AtomicInteger(0);
+        Map<String, Grid> grids = new HashMap<>();
 
         reader.wgs84Stream().forEach(feat -> {
             Geometry geom = (Geometry) feat.getDefaultGeometry();
@@ -692,11 +702,10 @@ public class Grid extends PointSet {
                 if (numericVal == 0) continue;
 
                 String attributeName = p.getName().getLocalPart();
-
-                // TODO this is assuming that each attribute name can only exist once. Shapefiles can contain duplicate attribute names. Validate to catch this.
+                
                 Grid grid = grids.get(attributeName);
                 if (grid == null) {
-                    grid = new Grid(zoom, envelope);
+                    grid = new Grid(extents);
                     grid.name = attributeName;
                     grids.put(attributeName, grid);
                 }
@@ -796,6 +805,15 @@ public class Grid extends PointSet {
         if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
             throw new IllegalArgumentException("Shapefile extent (" + roughWgsEnvelopeArea(envelope) + " sq. km.) " +
                     "exceeds limit (" + MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+        }
+    }
+
+    public static void checkPixelCount (WebMercatorExtents extents, int layers) {
+        int pixels = extents.width * extents.height * layers;
+        if (pixels > MAX_PIXELS) {
+            throw new IllegalArgumentException("Number of zoom level " + extents.zoom + " pixels (" + pixels + ")"  +
+                    "exceeds limit (" + MAX_PIXELS +"). Reduce the zoom level or the file's extents or number of " +
+                    "numeric attributes.");
         }
     }
 

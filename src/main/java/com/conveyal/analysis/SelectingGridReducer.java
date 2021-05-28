@@ -20,7 +20,6 @@ import java.util.zip.GZIPInputStream;
  * When storing bootstrap replications of travel time, we also store the point estimate (using all Monte Carlo draws
  * equally weighted) as the first value, so a SelectingGridReducer(0) can be used to retrieve the point estimate.
  *
- * This class is not referenced within R5, but is used by the Analysis front end.
  */
 public class SelectingGridReducer {
 

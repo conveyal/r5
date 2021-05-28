@@ -67,7 +67,7 @@ public class AnalysisCollection<T extends BaseModel> {
         newModel.createdBy = creatorEmail;
         newModel.updatedBy = creatorEmail;
 
-        // This creates the `_id` automatically
+        // This creates the `_id` automatically if it is missing
         collection.insertOne(newModel);
 
         return newModel;

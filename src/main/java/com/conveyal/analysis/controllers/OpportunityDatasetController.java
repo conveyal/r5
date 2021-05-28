@@ -415,6 +415,8 @@ public class OpportunityDatasetController implements HttpController {
     private void verifyBaseNamesSame (List<FileItem> fileItems) {
         String firstBaseName = null;
         for (FileItem fileItem : fileItems) {
+            // Ignore .shp.xml files
+            if (FilenameUtils.getExtension(fileItem.getName()).equals(".xml")) continue;
             String baseName = FilenameUtils.getBaseName(fileItem.getName());
             if (firstBaseName == null) {
                 firstBaseName = baseName;

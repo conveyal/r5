@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.models.Model;
+import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.time.Duration;
@@ -251,7 +251,7 @@ public class Task implements Runnable, ProgressListener {
     // We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
     // It is also awkward to make a method to set it on ProgressListener - it's not really progress.
     // So we set it directly on the task before submitting it. Requires pre-setting (not necessarily storing) Model._id.
-    public Task withWorkProduct (Model model) {
+    public Task withWorkProduct (BaseModel model) {
         this.workProduct = WorkProduct.forModel(model);
         return this;
     }

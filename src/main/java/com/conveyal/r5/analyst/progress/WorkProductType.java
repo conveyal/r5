@@ -1,10 +1,10 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.controllers.UserActivityController;
+import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.models.SpatialDatasetSource;
 
 /**
  * There is some implicit and unenforced correspondence between these values and those in FileCategory, as well
@@ -13,13 +13,14 @@ import com.conveyal.analysis.models.RegionalAnalysis;
  */
 public enum WorkProductType {
 
-    BUNDLE, REGIONAL_ANALYSIS, AGGREGATION_AREA, OPPORTUNITY_DATASET;
+    BUNDLE, REGIONAL_ANALYSIS, AGGREGATION_AREA, OPPORTUNITY_DATASET, SPATIAL_DATASET_SOURCE;
 
-    // Currently we have two base classes for db objects so may need to use Object instead of BaseModel parameter
-    public static WorkProductType forModel (Model model) {
+    public static WorkProductType forModel (Object model) {
         if (model instanceof Bundle) return BUNDLE;
         if (model instanceof OpportunityDataset) return OPPORTUNITY_DATASET;
         if (model instanceof RegionalAnalysis) return REGIONAL_ANALYSIS;
+        if (model instanceof AggregationArea) return AGGREGATION_AREA;
+        if (model instanceof SpatialDatasetSource) return SPATIAL_DATASET_SOURCE;
         throw new IllegalArgumentException("Unrecognized work product type.");
     }
 }

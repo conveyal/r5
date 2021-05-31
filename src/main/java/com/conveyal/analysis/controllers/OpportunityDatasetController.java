@@ -1,10 +1,12 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
+import com.conveyal.analysis.models.SpatialDatasetSource;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.spatial.SpatialDataset;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
@@ -15,11 +17,10 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
-import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
@@ -48,14 +49,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat;
 import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -143,29 +143,31 @@ public class OpportunityDatasetController implements HttpController {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
 
-        // default
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
-        final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);
+        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions.accessGroup);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet)
-        final String downloadBatchId = new ObjectId().toString();
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
         final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
-        taskScheduler.enqueueHeavyTask(() -> {
-            try {
-                status.message = "Extracting census data for region";
-                List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
-                createDatasetsFromPointSets(
-                        email, accessGroup, extractor.sourceName, downloadBatchId, regionId, status, grids
-                );
-            } catch (IOException e) {
-                status.completeWithError(e);
-                LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
-            }
-        });
+        SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, extractor.sourceName)
+                .withRegion(regionId);
+
+        taskScheduler.enqueue(Task.create("Extracting LODES data")
+                .forUser(userPermissions)
+                .setHeavy(true)
+                .withWorkProduct(source)
+                .withAction((progressListener) -> {
+                    try {
+                        status.message = "Extracting census data for region";
+                        List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
+                        updateAndStoreDatasets(source, status, grids);
+                    } catch (IOException e) {
+                        status.completeWithError(e);
+                        LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
+                    }
+                }));
 
         return status;
     }
@@ -174,31 +176,21 @@ public class OpportunityDatasetController implements HttpController {
      * Given a list of new PointSets, serialize each PointSet and save it to S3, then create a metadata object about
      * that PointSet and store it in Mongo.
      */
-    private List<OpportunityDataset> createDatasetsFromPointSets(String email,
-                                                                       String accessGroup,
-                                                                       String sourceName,
-                                                                       String sourceId,
-                                                                       String regionId,
-                                                                       OpportunityDatasetUploadStatus status,
-                                                                       List<? extends PointSet> pointSets) {
-        status.status = Status.UPLOADING;
-        status.totalGrids = pointSets.size();
+    private void updateAndStoreDatasets (SpatialDatasetSource source,
+                                         OpportunityDatasetUploadStatus status,
+                                         List<? extends PointSet> pointSets) {
 
         // Create an OpportunityDataset holding some metadata about each PointSet (Grid or FreeForm).
         final List<OpportunityDataset> datasets = new ArrayList<>();
         for (PointSet pointSet : pointSets) {
-
-            // Make new PointSet metadata objects.
-            // Unfortunately we can't pull this step out into a method because there are so many parameters.
-            // Some of that metadata could be consolidated e.g. user email and access group.
             OpportunityDataset dataset = new OpportunityDataset();
-            dataset.sourceName = sourceName;
-            dataset.sourceId = sourceId;
+            dataset.sourceName = source.name;
+            dataset.sourceId = source._id.toString();
+            dataset.createdBy = source.createdBy;
+            dataset.accessGroup = source.accessGroup;
+            dataset.regionId = source.regionId;
             dataset.name = pointSet.name;
-            dataset.createdBy = email;
-            dataset.accessGroup = accessGroup;
             dataset.totalPoints = pointSet.featureCount();
-            dataset.regionId = regionId;
             dataset.totalOpportunities = pointSet.sumTotalOpportunities();
             dataset.format = getFormatCode(pointSet);
             if (dataset.format == FileStorageFormat.FREEFORM) {
@@ -235,7 +227,8 @@ public class OpportunityDatasetController implements HttpController {
                     fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
-                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, regionId + "/" + dataset._id + ".pointset");
+                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, source.regionId + "/" + dataset._id +
+                            ".pointset");
                     File pointsetFile = FileUtils.createScratchFile("pointset");
 
                     OutputStream os = new GZIPOutputStream(new FileOutputStream(pointsetFile));
@@ -257,7 +250,6 @@ public class OpportunityDatasetController implements HttpController {
                 throw AnalysisServerException.unknown(e);
             }
         }
-        return datasets;
     }
 
     private static FileStorageFormat getFormatCode (PointSet pointSet) {
@@ -342,8 +334,7 @@ public class OpportunityDatasetController implements HttpController {
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
+        final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
@@ -366,7 +357,6 @@ public class OpportunityDatasetController implements HttpController {
         addStatusAndRemoveOldStatuses(status);
 
         final List<FileItem> fileItems;
-        final UploadFormat uploadFormat;
         final SpatialDataset.SourceFormat uploadFormat;
         final Map<String, String> parameters;
         try {
@@ -427,8 +417,9 @@ public class OpportunityDatasetController implements HttpController {
                 // Create a single unique ID string that will be referenced by all opportunity datasets produced by
                 // this upload. This allows us to group together datasets from the same source and associate them with
                 // the file(s) that produced them.
-                final String sourceFileId = new ObjectId().toString();
-                createDatasetsFromPointSets(email, accessGroup, sourceName, sourceFileId, regionId, status, pointsets);
+                SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName)
+                        .withRegion(regionId);
+                updateAndStoreDatasets(source, status, pointsets);
             } catch (Exception e) {
                 status.completeWithError(e);
             }

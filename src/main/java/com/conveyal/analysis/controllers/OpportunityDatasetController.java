@@ -196,17 +196,7 @@ public class OpportunityDatasetController implements HttpController {
             if (dataset.format == FileStorageFormat.FREEFORM) {
                 dataset.name = String.join(" ", pointSet.name, "(freeform)");
             }
-            // These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
-            // for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets because
-            // the zoom level is fixed in OpportunityDataset (there is not even a field for it).
-            // Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
-            {
-                WebMercatorExtents webMercatorExtents = pointSet.getWebMercatorExtents();
-                dataset.north = webMercatorExtents.north;
-                dataset.west = webMercatorExtents.west;
-                dataset.width = webMercatorExtents.width;
-                dataset.height = webMercatorExtents.height;
-            }
+            dataset.setWebMercatorExtents(pointSet);
             // TODO make origin and destination pointsets reference each other and indicate they are suitable
             //      for one-to-one analyses
 

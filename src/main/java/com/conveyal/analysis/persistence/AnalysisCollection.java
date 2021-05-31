@@ -78,14 +78,9 @@ public class AnalysisCollection<T extends BaseModel> {
     }
 
     public T update(T value, String accessGroup) {
-        // Store the current nonce for querying and to check later if needed.
-        ObjectId oldNonce = value.nonce;
-
-        value.nonce = new ObjectId();
 
         UpdateResult result = collection.replaceOne(and(
                 eq("_id", value._id),
-                eq("nonce", oldNonce),
                 eq("accessGroup", accessGroup)
         ), value);
 
@@ -94,8 +89,6 @@ public class AnalysisCollection<T extends BaseModel> {
             T model = findById(value._id);
             if (model == null) {
                 throw AnalysisServerException.notFound(type.getName() + " was not found.");
-            } else if (model.nonce != oldNonce) {
-                throw AnalysisServerException.nonce();
             } else if (!model.accessGroup.equals(accessGroup)) {
                 throw invalidAccessGroup();
             } else {

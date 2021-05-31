@@ -6,6 +6,7 @@ import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.spatial.SpatialDataset;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -55,6 +56,8 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat;
+import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -334,98 +337,6 @@ public class OpportunityDatasetController implements HttpController {
         }
     }
 
-    private enum UploadFormat {
-        SHAPEFILE, GRID, CSV
-    }
-
-    /**
-     * Detect from a batch of uploaded files whether the user has uploaded a Shapefile, a CSV, or one or more binary
-     * grids. In the process we validate the list of uploaded files, making sure certain preconditions are met.
-     * Some kinds of uploads must contain multiple files (.shp) or can contain multiple files (.grid) while others
-     * must have only a single file (.csv). Scan the list of uploaded files to ensure it makes sense before acting.
-     * @throws AnalysisServerException if the type of the upload can't be detected or preconditions are violated.
-     * @return the expected type of the uploaded file or files, never null.
-     */
-    private UploadFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
-        if (fileItems == null || fileItems.isEmpty()) {
-            throw AnalysisServerException.fileUpload("You must include some files to create an opportunity dataset.");
-        }
-
-        Set<String> fileExtensions = extractFileExtensions(fileItems);
-
-        // There was at least one file with an extension, the set must now contain at least one extension.
-        if (fileExtensions.isEmpty()) {
-            throw AnalysisServerException.fileUpload("No file extensions seen, cannot detect upload type.");
-        }
-
-        UploadFormat uploadFormat = null;
-
-        // Check that if upload contains any of the Shapefile sidecar files, it contains all of the required ones.
-        final Set<String> shapefileExtensions = Sets.newHashSet("SHP", "DBF", "PRJ");
-        if ( ! Sets.intersection(fileExtensions, shapefileExtensions).isEmpty()) {
-            if (fileExtensions.containsAll(shapefileExtensions)) {
-                uploadFormat = UploadFormat.SHAPEFILE;
-                verifyBaseNamesSame(fileItems);
-                // TODO check that any additional file is SHX, and that there are no more than 4 files.
-            } else {
-                final String message = "You must multi-select at least SHP, DBF, and PRJ files for shapefile upload.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-
-        // Even if we've already detected a shapefile, run the other tests to check for a bad mixture of file types.
-        if (fileExtensions.contains("GRID")) {
-            if (fileExtensions.size() == 1) {
-                uploadFormat = UploadFormat.GRID;
-            } else {
-                String message = "When uploading grids you may upload multiple files, but they must all be grids.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        } else if (fileExtensions.contains("CSV")) {
-            if (fileItems.size() == 1) {
-                uploadFormat = UploadFormat.CSV;
-            } else {
-                String message = "When uploading CSV you may only upload one file at a time.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-
-        if (uploadFormat == null) {
-            throw AnalysisServerException.fileUpload("Could not detect format of opportunity dataset upload.");
-        }
-        return uploadFormat;
-    }
-
-    private Set<String> extractFileExtensions (List<FileItem> fileItems) {
-
-        Set<String> fileExtensions = new HashSet<>();
-
-        for (FileItem fileItem : fileItems) {
-            String fileName = fileItem.getName();
-            String extension = FilenameUtils.getExtension(fileName);
-            if (extension.isEmpty()) {
-                throw AnalysisServerException.fileUpload("Filename has no extension: " + fileName);
-            }
-            fileExtensions.add(extension.toUpperCase());
-        }
-
-        return fileExtensions;
-    }
-
-    private void verifyBaseNamesSame (List<FileItem> fileItems) {
-        String firstBaseName = null;
-        for (FileItem fileItem : fileItems) {
-            String baseName = FilenameUtils.getBaseName(fileItem.getName());
-            if (firstBaseName == null) {
-                firstBaseName = baseName;
-            }
-            if (!firstBaseName.equals(baseName)) {
-                String message = "In a shapefile upload, all files must have the same base name.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-    }
-
     /**
      * Handle many types of file upload. Returns a OpportunityDatasetUploadStatus which has a handle to request status.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
@@ -456,6 +367,7 @@ public class OpportunityDatasetController implements HttpController {
 
         final List<FileItem> fileItems;
         final UploadFormat uploadFormat;
+        final SpatialDataset.SourceFormat uploadFormat;
         final Map<String, String> parameters;
         try {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
@@ -475,13 +387,13 @@ public class OpportunityDatasetController implements HttpController {
             try {
                 // A place to accumulate all the PointSets created, both FreeForm and Grids.
                 List<PointSet> pointsets = new ArrayList<>();
-                if (uploadFormat == UploadFormat.GRID) {
+                if (uploadFormat == SourceFormat.GRID) {
                     LOG.info("Detected opportunity dataset stored in Conveyal binary format.");
                     pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
-                } else if (uploadFormat == UploadFormat.SHAPEFILE) {
+                } else if (uploadFormat == SourceFormat.SHAPEFILE) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
                     pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
-                } else if (uploadFormat == UploadFormat.CSV) {
+                } else if (uploadFormat == SourceFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
                     FileItem csvFileItem = fileItems.get(0);

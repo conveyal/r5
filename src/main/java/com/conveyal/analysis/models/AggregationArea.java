@@ -1,5 +1,6 @@
 package com.conveyal.analysis.models;
 
+import com.conveyal.analysis.UserPermissions;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
@@ -7,8 +8,26 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * It is defined by a geometry that is rasterized and stored as a grid, with pixels with values between 0 and 100,000
  * depending on how much of that pixel is overlapped by the mask.
  */
-public class AggregationArea extends Model {
+public class AggregationArea extends BaseModel {
     public String regionId;
+    public String sourceId;
+
+    private AggregationArea(UserPermissions user, String name) {
+        super(user, name);
+    }
+
+    // FLUENT METHODS FOR CONFIGURING
+
+    /** Call this static factory to begin building a task. */
+    public static AggregationArea create (UserPermissions user, String name) {
+        return new AggregationArea(user, name);
+    }
+
+    public AggregationArea withSource (SpatialDatasetSource source) {
+        this.regionId = source.regionId;
+        this.sourceId = source._id.toString();
+        return this;
+    }
 
     @JsonIgnore
     public String getS3Key () {

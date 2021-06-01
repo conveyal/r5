@@ -73,6 +73,10 @@ public class AnalysisCollection<T extends BaseModel> {
         return newModel;
     }
 
+    public void insert (T model) {
+        collection.insertOne(model);
+    }
+
     public T update(T value) {
         return update(value, value.accessGroup);
     }

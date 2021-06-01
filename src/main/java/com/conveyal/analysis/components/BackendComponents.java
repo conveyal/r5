@@ -92,7 +92,7 @@ public abstract class BackendComponents {
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),
-                new AggregationAreaController(fileStorage),
+                new AggregationAreaController(fileStorage, database, taskScheduler),
                 new TimetableController(),
                 new FileStorageController(fileStorage, database),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which

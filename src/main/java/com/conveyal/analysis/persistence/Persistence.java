@@ -40,7 +40,6 @@ public class Persistence {
     public static MongoMap<Bundle> bundles;
     public static MongoMap<Region> regions;
     public static MongoMap<RegionalAnalysis> regionalAnalyses;
-    public static MongoMap<AggregationArea> aggregationAreas;
     public static MongoMap<OpportunityDataset> opportunityDatasets;
 
     // TODO progressively migrate to AnalysisDB which is non-static
@@ -59,7 +58,6 @@ public class Persistence {
         bundles = getTable("bundles", Bundle.class);
         regions = getTable("regions", Region.class);
         regionalAnalyses = getTable("regional-analyses", RegionalAnalysis.class);
-        aggregationAreas = getTable("aggregationAreas", AggregationArea.class);
         opportunityDatasets = getTable("opportunityDatasets", OpportunityDataset.class);
     }
 

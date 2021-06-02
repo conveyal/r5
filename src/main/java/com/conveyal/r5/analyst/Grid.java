@@ -101,7 +101,7 @@ public class Grid extends PointSet {
 
     /** Limit on number of pixels, to prevent OOME when multiple large grids are being created (width * height *
      * number of layers/attributes) */
-    private static final int MAX_PIXELS = 100_000_000 * 10;
+    private static final int MAX_PIXELS = 10_000 * 10_000 * 10;
 
     /** Used when reading a saved grid. */
     public Grid (int zoom, int width, int height, int north, int west) {
@@ -504,8 +504,8 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Given a pixel's local coordinates in the supplied WebMercatorExtents, return its geometry in absolute (world)
-     * coordinates
+     * Given a pixel's local grid coordinates within the supplied WebMercatorExtents, return a closed
+     * polygon of that pixel's outline in WGS84 global geographic coordinates.
      * @param localX x pixel number within the given extents.
      * @param localY y pixel number within the given extents.
      * @return a JTS Polygon in WGS84 coordinates for the given pixel.

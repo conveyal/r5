@@ -63,7 +63,7 @@ public class SelectingGridReducer {
         // median travel time.
         int nSamples = input.readInt();
 
-        Grid outputGrid = new Grid(zoom, width, height, north, west);
+        Grid outputGrid = new Grid(west, north, width, height, zoom);
 
         int[] valuesThisOrigin = new int[nSamples];
 

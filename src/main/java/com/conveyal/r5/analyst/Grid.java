@@ -34,7 +34,6 @@ import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
@@ -104,7 +103,7 @@ public class Grid extends PointSet {
     private static final int MAX_PIXELS = 10_000 * 10_000 * 10;
 
     /** Used when reading a saved grid. */
-    public Grid (int zoom, int width, int height, int north, int west) {
+    public Grid (int west, int north, int width, int height, int zoom) {
         this(new WebMercatorExtents(west, north, width, height, zoom));
     }
 
@@ -343,7 +342,7 @@ public class Grid extends PointSet {
         int width = data.readInt();
         int height = data.readInt();
 
-        Grid grid = new Grid(zoom, width, height, north, west);
+        Grid grid = new Grid(west, north, width, height, zoom);
 
         // loop in row-major order
         for (int y = 0, value = 0; y < height; y++) {

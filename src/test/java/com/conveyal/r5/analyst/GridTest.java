@@ -7,10 +7,8 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.DoubleStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +30,7 @@ public class GridTest {
         int zoom = 4;
         int xTile = 14;
         int yTile = 9;
-        Grid grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
+        Grid grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         ReferencedEnvelope envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
         assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
@@ -43,7 +41,7 @@ public class GridTest {
         zoom = 5;
         xTile = 16;
         yTile = 11;
-        grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
+        grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(0, envelope.getMinX(), 0.1);
         assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
@@ -107,7 +105,7 @@ public class GridTest {
         int width = random.nextInt(MAX_GRID_WIDTH_PIXELS) + 1;
         int height = random.nextInt(MAX_GRID_WIDTH_PIXELS) + 1;
 
-        Grid grid = new Grid(zoom, width, height, north, west);
+        Grid grid = new Grid(west, north, width, height, zoom);
         for (int y = 0; y < grid.extents.height; y++) {
             for (int x = 0; x < grid.extents.width; x++) {
                 double amount = random.nextDouble() * MAX_AMOUNT;

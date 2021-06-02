@@ -96,11 +96,8 @@ public class ShapefileReader {
         return features.getSchema()
                 .getAttributeDescriptors()
                 .stream()
-                .filter(d -> {
-                    AttributeType type = d.getType().getSuper();
-                    return type != null && type.getBinding().equals(Number.class);
-                })
-                .map(d -> d.getLocalName())
+                .filter(d -> Number.class.isInstance(d.getType().getBinding()))
+                .map(AttributeDescriptor::getLocalName)
                 .collect(Collectors.toList());
     }
 

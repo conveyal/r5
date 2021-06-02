@@ -2,7 +2,6 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
@@ -229,7 +228,7 @@ public class AnalysisRequest {
         //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
 
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
-        checkZoom(extents);
+        checkGridSize(extents);
         task.height = extents.height;
         task.north = extents.north;
         task.west = extents.west;
@@ -287,7 +286,7 @@ public class AnalysisRequest {
         return task;
     }
 
-    private static void checkZoom(WebMercatorExtents extents) {
+    private static void checkGridSize (WebMercatorExtents extents) {
         if (extents.zoom < MIN_ZOOM || extents.zoom > MAX_ZOOM) {
             throw AnalysisServerException.badRequest(String.format(
                     "Requested zoom (%s) is outside valid range (%s - %s)", extents.zoom, MIN_ZOOM, MAX_ZOOM

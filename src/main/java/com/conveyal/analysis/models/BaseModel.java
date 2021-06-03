@@ -5,7 +5,7 @@ import org.bson.types.ObjectId;
 
 public class BaseModel {
     // Can retrieve `createdAt` from here
-    public ObjectId _id;
+    public ObjectId _id = new ObjectId();
 
     public String createdBy = null;
     public String updatedBy = null;
@@ -17,8 +17,7 @@ public class BaseModel {
     public String name = null;
 
     // package private to encourage use of static factory methods
-    BaseModel (UserPermissions user, String name){
-        this._id = new ObjectId();
+    BaseModel (UserPermissions user, String name) {
         this.createdBy = user.email;
         this.updatedBy = user.email;
         this.accessGroup = user.accessGroup;

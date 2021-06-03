@@ -1,5 +1,6 @@
 package com.conveyal.r5.util;
 
+import com.conveyal.analysis.AnalysisServerException;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -25,6 +26,7 @@ import org.opengis.referencing.operation.TransformException;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -137,5 +139,23 @@ public class ShapefileReader {
 
     public int getFeatureCount() throws IOException {
         return source.getCount(Query.ALL);
+    }
+
+    public Map<String, Class> getAttributeTypes () {
+        Map<String, Class> attributes = new HashMap<>();
+        HashSet<String> uniqueAttributes = new HashSet<>();
+        features.getSchema()
+                .getAttributeDescriptors()
+                .forEach(d -> {
+                    String attributeName = d.getLocalName();
+                    AttributeType type = d.getType().getSuper();
+                    attributes.put(attributeName, type.getBinding());
+                    uniqueAttributes.add(attributeName);
+                });
+        if (attributes.size() != uniqueAttributes.size()) {
+            throw new AnalysisServerException("Shapefile has duplicate " +
+                    "attributes.");
+        }
+            return attributes;
     }
 }

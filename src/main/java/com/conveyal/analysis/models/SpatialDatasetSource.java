@@ -12,6 +12,7 @@ public class SpatialDatasetSource extends BaseModel {
     public SourceFormat sourceFormat;
     public GeometryType geometryType;
     public Map<String, Class> attributes;
+    public int featureCount;
 
     private SpatialDatasetSource (UserPermissions userPermissions, String sourceName) {
         super(userPermissions, sourceName);

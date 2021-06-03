@@ -62,7 +62,6 @@ public class AggregationAreaController implements HttpController {
 
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
-
     private final AnalysisCollection aggregationAreaCollection;
 
     public AggregationAreaController (

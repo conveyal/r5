@@ -7,12 +7,11 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.DoubleStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the Grid class, which holds destination counts in tiled spherical mercator pixels.
@@ -31,7 +30,7 @@ public class GridTest {
         int zoom = 4;
         int xTile = 14;
         int yTile = 9;
-        Grid grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
+        Grid grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         ReferencedEnvelope envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
         assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
@@ -42,7 +41,7 @@ public class GridTest {
         zoom = 5;
         xTile = 16;
         yTile = 11;
-        grid = new Grid(zoom, 256, 256, 256 * yTile, 256 * xTile);
+        grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
         assertEquals(0, envelope.getMinX(), 0.1);
         assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
@@ -106,9 +105,9 @@ public class GridTest {
         int width = random.nextInt(MAX_GRID_WIDTH_PIXELS) + 1;
         int height = random.nextInt(MAX_GRID_WIDTH_PIXELS) + 1;
 
-        Grid grid = new Grid(zoom, width, height, north, west);
-        for (int y = 0; y < grid.height; y++) {
-            for (int x = 0; x < grid.width; x++) {
+        Grid grid = new Grid(west, north, width, height, zoom);
+        for (int y = 0; y < grid.extents.height; y++) {
+            for (int x = 0; x < grid.extents.width; x++) {
                 double amount = random.nextDouble() * MAX_AMOUNT;
                 if (wholeNumbersOnly) {
                     amount = Math.round(amount);
@@ -121,11 +120,7 @@ public class GridTest {
 
     private static void assertGridSemanticEquals(Grid g1, Grid g2, boolean tolerateRounding) {
         // Note that the name field is excluded because it does not survive serialization.
-        assertEquals(g1.zoom, g2.zoom);
-        assertEquals(g1.north, g2.north);
-        assertEquals(g1.west, g2.west);
-        assertEquals(g1.width, g2.width);
-        assertEquals(g1.height, g2.height);
+        assertTrue(g1.hasEqualExtents(g2));
         assertArrayEquals(g1.grid, g2.grid, tolerateRounding);
     }
 

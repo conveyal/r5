@@ -2,7 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
@@ -227,12 +227,12 @@ public class AnalysisRequest {
         // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
         //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
 
-        Grid grid = new Grid(zoom, bounds.envelope());
-        checkZoom(grid);
-        task.height = grid.height;
-        task.north = grid.north;
-        task.west = grid.west;
-        task.width = grid.width;
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
+        checkGridSize(extents);
+        task.height = extents.height;
+        task.north = extents.north;
+        task.west = extents.west;
+        task.width = extents.width;
         task.zoom = zoom;
 
         task.date = date;
@@ -286,17 +286,17 @@ public class AnalysisRequest {
         return task;
     }
 
-    private static void checkZoom(Grid grid) {
-        if (grid.zoom < MIN_ZOOM || grid.zoom > MAX_ZOOM) {
+    private static void checkGridSize (WebMercatorExtents extents) {
+        if (extents.zoom < MIN_ZOOM || extents.zoom > MAX_ZOOM) {
             throw AnalysisServerException.badRequest(String.format(
-                    "Requested zoom (%s) is outside valid range (%s - %s)", grid.zoom, MIN_ZOOM, MAX_ZOOM
+                    "Requested zoom (%s) is outside valid range (%s - %s)", extents.zoom, MIN_ZOOM, MAX_ZOOM
             ));
         }
-        if (grid.height * grid.width > MAX_GRID_CELLS) {
+        if (extents.height * extents.width > MAX_GRID_CELLS) {
             throw AnalysisServerException.badRequest(String.format(
                     "Requested number of destinations (%s) exceeds limit (%s). " +
                             "Set smaller custom geographic bounds or a lower zoom level.",
-                            grid.height * grid.width, MAX_GRID_CELLS
+                            extents.height * extents.width, MAX_GRID_CELLS
             ));
         }
     }

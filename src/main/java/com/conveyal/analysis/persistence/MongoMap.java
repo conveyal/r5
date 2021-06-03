@@ -170,7 +170,7 @@ public class MongoMap<V extends Model> {
     }
 
     public V put(String key, V value) {
-        if (key != value._id) throw AnalysisServerException.badRequest("ID does not match");
+        if (!key.equals(value._id)) throw AnalysisServerException.badRequest("ID does not match");
         return put(value, null);
     }
 

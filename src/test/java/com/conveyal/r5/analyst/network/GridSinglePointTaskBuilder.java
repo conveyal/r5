@@ -102,11 +102,11 @@ public class GridSinglePointTaskBuilder {
 
         // In a single point task, the grid of destinations is given with these fields, not from the pointset object.
         // The destination point set (containing the opportunity densities) must then match these same dimensions.
-        task.zoom = grid.zoom;
-        task.north = grid.north;
-        task.west = grid.west;
-        task.width = grid.width;
-        task.height = grid.height;
+        task.zoom = grid.extents.zoom;
+        task.north = grid.extents.north;
+        task.west = grid.extents.west;
+        task.width = grid.extents.width;
+        task.height = grid.extents.height;
 
         return this;
     }

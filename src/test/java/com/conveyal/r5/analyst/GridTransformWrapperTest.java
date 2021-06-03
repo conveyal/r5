@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,11 +17,11 @@ class GridTransformWrapperTest {
     void testTwoAdjacentGrids () {
 
         // Two grids side by side, right one bigger than than the left, with top 20 pixels lower
-        Grid leftGrid = new Grid(10, 200, 300, 1000, 2000);
-        Grid rightGrid = new Grid(10, 300, 400, 1020, 2200);
+        Grid leftGrid = new Grid(2000, 1000, 200, 300, 10);
+        Grid rightGrid = new Grid(2200, 1020, 300, 400, 10);
 
         // One minimum bounding grid exactly encompassing the other two.
-        Grid superGrid = new Grid(10, 500, 400, 1000, 2000);
+        Grid superGrid = new Grid(2000, 1000, 500, 400, 10);
 
         // Make a column of pixel weights 2 pixels wide and 26 pixels high.
         List<Grid.PixelWeight> weights = new ArrayList<>();

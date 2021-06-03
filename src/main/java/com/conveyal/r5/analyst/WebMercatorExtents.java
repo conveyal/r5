@@ -26,10 +26,22 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class WebMercatorExtents {
 
+    /** The pixel number of the westernmost pixel (smallest x value). */
     public final int west;
+
+    /**
+     * The pixel number of the northernmost pixel (smallest y value in web Mercator, because y increases from north to
+     * south in web Mercator).
+     */
     public final int north;
+
+    /** Width in web Mercator pixels */
     public final int width;
+
+    /** Height in web Mercator pixels */
     public final int height;
+
+    /** Web mercator zoom level. */
     public final int zoom;
 
     public WebMercatorExtents (int west, int north, int width, int height, int zoom) {

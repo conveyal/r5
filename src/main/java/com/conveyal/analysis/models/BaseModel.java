@@ -7,6 +7,9 @@ public class BaseModel {
     // Can retrieve `createdAt` from here
     public ObjectId _id = new ObjectId();
 
+    // For version management. ObjectId's contain a timestamp, so can retrieve `updatedAt` from here.
+    public ObjectId nonce = new ObjectId();
+
     public String createdBy = null;
     public String updatedBy = null;
 

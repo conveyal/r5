@@ -18,7 +18,6 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
@@ -286,7 +285,7 @@ public class SpatialDatasetController implements HttpController {
      * Handle many types of spatial upload.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
-    private void handleUpload(Request req, Response res) {
+    private SpatialDatasetSource handleUpload(Request req, Response res) {
         final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         final Map<String, List<FileItem>> formFields;
         try {
@@ -301,9 +300,12 @@ public class SpatialDatasetController implements HttpController {
         final String sourceName = getFormField(formFields, "Name", true);
         final String regionId = getFormField(formFields, "regionId", true);
 
+        // TODO tracking
+
+        // TODO move to storage
+
         SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName).withRegion(regionId);
 
-        // TODO tracking
         final List<FileItem> fileItems;
         final SourceFormat uploadFormat;
         try {
@@ -311,51 +313,30 @@ public class SpatialDatasetController implements HttpController {
             // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
             fileItems = formFields.remove("files");
             uploadFormat = detectUploadFormatAndValidate(fileItems);
-            parameters = extractStringParameters(formFields);
+
+            if (uploadFormat == SourceFormat.GRID) {
+                // TODO source.fromGrids(fileItems);
+            } else if (uploadFormat == SourceFormat.SHAPEFILE) {
+                source.fromShapefile(fileItems);
+            } else if (uploadFormat == SourceFormat.CSV) {
+                // TODO source.fromCsv(fileItems);
+            } else if (uploadFormat == SourceFormat.GEOJSON) {
+                // TODO source.fromGeojson(fileItems);
+            }
+
+            spatialSourceCollection.insert(source);
+
         } catch (Exception e) {
             // TODO tracking
+            throw new AnalysisServerException("Problem reading files");
         }
 
         LOG.info("Handling uploaded {} file", uploadFormat);
 
-        if (uploadFormat == SourceFormat.GRID) {
 
-        } else if (uploadFormat == SourceFormat.SHAPEFILE) {
-            processShapefile(fileItems);
-        } else if (uploadFormat == SourceFormat.CSV) {
 
-        } else if (uploadFormat == SourceFormat.GEOJSON) {
+        return source;
 
-        }
-
-        // TODO move to storage
-    }
-
-    /**
-     * Given pre-parsed multipart POST data containing some text fields, pull those fields out into a simple String
-     * Map to simplify later use, performing some validation in the process.
-     * All FileItems are expected to be form fields, not uploaded files, and all items should have only a single subitem
-     * which can be understood as a UTF-8 String.
-     */
-    private Map<String, String> extractStringParameters(Map<String, List<FileItem>> formFields) {
-        // All other keys should be for String parameters.
-        Map<String, String> parameters = new HashMap<>();
-        formFields.forEach((key, items) -> {
-            if (items.size() != 1) {
-                LOG.error("In multipart form upload, key '{}' had {} sub-items (expected one).", key, items.size());
-            }
-            FileItem fileItem = items.get(0);
-            if (fileItem.isFormField()) {
-                try {
-                    parameters.put(key, fileItem.getString("UTF-8"));
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                LOG.warn("In multipart form upload, key '{}' was not for a form field.", key);
-            }
-        });
-        return parameters;
     }
 
     private OpportunityDataset editOpportunityDataset(Request request, Response response) throws IOException {
@@ -416,11 +397,11 @@ public class SpatialDatasetController implements HttpController {
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
         InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, status);
+        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, null);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
             ignoreFields = Arrays.asList(idField, latField, lonField);
-            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, zoom, status));
+            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, zoom, null));
         }
 
         return grids;
@@ -430,21 +411,20 @@ public class SpatialDatasetController implements HttpController {
      * Create a grid from an input stream containing a binary grid file.
      * For those in the know, we can upload manually created binary grid files.
      */
-    private List<Grid> createGridsFromBinaryGridFiles(List<FileItem> uploadedFiles,
-                                                             OpportunityDatasetUploadStatus status) throws Exception {
+    private List<Grid> createGridsFromBinaryGridFiles(List<FileItem> uploadedFiles) throws Exception {
 
         List<Grid> grids = new ArrayList<>();
-        status.totalFeatures = uploadedFiles.size();
+        // TODO task size with uploadedFiles.size();
         for (FileItem fileItem : uploadedFiles) {
             Grid grid = Grid.read(fileItem.getInputStream());
             String name = fileItem.getName();
             // Remove ".grid" from the name
             if (name.contains(".grid")) name = name.split(".grid")[0];
             grid.name = name;
+            // TODO task progress
             grids.add(grid);
-            status.completedFeatures += 1;
         }
-        status.completedFeatures = status.totalFeatures;
+        // TODO mark task complete
         return grids;
     }
 
@@ -452,94 +432,8 @@ public class SpatialDatasetController implements HttpController {
      * Preconditions: fileItems must contain SHP, DBF, and PRJ files, and optionally SHX. All files should have the
      * same base name, and should not contain any other files but these three or four.
      */
-    private SpatialDatasetSource processShapefile(List<FileItem> fileItems) throws Exception {
-
-        // In the caller, we should have already verified that all files have the same base name and have an extension.
-        // Extract the relevant files: .shp, .prj, .dbf, and .shx.
-        // We need the SHX even though we're looping over every feature as they might be sparse.
-        Map<String, FileItem> filesByExtension = new HashMap<>();
-        for (FileItem fileItem : fileItems) {
-            filesByExtension.put(FilenameUtils.getExtension(fileItem.getName()).toUpperCase(), fileItem);
-        }
-
-        // Copy the shapefile component files into a temporary directory with a fixed base name.
-        File tempDir = Files.createTempDir();
-
-        File shpFile = new File(tempDir, "grid.shp");
-        filesByExtension.get("SHP").write(shpFile);
-
-        File prjFile = new File(tempDir, "grid.prj");
-        filesByExtension.get("PRJ").write(prjFile);
-
-        File dbfFile = new File(tempDir, "grid.dbf");
-        filesByExtension.get("DBF").write(dbfFile);
-
-        // The .shx file is an index. It is optional, and not needed for dense shapefiles.
-        if (filesByExtension.containsKey("SHX")) {
-            File shxFile = new File(tempDir, "grid.shx");
-            filesByExtension.get("SHX").write(shxFile);
-        }
-
-        ShapefileReader reader = new ShapefileReader(shpFile);
-        Envelope envelope = reader.wgs84Bounds();
-        checkWgsEnvelopeSize(envelope);
-
-
-        reader.getAttributeTypes();
-
-        if (uniqueNumericAttributes.size() != numericAttributes.size()) {
-            throw new IllegalArgumentException("Shapefile has duplicate numeric attributes");
-        }
-        checkPixelCount(extents, numericAttributes.size());
-
-        int total = reader.getFeatureCount();
-        if (progressListener != null) {
-            progressListener.setTotalItems(total);
-        }
-
-        AtomicInteger count = new AtomicInteger(0);
-        Map<String, Grid> grids = new HashMap<>();
-
-        reader.wgs84Stream().forEach(feat -> {
-            Geometry geom = (Geometry) feat.getDefaultGeometry();
-
-            for (Property p : feat.getProperties()) {
-                Object val = p.getValue();
-
-                if (!(val instanceof Number)) continue;
-                double numericVal = ((Number) val).doubleValue();
-                if (numericVal == 0) continue;
-
-                String attributeName = p.getName().getLocalPart();
-
-                Grid grid = grids.get(attributeName);
-                if (grid == null) {
-                    grid = new Grid(extents);
-                    grid.name = attributeName;
-                    grids.put(attributeName, grid);
-                }
-
-                if (geom instanceof Point) {
-                    Point point = (Point) geom;
-                    // already in WGS 84
-                    grid.incrementPoint(point.getY(), point.getX(), numericVal);
-                } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
-                    grid.rasterize(geom, numericVal);
-                } else {
-                    throw new IllegalArgumentException("Unsupported geometry type");
-                }
-            }
-
-            int currentCount = count.incrementAndGet();
-            if (progressListener != null) {
-                progressListener.setCompletedItems(currentCount);
-            }
-            if (currentCount % 10000 == 0) {
-                LOG.info("{} / {} features read", human(currentCount), human(total));
-            }
-        });
-        reader.close();
-        return new ArrayList<>(grids.values());
+    private void createGridsFromShapefile(List<FileItem> fileItems) throws Exception {
+        // TODO implement rasterization methods
     }
 
     /**
@@ -593,10 +487,8 @@ public class SpatialDatasetController implements HttpController {
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/opportunities", () -> {
-            sparkService.post("", this::createOpportunityDataset, toJson);
+            sparkService.post("", this::handleUpload, toJson);
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
-            sparkService.get("/region/:regionId/status", this::getRegionUploadStatuses, toJson);
-            sparkService.delete("/region/:regionId/status/:statusId", this::clearStatus, toJson);
             sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);
             sparkService.delete("/source/:sourceId", this::deleteSourceSet, toJson);
             sparkService.delete("/:_id", this::deleteOpportunityDataset, toJson);

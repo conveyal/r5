@@ -64,7 +64,7 @@ public class FileStorageController implements HttpController {
 
     /**
      * Create the metadata object used to represent a file in FileStorage. Note: this does not handle the process of
-     * storing the file itself. See `addFile` for that.
+     * storing the file itself. See `uploadFile` for that.
      */
     private FileInfo createFileInfo(Request req, Response res) throws IOException {
         FileInfo fileInfo = fileCollection.create(req, res);

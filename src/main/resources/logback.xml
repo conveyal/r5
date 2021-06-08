@@ -15,6 +15,9 @@
     <logger name="com.conveyal.osmlib" level="INFO" />
     <logger name="com.conveyal.gtfs" level="INFO" />
     <logger name="com.conveyal.r5.profile.ExecutionTimer" level="INFO"/>
+    <logger name="graphql.GraphQL" level="WARN" />
+    <logger name="org.mongodb.driver.connection" level="WARN" />
+    <logger name="org.eclipse.jetty" level="WARN" />
     <logger name="com.conveyal.r5.profile.FastRaptorWorker" level="INFO" />
 
 </configuration>

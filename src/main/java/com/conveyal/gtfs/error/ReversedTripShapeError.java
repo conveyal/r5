@@ -14,15 +14,11 @@ public class ReversedTripShapeError extends GTFSError implements Serializable {
     public final String shapeId;
 
     public ReversedTripShapeError(Trip trip) {
-        super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
+        super("trips", trip.sourceFileLine, "shape_id", Priority.HIGH, trip.trip_id);
         this.shapeId = trip.shape_id;
     }
 
     @Override public String getMessage() {
         return "Trip " + affectedEntityId + " references reversed shape " + shapeId;
-    }
-
-    @Override public Priority getPriority() {
-        return Priority.HIGH;
     }
 }

@@ -1,6 +1,6 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.kryo.InstanceCountingClassResolver;
 import com.conveyal.kryo.TIntArrayListSerializer;
 import com.conveyal.kryo.TIntIntHashMapSerializer;
@@ -37,6 +37,12 @@ import java.util.BitSet;
 public abstract class KryoNetworkSerializer {
 
     private static final Logger LOG = LoggerFactory.getLogger(KryoNetworkSerializer.class);
+
+    /**
+     * This string should be changed to a new value each time the network storage format changes.
+     * I considered using an ISO date string but that could get confusing when seen in filenames.
+     */
+    public static final String NETWORK_FORMAT_VERSION = "nv1";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 
@@ -92,8 +98,8 @@ public abstract class KryoNetworkSerializer {
         Output output = new Output(new FileOutputStream(file));
         Kryo kryo = makeKryo();
         output.write(HEADER);
-        kryo.writeObject(output, BackendVersion.instance.version);
-        kryo.writeObject(output, BackendVersion.instance.commit);
+        kryo.writeObject(output, NETWORK_FORMAT_VERSION);
+        kryo.writeObject(output, SoftwareVersion.instance.commit);
         kryo.writeObject(output, network);
         output.close();
         LOG.info("Done writing.");
@@ -115,12 +121,13 @@ public abstract class KryoNetworkSerializer {
         if (!Arrays.equals(HEADER, header)) {
             throw new RuntimeException("Unrecognized file header. Is this an R5 Kryo network?");
         }
-        String version = kryo.readObject(input, String.class);
+        String formatVersion = kryo.readObject(input, String.class);
         String commit = kryo.readObject(input, String.class);
-        LOG.info("Loading {} file saved by R5 version {} commit {}", new String(header), version, commit);
-        if (!BackendVersion.instance.version.equals(version)) {
-            throw new RuntimeException(String.format("File version %s is not compatible with this R5 version %s",
-                    version, BackendVersion.instance.version));
+        LOG.info("Loading network from file format version {}, written by R5 commit {}", formatVersion, commit);
+        if (!NETWORK_FORMAT_VERSION.equals(formatVersion)) {
+            throw new RuntimeException(
+                String.format("File format version is %s, this R5 requires %s", formatVersion, NETWORK_FORMAT_VERSION)
+            );
         }
         TransportNetwork result = kryo.readObject(input, TransportNetwork.class);
         input.close();

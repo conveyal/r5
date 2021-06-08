@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.beust.jcommander.ParameterException;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
@@ -13,8 +12,6 @@ import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -86,9 +83,7 @@ public class MultiOriginAssembler {
      *      file up to an umbrella location where a single reference to the file storage can be used to
      *      store all of them.
      */
-    public MultiOriginAssembler (
-            RegionalAnalysis regionalAnalysis, Job job, String outputBucket, FileStorage fileStorage
-    ) {
+    public MultiOriginAssembler (RegionalAnalysis regionalAnalysis, Job job, FileStorage fileStorage) {
         try {
             this.regionalAnalysis = regionalAnalysis;
             this.job = job;
@@ -114,20 +109,18 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
-                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
-                    resultWriters.add( new MultiGridResultWriter(
-                        regionalAnalysis, job.templateTask, outputBucket, fileStorage
-                    ));
+                    resultWriters.add( new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
                 }
             }
 
             if (job.templateTask.recordTimes) {
-                resultWriters.add(new TimeCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new TimeCsvResultWriter(job.templateTask, fileStorage));
             }
 
             if (job.templateTask.includePathResults) {
-                resultWriters.add(new PathCsvResultWriter(job.templateTask, outputBucket, fileStorage));
+                resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
             }
 
             checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),
@@ -144,7 +137,7 @@ public class MultiOriginAssembler {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.asString(e));
+            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.stackTraceString(e));
         }
     }
 

@@ -35,7 +35,7 @@ public class AnalysisDB {
 
         database = mongo.getDatabase(config.databaseName()).withCodecRegistry(pojoCodecRegistry);
 
-        // Reqeust that the JVM clean up database connections in all cases - exiting cleanly or by being terminated.
+        // Request that the JVM clean up database connections in all cases - exiting cleanly or by being terminated.
         // We should probably register such hooks for other components to shut down more cleanly.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Persistence.mongo.close();

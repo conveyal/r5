@@ -5,6 +5,7 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 
 /**
@@ -21,7 +22,11 @@ public class OpportunityDataset extends Model {
     /** The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived. */
     public String sourceId;
 
-    /** Bucket name on S3 where the opportunity data itself is persisted. */
+    /**
+     * Bucket name on S3 where the opportunity data itself is persisted. Deprecated: as of April 2021, the FileStorage
+     * system encapsulates how local or remote storage coordinates are derived from the FileCategory.
+     */
+    @Deprecated
     public String bucketName;
 
     /**
@@ -85,12 +90,12 @@ public class OpportunityDataset extends Model {
     @JsonIgnore
     public FileStorageKey getStorageKey () {
         String path = storageLocation(this.format.extension);
-        return new FileStorageKey(this.bucketName, path);
+        return new FileStorageKey(GRIDS, path);
     }
 
     @JsonIgnore
     public FileStorageKey getStorageKey (FileStorageFormat fileFormat) {
-        return new FileStorageKey(this.bucketName, storageLocation(fileFormat.extension));
+        return new FileStorageKey(GRIDS, storageLocation(fileFormat.extension));
     }
 
     @JsonIgnore

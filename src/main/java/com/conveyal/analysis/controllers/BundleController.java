@@ -2,7 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.Components;
+import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
@@ -46,6 +46,7 @@ import java.util.zip.ZipFile;
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.BUNDLES;
 
 /**
  * This Controller provides HTTP REST endpoints for manipulating Bundles. Bundles are sets of GTFS feeds and OSM
@@ -62,16 +63,15 @@ public class BundleController implements HttpController {
 
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
+    // FIXME The backend appears to use an osmcache purely to get a file key at which to store incoming OSM. Refactor.
     private final OSMCache osmCache;
     private final TaskScheduler taskScheduler;
-    private final String bundleBucket;
 
-    public BundleController (Components components) {
+    public BundleController (BackendComponents components) {
         this.fileStorage = components.fileStorage;
         this.gtfsCache = components.gtfsCache;
         this.osmCache = components.osmCache;
         this.taskScheduler = components.taskScheduler;
-        this.bundleBucket = components.config.bundleBucket();
     }
 
     // INTERFACE METHOD
@@ -85,10 +85,6 @@ public class BundleController implements HttpController {
             sparkService.put("/:_id", this::update, toJson);
             sparkService.delete("/:_id", this::deleteBundle, toJson);
         });
-    }
-
-    public interface Config {
-        String bundleBucket ();
     }
 
     // HTTP REQUEST HANDLERS
@@ -141,7 +137,7 @@ public class BundleController implements HttpController {
             bundle.accessGroup = req.attribute("accessGroup");
             bundle.createdBy = req.attribute("email");
         } catch (Exception e) {
-            throw AnalysisServerException.badRequest(ExceptionUtils.asString(e));
+            throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
         // ID and create/update times are assigned here when we push into Mongo.
         // FIXME Ideally we'd only set and retain the ID without inserting in Mongo,
@@ -161,6 +157,7 @@ public class BundleController implements HttpController {
                     // Process uploaded OSM.
                     bundle.osmId = new ObjectId().toString();
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
+                    // Here we perform minimal validation by loading the OSM, but don't retain the resulting MapDB.
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
                     // Number of entities in an OSM file is unknown, so derive progress from the number of bytes read.
@@ -187,10 +184,9 @@ public class BundleController implements HttpController {
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
                         File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
-                        GTFSFeed feed = new GTFSFeed(tempDbFile);
+                        GTFSFeed feed = GTFSFeed.newWritableFile(tempDbFile);
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
-                        feed.findPatterns();
 
                         // Populate the metadata while the feed is open
                         // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
@@ -264,13 +260,13 @@ public class BundleController implements HttpController {
         File manifestFile = FileUtils.createScratchFile("json");
         JsonUtil.objectMapper.writeValue(manifestFile, manifest);
 
-        FileStorageKey key = new FileStorageKey(bundleBucket, manifestFileName);
+        FileStorageKey key = new FileStorageKey(BUNDLES, manifestFileName);
         fileStorage.moveIntoStorage(key, manifestFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
         Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
-        FileStorageKey key = new FileStorageKey(bundleBucket, bundle._id + ".zip");
+        FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
         fileStorage.delete(key);
 
         return bundle;

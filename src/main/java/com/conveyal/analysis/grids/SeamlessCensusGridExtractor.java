@@ -1,5 +1,6 @@
 package com.conveyal.analysis.grids;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.data.census.S3SeamlessSource;
 import com.conveyal.data.geobuf.GeobufFeature;
@@ -20,7 +21,7 @@ import java.util.Set;
  * Fetch data from the seamless-census s3 buckets and convert it from block-level vector data (polygons)
  * to raster opportunity density data (grids).
  */
-public class SeamlessCensusGridExtractor {
+public class SeamlessCensusGridExtractor implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(SeamlessCensusGridExtractor.class);
 
@@ -34,17 +35,20 @@ public class SeamlessCensusGridExtractor {
         String seamlessCensusBucket ();
     }
 
-    private static S3SeamlessSource source;
+    private final S3SeamlessSource source;
 
-    // TODO make this into a non-static Component
-    public static void configureStatically (Config config) {
+    /** A human-readable name for the source of extracted data, e.g. for distinguishing between different years. */
+    public final String sourceName;
+
+    public SeamlessCensusGridExtractor (Config config) {
         source = new S3SeamlessSource(config.seamlessCensusRegion(), config.seamlessCensusBucket());
+        sourceName = config.seamlessCensusBucket();
     }
 
     /**
      * Retrieve data for bounds and save to a bucket under a given key
      */
-    public static List<Grid> censusDataForBounds (Bounds bounds, int zoom) throws IOException {
+    public List<Grid> censusDataForBounds (Bounds bounds, int zoom) throws IOException {
         long startTime = System.currentTimeMillis();
 
         // All the features are buffered in a Map in memory. This could be problematic on large areas.
@@ -84,4 +88,5 @@ public class SeamlessCensusGridExtractor {
 
         return new ArrayList<>(grids.values());
     }
+
 }

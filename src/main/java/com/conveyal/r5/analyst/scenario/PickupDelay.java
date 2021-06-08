@@ -171,7 +171,7 @@ public class PickupDelay extends Modification {
             }
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.
-            errors.add(ExceptionUtils.asString(e));
+            errors.add(ExceptionUtils.stackTraceString(e));
         }
         return errors.size() > 0;
     }

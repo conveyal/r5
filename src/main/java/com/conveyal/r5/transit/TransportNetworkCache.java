@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.analysis.BackendVersion;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -32,6 +31,8 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import static com.conveyal.file.FileCategory.BUNDLES;
+
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
@@ -53,7 +54,6 @@ public class TransportNetworkCache {
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
     private final OSMCache osmCache;
-    private final String bucket;
 
     /**
      * A table of already seen scenarios, avoiding downloading them repeatedly from S3 and allowing us to replace
@@ -62,10 +62,9 @@ public class TransportNetworkCache {
     private final ScenarioCache scenarioCache = new ScenarioCache();
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
-    public TransportNetworkCache(FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache, String bucket) {
+    public TransportNetworkCache (FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         this.osmCache = osmCache;
         this.gtfsCache = gtfsCache;
-        this.bucket = bucket;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
         this.fileStorage = fileStorage;
     }
@@ -122,7 +121,7 @@ public class TransportNetworkCache {
         TransportNetwork scenarioNetwork =  baseNetwork.scenarios.get(scenarioId);
         if (scenarioNetwork == null) {
             // The network for this scenario was not found in the cache. Create that scenario network and cache it.
-            LOG.info("Applying scenario to base network...");
+            LOG.debug("Applying scenario to base network...");
             // Fetch the full scenario if an ID was specified.
             Scenario scenario = resolveScenario(networkId, scenarioId);
             // Apply any scenario modifications to the network before use, performing protective copies where necessary.
@@ -131,10 +130,10 @@ public class TransportNetworkCache {
             // the InactiveTripsFilter. The solution may be to cache linked point sets based on scenario ID but always
             // apply scenarios every time.
             scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
-            LOG.info("Done applying scenario. Caching the resulting network.");
+            LOG.debug("Done applying scenario. Caching the resulting network.");
             baseNetwork.scenarios.put(scenario.id, scenarioNetwork);
         } else {
-            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenarioId);
+            LOG.debug("Reusing cached TransportNetwork for scenario {}.", scenarioId);
         }
         return scenarioNetwork;
     }
@@ -144,11 +143,11 @@ public class TransportNetworkCache {
     }
 
     private String getR5NetworkFilename(String networkId) {
-        return networkId + "_" + BackendVersion.instance.version + ".dat";
+        return String.format("%s_%s.dat", networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
     }
 
     private FileStorageKey getR5NetworkFileStorageKey (String networkId) {
-        return new FileStorageKey(bucket, getR5NetworkFilename(networkId));
+        return new FileStorageKey(BUNDLES, getR5NetworkFilename(networkId));
     }
 
     /**
@@ -159,9 +158,9 @@ public class TransportNetworkCache {
         TransportNetwork network;
 
         // Check if we have a new-format bundle with a JSON manifest.
-        FileStorageKey manifestFileKey = new FileStorageKey(bucket,GTFSCache.cleanId(networkId) + ".json");
+        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
         if (fileStorage.exists(manifestFileKey)) {
-            LOG.info("Detected new-format bundle with manifest.");
+            LOG.debug("Detected new-format bundle with manifest.");
             network = buildNetworkFromManifest(networkId);
         } else {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
@@ -194,7 +193,7 @@ public class TransportNetworkCache {
     private TransportNetwork buildNetworkFromBundleZip (String networkId) {
         // The location of the inputs that will be used to build this graph
         File dataDirectory = FileUtils.createScratchDirectory();
-        FileStorageKey zipKey = new FileStorageKey(bucket,networkId + ".zip");
+        FileStorageKey zipKey = new FileStorageKey(BUNDLES, networkId + ".zip");
         File zipFile = fileStorage.getFile(zipKey);
 
         try {
@@ -215,7 +214,7 @@ public class TransportNetworkCache {
             zis.close();
         } catch (Exception e) {
             // TODO delete cache dir which is probably corrupted.
-            LOG.info("Error retrieving transportation network input files", e);
+            LOG.warn("Error retrieving transportation network input files", e);
             return null;
         }
 
@@ -240,7 +239,7 @@ public class TransportNetworkCache {
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
     private TransportNetwork buildNetworkFromManifest (String networkId) {
-        FileStorageKey manifestFileKey = new FileStorageKey(bucket, getManifestFilename(networkId));
+        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, getManifestFilename(networkId));
         File manifestFile = fileStorage.getFile(manifestFileKey);
         BundleManifest manifest;
 
@@ -299,20 +298,20 @@ public class TransportNetworkCache {
      * This should always return a usable TransportNetwork not null, and should throw an exception whenever it can't.
      */
     private @Nonnull TransportNetwork loadNetwork(String networkId) throws TransportNetworkException {
-        LOG.info(
-            "Finding or building a TransportNetwork for ID {} and R5 version {}",
-            networkId, BackendVersion.instance.version
+        LOG.debug(
+            "Finding or building a TransportNetwork for ID {} with file format version {}.",
+            networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION
         );
         try {
             FileStorageKey r5Key = getR5NetworkFileStorageKey(networkId);
             if (fileStorage.exists(r5Key)) {
                 File networkFile = fileStorage.getFile(r5Key);
-                LOG.info("Loading cached transport network at {}", networkFile);
+                LOG.debug("Loading cached transport network at {}", networkFile);
                 return KryoNetworkSerializer.read(networkFile);
             } else {
-                LOG.info(
-                    "Cached transport network for id {} and R5 version {} was not found. Building from scratch.",
-                    networkId, BackendVersion.instance.version
+                LOG.debug(
+                    "Cached transport network for ID {} with file format version {} was not found. Building from scratch.",
+                    networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION
                 );
                 return buildNetwork(networkId);
             }
@@ -355,10 +354,10 @@ public class TransportNetworkCache {
         // If a scenario ID is supplied, it overrides any supplied full scenario.
         // There is no intermediate cache here for the scenario objects - we read them from disk files.
         // This is not a problem, they're only read once before cacheing the resulting scenario-network.
-        FileStorageKey scenarioFileKey = new FileStorageKey(bucket, getScenarioFilename(networkId, scenarioId));
+        FileStorageKey scenarioFileKey = new FileStorageKey(BUNDLES, getScenarioFilename(networkId, scenarioId));
         try {
             File scenarioFile = fileStorage.getFile(scenarioFileKey);
-            LOG.info("Loading scenario from disk file {}", scenarioFile);
+            LOG.debug("Loading scenario from disk file {}", scenarioFile);
             return JsonUtilities.lenientObjectMapper.readValue(scenarioFile, Scenario.class);
         } catch (Exception e) {
             LOG.error("Could not fetch scenario {} or read it from from disk: {}", scenarioId, e.toString());

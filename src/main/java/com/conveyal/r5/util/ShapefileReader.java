@@ -14,6 +14,8 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
+import org.opengis.feature.type.AttributeType;
 import org.opengis.filter.Filter;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
@@ -24,9 +26,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Spliterator;
 import java.util.Spliterators;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -87,6 +91,15 @@ public class ShapefileReader {
 
     public ReferencedEnvelope getBounds () throws IOException {
         return source.getBounds();
+    }
+
+    public List<String> numericAttributes () {
+        return features.getSchema()
+                .getAttributeDescriptors()
+                .stream()
+                .filter(d -> Number.class.isInstance(d.getType().getBinding()))
+                .map(AttributeDescriptor::getLocalName)
+                .collect(Collectors.toList());
     }
 
     public double getAreaSqKm () throws IOException, TransformException, FactoryException {

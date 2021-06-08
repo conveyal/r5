@@ -114,7 +114,9 @@ public abstract class AsyncLoader<K,V> {
                 enqueueLoadTask = true;
             }
         }
-        // TODO maybe use futures and get() with timeout, so fast scenario applications don't require re-polling
+        // Here we could potentially use futures and get() with timeout, so fast scenario applications don't require
+        // re-polling. We should probably unify the progress tracking, exception handling, and thread pool management
+        // with taskScheduler. Async loading could be kicked off once per key, then fail fast on subsequent requests.
         // Enqueue task outside the above block (synchronizing the fewest lines possible).
         if (enqueueLoadTask) {
             executor.execute(() -> {
@@ -125,10 +127,10 @@ public abstract class AsyncLoader<K,V> {
                         map.put(key, new LoaderState(Status.PRESENT, null, 100, value));
                     }
                 } catch (Throwable t) {
-                    // It's essential to trap Throwable rather than just Exception.
-                    // Otherwise the executor threads can be killed by any Error that happens, stalling the executor.
+                    // It's essential to trap Throwable rather than just Exception. Otherwise the executor
+                    // threads can be killed by any Error that happens, stalling the executor.
                     setError(key, t);
-                    LOG.error(ExceptionUtils.asString(t));
+                    LOG.error("Async load failed: " + ExceptionUtils.stackTraceString(t));
                 }
             });
         }

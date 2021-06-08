@@ -90,7 +90,7 @@ public class WorkerProxyController implements HttpController {
             return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
         } catch (Exception exception) {
             response.status(HttpStatus.BAD_GATEWAY_502);
-            response.body(ExceptionUtils.asString(exception));
+            response.body(ExceptionUtils.stackTraceString(exception));
             return response;
         } finally {
 

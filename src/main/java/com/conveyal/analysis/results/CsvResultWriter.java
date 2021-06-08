@@ -53,9 +53,9 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
      * "origin", "destination", and the supplied indicator.
      * FIXME it's strange we're manually passing injectable components into objects not wired up at application construction.
      */
-    CsvResultWriter (RegionalTask task, String outputBucket, FileStorage fileStorage) throws IOException {
+    CsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
         super(fileStorage);
-        super.prepare(task.jobId, outputBucket);
+        super.prepare(task.jobId);
         this.fileName = task.jobId + "_" + resultType() +".csv";
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
         csvWriter = new CsvWriter(bufferedWriter, ',');

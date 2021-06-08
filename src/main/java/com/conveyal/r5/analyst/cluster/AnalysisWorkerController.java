@@ -87,8 +87,6 @@ public class AnalysisWorkerController {
     public static byte[] reportTaskErrors(Response response, List<TaskError> taskErrors) throws IOException {
         response.status(HttpStatus.BAD_REQUEST_400);
         response.header("Content-Type", "application/json");
-        // TODO expand task errors, this just logs the memory address of the list.
-        LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         addJsonToGrid(byteArrayOutputStream, null, taskErrors, Collections.emptyList(), null);
         byteArrayOutputStream.close();

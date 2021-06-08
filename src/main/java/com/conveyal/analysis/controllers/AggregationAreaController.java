@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 
 /**
@@ -52,22 +53,13 @@ public class AggregationAreaController implements HttpController {
     private static int MAX_FEATURES = 100;
 
     private final FileStorage fileStorage;
-    private final Config config;
 
-    public interface Config {
-        // TODO this could be eliminated by hard-wiring file types to bucket subdirectories in the FileStorage.
-        String gridBucket ();
-    }
-
-    public AggregationAreaController (FileStorage fileStorage, Config config) {
+    public AggregationAreaController (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
-        this.config = config;
     }
-
-
 
     private FileStorageKey getStoragePath (AggregationArea area) {
-        return new FileStorageKey(config.gridBucket(), area.getS3Key());
+        return new FileStorageKey(GRIDS, area.getS3Key());
     }
 
     /**

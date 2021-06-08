@@ -2,6 +2,7 @@ package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.WorkerLauncher;
+import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
@@ -41,6 +42,7 @@ import static com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent.St
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUESTED;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
+import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -85,8 +87,6 @@ public class Broker {
         // TODO Really these first two should be WorkerLauncher / Compute config
         boolean offline ();
         int maxWorkers ();
-        String resultsBucket ();
-        String bundleBucket ();
         boolean testTaskRedelivery ();
     }
 
@@ -171,9 +171,7 @@ public class Broker {
         // TODO encapsulate MultiOriginAssemblers in a new Component
         // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
         // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
-        MultiOriginAssembler assembler = new MultiOriginAssembler(
-                regionalAnalysis, job, config.resultsBucket(), fileStorage
-        );
+        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {
@@ -209,7 +207,7 @@ public class Broker {
         // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
         templateTask.scenario = null;
         String fileName = String.format("%s_%s.json", regionalAnalysis.bundleId, scenario.id);
-        FileStorageKey fileStorageKey = new FileStorageKey(config.bundleBucket(), fileName);
+        FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);
@@ -271,7 +269,7 @@ public class Broker {
         // If workers have already been started up, don't repeat the operation.
         if (recentlyRequestedWorkers.containsKey(category)
                 && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
-            LOG.info("Workers still starting on {}, not starting more", category);
+            LOG.debug("Workers still starting on {}, not starting more", category);
             return;
         }
 
@@ -465,8 +463,8 @@ public class Broker {
             assembler.handleMessage(workResult);
             markTaskCompleted(job, workResult.taskId);
         } catch (Throwable t) {
-            LOG.error("Error assembling results for job {}", job.jobId);
-            recordJobError(job, ExceptionUtils.asString(t));
+            recordJobError(job, ExceptionUtils.stackTraceString(t));
+            eventBus.send(new ErrorEvent(t));
             return;
         }
         // When non-error results are received for several tasks we assume the regional analysis is running smoothly.

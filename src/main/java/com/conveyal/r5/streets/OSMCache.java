@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.osmlib.OSM;
@@ -17,19 +18,13 @@ import java.util.concurrent.ExecutionException;
  */
 public class OSMCache {
 
-    private final String bucket;
     private final FileStorage fileStorage;
-
-    public interface Config {
-        String bundleBucket ();
-    }
 
     /**
      * Construct a new OSMCache.
      * If bucket is null, we will work offline (will not create an S3 client, avoiding need to set an AWS region).
      */
-    public OSMCache (FileStorage fileStorage, Config config) {
-        this.bucket = config.bundleBucket();
+    public OSMCache (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
 
@@ -44,7 +39,7 @@ public class OSMCache {
     public FileStorageKey getKey (String id) {
         // FIXME Transforming IDs each time they're used seems problematic. They should probably only be validated here.
         String cleanId = cleanId(id);
-        return new FileStorageKey(bucket, cleanId + ".pbf");
+        return new FileStorageKey(FileCategory.BUNDLES, cleanId + ".pbf");
     }
 
     /** This should always return an OSM object, not null. If something prevents that, it should throw an exception. */

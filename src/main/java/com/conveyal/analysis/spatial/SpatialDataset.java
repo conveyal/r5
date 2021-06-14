@@ -103,8 +103,8 @@ public class SpatialDataset {
     private static void verifyBaseNamesSame (List<FileItem> fileItems) {
         String firstBaseName = null;
         for (FileItem fileItem : fileItems) {
-            // Ignore .shp.xml files
-            if (FilenameUtils.getExtension(fileItem.getName()).equals(".xml")) continue;
+            // Ignore .shp.xml files, which will fail the verifyBaseNamesSame check
+            if ("xml".equalsIgnoreCase(FilenameUtils.getExtension(fileItem.getName()))) continue;
             String baseName = FilenameUtils.getBaseName(fileItem.getName());
             if (firstBaseName == null) {
                 firstBaseName = baseName;

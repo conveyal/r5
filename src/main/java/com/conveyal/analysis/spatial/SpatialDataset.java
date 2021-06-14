@@ -1,6 +1,7 @@
 package com.conveyal.analysis.spatial;
 
 import com.conveyal.analysis.AnalysisServerException;
+
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FilenameUtils;
@@ -14,12 +15,9 @@ import java.util.Set;
  */
 public class SpatialDataset {
 
+    // TODO merge with FileCategory?
     public enum SourceFormat {
         SHAPEFILE, CSV, GEOJSON, GRID, SEAMLESS
-    }
-
-    public enum GeometryType {
-        LINE, POLYGON, POINT, GRID
     }
 
     /**
@@ -36,6 +34,12 @@ public class SpatialDataset {
         }
 
         Set<String> fileExtensions = extractFileExtensions(fileItems);
+
+        if (fileExtensions.contains("ZIP")) {
+            throw AnalysisServerException.fileUpload("Upload of spatial .zip files not yet supported");
+            // TODO unzip
+            // detectUploadFormatAndValidate(unzipped)
+        }
 
         // There was at least one file with an extension, the set must now contain at least one extension.
         if (fileExtensions.isEmpty()) {

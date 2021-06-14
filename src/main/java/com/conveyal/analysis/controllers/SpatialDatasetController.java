@@ -21,17 +21,14 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
-import com.conveyal.r5.util.ShapefileReader;
-import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
-import org.apache.commons.io.FilenameUtils;
 import org.json.simple.JSONObject;
-import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -46,8 +43,8 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -57,8 +54,9 @@ import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat;
 import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.analyst.progress.WorkProductType.SPATIAL_DATASET_SOURCE;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -72,7 +70,7 @@ public class SpatialDatasetController implements HttpController {
     // Component Dependencies
 
     private final FileStorage fileStorage;
-    private final AnalysisCollection spatialSourceCollection;
+    private final AnalysisCollection<SpatialDatasetSource> spatialSourceCollection;
     private final TaskScheduler taskScheduler;
     private final SeamlessCensusGridExtractor extractor;
 
@@ -300,43 +298,41 @@ public class SpatialDatasetController implements HttpController {
         final String sourceName = getFormField(formFields, "Name", true);
         final String regionId = getFormField(formFields, "regionId", true);
 
-        // TODO tracking
-
-        // TODO move to storage
-
+        // Initialize model object
         SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName).withRegion(regionId);
 
-        final List<FileItem> fileItems;
-        final SourceFormat uploadFormat;
-        try {
-            // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
-            // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
-            fileItems = formFields.remove("files");
-            uploadFormat = detectUploadFormatAndValidate(fileItems);
+        taskScheduler.enqueue(Task.create("Storing " + sourceName)
+            .forUser(userPermissions)
+            .withWorkProduct(SPATIAL_DATASET_SOURCE, source._id.toString(), regionId)
+            .withAction(progressListener -> {
 
-            if (uploadFormat == SourceFormat.GRID) {
-                // TODO source.fromGrids(fileItems);
-            } else if (uploadFormat == SourceFormat.SHAPEFILE) {
-                source.fromShapefile(fileItems);
-            } else if (uploadFormat == SourceFormat.CSV) {
-                // TODO source.fromCsv(fileItems);
-            } else if (uploadFormat == SourceFormat.GEOJSON) {
-                // TODO source.fromGeojson(fileItems);
-            }
+                // Loop through uploaded files, registering the extensions and writing to storage (with filenames that
+                // correspond to the source id)
+                List<File> files = new ArrayList<>();
+                final List<FileItem> fileItems = formFields.remove("files");
+                for (FileItem fileItem : fileItems) {
+                    File file = ((DiskFileItem) fileItem).getStoreLocation();
+                    String filename = file.getName();
+                    String extension = filename.substring(filename.lastIndexOf(".") + 1).toUpperCase(Locale.ROOT);
+                    FileStorageKey key = new FileStorageKey(RESOURCES, source._id.toString(), extension);
+                    fileStorage.moveIntoStorage(key, file);
+                    files.add(fileStorage.getFile(key));
+                }
 
-            spatialSourceCollection.insert(source);
-
-        } catch (Exception e) {
-            // TODO tracking
-            throw new AnalysisServerException("Problem reading files");
-        }
-
-        LOG.info("Handling uploaded {} file", uploadFormat);
-
-
-
+                progressListener.beginTask("Detecting format", 1);
+                final SourceFormat uploadFormat;
+                try {
+                    // Validate inputs, which will throw an exception if there's anything wrong with them.
+                    uploadFormat = detectUploadFormatAndValidate(fileItems);
+                    LOG.info("Handling uploaded {} file", uploadFormat);
+                } catch (Exception e) {
+                    throw AnalysisServerException.fileUpload("Problem reading uploaded spatial files" + e.getMessage());
+                }
+                progressListener.beginTask("Validating files", 1);
+                source.validateAndSetDetails(uploadFormat, files);
+                spatialSourceCollection.insert(source);
+            }));
         return source;
-
     }
 
     private OpportunityDataset editOpportunityDataset(Request request, Response response) throws IOException {
@@ -486,7 +482,7 @@ public class SpatialDatasetController implements HttpController {
 
     @Override
     public void registerEndpoints (spark.Service sparkService) {
-        sparkService.path("/api/opportunities", () -> {
+        sparkService.path("/api/spatial", () -> {
             sparkService.post("", this::handleUpload, toJson);
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
             sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);

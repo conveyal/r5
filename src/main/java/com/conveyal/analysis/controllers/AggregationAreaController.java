@@ -7,6 +7,7 @@ import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.SpatialDatasetSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.analysis.spatial.Polygons;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
@@ -14,6 +15,7 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ShapefileReader;
+import com.google.common.base.Preconditions;
 import com.google.common.io.Files;
 import org.apache.commons.fileupload.FileItem;
 import org.json.simple.JSONObject;
@@ -63,6 +65,7 @@ public class AggregationAreaController implements HttpController {
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
     private final AnalysisCollection aggregationAreaCollection;
+    private final AnalysisCollection spatialSourceCollection;
 
     public AggregationAreaController (
             FileStorage fileStorage,
@@ -72,6 +75,7 @@ public class AggregationAreaController implements HttpController {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
+        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialDatasetSource.class);
     }
 
     private FileStorageKey getStoragePath (AggregationArea area) {
@@ -91,45 +95,16 @@ public class AggregationAreaController implements HttpController {
         Map<String, List<FileItem>> query = HttpUtils.getRequestFiles(req.raw());
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         String maskName = query.get("name").get(0).getString("UTF-8");
-        String regionId = req.params("regionId");
+        String nameProperty = query.get("nameProperty") == null ? null : query.get("nameProperty").get(0).getString(
+                "UTF-8");
+        String sourceId = query.get("sourceId").get(0).getString("UTF-8");
 
-        SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, maskName)
-                .withRegion(regionId);
+        // 1. Get shapefile from storage and read its features. ========================================================
+        SpatialDatasetSource source = (SpatialDatasetSource) spatialSourceCollection.findById(sourceId);
+        Preconditions.checkArgument(source.geometryWrapper instanceof  Polygons, "Only polygons can be converted to " +
+                "aggregation areas.");
+        File shpFile = fileStorage.getFile(source.storageKey());
 
-        // 1. Extract relevant files: .shp, .prj, .dbf, and .shx. ======================================================
-        Map<String, FileItem> filesByName = query.get("files").stream()
-                .collect(Collectors.toMap(FileItem::getName, f -> f));
-
-        String fileName = filesByName.keySet().stream().filter(f -> f.endsWith(".shp")).findAny().orElse(null);
-        if (fileName == null) {
-            throw AnalysisServerException.fileUpload("Shapefile upload must contain .shp, .prj, and .dbf");
-        }
-        String baseName = fileName.substring(0, fileName.length() - 4);
-
-        if (!filesByName.containsKey(baseName + ".shp") ||
-                !filesByName.containsKey(baseName + ".prj") ||
-                !filesByName.containsKey(baseName + ".dbf")) {
-            throw AnalysisServerException.fileUpload("Shapefile upload must contain .shp, .prj, and .dbf");
-        }
-
-        File tempDir = Files.createTempDir();
-
-        File shpFile = new File(tempDir, "grid.shp");
-        filesByName.get(baseName + ".shp").write(shpFile);
-
-        File prjFile = new File(tempDir, "grid.prj");
-        filesByName.get(baseName + ".prj").write(prjFile);
-
-        File dbfFile = new File(tempDir, "grid.dbf");
-        filesByName.get(baseName + ".dbf").write(dbfFile);
-
-        // shx is optional, not needed for dense shapefiles
-        if (filesByName.containsKey(baseName + ".shx")) {
-            File shxFile = new File(tempDir, "grid.shx");
-            filesByName.get(baseName + ".shx").write(shxFile);
-        }
-
-        // 2. Read features ============================================================================================
         ShapefileReader reader = null;
         List<SimpleFeature> features;
         try {
@@ -141,16 +116,15 @@ public class AggregationAreaController implements HttpController {
 
         Map<String, Geometry> areas = new HashMap<>();
 
-        boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
         String zoomString = query.get("zoom") == null ? null : query.get("zoom").get(0).getString();
         final int zoom = parseZoom(zoomString);
 
-        if (!unionRequested && features.size() > MAX_FEATURES) {
+        if (nameProperty != null && features.size() > MAX_FEATURES) {
             throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +
                     "which exceeds the limit of {1}", features.size(), MAX_FEATURES));
         }
 
-        if (unionRequested) {
+        if (nameProperty == null) {
             // Union (single combined aggregation area) requested
             List<Geometry> geometries = features.stream().map(f -> (Geometry) f.getDefaultGeometry()).collect(Collectors.toList());
             UnaryUnionOp union = new UnaryUnionOp(geometries);
@@ -158,7 +132,6 @@ public class AggregationAreaController implements HttpController {
             areas.put(maskName, union.union());
         } else {
             // Don't union. Name each area by looking up its value for the name property in the request.
-            String nameProperty = query.get("nameProperty").get(0).getString("UTF-8");
             features.forEach(f -> areas.put(readProperty(f, nameProperty), (Geometry) f.getDefaultGeometry()));
         }
 
@@ -169,7 +142,7 @@ public class AggregationAreaController implements HttpController {
                 // TODO move below into .withAction()
         );
 
-        // 3. Convert to raster grids, then store them. ================================================================
+        // 2. Convert to raster grids, then store them. ================================================================
         areas.forEach((String name, Geometry geometry) -> {
             if (geometry == null) throw new AnalysisServerException("Invalid geometry uploaded.");
             Envelope env = geometry.getEnvelopeInternal();
@@ -188,7 +161,6 @@ public class AggregationAreaController implements HttpController {
                 maskGrid.write(os);
                 os.close();
 
-                // Create the aggregation area before generating the S3 key so that the `_id` is generated
                 aggregationAreaCollection.insert(aggregationArea);
                 aggregationAreas.add(aggregationArea);
 
@@ -197,7 +169,6 @@ public class AggregationAreaController implements HttpController {
                 throw new AnalysisServerException("Error processing/uploading aggregation area");
             }
 
-            tempDir.delete();
         });
 
         return aggregationAreas;

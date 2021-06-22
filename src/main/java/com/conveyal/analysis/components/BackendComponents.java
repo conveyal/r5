@@ -7,6 +7,7 @@ import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.FileStorageController;
+import com.conveyal.analysis.controllers.GTFSController;
 import com.conveyal.analysis.controllers.GTFSGraphQLController;
 import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
@@ -89,6 +90,7 @@ public abstract class BackendComponents {
                 new ModificationController(),
                 new ProjectController(),
                 new GTFSGraphQLController(gtfsCache),
+                new GTFSController(gtfsCache),
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),

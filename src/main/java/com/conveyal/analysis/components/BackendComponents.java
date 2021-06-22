@@ -14,6 +14,7 @@ import com.conveyal.analysis.controllers.ModificationController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
+import com.conveyal.analysis.controllers.SpatialDatasetController;
 import com.conveyal.analysis.controllers.TimetableController;
 import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
@@ -102,7 +103,8 @@ public abstract class BackendComponents {
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
-                new GtfsTileController(gtfsCache)
+                new GtfsTileController(gtfsCache),
+                new SpatialDatasetController(fileStorage, database, taskScheduler, censusExtractor)
         );
     }
 

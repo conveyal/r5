@@ -156,9 +156,11 @@ public class ShapefileReader {
                 .getAttributeDescriptors()
                 .forEach(d -> {
                     String attributeName = d.getLocalName();
-                    AttributeType type = d.getType().getSuper();
-                    attributes.add(new SpatialAttribute(attributeName, type));
-                    uniqueAttributes.add(attributeName);
+                    AttributeType type = d.getType();
+                    if (type != null) {
+                        attributes.add(new SpatialAttribute(attributeName, type));
+                        uniqueAttributes.add(attributeName);
+                    }
                 });
         if (attributes.size() != uniqueAttributes.size()) {
             throw new AnalysisServerException("Shapefile has duplicate attributes.");

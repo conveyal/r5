@@ -1,9 +1,9 @@
 package com.conveyal.analysis.spatial;
 
 public abstract class GeometryWrapper {
-    int featureCount;
+    public int featureCount;
 
-    public GeometryWrapper (int featureCount) {
+    GeometryWrapper (int featureCount) {
         this.featureCount = featureCount;
     }
 

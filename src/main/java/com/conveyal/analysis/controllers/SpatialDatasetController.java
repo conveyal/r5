@@ -295,7 +295,7 @@ public class SpatialDatasetController implements HttpController {
         }
 
         // Parse required fields. Will throw a ServerException on failure.
-        final String sourceName = getFormField(formFields, "Name", true);
+        final String sourceName = getFormField(formFields, "sourceName", true);
         final String regionId = getFormField(formFields, "regionId", true);
 
         // Initialize model object
@@ -309,13 +309,14 @@ public class SpatialDatasetController implements HttpController {
                 // Loop through uploaded files, registering the extensions and writing to storage (with filenames that
                 // correspond to the source id)
                 List<File> files = new ArrayList<>();
-                final List<FileItem> fileItems = formFields.remove("files");
+                final List<FileItem> fileItems = formFields.remove("sourceFiles");
                 for (FileItem fileItem : fileItems) {
-                    File file = ((DiskFileItem) fileItem).getStoreLocation();
-                    String filename = file.getName();
+                    String filename = fileItem.getName();
                     String extension = filename.substring(filename.lastIndexOf(".") + 1).toUpperCase(Locale.ROOT);
                     FileStorageKey key = new FileStorageKey(RESOURCES, source._id.toString(), extension);
-                    fileStorage.moveIntoStorage(key, file);
+                    // FIXME writing not allowed by fileStorage.getFile contract
+                    // FIXME Investigate fileStorage.moveIntoStorage(key, file), for consistency with BundleController;
+                    fileItem.write(fileStorage.getFile(key));
                     files.add(fileStorage.getFile(key));
                 }
 

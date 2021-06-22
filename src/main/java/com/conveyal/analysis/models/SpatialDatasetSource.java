@@ -11,8 +11,11 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.locationtech.jts.geom.Envelope;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,7 +78,10 @@ public class SpatialDatasetSource extends BaseModel {
             checkWgsEnvelopeSize(envelope);
             this.attributes = reader.getAttributes();
             this.geometryWrapper = reader.getGeometryType();
-        } catch (Exception e) {
+        } catch (IOException e) {
+            throw AnalysisServerException.fileUpload("Shapefile parsing error. Ensure the files you are trying to " +
+                    "upload are valid.");
+        } catch (FactoryException | TransformException e) {
             throw AnalysisServerException.fileUpload("Shapefile transform error. Try uploading an unprojected " +
                     "(EPSG:4326) file." + e.getMessage());
         }

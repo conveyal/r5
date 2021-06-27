@@ -55,6 +55,8 @@ import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.analyst.progress.WorkProductType.SPATIAL_DATASET_SOURCE;
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -91,9 +93,9 @@ public class SpatialDatasetController implements HttpController {
         return json;
     }
 
-    private Collection<OpportunityDataset> getRegionDatasets(Request req, Response res) {
-        return Persistence.opportunityDatasets.findPermitted(
-                QueryBuilder.start("regionId").is(req.params("regionId")).get(),
+    private List<SpatialDatasetSource> getRegionDatasets(Request req, Response res) {
+        return spatialSourceCollection.findPermitted(
+                and(eq("regionId", req.params("regionId"))),
                 req.attribute("accessGroup")
         );
     }

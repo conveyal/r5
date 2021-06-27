@@ -5,7 +5,7 @@ import org.bson.types.ObjectId;
 
 public class BaseModel {
     // Can retrieve `createdAt` from here
-    public ObjectId _id = new ObjectId();
+    public final ObjectId _id = new ObjectId();
 
     // For version management. ObjectId's contain a timestamp, so can retrieve `updatedAt` from here.
     public ObjectId nonce = new ObjectId();
@@ -27,9 +27,10 @@ public class BaseModel {
         this.name = name;
     }
 
-
-    BaseModel () {
-        // No-arg
+    /**
+     * No-arg constructor required for Mongo POJO serialization
+     */
+    public BaseModel () {
+        
     }
-
 }

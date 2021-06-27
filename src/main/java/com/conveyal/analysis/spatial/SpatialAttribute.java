@@ -6,14 +6,14 @@ import org.opengis.feature.type.AttributeType;
 /** Groups the original names and user-friendly fields from shapefile attributes, CSV columns, etc. */
 public class SpatialAttribute {
     /** Name in source file */
-    public final String name;
+    public String name;
 
     /** Editable by end users */
-    String label;
+    public String label;
 
-    Type type;
+    public Type type;
 
-    enum Type {
+    private enum Type {
         NUMBER, // internally, we generally parse as doubles
         TEXT,
         GEOM,
@@ -27,6 +27,13 @@ public class SpatialAttribute {
         else if (String.class.isAssignableFrom(type.getBinding())) this.type = Type.TEXT;
         else if (Geometry.class.isAssignableFrom(type.getBinding())) this.type = Type.GEOM;
         else this.type = Type.ERROR;
+    }
+
+    /**
+     * No-arg constructor required for Mongo POJO serialization
+     */
+    public SpatialAttribute () {
+
     }
 
 }

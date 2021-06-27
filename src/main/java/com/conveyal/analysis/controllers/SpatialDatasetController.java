@@ -25,7 +25,6 @@ import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.json.simple.JSONObject;
@@ -50,7 +49,6 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat;
 import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
@@ -321,7 +319,7 @@ public class SpatialDatasetController implements HttpController {
                 }
 
                 progressListener.beginTask("Detecting format", 1);
-                final SourceFormat uploadFormat;
+                final FileStorageFormat uploadFormat;
                 try {
                     // Validate inputs, which will throw an exception if there's anything wrong with them.
                     uploadFormat = detectUploadFormatAndValidate(fileItems);

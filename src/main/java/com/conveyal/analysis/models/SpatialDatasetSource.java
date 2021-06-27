@@ -4,10 +4,9 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.spatial.FeatureSummary;
 import com.conveyal.analysis.spatial.SpatialAttribute;
-import com.conveyal.analysis.spatial.SpatialDataset;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.util.ShapefileReader;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.locationtech.jts.geom.Envelope;
@@ -20,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat.*;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 
@@ -28,8 +26,8 @@ public class SpatialDatasetSource extends BaseModel {
     public String regionId;
     /** Description editable by end users */
     public String description;
-    public SpatialDataset.SourceFormat sourceFormat;
-    /** General geometry type, with associated static methods for conversion to spatial datasets */
+    public String sourceFormat; // FIXME figure out Mongo serialization and revert to enum
+    /** General geometry type */
     public FeatureSummary features;
     /** Attributes, set only after validation (e.g. appropriate format for each feature's attributes) */
     public List<SpatialAttribute> attributes;
@@ -38,27 +36,31 @@ public class SpatialDatasetSource extends BaseModel {
         super(userPermissions, sourceName);
     }
 
-    @JsonIgnore
+    /**
+     * No-arg constructor required for Mongo POJO serialization
+     */
+    public SpatialDatasetSource () {
+        super();
+    }
+
     public static SpatialDatasetSource create (UserPermissions userPermissions, String sourceName) {
         return new SpatialDatasetSource(userPermissions, sourceName);
     }
 
-    @JsonIgnore
     public SpatialDatasetSource withRegion (String regionId) {
         this.regionId = regionId;
         return this;
     }
 
-    @JsonIgnore
-    public void validateAndSetDetails (SpatialDataset.SourceFormat uploadFormat, List<File> files) {
-        this.sourceFormat = uploadFormat;
-        if (uploadFormat == GRID) {
+    public void validateAndSetDetails (FileStorageFormat uploadFormat, List<File> files) {
+        this.sourceFormat = uploadFormat.toString();
+        if (uploadFormat == FileStorageFormat.GRID) {
             // TODO source.fromGrids(fileItems);
-        } else if (uploadFormat == SHAPEFILE) {
+        } else if (uploadFormat == FileStorageFormat.SHP) {
             this.fromShapefile(files);
-        } else if (uploadFormat == CSV) {
+        } else if (uploadFormat == FileStorageFormat.CSV) {
             // TODO source.fromCsv(fileItems);
-        } else if (uploadFormat == GEOJSON) {
+        } else if (uploadFormat == FileStorageFormat.GEOJSON) {
             // TODO source.fromGeojson(fileItems);
         }
     }
@@ -87,13 +89,11 @@ public class SpatialDatasetSource extends BaseModel {
         }
     }
 
-    @JsonIgnore
     public SpatialDatasetSource fromFiles (List<FileItem> fileItemList) {
         // TODO this.files from fileItemList;
         return this;
     }
 
-    @JsonIgnore
     public FileStorageKey storageKey() {
         return new FileStorageKey(RESOURCES, this._id.toString(), sourceFormat.toString());
     }

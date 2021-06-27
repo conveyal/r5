@@ -8,7 +8,6 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDatasetSource;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.spatial.SpatialDataset;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -56,7 +55,6 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.spatial.SpatialDataset.SourceFormat;
 import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
@@ -347,7 +345,7 @@ public class OpportunityDatasetController implements HttpController {
         addStatusAndRemoveOldStatuses(status);
 
         final List<FileItem> fileItems;
-        final SpatialDataset.SourceFormat uploadFormat;
+        final FileStorageFormat uploadFormat;
         final Map<String, String> parameters;
         try {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
@@ -367,13 +365,13 @@ public class OpportunityDatasetController implements HttpController {
             try {
                 // A place to accumulate all the PointSets created, both FreeForm and Grids.
                 List<PointSet> pointsets = new ArrayList<>();
-                if (uploadFormat == SourceFormat.GRID) {
+                if (uploadFormat == FileStorageFormat.GRID) {
                     LOG.info("Detected opportunity dataset stored in Conveyal binary format.");
                     pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
-                } else if (uploadFormat == SourceFormat.SHAPEFILE) {
+                } else if (uploadFormat == FileStorageFormat.SHP) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
                     pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
-                } else if (uploadFormat == SourceFormat.CSV) {
+                } else if (uploadFormat == FileStorageFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
                     FileItem csvFileItem = fileItems.get(0);

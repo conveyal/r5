@@ -2,6 +2,7 @@ package com.conveyal.analysis.spatial;
 
 import com.conveyal.analysis.AnalysisServerException;
 
+import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FilenameUtils;
@@ -15,11 +16,6 @@ import java.util.Set;
  */
 public class SpatialDataset {
 
-    // TODO merge with FileCategory?
-    public enum SourceFormat {
-        SHAPEFILE, CSV, GEOJSON, GRID, SEAMLESS
-    }
-
     /**
      * Detect from a batch of uploaded files whether the user has uploaded a Shapefile, a CSV, or one or more binary
      * grids. In the process we validate the list of uploaded files, making sure certain preconditions are met.
@@ -28,7 +24,7 @@ public class SpatialDataset {
      * @throws AnalysisServerException if the type of the upload can't be detected or preconditions are violated.
      * @return the expected type of the uploaded file or files, never null.
      */
-    public static SourceFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
+    public static FileStorageFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
         if (fileItems == null || fileItems.isEmpty()) {
             throw AnalysisServerException.fileUpload("You must include some files to create an opportunity dataset.");
         }
@@ -46,13 +42,13 @@ public class SpatialDataset {
             throw AnalysisServerException.fileUpload("No file extensions seen, cannot detect upload type.");
         }
 
-        SourceFormat uploadFormat = null;
+        FileStorageFormat uploadFormat = null;
 
         // Check that if upload contains any of the Shapefile sidecar files, it contains all of the required ones.
         final Set<String> shapefileExtensions = Sets.newHashSet("SHP", "DBF", "PRJ");
         if ( ! Sets.intersection(fileExtensions, shapefileExtensions).isEmpty()) {
             if (fileExtensions.containsAll(shapefileExtensions)) {
-                uploadFormat = SourceFormat.SHAPEFILE;
+                uploadFormat = FileStorageFormat.SHP;
                 verifyBaseNamesSame(fileItems);
                 // TODO check that any additional file is SHX, and that there are no more than 4 files.
             } else {
@@ -64,14 +60,14 @@ public class SpatialDataset {
         // Even if we've already detected a shapefile, run the other tests to check for a bad mixture of file types.
         if (fileExtensions.contains("GRID")) {
             if (fileExtensions.size() == 1) {
-                uploadFormat = SourceFormat.GRID;
+                uploadFormat = FileStorageFormat.GRID;
             } else {
                 String message = "When uploading grids you may upload multiple files, but they must all be grids.";
                 throw AnalysisServerException.fileUpload(message);
             }
         } else if (fileExtensions.contains("CSV")) {
             if (fileItems.size() == 1) {
-                uploadFormat = SourceFormat.CSV;
+                uploadFormat = FileStorageFormat.CSV;
             } else {
                 String message = "When uploading CSV you may only upload one file at a time.";
                 throw AnalysisServerException.fileUpload(message);

@@ -1,5 +1,7 @@
 package com.conveyal.file;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 public enum FileStorageFormat {
     FREEFORM("pointset", "application/octet-stream"),
     GRID("grid", "application/octet-stream"),
@@ -13,12 +15,16 @@ public enum FileStorageFormat {
     // PBF("pbf", "application/octet-stream"),
 
     // SHP implies .dbf and .prj, and optionally .shx
-    SHP("shp", "application/octet-stream");
+    SHP("shp", "application/octet-stream"),
 
+    GEOJSON("json", "application/json");
+
+    @BsonIgnore
     public final String extension;
+    @BsonIgnore
     public final String mimeType;
 
-    FileStorageFormat(String extension, String mimeType) {
+    FileStorageFormat (String extension, String mimeType) {
         this.extension = extension;
         this.mimeType = mimeType;
     }

@@ -1,10 +1,7 @@
 package com.conveyal.r5.util;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.spatial.GeometryWrapper;
-import com.conveyal.analysis.spatial.Lines;
-import com.conveyal.analysis.spatial.Points;
-import com.conveyal.analysis.spatial.Polygons;
+import com.conveyal.analysis.spatial.FeatureSummary;
 import com.conveyal.analysis.spatial.SpatialAttribute;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
@@ -17,9 +14,6 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Lineal;
-import org.locationtech.jts.geom.Polygonal;
-import org.locationtech.jts.geom.Puntal;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -168,11 +162,7 @@ public class ShapefileReader {
         return attributes;
     }
 
-    public GeometryWrapper getGeometryType () {
-        Class geometryType = features.getSchema().getGeometryDescriptor().getType().getBinding();
-        if (Polygonal.class.isAssignableFrom(geometryType)) return new Polygons(features.size());
-        if (Puntal.class.isAssignableFrom(geometryType)) return new Points(features.size());
-        if (Lineal.class.isAssignableFrom(geometryType)) return new Lines(features.size());
-        else return null;
+    public FeatureSummary featureSummary () {
+        return new FeatureSummary(features);
     }
 }

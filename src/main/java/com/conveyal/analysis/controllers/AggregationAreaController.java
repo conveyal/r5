@@ -7,7 +7,6 @@ import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.SpatialDatasetSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.spatial.Polygons;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
@@ -16,7 +15,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ShapefileReader;
 import com.google.common.base.Preconditions;
-import com.google.common.io.Files;
 import org.apache.commons.fileupload.FileItem;
 import org.json.simple.JSONObject;
 import org.locationtech.jts.geom.Envelope;
@@ -42,6 +40,7 @@ import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.components.HttpApi.USER_GROUP_ATTRIBUTE;
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.analysis.spatial.FeatureSummary.Type.POLYGON;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -101,7 +100,7 @@ public class AggregationAreaController implements HttpController {
 
         // 1. Get shapefile from storage and read its features. ========================================================
         SpatialDatasetSource source = (SpatialDatasetSource) spatialSourceCollection.findById(sourceId);
-        Preconditions.checkArgument(source.geometryWrapper instanceof  Polygons, "Only polygons can be converted to " +
+        Preconditions.checkArgument(POLYGON.equals(source.features.type), "Only polygons can be converted to " +
                 "aggregation areas.");
         File shpFile = fileStorage.getFile(source.storageKey());
 

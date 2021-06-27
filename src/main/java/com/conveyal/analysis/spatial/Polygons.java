@@ -1,18 +1,15 @@
 package com.conveyal.analysis.spatial;
 
 import com.conveyal.analysis.models.AggregationArea;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.Task;
 
 import java.io.File;
 import java.util.ArrayList;
 
-public class Polygons extends GeometryWrapper {
+public class Polygons {
 
-    public Polygons (int featureCount) {
-        super(featureCount);
-    }
-
-    public static ArrayList<AggregationArea> toAggregationAreas (File file, SpatialDataset.SourceFormat sourceFormat,
+    public static ArrayList<AggregationArea> toAggregationAreas (File file, FileStorageFormat sourceFormat,
                                                                  Task progressListener) {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         // TODO from shapefile

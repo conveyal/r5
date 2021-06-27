@@ -2,7 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.spatial.GeometryWrapper;
+import com.conveyal.analysis.spatial.FeatureSummary;
 import com.conveyal.analysis.spatial.SpatialAttribute;
 import com.conveyal.analysis.spatial.SpatialDataset;
 import com.conveyal.file.FileStorageKey;
@@ -30,7 +30,7 @@ public class SpatialDatasetSource extends BaseModel {
     public String description;
     public SpatialDataset.SourceFormat sourceFormat;
     /** General geometry type, with associated static methods for conversion to spatial datasets */
-    public GeometryWrapper geometryWrapper;
+    public FeatureSummary features;
     /** Attributes, set only after validation (e.g. appropriate format for each feature's attributes) */
     public List<SpatialAttribute> attributes;
 
@@ -77,7 +77,7 @@ public class SpatialDatasetSource extends BaseModel {
             Envelope envelope = reader.wgs84Bounds();
             checkWgsEnvelopeSize(envelope);
             this.attributes = reader.getAttributes();
-            this.geometryWrapper = reader.getGeometryType();
+            this.features = reader.featureSummary();
         } catch (IOException e) {
             throw AnalysisServerException.fileUpload("Shapefile parsing error. Ensure the files you are trying to " +
                     "upload are valid.");

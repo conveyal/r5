@@ -177,7 +177,8 @@ public class OpportunityDatasetController implements HttpController {
     private void updateAndStoreDatasets (SpatialDatasetSource source,
                                          OpportunityDatasetUploadStatus status,
                                          List<? extends PointSet> pointSets) {
-
+        status.status = Status.UPLOADING;
+        status.totalGrids = pointSets.size();
         // Create an OpportunityDataset holding some metadata about each PointSet (Grid or FreeForm).
         final List<OpportunityDataset> datasets = new ArrayList<>();
         for (PointSet pointSet : pointSets) {

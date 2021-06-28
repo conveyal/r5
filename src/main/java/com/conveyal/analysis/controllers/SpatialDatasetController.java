@@ -327,12 +327,6 @@ public class SpatialDatasetController implements HttpController {
         return Persistence.opportunityDatasets.updateFromJSONRequest(request);
     }
 
-    private SpatialDatasetSource toAggregationArea(Request request, Response response) {
-        SpatialDatasetSource source = spatialSourceCollection.findPermittedByRequestParamId(request, response);
-        // TODO implement
-        return source;
-    }
-
     private Collection<SpatialDatasetSource> deleteSourceSet(Request request, Response response) {
         SpatialDatasetSource source = spatialSourceCollection.findPermittedByRequestParamId(request, response);
         // TODO delete files from storage
@@ -434,7 +428,6 @@ public class SpatialDatasetController implements HttpController {
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
             sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);
             sparkService.delete("/source/:_id", this::deleteSourceSet, toJson);
-            sparkService.post("/source/:_id/toAggregationArea", this::toAggregationArea, toJson);
             sparkService.delete("/:_id", this::deleteOpportunityDataset, toJson);
             sparkService.get("/:_id", this::getSource, toJson);
             sparkService.put("/:_id", this::editOpportunityDataset, toJson);

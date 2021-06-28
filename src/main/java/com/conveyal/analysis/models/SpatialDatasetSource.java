@@ -26,7 +26,7 @@ public class SpatialDatasetSource extends BaseModel {
     public String regionId;
     /** Description editable by end users */
     public String description;
-    public String sourceFormat; // FIXME figure out Mongo serialization and revert to enum
+    public FileStorageFormat sourceFormat;
     /** General geometry type */
     public FeatureSummary features;
     /** Attributes, set only after validation (e.g. appropriate format for each feature's attributes) */
@@ -53,7 +53,7 @@ public class SpatialDatasetSource extends BaseModel {
     }
 
     public void validateAndSetDetails (FileStorageFormat uploadFormat, List<File> files) {
-        this.sourceFormat = uploadFormat.toString();
+        this.sourceFormat = uploadFormat;
         if (uploadFormat == FileStorageFormat.GRID) {
             // TODO source.fromGrids(fileItems);
         } else if (uploadFormat == FileStorageFormat.SHP) {

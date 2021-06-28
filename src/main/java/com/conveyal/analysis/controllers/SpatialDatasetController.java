@@ -21,7 +21,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
-import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.FileUploadException;
@@ -34,7 +33,6 @@ import spark.Request;
 import spark.Response;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -45,7 +43,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
@@ -54,7 +51,7 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.analyst.progress.WorkProductType.SPATIAL_DATASET_SOURCE;
+import static com.conveyal.r5.analyst.progress.WorkProductType.RESOURCE;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -100,18 +97,8 @@ public class SpatialDatasetController implements HttpController {
         );
     }
 
-    private Object getOpportunityDataset(Request req, Response res) {
-        OpportunityDataset dataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
-        if (dataset.format == FileStorageFormat.GRID) {
-            return getJSONURL(dataset.getStorageKey());
-        } else {
-            // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
-            // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
-            // to that grid for display and preview, but the freeform and corresponding grid pointset have different
-            // IDs and there are no references between them.
-            LOG.error("We cannot yet visualize freeform pointsets. Returning nothing to the UI.");
-            return null;
-        }
+    private Object getSource(Request req, Response res) {
+        return spatialSourceCollection.findPermittedByRequestParamId(req, res);
     }
 
     private SpatialDatasetSource downloadLODES(Request req, Response res) {
@@ -301,9 +288,9 @@ public class SpatialDatasetController implements HttpController {
         // Initialize model object
         SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName).withRegion(regionId);
 
-        taskScheduler.enqueue(Task.create("Storing " + sourceName)
+        taskScheduler.enqueue(Task.create("Uploading spatial dataset: " + sourceName)
             .forUser(userPermissions)
-            .withWorkProduct(SPATIAL_DATASET_SOURCE, source._id.toString(), regionId)
+            .withWorkProduct(RESOURCE, source._id.toString(), regionId)
             .withAction(progressListener -> {
 
                 // Loop through uploaded files, registering the extensions and writing to storage (with filenames that
@@ -340,15 +327,22 @@ public class SpatialDatasetController implements HttpController {
         return Persistence.opportunityDatasets.updateFromJSONRequest(request);
     }
 
-    private Collection<OpportunityDataset> deleteSourceSet(Request request, Response response) {
-        String sourceId = request.params("sourceId");
-        String accessGroup = request.attribute("accessGroup");
-        Collection<OpportunityDataset> datasets = Persistence.opportunityDatasets.findPermitted(
-                QueryBuilder.start("sourceId").is(sourceId).get(), accessGroup);
+    private SpatialDatasetSource toAggregationArea(Request request, Response response) {
+        SpatialDatasetSource source = spatialSourceCollection.findPermittedByRequestParamId(request, response);
+        // TODO implement
+        return source;
+    }
 
-        datasets.forEach(dataset -> deleteDataset(dataset._id, accessGroup));
+    private Collection<SpatialDatasetSource> deleteSourceSet(Request request, Response response) {
+        SpatialDatasetSource source = spatialSourceCollection.findPermittedByRequestParamId(request, response);
+        // TODO delete files from storage
+        // TODO delete referencing database records
+        spatialSourceCollection.delete(source);
 
-        return datasets;
+        return spatialSourceCollection.findPermitted(
+                and(eq("regionId", request.params("regionId"))),
+                request.attribute("accessGroup")
+        );
     }
 
     private OpportunityDataset deleteOpportunityDataset(Request request, Response response) {
@@ -433,65 +427,17 @@ public class SpatialDatasetController implements HttpController {
         // TODO implement rasterization methods
     }
 
-    /**
-     * Respond to a request with a redirect to a downloadable file.
-     * @param req should specify regionId, opportunityDatasetId, and an available download format (.tiff or .grid)
-     */
-    private Object downloadOpportunityDataset (Request req, Response res) throws IOException {
-        FileStorageFormat downloadFormat;
-        try {
-            downloadFormat = FileStorageFormat.valueOf(req.params("format").toUpperCase());
-        } catch (IllegalArgumentException iae) {
-            // This code handles the deprecated endpoint for retrieving opportunity datasets
-            // get("/api/opportunities/:regionId/:gridKey") is the same signature as this endpoint.
-            String regionId = req.params("_id");
-            String gridKey = req.params("format");
-            FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
-            return getJSONURL(storageKey);
-        }
-
-        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDataset(req, res);
-
-        final OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
-
-        FileStorageKey gridKey = opportunityDataset.getStorageKey(FileStorageFormat.GRID);
-        FileStorageKey formatKey = opportunityDataset.getStorageKey(downloadFormat);
-
-        // if this grid is not on S3 in the requested format, try to get the .grid format
-        if (!fileStorage.exists(gridKey)) {
-            throw AnalysisServerException.notFound("Requested grid does not exist.");
-        }
-
-        if (!fileStorage.exists(formatKey)) {
-            // get the grid and convert it to the requested format
-            File gridFile = fileStorage.getFile(gridKey);
-            Grid grid = Grid.read(new GZIPInputStream(new FileInputStream(gridFile))); // closes input stream
-            File localFile = FileUtils.createScratchFile(downloadFormat.toString());
-            FileOutputStream fos = new FileOutputStream(localFile);
-
-            if (FileStorageFormat.PNG.equals(downloadFormat)) {
-                grid.writePng(fos);
-            } else if (FileStorageFormat.TIFF.equals(downloadFormat)) {
-                grid.writeGeotiff(fos);
-            }
-
-            fileStorage.moveIntoStorage(formatKey, localFile);
-        }
-
-        return getJSONURL(formatKey);
-    }
-
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/spatial", () -> {
             sparkService.post("", this::handleUpload, toJson);
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
             sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);
-            sparkService.delete("/source/:sourceId", this::deleteSourceSet, toJson);
+            sparkService.delete("/source/:_id", this::deleteSourceSet, toJson);
+            sparkService.post("/source/:_id/toAggregationArea", this::toAggregationArea, toJson);
             sparkService.delete("/:_id", this::deleteOpportunityDataset, toJson);
-            sparkService.get("/:_id", this::getOpportunityDataset, toJson);
+            sparkService.get("/:_id", this::getSource, toJson);
             sparkService.put("/:_id", this::editOpportunityDataset, toJson);
-            sparkService.get("/:_id/:format", this::downloadOpportunityDataset, toJson);
         });
     }
 }

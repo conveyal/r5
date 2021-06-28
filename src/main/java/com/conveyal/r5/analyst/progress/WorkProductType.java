@@ -13,14 +13,14 @@ import com.conveyal.analysis.models.SpatialDatasetSource;
  */
 public enum WorkProductType {
 
-    BUNDLE, REGIONAL_ANALYSIS, AGGREGATION_AREA, OPPORTUNITY_DATASET, SPATIAL_DATASET_SOURCE;
+    BUNDLE, REGIONAL_ANALYSIS, AGGREGATION_AREA, OPPORTUNITY_DATASET, RESOURCE;
 
     public static WorkProductType forModel (Object model) {
         if (model instanceof Bundle) return BUNDLE;
         if (model instanceof OpportunityDataset) return OPPORTUNITY_DATASET;
         if (model instanceof RegionalAnalysis) return REGIONAL_ANALYSIS;
         if (model instanceof AggregationArea) return AGGREGATION_AREA;
-        if (model instanceof SpatialDatasetSource) return SPATIAL_DATASET_SOURCE;
+        if (model instanceof SpatialDatasetSource) return RESOURCE; // TODO switch to spatial dataset source
         throw new IllegalArgumentException("Unrecognized work product type.");
     }
 }

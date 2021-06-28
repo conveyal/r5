@@ -95,8 +95,8 @@ public class AggregationAreaController implements HttpController {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         String sourceId = req.params("sourceId");
-        String nameProperty = req.attribute("nameProperty");
-        final int zoom = parseZoom(req.attribute("zoom"));
+        String nameProperty = req.queryParams("nameProperty");
+        final int zoom = parseZoom(req.queryParams("zoom"));
 
         // 1. Get file from storage and read its features. =============================================================
         SpatialDatasetSource source = (SpatialDatasetSource) spatialSourceCollection.findById(sourceId);

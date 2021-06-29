@@ -4,51 +4,35 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
-import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDatasetSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.FileItemInputStreamProvider;
+import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.file.FileUtils;
-import com.conveyal.r5.analyst.FreeFormPointSet;
-import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.util.ExceptionUtils;
-import com.conveyal.r5.util.InputStreamProvider;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
-import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.zip.GZIPOutputStream;
+import java.util.StringJoiner;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.analyst.progress.WorkProductType.RESOURCE;
@@ -61,7 +45,6 @@ import static com.mongodb.client.model.Filters.eq;
 public class SpatialDatasetController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpatialDatasetController.class);
-    private static final FileItemFactory fileItemFactory = new DiskFileItemFactory();
 
     // Component Dependencies
     private final FileStorage fileStorage;
@@ -138,14 +121,7 @@ public class SpatialDatasetController implements HttpController {
      */
     private SpatialDatasetSource handleUpload(Request req, Response res) {
         final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        final Map<String, List<FileItem>> formFields;
-        try {
-            ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
-            formFields = sfu.parseParameterMap(req.raw());
-        } catch (FileUploadException e) {
-            // We can't even get enough information to create a status tracking object. Re-throw an exception.
-            throw AnalysisServerException.fileUpload("Unable to parse uploaded file(s). " + ExceptionUtils.stackTraceString(e));
-        }
+        final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
 
         // Parse required fields. Will throw a ServerException on failure.
         final String sourceName = getFormField(formFields, "sourceName", true);
@@ -162,14 +138,15 @@ public class SpatialDatasetController implements HttpController {
                 // Loop through uploaded files, registering the extensions and writing to storage (with filenames that
                 // correspond to the source id)
                 List<File> files = new ArrayList<>();
-                final List<FileItem> fileItems = formFields.remove("sourceFiles");
+                StringJoiner fileNames = new StringJoiner(", ");
+                final List<FileItem> fileItems = formFields.get("sourceFiles");
                 for (FileItem fileItem : fileItems) {
+                    DiskFileItem dfi = (DiskFileItem) fileItem;
                     String filename = fileItem.getName();
+                    fileNames.add(filename);
                     String extension = filename.substring(filename.lastIndexOf(".") + 1).toUpperCase(Locale.ROOT);
                     FileStorageKey key = new FileStorageKey(RESOURCES, source._id.toString(), extension);
-                    // FIXME writing not allowed by fileStorage.getFile contract
-                    // FIXME Investigate fileStorage.moveIntoStorage(key, file), for consistency with BundleController;
-                    fileItem.write(fileStorage.getFile(key));
+                    fileStorage.moveIntoStorage(key, dfi.getStoreLocation());
                     files.add(fileStorage.getFile(key));
                 }
 
@@ -183,6 +160,7 @@ public class SpatialDatasetController implements HttpController {
                     throw AnalysisServerException.fileUpload("Problem reading uploaded spatial files" + e.getMessage());
                 }
                 progressListener.beginTask("Validating files", 1);
+                source.description = "From uploaded files: " + fileNames;
                 source.validateAndSetDetails(uploadFormat, files);
                 spatialSourceCollection.insert(source);
             }));

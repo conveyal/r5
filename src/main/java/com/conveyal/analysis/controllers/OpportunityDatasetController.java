@@ -6,7 +6,7 @@ import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
-import com.conveyal.analysis.models.SpatialDatasetSource;
+import com.conveyal.analysis.models.SpatialResource;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.file.FileStorage;
@@ -55,7 +55,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.spatial.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -149,7 +149,7 @@ public class OpportunityDatasetController implements HttpController {
         final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
-        SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, extractor.sourceName)
+        SpatialResource source = SpatialResource.create(userPermissions, extractor.sourceName)
                 .withRegion(regionId);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
@@ -174,7 +174,7 @@ public class OpportunityDatasetController implements HttpController {
      * Given a list of new PointSets, serialize each PointSet and save it to S3, then create a metadata object about
      * that PointSet and store it in Mongo.
      */
-    private void updateAndStoreDatasets (SpatialDatasetSource source,
+    private void updateAndStoreDatasets (SpatialResource source,
                                          OpportunityDatasetUploadStatus status,
                                          List<? extends PointSet> pointSets) {
         status.status = Status.UPLOADING;
@@ -406,7 +406,7 @@ public class OpportunityDatasetController implements HttpController {
                 // Create a single unique ID string that will be referenced by all opportunity datasets produced by
                 // this upload. This allows us to group together datasets from the same source and associate them with
                 // the file(s) that produced them.
-                SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName)
+                SpatialResource source = SpatialResource.create(userPermissions, sourceName)
                         .withRegion(regionId);
                 updateAndStoreDatasets(source, status, pointsets);
             } catch (Exception e) {

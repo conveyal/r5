@@ -4,10 +4,9 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.AggregationArea;
-import com.conveyal.analysis.models.SpatialDatasetSource;
+import com.conveyal.analysis.models.SpatialResource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -15,7 +14,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ShapefileReader;
 import com.google.common.base.Preconditions;
-import org.apache.commons.fileupload.FileItem;
 import org.json.simple.JSONObject;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -76,7 +74,7 @@ public class AggregationAreaController implements HttpController {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialDatasetSource.class);
+        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
     }
 
     private FileStorageKey getStoragePath (AggregationArea area) {
@@ -99,7 +97,7 @@ public class AggregationAreaController implements HttpController {
         final int zoom = parseZoom(req.queryParams("zoom"));
 
         // 1. Get file from storage and read its features. =============================================================
-        SpatialDatasetSource source = (SpatialDatasetSource) spatialSourceCollection.findById(sourceId);
+        SpatialResource source = (SpatialResource) spatialSourceCollection.findById(sourceId);
         Preconditions.checkArgument(POLYGON.equals(source.features.type), "Only polygons can be converted to " +
                 "aggregation areas.");
 

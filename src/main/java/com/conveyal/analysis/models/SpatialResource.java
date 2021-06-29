@@ -22,7 +22,12 @@ import java.util.Map;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 
-public class SpatialDatasetSource extends BaseModel {
+/**
+ * Record of a spatial source file (e.g. shapefile, CSV) that has been validated and can be processed into specific
+ * Conveyal formats (e.g. grids and other spatial layers). Eventually a general Resource class could be extended by
+ * SpatialResource, GtfsResource, and OsmResource?
+ */
+public class SpatialResource extends BaseModel {
     public String regionId;
     /** Description editable by end users */
     public String description;
@@ -32,22 +37,22 @@ public class SpatialDatasetSource extends BaseModel {
     /** Attributes, set only after validation (e.g. appropriate format for each feature's attributes) */
     public List<SpatialAttribute> attributes;
 
-    private SpatialDatasetSource (UserPermissions userPermissions, String sourceName) {
+    private SpatialResource (UserPermissions userPermissions, String sourceName) {
         super(userPermissions, sourceName);
     }
 
     /**
      * No-arg constructor required for Mongo POJO serialization
      */
-    public SpatialDatasetSource () {
+    public SpatialResource () {
         super();
     }
 
-    public static SpatialDatasetSource create (UserPermissions userPermissions, String sourceName) {
-        return new SpatialDatasetSource(userPermissions, sourceName);
+    public static SpatialResource create (UserPermissions userPermissions, String sourceName) {
+        return new SpatialResource(userPermissions, sourceName);
     }
 
-    public SpatialDatasetSource withRegion (String regionId) {
+    public SpatialResource withRegion (String regionId) {
         this.regionId = regionId;
         return this;
     }
@@ -89,7 +94,7 @@ public class SpatialDatasetSource extends BaseModel {
         }
     }
 
-    public SpatialDatasetSource fromFiles (List<FileItem> fileItemList) {
+    public SpatialResource fromFiles (List<FileItem> fileItemList) {
         // TODO this.files from fileItemList;
         return this;
     }

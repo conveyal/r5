@@ -4,7 +4,7 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
-import com.conveyal.analysis.models.SpatialDatasetSource;
+import com.conveyal.analysis.models.SpatialResource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
@@ -13,9 +13,7 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.disk.DiskFileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -31,7 +29,7 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.spatial.SpatialDataset.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.spatial.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -40,46 +38,46 @@ import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
- * Controller that handles fetching opportunity datasets (grids and other pointset formats).
+ * Controller that handles CRUD of spatial resources.
  */
-public class SpatialDatasetController implements HttpController {
+public class SpatialResourceController implements HttpController {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SpatialDatasetController.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SpatialResourceController.class);
 
     // Component Dependencies
     private final FileStorage fileStorage;
-    private final AnalysisCollection<SpatialDatasetSource> spatialSourceCollection;
+    private final AnalysisCollection<SpatialResource> spatialResourceCollection;
     private final TaskScheduler taskScheduler;
     private final SeamlessCensusGridExtractor extractor;
 
-    public SpatialDatasetController (
+    public SpatialResourceController (
             FileStorage fileStorage,
             AnalysisDB database,
             TaskScheduler taskScheduler,
             SeamlessCensusGridExtractor extractor
     ) {
         this.fileStorage = fileStorage;
-        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialDatasetSource.class);
+        this.spatialResourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
         this.taskScheduler = taskScheduler;
         this.extractor = extractor;
     }
 
-    private List<SpatialDatasetSource> getRegionDatasets(Request req, Response res) {
-        return spatialSourceCollection.findPermitted(
+    private List<SpatialResource> getRegionResources (Request req, Response res) {
+        return spatialResourceCollection.findPermitted(
                 and(eq("regionId", req.params("regionId"))),
                 req.attribute("accessGroup")
         );
     }
 
-    private Object getSource(Request req, Response res) {
-        return spatialSourceCollection.findPermittedByRequestParamId(req, res);
+    private Object getResource (Request req, Response res) {
+        return spatialResourceCollection.findPermittedByRequestParamId(req, res);
     }
 
-    private SpatialDatasetSource downloadLODES(Request req, Response res) {
+    private SpatialResource downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, extractor.sourceName)
+        SpatialResource source = SpatialResource.create(userPermissions, extractor.sourceName)
                 .withRegion(regionId);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
@@ -119,7 +117,7 @@ public class SpatialDatasetController implements HttpController {
      * Handle many types of spatial upload.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
-    private SpatialDatasetSource handleUpload(Request req, Response res) {
+    private SpatialResource handleUpload(Request req, Response res) {
         final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
 
@@ -128,9 +126,9 @@ public class SpatialDatasetController implements HttpController {
         final String regionId = getFormField(formFields, "regionId", true);
 
         // Initialize model object
-        SpatialDatasetSource source = SpatialDatasetSource.create(userPermissions, sourceName).withRegion(regionId);
+        SpatialResource source = SpatialResource.create(userPermissions, sourceName).withRegion(regionId);
 
-        taskScheduler.enqueue(Task.create("Uploading spatial dataset: " + sourceName)
+        taskScheduler.enqueue(Task.create("Uploading spatial files: " + sourceName)
             .forUser(userPermissions)
             .withWorkProduct(RESOURCE, source._id.toString(), regionId)
             .withAction(progressListener -> {
@@ -162,18 +160,18 @@ public class SpatialDatasetController implements HttpController {
                 progressListener.beginTask("Validating files", 1);
                 source.description = "From uploaded files: " + fileNames;
                 source.validateAndSetDetails(uploadFormat, files);
-                spatialSourceCollection.insert(source);
+                spatialResourceCollection.insert(source);
             }));
         return source;
     }
 
-    private Collection<SpatialDatasetSource> deleteSourceSet(Request request, Response response) {
-        SpatialDatasetSource source = spatialSourceCollection.findPermittedByRequestParamId(request, response);
+    private Collection<SpatialResource> deleteResource (Request request, Response response) {
+        SpatialResource source = spatialResourceCollection.findPermittedByRequestParamId(request, response);
         // TODO delete files from storage
         // TODO delete referencing database records
-        spatialSourceCollection.delete(source);
+        spatialResourceCollection.delete(source);
 
-        return spatialSourceCollection.findPermitted(
+        return spatialResourceCollection.findPermitted(
                 and(eq("regionId", request.params("regionId"))),
                 request.attribute("accessGroup")
         );
@@ -184,9 +182,9 @@ public class SpatialDatasetController implements HttpController {
         sparkService.path("/api/spatial", () -> {
             sparkService.post("", this::handleUpload, toJson);
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
-            sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);
-            sparkService.delete("/source/:_id", this::deleteSourceSet, toJson);
-            sparkService.get("/:_id", this::getSource, toJson);
+            sparkService.get("/region/:regionId", this::getRegionResources, toJson);
+            sparkService.delete("/source/:_id", this::deleteResource, toJson);
+            sparkService.get("/:_id", this::getResource, toJson);
         });
     }
 }

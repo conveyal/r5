@@ -4,7 +4,7 @@ import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.analysis.models.SpatialDatasetSource;
+import com.conveyal.analysis.models.SpatialResource;
 
 /**
  * There is some implicit and unenforced correspondence between these values and those in FileCategory, as well
@@ -20,7 +20,7 @@ public enum WorkProductType {
         if (model instanceof OpportunityDataset) return OPPORTUNITY_DATASET;
         if (model instanceof RegionalAnalysis) return REGIONAL_ANALYSIS;
         if (model instanceof AggregationArea) return AGGREGATION_AREA;
-        if (model instanceof SpatialDatasetSource) return RESOURCE; // TODO switch to spatial dataset source
+        if (model instanceof SpatialResource) return RESOURCE; // TODO switch to spatial dataset source
         throw new IllegalArgumentException("Unrecognized work product type.");
     }
 }

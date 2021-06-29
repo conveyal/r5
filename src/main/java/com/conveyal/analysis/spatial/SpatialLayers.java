@@ -12,9 +12,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Common methods for validating and processing uploaded spatial data files.
+ * Utility class with common methods for validating and processing uploaded spatial data files.
  */
-public class SpatialDataset {
+public class SpatialLayers {
 
     /**
      * Detect from a batch of uploaded files whether the user has uploaded a Shapefile, a CSV, or one or more binary

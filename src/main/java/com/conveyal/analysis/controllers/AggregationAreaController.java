@@ -131,22 +131,28 @@ public class AggregationAreaController implements HttpController {
                     Map<String, Geometry> areas = new HashMap<>();
 
                     if (nameProperty != null && finalFeatures.size() > MAX_FEATURES) {
-                        throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +
-                                "which exceeds the limit of {1}", finalFeatures.size(), MAX_FEATURES));
+                        throw AnalysisServerException.fileUpload(
+                                MessageFormat.format("The uploaded shapefile has {0} features, " +
+                                "which exceeds the limit of {1}", finalFeatures.size(), MAX_FEATURES)
+                        );
                     }
 
                     if (nameProperty == null) {
                         // Union (single combined aggregation area) requested
-                        List<Geometry> geometries = finalFeatures.stream().map(f -> (Geometry) f.getDefaultGeometry()).collect(Collectors.toList());
+                        List<Geometry> geometries = finalFeatures.stream().map(f ->
+                                (Geometry) f.getDefaultGeometry()).collect(Collectors.toList()
+                        );
                         UnaryUnionOp union = new UnaryUnionOp(geometries);
                         // Name the area using the name in the request directly
                         areas.put(source.name, union.union());
                     } else {
                         // Don't union. Name each area by looking up its value for the name property in the request.
-                        finalFeatures.forEach(f -> areas.put(readProperty(f, nameProperty), (Geometry) f.getDefaultGeometry()));
+                        finalFeatures.forEach(f -> areas.put(
+                                readProperty(f, nameProperty), (Geometry) f.getDefaultGeometry())
+                        );
                     }
 
-                    // 2. Convert to raster grids, then store them. ================================================================
+                    // 2. Convert to raster grids, then store them. ====================================================
                     areas.forEach((String name, Geometry geometry) -> {
                         if (geometry == null) throw new AnalysisServerException("Invalid geometry uploaded.");
                         Envelope env = geometry.getEnvelopeInternal();

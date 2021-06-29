@@ -73,6 +73,14 @@ public class AnalysisCollection<T extends BaseModel> {
         return newModel;
     }
 
+    /**
+     * Note that if the supplied model has _id = null, the Mongo insertOne method will overwrite it with a new
+     * ObjectId(). We consider it good practice to set the _id for any model object ourselves, avoiding this behavior.
+     */
+    public void insert (T model) {
+        collection.insertOne(model);
+    }
+
     public T update(T value) {
         return update(value, value.accessGroup);
     }

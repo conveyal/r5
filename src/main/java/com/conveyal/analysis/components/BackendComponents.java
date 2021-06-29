@@ -14,6 +14,7 @@ import com.conveyal.analysis.controllers.ModificationController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
+import com.conveyal.analysis.controllers.SpatialResourceController;
 import com.conveyal.analysis.controllers.TimetableController;
 import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
@@ -92,7 +93,7 @@ public abstract class BackendComponents {
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),
-                new AggregationAreaController(fileStorage),
+                new AggregationAreaController(fileStorage, database, taskScheduler),
                 new TimetableController(),
                 new FileStorageController(fileStorage, database),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
@@ -102,7 +103,8 @@ public abstract class BackendComponents {
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
-                new GtfsTileController(gtfsCache)
+                new GtfsTileController(gtfsCache),
+                new SpatialResourceController(fileStorage, database, taskScheduler, censusExtractor)
         );
     }
 

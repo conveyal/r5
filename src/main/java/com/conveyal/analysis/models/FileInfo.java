@@ -6,6 +6,9 @@ import com.conveyal.file.FileStorageKey;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.bson.types.ObjectId;
 
+/**
+ * Metadata about files uploaded to Conveyal
+ */
 public class FileInfo extends BaseModel {
     public String regionId = null;
 

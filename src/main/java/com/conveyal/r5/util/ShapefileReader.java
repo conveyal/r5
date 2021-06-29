@@ -1,5 +1,8 @@
 package com.conveyal.r5.util;
 
+import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.spatial.FeatureSummary;
+import com.conveyal.analysis.spatial.SpatialAttribute;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -11,7 +14,6 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -24,7 +26,9 @@ import org.opengis.referencing.operation.TransformException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +101,7 @@ public class ShapefileReader {
         return features.getSchema()
                 .getAttributeDescriptors()
                 .stream()
-                .filter(d -> Number.class.isInstance(d.getType().getBinding()))
+                .filter(d -> Number.class.isAssignableFrom(d.getType().getBinding()))
                 .map(AttributeDescriptor::getLocalName)
                 .collect(Collectors.toList());
     }
@@ -112,7 +116,7 @@ public class ShapefileReader {
 
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {
         return stream().map(f -> {
-            Geometry g = (Geometry) f.getDefaultGeometry();
+            org.locationtech.jts.geom.Geometry g = (org.locationtech.jts.geom.Geometry) f.getDefaultGeometry();
             try {
                 // TODO does this leak beyond this function?
                 f.setDefaultGeometry(JTS.transform(g, transform));
@@ -137,5 +141,28 @@ public class ShapefileReader {
 
     public int getFeatureCount() throws IOException {
         return source.getCount(Query.ALL);
+    }
+
+    public List<SpatialAttribute> getAttributes () {
+        List<SpatialAttribute> attributes = new ArrayList<>();
+        HashSet<String> uniqueAttributes = new HashSet<>();
+        features.getSchema()
+                .getAttributeDescriptors()
+                .forEach(d -> {
+                    String attributeName = d.getLocalName();
+                    AttributeType type = d.getType();
+                    if (type != null) {
+                        attributes.add(new SpatialAttribute(attributeName, type));
+                        uniqueAttributes.add(attributeName);
+                    }
+                });
+        if (attributes.size() != uniqueAttributes.size()) {
+            throw new AnalysisServerException("Shapefile has duplicate attributes.");
+        }
+        return attributes;
+    }
+
+    public FeatureSummary featureSummary () {
+        return new FeatureSummary(features);
     }
 }

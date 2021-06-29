@@ -1,17 +1,19 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
+import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.AggregationArea;
-import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.HttpUtils;
+import com.conveyal.analysis.models.SpatialResource;
+import com.conveyal.analysis.persistence.AnalysisCollection;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ShapefileReader;
-import com.google.common.io.Files;
-import com.mongodb.QueryBuilder;
-import org.apache.commons.fileupload.FileItem;
+import com.google.common.base.Preconditions;
 import org.json.simple.JSONObject;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -34,9 +36,16 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.analysis.components.HttpApi.USER_GROUP_ATTRIBUTE;
+import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.analysis.spatial.FeatureSummary.Type.POLYGON;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
+import static com.conveyal.file.FileStorageFormat.GEOJSON;
+import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
 
 /**
  * Stores vector aggregationAreas (used to define the region of a weighted average accessibility metric).
@@ -53,9 +62,19 @@ public class AggregationAreaController implements HttpController {
     private static int MAX_FEATURES = 100;
 
     private final FileStorage fileStorage;
+    private final TaskScheduler taskScheduler;
+    private final AnalysisCollection aggregationAreaCollection;
+    private final AnalysisCollection spatialSourceCollection;
 
-    public AggregationAreaController (FileStorage fileStorage) {
+    public AggregationAreaController (
+            FileStorage fileStorage,
+            AnalysisDB database,
+            TaskScheduler taskScheduler
+    ) {
         this.fileStorage = fileStorage;
+        this.taskScheduler = taskScheduler;
+        this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
+        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
     }
 
     private FileStorageKey getStoragePath (AggregationArea area) {
@@ -72,113 +91,102 @@ public class AggregationAreaController implements HttpController {
      */
     private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
-        Map<String, List<FileItem>> query = HttpUtils.getRequestFiles(req.raw());
+        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        String sourceId = req.params("sourceId");
+        String nameProperty = req.queryParams("nameProperty");
+        final int zoom = parseZoom(req.queryParams("zoom"));
 
-        // 1. Extract relevant files: .shp, .prj, .dbf, and .shx. ======================================================
-        Map<String, FileItem> filesByName = query.get("files").stream()
-                .collect(Collectors.toMap(FileItem::getName, f -> f));
+        // 1. Get file from storage and read its features. =============================================================
+        SpatialResource source = (SpatialResource) spatialSourceCollection.findById(sourceId);
+        Preconditions.checkArgument(POLYGON.equals(source.features.type), "Only polygons can be converted to " +
+                "aggregation areas.");
 
-        String fileName = filesByName.keySet().stream().filter(f -> f.endsWith(".shp")).findAny().orElse(null);
-        if (fileName == null) {
-            throw AnalysisServerException.fileUpload("Shapefile upload must contain .shp, .prj, and .dbf");
-        }
-        String baseName = fileName.substring(0, fileName.length() - 4);
+        File sourceFile;
+        List<SimpleFeature> features = null;
 
-        if (!filesByName.containsKey(baseName + ".shp") ||
-                !filesByName.containsKey(baseName + ".prj") ||
-                !filesByName.containsKey(baseName + ".dbf")) {
-            throw AnalysisServerException.fileUpload("Shapefile upload must contain .shp, .prj, and .dbf");
-        }
-
-        String regionId = req.params("regionId");
-
-        File tempDir = Files.createTempDir();
-
-        File shpFile = new File(tempDir, "grid.shp");
-        filesByName.get(baseName + ".shp").write(shpFile);
-
-        File prjFile = new File(tempDir, "grid.prj");
-        filesByName.get(baseName + ".prj").write(prjFile);
-
-        File dbfFile = new File(tempDir, "grid.dbf");
-        filesByName.get(baseName + ".dbf").write(dbfFile);
-
-        // shx is optional, not needed for dense shapefiles
-        if (filesByName.containsKey(baseName + ".shx")) {
-            File shxFile = new File(tempDir, "grid.shx");
-            filesByName.get(baseName + ".shx").write(shxFile);
-        }
-
-        // 2. Read features ============================================================================================
-        ShapefileReader reader = null;
-        List<SimpleFeature> features;
-        try {
-            reader = new ShapefileReader(shpFile);
-            features = reader.wgs84Stream().collect(Collectors.toList());
-        } finally {
-            if (reader != null) reader.close();
-        }
-
-
-        Map<String, Geometry> areas = new HashMap<>();
-
-        boolean unionRequested = Boolean.parseBoolean(query.get("union").get(0).getString());
-        String zoomString = query.get("zoom") == null ? null : query.get("zoom").get(0).getString();
-        final int zoom = parseZoom(zoomString);
-
-        if (!unionRequested && features.size() > MAX_FEATURES) {
-            throw AnalysisServerException.fileUpload(MessageFormat.format("The uploaded shapefile has {0} features, " +
-                    "which exceeds the limit of {1}", features.size(), MAX_FEATURES));
-        }
-
-        if (unionRequested) {
-            // Union (single combined aggregation area) requested
-            List<Geometry> geometries = features.stream().map(f -> (Geometry) f.getDefaultGeometry()).collect(Collectors.toList());
-            UnaryUnionOp union = new UnaryUnionOp(geometries);
-            // Name the area using the name in the request directly
-            String maskName = query.get("name").get(0).getString("UTF-8");
-            areas.put(maskName, union.union());
-        } else {
-            // Don't union. Name each area by looking up its value for the name property in the request.
-            String nameProperty = query.get("nameProperty").get(0).getString("UTF-8");
-            features.forEach(f -> areas.put(readProperty(f, nameProperty), (Geometry) f.getDefaultGeometry()));
-        }
-        // 3. Convert to raster grids, then store them. ================================================================
-        areas.forEach((String name, Geometry geometry) -> {
-            Envelope env = geometry.getEnvelopeInternal();
-            Grid maskGrid = new Grid(zoom, env);
-
-            // Store the percentage each cell overlaps the mask, scaled as 0 to 100,000
-            List<Grid.PixelWeight> weights = maskGrid.getPixelWeights(geometry, true);
-            weights.forEach(pixel -> maskGrid.grid[pixel.x][pixel.y] = pixel.weight * 100_000);
-
-            AggregationArea aggregationArea = new AggregationArea();
-            aggregationArea.name = name;
-            aggregationArea.regionId = regionId;
-
-            // Set `createdBy` and `accessGroup`
-            aggregationArea.accessGroup = req.attribute("accessGroup");
-            aggregationArea.createdBy = req.attribute("email");
-
+        if (SHP.equals(source.sourceFormat)) {
+            sourceFile = fileStorage.getFile(source.storageKey());
+            ShapefileReader reader = null;
             try {
-                File gridFile = FileUtils.createScratchFile("grid");
-                OutputStream os = new GZIPOutputStream(FileUtils.getOutputStream(gridFile));
-                maskGrid.write(os);
-                os.close();
-
-                // Create the aggregation area before generating the S3 key so that the `_id` is generated
-                Persistence.aggregationAreas.create(aggregationArea);
-                aggregationAreas.add(aggregationArea);
-
-                fileStorage.moveIntoStorage(getStoragePath(aggregationArea), gridFile);
-            } catch (IOException e) {
-                throw new AnalysisServerException("Error processing/uploading aggregation area");
+                reader = new ShapefileReader(sourceFile);
+                features = reader.wgs84Stream().collect(Collectors.toList());
+            } finally {
+                if (reader != null) reader.close();
             }
+        }
 
-            tempDir.delete();
-        });
+        if (GEOJSON.equals(source.sourceFormat)) {
+            // TODO implement
+        }
+
+        List<SimpleFeature> finalFeatures = features;
+        taskScheduler.enqueue(Task.create("Aggregation area creation: " + source.name)
+                .forUser(userPermissions)
+                .setHeavy(true)
+                .withWorkProduct(source)
+                .withAction(progressListener -> {
+                    progressListener.beginTask("Processing request", 1);
+                    Map<String, Geometry> areas = new HashMap<>();
+
+                    if (nameProperty != null && finalFeatures.size() > MAX_FEATURES) {
+                        throw AnalysisServerException.fileUpload(
+                                MessageFormat.format("The uploaded shapefile has {0} features, " +
+                                "which exceeds the limit of {1}", finalFeatures.size(), MAX_FEATURES)
+                        );
+                    }
+
+                    if (nameProperty == null) {
+                        // Union (single combined aggregation area) requested
+                        List<Geometry> geometries = finalFeatures.stream().map(f ->
+                                (Geometry) f.getDefaultGeometry()).collect(Collectors.toList()
+                        );
+                        UnaryUnionOp union = new UnaryUnionOp(geometries);
+                        // Name the area using the name in the request directly
+                        areas.put(source.name, union.union());
+                    } else {
+                        // Don't union. Name each area by looking up its value for the name property in the request.
+                        finalFeatures.forEach(f -> areas.put(
+                                readProperty(f, nameProperty), (Geometry) f.getDefaultGeometry())
+                        );
+                    }
+
+                    // 2. Convert to raster grids, then store them. ====================================================
+                    areas.forEach((String name, Geometry geometry) -> {
+                        if (geometry == null) throw new AnalysisServerException("Invalid geometry uploaded.");
+                        Envelope env = geometry.getEnvelopeInternal();
+                        Grid maskGrid = new Grid(zoom, env);
+                        progressListener.beginTask("Creating grid for " + name, maskGrid.featureCount());
+
+                        // Store the percentage each cell overlaps the mask, scaled as 0 to 100,000
+                        List<Grid.PixelWeight> weights = maskGrid.getPixelWeights(geometry, true);
+                        weights.forEach(pixel -> {
+                            maskGrid.grid[pixel.x][pixel.y] = pixel.weight * 100_000;
+                            progressListener.increment();
+                        });
+
+                        AggregationArea aggregationArea = AggregationArea.create(userPermissions, name)
+                                .withSource(source);
+
+                        try {
+                            File gridFile = FileUtils.createScratchFile("grid");
+                            OutputStream os = new GZIPOutputStream(FileUtils.getOutputStream(gridFile));
+                            maskGrid.write(os);
+                            os.close();
+
+                            aggregationAreaCollection.insert(aggregationArea);
+                            aggregationAreas.add(aggregationArea);
+
+                            fileStorage.moveIntoStorage(getStoragePath(aggregationArea), gridFile);
+                        } catch (IOException e) {
+                            throw new AnalysisServerException("Error processing/uploading aggregation area");
+                        }
+                        progressListener.increment();
+                    });
+                })
+        );
 
         return aggregationAreas;
+
     }
 
     private String readProperty (SimpleFeature feature, String propertyName) {
@@ -192,17 +200,15 @@ public class AggregationAreaController implements HttpController {
     }
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
-        return Persistence.aggregationAreas.findPermitted(
-                QueryBuilder.start("regionId").is(req.params("regionId")).get(),
-                req.attribute("accessGroup")
+        return aggregationAreaCollection.findPermitted(
+                and(eq("regionId", req.queryParams("regionId"))), req.attribute(USER_GROUP_ATTRIBUTE)
         );
     }
 
     private Object getAggregationArea (Request req, Response res) {
-        final String accessGroup = req.attribute("accessGroup");
-        final String maskId = req.params("maskId");
-
-        AggregationArea aggregationArea = Persistence.aggregationAreas.findByIdIfPermitted(maskId, accessGroup);
+        AggregationArea aggregationArea = (AggregationArea) aggregationAreaCollection.findPermitted(
+                eq("_id", req.params("maskId")), req.attribute(USER_GROUP_ATTRIBUTE)
+        );
 
         String url = fileStorage.getURL(getStoragePath(aggregationArea));
         JSONObject wrappedUrl = new JSONObject();
@@ -216,7 +222,7 @@ public class AggregationAreaController implements HttpController {
         sparkService.path("/api/region/", () -> {
             sparkService.get("/:regionId/aggregationArea", this::getAggregationAreas, toJson);
             sparkService.get("/:regionId/aggregationArea/:maskId", this::getAggregationArea, toJson);
-            sparkService.post("/:regionId/aggregationArea", this::createAggregationAreas, toJson);
+            sparkService.post("/:regionId/aggregationArea/:sourceId", this::createAggregationAreas, toJson);
         });
     }
 

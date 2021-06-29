@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.controllers.UserActivityController;
-import com.conveyal.analysis.models.Model;
+import com.conveyal.analysis.models.BaseModel;
 
 /**
  * A unique identifier for the final product of a single task action. Currently this serves as both an
@@ -21,9 +20,8 @@ public class WorkProduct {
     }
 
     // FIXME Not all Models have a regionId. Rather than pass that in as a String, refine the programming API.
-    public static WorkProduct forModel (Model model) {
-        WorkProduct product = new WorkProduct(WorkProductType.forModel(model), model._id, null);
-        return product;
+    public static WorkProduct forModel (BaseModel model) {
+        return new WorkProduct(WorkProductType.forModel(model), model._id.toString(), null);
     }
 
 }

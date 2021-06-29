@@ -1,10 +1,12 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
+import com.conveyal.analysis.models.SpatialResource;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.file.FileStorage;
@@ -14,11 +16,10 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
-import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
@@ -47,14 +48,14 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.analysis.spatial.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -140,29 +141,31 @@ public class OpportunityDatasetController implements HttpController {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
 
-        // default
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
-        final Region region = Persistence.regions.findByIdIfPermitted(regionId, accessGroup);
+        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions.accessGroup);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet)
-        final String downloadBatchId = new ObjectId().toString();
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
         final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
-        taskScheduler.enqueueHeavyTask(() -> {
-            try {
-                status.message = "Extracting census data for region";
-                List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
-                createDatasetsFromPointSets(
-                        email, accessGroup, extractor.sourceName, downloadBatchId, regionId, status, grids
-                );
-            } catch (IOException e) {
-                status.completeWithError(e);
-                LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
-            }
-        });
+        SpatialResource source = SpatialResource.create(userPermissions, extractor.sourceName)
+                .withRegion(regionId);
+
+        taskScheduler.enqueue(Task.create("Extracting LODES data")
+                .forUser(userPermissions)
+                .setHeavy(true)
+                .withWorkProduct(source)
+                .withAction((progressListener) -> {
+                    try {
+                        status.message = "Extracting census data for region";
+                        List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
+                        updateAndStoreDatasets(source, status, grids);
+                    } catch (IOException e) {
+                        status.completeWithError(e);
+                        LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
+                    }
+                }));
 
         return status;
     }
@@ -171,47 +174,28 @@ public class OpportunityDatasetController implements HttpController {
      * Given a list of new PointSets, serialize each PointSet and save it to S3, then create a metadata object about
      * that PointSet and store it in Mongo.
      */
-    private List<OpportunityDataset> createDatasetsFromPointSets(String email,
-                                                                       String accessGroup,
-                                                                       String sourceName,
-                                                                       String sourceId,
-                                                                       String regionId,
-                                                                       OpportunityDatasetUploadStatus status,
-                                                                       List<? extends PointSet> pointSets) {
+    private void updateAndStoreDatasets (SpatialResource source,
+                                         OpportunityDatasetUploadStatus status,
+                                         List<? extends PointSet> pointSets) {
         status.status = Status.UPLOADING;
         status.totalGrids = pointSets.size();
-
         // Create an OpportunityDataset holding some metadata about each PointSet (Grid or FreeForm).
         final List<OpportunityDataset> datasets = new ArrayList<>();
         for (PointSet pointSet : pointSets) {
-
-            // Make new PointSet metadata objects.
-            // Unfortunately we can't pull this step out into a method because there are so many parameters.
-            // Some of that metadata could be consolidated e.g. user email and access group.
             OpportunityDataset dataset = new OpportunityDataset();
-            dataset.sourceName = sourceName;
-            dataset.sourceId = sourceId;
+            dataset.sourceName = source.name;
+            dataset.sourceId = source._id.toString();
+            dataset.createdBy = source.createdBy;
+            dataset.accessGroup = source.accessGroup;
+            dataset.regionId = source.regionId;
             dataset.name = pointSet.name;
-            dataset.createdBy = email;
-            dataset.accessGroup = accessGroup;
             dataset.totalPoints = pointSet.featureCount();
-            dataset.regionId = regionId;
             dataset.totalOpportunities = pointSet.sumTotalOpportunities();
             dataset.format = getFormatCode(pointSet);
             if (dataset.format == FileStorageFormat.FREEFORM) {
                 dataset.name = String.join(" ", pointSet.name, "(freeform)");
             }
-            // These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
-            // for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets because
-            // the zoom level is fixed in OpportunityDataset (there is not even a field for it).
-            // Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
-            {
-                WebMercatorExtents webMercatorExtents = pointSet.getWebMercatorExtents();
-                dataset.north = webMercatorExtents.north;
-                dataset.west = webMercatorExtents.west;
-                dataset.width = webMercatorExtents.width;
-                dataset.height = webMercatorExtents.height;
-            }
+            dataset.setWebMercatorExtents(pointSet);
             // TODO make origin and destination pointsets reference each other and indicate they are suitable
             //      for one-to-one analyses
 
@@ -232,7 +216,8 @@ public class OpportunityDatasetController implements HttpController {
                     fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
-                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, regionId + "/" + dataset._id + ".pointset");
+                    FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, source.regionId + "/" + dataset._id +
+                            ".pointset");
                     File pointsetFile = FileUtils.createScratchFile("pointset");
 
                     OutputStream os = new GZIPOutputStream(new FileOutputStream(pointsetFile));
@@ -254,7 +239,6 @@ public class OpportunityDatasetController implements HttpController {
                 throw AnalysisServerException.unknown(e);
             }
         }
-        return datasets;
     }
 
     private static FileStorageFormat getFormatCode (PointSet pointSet) {
@@ -333,108 +317,13 @@ public class OpportunityDatasetController implements HttpController {
                     fieldName));
         }
     }
-
-    private enum UploadFormat {
-        SHAPEFILE, GRID, CSV
-    }
-
-    /**
-     * Detect from a batch of uploaded files whether the user has uploaded a Shapefile, a CSV, or one or more binary
-     * grids. In the process we validate the list of uploaded files, making sure certain preconditions are met.
-     * Some kinds of uploads must contain multiple files (.shp) or can contain multiple files (.grid) while others
-     * must have only a single file (.csv). Scan the list of uploaded files to ensure it makes sense before acting.
-     * @throws AnalysisServerException if the type of the upload can't be detected or preconditions are violated.
-     * @return the expected type of the uploaded file or files, never null.
-     */
-    private UploadFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
-        if (fileItems == null || fileItems.isEmpty()) {
-            throw AnalysisServerException.fileUpload("You must include some files to create an opportunity dataset.");
-        }
-
-        Set<String> fileExtensions = extractFileExtensions(fileItems);
-
-        // There was at least one file with an extension, the set must now contain at least one extension.
-        if (fileExtensions.isEmpty()) {
-            throw AnalysisServerException.fileUpload("No file extensions seen, cannot detect upload type.");
-        }
-
-        UploadFormat uploadFormat = null;
-
-        // Check that if upload contains any of the Shapefile sidecar files, it contains all of the required ones.
-        final Set<String> shapefileExtensions = Sets.newHashSet("SHP", "DBF", "PRJ");
-        if ( ! Sets.intersection(fileExtensions, shapefileExtensions).isEmpty()) {
-            if (fileExtensions.containsAll(shapefileExtensions)) {
-                uploadFormat = UploadFormat.SHAPEFILE;
-                verifyBaseNamesSame(fileItems);
-                // TODO check that any additional file is SHX, and that there are no more than 4 files.
-            } else {
-                final String message = "You must multi-select at least SHP, DBF, and PRJ files for shapefile upload.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-
-        // Even if we've already detected a shapefile, run the other tests to check for a bad mixture of file types.
-        if (fileExtensions.contains("GRID")) {
-            if (fileExtensions.size() == 1) {
-                uploadFormat = UploadFormat.GRID;
-            } else {
-                String message = "When uploading grids you may upload multiple files, but they must all be grids.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        } else if (fileExtensions.contains("CSV")) {
-            if (fileItems.size() == 1) {
-                uploadFormat = UploadFormat.CSV;
-            } else {
-                String message = "When uploading CSV you may only upload one file at a time.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-
-        if (uploadFormat == null) {
-            throw AnalysisServerException.fileUpload("Could not detect format of opportunity dataset upload.");
-        }
-        return uploadFormat;
-    }
-
-    private Set<String> extractFileExtensions (List<FileItem> fileItems) {
-
-        Set<String> fileExtensions = new HashSet<>();
-
-        for (FileItem fileItem : fileItems) {
-            String fileName = fileItem.getName();
-            String extension = FilenameUtils.getExtension(fileName);
-            if (extension.isEmpty()) {
-                throw AnalysisServerException.fileUpload("Filename has no extension: " + fileName);
-            }
-            fileExtensions.add(extension.toUpperCase());
-        }
-
-        return fileExtensions;
-    }
-
-    private void verifyBaseNamesSame (List<FileItem> fileItems) {
-        String firstBaseName = null;
-        for (FileItem fileItem : fileItems) {
-            // Ignore .shp.xml files, which will fail the verifyBaseNamesSame check
-            if ("xml".equalsIgnoreCase(FilenameUtils.getExtension(fileItem.getName()))) continue;
-            String baseName = FilenameUtils.getBaseName(fileItem.getName());
-            if (firstBaseName == null) {
-                firstBaseName = baseName;
-            }
-            if (!firstBaseName.equals(baseName)) {
-                String message = "In a shapefile upload, all files must have the same base name.";
-                throw AnalysisServerException.fileUpload(message);
-            }
-        }
-    }
-
+    
     /**
      * Handle many types of file upload. Returns a OpportunityDatasetUploadStatus which has a handle to request status.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
+        final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
@@ -457,7 +346,7 @@ public class OpportunityDatasetController implements HttpController {
         addStatusAndRemoveOldStatuses(status);
 
         final List<FileItem> fileItems;
-        final UploadFormat uploadFormat;
+        final FileStorageFormat uploadFormat;
         final Map<String, String> parameters;
         try {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
@@ -477,13 +366,13 @@ public class OpportunityDatasetController implements HttpController {
             try {
                 // A place to accumulate all the PointSets created, both FreeForm and Grids.
                 List<PointSet> pointsets = new ArrayList<>();
-                if (uploadFormat == UploadFormat.GRID) {
+                if (uploadFormat == FileStorageFormat.GRID) {
                     LOG.info("Detected opportunity dataset stored in Conveyal binary format.");
                     pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
-                } else if (uploadFormat == UploadFormat.SHAPEFILE) {
+                } else if (uploadFormat == FileStorageFormat.SHP) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
                     pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
-                } else if (uploadFormat == UploadFormat.CSV) {
+                } else if (uploadFormat == FileStorageFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
                     FileItem csvFileItem = fileItems.get(0);
@@ -517,8 +406,9 @@ public class OpportunityDatasetController implements HttpController {
                 // Create a single unique ID string that will be referenced by all opportunity datasets produced by
                 // this upload. This allows us to group together datasets from the same source and associate them with
                 // the file(s) that produced them.
-                final String sourceFileId = new ObjectId().toString();
-                createDatasetsFromPointSets(email, accessGroup, sourceName, sourceFileId, regionId, status, pointsets);
+                SpatialResource source = SpatialResource.create(userPermissions, sourceName)
+                        .withRegion(regionId);
+                updateAndStoreDatasets(source, status, pointsets);
             } catch (Exception e) {
                 status.completeWithError(e);
             }

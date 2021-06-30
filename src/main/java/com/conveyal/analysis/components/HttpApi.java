@@ -137,20 +137,7 @@ public class HttpApi implements Component {
         // Can we consolidate all these exception handlers and get rid of the hard-wired "BAD_REQUEST" parameters?
 
         sparkService.exception(AnalysisServerException.class, (e, request, response) -> {
-            // Include a stack trace, except when the error is known to be about unauthenticated or unauthorized access,
-            // in which case we don't want to leak information about the server to people scanning it for weaknesses.
-            if (e.type == AnalysisServerException.Type.UNAUTHORIZED ||
-                e.type == AnalysisServerException.Type.FORBIDDEN
-            ){
-                JSONObject body = new JSONObject();
-                body.put("type", e.type.toString());
-                body.put("message", e.message);
-                response.status(e.httpCode);
-                response.type("application/json");
-                response.body(body.toJSONString());
-            } else {
-                respondToException(e, request, response, e.type, e.message, e.httpCode);
-            }
+            respondToException(e, request, response, e.type, e.message, e.httpCode);
         });
 
         sparkService.exception(IOException.class, (e, request, response) -> {
@@ -182,8 +169,11 @@ public class HttpApi implements Component {
         JSONObject body = new JSONObject();
         body.put("type", type.toString());
         body.put("message", message);
-        body.put("stackTrace", errorEvent.stackTrace);
-
+        // Include a stack trace except when the error is known to be about unauthenticated or unauthorized access,
+        // in which case we don't want to leak information about the server to people scanning it for weaknesses.
+        if (type != AnalysisServerException.Type.UNAUTHORIZED && type != AnalysisServerException.Type.FORBIDDEN) {
+            body.put("stackTrace", errorEvent.stackTrace);
+        }
         response.status(code);
         response.type("application/json");
         response.body(body.toJSONString());

@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
 
 /**
  * This implementation of FileStorage stores files in a local directory hierarchy and does not mirror anything to
@@ -56,6 +58,8 @@ public class LocalFileStorage implements FileStorage {
                 LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
                         file.getName());
             }
+            // Set the file to be read-only and accessible only by the current user.
+            Files.setPosixFilePermissions(file.toPath(), Set.of(PosixFilePermission.OWNER_READ));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

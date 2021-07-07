@@ -245,7 +245,9 @@ public abstract class TraversalPermissionLabeler {
     /** apply any specific permissions that may exist */
     private void applySpecificPermissions (EnumMap<Node, Label> tree, Way way) {
         // start from the root of the tree
-        if (!way.hasTag("service") || !"driveway".equals(way.getTag("service"))) {
+        if (way.hasTag("service") && "driveway".equals(way.getTag("service"))) {
+            applyLabel(Node.ACCESS, Label.YES, tree);
+        } else {
             if (way.hasTag("access")) applyLabel(Node.ACCESS, Label.fromTag(way.getTag("access")), tree);
         }
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);

@@ -26,7 +26,8 @@ public abstract class TraversalPermissionLabeler {
 
     static Map<String, EnumMap<Node, Label>> defaultPermissions = new HashMap<>(30);
 
-    //This is immutable map of highway tag and boolean which is true if this tag has same road with _link
+    // Immutable map that stores whether OSM highway tags have associated _link tags for ramps, slip lanes, etc. (e.g.
+    // motorway_link is an accepted tag, but residential_link is not)
     static final Map<String, Boolean> validHighwayTags;
 
     static {

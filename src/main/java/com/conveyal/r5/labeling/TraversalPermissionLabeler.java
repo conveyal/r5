@@ -56,7 +56,7 @@ public abstract class TraversalPermissionLabeler {
         validHighwayTags = Collections.unmodifiableMap(validHighwayTagsConst);
 
         addPermissions("motorway", "access=yes;bicycle=no;foot=no");
-        addPermissions("trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|service|track|driveway", "access=yes");
+        addPermissions("trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|service|track", "access=yes");
         addPermissions("pedestrian", "access=no;foot=yes");
         addPermissions("path", "access=no;foot=yes;bicycle=yes");
         addPermissions("bridleway", "access=no"); //horse=yes but we don't support horse
@@ -510,8 +510,7 @@ public abstract class TraversalPermissionLabeler {
                 || "customers".equals(access) || "delivery".equals(access)
                 || "forestry".equals(access)  || "agricultural".equals(access)
                 || "residents".equals(access) || "resident".equals(access)
-                || "customer".equals(access)
-                || "private".equals(access) ;
+                || "customer".equals(access);
         }
 
         public static Label fromTag (String tag) {

@@ -19,10 +19,10 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
     // Turn costs for various types of turns, in seconds.
     // These are all specified for drive-on-right countries, and reversed in drive-on-left countries.
     // TODO re-express as "turn against traffic" and "turn with traffic" to make this less confusing.
-
-    public static final int LEFT_TURN = 45;
-    public static final int STRAIGHT_ON = 1;
-    public static final int RIGHT_TURN = 25;
+    
+    public static final int LEFT_TURN = 30;
+    public static final int STRAIGHT_ON = 0;
+    public static final int RIGHT_TURN = 10;
     public static final int U_TURN = 90; // penalize U turns extremely heavily
 
     public boolean driveOnRight; // TODO instead of a field, this should be a different implementation class

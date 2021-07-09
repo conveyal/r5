@@ -100,7 +100,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * value afterward.
      * 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final double LINK_RADIUS_METERS = 1600;
+    public static final double LINK_RADIUS_METERS = 2400;
 
     /**
      * Searching for streets takes a fair amount of computation, and the number of streets examined grows roughly as

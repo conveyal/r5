@@ -332,7 +332,7 @@ public class StreetRouter {
         State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
         State startState1 = new State(split.vertex1, split.edge, streetMode);
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
-        int offStreetTime = split.distanceToEdge_mm / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+        int offStreetTime = Math.min(split.distanceToEdge_mm / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND, 300);
 
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);

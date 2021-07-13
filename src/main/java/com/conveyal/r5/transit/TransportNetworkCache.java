@@ -94,20 +94,22 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Find or create a TransportNetwork for the scenario specified in a ProfileRequest.
-     * ProfileRequests may contain an embedded complete scenario, or it may contain only the ID of a scenario that
-     * must be fetched from S3.
-     * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
-     * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
-     * rather than a compound key of (networkId, scenarioId).
+     * Find or create a TransportNetwork for the scenario specified in a ProfileRequest. ProfileRequests may contain an
+     * embedded complete scenario, or it may contain only the ID of a scenario that must be fetched from S3. By design
+     * a particular scenario is always defined relative to a single base graph (it's never applied to multiple different
+     * base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId rather than a
+     * compound key of (networkId, scenarioId).
      *
-     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
+     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused.
      * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving
-     *      the scenario against caches on S3 or local disk should be pulled out into a separate function
-     * the problem is that then you resolve the scenario every time, even when the ID is enough to look up the already built network.
-     * So we need to pass the whole task in here, so either the ID or full scenario are visible.
-     * FIXME the fact that this whole thing is synchronized will cause each new scenario to be applied in sequence.
-     *       I guess that's good as long as building distance tables is already parallelized.
+     *      the scenario against caches on S3 or local disk should be pulled out into a separate function.
+     * The problem is that then you resolve the scenario every time, even when the ID is enough to look up the already
+     * built network. So we need to pass the whole task in here, so either the ID or full scenario are visible.
+     *
+     * Thread safety notes: This entire method is synchronized so access by multiple threads will be sequential.
+     * The first thread will have a chance to build and store the requested scenario before any others see it.
+     * This means each new scenario will be applied one after the other. This is probably OK as long as building egress
+     * tables is already parallelized.
      */
     public synchronized TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
         // If the networkId is different than previous calls, a new network will be loaded. Its transient nested map

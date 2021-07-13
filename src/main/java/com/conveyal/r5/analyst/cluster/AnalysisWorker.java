@@ -462,8 +462,7 @@ public class AnalysisWorker implements Runnable {
         // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
         // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
         // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-        TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
-                .graphId, task.scenarioId);
+        TransportNetwork transportNetwork = networkPreloader.synchronousPreload(task);
 
         // Static site tasks do not specify destinations, but all other regional tasks should.
         // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.

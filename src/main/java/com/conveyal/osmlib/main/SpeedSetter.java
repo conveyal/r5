@@ -89,6 +89,7 @@ public class SpeedSetter {
             }
 
         });
+        osm.ways = ways;
         osm.writeToFile(osmOutputFile);
         bw.close();
     }

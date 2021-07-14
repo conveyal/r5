@@ -23,7 +23,7 @@ public class SpeedSetter {
             "Work/MassDOT/Streetlight/streetlight-ma-2019-02-04/";
     static final String osmInputFile = dir + "massachusetts-200101.osm.pbf";
     static final String speedInputFile = dir + "speed-extract-2019_v5.csv";
-    static final String speedFallbackFile = dir + "speed-fallbacks-2019.csv";
+    static final String speedFallbackFile = dir + "fallbacks.csv";
     static final String osmOutputFile = dir + "output.pbf";
     static final String csvOutputFile = dir + "speeds_v5.1.csv";
 
@@ -34,7 +34,6 @@ public class SpeedSetter {
         // Populate map from OSM way IDs to speeds using provided CSV
         Map<Long, Double> speeds = new HashMap<>();
         File speedsFile = new File(speedInputFile);
-
         BufferedReader br = new BufferedReader(new FileReader(speedsFile));
         br.readLine(); // skip headers
         for (String line; (line = br.readLine()) != null; ) {
@@ -50,8 +49,22 @@ public class SpeedSetter {
             speeds.put(osmWayId, speedMph);
         }
 
-        // TODO read fallback speeds
-        Map<Long, Double> fallbackSpeeds = new HashMap<>();
+        // Populate map from OSM highway tags to fallback speed values using provided CSV
+        Map<String, Double> fallbacks = new HashMap<>();
+        br = new BufferedReader(new FileReader(speedFallbackFile));
+        br.readLine(); // skip headers
+        for (String line; (line = br.readLine()) != null; ) {
+            String[] fields = line.split(",");
+            String osmHighwayTag = fields[0];
+
+            // For 06:00 to 09:00
+            double speedMph = Double.parseDouble(fields[5]);
+
+            // For 12:00 to 15:00
+            // double speedMph = Double.parseDouble(fields[7]);
+
+            fallbacks.put(osmHighwayTag, speedMph);
+        }
 
         SpeedConfig estimatedSpeedLimits = SpeedConfig.defaultConfig();
 
@@ -69,14 +82,15 @@ public class SpeedSetter {
             String streetType;
             Double speedMph = null;
 
-            if (way == null) {
+            if (osmWayId == null || way == null) {
                 streetType = "Missing";
             } else {
                 streetType = way.getTag("highway") == null ? "Untagged" : way.getTag("highway");
                 // TODO make this configurable (add arg "enforceSpeedLimits"?)
                 Integer speedLimit = estimatedSpeedLimits.values.getOrDefault(streetType, estimatedSpeedLimits.defaultSpeed);
+                double fallbackSpeed = fallbacks.get(streetType) == null ? speedLimit : fallbacks.get(streetType);
                 // TODO use fallback value by streetType instead of speed limit?
-                speedMph = speeds.get(osmWayId) != null ? Math.min(speedLimit, speeds.get(osmWayId)) : speedLimit;
+                speedMph = speeds.get(osmWayId) == null ? fallbackSpeed : Math.min(speedLimit, speeds.get(osmWayId));
                 // R5 currently prioritizes maxspeed:motorcar above all other maxspeed tags
                 way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f mph", speedMph));
                 ways.put(osmWayId, way);

@@ -21,11 +21,21 @@ public class SpeedSetter {
 
     static final String dir = "C:/Users/Anson/Dropbox (Conveyal)/Anson/Client " +
             "Work/MassDOT/Streetlight/streetlight-ma-2019-02-04/";
-    static final String osmInputFile = dir + "massachusetts-200101.osm.pbf";
+    static final String osmInputFile = dir + "massachusetts-200101-cropped.osm.pbf";
     static final String speedInputFile = dir + "speed-extract-2019_v5.csv";
     static final String speedFallbackFile = dir + "fallbacks.csv";
-    static final String osmOutputFile = dir + "output.pbf";
-    static final String csvOutputFile = dir + "speeds_v5.1.csv";
+    static final String osmOutputFile = dir + "2019-12pm-3pm_5.2.pbf";
+    static final String csvOutputFile = dir + "speeds-12pm-3pm_v5.2.csv";
+
+    // Column numbers in supplied CSVs
+
+    // For 6-9am
+    // static final int speedIndex = 3;
+    // static final int fallbackIndex = 5;
+
+    // For 12-3pm
+    static final int speedIndex = 5;
+    static final int fallbackIndex = 7;
 
     public static void main (String[] args) throws Exception {
         OSM osm = new OSM(null);
@@ -39,13 +49,7 @@ public class SpeedSetter {
         for (String line; (line = br.readLine()) != null; ) {
             String[] fields = line.split(",");
             long osmWayId = Long.parseLong(fields[0]);
-
-            // For 06:00 to 09:00
-            double speedMph = Double.parseDouble(fields[3]);
-
-            // For 12:00 to 15:00
-            // double speedMph = Double.parseDouble(fields[5]);
-
+            double speedMph = Double.parseDouble(fields[speedIndex]);
             speeds.put(osmWayId, speedMph);
         }
 
@@ -56,13 +60,7 @@ public class SpeedSetter {
         for (String line; (line = br.readLine()) != null; ) {
             String[] fields = line.split(",");
             String osmHighwayTag = fields[0];
-
-            // For 06:00 to 09:00
-            double speedMph = Double.parseDouble(fields[5]);
-
-            // For 12:00 to 15:00
-            // double speedMph = Double.parseDouble(fields[7]);
-
+            double speedMph = Double.parseDouble(fields[fallbackIndex]);
             fallbacks.put(osmHighwayTag, speedMph);
         }
 

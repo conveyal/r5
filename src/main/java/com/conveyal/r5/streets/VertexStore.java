@@ -4,6 +4,7 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
@@ -13,6 +14,8 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
 import java.io.Serializable;
+
+import static com.conveyal.r5.elevation.ToblerCalculator.DECIMETERS_PER_METER;
 
 /**
  * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.
@@ -32,6 +35,7 @@ public class VertexStore implements Serializable {
     public TIntList fixedLats;
     public TIntList fixedLons;
     public TByteList vertexFlags;
+    public TShortList elevations;
 
     public VertexStore (int initialSize) {
         fixedLats = new TIntArrayList(initialSize);
@@ -123,6 +127,8 @@ public class VertexStore implements Serializable {
         public Coordinate getJTSCoordinateFloating () {
             return new Coordinate(getLon(), getLat());
         }
+
+        public double getElevationMeters () { return elevations.get(index) / DECIMETERS_PER_METER; };
 
     }
 

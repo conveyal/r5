@@ -873,7 +873,7 @@ public class EdgeStore implements Serializable {
 
 
         /**
-         * Returns LineString geometry of edge
+         * Returns LineString geometry of edge in floating point geographic coordinates.
          * Uses from/to vertices for first/last node and nodes from geometries for middle nodes
          *
          * TODO: it might be better idea to return just list of coordinates

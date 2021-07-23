@@ -281,7 +281,7 @@ public class StreetLayer implements Serializable, Cloneable {
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
-        // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
+        // TEMPORARY HACK: create a EdgeTraversalTimes object to hold costs from preprocessed OSM data, and indicate that
         // we are loading them. Eventually this should be done based on configuration settings.
         this.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(edgeStore);
 
@@ -1120,6 +1120,7 @@ public class StreetLayer implements Serializable, Cloneable {
         LOG.info("Indexing streets...");
         spatialIndex = new IntHashGrid();
         // Skip by twos, we only need to index forward (even) edges. Their odd companions have the same geometry.
+        // Ideally shouldn't we then be recording the edge pair numbers, i.e. the edgeIndex/2 ?
         Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); e += 2) {
             edge.seek(e);

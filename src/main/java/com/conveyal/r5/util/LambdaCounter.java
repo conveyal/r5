@@ -2,6 +2,8 @@ package com.conveyal.r5.util;
 
 import org.slf4j.Logger;
 
+import static com.conveyal.gtfs.util.Util.human;
+
 /**
  * Allows counting iterations and logging inside lambda expressions, including those within parallel streams.
  * Java does not allow you to modify a primitive in a lambda expression, but you can modify a primitive via a constant
@@ -57,9 +59,9 @@ public class LambdaCounter {
 
     private void log () {
         if (total > 0) {
-            logger.info(message, count, total);
+            logger.info(message, human(count), human(total));
         } else {
-            logger.info(message, count);
+            logger.info(message, human(count));
         }
     }
 

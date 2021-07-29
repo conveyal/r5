@@ -51,6 +51,7 @@ import java.util.Objects;
  * This property is converted to an OSM tag in the output data. R5 reads and uses this tag to set its LTS values.
  * Several shapefiles are loaded and "noded", i.e. topological connections are created everywhere lines cross.
  * The inputs could potentially be any format that amounts to a collection of linestring features (GeoJSON etc.).
+ * See Javadoc on ShapefileMatcher for discussion of matching shapefiles to OSM versus converting shapefiles to OSM.
  */
 public class ShapefileMain {
 

@@ -99,8 +99,34 @@ public class ShapefileReader {
         return source.getBounds();
     }
 
+    public List<String> attributesAssignableTo (Class<?> theClass) {
+        return features.getSchema()
+                .getAttributeDescriptors()
+                .stream()
+                .filter(d -> theClass.isAssignableFrom(d.getType().getBinding()))
+                .map(AttributeDescriptor::getLocalName)
+                .collect(Collectors.toList());
+    }
+
     public List<String> numericAttributes () {
-        return features.getSchema().getAttributeDescriptors().stream().filter(d -> Number.class.isAssignableFrom(d.getType().getBinding())).map(AttributeDescriptor::getLocalName).collect(Collectors.toList());
+        return attributesAssignableTo(Number.class);
+    }
+
+    /**
+     * Find an attribute by name _ignoring case_ and ensure it is assignable to variables of a particular class.
+     * @return the index of this attribute, so it can be fetched on each feature by index instead of name.
+     */
+    public int findAttribute (String name, Class<?> assignableTo) {
+        SimpleFeatureType featureSchema = features.getSchema();
+        int nAttributes = featureSchema.getAttributeCount();
+        for (int i = 0; i < nAttributes; i++) {
+            AttributeDescriptor descriptor = featureSchema.getDescriptor(i);
+            if (descriptor.getName().getLocalPart().equalsIgnoreCase(name) &&
+                assignableTo.isAssignableFrom(descriptor.getType().getBinding())) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Could not find attribute with specified name and type.");
     }
 
     public double getAreaSqKm () throws IOException, TransformException, FactoryException {
@@ -108,7 +134,6 @@ public class ShapefileReader {
         MathTransform webMercatorTransform = CRS.findMathTransform(crs, webMercatorCRS, true);
         Envelope mercatorEnvelope = JTS.transform(getBounds(), webMercatorTransform);
         return mercatorEnvelope.getArea() / 1000 / 1000;
-
     }
 
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {

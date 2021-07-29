@@ -70,6 +70,10 @@ public class ShapefileMatcher {
      * Match each pair of edges in the street layer to a feature in the shapefile. Copy LTS attribute from that feature
      * to the pair of edges, setting the BIKE_LTS_EXPLICIT flag. This will prevent Conveyal OSM-inferred LTS from
      * overwriting the shapefile-derived LTS.
+     * In current usage this is applied after the OSM is already completely loaded and converted to network edges, so
+     * it overwrites any data from OSM. Perhaps instead of BIKE_LTS_EXPLICIT we should have an LTS source flag:
+     * OSM_INFERRED, OSM_EXPLICIT, SHAPEFILE_MATCH etc. This could also apply to things like speeds and slopes.
+     * The values could be retained only for the duration of network building unless we have a reason to keep them.
      */
     public void match (String shapefileName, String attributeName) {
         try {

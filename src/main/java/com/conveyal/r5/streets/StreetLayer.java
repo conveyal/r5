@@ -305,6 +305,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
             }
         }
+        // Initial bike LTS values were added in makeEdgePair calls above via LevelOfTrafficStressLabeler.label
         stressLabeler.logErrors();
 
         if (edgeStore.edgeTraversalTimes != null) {

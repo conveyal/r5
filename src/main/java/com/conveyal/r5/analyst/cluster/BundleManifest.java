@@ -10,9 +10,17 @@ import java.util.List;
  * before being looked up as S3 objects.
  */
 public class BundleManifest {
+
     /** ID of the OSM file, for use with OSMCache */
     public String osmId;
 
     /** IDs of the GTFS files, for use with GTFSCache */
     public List<String> gtfsIds;
+
+    /** ID of the elevation raster, if any, to be looked up as a resource. */
+    public String elevationRasterId;
+
+    /** ID of the bicycle LTS shapefile, if any, to be looked up as a resource. */
+    public String ltsShapefile;
+
 }

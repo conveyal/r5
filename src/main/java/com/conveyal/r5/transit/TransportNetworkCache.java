@@ -11,6 +11,7 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -32,6 +33,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.file.FileCategory.RESOURCES;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
@@ -251,14 +253,24 @@ public class TransportNetworkCache {
             LOG.error("Error reading manifest", e);
             return null;
         }
-        // FIXME duplicate code. All internal building logic should be encapsulated in a method like TransportNetwork.build(osm, gtfs1, gtfs2...)
-        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip
-        // So you've got to remember to do certain things like set the network ID of the network in multiple places in the code.
+        // FIXME duplicate code. All internal building logic should be encapsulated in a method like
+        //  TransportNetwork.build(osm, gtfs1, gtfs2...)
+        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip so you've
+        // got to remember to do certain things like set the network ID of the network in multiple places in the code.
+        // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
 
         TransportNetwork network = new TransportNetwork();
         network.scenarioId = networkId;
-        network.streetLayer = new StreetLayer(new TNBuilderConfig()); // TODO builderConfig
+        // TODO builderConfig - maybe even specifying elevation and LTS source IDs (which will be sought in RESOURCES)?
+        network.streetLayer = new StreetLayer(new TNBuilderConfig());
         network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
+        if (manifest.ltsShapefile != null) {
+            // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded
+            // code. Maybe some of this labeling and cleanup should be deferred until after the edges already exist.
+            // It's debatable whether this should be in the manifest.json, and how attribute name should be specified.
+            File ltsShapefile = fileStorage.getFile(new FileStorageKey(RESOURCES, manifest.ltsShapefile, "shp"));
+            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), "lts_ov");
+        }
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 

@@ -9,8 +9,14 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import org.apache.commons.math3.random.MersenneTwister;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
- /**
+import static com.google.common.base.Preconditions.checkElementIndex;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
+/**
   * Generates and stores departure time offsets for every frequency-based set of trips.
   * This holds only one set of offsets at a time. It is re-randomized before each Monte Carlo iteration.
   * Therefore we have no memory of exactly which offsets were used in a particular Monte Carlo search.
@@ -18,9 +24,19 @@ import java.util.Arrays;
   * we'd need to make alternate implementations that pre-generate the entire set or use deterministic seeded generators.
   */
 public class FrequencyRandomOffsets {
+
     /** map from trip pattern index to a list of offsets for trip i and frequency entry j on that pattern */
-    public final TIntObjectMap<int[][]> offsets = new TIntObjectHashMap<>();
-    public final TransitLayer data;
+    private final TIntObjectMap<int[][]> offsets = new TIntObjectHashMap<>();
+    private final TransitLayer data;
+
+    /**
+     * Secondary copy of the offsets keyed on TripSchedule objects.
+     * This allows lookups where patterns and trips have been filtered and int indexes no longer match unfiltered ones.
+     * This can't simply replace the other offsets map because we need to fetch stop sequences from TripPatterns
+     * to look up phase targets on the fly. It's awkward to store them if they're looked up in advance because the
+     * natural key is frequency entries, which are not objects but just array slots.
+     */
+    private final Map<TripSchedule, int[]> offsetsForTripSchedule = new HashMap<>();
 
     /** The mersenne twister is a higher quality random number generator than the one included with Java */
     private MersenneTwister mt = new MersenneTwister();
@@ -45,6 +61,17 @@ public class FrequencyRandomOffsets {
 
             offsets.put(pattIdx, offsetsThisPattern);
         }
+    }
+
+    public int getOffsetSeconds (TripSchedule tripSchedule, int freqEntryIndex) {
+        int[] offsetsPerEntry = offsetsForTripSchedule.get(tripSchedule);
+        checkState(
+            tripSchedule.nFrequencyEntries() == offsetsPerEntry.length,
+            "Offsets array length should exactly match number of freq entries in TripSchedule."
+        );
+        int offset = offsetsPerEntry[freqEntryIndex];
+        checkState(offset >= 0, "Frequency entry offset was not randomized.");
+        return offset;
     }
 
      /**
@@ -179,9 +206,19 @@ public class FrequencyRandomOffsets {
                     }
                 }
             }
-
             if (remainingAfterPreviousRound == remaining && remaining > 0) {
                 throw new IllegalArgumentException("Cannot solve phasing, you may have a circular reference!");
+            }
+            // Copy results of randomization to a Map keyed on TripSchedules (instead of TripPattern index ints)
+            offsetsForTripSchedule.clear();
+            for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
+                it.advance();
+                TripPattern tripPattern = data.tripPatterns.get(it.key());
+                int[][] offsetsForTrip = it.value();
+                for (int ts = 0; ts < tripPattern.tripSchedules.size(); ts++) {
+                    TripSchedule tripSchedule = tripPattern.tripSchedules.get(ts);
+                    offsetsForTripSchedule.put(tripSchedule, offsetsForTrip[ts]);
+                }
             }
         }
     }

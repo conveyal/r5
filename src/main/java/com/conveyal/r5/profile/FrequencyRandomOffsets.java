@@ -209,7 +209,10 @@ public class FrequencyRandomOffsets {
             if (remainingAfterPreviousRound == remaining && remaining > 0) {
                 throw new IllegalArgumentException("Cannot solve phasing, you may have a circular reference!");
             }
-            // Copy results of randomization to a Map keyed on TripSchedules (instead of TripPattern index ints)
+            // Copy results of randomization to a Map keyed on TripSchedules (instead of TripPattern index ints). This
+            // allows looking up offsets in a context where we only have a filtered list of running frequency trips and
+            // don't know the original unfiltered index of the trip within the pattern. Ideally we'd just build the
+            // original map keyed on TripSchedules (or hypothetical FreqEntries) but that reqires a lot of refactoring.
             offsetsForTripSchedule.clear();
             for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
                 it.advance();
@@ -217,7 +220,11 @@ public class FrequencyRandomOffsets {
                 int[][] offsetsForTrip = it.value();
                 for (int ts = 0; ts < tripPattern.tripSchedules.size(); ts++) {
                     TripSchedule tripSchedule = tripPattern.tripSchedules.get(ts);
-                    offsetsForTripSchedule.put(tripSchedule, offsetsForTrip[ts]);
+                    // On patterns with mixed scheduled and frequency trips, scheduled trip slots will be null.
+                    // Maps can store null values, but there's no point in storing them. We only store non-null arrays.
+                    if (offsetsForTrip[ts] != null) {
+                        offsetsForTripSchedule.put(tripSchedule, offsetsForTrip[ts]);
+                    }
                 }
             }
         }

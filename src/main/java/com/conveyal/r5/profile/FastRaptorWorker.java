@@ -671,7 +671,12 @@ public class FastRaptorWorker {
                             //  this looks like a good candidate for polymorphism (board time strategy passed in).
                             //  The offset could be looked up by the getDepartureTime method itself, not passed in.
                             if (frequencyBoardingMode == MONTE_CARLO) {
-                                int offset = offsets.offsets.get(patternIndex)[tripScheduleIndex][frequencyEntryIdx];
+                                int[] offsetsPerEntry = offsets.offsets.get(patternIndex)[tripScheduleIndex];
+                                checkState(
+                                    schedule.nFrequencyEntries() == offsetsPerEntry.length,
+                                    "Offsets array length should exactly match number of freq entries in TripSchedule."
+                                );
+                                int offset = offsetsPerEntry[frequencyEntryIdx];
                                 newBoardingDepartureTimeAtStop = getRandomFrequencyDepartureTime(
                                         schedule,
                                         stopPositionInPattern,
@@ -736,7 +741,9 @@ public class FastRaptorWorker {
             int frequencyEntryIdx,
             int earliestTime
     ) {
-        checkState(offset >= 0);
+        checkState(offset >= 0, "Offset should be non-negative.");
+        checkState(offset < schedule.headwaySeconds[frequencyEntryIdx], "Offset should be less than headway.");
+
         // Find the time the first vehicle in this entry will depart from the current stop:
         // The start time of the entry window, plus travel time from first stop to current stop, plus phase offset.
         // TODO check that frequency trips' stop times are always normalized to zero at first departure.

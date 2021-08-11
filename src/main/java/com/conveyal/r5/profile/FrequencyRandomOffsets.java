@@ -25,8 +25,13 @@ import static com.google.common.base.Preconditions.checkState;
   */
 public class FrequencyRandomOffsets {
 
-    /** map from trip pattern index to a list of offsets for trip i and frequency entry j on that pattern */
+    /**
+     * Map from trip pattern index (which is the same between filtered and unfiltered patterns) to a list of offsets
+     * (in seconds) for each frequency entry on each trip of that pattern. Final dimension null for non-frequency trips.
+     * In other words, patternIndex -> offsetsSeconds[tripOnPattern][frequencyEntryInTrip].
+     */
     private final TIntObjectMap<int[][]> offsets = new TIntObjectHashMap<>();
+
     private final TransitLayer data;
 
     /**
@@ -43,15 +48,15 @@ public class FrequencyRandomOffsets {
 
     public FrequencyRandomOffsets(TransitLayer data) {
         this.data = data;
-
-        if (!data.hasFrequencies)
+        if (!data.hasFrequencies) {
             return;
-
+        }
+        // Create skeleton empty data structure with slots for all offsets that will be generated.
         for (int pattIdx = 0; pattIdx < data.tripPatterns.size(); pattIdx++) {
             TripPattern tp = data.tripPatterns.get(pattIdx);
-
-            if (!tp.hasFrequencies) continue;
-
+            if (!tp.hasFrequencies) {
+                continue;
+            }
             int[][] offsetsThisPattern = new int[tp.tripSchedules.size()][];
 
             for (int tripIdx = 0; tripIdx < tp.tripSchedules.size(); tripIdx++) {
@@ -63,6 +68,10 @@ public class FrequencyRandomOffsets {
         }
     }
 
+    /**
+     * Return the random offset ("phase") in seconds generated for the given frequency entry of the given TripSchedule.
+     * Lookup is now by TripSchedule object as trips are filtered, losing track of their int indexes in unfiltered lists.
+     */
     public int getOffsetSeconds (TripSchedule tripSchedule, int freqEntryIndex) {
         int[] offsetsPerEntry = offsetsForTripSchedule.get(tripSchedule);
         checkState(
@@ -80,9 +89,10 @@ public class FrequencyRandomOffsets {
       * We run all Raptor rounds with one draw before proceeding to the next draw.
       */
     public void randomize () {
+        // The number of TripSchedules for which we still need to generate a random offset.
         int remaining = 0;
 
-        // First, initialize all offsets for all trips and entries on this pattern with -1s
+        // First, initialize all offsets for all trips and entries on this pattern with -1 ("not yet randomized").
         for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
             it.advance();
             for (int[] offsetsPerEntry : it.value()) {
@@ -94,12 +104,16 @@ public class FrequencyRandomOffsets {
             }
         }
 
+        // If some randomized schedules are synchronized with other schedules ("phased") we perform multiple passes. In
+        // each pass we randomize only schedules whose phasing target is already known (randomized in a previous pass).
+        // This will loop forever if the phasing dependency graph has cycles - we must catch stalled progress. This is
+        // essentially performing depth-first traversal of the dependency graph iteratively without materializing it.
         while (remaining > 0) {
-            int remainingAfterPreviousRound = remaining;
+            int remainingAfterPreviousPass = remaining;
 
             for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
                 it.advance();
-
+                // The only thing we need from the TripPattern is the stop sequence, which is used only in phase solving.
                 TripPattern pattern = data.tripPatterns.get(it.key());
                 int[][] val = it.value();
 
@@ -113,20 +127,24 @@ public class FrequencyRandomOffsets {
                     } else {
                         for (int frequencyEntryIndex = 0; frequencyEntryIndex < val[tripScheduleIndex].length; frequencyEntryIndex++) {
                             if (schedule.phaseFromId == null || schedule.phaseFromId[frequencyEntryIndex] == null) {
-                                // not phased. also, don't overwrite with new random number on each iteration, as other
-                                // trips may be phased from this one
+                                // This trip is not phased so does not require solving. Generate a random offset
+                                // immediately. Do this only once - don't overwrite with a new random number on each
+                                // phase solving pass, as other trips may be be phased from this one.
                                 if (val[tripScheduleIndex][frequencyEntryIndex] == -1) {
                                     val[tripScheduleIndex][frequencyEntryIndex] = mt.nextInt(schedule.headwaySeconds[frequencyEntryIndex]);
                                     remaining--;
                                 }
                             }
                             else {
-                                if (val[tripScheduleIndex][frequencyEntryIndex] != -1) continue; // already randomized
-
-                                // find source phase information
+                                // This trip is phased from another.
+                                if (val[tripScheduleIndex][frequencyEntryIndex] != -1) {
+                                    continue; // Offset has already have been generated.
+                                }
+                                // No random offset has been generated for this trip yet.
+                                // Find source phase information. TODO refactor to use references instead of ints.
                                 int[] source = data.frequencyEntryIndexForId.get(schedule.phaseFromId[frequencyEntryIndex]);
                                 // Throw a meaningful error when invalid IDs are encountered instead of NPE.
-                                // Really this should be done when applying the modifications rather than during the search.
+                                // Really this should be done when resolving or applying the modifications rather than during search.
                                 if (source == null) {
                                     throw new RuntimeException("This pattern ID specified in a scenario does not exist: "
                                             + schedule.phaseFromId[frequencyEntryIndex]);
@@ -147,7 +165,7 @@ public class FrequencyRandomOffsets {
                                     int sourceStopIndexInNetwork = data.indexForStopId.get(schedule.phaseFromStop[frequencyEntryIndex]);
 
                                     // TODO check that stop IDs were found.
-
+                                    // TODO find all stop IDs in advance when resolving/applying modifications or constructing FrequencyRandomOffsets.
                                     while (sourceStopIndexInPattern < phaseFromPattern.stops.length &&
                                             phaseFromPattern.stops[sourceStopIndexInPattern] != sourceStopIndexInNetwork) {
                                         sourceStopIndexInPattern++;
@@ -206,7 +224,7 @@ public class FrequencyRandomOffsets {
                     }
                 }
             }
-            if (remainingAfterPreviousRound == remaining && remaining > 0) {
+            if (remainingAfterPreviousPass == remaining && remaining > 0) {
                 throw new IllegalArgumentException("Cannot solve phasing, you may have a circular reference!");
             }
             // Copy results of randomization to a Map keyed on TripSchedules (instead of TripPattern index ints). This

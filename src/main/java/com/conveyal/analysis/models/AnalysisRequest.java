@@ -1,7 +1,6 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
@@ -12,7 +11,6 @@ import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.JsonUtilities;
-import com.mongodb.QueryBuilder;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -27,13 +25,16 @@ import java.util.zip.CRC32;
  * sends/forwards to R5 workers (see {@link AnalysisWorkerTask}), though it has many of the same fields.
  */
 public class AnalysisRequest {
-
     private static int MIN_ZOOM = 9;
     private static int MAX_ZOOM = 12;
     private static int MAX_GRID_CELLS = 5_000_000;
 
+    public String regionId;
     public String projectId;
-    public int variantIndex;
+    public String scenarioId;
+
+    public String bundleId;
+    public List<String> modificationIds = new ArrayList<>();
     public String workerVersion;
 
     public String accessModes;
@@ -149,23 +150,6 @@ public class AnalysisRequest {
     public DecayFunction decayFunction;
 
     /**
-     * Get all of the modifications for a project id that are in the Variant and map them to their
-     * corresponding r5 mod
-     */
-    private static List<Modification> modificationsForProject (
-            String accessGroup,
-            String projectId,
-            int variantIndex)
-    {
-        return Persistence.modifications
-                .findPermitted(QueryBuilder.start("projectId").is(projectId).get(), accessGroup)
-                .stream()
-                .filter(m -> variantIndex < m.variants.length && m.variants[variantIndex])
-                .map(com.conveyal.analysis.models.Modification::toR5)
-                .collect(Collectors.toList());
-    }
-
-    /**
      * Finds the modifications for the specified project and variant, maps them to their
      * corresponding R5 modification types, creates a checksum from those modifications, and adds
      * them to the AnalysisTask along with the rest of the request.
@@ -178,55 +162,34 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, Project project) {
+    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, List<Modification> modifications) {
+        if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
 
-        // Fetch the modifications associated with this project, filtering for the selected scenario
-        // (denoted here as "variant"). There are no modifications in the baseline scenario
-        // (which is denoted by special index -1).
-        List<Modification> modifications = new ArrayList<>();
-        String scenarioName;
-        if (variantIndex > -1) {
-            if (variantIndex >= project.variants.length) {
-                throw AnalysisServerException.badRequest("Scenario does not exist. Please select a new scenario.");
-            }
-            modifications = modificationsForProject(project.accessGroup, projectId, variantIndex);
-            scenarioName = project.variants[variantIndex];
-        } else {
-            scenarioName = "Baseline";
-        }
-
-        // The CRC of the modifications in this scenario is appended to the scenario ID to
-        // identify a unique revision of the scenario (still denoted here as variant) allowing
-        // the worker to cache and reuse networks built by applying that exact revision of the
+        // The CRC of the modifications in this scenario is appended to the bundle ID to identify a unique set of
+        // modifications allowing the worker to cache and reuse networks built by applying that exact revision of the
         // scenario to a base network.
         CRC32 crc = new CRC32();
         crc.update(JsonUtilities.objectToJsonBytes(modifications));
         long crcValue = crc.getValue();
-
-        task.scenario = new Scenario();
         // FIXME Job IDs need to be unique. Why are we setting this to the project and variant?
         //       This only works because the job ID is overwritten when the job is enqueued.
         //       Its main effect is to cause the scenario ID to have this same pattern!
         //       We should probably leave the JobID null on single point tasks. Needed: polymorphic task initialization.
-        task.jobId = String.format("%s-%s-%s", projectId, variantIndex, crcValue);
-        task.scenario.id = task.scenarioId = task.jobId;
-        task.scenario.modifications = modifications;
-        task.scenario.description = scenarioName;
-        task.graphId = project.bundleId;
-        task.workerVersion = workerVersion;
-        task.maxFare = this.maxFare;
-        task.inRoutingFareCalculator = this.inRoutingFareCalculator;
+        task.jobId = String.format("%s-%s", bundleId, crcValue);
 
-        Bounds bounds = this.bounds;
-        if (bounds == null) {
-            // If no bounds were specified, fall back on the bounds of the entire region.
-            Region region = Persistence.regions.findByIdIfPermitted(project.regionId, project.accessGroup);
-            bounds = region.bounds;
-        }
+        Scenario scenario = new Scenario();
+        scenario.id = task.scenarioId = task.jobId;
+        scenario.modifications = modifications;
+        // task.scenario.description = scenarioName;
+
+        task.scenario = scenario;
+        task.graphId = bundleId;
+        task.workerVersion = workerVersion;
+        task.maxFare = maxFare;
+        task.inRoutingFareCalculator = inRoutingFareCalculator;
 
         // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
         //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
-
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
         checkGridSize(extents);
         task.height = extents.height;

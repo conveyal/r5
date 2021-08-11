@@ -4,7 +4,6 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.api.graphql.WrappedGTFSEntity;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
@@ -14,12 +13,12 @@ import org.mapdb.Fun;
 import spark.Request;
 import spark.Response;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
@@ -44,7 +43,10 @@ public class GTFSController implements HttpController {
         RouteAPIResponse(Route route) {
             id = route.route_id;
             color = route.route_color;
-            name = String.join(" ", route.route_short_name + "", route.route_long_name + "").trim();
+            String tempName = "";
+            if (route.route_short_name != null) tempName += route.route_short_name;
+            if (route.route_long_name != null) tempName += " " + route.route_long_name;
+            name = tempName.trim();
             type = route.route_type;
         }
     }
@@ -60,14 +62,25 @@ public class GTFSController implements HttpController {
 
     static class PatternAPIResponse {
         public final String id;
-        public final com.vividsolutions.jts.geom.LineString geometry;
+        public final String name;
+        public final GeoJSONLineString geometry;
         public final List<String> orderedStopIds;
         public final List<String> associatedTripIds;
         PatternAPIResponse(Pattern pattern) {
             id = pattern.pattern_id;
-            geometry = pattern.geometry;
+            name = pattern.name;
+            geometry = serialize(pattern.geometry);
             orderedStopIds = pattern.orderedStops;
             associatedTripIds = pattern.associatedTrips;
+        }
+
+        GeoJSONLineString serialize (com.vividsolutions.jts.geom.LineString geometry) {
+            GeoJSONLineString ret = new GeoJSONLineString();
+            ret.coordinates = Stream.of(geometry.getCoordinates())
+                    .map(c -> new double[] { c.x, c.y })
+                    .toArray(double[][]::new);
+
+            return ret;
         }
     }
 
@@ -169,5 +182,10 @@ public class GTFSController implements HttpController {
         sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/stops", this::getStops, toJson);
+    }
+
+    private static class GeoJSONLineString {
+        public final String type = "LineString";
+        public double[][] coordinates;
     }
 }

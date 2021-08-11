@@ -10,8 +10,8 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
+import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
-import com.sun.net.httpserver.Headers;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -49,6 +48,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -132,10 +132,19 @@ public class BrokerController implements HttpController {
         final String accessGroup = request.attribute("accessGroup");
         final String userEmail = request.attribute("email");
         final long startTimeMsec = System.currentTimeMillis();
-        AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, accessGroup);
+
+        final AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
+
+        final List<Modification> modifications = Persistence.modifications.findPermitted(
+                QueryBuilder.start("_id").in(analysisRequest.modificationIds).get(),
+                accessGroup);
+
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest.populateTask(new TravelTimeSurfaceTask(), project);
+        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest.populateTask(
+                new TravelTimeSurfaceTask(),
+                modifications.stream().map(Modification::toR5).collect(Collectors.toList())
+        );
+
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
             // Look up all destination opportunity data sets from the database and derive their storage keys.
@@ -170,7 +179,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, project._id, project.regionId);
+            WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, analysisRequest.projectId, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
@@ -207,9 +216,9 @@ public class BrokerController implements HttpController {
             if (response.status() == 200) {
                 int durationMsec = (int) (System.currentTimeMillis() - startTimeMsec);
                 eventBus.send(new SinglePointEvent(
-                        task.scenarioId,
-                        analysisRequest.projectId,
-                        analysisRequest.variantIndex,
+                        analysisRequest.scenarioId,
+                        analysisRequest.bundleId,
+                        analysisRequest.regionId,
                         durationMsec
                     ).forUser(userEmail, accessGroup)
                 );

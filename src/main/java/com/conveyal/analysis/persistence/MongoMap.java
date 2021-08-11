@@ -17,6 +17,7 @@ import spark.Request;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * An attempt at simulating a MapDB-style interface, for storing Java objects in MongoDB.
@@ -74,7 +75,7 @@ public class MongoMap<V extends Model> {
      * Helper function that adds the `accessGroup` to the query if the user is not an admin. If you want to query using
      * the `accessGroup` as an admin it must be added to the query.
      */
-    public Collection<V> findPermitted(DBObject query, String accessGroup) {
+    public List<V> findPermitted(DBObject query, String accessGroup) {
         DBCursor<V> cursor = find(QueryBuilder.start().and(
                 query,
                 QueryBuilder.start("accessGroup").is(accessGroup).get()

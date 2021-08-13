@@ -60,7 +60,9 @@ public class FileStorageController implements HttpController {
      * Find all associated FileInfo records for a region.
      */
     private List<FileInfo> findAllForRegion(Request req, Response res) {
-        return fileCollection.findPermitted(and(eq("regionId", req.queryParams("regionId"))), UserPermissions.from(req));
+        return fileCollection.findPermitted(
+                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
+        );
     }
 
     /**

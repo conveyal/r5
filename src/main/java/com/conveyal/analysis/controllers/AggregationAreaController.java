@@ -192,7 +192,7 @@ public class AggregationAreaController implements HttpController {
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
         return aggregationAreaCollection.findPermitted(
-                and(eq("regionId", req.queryParams("regionId"))), UserPermissions.from(req)
+                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
         );
     }
 

@@ -63,8 +63,7 @@ public class SpatialResourceController implements HttpController {
 
     private List<SpatialResource> getRegionResources (Request req, Response res) {
         return spatialResourceCollection.findPermitted(
-                and(eq("regionId", req.params("regionId"))),
-                UserPermissions.from(req)
+                eq("regionId", req.params("regionId")), UserPermissions.from(req)
         );
     }
 
@@ -170,8 +169,7 @@ public class SpatialResourceController implements HttpController {
         // TODO delete referencing database records
         spatialResourceCollection.delete(source);
         return spatialResourceCollection.findPermitted(
-                and(eq("regionId", request.params("regionId"))),
-                UserPermissions.from(request)
+                eq("regionId", request.params("regionId")), UserPermissions.from(request)
         );
     }
 

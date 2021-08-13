@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.FileInfo;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
@@ -59,7 +60,7 @@ public class FileStorageController implements HttpController {
      * Find all associated FileInfo records for a region.
      */
     private List<FileInfo> findAllForRegion(Request req, Response res) {
-        return fileCollection.findPermitted(and(eq("regionId", req.queryParams("regionId"))), req.attribute("accessGroup"));
+        return fileCollection.findPermitted(and(eq("regionId", req.queryParams("regionId"))), UserPermissions.from(req));
     }
 
     /**
@@ -116,7 +117,7 @@ public class FileStorageController implements HttpController {
 
         // Set status to ready
         fileInfo.isReady = true;
-        fileInfo.updatedBy = req.attribute("email");
+        fileInfo.updatedBy = UserPermissions.from(req).email;
 
         // Store changes to the file info
         fileCollection.update(fileInfo);

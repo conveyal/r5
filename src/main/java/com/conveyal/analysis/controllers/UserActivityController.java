@@ -9,7 +9,6 @@ import spark.Service;
 
 import java.util.List;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -41,7 +40,7 @@ public class UserActivityController implements HttpController {
     }
 
     private ResponseModel getActivity (Request req, Response res) {
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        UserPermissions userPermissions = UserPermissions.from(req);
         ResponseModel responseModel = new ResponseModel();
         responseModel.systemStatusMessages = List.of();
         responseModel.taskBacklog = taskScheduler.getBacklog();

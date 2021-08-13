@@ -1,5 +1,8 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
+import spark.Request;
+
 /**
  * All of our classes defining HTTP API endpoints implement this interface.
  * It has a single method that registers all the endpoints.

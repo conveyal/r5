@@ -1,6 +1,7 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.JsonUtil;
@@ -66,7 +67,7 @@ public class GTFSGraphQLController implements HttpController {
         });
 
         QueryContext context = new QueryContext();
-        context.accessGroup = req.attribute("accessGroup");
+        context.userPermissions = UserPermissions.from(req);
 
         ExecutionResult er = graphql.execute(req.queryParams("query"), null, context, variables);
 
@@ -153,7 +154,7 @@ public class GTFSGraphQLController implements HttpController {
         QueryContext context = (QueryContext) environment.getContext();
         return Persistence.bundles.findPermitted(
                 QueryBuilder.start("_id").in(environment.getArgument("bundle_id")).get(),
-                context.accessGroup
+                context.userPermissions
         );
     }
 
@@ -202,7 +203,7 @@ public class GTFSGraphQLController implements HttpController {
 
     /** Context for a graphql query. Currently contains authorization info. */
     public static class QueryContext extends ExecutionContext {
-        public String accessGroup;
+        public UserPermissions userPermissions;
     }
 
 }

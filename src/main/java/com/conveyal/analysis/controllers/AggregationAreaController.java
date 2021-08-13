@@ -8,7 +8,6 @@ import com.conveyal.analysis.models.SpatialResource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
@@ -36,11 +35,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.analysis.persistence.AnalysisCollection.getAccessGroup;
 import static com.conveyal.analysis.spatial.FeatureSummary.Type.POLYGON;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
@@ -87,7 +83,7 @@ public class AggregationAreaController implements HttpController {
      */
     private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        UserPermissions userPermissions = UserPermissions.from(req);
         String resourceId = req.params("resourceId");
         String nameProperty = req.queryParams("nameProperty");
         final int zoom = parseZoom(req.queryParams("zoom"));
@@ -196,13 +192,13 @@ public class AggregationAreaController implements HttpController {
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
         return aggregationAreaCollection.findPermitted(
-                and(eq("regionId", req.queryParams("regionId"))), getAccessGroup(req)
+                and(eq("regionId", req.queryParams("regionId"))), UserPermissions.from(req)
         );
     }
 
     private JSONObject getAggregationArea (Request req, Response res) {
         AggregationArea aggregationArea = aggregationAreaCollection.findByIdIfPermitted(
-                req.params("maskId"), getAccessGroup(req)
+                req.params("maskId"), UserPermissions.from(req)
         );
         String url = fileStorage.getURL(aggregationArea.getStorageKey());
         JSONObject wrappedUrl = new JSONObject();

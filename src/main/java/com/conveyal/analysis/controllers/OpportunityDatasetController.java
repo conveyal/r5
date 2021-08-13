@@ -54,7 +54,6 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.spatial.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
@@ -106,7 +105,7 @@ public class OpportunityDatasetController implements HttpController {
     private Collection<OpportunityDataset> getRegionDatasets(Request req, Response res) {
         return Persistence.opportunityDatasets.findPermitted(
                 QueryBuilder.start("regionId").is(req.params("regionId")).get(),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         );
     }
 
@@ -140,9 +139,8 @@ public class OpportunityDatasetController implements HttpController {
     private OpportunityDatasetUploadStatus downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
-
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions.accessGroup);
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet)
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
@@ -323,7 +321,7 @@ public class OpportunityDatasetController implements HttpController {
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
-        final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final UserPermissions userPermissions = UserPermissions.from(req);
         final Map<String, List<FileItem>> formFields;
         try {
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
@@ -449,26 +447,23 @@ public class OpportunityDatasetController implements HttpController {
 
     private Collection<OpportunityDataset> deleteSourceSet(Request request, Response response) {
         String sourceId = request.params("sourceId");
-        String accessGroup = request.attribute("accessGroup");
+        UserPermissions userPermissions = UserPermissions.from(request);
         Collection<OpportunityDataset> datasets = Persistence.opportunityDatasets.findPermitted(
-                QueryBuilder.start("sourceId").is(sourceId).get(), accessGroup);
-
-        datasets.forEach(dataset -> deleteDataset(dataset._id, accessGroup));
-
+                QueryBuilder.start("sourceId").is(sourceId).get(), userPermissions);
+        datasets.forEach(dataset -> deleteDataset(dataset._id, userPermissions));
         return datasets;
     }
 
     private OpportunityDataset deleteOpportunityDataset(Request request, Response response) {
         String opportunityDatasetId = request.params("_id");
-        return deleteDataset(opportunityDatasetId, request.attribute("accessGroup"));
+        return deleteDataset(opportunityDatasetId, UserPermissions.from(request));
     }
 
     /**
      * Delete an Opportunity Dataset from the database and all formats from the file store.
      */
-    private OpportunityDataset deleteDataset(String id, String accessGroup) {
-        OpportunityDataset dataset = Persistence.opportunityDatasets.removeIfPermitted(id, accessGroup);
-
+    private OpportunityDataset deleteDataset(String id, UserPermissions userPermissions) {
+        OpportunityDataset dataset = Persistence.opportunityDatasets.removeIfPermitted(id, userPermissions);
         if (dataset == null) {
             throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
         } else {
@@ -476,7 +471,6 @@ public class OpportunityDatasetController implements HttpController {
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.PNG));
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.TIFF));
         }
-
         return dataset;
     }
 

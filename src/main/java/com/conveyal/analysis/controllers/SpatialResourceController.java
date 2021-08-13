@@ -28,7 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.spatial.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.RESOURCES;
@@ -65,7 +64,7 @@ public class SpatialResourceController implements HttpController {
     private List<SpatialResource> getRegionResources (Request req, Response res) {
         return spatialResourceCollection.findPermitted(
                 and(eq("regionId", req.params("regionId"))),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         );
     }
 
@@ -76,7 +75,7 @@ public class SpatialResourceController implements HttpController {
     private SpatialResource downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        UserPermissions userPermissions = UserPermissions.from(req);
         SpatialResource source = SpatialResource.create(userPermissions, extractor.sourceName)
                 .withRegion(regionId);
 
@@ -118,7 +117,7 @@ public class SpatialResourceController implements HttpController {
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private SpatialResource handleUpload(Request req, Response res) {
-        final UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final UserPermissions userPermissions = UserPermissions.from(req);
         final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
 
         // Parse required fields. Will throw a ServerException on failure.
@@ -170,10 +169,9 @@ public class SpatialResourceController implements HttpController {
         // TODO delete files from storage
         // TODO delete referencing database records
         spatialResourceCollection.delete(source);
-
         return spatialResourceCollection.findPermitted(
                 and(eq("regionId", request.params("regionId"))),
-                request.attribute("accessGroup")
+                UserPermissions.from(request)
         );
     }
 

@@ -109,7 +109,7 @@ public class HttpApi implements Component {
             Instant requestStartTime = req.attribute(REQUEST_START_TIME_ATTRIBUTE);
             Duration elapsed = Duration.between(requestStartTime, Instant.now());
             eventBus.send(new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis())
-                    .forUser(req.attribute(USER_PERMISSIONS_ATTRIBUTE)));
+                    .forUser(UserPermissions.from(req)));
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).

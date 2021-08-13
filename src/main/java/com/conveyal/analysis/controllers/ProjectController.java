@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.AddTripPattern;
 import com.conveyal.analysis.models.ConvertToFrequency;
 import com.conveyal.analysis.models.Modification;
@@ -32,7 +33,7 @@ public class ProjectController implements HttpController {
     private Collection<Project> getAllProjects (Request req, Response res) {
         return Persistence.projects.findPermitted(
                 QueryBuilder.start("regionId").is(req.params("region")).get(),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         );
     }
 
@@ -47,16 +48,16 @@ public class ProjectController implements HttpController {
     private Collection<Modification> modifications (Request req, Response res) {
         return Persistence.modifications.findPermitted(
                 QueryBuilder.start("projectId").is(req.params("_id")).get(),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         );
     }
 
     private Collection<Modification> importModifications (Request req, Response res) {
         final String importId = req.params("_importId");
         final String newId = req.params("_id");
-        final String accessGroup = req.attribute("accessGroup");
-        final Project project = Persistence.projects.findByIdIfPermitted(newId, accessGroup);
-        final Project importProject = Persistence.projects.findByIdIfPermitted(importId, accessGroup);
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        final Project project = Persistence.projects.findByIdIfPermitted(newId, userPermissions);
+        final Project importProject = Persistence.projects.findByIdIfPermitted(importId, userPermissions);
         final boolean bundlesAreNotEqual = !project.bundleId.equals(importProject.bundleId);
 
         QueryBuilder query = QueryBuilder.start("projectId").is(importId);
@@ -64,7 +65,7 @@ public class ProjectController implements HttpController {
             // Different bundle? Only copy add trip modifications
             query = query.and("type").is("add-trip-pattern");
         }
-        final Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), accessGroup);
+        final Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), userPermissions);
 
         // This would be a lot easier if we just used the actual `_id`s and dealt with it elsewhere when searching. They
         // should be unique anyways. Hmmmmmmmmmmmm. Trade offs.
@@ -86,7 +87,7 @@ public class ProjectController implements HttpController {
                     clone.name = clone.name + " (import)";
 
                     // Set `updatedBy` by manually, `createdBy` stays with the original author
-                    clone.updatedBy = req.attribute("email");
+                    clone.updatedBy = UserPermissions.from(req).email;
 
                     // Matched up the phased entries and timetables
                     if (modification.getType().equals(AddTripPattern.type)) {
@@ -148,7 +149,7 @@ public class ProjectController implements HttpController {
     }
 
     private Project deleteProject (Request req, Response res) {
-        return Persistence.projects.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        return Persistence.projects.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     public Collection<Project> getProjects (Request req, Response res) {

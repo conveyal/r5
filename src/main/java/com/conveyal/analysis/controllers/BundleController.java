@@ -43,7 +43,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
@@ -134,8 +133,9 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
-            bundle.accessGroup = req.attribute("accessGroup");
-            bundle.createdBy = req.attribute("email");
+            UserPermissions userPermissions = UserPermissions.from(req);
+            bundle.accessGroup = userPermissions.accessGroup;
+            bundle.createdBy = userPermissions.email;
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
@@ -146,7 +146,7 @@ public class BundleController implements HttpController {
 
         // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
         // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final UserPermissions userPermissions = UserPermissions.from(req);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
             .forUser(userPermissions)
             .setHeavy(true)
@@ -265,7 +265,7 @@ public class BundleController implements HttpController {
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
-        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
         FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
         fileStorage.delete(key);
 

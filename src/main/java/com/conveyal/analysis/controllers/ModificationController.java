@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.AbstractTimetable;
 import com.conveyal.analysis.models.AddTripPattern;
 import com.conveyal.analysis.models.ConvertToFrequency;
@@ -36,7 +37,7 @@ public class ModificationController implements HttpController {
     }
 
     private Modification deleteModification (Request req, Response res) {
-        return Persistence.modifications.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        return Persistence.modifications.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     private void mapPhaseIds (List<AbstractTimetable> timetables, String oldModificationId, String newModificationId) {
@@ -74,7 +75,7 @@ public class ModificationController implements HttpController {
         clone.name = clone.name + " (copy)";
 
         // Set `updateBy` manually, `createdBy` stays with the original modification author
-        clone.updatedBy = req.attribute("email");
+        clone.updatedBy = UserPermissions.from(req).email;
 
         // Update the clone
         return Persistence.modifications.put(clone);

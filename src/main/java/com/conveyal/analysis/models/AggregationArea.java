@@ -1,7 +1,10 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.file.FileStorageKey;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import static com.conveyal.file.FileCategory.GRIDS;
 
 /**
  * An aggregation area defines a set of origin points to be averaged together to produce an aggregate accessibility figure.
@@ -33,4 +36,11 @@ public class AggregationArea extends BaseModel {
     public String getS3Key () {
         return String.format("%s/mask/%s.grid", regionId, _id);
     }
+
+    @JsonIgnore
+    public FileStorageKey getStorageKey () {
+        // These in the GRIDS file storage category because aggregation areas are masks represented as binary grids.
+        return new FileStorageKey(GRIDS, getS3Key());
+    }
+
 }

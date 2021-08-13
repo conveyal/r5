@@ -36,8 +36,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.components.HttpApi.USER_GROUP_ATTRIBUTE;
 import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
+import static com.conveyal.analysis.persistence.AnalysisCollection.getAccessGroup;
 import static com.conveyal.analysis.spatial.FeatureSummary.Type.POLYGON;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
@@ -63,8 +63,8 @@ public class AggregationAreaController implements HttpController {
 
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
-    private final AnalysisCollection aggregationAreaCollection;
-    private final AnalysisCollection spatialSourceCollection;
+    private final AnalysisCollection<AggregationArea> aggregationAreaCollection;
+    private final AnalysisCollection<SpatialResource> spatialResourceCollection;
 
     public AggregationAreaController (
             FileStorage fileStorage,
@@ -74,11 +74,7 @@ public class AggregationAreaController implements HttpController {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        this.spatialSourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
-    }
-
-    private FileStorageKey getStoragePath (AggregationArea area) {
-        return new FileStorageKey(GRIDS, area.getS3Key());
+        this.spatialResourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
     }
 
     /**
@@ -92,20 +88,19 @@ public class AggregationAreaController implements HttpController {
     private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
-        String sourceId = req.params("sourceId");
+        String resourceId = req.params("resourceId");
         String nameProperty = req.queryParams("nameProperty");
         final int zoom = parseZoom(req.queryParams("zoom"));
 
         // 1. Get file from storage and read its features. =============================================================
-        SpatialResource source = (SpatialResource) spatialSourceCollection.findById(sourceId);
-        Preconditions.checkArgument(POLYGON.equals(source.features.type), "Only polygons can be converted to " +
-                "aggregation areas.");
-
+        SpatialResource resource = spatialResourceCollection.findById(resourceId);
+        Preconditions.checkArgument(POLYGON.equals(resource.features.type),
+                "Only polygons can be converted to aggregation areas.");
         File sourceFile;
         List<SimpleFeature> features = null;
 
-        if (SHP.equals(source.sourceFormat)) {
-            sourceFile = fileStorage.getFile(source.storageKey());
+        if (SHP.equals(resource.sourceFormat)) {
+            sourceFile = fileStorage.getFile(resource.storageKey());
             ShapefileReader reader = null;
             try {
                 reader = new ShapefileReader(sourceFile);
@@ -115,15 +110,15 @@ public class AggregationAreaController implements HttpController {
             }
         }
 
-        if (GEOJSON.equals(source.sourceFormat)) {
+        if (GEOJSON.equals(resource.sourceFormat)) {
             // TODO implement
         }
 
         List<SimpleFeature> finalFeatures = features;
-        taskScheduler.enqueue(Task.create("Aggregation area creation: " + source.name)
+        taskScheduler.enqueue(Task.create("Aggregation area creation: " + resource.name)
                 .forUser(userPermissions)
                 .setHeavy(true)
-                .withWorkProduct(source)
+                .withWorkProduct(resource)
                 .withAction(progressListener -> {
                     progressListener.beginTask("Processing request", 1);
                     Map<String, Geometry> areas = new HashMap<>();
@@ -142,7 +137,7 @@ public class AggregationAreaController implements HttpController {
                         );
                         UnaryUnionOp union = new UnaryUnionOp(geometries);
                         // Name the area using the name in the request directly
-                        areas.put(source.name, union.union());
+                        areas.put(resource.name, union.union());
                     } else {
                         // Don't union. Name each area by looking up its value for the name property in the request.
                         finalFeatures.forEach(f -> areas.put(
@@ -165,7 +160,7 @@ public class AggregationAreaController implements HttpController {
                         });
 
                         AggregationArea aggregationArea = AggregationArea.create(userPermissions, name)
-                                .withSource(source);
+                                .withSource(resource);
 
                         try {
                             File gridFile = FileUtils.createScratchFile("grid");
@@ -176,7 +171,7 @@ public class AggregationAreaController implements HttpController {
                             aggregationAreaCollection.insert(aggregationArea);
                             aggregationAreas.add(aggregationArea);
 
-                            fileStorage.moveIntoStorage(getStoragePath(aggregationArea), gridFile);
+                            fileStorage.moveIntoStorage(aggregationArea.getStorageKey(), gridFile);
                         } catch (IOException e) {
                             throw new AnalysisServerException("Error processing/uploading aggregation area");
                         }
@@ -201,19 +196,17 @@ public class AggregationAreaController implements HttpController {
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
         return aggregationAreaCollection.findPermitted(
-                and(eq("regionId", req.queryParams("regionId"))), req.attribute(USER_GROUP_ATTRIBUTE)
+                and(eq("regionId", req.queryParams("regionId"))), getAccessGroup(req)
         );
     }
 
-    private Object getAggregationArea (Request req, Response res) {
-        AggregationArea aggregationArea = (AggregationArea) aggregationAreaCollection.findPermitted(
-                eq("_id", req.params("maskId")), req.attribute(USER_GROUP_ATTRIBUTE)
+    private JSONObject getAggregationArea (Request req, Response res) {
+        AggregationArea aggregationArea = aggregationAreaCollection.findByIdIfPermitted(
+                req.params("maskId"), getAccessGroup(req)
         );
-
-        String url = fileStorage.getURL(getStoragePath(aggregationArea));
+        String url = fileStorage.getURL(aggregationArea.getStorageKey());
         JSONObject wrappedUrl = new JSONObject();
         wrappedUrl.put("url", url);
-
         return wrappedUrl;
     }
 

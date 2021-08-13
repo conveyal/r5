@@ -57,7 +57,7 @@ public class SpatialResourceController implements HttpController {
             SeamlessCensusGridExtractor extractor
     ) {
         this.fileStorage = fileStorage;
-        this.spatialResourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
+        this.spatialResourceCollection = database.getAnalysisCollection("spatialResources", SpatialResource.class);
         this.taskScheduler = taskScheduler;
         this.extractor = extractor;
     }

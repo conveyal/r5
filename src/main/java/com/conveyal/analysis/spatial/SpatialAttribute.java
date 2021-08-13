@@ -3,14 +3,21 @@ package com.conveyal.analysis.spatial;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.type.AttributeType;
 
-/** Groups the original names and user-friendly fields from shapefile attributes, CSV columns, etc. */
+/**
+ * In OpenGIS terminology, SpatialResources contain features, each of which has attributes. This class represents a
+ * single attribute present on all the features in a resource - it's basically the schema metadata for a GIS layer.
+ * Users can specify their own name for any attribute in the source file, so this also associates these user-specified
+ * names with the original attribute name.
+ */
 public class SpatialAttribute {
-    /** Name in source file */
+
+    /** The name of the attribute (CSV column, Shapefile attribute, etc.) in the uploaded source file. */
     public String name;
 
-    /** Editable by end users */
+    /** The editable label specified by the end user. */
     public String label;
 
+    /** The data type of the attribute - for our purposes primarily distinguishing between numbers and text. */
     public Type type;
 
     private enum Type {
@@ -29,11 +36,7 @@ public class SpatialAttribute {
         else this.type = Type.ERROR;
     }
 
-    /**
-     * No-arg constructor required for Mongo POJO serialization
-     */
-    public SpatialAttribute () {
-
-    }
+    /** No-arg constructor required for Mongo POJO deserialization. */
+    public SpatialAttribute () { }
 
 }

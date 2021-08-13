@@ -23,9 +23,10 @@ import static com.conveyal.file.FileCategory.RESOURCES;
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 
 /**
- * Record of a spatial source file (e.g. shapefile, CSV) that has been validated and can be processed into specific
- * Conveyal formats (e.g. grids and other spatial layers). Eventually a general Resource class could be extended by
- * SpatialResource, GtfsResource, and OsmResource?
+ * A Resource is a database record associating metadata with an Upload (a raw file in FileStorage uploaded by the user).
+ * A SpatialResource is such a record for a spatial source file (e.g. shapefile, GeoJSON, CSV) that has been validated
+ * and is ready to be processed into specific Conveyal formats (e.g. grids and other spatial layers). Eventually a
+ * general Resource class could be extended by SpatialResource, GtfsResource, and OsmResource?
  */
 public class SpatialResource extends BaseModel {
     public String regionId;
@@ -41,12 +42,8 @@ public class SpatialResource extends BaseModel {
         super(userPermissions, sourceName);
     }
 
-    /**
-     * No-arg constructor required for Mongo POJO serialization
-     */
-    public SpatialResource () {
-        super();
-    }
+    /** No-arg constructor required for Mongo POJO deserialization. */
+    public SpatialResource () { }
 
     public static SpatialResource create (UserPermissions userPermissions, String sourceName) {
         return new SpatialResource(userPermissions, sourceName);

@@ -1,6 +1,7 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.analysis.util.JsonUtil;
 import com.mongodb.client.MongoCollection;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -24,8 +26,13 @@ public class AnalysisCollection<T extends BaseModel> {
     public MongoCollection<T> collection;
     private Class<T> type;
 
-    private String getAccessGroup (Request req) {
-        return req.attribute("accessGroup");
+    /**
+     * Helper method to extract accessGroup from the UserPermissions set by the authentication component on a request.
+     * The redundant request attributes for email and accessGroup may be removed once methods like this are in use.
+     */
+    public static String getAccessGroup (Request req) {
+        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        return userPermissions.accessGroup;
     }
 
     private AnalysisServerException invalidAccessGroup() {
@@ -60,6 +67,17 @@ public class AnalysisCollection<T extends BaseModel> {
 
     public T findById(ObjectId _id) {
         return collection.find(eq("_id", _id)).first();
+    }
+
+    public T findByIdIfPermitted (String _id, String accessGroup) {
+        T item = findById(_id);
+        if (item.accessGroup.equals(accessGroup)) {
+            return item;
+        } else {
+            // TODO: To simplify stack traces this should be refactored to "throw new InvalidAccessGroupException()"
+            //       which should be a subtype of AnalysisServerException with methods like getHttpCode().
+            throw invalidAccessGroup();
+        }
     }
 
     public T create(T newModel, String accessGroup, String creatorEmail) {
@@ -113,6 +131,9 @@ public class AnalysisCollection<T extends BaseModel> {
 
         return value;
     }
+
+    // TODO should all below be static helpers on HttpController? Passing the whole request in seems to defy encapsulation.
+    //  On the other hand, making them instance methods reduces the number of parameters and gives access to Class<T>.
 
     /**
      * Controller creation helper.

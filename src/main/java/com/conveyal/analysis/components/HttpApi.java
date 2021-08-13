@@ -36,8 +36,6 @@ public class HttpApi implements Component {
     // These "attributes" are attached to an incoming HTTP request with String keys, making them available in handlers
     private static final String REQUEST_START_TIME_ATTRIBUTE = "requestStartTime";
     public static final String USER_PERMISSIONS_ATTRIBUTE = "permissions";
-    public static final String USER_EMAIL_ATTRIBUTE = "email";
-    public static final String USER_GROUP_ATTRIBUTE = "accessGroup";
 
     public interface Config {
         boolean offline (); // TODO remove this parameter, use different Components types instead
@@ -99,12 +97,9 @@ public class HttpApi implements Component {
             if (authorize) {
                 // Determine which user is sending the request, and which permissions that user has.
                 // This method throws an exception if the user cannot be authenticated.
-                // Store the resulting permissions object in the request so it can be examined by any handler.
                 UserPermissions userPermissions = authentication.authenticate(req);
+                // Store the resulting permissions object in the request so it can be examined by any handler.
                 req.attribute(USER_PERMISSIONS_ATTRIBUTE, userPermissions);
-                // TODO stop using these two separate attributes, and use the permissions object directly
-                req.attribute(USER_EMAIL_ATTRIBUTE, userPermissions.email);
-                req.attribute(USER_GROUP_ATTRIBUTE, userPermissions.accessGroup);
             }
         });
 

@@ -14,7 +14,8 @@ import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.analyst.network.GridGtfsGenerator.GTFS_DATE;
+import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
+import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
 /**
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
@@ -35,7 +36,7 @@ public class GridSinglePointTaskBuilder {
         this.gridLayout = gridLayout;
         // We will accumulate settings into this task.
         task = new TravelTimeSurfaceTask();
-        task.date = GTFS_DATE;
+        task.date = WEEKDAY_DATE;
         // Set defaults that can be overridden by calling builder methods.
         task.accessModes = EnumSet.of(LegMode.WALK);
         task.egressModes = EnumSet.of(LegMode.WALK);
@@ -75,6 +76,18 @@ public class GridSinglePointTaskBuilder {
         task.toLat = destination.y;
         task.toLon = destination.x;
         task.includePathResults = true;
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder weekdayMorningPeak () {
+        task.date = WEEKDAY_DATE;
+        morningPeak();
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder weekendMorningPeak () {
+        task.date = WEEKEND_DATE;
+        morningPeak();
         return this;
     }
 

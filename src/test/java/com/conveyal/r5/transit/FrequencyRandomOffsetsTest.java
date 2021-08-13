@@ -74,8 +74,8 @@ public class FrequencyRandomOffsetsTest {
 
         // check that phasing is correct
         // offset indices are trip pattern, trip, frequency entry
-        int timeAtTargetStop = ts2.startTimes[0] + ts2.departures[1] + fro.offsets.get(1)[0][0];
-        int timeAtSourceStop = ts1.startTimes[0] + ts1.departures[2] + fro.offsets.get(0)[0][0];
+        int timeAtTargetStop = ts2.startTimes[0] + ts2.departures[1] + fro.getOffsetSeconds(ts2, 0);
+        int timeAtSourceStop = ts1.startTimes[0] + ts1.departures[2] + fro.getOffsetSeconds(ts1, 0);
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).
@@ -141,8 +141,8 @@ public class FrequencyRandomOffsetsTest {
 
         // check that phasing is correct
         // offset indices are trip pattern, trip, frequency entry
-        int timeAtTargetStop = ts2.startTimes[0] + ts2.arrivals[3] + fro.offsets.get(1)[0][0];
-        int timeAtSourceStop = ts1.startTimes[0] + ts1.arrivals[3] + fro.offsets.get(0)[0][0];
+        int timeAtTargetStop = ts2.startTimes[0] + ts2.arrivals[3] + fro.getOffsetSeconds(ts2, 0);
+        int timeAtSourceStop = ts1.startTimes[0] + ts1.arrivals[3] + fro.getOffsetSeconds(ts1, 0);
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).

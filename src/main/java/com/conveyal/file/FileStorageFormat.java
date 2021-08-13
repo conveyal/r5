@@ -18,10 +18,8 @@ public enum FileStorageFormat {
     SHP("shp", "application/octet-stream"),
 
     GEOJSON("json", "application/json");
-
-    @BsonIgnore
+    // These should not be serialized into Mongo. Default Enum codec uses String name() and valueOf(String).
     public final String extension;
-    @BsonIgnore
     public final String mimeType;
 
     FileStorageFormat (String extension, String mimeType) {

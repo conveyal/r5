@@ -5,12 +5,14 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.Conventions;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.mongodb.MongoClientSettings.getDefaultCodecRegistry;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -29,14 +31,16 @@ public class AnalysisDB {
             mongo = MongoClients.create();
         }
 
-        // Create codec registry for POJOs
+        // Create a codec registry that has all the default codecs (dates, geojson, etc.) and falls back to a provider
+        // that automatically generates codecs for any other Java class it encounters, based on their public getter and
+        // setter methods and public fields, skipping any properties whose underlying fields are transient or static.
+        // These classes must have an empty public or protected zero-argument constructor.
+        // In the documentation a "discriminator" refers to a field that identifies the Java type, like @JsonTypes.
+        CodecProvider automaticPojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
         CodecRegistry pojoCodecRegistry = fromRegistries(
-                MongoClientSettings.getDefaultCodecRegistry(),
-                fromProviders(PojoCodecProvider.builder()
-                        .conventions(Conventions.DEFAULT_CONVENTIONS)
-                        .automatic(true)
-                        .build()
-                ));
+                getDefaultCodecRegistry(),
+                fromProviders(automaticPojoCodecProvider)
+        );
 
         database = mongo.getDatabase(config.databaseName()).withCodecRegistry(pojoCodecRegistry);
 

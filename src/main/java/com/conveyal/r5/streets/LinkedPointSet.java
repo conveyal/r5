@@ -613,7 +613,7 @@ public class LinkedPointSet implements Serializable {
         if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         } else {
-            int offStreetTime = distancesToEdge_mm[pointIndex] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+            int offStreetTime = Math.min(distancesToEdge_mm[pointIndex] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND, 60);
             time0 += distances0_mm[pointIndex] / onStreetSpeed + offStreetTime;
             time1 += distances1_mm[pointIndex] / onStreetSpeed + offStreetTime;
             return Math.min(handleOverflow(time0), handleOverflow(time1));

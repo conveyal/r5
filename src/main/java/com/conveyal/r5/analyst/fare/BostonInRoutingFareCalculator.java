@@ -22,6 +22,9 @@ import java.util.WeakHashMap;
 /**
  * Fare calculator for the MBTA, assuming use of CharlieCard where accepted.  For an overview of the logic of
  * calculateFares(), including numerous MBTA special cases, see https://files.indicatrix.org/charlie.pdf
+ *
+ * The fare tariff policy in effect at the time this was implemented is available at
+ * https://web.archive.org/web/20210817154117/https://www.bidnet.com/bneattachments?/524393819.pdf
  */
 public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
@@ -30,11 +33,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
 
-    // Some fares may confer different transfer allowance values, but have the same issuing and acceptance rules.
-    // For example, in Boston, the transfer allowances from inner and outer express bus fares have different values,
-    // but they are issued and accepted under the same circumstances.
-    private enum TransferRuleGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, SL_FREE, LOCAL_BUS_TO_SUBWAY,
-        OTHER, NONE}
+    private enum TransferRuleGroup { LOCAL_BUS, SUBWAY, INNER_EXPRESS_BUS, OUTER_EXPRESS_BUS, SL_FREE,
+        LOCAL_BUS_TO_SUBWAY, OTHER, NONE}
 
     // Map fare_id values from GTFS fare_attributes.txt to these transfer rule groups
     private static final String LOCAL_BUS_FARE_ID = "localBus";
@@ -42,10 +42,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Map<String, TransferRuleGroup> fareGroups = new HashMap<String, TransferRuleGroup>() {
         {put(LOCAL_BUS_FARE_ID, TransferRuleGroup.LOCAL_BUS); }
         {put(SUBWAY_FARE_ID, TransferRuleGroup.SUBWAY); }
-        // okay for inner and outer express buses to use same rule group, as they have the same
-        // transfer privileges
-        {put("innerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
-        {put("outerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
+        // these used to use the same transfer class, but it turns out that inner-inner and outer-outer
+        // transfers are not allowed, though inner-outer and outer-inner are.
+        {put("innerExpressBus", TransferRuleGroup.INNER_EXPRESS_BUS); }
+        {put("outerExpressBus", TransferRuleGroup.OUTER_EXPRESS_BUS); }
         {put("slairport", TransferRuleGroup.SL_FREE); }
     };
 
@@ -57,10 +57,18 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     //Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.LOCAL_BUS),
-                    Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.SUBWAY),
-                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.EXPRESS_BUS),
-                    Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.LOCAL_BUS),
-                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.INNER_EXPRESS_BUS, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.INNER_EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.INNER_EXPRESS_BUS, TransferRuleGroup.LOCAL_BUS),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.INNER_EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.OUTER_EXPRESS_BUS, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.OUTER_EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.OUTER_EXPRESS_BUS, TransferRuleGroup.LOCAL_BUS),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.OUTER_EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.OUTER_EXPRESS_BUS, TransferRuleGroup.INNER_EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.INNER_EXPRESS_BUS, TransferRuleGroup.OUTER_EXPRESS_BUS),
+                    // No INNER-INNER or OUTER-OUTER transfers:
+                    // https://web.archive.org/web/20210817154117/https://www.bidnet.com/bneattachments?/524393819.pdf
                     // see comment about SUBWAY, SUBWAY
                     //Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.SUBWAY),
                     Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.LOCAL_BUS)
@@ -174,9 +182,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          * @param startTime clock time when the validity of this transferAllowance starts.
          */
         private BostonTransferAllowance(Fare fare, int startTime){
-            super(fare,
-                    priceToInt(Math.min(fares.byId.get(SUBWAY_FARE_ID).fare_attribute.price, fare.fare_attribute.price)),
-                    startTime + fare.fare_attribute.transfer_duration);
+            super(fare, priceToInt(fare.fare_attribute.price), startTime + fare.fare_attribute.transfer_duration);
             this.transferRuleGroup = fareGroups.get(fare.fare_id);
             this.behindGates = false;
             this.enteredSubwayForFree = false;

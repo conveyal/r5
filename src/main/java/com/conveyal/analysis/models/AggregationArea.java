@@ -26,7 +26,7 @@ public class AggregationArea extends BaseModel {
         return new AggregationArea(user, name);
     }
 
-    public AggregationArea withSource (SpatialResource source) {
+    public AggregationArea withSource (SpatialDataSource source) {
         this.regionId = source.regionId;
         this.sourceId = source._id.toString();
         return this;

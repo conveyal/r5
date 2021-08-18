@@ -679,7 +679,7 @@ public class Grid extends PointSet {
         }
         checkPixelCount(extents, numericAttributes.size());
 
-        int total = reader.getFeatureCount();
+        int total = reader.featureCount();
         if (progressListener != null) {
             progressListener.setTotalItems(total);
         }

@@ -1,4 +1,4 @@
-package com.conveyal.analysis.spatial;
+package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.AnalysisServerException;
 
@@ -17,10 +17,13 @@ import java.util.Set;
 public abstract class SpatialLayers {
 
     /**
+     * FIXME Originally used for OpportunityDataset upload, moved to SpatialLayers but should be named DataSource
      * Detect from a batch of uploaded files whether the user has uploaded a Shapefile, a CSV, or one or more binary
      * grids. In the process we validate the list of uploaded files, making sure certain preconditions are met.
      * Some kinds of uploads must contain multiple files (.shp) or can contain multiple files (.grid) while others
      * must have only a single file (.csv). Scan the list of uploaded files to ensure it makes sense before acting.
+     * Note that this does not validate the contents of the files semantically, just the high-level characteristics of
+     * the set of files.
      * @throws AnalysisServerException if the type of the upload can't be detected or preconditions are violated.
      * @return the expected type of the uploaded file or files, never null.
      */

@@ -1,8 +1,7 @@
 package com.conveyal.r5.util;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.spatial.FeatureSummary;
-import com.conveyal.analysis.spatial.SpatialAttribute;
+import com.conveyal.analysis.datasource.SpatialAttribute;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -14,6 +13,9 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Lineal;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.geom.Puntal;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
@@ -37,6 +39,10 @@ import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static com.conveyal.r5.util.ShapefileReader.GeometryType.LINE;
+import static com.conveyal.r5.util.ShapefileReader.GeometryType.POINT;
+import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 
 /**
  * Encapsulate Shapefile reading logic
@@ -139,11 +145,11 @@ public class ShapefileReader {
         store.dispose();
     }
 
-    public int getFeatureCount() throws IOException {
+    public int featureCount () throws IOException {
         return source.getCount(Query.ALL);
     }
 
-    public List<SpatialAttribute> getAttributes () {
+    public List<SpatialAttribute> attributes () {
         List<SpatialAttribute> attributes = new ArrayList<>();
         HashSet<String> uniqueAttributes = new HashSet<>();
         features.getSchema()
@@ -162,7 +168,16 @@ public class ShapefileReader {
         return attributes;
     }
 
-    public FeatureSummary featureSummary () {
-        return new FeatureSummary(features);
+    /** These are very broad. For example, line includes linestring and multilinestring. */
+    public enum GeometryType {
+        POLYGON, POINT, LINE;
+    }
+
+    public GeometryType geometryType () {
+        Class geometryClass = features.getSchema().getGeometryDescriptor().getType().getBinding();
+        if (Polygonal.class.isAssignableFrom(geometryClass)) return POLYGON;
+        if (Puntal.class.isAssignableFrom(geometryClass)) return POINT;
+        if (Lineal.class.isAssignableFrom(geometryClass)) return LINE;
+        throw new IllegalArgumentException("Could not determine geometry type of features in DataSource.");
     }
 }

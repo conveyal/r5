@@ -10,15 +10,17 @@ public enum FileStorageFormat {
     TIFF("tiff", "image/tiff"),
     CSV("csv", "text/csv"),
 
-    // These are not currently used but plan to be in the future. Exact types need to be determined
-    // GTFS("zip", "application/zip"),
-    // PBF("pbf", "application/octet-stream"),
-
     // SHP implies .dbf and .prj, and optionally .shx
     SHP("shp", "application/octet-stream"),
 
+    // These final ones are not yet used.
+    // In our internal storage, we may want to force less ambiguous .gtfs.zip .osm.pbf and .geo.json.
+    GTFS("zip", "application/zip"),
+    OSMPBF("pbf", "application/octet-stream"),
     GEOJSON("json", "application/json");
+
     // These should not be serialized into Mongo. Default Enum codec uses String name() and valueOf(String).
+    // TODO clarify whether the extension is used for backend storage, or for detecting type up uploaded files.
     public final String extension;
     public final String mimeType;
 

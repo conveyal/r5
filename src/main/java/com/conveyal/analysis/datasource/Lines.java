@@ -1,4 +1,4 @@
-package com.conveyal.analysis.spatial;
+package com.conveyal.analysis.datasource;
 
 public class Lines {
 

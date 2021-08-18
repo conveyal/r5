@@ -29,10 +29,7 @@ public class BaseModel {
         this.name = name;
     }
 
-    /**
-     * No-arg constructor required for Mongo POJO serialization
-     */
-    public BaseModel () {
-        
-    }
+    /** Zero argument constructor required for MongoDB driver automatic POJO deserialization. */
+    public BaseModel () { }
+
 }

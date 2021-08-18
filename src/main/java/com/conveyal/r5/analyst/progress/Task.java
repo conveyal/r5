@@ -32,7 +32,7 @@ public class Task implements Runnable, ProgressListener {
         QUEUED, ACTIVE, DONE, ERROR
     }
 
-    /** Every has an ID so the UI can update tasks it already knows about with new information after polling. */
+    /** Every Task has an ID so the UI can update tasks it already knows about with new information after polling. */
     public final UUID id = UUID.randomUUID();
 
     // User and group are only relevant on the backend. On workers, we want to show network or cost table build progress

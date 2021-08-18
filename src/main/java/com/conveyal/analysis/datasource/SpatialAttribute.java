@@ -1,4 +1,4 @@
-package com.conveyal.analysis.spatial;
+package com.conveyal.analysis.datasource;
 
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.type.AttributeType;

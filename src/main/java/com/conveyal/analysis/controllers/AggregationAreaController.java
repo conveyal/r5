@@ -4,7 +4,8 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.AggregationArea;
-import com.conveyal.analysis.models.SpatialResource;
+import com.conveyal.analysis.models.DataSource;
+import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
@@ -35,11 +36,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.spatial.FeatureSummary.Type.POLYGON;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -60,7 +61,7 @@ public class AggregationAreaController implements HttpController {
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
     private final AnalysisCollection<AggregationArea> aggregationAreaCollection;
-    private final AnalysisCollection<SpatialResource> spatialResourceCollection;
+    private final AnalysisCollection<SpatialDataSource> dataSourceCollection;
 
     public AggregationAreaController (
             FileStorage fileStorage,
@@ -70,7 +71,7 @@ public class AggregationAreaController implements HttpController {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        this.spatialResourceCollection = database.getAnalysisCollection("spatialSources", SpatialResource.class);
+        this.dataSourceCollection = database.getAnalysisCollection("dataSources", DataSource.class);
     }
 
     /**
@@ -84,18 +85,18 @@ public class AggregationAreaController implements HttpController {
     private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         UserPermissions userPermissions = UserPermissions.from(req);
-        String resourceId = req.params("resourceId");
+        String dataSourceId = req.params("dataSourceId");
         String nameProperty = req.queryParams("nameProperty");
         final int zoom = parseZoom(req.queryParams("zoom"));
 
         // 1. Get file from storage and read its features. =============================================================
-        SpatialResource resource = spatialResourceCollection.findById(resourceId);
-        Preconditions.checkArgument(POLYGON.equals(resource.features.type),
+        SpatialDataSource resource = dataSourceCollection.findById(dataSourceId);
+        Preconditions.checkArgument(POLYGON.equals(resource.geometryType),
                 "Only polygons can be converted to aggregation areas.");
         File sourceFile;
         List<SimpleFeature> features = null;
 
-        if (SHP.equals(resource.sourceFormat)) {
+        if (SHP.equals(resource.fileFormat)) {
             sourceFile = fileStorage.getFile(resource.storageKey());
             ShapefileReader reader = null;
             try {
@@ -106,7 +107,7 @@ public class AggregationAreaController implements HttpController {
             }
         }
 
-        if (GEOJSON.equals(resource.sourceFormat)) {
+        if (GEOJSON.equals(resource.fileFormat)) {
             // TODO implement
         }
 

@@ -22,6 +22,8 @@ import static com.mongodb.client.model.Filters.eq;
 /**
  * HTTP request handler methods allowing users to upload/download files from FileStorage implementations and CRUDing
  * metadata about those files in the database.
+ * NOTE: THIS CLASS IS UNUSED AND IS RETAINED FOR DOCUMENTATION PURPOSES - TO DEMONSTRATE HOW FILESTORAGE IS USED.
+ * In practice we don't need direct HTTP API access to FileStorage - it's always used in some more complex process.
  */
 public class FileStorageController implements HttpController {
 

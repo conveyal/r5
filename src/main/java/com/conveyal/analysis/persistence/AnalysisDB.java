@@ -1,5 +1,7 @@
 package com.conveyal.analysis.persistence;
 
+import com.conveyal.analysis.models.BaseModel;
+import com.conveyal.analysis.models.SpatialDataSource;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -30,19 +32,7 @@ public class AnalysisDB {
             LOG.info("Connecting to local MongoDB instance...");
             mongo = MongoClients.create();
         }
-
-        // Create a codec registry that has all the default codecs (dates, geojson, etc.) and falls back to a provider
-        // that automatically generates codecs for any other Java class it encounters, based on their public getter and
-        // setter methods and public fields, skipping any properties whose underlying fields are transient or static.
-        // These classes must have an empty public or protected zero-argument constructor.
-        // In the documentation a "discriminator" refers to a field that identifies the Java type, like @JsonTypes.
-        CodecProvider automaticPojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
-        CodecRegistry pojoCodecRegistry = fromRegistries(
-                getDefaultCodecRegistry(),
-                fromProviders(automaticPojoCodecProvider)
-        );
-
-        database = mongo.getDatabase(config.databaseName()).withCodecRegistry(pojoCodecRegistry);
+        database = mongo.getDatabase(config.databaseName()).withCodecRegistry(makeCodecRegistry());
 
         // Request that the JVM clean up database connections in all cases - exiting cleanly or by being terminated.
         // We should probably register such hooks for other components to shut down more cleanly.
@@ -52,12 +42,42 @@ public class AnalysisDB {
         }));
     }
 
-    public AnalysisCollection getAnalysisCollection (String name, Class clazz) {
-        return new AnalysisCollection<>(database.getCollection(name, clazz), clazz);
+    /**
+     * Create a codec registry that has all the default codecs (dates, geojson, etc.) and falls back to a provider
+     * that automatically generates codecs for any other Java class it encounters, based on their public getter and
+     * setter methods and public fields, skipping any properties whose underlying fields are transient or static.
+     * These classes must have an empty public or protected zero-argument constructor.
+     * An automatic PojoCodecProvider can create class models and codecs on the fly as it encounters the classes
+     * during writing. However, upon restart it will need to re-register those same classes before it can decode
+     * them. This is apparently done automatically when calling database.getCollection(), but gets a little tricky
+     * when decoding subclasses whose discriminators are not fully qualified class names with package. See Javadoc
+     * on getAnalysisCollection() for how we register such subclasses.
+     * We could register all these subclasses here via the PojoCodecProvider.Builder, but that separates their
+     * registration from the place they're used. The builder has methods for registering whole packages, but these
+     * methods do not auto-scan, they just provide the same behavior as automatic() but limited to specific packages.
+     */
+    private CodecRegistry makeCodecRegistry () {
+        CodecProvider automaticPojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
+        CodecRegistry pojoCodecRegistry = fromRegistries(
+                getDefaultCodecRegistry(),
+                fromProviders(automaticPojoCodecProvider)
+        );
+        return pojoCodecRegistry;
     }
 
-    public MongoCollection getMongoCollection (String name, Class clazz) {
-        return database.getCollection(name, clazz);
+    /**
+     * If the optional subclasses are supplied, the codec registry will be hit to cause it to build class models and
+     * codecs for them. This is necessary when these subclasses specify short discriminators, as opposed to the
+     * verbose default discriminator of a fully qualified class name, because the Mongo driver does not auto-scan for
+     * classes it has not encountered in a write operation or in a request for a collection.
+     */
+    public <T extends BaseModel> AnalysisCollection getAnalysisCollection (
+        String name, Class<T> clazz, Class<? extends T>... subclasses
+    ){
+        for (Class subclass : subclasses) {
+            database.getCodecRegistry().get(subclass);
+        }
+        return new AnalysisCollection<T>(database.getCollection(name, clazz), clazz);
     }
 
     /** Interface to supply configuration to this component. */

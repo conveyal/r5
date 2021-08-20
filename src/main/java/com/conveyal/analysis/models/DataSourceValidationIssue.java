@@ -1,13 +1,21 @@
 package com.conveyal.analysis.models;
 
-public abstract class DataSourceValidationIssue {
+/**
+ * Represents problems encountered while validating a newly uploaded DataSource.
+ */
+public class DataSourceValidationIssue {
 
-    public abstract String description();
+    public Level level;
 
-    public abstract Level level();
+    public String description;
 
     public enum Level {
         ERROR, WARN, INFO
+    }
+
+    public DataSourceValidationIssue (Level level, String description) {
+        this.level = level;
+        this.description = description;
     }
 
 }

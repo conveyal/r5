@@ -5,6 +5,8 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
+import java.util.List;
+
 import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
 
 /**
@@ -40,6 +42,9 @@ public abstract class DataSource extends BaseModel {
     // This type uses (north, south, east, west), ideally we'd use (minLon, minLat, maxLon, maxLat).
     public Bounds wgsBounds;
 
+    /** Problems encountered while loading. TODO should this be a separate json file in storage? */
+    public List<DataSourceValidationIssue> issues;
+
     public DataSource (UserPermissions user, String name) {
         super(user, name);
     }
@@ -50,5 +55,9 @@ public abstract class DataSource extends BaseModel {
     public WorkProduct toWorkProduct () {
         return new WorkProduct(DATA_SOURCE, _id.toString(), regionId);
     };
+
+    public void addIssue (DataSourceValidationIssue.Level level, String message) {
+        issues.add(new DataSourceValidationIssue(level, message));
+    }
 
 }

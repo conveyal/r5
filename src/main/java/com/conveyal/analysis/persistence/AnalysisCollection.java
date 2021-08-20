@@ -43,7 +43,7 @@ public class AnalysisCollection<T extends BaseModel> {
     public DeleteResult deleteByIdParamIfPermitted (Request request) {
         String _id = request.params("_id");
         UserPermissions user = UserPermissions.from(request);
-        return collection.deleteOne(and(eq("_id", _id), eq("accessGroup", user.accessGroup)));
+        return collection.deleteOne(and(eq("_id", new ObjectId(_id)), eq("accessGroup", user.accessGroup)));
     }
 
     public List<T> findPermitted(Bson query, UserPermissions userPermissions) {

@@ -257,10 +257,19 @@ public class Task implements Runnable, ProgressListener {
         return this;
     }
 
-    /** Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel(). */
+    /**
+     * Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel().
+     * This can now be reported via ProgressListener interface for better encapsulation, potentially only revealing the
+     * work product when it's acutally in the database.
+     */
     public Task withWorkProduct (WorkProductType type, String id, String region) {
         this.workProduct = new WorkProduct(type, id, region);
         return this;
+    }
+
+    @Override
+    public void setWorkProduct (WorkProduct workProduct) {
+        this.workProduct = workProduct;
     }
 
     public Task setHeavy (boolean heavy) {

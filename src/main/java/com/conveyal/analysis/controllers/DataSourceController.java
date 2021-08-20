@@ -2,7 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.analysis.datasource.DataSourceIngester;
+import com.conveyal.analysis.datasource.DataSourceUploadAction;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.GtfsDataSource;
@@ -13,14 +13,12 @@ import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.apache.commons.fileupload.FileItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -77,8 +75,8 @@ public class DataSourceController implements HttpController {
 
     /** HTTP DELETE: Delete a single DataSource record and associated files in FileStorage by supplied ID parameter. */
     private String deleteOneDataSourceById (Request request, Response response) {
-        dataSourceCollection.deleteByIdParamIfPermitted(request).getDeletedCount();
-        return "DELETE";
+        long nDeleted = dataSourceCollection.deleteByIdParamIfPermitted(request).getDeletedCount();
+        return "DELETE " + nDeleted;
         // TODO delete files from storage
         // TODO delete referencing database records
         //      Shouldn't this be deleting by ID instead of sending the whole document?
@@ -112,23 +110,12 @@ public class DataSourceController implements HttpController {
     private String handleUpload (Request req, Response res) {
         final UserPermissions userPermissions = UserPermissions.from(req);
         final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
-
-        DataSourceIngester ingester = DataSourceIngester.forFormFields(
+        DataSourceUploadAction uploadAction = DataSourceUploadAction.forFormFields(
                 fileStorage, dataSourceCollection, formFields, userPermissions
         );
-
-        Task backgroundTask = Task.create("Processing uploaded files: " + ingester.getDataSourceName())
+        Task backgroundTask = Task.create("Processing uploaded files: " + uploadAction.getDataSourceName())
                 .forUser(userPermissions)
-                //.withWorkProduct(dataSource)
-                // or should TaskActions have a method to return their work product?
-                // Or a WorkProductDescriptor, with type, region, and ID?
-                // TaskActions could define methods to return a title, workProductDescriptor, etc.
-                // Then we just have taskScheduler.enqueue(Task.forAction(user, ingester));
-                // To the extent that TaskActions are named types instead of lambdas, they can create their workproduct
-                // upon instantiation and return it via a method.
-                // ProgressListener could also have a setWorkProduct method.
-                .withWorkProduct(DATA_SOURCE, ingester.getDataSourceId(), ingester.getRegionId())
-                .withAction(ingester);
+                .withAction(uploadAction);
 
         taskScheduler.enqueue(backgroundTask);
         return backgroundTask.id.toString();

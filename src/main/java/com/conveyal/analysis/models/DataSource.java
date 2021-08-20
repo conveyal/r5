@@ -2,20 +2,24 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.file.FileStorageFormat;
+import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
-// Do we get any advantages from a DataSource class hierarchy as opposed to a class with some fields left null?
-// Handling different classes may not be worth additional effort unless we take advantage of polymorphic methods.
-// We'll have Mongo collections returning the supertype, leaving any specialized fields inaccessible.
-// Usefulness will depend on how different the different subtypes are, and we don't know that yet.
-// The main action we take on DataSources is to process them into derived data. That can't easily be polymorphic.
-// Perhaps we should just have a DataSourceType enum with corresponding field, but we're then ignoring Java types.
+import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
 
 /**
  * This represents a file which was uploaded by the user and validated by the backend. Instances are persisted to Mongo.
  * DataSources can be processed into derived products like aggregation areas, destination grids, and transport networks.
  * Subtypes exist to allow additional fields on certain kinds of data sources. The attribute "type" of instances
  * serialized into Mongo is a "discriminator" which determines the corresponding Java class on deserialization.
+ *
+ * Given the existence of descriminators in the Mongo driver, for now we're trying full Java typing with inheritance.
+ * It is debatable whether we get any advantages from this DataSource class hierarchy as opposed to a single class with
+ * some fields left null in certain cases (e.g. feature schema is null on OSM DataSources). Juggling different classes
+ * may not be worth the trouble unless we get some utility out of polymorphic methods. For example, Mongo collections
+ * will return the shared supertype, leaving any specialized fields inaccessible except via overridden methods.
+ * Usefulness will depend on how different the different subtypes are, and we haven't really seen that yet.
+ * The main action we take on DataSources is to process them into derived data. That can't easily use polymorphism.
  */
 @BsonDiscriminator(key="type")
 public abstract class DataSource extends BaseModel {
@@ -42,5 +46,9 @@ public abstract class DataSource extends BaseModel {
 
     /** Zero-argument constructor required for Mongo automatic POJO deserialization. */
     public DataSource () { }
+
+    public WorkProduct toWorkProduct () {
+        return new WorkProduct(DATA_SOURCE, _id.toString(), regionId);
+    };
 
 }

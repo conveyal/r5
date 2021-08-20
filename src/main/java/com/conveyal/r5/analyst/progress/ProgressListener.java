@@ -25,4 +25,13 @@ public interface ProgressListener {
         increment(1);
     }
 
+    /**
+     * We want WorkProducts to be revealed by a TaskAction even in the case of exception or failure (to report complex
+     * structured error or validation information). Returning them from the action method will not work in case of an
+     * unexpected exception. Adding them to the background Task with a fluent method is also problematic as it requires
+     * the caller to construct or otherwise hold a reference to the product to get its ID before the action is run. It's
+     * preferable for the product to be fully encapsulated in the action, so it's reported as park of the task progress.
+     */
+    default void setWorkProduct (WorkProduct workProduct) { /* Default is no-op */ }
+
 }

@@ -9,7 +9,7 @@ import java.io.File;
  * Logic for loading and validating a specific kind of input file, yielding a specific subclass of DataSource.
  * This plugs into DataSourceUploadAction, which handles the general parts of processing any new DataSource.
  */
-public abstract class DataSourceIngester <D extends DataSource> {
+public abstract class DataSourceIngester {
 
     /**
      * An accessor method that gives the general purpose DataSourceUploadAction a view of the DataSource being
@@ -18,7 +18,7 @@ public abstract class DataSourceIngester <D extends DataSource> {
      * Concrete subclasses should ensure that this method can return an object immediately after they're constructed.
      * Or maybe only after ingest() returns?
      */
-    public abstract D dataSource ();
+    public abstract DataSource dataSource ();
 
     /**
      * This method is implemented on concrete subclasses to provide logic for interpreting a particular file type.

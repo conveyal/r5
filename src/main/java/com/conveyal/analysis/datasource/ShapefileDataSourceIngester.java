@@ -16,7 +16,7 @@ import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 /**
  * Logic to create SpatialDataSource metadata from a Shapefile.
  */
-public class ShapefileDataSourceIngester extends DataSourceIngester<SpatialDataSource> {
+public class ShapefileDataSourceIngester extends DataSourceIngester {
 
     private final SpatialDataSource dataSource;
 

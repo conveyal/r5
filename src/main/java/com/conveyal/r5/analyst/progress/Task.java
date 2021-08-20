@@ -204,6 +204,7 @@ public class Task implements Runnable, ProgressListener {
     }
 
     // Methods for reporting elapsed times over API
+    // Durations are reported instead of times to avoid problems with clock skew between backend and client.
 
     public Duration durationInQueue () {
         Instant endTime = (began == null) ? Instant.now() : began;

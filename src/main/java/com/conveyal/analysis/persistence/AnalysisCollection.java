@@ -40,6 +40,12 @@ public class AnalysisCollection<T extends BaseModel> {
         return collection.deleteOne(eq("_id", value._id));
     }
 
+    public DeleteResult deleteByIdParamIfPermitted (Request request) {
+        String _id = request.params("_id");
+        UserPermissions user = UserPermissions.from(request);
+        return collection.deleteOne(and(eq("_id", _id), eq("accessGroup", user.accessGroup)));
+    }
+
     public List<T> findPermitted(Bson query, UserPermissions userPermissions) {
         return find(and(eq(MONGO_PROP_ACCESS_GROUP, userPermissions.accessGroup), query));
     }
@@ -137,6 +143,7 @@ public class AnalysisCollection<T extends BaseModel> {
 
     /**
      * Controller find by id helper.
+     * TODO remove unused second parameter.
      */
     public T findPermittedByRequestParamId(Request req, Response res) {
         UserPermissions user = UserPermissions.from(req);
@@ -160,4 +167,5 @@ public class AnalysisCollection<T extends BaseModel> {
         }
         return update(value, user.accessGroup);
     }
+
 }

@@ -623,9 +623,7 @@ public class FastRaptorWorker {
         ) {
             FilteredPattern filteredPattern = filteredPatterns.patterns.get(patternIndex);
             TripPattern pattern = transit.tripPatterns.get(patternIndex);
-            int tripScheduleIndex = -1; // First loop iteration will immediately increment to 0.
             for (TripSchedule schedule : filteredPattern.runningFrequencyTrips) {
-                tripScheduleIndex++;
                 // Loop through all the entries for this trip (time windows with service at a given frequency).
                 for (int frequencyEntryIdx = 0;
                          frequencyEntryIdx < schedule.headwaySeconds.length;
@@ -671,7 +669,7 @@ public class FastRaptorWorker {
                             //  this looks like a good candidate for polymorphism (board time strategy passed in).
                             //  The offset could be looked up by the getDepartureTime method itself, not passed in.
                             if (frequencyBoardingMode == MONTE_CARLO) {
-                                int offset = offsets.offsets.get(patternIndex)[tripScheduleIndex][frequencyEntryIdx];
+                                int offset = offsets.getOffsetSeconds(schedule, frequencyEntryIdx);
                                 newBoardingDepartureTimeAtStop = getRandomFrequencyDepartureTime(
                                         schedule,
                                         stopPositionInPattern,
@@ -736,7 +734,9 @@ public class FastRaptorWorker {
             int frequencyEntryIdx,
             int earliestTime
     ) {
-        checkState(offset >= 0);
+        checkState(offset >= 0, "Offset should be non-negative.");
+        checkState(offset < schedule.headwaySeconds[frequencyEntryIdx], "Offset should be less than headway.");
+
         // Find the time the first vehicle in this entry will depart from the current stop:
         // The start time of the entry window, plus travel time from first stop to current stop, plus phase offset.
         // TODO check that frequency trips' stop times are always normalized to zero at first departure.

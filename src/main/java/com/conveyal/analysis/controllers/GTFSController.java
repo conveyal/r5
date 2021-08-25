@@ -28,27 +28,43 @@ public class GTFSController implements HttpController {
         this.gtfsCache = gtfsCache;
     }
 
+    static class BaseIdentifier {
+        public final String _id;
+        public final String name;
+
+        BaseIdentifier (String _id, String name) {
+            this._id = _id;
+            this.name = name;
+        }
+    }
+
     private GTFSFeed getFeedFromRequest (Request req) {
         Bundle bundle = Persistence.bundles.findByIdFromRequestIfPermitted(req);
         String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), bundle.feedGroupId);
         return gtfsCache.get(bundleScopedFeedId);
     }
 
-    static class RouteAPIResponse {
-        public final String id;
-        public final String name;
+    static class RouteAPIResponse extends BaseIdentifier {
         public final int type;
         public final String color;
 
-        RouteAPIResponse(Route route) {
-            id = route.route_id;
-            color = route.route_color;
+        static String getRouteName (Route route) {
             String tempName = "";
             if (route.route_short_name != null) tempName += route.route_short_name;
             if (route.route_long_name != null) tempName += " " + route.route_long_name;
-            name = tempName.trim();
+            return tempName.trim();
+        }
+
+        RouteAPIResponse(Route route) {
+            super(route.route_id, getRouteName(route));
+            color = route.route_color;
             type = route.route_type;
         }
+    }
+
+    private RouteAPIResponse getRoute(Request req, Response res) {
+        GTFSFeed feed = getFeedFromRequest(req);
+        return new RouteAPIResponse(feed.routes.get(req.params("routeId")));
     }
 
     private List<RouteAPIResponse> getRoutes(Request req, Response res) {
@@ -60,21 +76,19 @@ public class GTFSController implements HttpController {
                 .collect(Collectors.toList());
     }
 
-    static class PatternAPIResponse {
-        public final String id;
-        public final String name;
+    static class PatternAPIResponse extends BaseIdentifier {
         public final GeoJSONLineString geometry;
         public final List<String> orderedStopIds;
         public final List<String> associatedTripIds;
+
         PatternAPIResponse(Pattern pattern) {
-            id = pattern.pattern_id;
-            name = pattern.name;
+            super(pattern.pattern_id, pattern.name);
             geometry = serialize(pattern.geometry);
             orderedStopIds = pattern.orderedStops;
             associatedTripIds = pattern.associatedTrips;
         }
 
-        GeoJSONLineString serialize (com.vividsolutions.jts.geom.LineString geometry) {
+        static GeoJSONLineString serialize (com.vividsolutions.jts.geom.LineString geometry) {
             GeoJSONLineString ret = new GeoJSONLineString();
             ret.coordinates = Stream.of(geometry.getCoordinates())
                     .map(c -> new double[] { c.x, c.y })
@@ -95,15 +109,12 @@ public class GTFSController implements HttpController {
                 .collect(Collectors.toList());
     }
 
-    static class StopAPIResponse {
-        public final String id;
-        public final String name;
+    static class StopAPIResponse extends BaseIdentifier {
         public final double lat;
         public final double lon;
 
         StopAPIResponse(Stop stop) {
-            id = stop.stop_id;
-            name = stop.stop_name;
+            super(stop.stop_id, stop.stop_name);
             lat = stop.stop_lat;
             lon = stop.stop_lon;
         }
@@ -137,17 +148,14 @@ public class GTFSController implements HttpController {
         }).collect(Collectors.toList());
     }
 
-    static class TripAPIResponse {
-        public final String id;
-        public final String name;
+    static class TripAPIResponse extends BaseIdentifier {
         public final String headsign;
         public final Integer startTime;
         public final Integer duration;
         public final int directionId;
 
         TripAPIResponse(GTFSFeed feed, Trip trip) {
-            id = trip.trip_id;
-            name = trip.trip_short_name;
+            super(trip.trip_id, trip.trip_short_name);
             headsign = trip.trip_headsign;
             directionId = trip.direction_id;
 
@@ -179,6 +187,7 @@ public class GTFSController implements HttpController {
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.get("/api/gtfs/:_id/stops", this::getBundleStops, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/routes", this::getRoutes, toJson);
+        sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId", this::getRoute, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
         sparkService.get("/api/gtfs/:_id/:feedId/stops", this::getStops, toJson);

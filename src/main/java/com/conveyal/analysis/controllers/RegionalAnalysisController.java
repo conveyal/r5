@@ -380,9 +380,8 @@ public class RegionalAnalysisController implements HttpController {
             analysisRequest.percentiles = DEFAULT_REGIONAL_PERCENTILES;
         }
 
-        final List<String> modificationIds = new ArrayList<>();
         List<Modification> modifications = Persistence.modifications.findPermitted(
-                QueryBuilder.start("_id").in(modificationIds).get(),
+                QueryBuilder.start("_id").in(analysisRequest.modificationIds).get(),
                 accessGroup
         );
 
@@ -396,7 +395,7 @@ public class RegionalAnalysisController implements HttpController {
         );
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
-        if (! analysisRequest.makeTauiSite) {
+        if (!analysisRequest.makeTauiSite) {
             checkNotNull(analysisRequest.destinationPointSetIds);
             checkState(analysisRequest.destinationPointSetIds.length > 0,
                 "At least one destination pointset ID must be supplied.");

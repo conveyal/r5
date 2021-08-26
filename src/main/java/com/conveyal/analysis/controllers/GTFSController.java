@@ -1,7 +1,6 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
@@ -28,7 +27,7 @@ public class GTFSController implements HttpController {
         this.gtfsCache = gtfsCache;
     }
 
-    static class BaseIdentifier {
+    private static class BaseIdentifier {
         public final String _id;
         public final String name;
 
@@ -38,9 +37,13 @@ public class GTFSController implements HttpController {
         }
     }
 
+    private static class GeoJSONLineString {
+        public final String type = "LineString";
+        public double[][] coordinates;
+    }
+
     private GTFSFeed getFeedFromRequest (Request req) {
-        Bundle bundle = Persistence.bundles.findByIdFromRequestIfPermitted(req);
-        String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), bundle.feedGroupId);
+        String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
         return gtfsCache.get(bundleScopedFeedId);
     }
 
@@ -125,29 +128,6 @@ public class GTFSController implements HttpController {
         return feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
     }
 
-    static class FeedStopsAPIResponse {
-        public final String feedId;
-        public final List<StopAPIResponse> stops;
-
-        FeedStopsAPIResponse(String feedId, List<StopAPIResponse> stops) {
-            this.feedId = feedId;
-            this.stops = stops;
-        }
-    }
-
-    private List<FeedStopsAPIResponse> getBundleStops (Request req, Response res) {
-        final Bundle bundle = Persistence.bundles.findByIdFromRequestIfPermitted(req);
-        return bundle.feeds.stream().map(f -> {
-            String bundleScopedFeedId = Bundle.bundleScopeFeedId(f.feedId, bundle.feedGroupId);
-            GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
-            List<StopAPIResponse> stops = feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
-            return new FeedStopsAPIResponse(
-                    f.feedId,
-                    stops
-            );
-        }).collect(Collectors.toList());
-    }
-
     static class TripAPIResponse extends BaseIdentifier {
         public final String headsign;
         public final Integer startTime;
@@ -185,16 +165,10 @@ public class GTFSController implements HttpController {
 
     @Override
     public void registerEndpoints (spark.Service sparkService) {
-        sparkService.get("/api/gtfs/:_id/stops", this::getBundleStops, toJson);
-        sparkService.get("/api/gtfs/:_id/:feedId/routes", this::getRoutes, toJson);
-        sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId", this::getRoute, toJson);
-        sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
-        sparkService.get("/api/gtfs/:_id/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
-        sparkService.get("/api/gtfs/:_id/:feedId/stops", this::getStops, toJson);
-    }
-
-    private static class GeoJSONLineString {
-        public final String type = "LineString";
-        public double[][] coordinates;
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes", this::getRoutes, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId", this::getRoute, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/stops", this::getStops, toJson);
     }
 }

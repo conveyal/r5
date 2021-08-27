@@ -79,7 +79,7 @@ public class ShapefileReader {
             FeatureIterator<SimpleFeature> wrapped = features.features();
 
             @Override
-            public boolean hasNext() {
+            public boolean hasNext () {
                 boolean hasNext = wrapped.hasNext();
                 if (!hasNext) {
                     // Prevent keeping a lock on the shapefile.
@@ -91,7 +91,7 @@ public class ShapefileReader {
             }
 
             @Override
-            public SimpleFeature next() {
+            public SimpleFeature next () {
                 return wrapped.next();
             }
         };
@@ -104,12 +104,7 @@ public class ShapefileReader {
     }
 
     public List<String> numericAttributes () {
-        return features.getSchema()
-                .getAttributeDescriptors()
-                .stream()
-                .filter(d -> Number.class.isAssignableFrom(d.getType().getBinding()))
-                .map(AttributeDescriptor::getLocalName)
-                .collect(Collectors.toList());
+        return features.getSchema().getAttributeDescriptors().stream().filter(d -> Number.class.isAssignableFrom(d.getType().getBinding())).map(AttributeDescriptor::getLocalName).collect(Collectors.toList());
     }
 
     public double getAreaSqKm () throws IOException, TransformException, FactoryException {
@@ -150,18 +145,21 @@ public class ShapefileReader {
     }
 
     public List<SpatialAttribute> attributes () {
+        return attributes(features.getSchema());
+    }
+
+    /** Static utility method for reuse in other classes importing GeoTools FeatureCollections. */
+    public static List<SpatialAttribute> attributes (SimpleFeatureType schema) {
         List<SpatialAttribute> attributes = new ArrayList<>();
         HashSet<String> uniqueAttributes = new HashSet<>();
-        features.getSchema()
-                .getAttributeDescriptors()
-                .forEach(d -> {
-                    String attributeName = d.getLocalName();
-                    AttributeType type = d.getType();
-                    if (type != null) {
-                        attributes.add(new SpatialAttribute(attributeName, type));
-                        uniqueAttributes.add(attributeName);
-                    }
-                });
+        schema.getAttributeDescriptors().forEach(d -> {
+            String attributeName = d.getLocalName();
+            AttributeType type = d.getType();
+            if (type != null) {
+                attributes.add(new SpatialAttribute(attributeName, type));
+                uniqueAttributes.add(attributeName);
+            }
+        });
         if (attributes.size() != uniqueAttributes.size()) {
             throw new AnalysisServerException("Shapefile has duplicate attributes.");
         }
@@ -174,10 +172,16 @@ public class ShapefileReader {
     }
 
     public GeometryType geometryType () {
-        Class geometryClass = features.getSchema().getGeometryDescriptor().getType().getBinding();
+        return geometryType(features);
+    }
+
+    /** Static utility method for reuse in other classes importing GeoTools FeatureCollections. */
+    public static GeometryType geometryType (FeatureCollection featureCollection) {
+        Class geometryClass = featureCollection.getSchema().getGeometryDescriptor().getType().getBinding();
         if (Polygonal.class.isAssignableFrom(geometryClass)) return POLYGON;
         if (Puntal.class.isAssignableFrom(geometryClass)) return POINT;
         if (Lineal.class.isAssignableFrom(geometryClass)) return LINE;
         throw new IllegalArgumentException("Could not determine geometry type of features in DataSource.");
     }
+
 }

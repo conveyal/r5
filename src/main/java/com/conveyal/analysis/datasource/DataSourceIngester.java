@@ -1,9 +1,13 @@
 package com.conveyal.analysis.datasource;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import org.apache.commons.fileupload.FileItem;
+import org.bson.types.ObjectId;
 
 import java.io.File;
+import java.util.stream.Collectors;
 
 /**
  * Logic for loading and validating a specific kind of input file, yielding a specific subclass of DataSource.
@@ -12,13 +16,13 @@ import java.io.File;
 public abstract class DataSourceIngester {
 
     /**
-     * An accessor method that gives the general purpose DataSourceUploadAction a view of the DataSource being
-     * constructed. This allows to DataSourceUploadAction to set all the shared general properties of a DataSource,
-     * leaving the DataSourceIngester to handle only the details specific to its input format and DataSource subclass.
-     * Concrete subclasses should ensure that this method can return an object immediately after they're constructed.
-     * Or maybe only after ingest() returns?
+     * An accessor method that gives the general purpose DataSourceUploadAction and DataSourceIngester code a view of
+     * the DataSource being constructed. This allows to DataSourceUploadAction to set all the shared general properties
+     * of a DataSource and insert it into the database, leaving the DataSourceIngester to handle only the details
+     * specific to its input format and DataSource subclass. Concrete subclasses should ensure that this method can
+     * return an object immediately after they're constructed.
      */
-    public abstract DataSource dataSource ();
+    protected abstract DataSource dataSource ();
 
     /**
      * This method is implemented on concrete subclasses to provide logic for interpreting a particular file type.
@@ -29,5 +33,22 @@ public abstract class DataSourceIngester {
      * the same base name as required, and only one of their complete file names must be provided.
      */
     public abstract void ingest (File file, ProgressListener progressListener);
+
+    /**
+     * This method takes care of setting the fields common to all kinds of DataSource, with the specific concrete
+     * DataSourceIngester taking care of the rest.
+     * Our no-arg BaseModel constructors are used for deserialization so they don't create an _id or nonce ObjectId();
+     */
+    public void initializeDataSource (String name, String description, String regionId, UserPermissions userPermissions) {
+        DataSource dataSource = dataSource();
+        dataSource._id = new ObjectId();
+        dataSource.nonce = new ObjectId();
+        dataSource.name = name;
+        dataSource.regionId = regionId;
+        dataSource.createdBy = userPermissions.email;
+        dataSource.updatedBy = userPermissions.email;
+        dataSource.accessGroup = userPermissions.accessGroup;
+        dataSource.description = description;
+    }
 
 }

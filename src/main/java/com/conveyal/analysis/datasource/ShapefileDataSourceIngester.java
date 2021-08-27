@@ -1,6 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.models.Bounds;
+import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -21,7 +22,7 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
     private final SpatialDataSource dataSource;
 
     @Override
-    public SpatialDataSource dataSource () {
+    public DataSource dataSource () {
         return dataSource;
     }
 

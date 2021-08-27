@@ -24,7 +24,9 @@ import java.util.stream.Collectors;
 import static com.conveyal.analysis.controllers.OpportunityDatasetController.getFormField;
 import static com.conveyal.analysis.datasource.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.file.FileCategory.DATASOURCES;
+import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
+import static com.conveyal.file.FileStorageFormat.TIFF;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -71,24 +73,6 @@ public class DataSourceUploadAction implements TaskAction {
         this.dataSourceCollection = dataSourceCollection;
         this.fileItems = fileItems;
         this.ingester = ingester;
-    }
-
-    /**
-     * Our no-arg BaseModel constructors are used for deserialization so they don't create an _id or nonce ObjectId();
-     * This DataSourceUploadAction takes care of setting the fields common to all kinds of DataSource, with the specific
-     * DataSourceIngester taking care of the rest. There must be a better way to set all this, but this works for now.
-     */
-    public void initializeDataSource (String name, String regionId, UserPermissions userPermissions) {
-        DataSource dataSource = ingester.dataSource();
-        dataSource._id = new ObjectId();
-        dataSource.nonce = new ObjectId();
-        dataSource.name = name;
-        dataSource.regionId = regionId;
-        dataSource.createdBy = userPermissions.email;
-        dataSource.updatedBy = userPermissions.email;
-        dataSource.accessGroup = userPermissions.accessGroup;
-        String fileNames = fileItems.stream().map(FileItem::getName).collect(Collectors.joining(", "));
-        dataSource.description = "From uploaded files: " + fileNames;
     }
 
     @Override
@@ -146,13 +130,19 @@ public class DataSourceUploadAction implements TaskAction {
         DataSourceIngester ingester;
         if (format == SHP) {
             ingester = new ShapefileDataSourceIngester();
+        } else if (format == GEOJSON) {
+            ingester = new GeoJsonDataSourceIngester();
+        } else if (format == TIFF) { // really this enum value should be GEOTIFF rather than just TIFF.
+            ingester = new GeoTiffDataSourceIngester();
         } else {
             throw new IllegalArgumentException("Ingestion logic not yet defined for format: " + format);
         }
+        String description = "From uploaded files: " + fileItems.stream()
+                .map(FileItem::getName).collect(Collectors.joining(", "));
+        ingester.initializeDataSource(sourceName, description, regionId, userPermissions);
         DataSourceUploadAction dataSourceUploadAction =
                 new DataSourceUploadAction(fileStorage, dataSourceCollection, fileItems, ingester);
 
-        dataSourceUploadAction.initializeDataSource(sourceName, regionId, userPermissions);
         return dataSourceUploadAction;
     }
 

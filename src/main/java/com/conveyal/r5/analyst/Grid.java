@@ -713,7 +713,7 @@ public class Grid extends PointSet {
                 } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
                     grid.rasterize(geom, numericVal);
                 } else {
-                    throw new IllegalArgumentException("Unsupported geometry type");
+                    throw new IllegalArgumentException("Unsupported geometry type: " + geom);
                 }
             }
 

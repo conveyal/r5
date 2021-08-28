@@ -7,12 +7,14 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
 import java.io.File;
 
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Logic to create SpatialDataSource metadata from a Shapefile.
@@ -38,8 +40,12 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
         progressListener.beginTask("Validating files", 1);
         try {
             ShapefileReader reader = new ShapefileReader(file);
+            // Iterate over all features to ensure file is readable, geometries are valid, and can be reprojected.
             Envelope envelope = reader.wgs84Bounds();
             checkWgsEnvelopeSize(envelope);
+            reader.wgs84Stream().forEach(f -> {
+                checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
+            });
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
             dataSource.attributes = reader.attributes();
             dataSource.geometryType = reader.geometryType();

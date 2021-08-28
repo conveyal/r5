@@ -28,6 +28,7 @@ import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.file.FileStorageFormat.TIFF;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a batch of uploaded files, put them into FileStorage, categorize and validate them, and record metadata as
@@ -108,6 +109,7 @@ public class DataSourceUploadAction implements TaskAction {
             }
         }
         checkNotNull(file);
+        checkState(file.exists());
     }
 
     /**
@@ -127,16 +129,8 @@ public class DataSourceUploadAction implements TaskAction {
         final List<FileItem> fileItems = formFields.get("sourceFiles");
 
         FileStorageFormat format = detectUploadFormatAndValidate(fileItems);
-        DataSourceIngester ingester;
-        if (format == SHP) {
-            ingester = new ShapefileDataSourceIngester();
-        } else if (format == GEOJSON) {
-            ingester = new GeoJsonDataSourceIngester();
-        } else if (format == TIFF) { // really this enum value should be GEOTIFF rather than just TIFF.
-            ingester = new GeoTiffDataSourceIngester();
-        } else {
-            throw new IllegalArgumentException("Ingestion logic not yet defined for format: " + format);
-        }
+        DataSourceIngester ingester = DataSourceIngester.forFormat(format);
+
         String description = "From uploaded files: " + fileItems.stream()
                 .map(FileItem::getName).collect(Collectors.joining(", "));
         ingester.initializeDataSource(sourceName, description, regionId, userPermissions);

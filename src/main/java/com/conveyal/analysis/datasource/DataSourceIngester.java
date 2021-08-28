@@ -2,12 +2,17 @@ package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.DataSource;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import org.apache.commons.fileupload.FileItem;
 import org.bson.types.ObjectId;
 
 import java.io.File;
 import java.util.stream.Collectors;
+
+import static com.conveyal.file.FileStorageFormat.GEOJSON;
+import static com.conveyal.file.FileStorageFormat.SHP;
+import static com.conveyal.file.FileStorageFormat.TIFF;
 
 /**
  * Logic for loading and validating a specific kind of input file, yielding a specific subclass of DataSource.
@@ -51,4 +56,19 @@ public abstract class DataSourceIngester {
         dataSource.description = description;
     }
 
+    /**
+     * Factory method to return an instance of the appropriate concrete subclass for the given file format.
+     */
+    public static DataSourceIngester forFormat (FileStorageFormat format) {
+        if (format == SHP) {
+            return new ShapefileDataSourceIngester();
+        } else if (format == GEOJSON) {
+            return new GeoJsonDataSourceIngester();
+        } else if (format == TIFF) { // really this enum value should be GEOTIFF rather than just TIFF.
+            return new GeoTiffDataSourceIngester();
+        } else {
+            throw new IllegalArgumentException("Ingestion logic not yet defined for format: " + format);
+        }
+
+    }
 }

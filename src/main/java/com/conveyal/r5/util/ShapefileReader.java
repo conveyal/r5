@@ -118,6 +118,9 @@ public class ShapefileReader {
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {
         return stream().map(f -> {
             org.locationtech.jts.geom.Geometry g = (org.locationtech.jts.geom.Geometry) f.getDefaultGeometry();
+            if (g == null) {
+                throw new RuntimeException("Null geometry on feature: " + f.getID());
+            }
             try {
                 // TODO does this leak beyond this function?
                 f.setDefaultGeometry(JTS.transform(g, transform));
@@ -169,6 +172,12 @@ public class ShapefileReader {
     /** These are very broad. For example, line includes linestring and multilinestring. */
     public enum GeometryType {
         POLYGON, POINT, LINE;
+        public static GeometryType forBindingClass (Class binding) {
+            if (Polygonal.class.isAssignableFrom(binding)) return POLYGON;
+            if (Puntal.class.isAssignableFrom(binding)) return POINT;
+            if (Lineal.class.isAssignableFrom(binding)) return LINE;
+            throw new IllegalArgumentException("Could not determine geometry type of features in DataSource.");
+        }
     }
 
     public GeometryType geometryType () {
@@ -178,10 +187,7 @@ public class ShapefileReader {
     /** Static utility method for reuse in other classes importing GeoTools FeatureCollections. */
     public static GeometryType geometryType (FeatureCollection featureCollection) {
         Class geometryClass = featureCollection.getSchema().getGeometryDescriptor().getType().getBinding();
-        if (Polygonal.class.isAssignableFrom(geometryClass)) return POLYGON;
-        if (Puntal.class.isAssignableFrom(geometryClass)) return POINT;
-        if (Lineal.class.isAssignableFrom(geometryClass)) return LINE;
-        throw new IllegalArgumentException("Could not determine geometry type of features in DataSource.");
+        return GeometryType.forBindingClass(geometryClass);
     }
 
 }

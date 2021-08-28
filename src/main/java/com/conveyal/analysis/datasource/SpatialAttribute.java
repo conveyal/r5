@@ -1,6 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import org.locationtech.jts.geom.Geometry;
+import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.AttributeType;
 
 /**
@@ -20,20 +21,33 @@ public class SpatialAttribute {
     /** The data type of the attribute - for our purposes primarily distinguishing between numbers and text. */
     public Type type;
 
-    private enum Type {
-        NUMBER, // internally, we generally parse as doubles
+    /** On how many features does this attribute occur? */
+    public int occurrances = 0;
+
+    public enum Type {
+        NUMBER, // internally, we generally work with doubles so all numeric GIS types can be up-converted
         TEXT,
         GEOM,
-        ERROR
+        ERROR;
+        public static Type forBindingClass (Class binding) {
+            if (Number.class.isAssignableFrom(binding)) return Type.NUMBER;
+            else if (String.class.isAssignableFrom(binding)) return Type.TEXT;
+            else if (Geometry.class.isAssignableFrom(binding)) return Type.GEOM;
+            else return Type.ERROR;
+        }
     }
 
+    /**
+     * Given an OpenGIS AttributeType, create a new Conveyal attribute metadata object reflecting it.
+     */
     public SpatialAttribute(String name, AttributeType type) {
         this.name = name;
         this.label = name;
-        if (Number.class.isAssignableFrom(type.getBinding())) this.type = Type.NUMBER;
-        else if (String.class.isAssignableFrom(type.getBinding())) this.type = Type.TEXT;
-        else if (Geometry.class.isAssignableFrom(type.getBinding())) this.type = Type.GEOM;
-        else this.type = Type.ERROR;
+        this.type = Type.forBindingClass(type.getBinding());
+    }
+
+    public SpatialAttribute(AttributeDescriptor descriptor) {
+        this(descriptor.getLocalName(), descriptor.getType());
     }
 
     /** No-arg constructor required for Mongo POJO deserialization. */

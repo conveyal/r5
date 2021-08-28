@@ -409,6 +409,7 @@ public class OpportunityDatasetController implements HttpController {
                 source.regionId = regionId;
                 updateAndStoreDatasets(source, status, pointsets);
             } catch (Exception e) {
+                e.printStackTrace();
                 status.completeWithError(e);
             }
         });

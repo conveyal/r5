@@ -125,6 +125,11 @@ repositories {
     maven { url 'https://nexus.axiomalaska.com/nexus/content/repositories/public-releases' }
 }
 
+// Exclude all JUnit 4 transitive dependencies - IntelliJ bug causes it to think we're using Junit 4 instead of 5.
+configurations.all {
+    exclude group: "junit", module: "junit"
+}
+
 dependencies {
     // Provides our logging API
     implementation 'org.slf4j:slf4j-api:1.7.30'
@@ -160,7 +165,9 @@ dependencies {
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-referencing'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-shapefile'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-coverage'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojson' // TODO REMOVE DEPRECATED
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojsondatastore'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geopkg'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geotiff'
     // Provides the EPSG coordinate reference system catalog as an HSQL database.
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-epsg-hsql'

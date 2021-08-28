@@ -58,7 +58,14 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             params.put("database", file.getAbsolutePath());
             DataStore datastore = DataStoreFinder.getDataStore(params);
             // TODO Remaining logic should be similar to Shapefile and GeoJson
-            FeatureSource featureSource = datastore.getFeatureSource(datastore.getTypeNames()[0]);
+            // Some GeoTools DataStores have multiple tables ("type names") available. GeoPackage seems to allow this.
+            // Shapefile has only one per DataStore, so the ShapefileDataStore provides a convenience method that does
+            // this automatically.
+            String[] typeNames = datastore.getTypeNames();
+            if (typeNames.length != 1) {
+                throw new RuntimeException("GeoPackage must contain only one table, this file has " + typeNames.length);
+            }
+            FeatureSource featureSource = datastore.getFeatureSource(typeNames[0]);
             FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = featureSource.getFeatures();
             Envelope envelope = featureCollection.getBounds();
             checkWgsEnvelopeSize(envelope); // Note this may be projected TODO reprojection logic

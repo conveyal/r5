@@ -61,6 +61,7 @@ public abstract class SpatialLayers {
         }
 
         // Even if we've already detected a shapefile, run the other tests to check for a bad mixture of file types.
+        // TODO factor the size == 1 check out of all cases
         if (fileExtensions.contains("GRID")) {
             if (fileExtensions.size() == 1) {
                 uploadFormat = FileStorageFormat.GRID;
@@ -75,10 +76,16 @@ public abstract class SpatialLayers {
                 String message = "When uploading CSV you may only upload one file at a time.";
                 throw AnalysisServerException.fileUpload(message);
             }
+        } else if (fileExtensions.contains("GEOJSON") || fileExtensions.contains("JSON")) {
+            uploadFormat = FileStorageFormat.GEOJSON;
+        } else if (fileExtensions.contains("GPKG")) {
+            uploadFormat = FileStorageFormat.GEOPACKAGE;
+        } else if (fileExtensions.contains("TIFF") || fileExtensions.contains("TIF")) {
+            uploadFormat = FileStorageFormat.TIFF;
         }
 
         if (uploadFormat == null) {
-            throw AnalysisServerException.fileUpload("Could not detect format of opportunity dataset upload.");
+            throw AnalysisServerException.fileUpload("Could not detect format of uploaded spatial data.");
         }
         return uploadFormat;
     }

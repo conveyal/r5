@@ -67,7 +67,7 @@ public abstract class DataSourceIngester {
         } else if (format == TIFF) { // really this enum value should be GEOTIFF rather than just TIFF.
             return new GeoTiffDataSourceIngester();
         } else {
-            throw new IllegalArgumentException("Ingestion logic not yet defined for format: " + format);
+            return new GeoPackageDataSourceIngester();
         }
 
     }

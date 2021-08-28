@@ -155,15 +155,18 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
                     continue;
                 }
             }
+            checkCrs(featureType);
             // Set SpatialDataSource fields (Conveyal metadata) from GeoTools model
             ReferencedEnvelope envelope = featureCollection.getBounds();
-            // TODO Also check bounds for antimeridian crossing or out-of-range
+            // TODO Range-check lats and lons, projection of bad inputs can give negative areas (even check every feature)
+            // TODO Also check bounds for antimeridian crossing
             checkWgsEnvelopeSize(envelope);
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
             // Cannot set from FeatureType because it's always Geometry for GeoJson.
             dataSource.geometryType = ShapefileReader.GeometryType.forBindingClass(firstGeometryType);
             dataSource.featureCount = featureCollection.size();
         } catch (Throwable t) {
+            // Unexpected errors cause immediate failure; predictable issues will be recorded on the DataSource object.
             throw new RuntimeException("Error parsing GeoJSON. Please ensure the files you uploaded are valid.", t);
         }
     }

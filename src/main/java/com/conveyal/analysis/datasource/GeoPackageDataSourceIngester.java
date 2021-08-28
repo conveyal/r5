@@ -8,11 +8,13 @@ import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
+import org.geotools.data.FeatureSource;
 import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -22,7 +24,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.conveyal.r5.util.ShapefileReader.attributes;
 import static com.conveyal.r5.util.ShapefileReader.geometryType;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Logic to create SpatialDataSource metadata from an uploaded GeoPackage file and perform validation.
@@ -43,7 +47,7 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
         // Note we're using the no-arg constructor creating a totally empty object.
         // Its ID and other general fields will be set later by the enclosing DataSourceUploadAction.
         this.dataSource = new SpatialDataSource();
-        dataSource.fileFormat = FileStorageFormat.SHP;
+        dataSource.fileFormat = FileStorageFormat.GEOPACKAGE;
     }
 
     @Override
@@ -54,6 +58,17 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             params.put("database", file.getAbsolutePath());
             DataStore datastore = DataStoreFinder.getDataStore(params);
             // TODO Remaining logic should be similar to Shapefile and GeoJson
+            FeatureSource featureSource = datastore.getFeatureSource(datastore.getTypeNames()[0]);
+            FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = featureSource.getFeatures();
+            Envelope envelope = featureCollection.getBounds();
+            checkWgsEnvelopeSize(envelope); // Note this may be projected TODO reprojection logic
+//            reader.wgs84Stream().forEach(f -> {
+//                checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
+//            });
+            dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
+            dataSource.attributes = attributes(featureCollection.getSchema());
+            dataSource.geometryType = geometryType(featureCollection);
+            dataSource.featureCount = featureCollection.size();
         } catch (Exception e) {
             throw new RuntimeException("Error parsing GeoPackage. Ensure the file you uploaded is valid.", e);
         }

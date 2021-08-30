@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
@@ -799,15 +800,16 @@ public class Grid extends PointSet {
      */
     public static void checkWgsEnvelopeSize (Envelope envelope) {
         if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
-            throw new IllegalArgumentException("Shapefile extent (" + roughWgsEnvelopeArea(envelope) + " sq. km.) " +
-                    "exceeds limit (" + MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+            throw new DataSourceException(String.format("Geographic extent of spatial layer (%.0f km2) exceeds limit of %.0f km2.",
+                    roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM));
+
         }
     }
 
     public static void checkPixelCount (WebMercatorExtents extents, int layers) {
         int pixels = extents.width * extents.height * layers;
         if (pixels > MAX_PIXELS) {
-            throw new IllegalArgumentException("Number of zoom level " + extents.zoom + " pixels (" + pixels + ")"  +
+            throw new DataSourceException("Number of zoom level " + extents.zoom + " pixels (" + pixels + ")"  +
                     "exceeds limit (" + MAX_PIXELS +"). Reduce the zoom level or the file's extents or number of " +
                     "numeric attributes.");
         }

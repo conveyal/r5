@@ -12,6 +12,7 @@ import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
 import java.io.File;
+import java.io.IOException;
 
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 import static com.google.common.base.Preconditions.checkState;
@@ -46,15 +47,17 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
             reader.wgs84Stream().forEach(f -> {
                 checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
             });
+            reader.close();
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
             dataSource.attributes = reader.attributes();
             dataSource.geometryType = reader.geometryType();
             dataSource.featureCount = reader.featureCount();
         } catch (FactoryException | TransformException e) {
-            throw new RuntimeException("Shapefile transform error. Try uploading an unprojected (EPSG:4326) file.", e);
-        } catch (Exception e) {
-            // Must catch because ShapefileReader throws a checked IOException.
-            throw new RuntimeException("Error parsing shapefile. Ensure the files you uploaded are valid.", e);
+            throw new DataSourceException("Shapefile transform error. " +
+                    "Try uploading an unprojected WGS84 (EPSG:4326) file.", e);
+        } catch (IOException e) {
+            // ShapefileReader throws a checked IOException.
+            throw new DataSourceException("Error parsing shapefile. Ensure the files you uploaded are valid.", e);
         }
     }
 

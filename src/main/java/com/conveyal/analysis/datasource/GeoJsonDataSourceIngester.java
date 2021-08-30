@@ -119,7 +119,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             throw new IllegalArgumentException("File does not exist: " + file.getPath());
         }
         if (file.length() < MIN_GEOJSON_FILE_LENGTH) {
-            throw new IllegalArgumentException("File is too short to be GeoJSON, length is: " + file.length());
+            throw new DataSourceException("File is too short to be GeoJSON, length is: " + file.length());
         }
         try {
             // Note that most of this logic is identical to Shapefile and GeoPackage, extract common code.
@@ -165,9 +165,10 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             // Cannot set from FeatureType because it's always Geometry for GeoJson.
             dataSource.geometryType = ShapefileReader.GeometryType.forBindingClass(firstGeometryType);
             dataSource.featureCount = featureCollection.size();
-        } catch (Throwable t) {
+        } catch (FactoryException | IOException e) {
             // Unexpected errors cause immediate failure; predictable issues will be recorded on the DataSource object.
-            throw new RuntimeException("Error parsing GeoJSON. Please ensure the files you uploaded are valid.", t);
+            // Catch only checked exceptions to preserve the top-level exception type when possible.
+            throw new DataSourceException("Error parsing GeoJSON. Please ensure the files you uploaded are valid.");
         }
     }
 
@@ -178,8 +179,8 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
     private static void checkCrs (FeatureType featureType) throws FactoryException {
         CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
         if (crs != null && !DefaultGeographicCRS.WGS84.equals(crs) && !CRS.decode("CRS:84").equals(crs)) {
-            throw new RuntimeException("GeoJSON should specify no coordinate reference system, and contain unprojected " +
-                    "WGS84 coordinates. CRS is: " + crs.toString());
+            throw new DataSourceException("GeoJSON should specify no coordinate reference system, and contain " +
+                    "unprojected WGS84 coordinates. CRS is: " + crs.toString());
         }
 
     }

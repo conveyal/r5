@@ -38,6 +38,9 @@ public abstract class DataSource extends BaseModel {
      */
     public String originalFileName;
 
+    /** The size of the uploaded file, including any sidecar files. */
+    public int fileSizeBytes;
+
     public FileStorageFormat fileFormat;
 
     // This type uses (north, south, east, west), ideally we'd use (minLon, minLat, maxLon, maxLat).

@@ -1,6 +1,7 @@
 package com.conveyal.r5.util;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.analysis.datasource.SpatialAttribute;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
@@ -119,7 +120,7 @@ public class ShapefileReader {
         return stream().map(f -> {
             org.locationtech.jts.geom.Geometry g = (org.locationtech.jts.geom.Geometry) f.getDefaultGeometry();
             if (g == null) {
-                throw new RuntimeException("Null geometry on feature: " + f.getID());
+                throw new DataSourceException("Null (missing) geometry on feature: " + f.getID());
             }
             try {
                 // TODO does this leak beyond this function?
@@ -164,7 +165,7 @@ public class ShapefileReader {
             }
         });
         if (attributes.size() != uniqueAttributes.size()) {
-            throw new AnalysisServerException("Shapefile has duplicate attributes.");
+            throw new DataSourceException("Spatial layer has attributes with duplicate names.");
         }
         return attributes;
     }

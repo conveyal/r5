@@ -2,16 +2,11 @@ package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.DataSource;
-import com.conveyal.analysis.models.DataSourceValidationIssue;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.geojson.GeoJsonModule;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
-import org.geotools.data.FeatureReader;
 import org.geotools.data.geojson.GeoJSONDataStore;
-import org.geotools.data.geojson.GeoJSONFeatureSource;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
@@ -20,28 +15,19 @@ import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.index.strtree.STRtree;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.AttributeDescriptor;
-import org.opengis.feature.type.AttributeType;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.TransformException;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import static com.conveyal.analysis.models.DataSourceValidationIssue.Level.ERROR;
 import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
-import static com.conveyal.r5.util.ShapefileReader.geometryType;
 
 /**
  * Logic to create SpatialDataSource metadata from an uploaded GeoJSON file and perform validation.
@@ -86,7 +72,7 @@ import static com.conveyal.r5.util.ShapefileReader.geometryType;
  * Allow Attributes to be of "AMBIGUOUS" or null type, or just drop them if they're ambiguous.
  * Flag them as hasMissingValues, or the quantity of missing values.
  *
- * Be careful, QGIS will happily export GeoJSON with a CRS property which is no longer considered valid:
+ * Be careful, QGIS will happily export GeoJSON with a CRS property which is no longer allowed by the GeoJSON spec:
  * "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::3857" } }
  * If a CRS is present, make sure it matches one of the names for WGS84. Throw a warning if the field is present at all.
  *
@@ -113,6 +99,8 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
 
     @Override
     public void ingest (File file, ProgressListener progressListener) {
+        progressListener.beginTask("Processing and validating uploaded GeoJSON", 2);
+        progressListener.setWorkProduct(dataSource.toWorkProduct());
         // Check that file exists and is not empty.
         // Geotools GeoJson reader fails with stack overflow on empty/missing file. TODO: File GeoTools issue.
         if (!file.exists()) {
@@ -155,8 +143,10 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
                     continue;
                 }
             }
+            progressListener.increment();
             checkCrs(featureType);
             // Set SpatialDataSource fields (Conveyal metadata) from GeoTools model
+            // TODO project into WGS84, perhaps using Query.
             ReferencedEnvelope envelope = featureCollection.getBounds();
             // TODO Range-check lats and lons, projection of bad inputs can give negative areas (even check every feature)
             // TODO Also check bounds for antimeridian crossing
@@ -165,6 +155,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             // Cannot set from FeatureType because it's always Geometry for GeoJson.
             dataSource.geometryType = ShapefileReader.GeometryType.forBindingClass(firstGeometryType);
             dataSource.featureCount = featureCollection.size();
+            progressListener.increment();
         } catch (FactoryException | IOException e) {
             // Unexpected errors cause immediate failure; predictable issues will be recorded on the DataSource object.
             // Catch only checked exceptions to preserve the top-level exception type when possible.

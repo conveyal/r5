@@ -38,7 +38,8 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
 
     @Override
     public void ingest (File file, ProgressListener progressListener) {
-        progressListener.beginTask("Validating files", 1);
+        progressListener.beginTask("Validating uploaded shapefile", 2);
+        progressListener.setWorkProduct(dataSource.toWorkProduct());
         try {
             ShapefileReader reader = new ShapefileReader(file);
             // Iterate over all features to ensure file is readable, geometries are valid, and can be reprojected.
@@ -48,10 +49,12 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
                 checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
             });
             reader.close();
+            progressListener.increment();
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
             dataSource.attributes = reader.attributes();
             dataSource.geometryType = reader.geometryType();
             dataSource.featureCount = reader.featureCount();
+            progressListener.increment();
         } catch (FactoryException | TransformException e) {
             throw new DataSourceException("Shapefile transform error. " +
                     "Try uploading an unprojected WGS84 (EPSG:4326) file.", e);

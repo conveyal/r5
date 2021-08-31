@@ -22,7 +22,8 @@ public enum FileStorageFormat {
     GTFS("zip", "application/zip"),
     OSMPBF("pbf", "application/octet-stream"),
     // Also can be application/geo+json, see https://www.iana.org/assignments/media-types/application/geo+json
-    GEOJSON("json", "application/json"),
+    // The extension used to be defined as .json TODO ensure that changing it to .geojson hasn't broken anything.
+    GEOJSON("geojson", "application/json"),
     // See requirement 3 http://www.geopackage.org/spec130/#_file_extension_name
     GEOPACKAGE("gpkg", "application/geopackage+sqlite3");
 

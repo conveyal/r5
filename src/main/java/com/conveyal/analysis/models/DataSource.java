@@ -43,7 +43,10 @@ public abstract class DataSource extends BaseModel {
 
     public FileStorageFormat fileFormat;
 
-    // This type uses (north, south, east, west), ideally we'd use (minLon, minLat, maxLon, maxLat).
+    /**
+     * The geographic bounds of this data set in WGS84 coordinates (independent of the original CRS of uploaded file).
+     * This type uses (north, south, east, west), ideally for consistency we'd use (minLon, minLat, maxLon, maxLat).
+     */
     public Bounds wgsBounds;
 
     /**

@@ -5,13 +5,15 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 
+import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.ingest;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
+ * Beyond the standard cases in SpatialDataSourceIngesterTest, special cases for ESRI Shapefile ingestion.
  * Test that we can correctly read Shapefiles with many different characteristics, and can detect problematic inputs
- * including many that we've encountered in practice.
+ * including ones we've encountered in practice.
  */
 class ShapefileDataSourceIngesterTest {
 
@@ -24,7 +26,7 @@ class ShapefileDataSourceIngesterTest {
     void nullPointGeometries () {
         Throwable throwable = assertThrows(
                 DataSourceException.class,
-                () -> ingest("nl-null-points"),
+                () -> ingest(SHP, "nl-null-points"),
                 "Expected exception on shapefile with null geometries."
         );
         assertTrue(throwable.getMessage().contains("missing"));
@@ -39,54 +41,10 @@ class ShapefileDataSourceIngesterTest {
      */
     @Test
     void duplicateAttributeNames () {
-        SpatialDataSource spatialDataSource = ingest("duplicate-fields");
+        SpatialDataSource spatialDataSource = ingest(SHP, "duplicate-fields");
         // id, the_geom, DDDDDDDDDD, and DDDDDDDDDD. The final one will be renamed on the fly to DDDDDDDDDD1.
         assertTrue(spatialDataSource.attributes.size() == 4);
         assertTrue(spatialDataSource.attributes.get(3).name.endsWith("1"));
-    }
-
-    /**
-     * Test on a shapefile containing huge shapes,
-     * in this case the continents of Africa, South America, and Australia.
-     */
-    @Test
-    void continentalScale () {
-        Throwable throwable = assertThrows(
-                DataSourceException.class,
-                () -> ingest("continents"),
-                "Expected exception on continental-scale shapefile."
-        );
-        assertTrue(throwable.getMessage().contains("exceeds"));
-    }
-
-    /**
-     * Test on a shapefile containing shapes on both sides of the 180 degree antimeridian.
-     * This case was encountered in the wild: the North Island and the Chatham islands, both part of New Zealand.
-     */
-    @Test
-    void newZealandAntimeridian () {
-        Throwable throwable = assertThrows(
-                DataSourceException.class,
-                () -> ingest("new-zealand-antimeridian"),
-                "Expected exception on shapefile crossing antimeridian."
-        );
-        // TODO generate message specifically about 180 degree meridian, not excessive bbox size
-        assertTrue(throwable.getMessage().contains("exceeds"));
-    }
-
-    private SpatialDataSource ingest (String shpBaseName) {
-        TestingProgressListener progressListener = new TestingProgressListener();
-        DataSourceIngester ingester = DataSourceIngester.forFormat(SHP);
-        File geoJsonInputFile = getResourceAsFile(shpBaseName + ".shp");
-        ingester.ingest(geoJsonInputFile, progressListener);
-        // TODO progressListener.assertUsedCorrectly();
-        return ((SpatialDataSource) ingester.dataSource());
-    }
-
-    /** Method is non-static since resource resolution is relative to the package of the current class. */
-    private File getResourceAsFile (String resource) {
-        // This just removes the protocol and query parameter part of the URL, which for File URLs leaves a file path.
-        return new File(getClass().getResource(resource).getFile());
     }
 
 }

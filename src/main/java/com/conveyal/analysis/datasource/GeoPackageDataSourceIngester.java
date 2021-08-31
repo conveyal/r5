@@ -20,6 +20,7 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,6 +53,8 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
 
     @Override
     public void ingest (File file, ProgressListener progressListener) {
+        progressListener.beginTask("Validating uploaded GeoPackage", 2);
+        progressListener.setWorkProduct(dataSource.toWorkProduct());
         try {
             Map params = new HashMap();
             params.put("dbtype", "geopkg");
@@ -69,6 +72,7 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = featureSource.getFeatures();
             Envelope envelope = featureCollection.getBounds();
             checkWgsEnvelopeSize(envelope); // Note this may be projected TODO reprojection logic
+            progressListener.increment();
 //            reader.wgs84Stream().forEach(f -> {
 //                checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
 //            });
@@ -76,8 +80,9 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             dataSource.attributes = attributes(featureCollection.getSchema());
             dataSource.geometryType = geometryType(featureCollection);
             dataSource.featureCount = featureCollection.size();
-        } catch (Exception e) {
-            throw new RuntimeException("Error parsing GeoPackage. Ensure the file you uploaded is valid.", e);
+            progressListener.increment();
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading GeoPackage due to IOException.", e);
         }
     }
 

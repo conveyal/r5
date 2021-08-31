@@ -799,10 +799,12 @@ public class Grid extends PointSet {
      * Throw an exception if the provided envelope is too big for a reasonable destination grid.
      */
     public static void checkWgsEnvelopeSize (Envelope envelope) {
+        checkWgsEnvelopeRange(envelope);
         if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
-            throw new DataSourceException(String.format("Geographic extent of spatial layer (%.0f km2) exceeds limit of %.0f km2.",
-                    roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM));
-
+            throw new DataSourceException(String.format(
+                    "Geographic extent of spatial layer (%.0f km2) exceeds limit of %.0f km2.",
+                    roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM
+            ));
         }
     }
 
@@ -812,6 +814,30 @@ public class Grid extends PointSet {
             throw new DataSourceException("Number of zoom level " + extents.zoom + " pixels (" + pixels + ")"  +
                     "exceeds limit (" + MAX_PIXELS +"). Reduce the zoom level or the file's extents or number of " +
                     "numeric attributes.");
+        }
+    }
+
+    /**
+     * We have to range-check the envelope before checking its size. Large unprojected y values interpreted as latitudes
+     * can yield negaive cosines, producing negative estimated areas, producing false negatives on size checks.
+     */
+    private static void checkWgsEnvelopeRange (Envelope envelope) {
+        checkLon(envelope.getMinX());
+        checkLon(envelope.getMaxX());
+        checkLat(envelope.getMinY());
+        checkLat(envelope.getMaxY());
+    }
+
+    private static void checkLon (double longitude) {
+        if (!Double.isFinite(longitude) || Math.abs(longitude) > 180) {
+            throw new DataSourceException("Longitude is not a finite number with absolute value below 180.");
+        }
+    }
+
+    private static void checkLat (double latitude) {
+        // Longyearbyen on the Svalbard archipelago is the world's northernmost permanent settlement (78 degrees N).
+        if (!Double.isFinite(latitude) || Math.abs(latitude) > 80) {
+            throw new DataSourceException("Longitude is not a finite number with absolute value below 80.");
         }
     }
 

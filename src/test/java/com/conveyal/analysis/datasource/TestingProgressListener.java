@@ -4,6 +4,9 @@ import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.junit.jupiter.api.Assertions;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * A mock ProgressListener for use in tests, which makes sure all the interface methods are called and shows progress.
  */
@@ -11,16 +14,21 @@ public class TestingProgressListener implements ProgressListener {
 
     private String description;
     private WorkProduct workProduct;
-    private int count = 0;
+    private int taskCount = 0;
+    private int totalElements = 0;
+    private int elementsCompleted = 0;
 
     @Override
     public void beginTask (String description, int totalElements) {
         this.description = description;
+        this.totalElements = totalElements;
+        taskCount += 1;
     }
 
     @Override
     public void increment (int n) {
-        count += n;
+        elementsCompleted += n;
+        assertTrue(elementsCompleted <= totalElements);
     }
 
     @Override
@@ -29,9 +37,11 @@ public class TestingProgressListener implements ProgressListener {
     }
 
     public void assertUsedCorrectly () {
-        Assertions.assertNotNull(description);
-        Assertions.assertNotNull(workProduct);
-        Assertions.assertTrue(count > 0);
+        assertNotNull(description);
+        assertNotNull(workProduct);
+        assertTrue(taskCount > 0);
+        assertTrue(elementsCompleted > 0);
+        assertEquals(totalElements, elementsCompleted);
     }
 
 }

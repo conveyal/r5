@@ -1,12 +1,10 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.models.DataSourceValidationIssue;
 import com.conveyal.analysis.models.SpatialDataSource;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-
-import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.ingest;
+import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.assertIngestException;
+import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.testIngest;
 import static com.conveyal.analysis.models.DataSourceValidationIssue.Level.ERROR;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,7 +19,7 @@ class GeoJsonDataSourceIngesterTest {
 
     @Test
     void typeMismatch () {
-        SpatialDataSource spatialDataSource = ingest(GEOJSON, "hkzones-type-mismatch");
+        SpatialDataSource spatialDataSource = testIngest(GEOJSON, "hkzones-type-mismatch");
         // Currently we can't detect problems with inconsistent schema across features.
         // GeoTools seems to report the same schema on every feature.
         assertTrue(spatialDataSource.issues.isEmpty());
@@ -29,7 +27,7 @@ class GeoJsonDataSourceIngesterTest {
 
     @Test
     void extraAttribute () {
-        SpatialDataSource spatialDataSource = ingest(GEOJSON, "hkzones-extra-attribute");
+        SpatialDataSource spatialDataSource = testIngest(GEOJSON, "hkzones-extra-attribute");
         // Currently we can't detect problems with inconsistent schema across features.
         // GeoTools seems to report the same schema on every feature.
         assertTrue(spatialDataSource.issues.isEmpty());
@@ -37,7 +35,7 @@ class GeoJsonDataSourceIngesterTest {
 
     @Test
     void mixedNumeric () {
-        SpatialDataSource spatialDataSource = ingest(GEOJSON, "hkzones-mixed-numeric");
+        SpatialDataSource spatialDataSource = testIngest(GEOJSON, "hkzones-mixed-numeric");
         // Currently we can't detect problems with inconsistent schema across features.
         // GeoTools seems to report the same schema on every feature.
         assertTrue(spatialDataSource.issues.isEmpty());
@@ -45,27 +43,19 @@ class GeoJsonDataSourceIngesterTest {
 
     @Test
     void mixedGeometries () {
-        SpatialDataSource spatialDataSource = ingest(GEOJSON, "hkzones-mixed-geometries");
+        SpatialDataSource spatialDataSource = testIngest(GEOJSON, "hkzones-mixed-geometries");
         // Inconsistent geometry between features is detected.
         assertTrue(spatialDataSource.issues.stream().anyMatch(i -> i.level == ERROR));
     }
 
     @Test
     void fileEmpty () {
-        assertThrows(
-                DataSourceException.class,
-                () -> ingest(GEOJSON, "empty"),
-                "Expected exception on empty input file."
-        );
+        assertIngestException(GEOJSON, "empty", DataSourceException.class, "length");
     }
 
     @Test
     void fileTooSmall () {
-        assertThrows(
-                DataSourceException.class,
-                () -> ingest(GEOJSON, "too-small"),
-                "Expected exception on input file too short to be GeoJSON."
-        );
+        assertIngestException(GEOJSON, "too-small", DataSourceException.class, "length");
     }
 
 }

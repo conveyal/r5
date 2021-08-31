@@ -3,23 +3,17 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.util.ShapefileReader;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.locationtech.jts.geom.Envelope;
 
 import java.io.File;
-import java.lang.invoke.MethodHandles;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 
 import static com.conveyal.analysis.datasource.SpatialAttribute.Type.NUMBER;
 import static com.conveyal.analysis.datasource.SpatialAttribute.Type.TEXT;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
-import static com.conveyal.file.FileStorageFormat.GEOPACKAGE;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,7 +29,7 @@ class SpatialDataSourceIngesterTest {
     // Or a separate local enum that gets mapped to the FileStorageFormat enum.
 
     /** Envelope around Hong Kong Island, Kowloon, and Lamma. */
-    public static final Envelope HK_ENVELOPE = new Envelope(114.09, 114.40, 22.18, 22.20);
+    public static final Envelope HK_ENVELOPE = new Envelope(114.09, 114.40, 22.18, 22.34);
 
     /**
      * Test on small basic data sets with no errors, but projected into some relatively obscure local coordinate system.
@@ -48,15 +42,20 @@ class SpatialDataSourceIngesterTest {
         // TODO for (String geomType : List.of("point", "polygon", "linestring")) {
         // For now all test files are polygons with three features and two additional attributes (name and count).
         for (String fileSuffix : List.of("wgs84", "projected")) {
-            SpatialDataSource spatialDataSource = ingest(format, "valid-polygon-" + fileSuffix);
-            assertTrue(spatialDataSource.issues.isEmpty());
-            assertTrue(spatialDataSource.geometryType == POLYGON);
-            assertTrue(spatialDataSource.featureCount == 3);
-            assertTrue(hasAttribute(spatialDataSource.attributes, "Name", TEXT));
-            assertTrue(hasAttribute(spatialDataSource.attributes, "Count", NUMBER));
-            assertFalse(hasAttribute(spatialDataSource.attributes, "Count", TEXT));
-            // FIXME projected DataSources are returning projected bounds, not WGS84.
-            assertTrue(HK_ENVELOPE.contains(spatialDataSource.wgsBounds.envelope()));
+            if (format == GEOJSON && "projected".equals(fileSuffix)) {
+                // GeoTools silently ignores (illegal) non-WGS84 CRS in GeoJSON files.
+                assertIngestException(format, "valid-polygon-" + fileSuffix, DataSourceException.class, "value");
+            } else {
+                SpatialDataSource spatialDataSource = testIngest(format, "valid-polygon-" + fileSuffix);
+                assertTrue(spatialDataSource.issues.isEmpty());
+                assertTrue(spatialDataSource.geometryType == POLYGON);
+                assertTrue(spatialDataSource.featureCount == 3);
+                assertTrue(hasAttribute(spatialDataSource.attributes, "Name", TEXT));
+                assertTrue(hasAttribute(spatialDataSource.attributes, "Count", NUMBER));
+                assertFalse(hasAttribute(spatialDataSource.attributes, "Count", TEXT));
+                // FIXME projected DataSources are returning projected bounds, not WGS84.
+                assertTrue(HK_ENVELOPE.contains(spatialDataSource.wgsBounds.envelope()));
+            }
         }
     }
 
@@ -64,39 +63,38 @@ class SpatialDataSourceIngesterTest {
     @ParameterizedTest
     @EnumSource(names = {"GEOPACKAGE", "GEOJSON", "SHP"})
     void continentalScale (FileStorageFormat format) {
-        Throwable throwable = assertThrows(
-                DataSourceException.class,
-                () -> ingest(format, "continents"),
-                "Expected exception on continental-scale geographic features."
-        );
-        assertTrue(throwable.getMessage().contains("exceeds"));
+        assertIngestException(format, "continents", DataSourceException.class, "exceeds");
     }
 
     /**
-     * Test on projected (non-WGS84) GeoPackage containing shapes on both sides of the 180 degree antimeridian.
+     * Test on projected (non-WGS84) data containing shapes on both sides of the 180 degree antimeridian.
      * This case was encountered in the wild: the North Island and the Chatham islands, both part of New Zealand.
      */
     @ParameterizedTest
     @EnumSource(names = {"GEOPACKAGE", "GEOJSON", "SHP"})
     void newZealandAntimeridian (FileStorageFormat format) {
-        Throwable throwable = assertThrows(
-                DataSourceException.class,
-                () -> ingest(format, "new-zealand-antimeridian"),
-                "Expected exception on geographic feature collection crossing antimeridian."
-        );
         // TODO generate message specifically about 180 degree meridian, not excessive bbox size
-        assertTrue(throwable.getMessage().contains("exceeds"));
+        assertIngestException(format, "new-zealand-antimeridian", DataSourceException.class, "exceeds");
     }
 
-    public static SpatialDataSource ingest (FileStorageFormat format, String inputFile) {
+    public static SpatialDataSource testIngest (FileStorageFormat format, String inputFile) {
         TestingProgressListener progressListener = new TestingProgressListener();
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);
         ingester.initializeDataSource("TestName", "Test Description", "test_region_id",
                 new UserPermissions("test@email.com", false, "test_group"));
-        File geoJsonInputFile = getResourceAsFile(String.join(".", inputFile, format.extension));
-        ingester.ingest(geoJsonInputFile, progressListener);
+        File resourceFile = getResourceAsFile(String.join(".", inputFile, format.extension));
+        ingester.ingest(resourceFile, progressListener);
         progressListener.assertUsedCorrectly();
         return ((SpatialDataSource) ingester.dataSource());
+    }
+
+    public static void assertIngestException (
+            FileStorageFormat format, String inputFile, Class<? extends Exception> exceptionType, String messageWord
+    ) {
+        Throwable throwable = assertThrows(exceptionType, () -> testIngest(format, inputFile),
+                "Expected failure with exception type: " + exceptionType.getSimpleName());
+        assertTrue(throwable.getMessage().contains(messageWord),
+                "Exception message is expected to contain the text: " + messageWord);
     }
 
     /** Method is static, so resolution is always relative to the package of the class where it's defined. */

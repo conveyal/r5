@@ -9,11 +9,13 @@ import com.conveyal.r5.util.ShapefileReader;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
+import org.geotools.data.Query;
 import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
@@ -69,17 +71,24 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
                 throw new RuntimeException("GeoPackage must contain only one table, this file has " + typeNames.length);
             }
             FeatureSource featureSource = datastore.getFeatureSource(typeNames[0]);
-            FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = featureSource.getFeatures();
-            Envelope envelope = featureCollection.getBounds();
-            checkWgsEnvelopeSize(envelope); // Note this may be projected TODO reprojection logic
+            Query query = new Query(Query.ALL);
+            query.setCoordinateSystemReproject(DefaultGeographicCRS.WGS84);
+            FeatureCollection<SimpleFeatureType, SimpleFeature> wgsFeatureCollection = featureSource.getFeatures(query);
+            Envelope wgsEnvelope = wgsFeatureCollection.getBounds();
+            checkWgsEnvelopeSize(wgsEnvelope);
             progressListener.increment();
-//            reader.wgs84Stream().forEach(f -> {
-//                checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
-//            });
-            dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
-            dataSource.attributes = attributes(featureCollection.getSchema());
-            dataSource.geometryType = geometryType(featureCollection);
-            dataSource.featureCount = featureCollection.size();
+            FeatureIterator<SimpleFeature> wgsFeatureIterator = wgsFeatureCollection.features();
+            while (wgsFeatureIterator.hasNext()) {
+                Geometry wgsFeatureGeometry = (Geometry)(wgsFeatureIterator.next().getDefaultGeometry());
+                // FIXME GeoTools seems to be returning an envelope slightly smaller than the projected shapes.
+                //  maybe it's giving us projection(envelope(shapes)) instead of envelope(projection(shapes))?
+                // As a stopgap, test that they intersect.
+                checkState(wgsEnvelope.intersects(wgsFeatureGeometry.getEnvelopeInternal()));
+            }
+            dataSource.wgsBounds = Bounds.fromWgsEnvelope(wgsEnvelope);
+            dataSource.attributes = attributes(wgsFeatureCollection.getSchema());
+            dataSource.geometryType = geometryType(wgsFeatureCollection);
+            dataSource.featureCount = wgsFeatureCollection.size();
             progressListener.increment();
         } catch (IOException e) {
             throw new RuntimeException("Error reading GeoPackage due to IOException.", e);

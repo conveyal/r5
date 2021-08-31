@@ -3,9 +3,9 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
-
-import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.ingest;
+import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.assertIngestException;
+import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.testIngest;
+import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,12 +24,7 @@ class ShapefileDataSourceIngesterTest {
      */
     @Test
     void nullPointGeometries () {
-        Throwable throwable = assertThrows(
-                DataSourceException.class,
-                () -> ingest(SHP, "nl-null-points"),
-                "Expected exception on shapefile with null geometries."
-        );
-        assertTrue(throwable.getMessage().contains("missing"));
+        assertIngestException(SHP, "nl-null-points", DataSourceException.class, "missing");
     }
 
     /**
@@ -41,7 +36,7 @@ class ShapefileDataSourceIngesterTest {
      */
     @Test
     void duplicateAttributeNames () {
-        SpatialDataSource spatialDataSource = ingest(SHP, "duplicate-fields");
+        SpatialDataSource spatialDataSource = testIngest(SHP, "duplicate-fields");
         // id, the_geom, DDDDDDDDDD, and DDDDDDDDDD. The final one will be renamed on the fly to DDDDDDDDDD1.
         assertTrue(spatialDataSource.attributes.size() == 4);
         assertTrue(spatialDataSource.attributes.get(3).name.endsWith("1"));

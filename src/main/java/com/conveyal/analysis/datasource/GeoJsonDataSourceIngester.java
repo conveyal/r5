@@ -6,6 +6,7 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
+import org.geotools.data.Query;
 import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
@@ -114,11 +115,13 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             GeoJSONDataStore dataStore = new GeoJSONDataStore(file);
             SimpleFeatureSource featureSource = dataStore.getFeatureSource();
             // This loads the whole thing into memory. That should be harmless given our file upload size limits.
-            FeatureCollection<SimpleFeatureType, SimpleFeature> featureCollection = featureSource.getFeatures();
+            Query query = new Query(Query.ALL);
+            query.setCoordinateSystemReproject(DefaultGeographicCRS.WGS84);
+            FeatureCollection<SimpleFeatureType, SimpleFeature> wgsFeatureCollection = featureSource.getFeatures(query);
             // The schema of the FeatureCollection does seem to reflect all attributes present on all features.
             // However the type of those attributes seems to be restricted to that of the first value encountered.
             // Conversions may fail silently on any successive instances of that property with a different type.
-            SimpleFeatureType featureType = featureCollection.getSchema();
+            SimpleFeatureType featureType = wgsFeatureCollection.getSchema();
             // Note: this somewhat duplicates ShapefileReader.attributes, code should be reusable across formats
             // But look into the null checking and duplicate attribute checks there.
             dataSource.attributes = new ArrayList<>();
@@ -128,7 +131,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             // The schema always reports the geometry type as the very generic "Geometry" class.
             // Check that all features have the same concrete Geometry type.
             Class firstGeometryType = null;
-            FeatureIterator<SimpleFeature> iterator = featureCollection.features();
+            FeatureIterator<SimpleFeature> iterator = wgsFeatureCollection.features();
             while (iterator.hasNext()) {
                 SimpleFeature feature = iterator.next();
                 Geometry geometry = (Geometry) feature.getDefaultGeometry();
@@ -145,16 +148,13 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             }
             progressListener.increment();
             checkCrs(featureType);
+            Envelope wgsEnvelope = wgsFeatureCollection.getBounds();
+            checkWgsEnvelopeSize(wgsEnvelope);
             // Set SpatialDataSource fields (Conveyal metadata) from GeoTools model
-            // TODO project into WGS84, perhaps using Query.
-            ReferencedEnvelope envelope = featureCollection.getBounds();
-            // TODO Range-check lats and lons, projection of bad inputs can give negative areas (even check every feature)
-            // TODO Also check bounds for antimeridian crossing
-            checkWgsEnvelopeSize(envelope);
-            dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
+            dataSource.wgsBounds = Bounds.fromWgsEnvelope(wgsEnvelope);
             // Cannot set from FeatureType because it's always Geometry for GeoJson.
             dataSource.geometryType = ShapefileReader.GeometryType.forBindingClass(firstGeometryType);
-            dataSource.featureCount = featureCollection.size();
+            dataSource.featureCount = wgsFeatureCollection.size();
             progressListener.increment();
         } catch (FactoryException | IOException e) {
             // Unexpected errors cause immediate failure; predictable issues will be recorded on the DataSource object.
@@ -166,6 +166,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
     /**
      * GeoJSON used to allow CRS, but the RFC now says GeoJSON is always in WGS84 and no other CRS are allowed.
      * QGIS and GeoTools both seem to support this, but it's an obsolete feature.
+     * FIXME this is never failing, even on projected input. The GeoTools reader seems to silently convert to WGS84.
      */
     private static void checkCrs (FeatureType featureType) throws FactoryException {
         CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();

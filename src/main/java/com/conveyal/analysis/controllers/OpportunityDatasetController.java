@@ -9,6 +9,7 @@ import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -20,6 +21,7 @@ import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
@@ -29,7 +31,6 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.FilenameUtils;
 import org.bson.types.ObjectId;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -87,11 +88,8 @@ public class OpportunityDatasetController implements HttpController {
     /** Store upload status objects FIXME trivial Javadoc */
     private final List<OpportunityDatasetUploadStatus> uploadStatuses = new ArrayList<>();
 
-    private JSONObject getJSONURL (FileStorageKey key) {
-        JSONObject json = new JSONObject();
-        String url = fileStorage.getURL(key);
-        json.put("url", url);
-        return json;
+    private ObjectNode getJsonUrl (FileStorageKey key) {
+        return JsonUtil.objectNode().put("url", fileStorage.getURL(key));
     }
 
     private void addStatusAndRemoveOldStatuses(OpportunityDatasetUploadStatus status) {
@@ -112,7 +110,7 @@ public class OpportunityDatasetController implements HttpController {
     private Object getOpportunityDataset(Request req, Response res) {
         OpportunityDataset dataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
         if (dataset.format == FileStorageFormat.GRID) {
-            return getJSONURL(dataset.getStorageKey());
+            return getJsonUrl(dataset.getStorageKey());
         } else {
             // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
             // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
@@ -583,7 +581,7 @@ public class OpportunityDatasetController implements HttpController {
             String regionId = req.params("_id");
             String gridKey = req.params("format");
             FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
-            return getJSONURL(storageKey);
+            return getJsonUrl(storageKey);
         }
 
         if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDataset(req, res);
@@ -614,7 +612,7 @@ public class OpportunityDatasetController implements HttpController {
             fileStorage.moveIntoStorage(formatKey, localFile);
         }
 
-        return getJSONURL(formatKey);
+        return getJsonUrl(formatKey);
     }
 
     /**

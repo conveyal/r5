@@ -21,10 +21,10 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
-import org.json.simple.JSONObject;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -317,10 +317,9 @@ public class RegionalAnalysisController implements HttpController {
 
                 fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
             }
-
-            JSONObject json = new JSONObject();
-            json.put("url", fileStorage.getURL(singleCutoffFileStorageKey));
-            return json.toJSONString();
+            return JsonUtil.toJsonString(
+                    JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
+            );
         }
     }
 

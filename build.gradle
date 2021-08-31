@@ -165,7 +165,6 @@ dependencies {
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-referencing'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-shapefile'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-coverage'
-    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojson' // TODO REMOVE DEPRECATED
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojsondatastore'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geopkg'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geotiff'

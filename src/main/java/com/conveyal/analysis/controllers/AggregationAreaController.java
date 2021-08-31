@@ -14,7 +14,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.util.ShapefileReader;
 import com.google.common.base.Preconditions;
-import org.json.simple.JSONObject;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
@@ -197,12 +196,13 @@ public class AggregationAreaController implements HttpController {
         );
     }
 
-    private JSONObject getAggregationArea (Request req, Response res) {
+    private Map<String, String> getAggregationArea (Request req, Response res) {
         AggregationArea aggregationArea = aggregationAreaCollection.findByIdIfPermitted(
                 req.params("maskId"), UserPermissions.from(req)
         );
         String url = fileStorage.getURL(aggregationArea.getStorageKey());
-        JSONObject wrappedUrl = new JSONObject();
+        // Put the URL into something that will be serialized as a JSON object with a single property.
+        Map<String, String> wrappedUrl = new HashMap<>();
         wrappedUrl.put("url", url);
         return wrappedUrl;
     }

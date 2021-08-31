@@ -9,8 +9,8 @@ import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.fileupload.FileUploadException;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -19,7 +19,9 @@ import spark.Response;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
@@ -137,12 +139,13 @@ public class HttpApi implements Component {
             if (e.type == AnalysisServerException.Type.UNAUTHORIZED ||
                 e.type == AnalysisServerException.Type.FORBIDDEN
             ){
-                JSONObject body = new JSONObject();
-                body.put("type", e.type.toString());
-                body.put("message", e.message);
+                ObjectNode body = JsonUtil.objectNode()
+                    .put("type", e.type.toString())
+                    .put("message", e.message);
+
                 response.status(e.httpCode);
                 response.type("application/json");
-                response.body(body.toJSONString());
+                response.body(JsonUtil.toJsonString(body));
             } else {
                 respondToException(e, request, response, e.type, e.message, e.httpCode);
             }
@@ -174,14 +177,14 @@ public class HttpApi implements Component {
         ErrorEvent errorEvent = new ErrorEvent(e);
         eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
 
-        JSONObject body = new JSONObject();
-        body.put("type", type.toString());
-        body.put("message", message);
-        body.put("stackTrace", errorEvent.stackTrace);
+        ObjectNode body = JsonUtil.objectNode()
+                .put("type", type.toString())
+                .put("message", message)
+                .put("stackTrace", errorEvent.stackTrace);
 
         response.status(code);
         response.type("application/json");
-        response.body(body.toJSONString());
+        response.body(JsonUtil.toJsonString(body));
     }
 
     // Maybe this should be done or called with a JVM shutdown hook

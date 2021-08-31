@@ -46,7 +46,6 @@ public abstract class BackendMain {
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
         // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
-        ApiMain.initialize(components.gtfsCache);
         PointSetCache.initializeStatically(components.fileStorage);
 
         // TODO handle this via components without explicit "if (offline)"

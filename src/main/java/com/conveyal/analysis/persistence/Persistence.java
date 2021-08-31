@@ -6,7 +6,6 @@ import com.conveyal.analysis.models.JsonViews;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.util.JsonUtil;
@@ -36,7 +35,6 @@ public class Persistence {
     private static DB db;
 
     public static MongoMap<Modification> modifications;
-    public static MongoMap<Project> projects;
     public static MongoMap<Bundle> bundles;
     public static MongoMap<Region> regions;
     public static MongoMap<RegionalAnalysis> regionalAnalyses;
@@ -55,7 +53,6 @@ public class Persistence {
         }
         db = mongo.getDB(config.databaseName());
         modifications = getTable("modifications", Modification.class);
-        projects = getTable("projects", Project.class);
         bundles = getTable("bundles", Bundle.class);
         regions = getTable("regions", Region.class);
         regionalAnalyses = getTable("regional-analyses", RegionalAnalysis.class);

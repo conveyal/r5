@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 
@@ -31,11 +33,11 @@ import static com.mongodb.client.model.Filters.eq;
 /**
  * Controller that handles CRUD of DataSources, which are Mongo metadata about user-uploaded files.
  * Unlike some Mongo documents, these are mostly created and updated by backend validation and processing methods.
- * Currently this handles only one subtype: SpatialDataSource, which represents GIS-like geospatial feature data.
+ * Currently this handles only one subtype: SpatialDataSource, which represents GIS-like vector geospatial data.
  */
 public class DataSourceController implements HttpController {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DataSourceController.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     // Component Dependencies
     private final FileStorage fileStorage;
@@ -96,6 +98,7 @@ public class DataSourceController implements HttpController {
                 .withWorkProduct(source)
                 .withAction((progressListener) -> {
                     // TODO implement
+                    throw new UnsupportedOperationException();
                 }));
 
         return source;

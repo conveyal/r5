@@ -84,7 +84,7 @@ public class AggregationAreaController implements HttpController {
     private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         UserPermissions userPermissions = UserPermissions.from(req);
-        String dataSourceId = req.params("dataSourceId");
+        String dataSourceId = req.queryParams("dataSourceId");
         String nameProperty = req.queryParams("nameProperty");
         final int zoom = parseZoom(req.queryParams("zoom"));
 
@@ -212,7 +212,7 @@ public class AggregationAreaController implements HttpController {
         sparkService.path("/api/region/", () -> {
             sparkService.get("/:regionId/aggregationArea", this::getAggregationAreas, toJson);
             sparkService.get("/:regionId/aggregationArea/:maskId", this::getAggregationArea, toJson);
-            sparkService.post("/:regionId/aggregationArea/:sourceId", this::createAggregationAreas, toJson);
+            sparkService.post("/:regionId/aggregationArea", this::createAggregationAreas, toJson);
         });
     }
 

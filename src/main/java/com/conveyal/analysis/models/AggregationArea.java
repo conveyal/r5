@@ -21,7 +21,7 @@ public class AggregationArea extends BaseModel {
 
     // FLUENT METHODS FOR CONFIGURING
 
-    /** Call this static factory to begin building a task. */
+    /** Call this static factory to begin building an AggregationArea. */
     public static AggregationArea create (UserPermissions user, String name) {
         return new AggregationArea(user, name);
     }

@@ -3,6 +3,7 @@ package com.conveyal.analysis.models;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.file.FileStorageKey;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import static com.conveyal.file.FileCategory.GRIDS;
 
@@ -12,32 +13,28 @@ import static com.conveyal.file.FileCategory.GRIDS;
  * depending on how much of that pixel is overlapped by the mask.
  */
 public class AggregationArea extends BaseModel {
+
     public String regionId;
-    public String sourceId;
+    public String dataSourceId;
+    public String dataGroupId;
 
-    private AggregationArea(UserPermissions user, String name) {
+    /** Zero-argument constructor required for Mongo automatic POJO deserialization. */
+    public AggregationArea () { }
+
+    public AggregationArea(UserPermissions user, String name, SpatialDataSource dataSource) {
         super(user, name);
-    }
-
-    // FLUENT METHODS FOR CONFIGURING
-
-    /** Call this static factory to begin building an AggregationArea. */
-    public static AggregationArea create (UserPermissions user, String name) {
-        return new AggregationArea(user, name);
-    }
-
-    public AggregationArea withSource (SpatialDataSource source) {
-        this.regionId = source.regionId;
-        this.sourceId = source._id.toString();
-        return this;
+        this.regionId = dataSource.regionId;
+        this.dataSourceId = dataSource._id.toString();
     }
 
     @JsonIgnore
+    @BsonIgnore
     public String getS3Key () {
         return String.format("%s/mask/%s.grid", regionId, _id);
     }
 
     @JsonIgnore
+    @BsonIgnore
     public FileStorageKey getStorageKey () {
         // These in the GRIDS file storage category because aggregation areas are masks represented as binary grids.
         return new FileStorageKey(GRIDS, getS3Key());

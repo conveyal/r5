@@ -97,6 +97,10 @@ public class AnalysisCollection<T extends BaseModel> {
         collection.insertOne(model);
     }
 
+    public void insertMany (List<? extends T> models) {
+        collection.insertMany(models);
+    }
+
     public T update(T value) {
         return update(value, value.accessGroup);
     }

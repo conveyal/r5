@@ -3,6 +3,7 @@ package com.conveyal.analysis.models;
 import com.conveyal.analysis.UserPermissions;
 import org.bson.types.ObjectId;
 
+/** The base type for objects stored in our newer AnalysisDB using the Mongo Java driver's POJO functionality. */
 public class BaseModel {
     // Can retrieve `createdAt` from here
     public ObjectId _id;

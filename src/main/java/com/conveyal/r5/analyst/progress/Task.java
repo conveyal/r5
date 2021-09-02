@@ -106,7 +106,7 @@ public class Task implements Runnable, ProgressListener {
 
     List<Task> subtasks = new ArrayList<>();
 
-    // TODO find a better way to set this than directly inside a closure
+    // TODO find a better way to set this than directly inside a closure - possibly using ProgressListener
     public WorkProduct workProduct;
 
     public void addSubtask (Task subtask) {
@@ -188,11 +188,13 @@ public class Task implements Runnable, ProgressListener {
 
     @Override
     public void beginTask(String description, int totalElements) {
-        // In the absence of subtasks we can call this repeatedly on the same task, which will cause the UI progress
-        // bar to reset to zero at each stage, while keeping the same top level title.
+        // In the absence of a real subtask mechanism, we can call this repeatedly on the same task with totalElements
+        // of zero, allow the UI progress while changing the detail message without resetting progress to zero.
         this.description = description;
-        this.totalWorkUnits = totalElements;
-        this.currentWorkUnit = 0;
+        if (totalElements > 0) {
+            this.totalWorkUnits = totalElements;
+            this.currentWorkUnit = 0;
+        }
     }
 
     @Override
@@ -252,6 +254,8 @@ public class Task implements Runnable, ProgressListener {
     // We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
     // It is also awkward to make a method to set it on ProgressListener - it's not really progress.
     // So we set it directly on the task before submitting it. Requires pre-setting (not necessarily storing) Model._id.
+    // Update: I've started setting it via progressListener, it's just more encapsulated to create inside the TaskAction.
+    // But this then requires the TaskAction to hold a UserPermissions instance.
     public Task withWorkProduct (BaseModel model) {
         this.workProduct = WorkProduct.forModel(model);
         return this;

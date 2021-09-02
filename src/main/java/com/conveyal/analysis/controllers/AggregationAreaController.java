@@ -4,16 +4,22 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.AggregationArea;
+import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.analyst.progress.WorkProductType;
 import com.conveyal.r5.util.ShapefileReader;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
+import org.bson.conversions.Bson;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
@@ -39,6 +45,7 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.analyst.progress.WorkProductType.AGGREGATION_AREA;
 import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.mongodb.client.model.Filters.and;
@@ -66,6 +73,9 @@ public class AggregationAreaController implements HttpController {
     //  Anyway the parameterized type is too specific.
     private final AnalysisCollection<DataSource> dataSourceCollection;
 
+    // TODO review July 1 notes
+    private final AnalysisCollection<DataGroup> dataGroupCollection;
+
     public AggregationAreaController (
             FileStorage fileStorage,
             AnalysisDB database,
@@ -75,22 +85,27 @@ public class AggregationAreaController implements HttpController {
         this.taskScheduler = taskScheduler;
         this.aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
         this.dataSourceCollection = database.getAnalysisCollection("dataSources", DataSource.class);
+        this.dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
     }
 
     /**
      * Create binary .grid files for aggregation (aka mask) areas, save them to S3, and persist their details.
      * @param req Must include a shapefile on which the aggregation area(s) will be based.
+     *            --NOTE-- behavior has changed. union parameter is not specified. Now union = (nameProperty == null).
      *            If HTTP query parameter union is "true", features will be merged to a single aggregation area, named
      *            using the value of the "name" query parameter. If union is false or if the parameter is missing, each
      *            feature will be a separate aggregation area, named using the value for the shapefile property
      *            specified by the HTTP query parameter "nameAttribute."
+     * @return the Task representing the background action of creating the aggregation areas, or its ID.
      */
-    private List<AggregationArea> createAggregationAreas (Request req, Response res) throws Exception {
+    private Task createAggregationAreas (Request req, Response res) throws Exception {
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         UserPermissions userPermissions = UserPermissions.from(req);
         String dataSourceId = req.queryParams("dataSourceId");
-        String nameProperty = req.queryParams("nameProperty");
+        //String nameProperty = req.queryParams("nameProperty");
+        final String nameProperty = "dist_name";
         final int zoom = parseZoom(req.queryParams("zoom"));
+
 
         // 1. Get file from storage and read its features. =============================================================
         DataSource dataSource = dataSourceCollection.findById(dataSourceId);
@@ -120,13 +135,16 @@ public class AggregationAreaController implements HttpController {
             // TODO implement
         }
 
-        List<SimpleFeature> finalFeatures = features;
-        taskScheduler.enqueue(Task.create("Aggregation area creation: " + spatialDataSource.name)
+        final List<SimpleFeature> finalFeatures = features;
+        Task backgroundTask = Task.create("Aggregation area creation: " + spatialDataSource.name)
                 .forUser(userPermissions)
                 .setHeavy(true)
-                .withWorkProduct(spatialDataSource)
                 .withAction(progressListener -> {
-                    progressListener.beginTask("Processing request", 1);
+                    String groupDescription = "Convert polygons to aggregation areas, " +
+                            ((nameProperty == null) ? "merging all polygons." : "one area per polygon.");
+                    DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id.toString(), groupDescription);
+
+                    progressListener.beginTask("Reading data source", finalFeatures.size() + 1);
                     Map<String, Geometry> areas = new HashMap<>();
 
                     if (nameProperty != null && finalFeatures.size() > MAX_FEATURES) {
@@ -156,38 +174,39 @@ public class AggregationAreaController implements HttpController {
                         if (geometry == null) throw new AnalysisServerException("Invalid geometry uploaded.");
                         Envelope env = geometry.getEnvelopeInternal();
                         Grid maskGrid = new Grid(zoom, env);
-                        progressListener.beginTask("Creating grid for " + name, maskGrid.featureCount());
+                        progressListener.beginTask("Creating grid for " + name, 0);
 
                         // Store the percentage each cell overlaps the mask, scaled as 0 to 100,000
                         List<Grid.PixelWeight> weights = maskGrid.getPixelWeights(geometry, true);
                         weights.forEach(pixel -> {
                             maskGrid.grid[pixel.x][pixel.y] = pixel.weight * 100_000;
-                            progressListener.increment();
                         });
 
-                        AggregationArea aggregationArea = AggregationArea.create(userPermissions, name)
-                                .withSource(spatialDataSource);
+                        AggregationArea aggregationArea = new AggregationArea(userPermissions, name, spatialDataSource);
 
                         try {
                             File gridFile = FileUtils.createScratchFile("grid");
                             OutputStream os = new GZIPOutputStream(FileUtils.getOutputStream(gridFile));
                             maskGrid.write(os);
                             os.close();
-
-                            aggregationAreaCollection.insert(aggregationArea);
+                            aggregationArea.dataGroupId = dataGroup._id.toString();
                             aggregationAreas.add(aggregationArea);
-
                             fileStorage.moveIntoStorage(aggregationArea.getStorageKey(), gridFile);
                         } catch (IOException e) {
                             throw new AnalysisServerException("Error processing/uploading aggregation area");
                         }
                         progressListener.increment();
                     });
-                })
-        );
+                    aggregationAreaCollection.insertMany(aggregationAreas);
+                    dataGroupCollection.insert(dataGroup);
+                    progressListener.setWorkProduct(WorkProduct.forDataGroup(
+                            AGGREGATION_AREA, dataGroup._id.toString(), dataSource.regionId)
+                    );
+                    progressListener.increment();
+                });
 
-        return aggregationAreas;
-
+        taskScheduler.enqueue(backgroundTask);
+        return backgroundTask;
     }
 
     private String readProperty (SimpleFeature feature, String propertyName) {
@@ -201,20 +220,21 @@ public class AggregationAreaController implements HttpController {
     }
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
-        return aggregationAreaCollection.findPermitted(
-                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
-        );
+        Bson query = eq("regionId", req.queryParams("regionId"));
+        String dataGroupId = req.queryParams("dataGroupId");
+        if (dataGroupId != null) {
+            query = and(eq("dataGroupId", dataGroupId), query);
+        }
+        return aggregationAreaCollection.findPermitted(query, UserPermissions.from(req));
     }
 
-    private Map<String, String> getAggregationArea (Request req, Response res) {
+    private ObjectNode getAggregationArea (Request req, Response res) {
         AggregationArea aggregationArea = aggregationAreaCollection.findByIdIfPermitted(
                 req.params("maskId"), UserPermissions.from(req)
         );
         String url = fileStorage.getURL(aggregationArea.getStorageKey());
-        // Put the URL into something that will be serialized as a JSON object with a single property.
-        Map<String, String> wrappedUrl = new HashMap<>();
-        wrappedUrl.put("url", url);
-        return wrappedUrl;
+        return JsonUtil.objectNode().put("url", url);
+
     }
 
     @Override

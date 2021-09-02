@@ -43,7 +43,7 @@ public class GTFSController implements HttpController {
      * Use the same Cache-Control header for each endpoint here. 2,592,000 seconds is one month.
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
      */
-    private final String cacheControlImmutable = "public, max-age=2592000 immutable";
+    private final String cacheControlImmutable = "public, max-age=2592000, immutable";
 
     /**
      * Extracted into a common method to allow turning off during development.

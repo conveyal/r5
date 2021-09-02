@@ -40,6 +40,7 @@ import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -60,7 +61,10 @@ public class AggregationAreaController implements HttpController {
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
     private final AnalysisCollection<AggregationArea> aggregationAreaCollection;
-    private final AnalysisCollection<SpatialDataSource> dataSourceCollection;
+
+    // FIXME Should we instead be using the same instance as the DataSourceController?
+    //  Anyway the parameterized type is too specific.
+    private final AnalysisCollection<DataSource> dataSourceCollection;
 
     public AggregationAreaController (
             FileStorage fileStorage,
@@ -89,14 +93,20 @@ public class AggregationAreaController implements HttpController {
         final int zoom = parseZoom(req.queryParams("zoom"));
 
         // 1. Get file from storage and read its features. =============================================================
-        SpatialDataSource resource = dataSourceCollection.findById(dataSourceId);
-        Preconditions.checkArgument(POLYGON.equals(resource.geometryType),
-                "Only polygons can be converted to aggregation areas.");
+        DataSource dataSource = dataSourceCollection.findById(dataSourceId);
+        checkArgument(dataSource instanceof SpatialDataSource,
+                "Only spatial data sets can be converted to aggregation areas.");
+        SpatialDataSource spatialDataSource = (SpatialDataSource) dataSource;
+        checkArgument(POLYGON.equals(spatialDataSource.geometryType),
+                "Only polygons can be converted to aggregation areas. DataSource is: " + spatialDataSource.geometryType);
+        checkArgument(SHP.equals(spatialDataSource.fileFormat),
+                "Currently, only shapefiles can be converted to aggregation areas.");
+
         File sourceFile;
         List<SimpleFeature> features = null;
 
-        if (SHP.equals(resource.fileFormat)) {
-            sourceFile = fileStorage.getFile(resource.storageKey());
+        if (SHP.equals(spatialDataSource.fileFormat)) {
+            sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
             ShapefileReader reader = null;
             try {
                 reader = new ShapefileReader(sourceFile);
@@ -106,15 +116,15 @@ public class AggregationAreaController implements HttpController {
             }
         }
 
-        if (GEOJSON.equals(resource.fileFormat)) {
+        if (GEOJSON.equals(spatialDataSource.fileFormat)) {
             // TODO implement
         }
 
         List<SimpleFeature> finalFeatures = features;
-        taskScheduler.enqueue(Task.create("Aggregation area creation: " + resource.name)
+        taskScheduler.enqueue(Task.create("Aggregation area creation: " + spatialDataSource.name)
                 .forUser(userPermissions)
                 .setHeavy(true)
-                .withWorkProduct(resource)
+                .withWorkProduct(spatialDataSource)
                 .withAction(progressListener -> {
                     progressListener.beginTask("Processing request", 1);
                     Map<String, Geometry> areas = new HashMap<>();
@@ -133,7 +143,7 @@ public class AggregationAreaController implements HttpController {
                         );
                         UnaryUnionOp union = new UnaryUnionOp(geometries);
                         // Name the area using the name in the request directly
-                        areas.put(resource.name, union.union());
+                        areas.put(spatialDataSource.name, union.union());
                     } else {
                         // Don't union. Name each area by looking up its value for the name property in the request.
                         finalFeatures.forEach(f -> areas.put(
@@ -156,7 +166,7 @@ public class AggregationAreaController implements HttpController {
                         });
 
                         AggregationArea aggregationArea = AggregationArea.create(userPermissions, name)
-                                .withSource(resource);
+                                .withSource(spatialDataSource);
 
                         try {
                             File gridFile = FileUtils.createScratchFile("grid");

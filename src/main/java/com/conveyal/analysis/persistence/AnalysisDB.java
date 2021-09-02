@@ -18,6 +18,7 @@ import static com.mongodb.MongoClientSettings.getDefaultCodecRegistry;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
+/** TODO should we pre-create all the AnalysisCollections and fetch them by Class? */
 public class AnalysisDB {
 
     private final Logger LOG = LoggerFactory.getLogger(AnalysisDB.class);

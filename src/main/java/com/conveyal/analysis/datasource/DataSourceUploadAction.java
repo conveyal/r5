@@ -131,9 +131,8 @@ public class DataSourceUploadAction implements TaskAction {
         FileStorageFormat format = detectUploadFormatAndValidate(fileItems);
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);
 
-        String description = "From uploaded files: " + fileItems.stream()
-                .map(FileItem::getName).collect(Collectors.joining(", "));
-        ingester.initializeDataSource(sourceName, description, regionId, userPermissions);
+        String originalFileNames = fileItems.stream().map(FileItem::getName).collect(Collectors.joining(", "));
+        ingester.initializeDataSource(sourceName, originalFileNames, regionId, userPermissions);
         DataSourceUploadAction dataSourceUploadAction =
                 new DataSourceUploadAction(fileStorage, dataSourceCollection, fileItems, ingester);
 

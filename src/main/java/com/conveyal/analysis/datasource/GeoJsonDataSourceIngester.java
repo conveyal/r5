@@ -47,9 +47,6 @@ import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
  * capabilities. This is just support for an obsolete feature and should not be invoked. We instead range check all
  * incoming coordinates (via a total bounding box check) to ensure they look reasonable in WGS84.
  *
- * Current stable Geotools documentation (version 25?) shows a GeoJSONFeatureSource and CSVFeatureSource.
- * We're using 21.2 which does not have these.
- *
  * In GeoTools FeatureSource is a read-only mechanism but it can apparently only return FeatureCollections, which load
  * everything into memory. FeatureReader provides iterator-style access, but seems quite low-level and not intended
  * for regular use. Because we limit the size of file uploads we can be fairly sure it will be harmless for the backend

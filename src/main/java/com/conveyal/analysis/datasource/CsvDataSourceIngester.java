@@ -35,22 +35,7 @@ public class CsvDataSourceIngester extends DataSourceIngester {
 
     @Override
     public void ingest (File file, ProgressListener progressListener) {
-        progressListener.beginTask("Scanning CSV file", 1);
-        try {
-            // TODO logic based on FreeFormPointSet.fromCsv() and Grid.fromCsv()
-            ShapefileReader reader = new ShapefileReader(null);
-            Envelope envelope = reader.wgs84Bounds();
-            checkWgsEnvelopeSize(envelope);
-            dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
-            dataSource.attributes = reader.attributes();
-            dataSource.geometryType = reader.geometryType();
-            dataSource.featureCount = reader.featureCount();
-        } catch (FactoryException | TransformException e) {
-            throw new RuntimeException("Shapefile transform error. Try uploading an unprojected (EPSG:4326) file.", e);
-        } catch (Exception e) {
-            // Must catch because ShapefileReader throws a checked IOException.
-            throw new RuntimeException("Error parsing shapefile. Ensure the files you uploaded are valid.", e);
-        }
+        throw new UnsupportedOperationException();
     }
 
 }

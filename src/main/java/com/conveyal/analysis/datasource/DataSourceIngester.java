@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.stream.Collectors;
 
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
+import static com.conveyal.file.FileStorageFormat.GEOPACKAGE;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.file.FileStorageFormat.TIFF;
 
@@ -44,7 +45,9 @@ public abstract class DataSourceIngester {
      * DataSourceIngester taking care of the rest.
      * Our no-arg BaseModel constructors are used for deserialization so they don't create an _id or nonce ObjectId();
      */
-    public void initializeDataSource (String name, String description, String regionId, UserPermissions userPermissions) {
+    public void initializeDataSource (
+            String name, String originalFileNames, String regionId, UserPermissions userPermissions
+    ) {
         DataSource dataSource = dataSource();
         dataSource._id = new ObjectId();
         dataSource.nonce = new ObjectId();
@@ -53,7 +56,8 @@ public abstract class DataSourceIngester {
         dataSource.createdBy = userPermissions.email;
         dataSource.updatedBy = userPermissions.email;
         dataSource.accessGroup = userPermissions.accessGroup;
-        dataSource.description = description;
+        dataSource.originalFileName = originalFileNames;
+        dataSource.description = "From uploaded files: " + originalFileNames;
     }
 
     /**
@@ -66,9 +70,10 @@ public abstract class DataSourceIngester {
             return new GeoJsonDataSourceIngester();
         } else if (format == TIFF) { // really this enum value should be GEOTIFF rather than just TIFF.
             return new GeoTiffDataSourceIngester();
-        } else {
+        } else if (format == GEOPACKAGE) {
             return new GeoPackageDataSourceIngester();
         }
-
+        throw new UnsupportedOperationException("Unknown file format: " + format.name());
     }
+
 }

@@ -158,6 +158,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             } else {
                 dataSource.geometryType = geometryTypes.get(0);
             }
+            dataSource.coordinateSystem = DefaultGeographicCRS.WGS84.getName().getCode();
             progressListener.increment();
         } catch (FactoryException | IOException e) {
             // Catch only checked exceptions to avoid excessive wrapping of root cause exception when possible.

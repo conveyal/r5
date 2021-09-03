@@ -52,7 +52,7 @@ public class ShapefileReader {
     private final FeatureCollection<SimpleFeatureType, SimpleFeature> features;
     private final DataStore store;
     private final FeatureSource<SimpleFeatureType, SimpleFeature> source;
-    private final CoordinateReferenceSystem crs;
+    public final CoordinateReferenceSystem crs;
     private final MathTransform transform;
 
     public ShapefileReader (File shapefile) throws IOException, FactoryException {

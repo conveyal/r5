@@ -6,6 +6,7 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
+import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
@@ -54,6 +55,9 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
             dataSource.attributes = reader.attributes();
             dataSource.geometryType = reader.geometryType();
             dataSource.featureCount = reader.featureCount();
+            dataSource.coordinateSystem =
+                    reader.crs.getName().getCode();
+
             progressListener.increment();
         } catch (FactoryException | TransformException e) {
             throw new DataSourceException("Shapefile transform error. " +

@@ -84,7 +84,7 @@ public class GeoTiffDataSourceIngester extends DataSourceIngester {
         dataSource.featureCount = (long)gridEnv.width * (long)gridEnv.height;
         dataSource.geometryType = PIXEL;
         dataSource.attributes = attributes;
-        dataSource.coordinateSystem = coverage.getCoordinateReferenceSystem2D().getName().toString();
+        dataSource.coordinateSystem = coverage.getCoordinateReferenceSystem().getName().getCode();
     }
 
 }

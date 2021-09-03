@@ -15,11 +15,13 @@ import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.referencing.FactoryException;
 
 import java.io.File;
 import java.io.IOException;
@@ -89,9 +91,11 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             dataSource.attributes = attributes(wgsFeatureCollection.getSchema());
             dataSource.geometryType = geometryType(wgsFeatureCollection);
             dataSource.featureCount = wgsFeatureCollection.size();
+            dataSource.coordinateSystem =
+                    featureSource.getSchema().getCoordinateReferenceSystem().getName().getCode();
             progressListener.increment();
         } catch (IOException e) {
-            throw new RuntimeException("Error reading GeoPackage due to IOException.", e);
+            throw new RuntimeException("Error reading GeoPackage.", e);
         }
     }
 

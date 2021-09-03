@@ -48,6 +48,7 @@ public class GeoTiffDataSourceIngester extends DataSourceIngester {
 
     @Override
     public void ingest (File file, ProgressListener progressListener) {
+        progressListener.beginTask("Processing uploaded GeoTIFF", 1);
         AbstractGridFormat format = GridFormatFinder.findFormat(file);
         Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
         var coverageReader = format.getReader(file, hints);
@@ -85,6 +86,7 @@ public class GeoTiffDataSourceIngester extends DataSourceIngester {
         dataSource.geometryType = PIXEL;
         dataSource.attributes = attributes;
         dataSource.coordinateSystem = coverage.getCoordinateReferenceSystem().getName().getCode();
+        progressListener.increment();
     }
 
 }

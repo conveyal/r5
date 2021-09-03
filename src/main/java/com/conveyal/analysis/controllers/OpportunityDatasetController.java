@@ -9,6 +9,7 @@ import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
+import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -41,7 +42,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -293,29 +293,6 @@ public class OpportunityDatasetController implements HttpController {
     }
 
     /**
-     * Get the specified field from a map representing a multipart/form-data POST request, as a UTF-8 String.
-     * FileItems represent any form item that was received within a multipart/form-data POST request, not just files.
-     * This is a static utility method that should be reusable across different HttpControllers.
-     */
-    public static String getFormField(Map<String, List<FileItem>> formFields, String fieldName, boolean required) {
-        try {
-            List<FileItem> fileItems = formFields.get(fieldName);
-            if (fileItems == null || fileItems.isEmpty()) {
-                if (required) {
-                    throw AnalysisServerException.badRequest("Missing required field: " + fieldName);
-                } else {
-                    return null;
-                }
-            }
-            String value = fileItems.get(0).getString("UTF-8");
-            return value;
-        } catch (UnsupportedEncodingException e) {
-            throw AnalysisServerException.badRequest(String.format("Multipart form field '%s' had unsupported encoding",
-                    fieldName));
-        }
-    }
-    
-    /**
      * Handle many types of file upload. Returns a OpportunityDatasetUploadStatus which has a handle to request status.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
@@ -331,9 +308,9 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         // Parse required fields. Will throw a ServerException on failure.
-        final String sourceName = getFormField(formFields, "Name", true);
-        final String regionId = getFormField(formFields, "regionId", true);
-        final int zoom = parseZoom(getFormField(formFields, "zoom", false));
+        final String sourceName = HttpUtils.getFormField(formFields, "Name", true);
+        final String regionId = HttpUtils.getFormField(formFields, "regionId", true);
+        final int zoom = parseZoom(HttpUtils.getFormField(formFields, "zoom", false));
 
         // Create a region-wide status object tracking the processing of opportunity data.
         // Create the status object before doing anything including input and parameter validation, so that any problems
@@ -485,14 +462,14 @@ public class OpportunityDatasetController implements HttpController {
                                                  int zoom,
                                                  OpportunityDatasetUploadStatus status) throws Exception {
 
-        String latField = getFormField(query, "latField", true);
-        String lonField = getFormField(query, "lonField", true);
-        String idField = getFormField(query, "idField", false);
+        String latField = HttpUtils.getFormField(query, "latField", true);
+        String lonField = HttpUtils.getFormField(query, "lonField", true);
+        String idField = HttpUtils.getFormField(query, "idField", false);
 
         // Optional fields to run grid construction twice with two different sets of points.
         // This is only really useful when creating grids to visualize freeform pointsets for one-to-one analyses.
-        String latField2 = getFormField(query, "latField2", false);
-        String lonField2 = getFormField(query, "lonField2", false);
+        String latField2 = HttpUtils.getFormField(query, "latField2", false);
+        String lonField2 = HttpUtils.getFormField(query, "lonField2", false);
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
         InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);

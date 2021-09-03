@@ -11,7 +11,6 @@ import com.conveyal.r5.analyst.progress.TaskAction;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
-import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,12 +20,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.analysis.controllers.OpportunityDatasetController.getFormField;
+import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.analysis.datasource.SpatialLayers.detectUploadFormatAndValidate;
 import static com.conveyal.file.FileCategory.DATASOURCES;
-import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.conveyal.file.FileStorageFormat.TIFF;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 

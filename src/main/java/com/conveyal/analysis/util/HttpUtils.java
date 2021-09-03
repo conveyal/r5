@@ -8,6 +8,7 @@ import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +29,29 @@ public abstract class HttpUtils {
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
+        }
+    }
+
+    /**
+     * Get the specified field from a map representing a multipart/form-data POST request, as a UTF-8 String.
+     * FileItems represent any form item that was received within a multipart/form-data POST request, not just files.
+     * This is a static utility method that should be reusable across different HttpControllers.
+     */
+    public static String getFormField(Map<String, List<FileItem>> formFields, String fieldName, boolean required) {
+        try {
+            List<FileItem> fileItems = formFields.get(fieldName);
+            if (fileItems == null || fileItems.isEmpty()) {
+                if (required) {
+                    throw AnalysisServerException.badRequest("Missing required field: " + fieldName);
+                } else {
+                    return null;
+                }
+            }
+            String value = fileItems.get(0).getString("UTF-8");
+            return value;
+        } catch (UnsupportedEncodingException e) {
+            throw AnalysisServerException.badRequest(String.format("Multipart form field '%s' had unsupported encoding",
+                    fieldName));
         }
     }
 }

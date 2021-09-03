@@ -21,7 +21,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -264,7 +263,7 @@ public class RegionalAnalysisController implements HttpController {
             LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
                     cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
             FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-            if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.TIFF.equals(format)) {
+            if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
                 throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
             }
 
@@ -310,7 +309,7 @@ public class RegionalAnalysisController implements HttpController {
                     case PNG:
                         grid.writePng(fos);
                         break;
-                    case TIFF:
+                    case GEOTIFF:
                         grid.writeGeotiff(fos);
                         break;
                 }

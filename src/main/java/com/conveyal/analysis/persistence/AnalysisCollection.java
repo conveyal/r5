@@ -92,6 +92,8 @@ public class AnalysisCollection<T extends BaseModel> {
     /**
      * Note that if the supplied model has _id = null, the Mongo insertOne method will overwrite it with a new
      * ObjectId(). We consider it good practice to set the _id for any model object ourselves, avoiding this behavior.
+     * It looks like we could remove the OBJECT_ID_GENERATORS convention to force explicit ID creation.
+     * https://mongodb.github.io/mongo-java-driver/3.11/bson/pojos/#conventions
      */
     public void insert (T model) {
         collection.insertOne(model);

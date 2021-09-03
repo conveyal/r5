@@ -446,7 +446,7 @@ public class OpportunityDatasetController implements HttpController {
         } else {
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GRID));
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.PNG));
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.TIFF));
+            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GEOTIFF));
         }
         return dataset;
     }
@@ -582,7 +582,7 @@ public class OpportunityDatasetController implements HttpController {
 
             if (FileStorageFormat.PNG.equals(downloadFormat)) {
                 grid.writePng(fos);
-            } else if (FileStorageFormat.TIFF.equals(downloadFormat)) {
+            } else if (FileStorageFormat.GEOTIFF.equals(downloadFormat)) {
                 grid.writeGeotiff(fos);
             }
 

@@ -108,8 +108,8 @@ public class DataSourceController implements HttpController {
     /**
      * A file is posted to this endpoint to create a new DataSource. It is validated and metadata are extracted.
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
-     * In a standard REST API, a post would return the ID of the newly created DataSource. Here we're starting an async
-     * background process, so we return the task ID or the ID its work product (the DataSource)?
+     * In standard REST API style, a POST would return the ID of the newly created DataSource. Here we're starting an
+     * async background process, so we return the ID of the enqueued Task (rather than its work product, the DataSource).
      */
     private String handleUpload (Request req, Response res) {
         final UserPermissions userPermissions = UserPermissions.from(req);

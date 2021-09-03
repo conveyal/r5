@@ -172,7 +172,7 @@ public class ShapefileReader {
 
     /** These are very broad. For example, line includes linestring and multilinestring. */
     public enum GeometryType {
-        POLYGON, POINT, LINE;
+        POLYGON, POINT, LINE, PIXEL;
         public static GeometryType forBindingClass (Class binding) {
             if (Polygonal.class.isAssignableFrom(binding)) return POLYGON;
             if (Puntal.class.isAssignableFrom(binding)) return POINT;

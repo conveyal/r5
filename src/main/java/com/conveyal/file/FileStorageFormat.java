@@ -11,14 +11,14 @@ public enum FileStorageFormat {
     GRID("grid", "application/octet-stream"),
     POINTSET("pointset", "application/octet-stream"), // Why is this "pointset" extension duplicated?
     PNG("png", "image/png"),
-    TIFF("tiff", "image/tiff"),
+    GEOTIFF("tif", "image/tiff"),
     CSV("csv", "text/csv"),
 
     // SHP implies .dbf and .prj, and optionally .shx
     SHP("shp", "application/octet-stream"),
 
-    // These final ones are not yet used.
-    // In our internal storage, we may want to force less ambiguous .gtfs.zip .osm.pbf and .geo.json.
+    // Some of these are not yet used.
+    // In our internal storage, we may want to force less ambiguous .gtfs.zip .osm.pbf and .geojson.
     GTFS("zip", "application/zip"),
     OSMPBF("pbf", "application/octet-stream"),
     // Also can be application/geo+json, see https://www.iana.org/assignments/media-types/application/geo+json
@@ -29,6 +29,7 @@ public enum FileStorageFormat {
 
     // These should not be serialized into Mongo. Default Enum codec uses String name() and valueOf(String).
     // TODO clarify whether the extension is used for backend storage, or for detecting type up uploaded files.
+    // TODO array of file extensions, with the first one used canonically in FileStorage and the others for detection.
     public final String extension;
     public final String mimeType;
 

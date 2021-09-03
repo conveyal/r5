@@ -78,7 +78,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         // Before kicking off asynchronous processing, range check inputs to fail fast on obvious problems.
         userPermissions = UserPermissions.from(req);
         dataSourceId = req.queryParams("dataSourceId");
-        nameProperty = "dist_name"; // req.queryParams("nameProperty");
+        nameProperty = req.queryParams("nameProperty"); //"dist_name"; //
         zoom = parseZoom(req.queryParams("zoom")); 
         checkNotNull(dataSourceId);
         checkNotNull(nameProperty);

@@ -81,7 +81,7 @@ public abstract class SpatialLayers {
         } else if (fileExtensions.contains("GPKG")) {
             uploadFormat = FileStorageFormat.GEOPACKAGE;
         } else if (fileExtensions.contains("TIFF") || fileExtensions.contains("TIF")) {
-            uploadFormat = FileStorageFormat.TIFF;
+            uploadFormat = FileStorageFormat.GEOTIFF;
         }
 
         if (uploadFormat == null) {

@@ -98,7 +98,7 @@ public class DataSourceUploadAction implements TaskAction {
             DiskFileItem dfi = (DiskFileItem) fileItem;
             // TODO use canonical extensions from filetype enum
             // TODO upper case? should we be using lower case?
-            String extension = FilenameUtils.getExtension(fileItem.getName()).toUpperCase(Locale.ROOT);
+            String extension = FilenameUtils.getExtension(fileItem.getName()).toLowerCase(Locale.ROOT);
             FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, extension);
             fileStorage.moveIntoStorage(key, dfi.getStoreLocation());
             if (fileItems.size() == 1 || extension.equalsIgnoreCase(SHP.extension)) {

@@ -1,6 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import org.locationtech.jts.geom.Geometry;
+import org.opengis.coverage.SampleDimensionType;
 import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.AttributeType;
 
@@ -46,8 +47,14 @@ public class SpatialAttribute {
         this.type = Type.forBindingClass(type.getBinding());
     }
 
-    public SpatialAttribute(AttributeDescriptor descriptor) {
+    public SpatialAttribute (AttributeDescriptor descriptor) {
         this(descriptor.getLocalName(), descriptor.getType());
+    }
+
+    public SpatialAttribute (SampleDimensionType dimensionType, int bandNumber) {
+        name = "Band " + bandNumber;
+        label = String.format("%s (%s)", name, dimensionType.name());
+        type = Type.NUMBER;
     }
 
     /** No-arg constructor required for Mongo POJO deserialization. */

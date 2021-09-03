@@ -60,9 +60,9 @@ public class AggregationAreaController implements HttpController {
      * non-null, it must be the name of a text attribute in that SpatialDataSource, and one aggregation area will be
      * created for each polygon using those names. If the nameProperty is not supplied, all polygons will be merged into
      * one large nameless (multi)polygon aggregation area.
-     * @return the Task representing the enqueued background action that will create the aggregation areas.
+     * @return the ID of the Task representing the enqueued background action that will create the aggregation areas.
      */
-    private Task createAggregationAreas (Request req, Response res) throws Exception {
+    private String createAggregationAreas (Request req, Response res) throws Exception {
 
         // Create and enqueue an asynchronous background action to derive aggreagation areas from spatial data source.
         // The constructor will extract query parameters and range check them (not ideal separation, but it works).
@@ -73,7 +73,7 @@ public class AggregationAreaController implements HttpController {
                 .withAction(derivation);
 
         taskScheduler.enqueue(backgroundTask);
-        return backgroundTask;
+        return backgroundTask.id.toString();
     }
 
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {

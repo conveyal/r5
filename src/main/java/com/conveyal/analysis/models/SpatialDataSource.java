@@ -34,10 +34,13 @@ import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 public class SpatialDataSource extends DataSource {
 
     /** The number of features in this SpatialDataSource. */
-    public int featureCount;
+    public long featureCount;
 
     /** All features in this SpatialDataSource have an attached geometry of this type. */
     public ShapefileReader.GeometryType geometryType;
+
+    /** An EPSG code for the source's native coordinate system, or a WKT projection string. */
+    public String coordinateSystem;
 
     /** Every feature has this set of Attributes - this is essentially a schema giving attribute names and types. */
     public List<SpatialAttribute> attributes;

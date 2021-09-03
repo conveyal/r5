@@ -30,6 +30,7 @@ public class SpeedSetter {
     static final String csvOutputFile = dir + "speeds_v5.4";
     static final int timePeriods = 8;
     static final double fallbackMultiplier = 1.1;
+    static final SpeedConfig estSpeedLimits = SpeedConfig.defaultConfig();
 
     // Column numbers in supplied CSVs
     static final int speedIndexOffset = 1;
@@ -70,12 +71,8 @@ public class SpeedSetter {
             }
         }
 
-        SpeedConfig estSpeedLimits = SpeedConfig.defaultConfig();
-
-        System.out.println("Setting maxspeed:motorcar tags...");
-
         for (int timePeriod = 0; timePeriod < timePeriods; timePeriod++) {
-            System.out.println("for time period " + timePeriod);
+            System.out.println("Setting maxspeed:motorcar tags for time period " + timePeriod);
 
             Map<Long, Way> ways = new HashMap<>();
             File output = new File(csvOutputFile + "_" + timePeriod + ".csv");
@@ -86,33 +83,26 @@ public class SpeedSetter {
             int tp = timePeriod; // To satisfy Java lambda effectively final requirements
             osm.ways.forEach((osmWayId, way) -> {
                 String streetType;
-                Double speedMph = null;
-
-                if (osmWayId == null || way == null) {
-                    streetType = "Missing";
-                } else {
-                    streetType = way.getTag("highway") == null ? "Untagged" : way.getTag("highway");
-
-                    double speed;
-                    int speedLimit = estSpeedLimits.values.getOrDefault(streetType, estSpeedLimits.defaultSpeed);
-                    if (speeds.get(tp).get(osmWayId) != null) {
-                        // Value is present for this way in this time period. Use it, but enforce speed limit
-                        speed = Math.min(speeds.get(tp).get(osmWayId), speedLimit);
-                    }
-                    else if (fallbacks.get(tp).get(streetType) != null) {
-                        // Use the fallback speed (average speed for ways of this type in this time period). Don't
-                        // enforce the speed limit for these fallback speeds.
-                        speed = fallbacks.get(tp).get(streetType);
-                    } else {
-                        // If the speed for this way is missing, and there is no fallback speed, use the speed limit.
-                        speed = speedLimit;
-                    }
-                    // R5 currently prioritizes maxspeed:motorcar above all other maxspeed tags
-                    way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f mph", speed));
-                    ways.put(osmWayId, way);
+                double speed;
+                streetType = way.getTag("highway") == null ? "Untagged" : way.getTag("highway");
+                int speedLimit = estSpeedLimits.values.getOrDefault(streetType, estSpeedLimits.defaultSpeed);
+                if (speeds.get(tp).get(osmWayId) != null) {
+                    // Value is present for this way in this time period. Use it, but enforce speed limit
+                    speed = Math.min(speeds.get(tp).get(osmWayId), speedLimit);
                 }
+                else if (fallbacks.get(tp).get(streetType) != null) {
+                    // Use the fallback speed (average speed for ways of this type in this time period). Don't
+                    // enforce the speed limit for these fallback speeds.
+                    speed = fallbackMultiplier * fallbacks.get(tp).get(streetType);
+                } else {
+                    // If the speed for this way is missing, and there is no fallback speed, use the speed limit.
+                    speed = speedLimit;
+                }
+                // R5 currently prioritizes maxspeed:motorcar above all other maxspeed tags
+                way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f mph", speed));
+                ways.put(osmWayId, way);
                 try {
-                    bw.write(String.join(",", String.valueOf(osmWayId), streetType, String.valueOf(speedMph)));
+                    bw.write(String.join(",", String.valueOf(osmWayId), streetType, String.valueOf(speed)));
                     bw.newLine();
                 } catch (IOException e) {
                     e.printStackTrace();

@@ -29,6 +29,7 @@ public class SpeedSetter {
     static final String osmOutputFile = dir + "2019_5.4";
     static final String csvOutputFile = dir + "speeds_v5.4";
     static final int timePeriods = 8;
+    static final double fallbackMultiplier = 1.1;
 
     // Column numbers in supplied CSVs
     static final int speedIndexOffset = 1;
@@ -69,12 +70,12 @@ public class SpeedSetter {
             }
         }
 
-        SpeedConfig estimatedSpeedLimits = SpeedConfig.defaultConfig();
+        SpeedConfig estSpeedLimits = SpeedConfig.defaultConfig();
 
         System.out.println("Setting maxspeed:motorcar tags...");
 
         for (int timePeriod = 0; timePeriod < timePeriods; timePeriod++) {
-            System.out.println("Time period " + timePeriod);
+            System.out.println("for time period " + timePeriod);
 
             Map<Long, Way> ways = new HashMap<>();
             File output = new File(csvOutputFile + "_" + timePeriod + ".csv");
@@ -91,15 +92,23 @@ public class SpeedSetter {
                     streetType = "Missing";
                 } else {
                     streetType = way.getTag("highway") == null ? "Untagged" : way.getTag("highway");
-                    // TODO make this configurable (add arg "enforceSpeedLimits"?)
-                    Integer speedLimit = estimatedSpeedLimits.values.getOrDefault(streetType, estimatedSpeedLimits.defaultSpeed);
-                    double fallbackSpeed = fallbacks.get(tp).get(streetType) == null ? speedLimit :
-                            fallbacks.get(tp).get(streetType);
-                    // TODO use fallback value by streetType instead of speed limit?
-                    speedMph = speeds.get(tp).get(osmWayId) == null ? fallbackSpeed : Math.min(speedLimit,
-                            speeds.get(tp).get(osmWayId));
+
+                    double speed;
+                    int speedLimit = estSpeedLimits.values.getOrDefault(streetType, estSpeedLimits.defaultSpeed);
+                    if (speeds.get(tp).get(osmWayId) != null) {
+                        // Value is present for this way in this time period. Use it, but enforce speed limit
+                        speed = Math.min(speeds.get(tp).get(osmWayId), speedLimit);
+                    }
+                    else if (fallbacks.get(tp).get(streetType) != null) {
+                        // Use the fallback speed (average speed for ways of this type in this time period). Don't
+                        // enforce the speed limit for these fallback speeds.
+                        speed = fallbacks.get(tp).get(streetType);
+                    } else {
+                        // If the speed for this way is missing, and there is no fallback speed, use the speed limit.
+                        speed = speedLimit;
+                    }
                     // R5 currently prioritizes maxspeed:motorcar above all other maxspeed tags
-                    way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f mph", speedMph));
+                    way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f mph", speed));
                     ways.put(osmWayId, way);
                 }
                 try {
@@ -108,7 +117,6 @@ public class SpeedSetter {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
             });
             osm.ways = ways;
             osm.writeToFile(osmOutputFile + "_" + timePeriod + ".pbf");

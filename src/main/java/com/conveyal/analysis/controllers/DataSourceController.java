@@ -12,6 +12,7 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
 import org.apache.commons.fileupload.FileItem;
 import org.slf4j.Logger;
@@ -79,11 +80,9 @@ public class DataSourceController implements HttpController {
     /** HTTP DELETE: Delete a single DataSource record and associated files in FileStorage by supplied ID parameter. */
     private String deleteOneDataSourceById (Request request, Response response) {
         long nDeleted = dataSourceCollection.deleteByIdParamIfPermitted(request).getDeletedCount();
+        // TODO normalize to canonical file extensions so we can find them to delete them.
+        // fileStorage.delete(new FileStorageKey(DATA_SOURCE, _id + extension));
         return "DELETE " + nDeleted;
-        // TODO delete files from storage
-        // TODO delete referencing database records
-        //      Shouldn't this be deleting by ID instead of sending the whole document?
-        // TODO why do our delete methods return a list of documents? Can we just return the ID or HTTP status code?
     }
 
     private SpatialDataSource downloadLODES(Request req, Response res) {

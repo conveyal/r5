@@ -58,6 +58,7 @@ public class DataSourceController implements HttpController {
         this.extractor = extractor;
         // We don't hold on to the AnalysisDB Component, just get one collection from it.
         // Register all the subclasses so the Mongo driver will recognize their discriminators.
+        // TODO should this be done once in AnalysisDB and the collection reused everywhere? Is that threadsafe?
         this.dataSourceCollection = database.getAnalysisCollection(
             "dataSources", DataSource.class, SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class
         );

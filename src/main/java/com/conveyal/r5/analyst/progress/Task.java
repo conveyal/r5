@@ -11,10 +11,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * This newer task progress system coexists with several older mechanisms. It is still evolving as we adapt it to new
- * use cases. The Task class is intended to represent background tasks whose progress the end user should be aware of,
- * such as processing uploaded files. It should not be used for automatic internal actions (such as Events) which would
- * clutter a user's active task list.
+ * This newer task progress system coexists with several older mechanisms, which it is intended to supersede. It is
+ * still evolving as we adapt it to new use cases. The Task class is intended to represent background tasks whose
+ * progress the end user should be aware of, such as processing uploaded files. It should not be used for automatic
+ * internal actions (such as Events) which would clutter a user's active task list.
  *
  * A Task (or some interface that it implements) could be used by the AsyncLoader to track progress. Together with some
  * AsyncLoader functionality it will be a bit like a Future with progress reporting. Use of AsyncLoader could then be

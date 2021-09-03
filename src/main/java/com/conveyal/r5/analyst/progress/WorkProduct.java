@@ -3,7 +3,7 @@ package com.conveyal.r5.analyst.progress;
 import com.conveyal.analysis.models.BaseModel;
 
 /**
- * A unique identifier for the final product of a single task action. Currently this serves as both an internal data
+ * A unique identifier for the final product of a single TaskAction. Currently this serves as both an internal data
  * structure and an API model class, which should be harmless as it's an immutable data class. The id is unique within
  * the type, so the regionId is redundant information, but facilitates prefectches on the UI. If isGroup is true, the
  * id is not that of an individual record, but the dataGroupId of several records created in a single operation.

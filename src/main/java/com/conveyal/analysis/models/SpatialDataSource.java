@@ -39,7 +39,7 @@ public class SpatialDataSource extends DataSource {
     /** All features in this SpatialDataSource have an attached geometry of this type. */
     public ShapefileReader.GeometryType geometryType;
 
-    /** Every feature has this set of Attributes - this is essentially a schema. */
+    /** Every feature has this set of Attributes - this is essentially a schema giving attribute names and types. */
     public List<SpatialAttribute> attributes;
 
     public SpatialDataSource (UserPermissions userPermissions, String name) {
@@ -49,16 +49,7 @@ public class SpatialDataSource extends DataSource {
     /** Zero-argument constructor required for Mongo automatic POJO deserialization. */
     public SpatialDataSource () { }
 
-    /**
-     * Fluent methods to avoid constructors with lots of positional paramters.
-     * Not really a builder pattern since it doesn't construct immutable objects,
-     * but due to automatic POJO Mongo storage we can't have immutable objects anyway.
-     * Unfortunately these can't be placed on the superclass because they won't return the concrete subclass.
-     * Hence more absurd Java verbosity for things that should be built in language features like named parameters.
-     */
-    // Given these restrictions I think I'd rather go with classic factory methods here instead of builders.
-
-    public FileStorageKey storageKey() {
+    public FileStorageKey storageKey () {
         return new FileStorageKey(DATASOURCES, this._id.toString(), fileFormat.toString());
     }
 

@@ -163,7 +163,7 @@ public class HttpApi implements Component {
                                     AnalysisServerException.Type type, String message, int code) {
 
         // Stacktrace in ErrorEvent reused below to avoid repeatedly generating String of stacktrace.
-        ErrorEvent errorEvent = new ErrorEvent(e);
+        ErrorEvent errorEvent = new ErrorEvent(e, request.pathInfo());
         eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
 
         JSONObject body = new JSONObject();

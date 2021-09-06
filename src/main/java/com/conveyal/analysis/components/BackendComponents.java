@@ -7,7 +7,7 @@ import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.FileStorageController;
-import com.conveyal.analysis.controllers.GTFSController;
+import com.conveyal.analysis.controllers.GtfsController;
 import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
@@ -83,7 +83,7 @@ public abstract class BackendComponents {
         return Lists.newArrayList(
                 // These handlers are at paths beginning with /api
                 // and therefore subject to authentication and authorization.
-                new GTFSController(gtfsCache),
+                new GtfsController(gtfsCache),
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),

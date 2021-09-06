@@ -33,9 +33,9 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
  * CDN in the future. Everything retrieved is immutable. Once it's retrieved and stored in the CDN, it doesn't need to
  * be pulled from the cache again.
  */
-public class GTFSController implements HttpController {
+public class GtfsController implements HttpController {
     private final GTFSCache gtfsCache;
-    public GTFSController (GTFSCache gtfsCache) {
+    public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
     }
 
@@ -52,17 +52,17 @@ public class GTFSController implements HttpController {
         res.header("Cache-Control", cacheControlImmutable);
     }
 
-    private static class BaseAPIResponse {
+    private static class BaseApiResponse {
         public final String _id;
         public final String name;
 
-        BaseAPIResponse(String _id, String name) {
+        BaseApiResponse(String _id, String name) {
             this._id = _id;
             this.name = name;
         }
     }
 
-    private static class GeoJSONLineString {
+    private static class GeoJsonLineString {
         public final String type = "LineString";
         public double[][] coordinates;
     }
@@ -72,7 +72,7 @@ public class GTFSController implements HttpController {
         return gtfsCache.get(bundleScopedFeedId);
     }
 
-    static class RouteAPIResponse extends BaseAPIResponse {
+    static class RouteApiResponse extends BaseApiResponse {
         public final int type;
         public final String color;
 
@@ -83,43 +83,43 @@ public class GTFSController implements HttpController {
             return tempName.trim();
         }
 
-        RouteAPIResponse(Route route) {
+        RouteApiResponse(Route route) {
             super(route.route_id, getRouteName(route));
             color = route.route_color;
             type = route.route_type;
         }
     }
 
-    private RouteAPIResponse getRoute(Request req, Response res) {
+    private RouteApiResponse getRoute(Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
-        return new RouteAPIResponse(feed.routes.get(req.params("routeId")));
+        return new RouteApiResponse(feed.routes.get(req.params("routeId")));
     }
 
-    private List<RouteAPIResponse> getRoutes(Request req, Response res) {
+    private List<RouteApiResponse> getRoutes(Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.routes
                 .values()
                 .stream()
-                .map(RouteAPIResponse::new)
+                .map(RouteApiResponse::new)
                 .collect(Collectors.toList());
     }
 
-    static class PatternAPIResponse extends BaseAPIResponse {
-        public final GeoJSONLineString geometry;
+    static class PatternApiResponse extends BaseApiResponse {
+        public final GeoJsonLineString geometry;
         public final List<String> orderedStopIds;
         public final List<String> associatedTripIds;
 
-        PatternAPIResponse(Pattern pattern) {
+        PatternApiResponse(Pattern pattern) {
             super(pattern.pattern_id, pattern.name);
             geometry = serialize(pattern.geometry);
             orderedStopIds = pattern.orderedStops;
             associatedTripIds = pattern.associatedTrips;
         }
 
-        static GeoJSONLineString serialize (com.vividsolutions.jts.geom.LineString geometry) {
-            GeoJSONLineString ret = new GeoJSONLineString();
+        static GeoJsonLineString serialize (com.vividsolutions.jts.geom.LineString geometry) {
+            GeoJsonLineString ret = new GeoJsonLineString();
             ret.coordinates = Stream.of(geometry.getCoordinates())
                     .map(c -> new double[] { c.x, c.y })
                     .toArray(double[][]::new);
@@ -128,7 +128,7 @@ public class GTFSController implements HttpController {
         }
     }
 
-    private List<PatternAPIResponse> getPatternsForRoute (Request req, Response res) {
+    private List<PatternApiResponse> getPatternsForRoute (Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
@@ -136,38 +136,38 @@ public class GTFSController implements HttpController {
                 .values()
                 .stream()
                 .filter(p -> Objects.equals(p.route_id, routeId))
-                .map(PatternAPIResponse::new)
+                .map(PatternApiResponse::new)
                 .collect(Collectors.toList());
     }
 
-    static class StopAPIResponse extends BaseAPIResponse {
+    static class StopApiResponse extends BaseApiResponse {
         public final double lat;
         public final double lon;
 
-        StopAPIResponse(Stop stop) {
+        StopApiResponse(Stop stop) {
             super(stop.stop_id, stop.stop_name);
             lat = stop.stop_lat;
             lon = stop.stop_lon;
         }
     }
 
-    private List<StopAPIResponse> getAllStopsForOneFeed(Request req, Response res) {
+    private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
-        return feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
+        return feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
     }
 
-    static class FeedGroupStopsAPIResponse {
+    static class FeedGroupStopsApiResponse {
         public final String feedId;
-        public final List<StopAPIResponse> stops;
+        public final List<StopApiResponse> stops;
 
-        FeedGroupStopsAPIResponse(GTFSFeed feed) {
+        FeedGroupStopsApiResponse(GTFSFeed feed) {
             this.feedId = feed.feedId;
-            this.stops = feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
+            this.stops = feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
         }
     }
 
-    private List<FeedGroupStopsAPIResponse> getAllStopsForFeedGroup(Request req, Response res) {
+    private List<FeedGroupStopsApiResponse> getAllStopsForFeedGroup(Request req, Response res) {
         addImmutableResponseHeader(res);
         String feedGroupId = req.params("feedGroupId");
         DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
@@ -175,23 +175,23 @@ public class GTFSController implements HttpController {
             throw AnalysisServerException.notFound("Bundle could not be found for the given feed group ID.");
         }
 
-        List<FeedGroupStopsAPIResponse> allStopsByFeed = new ArrayList<>();
+        List<FeedGroupStopsApiResponse> allStopsByFeed = new ArrayList<>();
         Bundle bundle = cursor.next();
         for (Bundle.FeedSummary feedSummary : bundle.feeds) {
             String bundleScopedFeedId = Bundle.bundleScopeFeedId(feedSummary.feedId, feedGroupId);
             GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
-            allStopsByFeed.add(new FeedGroupStopsAPIResponse(feed));
+            allStopsByFeed.add(new FeedGroupStopsApiResponse(feed));
         }
         return allStopsByFeed;
     }
 
-    static class TripAPIResponse extends BaseAPIResponse {
+    static class TripApiResponse extends BaseApiResponse {
         public final String headsign;
         public final Integer startTime;
         public final Integer duration;
         public final int directionId;
 
-        TripAPIResponse(GTFSFeed feed, Trip trip) {
+        TripApiResponse(GTFSFeed feed, Trip trip) {
             super(trip.trip_id, trip.trip_short_name);
             headsign = trip.trip_headsign;
             directionId = trip.direction_id;
@@ -209,14 +209,14 @@ public class GTFSController implements HttpController {
         }
     }
 
-    private List<TripAPIResponse> getTripsForRoute (Request req, Response res) {
+    private List<TripApiResponse> getTripsForRoute (Request req, Response res) {
         addImmutableResponseHeader(res);
         final GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
         return feed.trips
                 .values().stream()
                 .filter(t -> Objects.equals(t.route_id, routeId))
-                .map(t -> new TripAPIResponse(feed, t))
+                .map(t -> new TripApiResponse(feed, t))
                 .sorted(Comparator.comparingInt(t -> t.startTime))
                 .collect(Collectors.toList());
     }

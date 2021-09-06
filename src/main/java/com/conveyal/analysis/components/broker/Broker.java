@@ -338,7 +338,12 @@ public class Broker {
         }
     }
 
-    /** This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler. */
+    /**
+     * When job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
+     * The Job will stop delivering tasks, allowing workers to shut down, but will continue to exist allowing the user
+     * to see the error message. User will then need to manually delete it, which will remove the result assembler.
+     * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
+     */
     private synchronized void recordJobError (Job job, String error) {
         job.errors.add(error);
     }
@@ -446,14 +451,13 @@ public class Broker {
             job = findJob(workResult.jobId);
             assembler = resultAssemblers.get(workResult.jobId);
         }
-        if (job == null || assembler == null) {
-            // This will happen naturally for all delivered tasks when a job is deleted by the user.
-            LOG.debug("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
+        if (job == null || assembler == null || !job.isActive()) {
+            // This will happen naturally for all delivered tasks when a job is deleted by the user or after it errors.
+            LOG.debug("Received result for unrecognized, deleted, or inactive job ID {}, discarding.", workResult.jobId);
             return;
         }
         if (workResult.error != null) {
-            // Just record the error reported by the worker and don't pass the result on to regional result assembly.
-            // The Job will stop delivering tasks, allowing workers to shut down. User will need to manually delete it.
+            // Record any error reported by the worker and don't pass the (bad) result on to regional result assembly.
             recordJobError(job, workResult.error);
             return;
         }

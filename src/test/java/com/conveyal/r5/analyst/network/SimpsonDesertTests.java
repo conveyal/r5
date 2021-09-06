@@ -46,7 +46,7 @@ public class SimpsonDesertTests {
         // gridLayout.exportFiles("test");
 
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
-                .morningPeak()
+                .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .uniformOpportunityDensity(10)
                 .build();
@@ -85,7 +85,7 @@ public class SimpsonDesertTests {
         TransportNetwork network = gridLayout.generateNetwork();
 
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
-                .morningPeak()
+                .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .uniformOpportunityDensity(10)
                 .build();
@@ -120,7 +120,7 @@ public class SimpsonDesertTests {
         TransportNetwork network = gridLayout.generateNetwork();
 
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
-                .morningPeak()
+                .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .uniformOpportunityDensity(10)
                 .monteCarloDraws(20000)
@@ -229,7 +229,7 @@ public class SimpsonDesertTests {
         TransportNetwork network = gridLayout.generateNetwork();
 
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
-                .morningPeak()
+                .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .uniformOpportunityDensity(10)
                 .monteCarloDraws(4000)

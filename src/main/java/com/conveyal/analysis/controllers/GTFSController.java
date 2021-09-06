@@ -181,7 +181,6 @@ public class GTFSController implements HttpController {
             String bundleScopedFeedId = Bundle.bundleScopeFeedId(feedSummary.feedId, feedGroupId);
             GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
             allStopsByFeed.add(new AllStopsAPIResponse(feed));
-            feed.close();
         }
         return allStopsByFeed;
     }

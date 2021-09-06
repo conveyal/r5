@@ -70,7 +70,7 @@ public class ErrorEvent extends Event {
         String conveyalFrame = stackTrace.lines()
                 .map(String::strip)
                 .filter(s -> s.startsWith("at com.conveyal."))
-                .filter(frame::equals)
+                .filter(s -> !frame.equals(s))
                 .findFirst().orElse("");
         return String.join("\n", error, frame, conveyalFrame);
     }

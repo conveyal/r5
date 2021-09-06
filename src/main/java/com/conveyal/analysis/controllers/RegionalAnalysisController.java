@@ -16,6 +16,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
@@ -455,6 +456,14 @@ public class RegionalAnalysisController implements HttpController {
             task.destinationPointSets = new PointSet[] {
                     PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
             };
+        }
+        if (task.recordTimes) {
+            checkArgument(
+                task.destinationPointSets != null &&
+                task.destinationPointSets.length == 1 &&
+                task.destinationPointSets[0] instanceof FreeFormPointSet,
+                "recordTimes can only be used with a single destination pointset, which must be freeform (non-grid)."
+            );
         }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.

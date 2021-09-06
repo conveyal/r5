@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.network;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -18,24 +20,37 @@ public class GridRoute {
     public int stopSpacingBlocks;
     public Orientation orientation;
     public boolean bidirectional;
-    public int startHour;
-    public int endHour;
+
     /** Explicit departure times from first stop; if set, startHour and endHour will be ignored*/
     public int[] startTimes;
-    /**
-     * Override default hop times. Map of (trip, stopAtStartOfHop) to factor by which default hop is multiplied
-     */
+
+    /** Override default hop times. Map of (trip, stopAtStartOfHop) to factor by which default hop is multiplied. */
     public Map<TripHop, Double> hopTimeScaling;
-    public int headwayMinutes;
-    public boolean pureFrequency;
+
+    /** These will be services codes, and can be referenced in timetables. */
+    public static enum Services { ALL, WEEKDAY, WEEKEND }
+
+    /** How a Timetable will be translated into GTFS data - stop_times or frequencies with or without exact_times. */
+    public static enum Materialization { STOP_TIMES, PURE_FREQ, EXACT_TIMES }
+
+    /** All Timetables on a GridRoute will be materialized in the same way, according to this field. */
+    public Materialization materialization = Materialization.STOP_TIMES;
+
+    /** This defines something like a frequency in GTFS, but can also be used to generate normal stop_times trips. */
+    public static class Timetable {
+        Services service;
+        public int startHour;
+        public int endHour;
+        int headwayMinutes;
+    }
+
+    public List<Timetable> timetables = new ArrayList<>();
 
     private Stream<String> stopIds() {
         return null;
     }
 
-    public static enum Orientation {
-        HORIZONTAL, VERTICAL
-    }
+    public static enum Orientation { HORIZONTAL, VERTICAL }
 
     public int nBlocksLength () {
         return (nStops - 1) * stopSpacingBlocks;
@@ -88,11 +103,9 @@ public class GridRoute {
         route.id = gridLayout.nextIntegerId(); // Avoid collisions when same route is added multiple times
         route.stopSpacingBlocks = 1;
         route.gridLayout = gridLayout;
-        route.startHour = 5;
-        route.endHour = 10;
         route.bidirectional = true;
-        route.headwayMinutes = headwayMinutes;
         route.nStops = gridLayout.widthAndHeightInBlocks + 1;
+        route.addTimetable(Services.WEEKDAY, 5, 10, headwayMinutes);
         return route;
     }
 
@@ -105,6 +118,21 @@ public class GridRoute {
         return route;
     }
 
+    public GridRoute pureFrequency () {
+        this.materialization = Materialization.PURE_FREQ;
+        return this;
+    }
+
+    public GridRoute addTimetable (Services service, int startHour, int endHour, int headwayMinutes) {
+        Timetable timetable = new Timetable();
+        timetable.service = service;
+        timetable.startHour = startHour;
+        timetable.endHour = endHour;
+        timetable.headwayMinutes = headwayMinutes;
+        this.timetables.add(timetable);
+        return this;
+    }
+
     public static GridRoute newVerticalRoute (GridLayout gridLayout, int col, int headwayMinutes) {
         GridRoute route = newBareRoute(gridLayout, headwayMinutes);
         route.orientation = Orientation.VERTICAL;
@@ -114,12 +142,7 @@ public class GridRoute {
         return route;
     }
 
-    public GridRoute pureFrequency () {
-        pureFrequency = true;
-        return this;
-    }
-
-    public static class TripHop{
+    public static class TripHop {
         int trip;
         int hop;
 

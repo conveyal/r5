@@ -1,6 +1,7 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
@@ -8,6 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
@@ -31,9 +33,13 @@ public class TimeCsvResultWriter extends CsvResultWriter {
      */
     @Override
     protected void checkDimension (RegionalWorkResult workResult) {
-        // This CSV writer expects only a single freeform destination pointset.
         // TODO handle multiple destination pointsets at once?
-        checkState(task.destinationPointSets.length == 1);
+        checkState(
+           task.destinationPointSets != null &&
+           task.destinationPointSets.length == 1 &&
+           task.destinationPointSets[0] instanceof FreeFormPointSet,
+           "Time CSV writer expects only a single freeform destination pointset."
+        );
         // In one-to-one mode, we expect only one value per origin, the destination point at the same pointset index as
         // the origin point. Otherwise, for each origin, we expect one value per destination.
         final int nDestinations = task.oneToOne ? 1 : task.destinationPointSets[0].featureCount();

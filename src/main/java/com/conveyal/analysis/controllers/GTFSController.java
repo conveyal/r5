@@ -52,11 +52,11 @@ public class GTFSController implements HttpController {
         res.header("Cache-Control", cacheControlImmutable);
     }
 
-    private static class BaseIdentifier {
+    private static class BaseAPIResponse {
         public final String _id;
         public final String name;
 
-        BaseIdentifier (String _id, String name) {
+        BaseAPIResponse(String _id, String name) {
             this._id = _id;
             this.name = name;
         }
@@ -72,7 +72,7 @@ public class GTFSController implements HttpController {
         return gtfsCache.get(bundleScopedFeedId);
     }
 
-    static class RouteAPIResponse extends BaseIdentifier {
+    static class RouteAPIResponse extends BaseAPIResponse {
         public final int type;
         public final String color;
 
@@ -106,7 +106,7 @@ public class GTFSController implements HttpController {
                 .collect(Collectors.toList());
     }
 
-    static class PatternAPIResponse extends BaseIdentifier {
+    static class PatternAPIResponse extends BaseAPIResponse {
         public final GeoJSONLineString geometry;
         public final List<String> orderedStopIds;
         public final List<String> associatedTripIds;
@@ -140,7 +140,7 @@ public class GTFSController implements HttpController {
                 .collect(Collectors.toList());
     }
 
-    static class StopAPIResponse extends BaseIdentifier {
+    static class StopAPIResponse extends BaseAPIResponse {
         public final double lat;
         public final double lon;
 
@@ -151,23 +151,23 @@ public class GTFSController implements HttpController {
         }
     }
 
-    private List<StopAPIResponse> getStops (Request req, Response res) {
+    private List<StopAPIResponse> getAllStopsForOneFeed(Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
     }
 
-    static class AllStopsAPIResponse {
+    static class FeedGroupStopsAPIResponse {
         public final String feedId;
         public final List<StopAPIResponse> stops;
 
-        AllStopsAPIResponse(GTFSFeed feed) {
+        FeedGroupStopsAPIResponse(GTFSFeed feed) {
             this.feedId = feed.feedId;
             this.stops = feed.stops.values().stream().map(StopAPIResponse::new).collect(Collectors.toList());
         }
     }
 
-    private List<AllStopsAPIResponse> getAllStops (Request req, Response res) {
+    private List<FeedGroupStopsAPIResponse> getAllStopsForFeedGroup(Request req, Response res) {
         addImmutableResponseHeader(res);
         String feedGroupId = req.params("feedGroupId");
         DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
@@ -175,17 +175,17 @@ public class GTFSController implements HttpController {
             throw AnalysisServerException.notFound("Bundle could not be found for the given feed group ID.");
         }
 
-        List<AllStopsAPIResponse> allStopsByFeed = new ArrayList<>();
+        List<FeedGroupStopsAPIResponse> allStopsByFeed = new ArrayList<>();
         Bundle bundle = cursor.next();
         for (Bundle.FeedSummary feedSummary : bundle.feeds) {
             String bundleScopedFeedId = Bundle.bundleScopeFeedId(feedSummary.feedId, feedGroupId);
             GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
-            allStopsByFeed.add(new AllStopsAPIResponse(feed));
+            allStopsByFeed.add(new FeedGroupStopsAPIResponse(feed));
         }
         return allStopsByFeed;
     }
 
-    static class TripAPIResponse extends BaseIdentifier {
+    static class TripAPIResponse extends BaseAPIResponse {
         public final String headsign;
         public final Integer startTime;
         public final Integer duration;
@@ -223,11 +223,11 @@ public class GTFSController implements HttpController {
 
     @Override
     public void registerEndpoints (spark.Service sparkService) {
-        sparkService.get("/api/gtfs/:feedGroupId/stops", this::getAllStops, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/stops", this::getAllStopsForFeedGroup, toJson);
         sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes", this::getRoutes, toJson);
         sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId", this::getRoute, toJson);
         sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
         sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/stops", this::getStops, toJson);
+        sparkService.get("/api/gtfs/:feedGroupId/:feedId/stops", this::getAllStopsForOneFeed, toJson);
     }
 }

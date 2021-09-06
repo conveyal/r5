@@ -23,6 +23,7 @@ import java.util.List;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
+import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
 
 /**

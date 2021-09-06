@@ -38,10 +38,14 @@ public class ErrorEvent extends Event {
     /** Return a string intended for logging on Slack or the console. */
     public String traceWithContext (boolean verbose) {
         StringBuilder builder = new StringBuilder();
-        builder.append("User ");
-        builder.append(user);
-        builder.append(" of group ");
-        builder.append(accessGroup);
+        if (user == null && accessGroup == null) {
+            builder.append("Unknown/unauthenticated user");
+        } else {
+            builder.append("User ");
+            builder.append(user);
+            builder.append(" of group ");
+            builder.append(accessGroup);
+        }
         if (httpPath != null) {
             builder.append(" accessing ");
             builder.append(httpPath);

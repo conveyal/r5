@@ -456,14 +456,8 @@ public class AnalysisWorker implements Runnable {
 
         // Get the graph object for the ID given in the task, fetching inputs and building as needed.
         // All requests handled together are for the same graph, and this call is synchronized so the graph will
-        // only be built once.
-        // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+        // only be built once. Record the currently loaded network ID to remain on this same graph on subsequent polls.
         networkId = task.graphId;
-        // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
-        // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
-        // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-        TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
-                .graphId, task.scenarioId);
 
         // Static site tasks do not specify destinations, but all other regional tasks should.
         // Load the PointSets based on the IDs (actually, full storage keys including IDs) in the task.
@@ -471,6 +465,13 @@ public class AnalysisWorker implements Runnable {
         if (!task.makeTauiSite) {
             task.loadAndValidateDestinationPointSets(pointSetCache);
         }
+
+        // Pull all necessary inputs into cache in a blocking fashion, unlike single-point tasks where prep is async.
+        // Avoids auto-shutdown while preloading. Must be done after loading destination pointsets to establish extents.
+        // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
+        // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
+        // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
+        TransportNetwork transportNetwork = networkPreloader.synchronousPreload(task);
 
         // If we are generating a static site, there must be a single metadata file for an entire batch of results.
         // Arbitrarily we create this metadata as part of the first task in the job.

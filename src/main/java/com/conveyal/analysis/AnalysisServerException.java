@@ -1,11 +1,8 @@
 package com.conveyal.analysis;
 
 import com.conveyal.r5.util.ExceptionUtils;
-import graphql.GraphQLError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 public class AnalysisServerException extends RuntimeException {
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisServerException.class);
@@ -38,17 +35,6 @@ public class AnalysisServerException extends RuntimeException {
 
     public static AnalysisServerException forbidden(String message) {
         return new AnalysisServerException(Type.FORBIDDEN, message, 403);
-    }
-
-    public static AnalysisServerException graphQL(List<GraphQLError> errors) {
-        return new AnalysisServerException(
-                Type.GRAPHQL,
-                errors
-                    .stream()
-                    .map(e -> e.getMessage())
-                    .reduce("", (a, b) -> a + " " + b),
-                400
-        );
     }
 
     public static AnalysisServerException nonce() {

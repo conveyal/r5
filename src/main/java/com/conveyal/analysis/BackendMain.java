@@ -3,7 +3,6 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;

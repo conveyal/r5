@@ -201,10 +201,6 @@ dependencies {
     // Now used only for Seamless Census TODO eliminate this final AWS dependency
     implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
 
-    // Old version of GraphQL-Java used by legacy gtfs-api embedded in analysis-backend.
-    // TODO eliminate GraphQL in future API revisions
-    implementation 'com.graphql-java:graphql-java:2.1.0'
-
     // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
     implementation 'org.apache.commons:commons-math3:3.0'
 

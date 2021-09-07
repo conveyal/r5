@@ -82,7 +82,7 @@ public class FileStorageController implements HttpController {
      * Remove the FileInfo record from the database and the file from the FileStorage.
      */
     private boolean deleteFile(Request req, Response res) {
-        FileInfo file = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo file = fileCollection.findPermittedByRequestParamId(req);
         fileStorage.delete(file.getKey());
         return fileCollection.delete(file).wasAcknowledged();
     }
@@ -92,7 +92,7 @@ public class FileStorageController implements HttpController {
      * file.
      */
     private String generateDownloadURL(Request req, Response res) {
-        FileInfo file = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo file = fileCollection.findPermittedByRequestParamId(req);
         res.type("text/plain");
         return fileStorage.getURL(file.getKey());
     }
@@ -101,7 +101,7 @@ public class FileStorageController implements HttpController {
      * Find FileInfo by passing in and _id and download the corresponding file by returning an InputStream.
      */
     private InputStream downloadFile(Request req, Response res) throws IOException {
-        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req);
         File file = fileStorage.getFile(fileInfo.getKey());
         res.type(fileInfo.format.mimeType);
         if (FileUtils.isGzip(file)) {
@@ -115,7 +115,7 @@ public class FileStorageController implements HttpController {
      * file.
      */
     private FileInfo uploadFile(Request req, Response res) throws Exception {
-        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req);
         File file = FileUtils.createScratchFile(req.raw().getInputStream());
         fileStorage.moveIntoStorage(fileInfo.getKey(), file);
 

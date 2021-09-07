@@ -1,7 +1,9 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageFormat;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
@@ -68,6 +70,10 @@ public abstract class DataSource extends BaseModel {
 
     public void addIssue (DataSourceValidationIssue.Level level, String message) {
         issues.add(new DataSourceValidationIssue(level, message));
+    }
+
+    public FileStorageKey fileStorageKey () {
+        return new FileStorageKey(FileCategory.DATASOURCES, _id.toString(), fileFormat.extension);
     }
 
 }

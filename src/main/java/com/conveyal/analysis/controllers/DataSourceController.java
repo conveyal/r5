@@ -11,23 +11,26 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
+import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.DATASOURCES;
+import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -74,15 +77,24 @@ public class DataSourceController implements HttpController {
 
     /** HTTP GET: Retrieve a single DataSource record by the ID supplied in the URL path parameter. */
     private DataSource getOneDataSourceById (Request req, Response res) {
-        return dataSourceCollection.findPermittedByRequestParamId(req, res);
+        return dataSourceCollection.findPermittedByRequestParamId(req);
     }
 
     /** HTTP DELETE: Delete a single DataSource record and associated files in FileStorage by supplied ID parameter. */
     private String deleteOneDataSourceById (Request request, Response response) {
-        long nDeleted = dataSourceCollection.deleteByIdParamIfPermitted(request).getDeletedCount();
-        // TODO normalize to canonical file extensions so we can find them to delete them.
-        // fileStorage.delete(new FileStorageKey(DATA_SOURCE, _id + extension));
-        return "DELETE " + nDeleted;
+        DataSource dataSource = dataSourceCollection.findPermittedByRequestParamId(request);
+        DeleteResult deleteResult = dataSourceCollection.delete(dataSource);
+        long nDeleted = deleteResult.getDeletedCount();
+        // This will not delete the file if its extension when uploaded did not match the canonical one.
+        // Ideally we should normalize file extensions when uploaded, but it's a little tricky to handle SHP sidecars.
+        fileStorage.delete(dataSource.fileStorageKey());
+        // This is so ad-hoc but it's not necessarily worth generalizing since SHP is the only format with sidecars.
+        if (dataSource.fileFormat == SHP) {
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "shx"));
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "dbf"));
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "prj"));
+        }
+        return "Deleted " + nDeleted;
     }
 
     private SpatialDataSource downloadLODES(Request req, Response res) {

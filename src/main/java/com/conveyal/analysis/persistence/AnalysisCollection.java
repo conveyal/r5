@@ -148,10 +148,9 @@ public class AnalysisCollection<T extends BaseModel> {
     }
 
     /**
-     * Controller find by id helper.
-     * TODO remove unused second parameter.
+     * Helper for HttpControllers - find a document by the _id path parameter in the request, checking permissions.
      */
-    public T findPermittedByRequestParamId(Request req, Response res) {
+    public T findPermittedByRequestParamId (Request req) {
         UserPermissions user = UserPermissions.from(req);
         T value = findById(req.params("_id"));
         // Throw if or does not have permission

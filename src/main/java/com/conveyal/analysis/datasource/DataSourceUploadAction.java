@@ -90,14 +90,19 @@ public class DataSourceUploadAction implements TaskAction {
      * stage. If so, then this logic needs to change a bit.
      */
     private final void moveFilesIntoStorage (ProgressListener progressListener) {
-        // Loop through uploaded files, registering the extensions and writing to storage (with filenames that
-        // correspond to the source id)
+        // Loop through uploaded files, registering the extensions and writing to storage
+        // (with filenames that correspond to the source id)
         progressListener.beginTask("Moving files into storage...", 1);
         final String dataSourceId = ingester.dataSource()._id.toString();
         for (FileItem fileItem : fileItems) {
             DiskFileItem dfi = (DiskFileItem) fileItem;
-            // TODO use canonical extensions from filetype enum
-            String extension = FilenameUtils.getExtension(fileItem.getName()).toLowerCase(Locale.ROOT);
+            // Use canonical extension from file type - files may be uploaded with e.g. tif instead of tiff or geotiff.
+            String extension = ingester.dataSource().fileFormat.extension;
+            if (fileItems.size() > 1) {
+                // If we have multiple files, as with Shapefile, just keep the original extension for each file.
+                // This could lead to orphaned files after a deletion, we might want to implement wildcard deletion.
+                extension = FilenameUtils.getExtension(fileItem.getName()).toLowerCase(Locale.ROOT);
+            }
             FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, extension);
             fileStorage.moveIntoStorage(key, dfi.getStoreLocation());
             if (fileItems.size() == 1 || extension.equalsIgnoreCase(SHP.extension)) {

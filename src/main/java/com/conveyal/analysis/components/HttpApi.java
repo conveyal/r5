@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
+import static com.conveyal.analysis.AnalysisServerException.Type.FORBIDDEN;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
+import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
 
 /**
@@ -134,21 +136,7 @@ public class HttpApi implements Component {
         // Can we consolidate all these exception handlers and get rid of the hard-wired "BAD_REQUEST" parameters?
 
         sparkService.exception(AnalysisServerException.class, (e, request, response) -> {
-            // Include a stack trace, except when the error is known to be about unauthenticated or unauthorized access,
-            // in which case we don't want to leak information about the server to people scanning it for weaknesses.
-            if (e.type == AnalysisServerException.Type.UNAUTHORIZED ||
-                e.type == AnalysisServerException.Type.FORBIDDEN
-            ){
-                ObjectNode body = JsonUtil.objectNode()
-                    .put("type", e.type.toString())
-                    .put("message", e.message);
-
-                response.status(e.httpCode);
-                response.type("application/json");
-                response.body(JsonUtil.toJsonString(body));
-            } else {
-                respondToException(e, request, response, e.type, e.message, e.httpCode);
-            }
+            respondToException(e, request, response, e.type, e.message, e.httpCode);
         });
 
         sparkService.exception(IOException.class, (e, request, response) -> {
@@ -174,14 +162,18 @@ public class HttpApi implements Component {
                                     AnalysisServerException.Type type, String message, int code) {
 
         // Stacktrace in ErrorEvent reused below to avoid repeatedly generating String of stacktrace.
-        ErrorEvent errorEvent = new ErrorEvent(e);
+        ErrorEvent errorEvent = new ErrorEvent(e, request.pathInfo());
         eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
 
         ObjectNode body = JsonUtil.objectNode()
                 .put("type", type.toString())
-                .put("message", message)
-                .put("stackTrace", errorEvent.stackTrace);
+                .put("message", message);
 
+        // Include a stack trace except when the error is known to be about unauthenticated or unauthorized access,
+        // in which case we don't want to leak information about the server to people scanning it for weaknesses.
+        if (type != UNAUTHORIZED && type != FORBIDDEN) {
+            body.put("stackTrace", errorEvent.stackTrace);
+        }
         response.status(code);
         response.type("application/json");
         response.body(JsonUtil.toJsonString(body));

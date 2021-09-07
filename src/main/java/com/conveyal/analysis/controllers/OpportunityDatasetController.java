@@ -444,6 +444,7 @@ public class OpportunityDatasetController implements HttpController {
         if (dataset == null) {
             throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
         } else {
+            // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GRID));
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.PNG));
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GEOTIFF));

@@ -1,16 +1,18 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.common.JsonUtilities;
+import com.mongodb.DBObject;
+import com.mongodb.QueryBuilder;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -18,7 +20,6 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.zip.CRC32;
 
 /**
  * Request sent from the UI to the backend. It is actually distinct from the task that the broker
@@ -150,6 +151,23 @@ public class AnalysisRequest {
     public DecayFunction decayFunction;
 
     /**
+     * Create the R5 `Scenario` from this request.
+     */
+    public Scenario createScenario (String accessGroup) {
+        DBObject query = "all".equals(scenarioId)
+                ? QueryBuilder.start("projectId").is(projectId).get()
+                : QueryBuilder.start("_id").in(modificationIds).get();
+        List<com.conveyal.analysis.models.Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
+        // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
+        String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
+        String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
+        Scenario scenario = new Scenario();
+        scenario.id = scenarioId;
+        scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
+        return scenario;
+    }
+
+    /**
      * Finds the modifications for the specified project and variant, maps them to their
      * corresponding R5 modification types, creates a checksum from those modifications, and adds
      * them to the AnalysisTask along with the rest of the request.
@@ -162,27 +180,10 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, List<Modification> modifications) {
+    public void populateTask (AnalysisWorkerTask task, String accessGroup) {
         if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
 
-        // The CRC of the modifications in this scenario is appended to the bundle ID to identify a unique set of
-        // modifications allowing the worker to cache and reuse networks built by applying that exact revision of the
-        // scenario to a base network.
-        CRC32 crc = new CRC32();
-        crc.update(JsonUtilities.objectToJsonBytes(modifications));
-        long crcValue = crc.getValue();
-        // FIXME Job IDs need to be unique. Why are we setting this to the project and variant?
-        //       This only works because the job ID is overwritten when the job is enqueued.
-        //       Its main effect is to cause the scenario ID to have this same pattern!
-        //       We should probably leave the JobID null on single point tasks. Needed: polymorphic task initialization.
-        task.jobId = String.format("%s-%s", bundleId, crcValue);
-
-        Scenario scenario = new Scenario();
-        scenario.id = task.scenarioId = task.jobId;
-        scenario.modifications = modifications;
-        // task.scenario.description = scenarioName;
-
-        task.scenario = scenario;
+        task.scenario = createScenario(accessGroup);
         task.graphId = bundleId;
         task.workerVersion = workerVersion;
         task.maxFare = maxFare;
@@ -245,8 +246,6 @@ public class AnalysisRequest {
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
         }
-
-        return task;
     }
 
     private static void checkGridSize (WebMercatorExtents extents) {

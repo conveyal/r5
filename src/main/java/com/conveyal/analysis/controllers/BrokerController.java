@@ -10,7 +10,6 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
@@ -26,7 +25,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
-import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -49,7 +47,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -135,16 +132,9 @@ public class BrokerController implements HttpController {
         final long startTimeMsec = System.currentTimeMillis();
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-        DBObject query = "all".equals(analysisRequest.scenarioId)
-                ? QueryBuilder.start("projectId").is(analysisRequest.projectId).get()
-                : QueryBuilder.start("_id").in(analysisRequest.modificationIds).get();
-        List<Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
-
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest.populateTask(
-                new TravelTimeSurfaceTask(),
-                modifications.stream().map(Modification::toR5).collect(Collectors.toList())
-        );
+        TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
+        analysisRequest.populateTask(task, accessGroup);
 
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){

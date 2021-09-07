@@ -5,7 +5,6 @@ import com.conveyal.analysis.SelectingGridReducer;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
-import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
@@ -21,7 +20,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.primitives.Ints;
-import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
 import org.json.simple.JSONObject;
@@ -41,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -379,19 +376,11 @@ public class RegionalAnalysisController implements HttpController {
             analysisRequest.percentiles = DEFAULT_REGIONAL_PERCENTILES;
         }
 
-        DBObject query = "all".equals(analysisRequest.scenarioId)
-                ? QueryBuilder.start("projectId").is(analysisRequest.projectId).get()
-                : QueryBuilder.start("_id").in(analysisRequest.modificationIds).get();
-        List<Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
-
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
-
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = (RegionalTask) analysisRequest.populateTask(
-                new RegionalTask(),
-                modifications.stream().map(Modification::toR5).collect(Collectors.toList())
-        );
+        RegionalTask task = new RegionalTask();
+        analysisRequest.populateTask(task, accessGroup);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
         if (!analysisRequest.makeTauiSite) {

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
+import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -133,11 +134,11 @@ public class BrokerController implements HttpController {
         final String userEmail = request.attribute("email");
         final long startTimeMsec = System.currentTimeMillis();
 
-        final AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-
-        final List<Modification> modifications = Persistence.modifications.findPermitted(
-                QueryBuilder.start("_id").in(analysisRequest.modificationIds).get(),
-                accessGroup);
+        AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
+        DBObject query = "all".equals(analysisRequest.scenarioId)
+                ? QueryBuilder.start("projectId").is(analysisRequest.projectId).get()
+                : QueryBuilder.start("_id").in(analysisRequest.modificationIds).get();
+        List<Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest.populateTask(

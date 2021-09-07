@@ -21,6 +21,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.primitives.Ints;
+import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
 import org.json.simple.JSONObject;
@@ -378,10 +379,10 @@ public class RegionalAnalysisController implements HttpController {
             analysisRequest.percentiles = DEFAULT_REGIONAL_PERCENTILES;
         }
 
-        List<Modification> modifications = Persistence.modifications.findPermitted(
-                QueryBuilder.start("_id").in(analysisRequest.modificationIds).get(),
-                accessGroup
-        );
+        DBObject query = "all".equals(analysisRequest.scenarioId)
+                ? QueryBuilder.start("projectId").is(analysisRequest.projectId).get()
+                : QueryBuilder.start("_id").in(analysisRequest.modificationIds).get();
+        List<Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
 
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
 

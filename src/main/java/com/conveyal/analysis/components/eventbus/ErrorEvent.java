@@ -61,7 +61,7 @@ public class ErrorEvent extends Event {
 
     private static String filterStackTrace (String stackTrace) {
         if (stackTrace == null) return null;
-        final String unknownFrame = "at unknown frame";
+        final String unknownFrame = "Unknown stack frame, probably optimized out by JVM.";
         String error = stackTrace.lines().findFirst().get();
         String frame = stackTrace.lines()
                 .map(String::strip)

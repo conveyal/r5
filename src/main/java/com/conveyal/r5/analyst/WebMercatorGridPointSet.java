@@ -28,6 +28,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      */
     public static final int DEFAULT_ZOOM = 9;
 
+    public static final int MIN_ZOOM = 9;
+
+    public static final int MAX_ZOOM = 12;
+
     /** web mercator zoom level */
     public final int zoom;
 
@@ -229,12 +233,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return new WebMercatorExtents(west, north, width, height, zoom);
     }
 
-    public static int parseZoom(String zoom) {
-        if (zoom != null) {
-            return Integer.parseInt(zoom);
-        } else {
-            return DEFAULT_ZOOM;
-        }
+    public static int parseZoom(String zoomString) {
+        int zoom = (zoomString == null) ? DEFAULT_ZOOM : Integer.parseInt(zoomString);
+        checkArgument(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM);
+        return zoom;
     }
 
 }

@@ -57,10 +57,11 @@ public class AggregationAreaController implements HttpController {
     /**
      * Create binary .grid files for aggregation (aka mask) areas, save them to FileStorage, and persist their metadata
      * to Mongo. The supplied request (req) must include query parameters specifying the dataSourceId of a
-     * SpatialDataSoure containing the polygonal aggregation area geometries. If the nameProperty query parameter is
-     * non-null, it must be the name of a text attribute in that SpatialDataSource, and one aggregation area will be
-     * created for each polygon using those names. If the nameProperty is not supplied, all polygons will be merged into
-     * one large nameless (multi)polygon aggregation area.
+     * SpatialDataSoure containing the polygonal aggregation area geometries. If the mergePolygons query parameter is
+     * supplied and is true, all polygons will be merged into one large (multi)polygon aggregation area.
+     * If the mergePolygons query parameter is not supplied or is false, the nameProperty query parameter must be
+     * the name of a text attribute in that SpatialDataSource. One aggregation area will be created for each polygon
+     * drawing the names from that attribute.
      * @return the ID of the Task representing the enqueued background action that will create the aggregation areas.
      */
     private String createAggregationAreas (Request req, Response res) throws Exception {

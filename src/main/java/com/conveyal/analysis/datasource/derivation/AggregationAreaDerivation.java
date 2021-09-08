@@ -58,6 +58,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
     private final UserPermissions userPermissions;
     private final String dataSourceId;
     private final String nameProperty;
+    private final boolean mergePolygons;
     private final int zoom;
     private final SpatialDataSource spatialDataSource;
     private final List<SimpleFeature> finalFeatures;
@@ -79,11 +80,13 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         userPermissions = UserPermissions.from(req);
         dataSourceId = req.queryParams("dataSourceId");
         nameProperty = req.queryParams("nameProperty"); //"dist_name"; //
-        zoom = parseZoom(req.queryParams("zoom")); 
+        zoom = parseZoom(req.queryParams("zoom"));
+        mergePolygons = Boolean.parseBoolean(req.queryParams("mergePolygons"));
         checkNotNull(dataSourceId);
-        checkNotNull(nameProperty);
-        // TODO range check zoom
-        
+        if (!mergePolygons) {
+            checkNotNull(nameProperty, "You must supply a nameProperty if mergePolygons is not true.");
+        }
+
         AnalysisCollection<DataSource> dataSourceCollection =
                 database.getAnalysisCollection("dataSources", DataSource.class);
         DataSource dataSource = dataSourceCollection.findById(dataSourceId);
@@ -125,7 +128,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             // GeoJSON, GeoPackage etc.
             throw new UnsupportedOperationException("To be implemented.");
         }
-        if (nameProperty != null && finalFeatures.size() > MAX_FEATURES) {
+        if (!mergePolygons && finalFeatures.size() > MAX_FEATURES) {
             String message = MessageFormat.format(
                     "The uploaded shapefile has {0} features, exceeding the limit of {1}",
                     finalFeatures.size(), MAX_FEATURES
@@ -145,13 +148,13 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
 
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         String groupDescription = "Convert polygons to aggregation areas, " +
-                ((nameProperty == null) ? "merging all polygons." : "one area per polygon.");
+                (mergePolygons ? "merging all polygons." : "one area per polygon.");
         DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id.toString(), groupDescription);
 
         progressListener.beginTask("Reading data source", finalFeatures.size() + 1);
         Map<String, Geometry> areaGeometries = new HashMap<>();
 
-        if (nameProperty == null) {
+        if (mergePolygons) {
             // Union (single combined aggregation area) requested
             List<Geometry> geometries = finalFeatures.stream().map(f ->
                     (Geometry) f.getDefaultGeometry()).collect(Collectors.toList()

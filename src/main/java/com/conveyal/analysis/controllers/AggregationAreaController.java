@@ -19,9 +19,12 @@ import spark.Request;
 import spark.Response;
 
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -61,7 +64,6 @@ public class AggregationAreaController implements HttpController {
      * @return the ID of the Task representing the enqueued background action that will create the aggregation areas.
      */
     private String createAggregationAreas (Request req, Response res) throws Exception {
-
         // Create and enqueue an asynchronous background action to derive aggreagation areas from spatial data source.
         // The constructor will extract query parameters and range check them (not ideal separation, but it works).
         DataDerivation derivation = AggregationAreaDerivation.fromRequest(req, fileStorage, analysisDb);
@@ -74,31 +76,38 @@ public class AggregationAreaController implements HttpController {
         return backgroundTask.id.toString();
     }
 
+    /**
+     * Get all aggregation area documents meeting the supplied criteria.
+     * The request must contain a query parameter for the regionId or the dataGroupId or both.
+     */
     private Collection<AggregationArea> getAggregationAreas (Request req, Response res) {
-        Bson query = eq("regionId", req.queryParams("regionId"));
+        List<Bson> filters = new ArrayList<>();
+        String regionId = req.queryParams("regionId");
+        if (regionId != null) {
+            filters.add(eq("regionId", regionId));
+        }
         String dataGroupId = req.queryParams("dataGroupId");
         if (dataGroupId != null) {
-            query = and(eq("dataGroupId", dataGroupId), query);
+            filters.add(eq("dataGroupId", dataGroupId));
         }
-        return aggregationAreaCollection.findPermitted(query, UserPermissions.from(req));
+        if (filters.isEmpty()) {
+            throw new IllegalArgumentException("You must supply either a regionId or a dataGroupId or both.");
+        }
+        return aggregationAreaCollection.findPermitted(and(filters), UserPermissions.from(req));
     }
 
-    private ObjectNode getAggregationArea (Request req, Response res) {
-        AggregationArea aggregationArea = aggregationAreaCollection.findByIdIfPermitted(
-                req.params("maskId"), UserPermissions.from(req)
-        );
+    /** Returns a JSON-wrapped URL for the mask grid of the aggregation area whose id matches the path parameter. */
+    private ObjectNode getAggregationAreaGridUrl (Request req, Response res) {
+        AggregationArea aggregationArea = aggregationAreaCollection.findPermittedByRequestParamId(req);
         String url = fileStorage.getURL(aggregationArea.getStorageKey());
         return JsonUtil.objectNode().put("url", url);
-
     }
 
     @Override
     public void registerEndpoints (spark.Service sparkService) {
-        sparkService.path("/api/region/", () -> {
-            sparkService.get("/:regionId/aggregationArea", this::getAggregationAreas, toJson);
-            sparkService.get("/:regionId/aggregationArea/:maskId", this::getAggregationArea, toJson);
-            sparkService.post("/:regionId/aggregationArea", this::createAggregationAreas, toJson);
-        });
+        sparkService.get("/api/aggregationArea", this::getAggregationAreas, toJson);
+        sparkService.get("/api/aggregationArea/:_id/gridUrl", this::getAggregationAreaGridUrl, toJson);
+        sparkService.post("/api/aggregationArea", this::createAggregationAreas, toJson);
     }
 
 }

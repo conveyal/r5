@@ -18,12 +18,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
+import static com.conveyal.analysis.util.HttpStatus.OK_200;
+
 /**
  * This proxies requests coming from the UI over to any currently active worker for the specified network bundle.
  * This could be used for point-to-point routing or the existing R5 endpoints producing debug tiles of the graph.
  * GTFS data might be better fetched directly from the backend, since it already has an API for examining cached GTFS.
  * This works similarly to the single-point controller, but that has a lot of ad-hoc code in it I don't
- * wnat to break so I'm keeping this general purpose proxy separate for now. That also allows us to experiment with
+ * want to break so I'm keeping this general purpose proxy separate for now. That also allows us to experiment with
  * using Java's built-in HTTP client. This could eventually be expanded to also handle the single point requests.
  */
 public class WorkerProxyController implements HttpController {
@@ -42,6 +44,7 @@ public class WorkerProxyController implements HttpController {
         // Those could be path parameters, x-conveyal-headers, etc.
         // Path starts with api to ensure authentication
         sparkService.get("/api/bundles/:bundle/workerProxy/:workerVersion", this::proxyGet);
+        sparkService.get("/networkVectorTiles/:networkId/:z/:x/:y", this::proxyGet);
     }
 
     /**
@@ -53,10 +56,13 @@ public class WorkerProxyController implements HttpController {
 
         final long startTimeMsec = System.currentTimeMillis();
 
-        final String bundleId = request.params("bundleId");
-        final String workerVersion = request.params("workerVersion");
+        final String networkId = request.params("networkId");
+        final String z = request.params("z");
+        final String x = request.params("x");
+        final String y = request.params("y");
+        final String workerVersion = "UNKNOWN"; // TODO request.params("workerVersion");
 
-        WorkerCategory workerCategory = new WorkerCategory(bundleId, workerVersion);
+        WorkerCategory workerCategory = new WorkerCategory(networkId, workerVersion);
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             Bundle bundle = null;
@@ -73,7 +79,8 @@ public class WorkerProxyController implements HttpController {
             broker.recentlyRequestedWorkers.remove(workerCategory);
         }
 
-        String workerUrl = "http://" + address + ":7080/single"; // TODO remove hard-coded port number.
+        String workerUrl = "http://" + address + ":7080/networkVectorTiles/" + networkId + "/" + z + "/" + x + "/" + y;
+        // TODO cleanup, remove hard-coded port number.
         LOG.info("Re-issuing HTTP request from UI to worker at {}", workerUrl);
 
 
@@ -81,12 +88,15 @@ public class WorkerProxyController implements HttpController {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .GET()
                 .uri(URI.create(workerUrl))
-                .header("Accept-Encoding", "gzip") // TODO Explore: is this unzipping and re-zipping the result from the worker?
                 .build();
         try {
-            response.status(0);
-            // content-type response.header();
-            return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse resp = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
+            // TODO copied from NetworkTileController
+            response.header("Content-Type", "application/vnd.mapbox-vector-tile");
+            response.header("Content-Encoding", "gzip");
+            response.header("Cache-Control", "max-age=3600, immutable");
+            response.status(OK_200);
+            return resp.body();
         } catch (Exception exception) {
             response.status(HttpStatus.BAD_GATEWAY_502);
             response.body(ExceptionUtils.stackTraceString(exception));

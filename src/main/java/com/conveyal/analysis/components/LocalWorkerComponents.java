@@ -2,6 +2,7 @@ package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -25,6 +26,7 @@ public class LocalWorkerComponents extends WorkerComponents {
         taskScheduler = new TaskScheduler(config);
         eventBus = new EventBus(taskScheduler);
         analysisWorker = new AnalysisWorker(fileStorage, transportNetworkCache, eventBus, config);
+        networkTileController = new NetworkTileController(transportNetworkCache);
         // taskScheduler.repeatRegularly(...);
         // eventBus.addHandlers(...);
     }

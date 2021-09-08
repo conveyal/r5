@@ -33,7 +33,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
@@ -1113,6 +1115,20 @@ public class EdgeStore implements Serializable {
         public void setBikeTimeFactor (double bikeTimeFactor) {
             edgeTraversalTimes.setBikeTimeFactor(edgeIndex, bikeTimeFactor);
         }
+
+        public Map<String, Object> attributesForDisplay () {
+            Map<String, Object> map = new HashMap<>();
+            map.put("speedKph", getSpeedKph());
+            int lts = getFlag(EdgeFlag.BIKE_LTS_1) ? 1 :
+                        getFlag(EdgeFlag.BIKE_LTS_2) ? 2 :
+                        getFlag(EdgeFlag.BIKE_LTS_3) ? 3 : 4;
+            map.put("lts", lts);
+            map.put("pedestrian", getFlag(EdgeFlag.ALLOWS_PEDESTRIAN));
+            map.put("bike", getFlag(EdgeFlag.ALLOWS_BIKE));
+            map.put("car", getFlag(EdgeFlag.ALLOWS_CAR));
+            return map;
+        }
+
     }
 
     /**

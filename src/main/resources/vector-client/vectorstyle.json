@@ -5,7 +5,7 @@
     "r5": {
       "type": "vector",
       "tiles": [
-        "http://localhost:7070/vectorTiles/5f9bcd619cffc76a49c8fcc7_5f9bcd619cffc76a49c8fcc6/{z}/{x}/{y}"
+        "http://localhost:7070/networkVectorTiles/5f4ee64db8b6303fdd2fdec2/{z}/{x}/{y}"
       ],
       "maxzoom": 14
     },
@@ -43,49 +43,21 @@
     {
       "id": "patterns",
       "source": "r5",
-      "source-layer": "patternShapes",
+      "source-layer": "edges",
       "type": "line",
+      "filter": ["get", "car"],
       "paint": {
-        "line-color": "#008000"
-      }
-    },
-    {
-      "id": "pattern-labels",
-      "source": "r5",
-      "source-layer": "patternShapes",
-      "minzoom": 12,
-      "type": "symbol",
-      "layout": {
-        "symbol-placement": "line",
-        "text-anchor": "bottom",
-        "text-font": [
-          "Open Sans Bold",
-          "Arial Unicode MS Bold"
-        ],
-        "text-field": "route name"
-      }
-    },
-    {
-      "id": "stops",
-      "source": "r5",
-      "source-layer": "stops",
-      "type": "circle",
-      "minzoom": 10
-    },
-    {
-      "id": "stop-labels",
-      "source": "r5",
-      "source-layer": "stops",
-      "minzoom": 13,
-      "type": "symbol",
-      "layout": {
-        "symbol-placement": "point",
-        "text-anchor": "left",
-        "text-font": [
-          "Open Sans Bold",
-          "Arial Unicode MS Bold"
-        ],
-        "text-field": "stop-name"
+        "line-color": [
+          "interpolate",
+          ["linear"],
+          ["get", "lts"],
+          1,
+          ["to-color","#0f0"],
+          2,
+          ["to-color","#099"],
+          4,
+          ["to-color","#f00"]
+        ]
       }
     }
   ]

@@ -1,6 +1,7 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.r5.common.JsonUtilities;
 import com.mongodb.BasicDBObject;
@@ -18,6 +19,8 @@ import spark.Request;
 import java.io.IOException;
 import java.util.Collection;
 
+import static com.conveyal.analysis.persistence.AnalysisCollection.MONGO_PROP_ACCESS_GROUP;
+
 /**
  * An attempt at simulating a MapDB-style interface, for storing Java objects in MongoDB.
  * Note this used to implement Map, but the Map interface predates generics in Java, so it is more typesafe not
@@ -31,10 +34,6 @@ public class MongoMap<V extends Model> {
     private JacksonDBCollection<V, String> wrappedCollection;
     private Class<V> type;
 
-    private String getAccessGroup (Request req) {
-        return req.attribute("accessGroup");
-    }
-
     public MongoMap (JacksonDBCollection<V, String> wrappedCollection, Class<V> type) {
         this.type = type;
         this.wrappedCollection = wrappedCollection;
@@ -45,17 +44,17 @@ public class MongoMap<V extends Model> {
     }
 
     public V findByIdFromRequestIfPermitted(Request request) {
-        return findByIdIfPermitted(request.params("_id"), getAccessGroup(request));
+        return findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
     }
 
-    public V findByIdIfPermitted(String id, String accessGroup) {
+    public V findByIdIfPermitted(String id, UserPermissions userPermissions) {
         V result = wrappedCollection.findOneById(id);
 
         if (result == null) {
             throw AnalysisServerException.notFound(String.format(
                     "The resource you requested (_id %s) could not be found. Has it been deleted?", id
             ));
-        } else if (!accessGroup.equals(result.accessGroup)) {
+        } else if (!userPermissions.accessGroup.equals(result.accessGroup)) {
             throw AnalysisServerException.forbidden("You do not have permission to access this data.");
         } else {
             return result;
@@ -67,27 +66,27 @@ public class MongoMap<V extends Model> {
     }
 
     public Collection<V> findAllForRequest(Request req) {
-        return find(QueryBuilder.start("accessGroup").is(getAccessGroup(req)).get()).toArray();
+        return find(QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(UserPermissions.from(req).accessGroup).get()).toArray();
     }
 
     /**
      * Helper function that adds the `accessGroup` to the query if the user is not an admin. If you want to query using
      * the `accessGroup` as an admin it must be added to the query.
      */
-    public Collection<V> findPermitted(DBObject query, String accessGroup) {
+    public Collection<V> findPermitted(DBObject query, UserPermissions userPermissions) {
         DBCursor<V> cursor = find(QueryBuilder.start().and(
                 query,
-                QueryBuilder.start("accessGroup").is(accessGroup).get()
+                QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(userPermissions.accessGroup).get()
         ).get());
 
         return cursor.toArray();
     }
 
     // See comments for `findPermitted` above. This helper also adds a projection.
-    public Collection<V> findPermitted(DBObject query, DBObject project, String accessGroup) {
+    public Collection<V> findPermitted(DBObject query, DBObject project, UserPermissions userPermissions) {
         DBCursor<V> cursor = find(QueryBuilder.start().and(
                 query,
-                QueryBuilder.start("accessGroup").is(accessGroup).get()
+                QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(userPermissions.accessGroup).get()
         ).get(), project);
 
         return cursor.toArray();
@@ -102,8 +101,7 @@ public class MongoMap<V extends Model> {
         req.queryParams().forEach(name -> {
             query.and(name).is(req.queryParams(name));
         });
-
-        return findPermitted(query.get(), getAccessGroup(req));
+        return findPermitted(query.get(), UserPermissions.from(req));
     }
 
     /**
@@ -124,13 +122,9 @@ public class MongoMap<V extends Model> {
 
     public V createFromJSONRequest(Request request) throws IOException {
         V json = JsonUtilities.objectMapper.readValue(request.body(), this.type);
-
-        // Set access group
-        json.accessGroup = getAccessGroup(request);
-
-        // Set `createdBy` from the user's email
-        json.createdBy = request.attribute("email");
-
+        UserPermissions userPermissions = UserPermissions.from(request);
+        json.accessGroup = userPermissions.accessGroup;
+        json.createdBy = userPermissions.email;
         return create(json);
     }
 
@@ -159,14 +153,14 @@ public class MongoMap<V extends Model> {
     public V updateFromJSONRequest(Request request) throws IOException {
         V json = JsonUtilities.objectMapper.readValue(request.body(), this.type);
         // Add the additional check for the same access group
-        return updateByUserIfPermitted(json, request.attribute("email"), getAccessGroup(request));
+        return updateByUserIfPermitted(json, UserPermissions.from(request));
     }
 
-    public V updateByUserIfPermitted(V value, String updatedBy, String accessGroup) {
+    public V updateByUserIfPermitted(V value, UserPermissions userPermissions) {
         // Set `updatedBy`
-        value.updatedBy = updatedBy;
+        value.updatedBy = userPermissions.email;
 
-        return put(value, QueryBuilder.start("accessGroup").is(accessGroup).get());
+        return put(value, QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(userPermissions.accessGroup).get());
     }
 
     public V put(String key, V value) {
@@ -228,10 +222,10 @@ public class MongoMap<V extends Model> {
         return value;
     }
 
-    public V removeIfPermitted(String key, String accessGroup) {
+    public V removeIfPermitted(String key, UserPermissions userPermissions) {
         DBObject query = QueryBuilder.start().and(
                 QueryBuilder.start("_id").is(key).get(),
-                QueryBuilder.start("accessGroup").is(accessGroup).get()
+                QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(userPermissions.accessGroup).get()
         ).get();
 
         V result = wrappedCollection.findAndRemove(query);

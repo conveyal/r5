@@ -2,6 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
@@ -11,7 +12,6 @@ import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -24,7 +24,6 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
-import org.json.simple.JSONObject;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,24 +73,24 @@ public class RegionalAnalysisController implements HttpController {
         this.fileStorage = fileStorage;
     }
 
-    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, String accessGroup) {
+    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, UserPermissions userPermissions) {
         return Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start().and(
                         QueryBuilder.start("regionId").is(regionId).get(),
                         QueryBuilder.start("deleted").is(false).get()
                 ).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                accessGroup
+                userPermissions
         );
     }
 
     private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(Request req, Response res) {
-        return getRegionalAnalysesForRegion(req.params("regionId"), req.attribute("accessGroup"));
+        return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
     }
 
     // Note: this includes the modifications object which can be very large
     private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     /**
@@ -100,7 +99,7 @@ public class RegionalAnalysisController implements HttpController {
      * @return JobStatues with associated regional analysis embedded
      */
     private Collection<JobStatus> getRunningAnalyses(Request req, Response res) {
-        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), req.attribute("accessGroup"));
+        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
         List<JobStatus> runningStatusesForRegion = new ArrayList<>();
         Collection<JobStatus> allJobStatuses = broker.getAllJobStatuses();
         for (RegionalAnalysis ra : allAnalysesInRegion) {
@@ -115,19 +114,17 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private RegionalAnalysis deleteRegionalAnalysis (Request req, Response res) {
-        String accessGroup = req.attribute("accessGroup");
-        String email = req.attribute("email");
-
+        UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start().and(
                         QueryBuilder.start("_id").is(req.params("_id")).get(),
                         QueryBuilder.start("deleted").is(false).get()
                 ).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                accessGroup
+                userPermissions
         ).iterator().next();
         analysis.deleted = true;
-        Persistence.regionalAnalyses.updateByUserIfPermitted(analysis, email, accessGroup);
+        Persistence.regionalAnalyses.updateByUserIfPermitted(analysis, userPermissions);
 
         // clear it from the broker
         if (!analysis.complete) {
@@ -174,7 +171,7 @@ public class RegionalAnalysisController implements HttpController {
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(req.params("_id")).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
@@ -266,7 +263,7 @@ public class RegionalAnalysisController implements HttpController {
             LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
                     cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
             FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-            if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.TIFF.equals(format)) {
+            if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
                 throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
             }
 
@@ -312,17 +309,16 @@ public class RegionalAnalysisController implements HttpController {
                     case PNG:
                         grid.writePng(fos);
                         break;
-                    case TIFF:
+                    case GEOTIFF:
                         grid.writeGeotiff(fos);
                         break;
                 }
 
                 fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
             }
-
-            JSONObject json = new JSONObject();
-            json.put("url", fileStorage.getURL(singleCutoffFileStorageKey));
-            return json.toJSONString();
+            return JsonUtil.toJsonString(
+                    JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
+            );
         }
     }
 
@@ -334,7 +330,7 @@ public class RegionalAnalysisController implements HttpController {
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(regionalAnalysisId).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
@@ -358,8 +354,7 @@ public class RegionalAnalysisController implements HttpController {
      * in the body of the HTTP response.
      */
     private RegionalAnalysis createRegionalAnalysis (Request req, Response res) throws IOException {
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
+        final UserPermissions userPermissions = UserPermissions.from(req);
 
         AnalysisRequest analysisRequest = JsonUtil.objectMapper.readValue(req.body(), AnalysisRequest.class);
 
@@ -379,10 +374,10 @@ public class RegionalAnalysisController implements HttpController {
         }
 
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, accessGroup);
+        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = (RegionalTask) analysisRequest.populateTask(new RegionalTask(), project);
+        RegionalTask task = (RegionalTask) analysisRequest.populateTask(new RegionalTask(), project, userPermissions);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
         if (! analysisRequest.makeTauiSite) {
@@ -396,7 +391,7 @@ public class RegionalAnalysisController implements HttpController {
                 String destinationPointSetId = analysisRequest.destinationPointSetIds[i];
                 OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
                         destinationPointSetId,
-                        accessGroup
+                        userPermissions
                 );
                 checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
                 opportunityDatasets.add(opportunityDataset);
@@ -431,7 +426,7 @@ public class RegionalAnalysisController implements HttpController {
         // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
-                    .findByIdIfPermitted(analysisRequest.originPointSetId, accessGroup).storageLocation();
+                    .findByIdIfPermitted(analysisRequest.originPointSetId, userPermissions).storageLocation();
             task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
 
@@ -479,9 +474,9 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.west = task.west;
         regionalAnalysis.width = task.width;
 
-        regionalAnalysis.accessGroup = accessGroup;
+        regionalAnalysis.accessGroup = userPermissions.accessGroup;
         regionalAnalysis.bundleId = project.bundleId;
-        regionalAnalysis.createdBy = email;
+        regionalAnalysis.createdBy = userPermissions.email;
         regionalAnalysis.destinationPointSetIds = analysisRequest.destinationPointSetIds;
         regionalAnalysis.name = analysisRequest.name;
         regionalAnalysis.projectId = analysisRequest.projectId;
@@ -535,10 +530,8 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private RegionalAnalysis updateRegionalAnalysis(Request request, Response response) throws IOException {
-        final String accessGroup = request.attribute("accessGroup");
-        final String email = request.attribute("email");
         RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, email, accessGroup);
+        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
     }
 
     @Override

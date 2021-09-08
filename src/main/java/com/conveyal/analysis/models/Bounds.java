@@ -26,4 +26,12 @@ public class Bounds {
         return new Envelope(this.west, this.east, this.south, this.north);
     }
 
+    public static Bounds fromWgsEnvelope (Envelope envelope) {
+        Bounds bounds = new Bounds();
+        bounds.west = envelope.getMinX();
+        bounds.east = envelope.getMaxX();
+        bounds.south = envelope.getMinY();
+        bounds.north = envelope.getMaxY();
+        return bounds;
+    }
 }

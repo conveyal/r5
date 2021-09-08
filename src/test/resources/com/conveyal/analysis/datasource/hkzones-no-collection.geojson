@@ -1,0 +1,6 @@
+{
+"type": "Feature",
+"description": "This file has no FeatureCollection, just a single unwrapped Feature.",
+"properties": { "Name": "Kowloon", "Count": 5 },
+"geometry": { "type": "Polygon", "coordinates": [ [ [ 114.159122921974657, 22.32164790382194 ], [ 114.168719395665576, 22.296045686522024 ], [ 114.190255668018438, 22.302549920319244 ], [ 114.190255668018438, 22.322473703634543 ], [ 114.159122921974657, 22.32164790382194 ] ] ] }
+}

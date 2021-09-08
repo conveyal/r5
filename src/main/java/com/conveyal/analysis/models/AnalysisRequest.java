@@ -1,6 +1,7 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
@@ -153,12 +154,12 @@ public class AnalysisRequest {
      * corresponding r5 mod
      */
     private static List<Modification> modificationsForProject (
-            String accessGroup,
+            UserPermissions userPermissions,
             String projectId,
             int variantIndex)
     {
         return Persistence.modifications
-                .findPermitted(QueryBuilder.start("projectId").is(projectId).get(), accessGroup)
+                .findPermitted(QueryBuilder.start("projectId").is(projectId).get(), userPermissions)
                 .stream()
                 .filter(m -> variantIndex < m.variants.length && m.variants[variantIndex])
                 .map(com.conveyal.analysis.models.Modification::toR5)
@@ -178,7 +179,7 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, Project project) {
+    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, Project project, UserPermissions userPermissions) {
 
         // Fetch the modifications associated with this project, filtering for the selected scenario
         // (denoted here as "variant"). There are no modifications in the baseline scenario
@@ -189,7 +190,7 @@ public class AnalysisRequest {
             if (variantIndex >= project.variants.length) {
                 throw AnalysisServerException.badRequest("Scenario does not exist. Please select a new scenario.");
             }
-            modifications = modificationsForProject(project.accessGroup, projectId, variantIndex);
+            modifications = modificationsForProject(userPermissions, projectId, variantIndex);
             scenarioName = project.variants[variantIndex];
         } else {
             scenarioName = "Baseline";
@@ -220,7 +221,7 @@ public class AnalysisRequest {
         Bounds bounds = this.bounds;
         if (bounds == null) {
             // If no bounds were specified, fall back on the bounds of the entire region.
-            Region region = Persistence.regions.findByIdIfPermitted(project.regionId, project.accessGroup);
+            Region region = Persistence.regions.findByIdIfPermitted(project.regionId, new UserPermissions("UNKNOWN", false, project.accessGroup));
             bounds = region.bounds;
         }
 

@@ -11,9 +11,7 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
 import com.mongodb.client.result.DeleteResult;
@@ -31,7 +29,6 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
 /**

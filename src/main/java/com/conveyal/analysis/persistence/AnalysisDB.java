@@ -1,8 +1,6 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.models.BaseModel;
-import com.conveyal.analysis.models.SpatialDataSource;
-import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;

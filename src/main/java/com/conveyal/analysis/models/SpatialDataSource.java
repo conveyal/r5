@@ -1,26 +1,14 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.datasource.SpatialAttribute;
-import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.util.ShapefileReader;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.io.FilenameUtils;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-import org.locationtech.jts.geom.Envelope;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.TransformException;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.conveyal.file.FileCategory.DATASOURCES;
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 
 /**
  * A SpatialDataSource is metadata about a user-uploaded file containing geospatial features (e.g. shapefile, GeoJSON,

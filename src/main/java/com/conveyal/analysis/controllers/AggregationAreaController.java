@@ -22,8 +22,6 @@ import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 

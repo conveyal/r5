@@ -6,7 +6,7 @@ import org.opengis.feature.type.AttributeDescriptor;
 import org.opengis.feature.type.AttributeType;
 
 /**
- * In OpenGIS terminology, SpatialResources contain features, each of which has attributes. This class represents a
+ * In OpenGIS terminology, SpatialDataSources contain features, each of which has attributes. This class represents a
  * single attribute present on all the features in a resource - it's basically the schema metadata for a GIS layer.
  * Users can specify their own name for any attribute in the source file, so this also associates these user-specified
  * names with the original attribute name.

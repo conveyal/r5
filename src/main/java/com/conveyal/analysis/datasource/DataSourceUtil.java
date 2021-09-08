@@ -5,12 +5,17 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
 
+import java.io.File;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Utility class with common static methods for validating and processing uploaded spatial data files.
@@ -27,18 +32,18 @@ public abstract class DataSourceUtil {
      * @return the expected type of the uploaded file or files, never null.
      */
     public static FileStorageFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
-        if (fileItems == null || fileItems.isEmpty()) {
-            throw new DataSourceException("You must include some files to create an opportunity dataset.");
+        if (isNullOrEmpty(fileItems)) {
+            throw new DataSourceException("You must select some files to upload.");
         }
         Set<String> fileExtensions = extractFileExtensions(fileItems);
+        if (fileExtensions.isEmpty()) {
+            throw new DataSourceException("No file extensions seen, cannot detect upload type.");
+        }
+        checkFileCharacteristics(fileItems);
         if (fileExtensions.contains("zip")) {
             throw new DataSourceException("Upload of spatial .zip files not yet supported");
             // TODO unzip and process unzipped files - will need to peek inside to detect GTFS uploads first.
             // detectUploadFormatAndValidate(unzipped)
-        }
-        // There was at least one file with an extension, the set must now contain at least one extension.
-        if (fileExtensions.isEmpty()) {
-            throw new DataSourceException("No file extensions seen, cannot detect upload type.");
         }
         // Check that if upload contains any of the Shapefile sidecar files, it contains all of the required ones.
         final Set<String> shapefileExtensions = Sets.newHashSet("shp", "dbf", "prj");
@@ -71,7 +76,24 @@ public abstract class DataSourceUtil {
         throw new DataSourceException("Could not detect format of uploaded spatial data.");
     }
 
-    /** Given a list of FileItems, return a set of all unique file extensions present, normalized to lower case. */
+    /**
+     * Check that all FileItems supplied are stored in disk files (not memory), that they are all readable and all
+     * have nonzero size.
+     */
+    private static void checkFileCharacteristics (List<FileItem> fileItems) {
+        for (FileItem fileItem : fileItems) {
+            checkState(fileItem instanceof DiskFileItem);
+            File diskFile = ((DiskFileItem)fileItem).getStoreLocation();
+            checkState(diskFile.exists());
+            checkState(diskFile.canRead());
+            checkState(diskFile.length() > 0);
+        }
+    }
+
+    /**
+     * Given a list of FileItems, return a set of all unique file extensions present, normalized to lower case.
+     * Always returns a set instance which may be empty, but never null.
+     */
     private static Set<String> extractFileExtensions (List<FileItem> fileItems) {
         Set<String> fileExtensions = new HashSet<>();
         for (FileItem fileItem : fileItems) {
@@ -89,16 +111,10 @@ public abstract class DataSourceUtil {
     private static void verifyBaseNamesSame (List<FileItem> fileItems) {
         String firstBaseName = null;
         for (FileItem fileItem : fileItems) {
-            String fileName = fileItem.getName();
-            // Special case for .shp.xml files, which will otherwise fail this check
-            if ("xml".equalsIgnoreCase(FilenameUtils.getExtension(fileName))) {
-                fileName = FilenameUtils.getBaseName(fileName);
-            }
-            String baseName = FilenameUtils.getBaseName(fileName);
+            String baseName = FilenameUtils.getBaseName(fileItem.getName());
             if (firstBaseName == null) {
                 firstBaseName = baseName;
-            }
-            if (!firstBaseName.equals(baseName)) {
+            } else if (!firstBaseName.equals(baseName)) {
                 throw new DataSourceException("In a shapefile upload, all files must have the same base name.");
             }
         }

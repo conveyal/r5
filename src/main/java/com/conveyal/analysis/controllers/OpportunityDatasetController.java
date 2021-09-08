@@ -55,7 +55,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.datasource.SpatialLayers.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;

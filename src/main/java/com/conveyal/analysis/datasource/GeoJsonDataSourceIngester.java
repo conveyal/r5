@@ -7,6 +7,7 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader.GeometryType;
 import org.geotools.data.Query;
+import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;

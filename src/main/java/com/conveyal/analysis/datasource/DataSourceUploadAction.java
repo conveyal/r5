@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.conveyal.analysis.util.HttpUtils.getFormField;
-import static com.conveyal.analysis.datasource.SpatialLayers.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.google.common.base.Preconditions.checkNotNull;

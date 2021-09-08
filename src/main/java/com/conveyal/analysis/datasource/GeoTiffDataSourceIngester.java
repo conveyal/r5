@@ -63,6 +63,7 @@ public class GeoTiffDataSourceIngester extends DataSourceIngester {
         MathTransform wgsToCoverage, coverageToWgs;
         ReferencedEnvelope wgsEnvelope;
         try {
+            // These two transforms are not currently used - find them just to fail fast if GeoTools does not understand.
             wgsToCoverage = CRS.findMathTransform(DefaultGeographicCRS.WGS84, coverageCrs);
             coverageToWgs = wgsToCoverage.inverse();
             // Envelope in coverage CRS is not necessarily aligned with axes when transformed to WGS84.

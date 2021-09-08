@@ -27,8 +27,8 @@ public enum FileStorageFormat {
     // See requirement 3 http://www.geopackage.org/spec130/#_file_extension_name
     GEOPACKAGE("gpkg", "application/geopackage+sqlite3");
 
-    // These should not be serialized into Mongo. Default Enum codec uses String name() and valueOf(String).
-    // TODO clarify whether the extension is used for backend storage, or for detecting type up uploaded files.
+    // These fields will not be serialized into Mongo.
+    // The default codec to serialize Enums into BSON for Mongo uses String name() and valueOf(String).
     // TODO array of file extensions, with the first one used canonically in FileStorage and the others for detection.
     public final String extension;
     public final String mimeType;

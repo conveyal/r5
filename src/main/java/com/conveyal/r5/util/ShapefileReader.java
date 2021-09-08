@@ -1,6 +1,5 @@
 package com.conveyal.r5.util;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.analysis.datasource.SpatialAttribute;
 import org.geotools.data.DataStore;
@@ -40,10 +39,6 @@ import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.LINE;
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.POINT;
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 
 /**
  * Encapsulate Shapefile reading logic

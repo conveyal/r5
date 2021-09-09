@@ -18,7 +18,6 @@ import spark.Request;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
 
 import static com.conveyal.analysis.persistence.AnalysisCollection.MONGO_PROP_ACCESS_GROUP;
 

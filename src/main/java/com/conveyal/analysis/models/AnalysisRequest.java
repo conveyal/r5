@@ -11,13 +11,13 @@ import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -154,11 +154,11 @@ public class AnalysisRequest {
     /**
      * Create the R5 `Scenario` from this request.
      */
-    public Scenario createScenario (String accessGroup) {
-        DBObject query = "all".equals(scenarioId)
-                ? QueryBuilder.start("projectId").is(projectId).get()
-                : QueryBuilder.start("_id").in(modificationIds).get();
-        List<com.conveyal.analysis.models.Modification> modifications = Persistence.modifications.findPermitted(query, accessGroup);
+    public Scenario createScenario (UserPermissions userPermissions) {
+        QueryBuilder query = "all".equals(scenarioId)
+                ? QueryBuilder.start("projectId").is(projectId)
+                : QueryBuilder.start("_id").in(modificationIds);
+        Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), userPermissions);
         // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
         String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
         String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
@@ -181,10 +181,10 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public void populateTask (AnalysisWorkerTask task, String accessGroup) {
+    public void populateTask (AnalysisWorkerTask task, UserPermissions userPermissions) {
         if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
 
-        task.scenario = createScenario(accessGroup);
+        task.scenario = createScenario(userPermissions);
         task.graphId = bundleId;
         task.workerVersion = workerVersion;
         task.maxFare = maxFare;

@@ -133,12 +133,8 @@ public class BrokerController implements HttpController {
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
-        analysisRequest.populateTask(task, accessGroup);
+        analysisRequest.populateTask(task, userPermissions);
 
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
-        // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest
-                .populateTask(new TravelTimeSurfaceTask(), project, userPermissions);
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
             // Look up all destination opportunity data sets from the database and derive their storage keys.
@@ -173,8 +169,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, analysisRequest.projectId, analysisRequest.regionId);
-            WorkerTags workerTags = new WorkerTags(userPermissions, project._id, project.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.projectId, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");

@@ -376,11 +376,7 @@ public class RegionalAnalysisController implements HttpController {
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
         RegionalTask task = new RegionalTask();
-        analysisRequest.populateTask(task, accessGroup);
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
-        // TODO now this is setting cutoffs and percentiles in the regional (template) task.
-        //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = (RegionalTask) analysisRequest.populateTask(new RegionalTask(), project, userPermissions);
+        analysisRequest.populateTask(task, userPermissions);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
         if (!analysisRequest.makeTauiSite) {
@@ -477,11 +473,8 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.west = task.west;
         regionalAnalysis.width = task.width;
 
-        regionalAnalysis.accessGroup = accessGroup;
-        regionalAnalysis.bundleId = analysisRequest.bundleId;
-        regionalAnalysis.createdBy = email;
         regionalAnalysis.accessGroup = userPermissions.accessGroup;
-        regionalAnalysis.bundleId = project.bundleId;
+        regionalAnalysis.bundleId = analysisRequest.bundleId;
         regionalAnalysis.createdBy = userPermissions.email;
         regionalAnalysis.destinationPointSetIds = analysisRequest.destinationPointSetIds;
         regionalAnalysis.name = analysisRequest.name;

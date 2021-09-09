@@ -1,11 +1,11 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.JsonViews;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
+import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.util.JsonUtil;
@@ -35,6 +35,7 @@ public class Persistence {
     private static DB db;
 
     public static MongoMap<Modification> modifications;
+    public static MongoMap<Project> projects;
     public static MongoMap<Bundle> bundles;
     public static MongoMap<Region> regions;
     public static MongoMap<RegionalAnalysis> regionalAnalyses;
@@ -52,6 +53,7 @@ public class Persistence {
         }
         db = mongo.getDB(config.databaseName());
         modifications = getTable("modifications", Modification.class);
+        projects = getTable("projects", Project.class);
         bundles = getTable("bundles", Bundle.class);
         regions = getTable("regions", Region.class);
         regionalAnalyses = getTable("regional-analyses", RegionalAnalysis.class);
@@ -61,6 +63,7 @@ public class Persistence {
     /** Connect to a Mongo table using MongoJack, which persists Java objects into Mongo. */
     private static <V extends Model> MongoMap<V> getTable (String name, Class clazz) {
         DBCollection collection = db.getCollection(name);
+        collection.find().next();
         ObjectMapper om = JsonUtil.getObjectMapper(JsonViews.Db.class, true);
         JacksonDBCollection<V, String> coll = JacksonDBCollection.wrap(collection, clazz, String.class, om);
         return new MongoMap<>(coll, clazz);

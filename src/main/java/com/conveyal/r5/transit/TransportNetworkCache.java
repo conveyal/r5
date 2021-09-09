@@ -4,7 +4,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
@@ -159,12 +159,9 @@ public class TransportNetworkCache {
      */
     private @Nonnull TransportNetwork buildNetwork (String networkId) {
         TransportNetwork network;
-
-        // Check if we have a new-format bundle with a JSON manifest.
-        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
-        if (fileStorage.exists(manifestFileKey)) {
-            LOG.debug("Detected new-format bundle with manifest.");
-            network = buildNetworkFromManifest(networkId);
+        FileStorageKey networkConfigKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
+        if (fileStorage.exists(networkConfigKey)) {
+            network = buildNetworkFromConfig(networkId);
         } else {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
             network = buildNetworkFromBundleZip(networkId);
@@ -237,43 +234,42 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Build a network from a JSON manifest in S3.
-     * A manifest describes the locations of files used to create a bundle.
+     * Build a network from a JSON TransportNetworkConfig in S3.
+     * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
-    private TransportNetwork buildNetworkFromManifest (String networkId) {
-        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, getManifestFilename(networkId));
-        File manifestFile = fileStorage.getFile(manifestFileKey);
-        BundleManifest manifest;
+    private TransportNetwork buildNetworkFromConfig (String networkId) {
+        FileStorageKey configFileKey = new FileStorageKey(BUNDLES, getNetworkConfigFilename(networkId));
+        File configFile = fileStorage.getFile(configFileKey);
+        TransportNetworkConfig config;
 
         try {
-            manifest = JsonUtilities.objectMapper.readValue(manifestFile, BundleManifest.class);
+            config = JsonUtilities.objectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
-            LOG.error("Error reading manifest", e);
-            return null;
+            throw new RuntimeException("Error reading TransportNetworkConfig.", e);
         }
         // FIXME duplicate code. All internal building logic should be encapsulated in a method like
         //  TransportNetwork.build(osm, gtfs1, gtfs2...)
-        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip so you've
+        // We currently have multiple copies of it, in buildNetworkFromConfig and buildNetworkFromBundleZip so you've
         // got to remember to do certain things like set the network ID of the network in multiple places in the code.
         // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
 
         TransportNetwork network = new TransportNetwork();
         network.scenarioId = networkId;
         network.streetLayer = new StreetLayer();
-        network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
-        if (manifest.ltsDataSource != null) {
+        network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
+        if (config.ltsDataSource != null) {
             // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded
             // code. Maybe some of that labeling and cleanup should be deferred until after the edges already exist.
-            File ltsShapefile = fileStorage.getFile(new FileStorageKey(DATASOURCES, manifest.ltsDataSource, "shp"));
-            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), manifest.ltsAttributeName);
+            File ltsShapefile = fileStorage.getFile(new FileStorageKey(DATASOURCES, config.ltsDataSource, "shp"));
+            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), config.ltsAttributeName);
         }
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
         network.transitLayer = new TransitLayer();
 
-        manifest.gtfsIds.stream()
+        config.gtfsIds.stream()
                 .map(gtfsCache::get)
                 .forEach(network.transitLayer::loadFromGtfs);
 
@@ -290,7 +286,7 @@ public class TransportNetworkCache {
         return network;
     }
 
-    private String getManifestFilename(String networkId) {
+    private String getNetworkConfigFilename (String networkId) {
         return GTFSCache.cleanId(networkId) + ".json";
     }
 

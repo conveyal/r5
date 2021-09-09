@@ -1,7 +1,6 @@
 package com.conveyal.r5.shapefile;
 
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.streets.StreetLayer;
 
 /**
@@ -29,7 +28,7 @@ public class ShapefileMatcherMain {
         OSM osm = new OSM(OSM_FILE + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(OSM_FILE);
-        StreetLayer streetLayer = new StreetLayer(new TNBuilderConfig());
+        StreetLayer streetLayer = new StreetLayer();
         streetLayer.loadFromOsm(osm);
         osm.close();
         return streetLayer;

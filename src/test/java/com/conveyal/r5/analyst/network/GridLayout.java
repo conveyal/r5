@@ -2,22 +2,16 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.PathResult;
-import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Envelope;
 
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -119,7 +113,7 @@ public class GridLayout {
     public TransportNetwork generateNetwork () {
         OSM osm = new GridOsmGenerator(this).generate();
         GTFSFeed gtfs = new GridGtfsGenerator(this).generate();
-        TransportNetwork network = TransportNetwork.fromInputs(new TNBuilderConfig(), osm, Stream.of(gtfs));
+        TransportNetwork network = TransportNetwork.fromInputs(osm, Stream.of(gtfs));
         // The usual analysis code path always applies a scenario, even an empty one to baseline cases.
         // We are not doing that here.
         // The steps below are taken when the TNCache loads or builds a network, but not in the network build methods.

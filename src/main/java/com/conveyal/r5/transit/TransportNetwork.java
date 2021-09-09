@@ -7,9 +7,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
@@ -20,8 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
@@ -116,8 +112,7 @@ public class TransportNetwork implements Serializable {
      */
     public static TransportNetwork fromFiles (
             String osmSourceFile,
-            List<String> gtfsSourceFiles,
-            TNBuilderConfig tnBuilderConfig
+            List<String> gtfsSourceFiles
     ) throws DuplicateFeedException {
         // Load OSM data into MapDB to pass into network builder.
         OSM osm = new OSM(osmSourceFile + ".mapdb");
@@ -125,7 +120,7 @@ public class TransportNetwork implements Serializable {
         osm.readFromFile(osmSourceFile);
         // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
         Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
-        return fromInputs(tnBuilderConfig, osm, feeds);
+        return fromInputs(osm, feeds);
     }
 
     /**
@@ -134,16 +129,12 @@ public class TransportNetwork implements Serializable {
      * directories etc. The supplied OSM object must have intersections already detected.
      * The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
      */
-    public static TransportNetwork fromInputs (TNBuilderConfig tnBuilderConfig, OSM osm, Stream<GTFSFeed> gtfsFeeds) {
-
-        System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
-        System.out.println(tnBuilderConfig);
-
+    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
         // Make street layer from OSM data in MapDB
-        StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
+        StreetLayer streetLayer = new StreetLayer();
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
@@ -153,10 +144,6 @@ public class TransportNetwork implements Serializable {
 
         // Build a street index to help associate transit stops and bike share stations with the street network.
         streetLayer.indexStreets();
-
-        if (tnBuilderConfig.bikeRentalFile != null) {
-            streetLayer.associateBikeSharing(tnBuilderConfig);
-        }
 
         // Load transit data
         TransitLayer transitLayer = new TransitLayer();
@@ -185,12 +172,6 @@ public class TransportNetwork implements Serializable {
         new TransferFinder(transportNetwork).findTransfers();
         new TransferFinder(transportNetwork).findParkRideTransfer();
 
-        // Store the supplied fare calculator, if any.
-        transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
-        if (transportNetwork.fareCalculator != null) {
-            transportNetwork.fareCalculator.transitLayer = transitLayer;
-        }
-
         return transportNetwork;
     }
 
@@ -198,9 +179,6 @@ public class TransportNetwork implements Serializable {
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
-        TNBuilderConfig builderConfig = null;
-        //This can exit program if json file has errors.
-        builderConfig = loadJson(new File(directory, BUILDER_CONFIG_FILENAME));
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
                 case GTFS:
@@ -226,33 +204,14 @@ public class TransportNetwork implements Serializable {
             LOG.error("An OSM PBF file is required to build a network.");
             return null;
         } else {
-            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
         }
     }
 
-    /**
-     * Open and parse the JSON file at the given path into a Jackson JSON tree. Comments and unquoted keys are allowed.
-     * Returns default config if the file does not exist,
-     * Returns null if the file contains syntax errors or cannot be parsed for some other reason.
-     * <p>
-     * We do not require any JSON config files to be present because that would get in the way of the simplest
-     * rapid deployment workflow. Therefore we return default config if file does not exist.
-     */
-    static TNBuilderConfig loadJson(File file) {
-        try (FileInputStream jsonStream = new FileInputStream(file)) {
-            TNBuilderConfig config = JsonUtilities.objectMapper
-                .readValue(jsonStream, TNBuilderConfig.class);
-            config.fillPath(file.getParent());
-            LOG.info("Found and loaded JSON configuration file '{}'", file);
-            return config;
-        } catch (FileNotFoundException ex) {
-            LOG.info("File '{}' is not present. Using default configuration.", file);
-            return TNBuilderConfig.defaultConfig();
-        } catch (Exception ex) {
-            LOG.error("Error while parsing JSON config file '{}': {}", file, ex.getMessage());
-            System.exit(42); // probably "should" be done with an exception
-            return null;
-        }
+    /** Establish a bidirectional reference between this TransportNetwork and the supplied fare calculator. */
+    public void setFareCalculator (InRoutingFareCalculator fareCalculator) {
+        this.fareCalculator = fareCalculator;
+        fareCalculator.transitLayer = transitLayer;
     }
 
     /**

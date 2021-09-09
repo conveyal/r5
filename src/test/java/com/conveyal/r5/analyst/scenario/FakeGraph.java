@@ -8,7 +8,6 @@ import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.ByteStreams;
 import org.mapdb.Fun;
@@ -64,7 +63,7 @@ public class FakeGraph {
                 gtfsFiles.add(gtfsFile.getAbsolutePath());
             }
 
-            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, new TNBuilderConfig());
+            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
             net.transitLayer.buildDistanceTables(null);
 
             // clean up

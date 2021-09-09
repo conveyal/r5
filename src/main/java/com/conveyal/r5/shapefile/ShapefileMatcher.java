@@ -1,7 +1,6 @@
 package com.conveyal.r5.shapefile;
 
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;

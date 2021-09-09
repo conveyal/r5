@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+
 import java.util.List;
 
 /**
@@ -16,6 +18,9 @@ public class BundleManifest {
 
     /** IDs of the GTFS files, for use with GTFSCache */
     public List<String> gtfsIds;
+
+    /** The fare calculator for analysis, if any. TODO this is not yet wired up to TransportNetwork.setFareCalculator. */
+    public InRoutingFareCalculator analysisFareCalculator;
 
     /** ID of the DataSource containing the elevation raster, if any. */
     public String elevationDataSource;

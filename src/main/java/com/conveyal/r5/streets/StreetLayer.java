@@ -16,7 +16,7 @@ import com.conveyal.r5.labeling.SpeedLabeler;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
@@ -52,7 +52,6 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -195,8 +194,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public boolean bikeSharing = false;
 
-    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
-        speedLabeler = new SpeedLabeler(tnBuilderConfig.speeds);
+    public StreetLayer() {
+        speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
     }
 
     /** Load street layer from an OSM-lib OSM DB */
@@ -1446,10 +1445,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Creates vertices to represent each bike rental station.
+     * CURRENTLY UNUSED. Should this be configuratble in the network build configuration?
      */
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) {
-        LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
-        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
+    public void associateBikeSharing(File bikeRentalFile) {
+        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(bikeRentalFile);
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
         bikeRentalStationMap = new TIntObjectHashMap<>(bikeRentalStations.size());
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());

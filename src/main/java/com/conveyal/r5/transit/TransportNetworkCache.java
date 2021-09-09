@@ -9,7 +9,6 @@ import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
@@ -261,7 +260,7 @@ public class TransportNetworkCache {
 
         TransportNetwork network = new TransportNetwork();
         network.scenarioId = networkId;
-        network.streetLayer = new StreetLayer(new TNBuilderConfig());
+        network.streetLayer = new StreetLayer();
         network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
         if (manifest.ltsDataSource != null) {
             // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded

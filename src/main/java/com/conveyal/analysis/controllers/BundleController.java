@@ -16,7 +16,7 @@ import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -93,8 +93,8 @@ public class BundleController implements HttpController {
      * Given a request containing an HTML form-based file upload (a multipart/form-data POST request), interpret each
      * of the uploaded items as a GTFS feed, processing the uploaded feeds into MapDB form. This provides at least
      * some form of basic validation that the feed can be loaded at all, then creates the Bundle object in MongoDB to
-     * represent the set of feeds, as well as a JSON "manifest" which is stored on S3 alongside the feeds so that
-     * workers know which feeds are grouped together as a Bundle. The Bundle object is returned so it can be
+     * represent the set of feeds, as well as a JSON TransportNetworkConfig which is stored on S3 alongside the feeds so
+     * that workers know which feeds are grouped together as a Bundle. The Bundle object is returned so it can be
      * communicated back to the client over HTTP. The processing of the feeds is done asynchronously, so the status
      * field of the Bundle will at first indicate that it is not complete. By polling these API endpoints a client
      * can see when the GTFS processing has finished, or whether any errors occurred.
@@ -232,7 +232,7 @@ public class BundleController implements HttpController {
                     bundle.east = bundleBounds.getMaxX();
                     bundle.west = bundleBounds.getMinX();
                 }
-                writeManifestToCache(bundle);
+                writeNetworkConfigToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
               } catch (Throwable t) {
                 LOG.error("Error creating bundle", t);
@@ -251,17 +251,17 @@ public class BundleController implements HttpController {
         return bundle;
     }
 
-    private void writeManifestToCache (Bundle bundle) throws IOException {
-        BundleManifest manifest = new BundleManifest();
-        manifest.osmId = bundle.osmId;
-        manifest.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
+    private void writeNetworkConfigToCache (Bundle bundle) throws IOException {
+        TransportNetworkConfig networkConfig = new TransportNetworkConfig();
+        networkConfig.osmId = bundle.osmId;
+        networkConfig.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
 
-        String manifestFileName = bundle._id + ".json";
-        File manifestFile = FileUtils.createScratchFile("json");
-        JsonUtil.objectMapper.writeValue(manifestFile, manifest);
+        String configFileName = bundle._id + ".json";
+        File configFile = FileUtils.createScratchFile("json");
+        JsonUtil.objectMapper.writeValue(configFile, networkConfig);
 
-        FileStorageKey key = new FileStorageKey(BUNDLES, manifestFileName);
-        fileStorage.moveIntoStorage(key, manifestFile);
+        FileStorageKey key = new FileStorageKey(BUNDLES, configFileName);
+        fileStorage.moveIntoStorage(key, configFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {

@@ -164,7 +164,7 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
 
         // This would re-build the street index and edge list, so we only rebuild indexes on the transit layer.
-        // However TransportNetworkCache#buildNetworkFromManifest does seem to call rebuild on the whole network.
+        // However TransportNetworkCache#buildNetworkFromConfig does seem to call rebuild on the whole network.
         // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 

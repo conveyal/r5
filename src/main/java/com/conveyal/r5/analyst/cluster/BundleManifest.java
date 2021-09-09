@@ -17,10 +17,13 @@ public class BundleManifest {
     /** IDs of the GTFS files, for use with GTFSCache */
     public List<String> gtfsIds;
 
-    /** ID of the elevation raster, if any, to be looked up as a resource. */
-    public String elevationRasterId;
+    /** ID of the DataSource containing the elevation raster, if any. */
+    public String elevationDataSource;
 
-    /** ID of the bicycle LTS shapefile, if any, to be looked up as a resource. */
-    public String ltsShapefile;
+    /** ID of the linear shapefile DataSource containing bicycle LTS to be matched to streets, if any. */
+    public String ltsDataSource;
+
+    /** The name of the numeric attribute within the ltsDataSource containing LTS values from 1-4. */
+    public String ltsAttributeName;
 
 }

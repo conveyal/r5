@@ -33,7 +33,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
-import static com.conveyal.file.FileCategory.RESOURCES;
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
@@ -261,15 +261,13 @@ public class TransportNetworkCache {
 
         TransportNetwork network = new TransportNetwork();
         network.scenarioId = networkId;
-        // TODO builderConfig - maybe even specifying elevation and LTS source IDs (which will be sought in RESOURCES)?
         network.streetLayer = new StreetLayer(new TNBuilderConfig());
         network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
-        if (manifest.ltsShapefile != null) {
+        if (manifest.ltsDataSource != null) {
             // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded
-            // code. Maybe some of this labeling and cleanup should be deferred until after the edges already exist.
-            // It's debatable whether this should be in the manifest.json, and how attribute name should be specified.
-            File ltsShapefile = fileStorage.getFile(new FileStorageKey(RESOURCES, manifest.ltsShapefile, "shp"));
-            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), "lts_ov");
+            // code. Maybe some of that labeling and cleanup should be deferred until after the edges already exist.
+            File ltsShapefile = fileStorage.getFile(new FileStorageKey(DATASOURCES, manifest.ltsDataSource, "shp"));
+            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), manifest.ltsAttributeName);
         }
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();

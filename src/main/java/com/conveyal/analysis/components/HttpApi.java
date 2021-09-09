@@ -9,8 +9,8 @@ import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.fileupload.FileUploadException;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -19,10 +19,14 @@ import spark.Response;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
+import static com.conveyal.analysis.AnalysisServerException.Type.FORBIDDEN;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
+import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
 
 /**
@@ -36,8 +40,6 @@ public class HttpApi implements Component {
     // These "attributes" are attached to an incoming HTTP request with String keys, making them available in handlers
     private static final String REQUEST_START_TIME_ATTRIBUTE = "requestStartTime";
     public static final String USER_PERMISSIONS_ATTRIBUTE = "permissions";
-    public static final String USER_EMAIL_ATTRIBUTE = "email";
-    public static final String USER_GROUP_ATTRIBUTE = "accessGroup";
 
     public interface Config {
         boolean offline (); // TODO remove this parameter, use different Components types instead
@@ -99,12 +101,9 @@ public class HttpApi implements Component {
             if (authorize) {
                 // Determine which user is sending the request, and which permissions that user has.
                 // This method throws an exception if the user cannot be authenticated.
-                // Store the resulting permissions object in the request so it can be examined by any handler.
                 UserPermissions userPermissions = authentication.authenticate(req);
+                // Store the resulting permissions object in the request so it can be examined by any handler.
                 req.attribute(USER_PERMISSIONS_ATTRIBUTE, userPermissions);
-                // TODO stop using these two separate attributes, and use the permissions object directly
-                req.attribute(USER_EMAIL_ATTRIBUTE, userPermissions.email);
-                req.attribute(USER_GROUP_ATTRIBUTE, userPermissions.accessGroup);
             }
         });
 
@@ -114,7 +113,7 @@ public class HttpApi implements Component {
             Instant requestStartTime = req.attribute(REQUEST_START_TIME_ATTRIBUTE);
             Duration elapsed = Duration.between(requestStartTime, Instant.now());
             eventBus.send(new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis())
-                    .forUser(req.attribute(USER_PERMISSIONS_ATTRIBUTE)));
+                    .forUser(UserPermissions.from(req)));
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).
@@ -137,20 +136,7 @@ public class HttpApi implements Component {
         // Can we consolidate all these exception handlers and get rid of the hard-wired "BAD_REQUEST" parameters?
 
         sparkService.exception(AnalysisServerException.class, (e, request, response) -> {
-            // Include a stack trace, except when the error is known to be about unauthenticated or unauthorized access,
-            // in which case we don't want to leak information about the server to people scanning it for weaknesses.
-            if (e.type == AnalysisServerException.Type.UNAUTHORIZED ||
-                e.type == AnalysisServerException.Type.FORBIDDEN
-            ){
-                JSONObject body = new JSONObject();
-                body.put("type", e.type.toString());
-                body.put("message", e.message);
-                response.status(e.httpCode);
-                response.type("application/json");
-                response.body(body.toJSONString());
-            } else {
-                respondToException(e, request, response, e.type, e.message, e.httpCode);
-            }
+            respondToException(e, request, response, e.type, e.message, e.httpCode);
         });
 
         sparkService.exception(IOException.class, (e, request, response) -> {
@@ -176,17 +162,21 @@ public class HttpApi implements Component {
                                     AnalysisServerException.Type type, String message, int code) {
 
         // Stacktrace in ErrorEvent reused below to avoid repeatedly generating String of stacktrace.
-        ErrorEvent errorEvent = new ErrorEvent(e);
+        ErrorEvent errorEvent = new ErrorEvent(e, request.pathInfo());
         eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
 
-        JSONObject body = new JSONObject();
-        body.put("type", type.toString());
-        body.put("message", message);
-        body.put("stackTrace", errorEvent.stackTrace);
+        ObjectNode body = JsonUtil.objectNode()
+                .put("type", type.toString())
+                .put("message", message);
 
+        // Include a stack trace except when the error is known to be about unauthenticated or unauthorized access,
+        // in which case we don't want to leak information about the server to people scanning it for weaknesses.
+        if (type != UNAUTHORIZED && type != FORBIDDEN) {
+            body.put("stackTrace", errorEvent.stackTrace);
+        }
         response.status(code);
         response.type("application/json");
-        response.body(body.toJSONString());
+        response.body(JsonUtil.toJsonString(body));
     }
 
     // Maybe this should be done or called with a JVM shutdown hook

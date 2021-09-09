@@ -46,6 +46,8 @@ public class AnalysisServerException extends RuntimeException {
         return new AnalysisServerException(Type.NOT_FOUND, message, 404);
     }
 
+    // Note that there is a naming mistake in the HTTP codes. 401 "unauthorized" actually means "unauthenticated".
+    // 403 "forbidden" is what is usually referred to as "unauthorized" in other contexts.
     public static AnalysisServerException unauthorized(String message) {
         return new AnalysisServerException(Type.UNAUTHORIZED, message, 401);
     }

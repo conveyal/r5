@@ -60,6 +60,8 @@ public interface FileStorage {
 
     /**
      * Delete the File identified by the FileStorageKey, in both the local cache and any remote mirror.
+     * Due to some pre-existing code, implementations must tolerate calling this method on files that don't exist
+     * without throwing exceptions.
      */
     void delete(FileStorageKey fileStorageKey);
 

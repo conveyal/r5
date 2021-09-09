@@ -8,7 +8,8 @@ public interface ProgressListener {
 
     /**
      * Call this method once at the beginning of a new task, specifying how many sub-units of work will be performed.
-     * This does not allow for subsequently starting sub-tasks that use the same ProgressListener while progress is
+     * If totalElements is zero or negative, any previously set total number of elements remains unchanged.
+     * This allows for subsequently starting named sub-tasks that use the same ProgressListener while progress is
      * still being reported. Any recursion launching sub-tasks will need to be head- or tail-recursion, launched before
      * you call beginTask or after the last unit of work is complete.
      * Rather than implementing some kind of push/pop mechanism, we may eventually have some kind of nested task system,
@@ -24,5 +25,15 @@ public interface ProgressListener {
     default void increment () {
         increment(1);
     }
+
+    /**
+     * We want WorkProducts to be revealed by a TaskAction even in the case of exception or failure (to report complex
+     * structured error or validation information). Returning them from the action method will not work in case of an
+     * unexpected exception. Adding them to the background Task with a fluent method is also problematic as it requires
+     * the caller to construct or otherwise hold a reference to the product to get its ID before the action is run. It's
+     * preferable for the product to be fully encapsulated in the action, so it's reported as park of the task progress.
+     * On the other hand, creating the product within the TaskAction usually requires it to hold a UserPermissions.
+     */
+    default void setWorkProduct (WorkProduct workProduct) { /* Default is no-op */ }
 
 }

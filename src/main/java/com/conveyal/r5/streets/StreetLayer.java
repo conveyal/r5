@@ -29,7 +29,6 @@ import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import org.geotools.geojson.geom.GeometryJSON;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -1536,24 +1535,6 @@ public class StreetLayer implements Serializable, Cloneable {
             return null;
         } else {
             return result;
-        }
-    }
-
-    /**
-     * Given a JTS Geometry in fixed-point latitude and longitude, log it as floating-point GeoJSON.
-     */
-    public static void logFixedPointGeometry (String label, Geometry fixedPointGeometry) {
-        if (fixedPointGeometry == null){
-            LOG.info("{} is null.", label);
-        } else if (fixedPointGeometry.isEmpty()) {
-            LOG.info("{} is empty.", label);
-        } else {
-            String geoJson = new GeometryJSON().toString(fixedDegreeGeometryToFloating(fixedPointGeometry));
-            if (geoJson == null) {
-                LOG.info("Could not convert non-null geometry to GeoJSON");
-            } else {
-                LOG.info("{} {}", label, geoJson);
-            }
         }
     }
 

@@ -125,6 +125,11 @@ repositories {
     maven { url 'https://nexus.axiomalaska.com/nexus/content/repositories/public-releases' }
 }
 
+// Exclude all JUnit 4 transitive dependencies - IntelliJ bug causes it to think we're using Junit 4 instead of 5.
+configurations.all {
+    exclude group: "junit", module: "junit"
+}
+
 dependencies {
     // Provides our logging API
     implementation 'org.slf4j:slf4j-api:1.7.30'
@@ -154,13 +159,14 @@ dependencies {
     implementation 'com.beust:jcommander:1.30'
 
     // GeoTools provides GIS functionality on top of JTS topology suite.
-    def geotoolsVersion = '21.2'
+    def geotoolsVersion = '25.2'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-main'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-opengis'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-referencing'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-shapefile'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-coverage'
-    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojson'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geojsondatastore'
+    implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geopkg'
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-geotiff'
     // Provides the EPSG coordinate reference system catalog as an HSQL database.
     implementation group: 'org.geotools', version: geotoolsVersion, name: 'gt-epsg-hsql'

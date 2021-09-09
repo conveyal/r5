@@ -127,8 +127,7 @@ public class BrokerController implements HttpController {
         // The accessgroup stuff is copypasta from the old single point controller.
         // We already know the user is authenticated, and we need not check if they have access to the graphs etc,
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
-        final String accessGroup = request.attribute("accessGroup");
-        final String userEmail = request.attribute("email");
+        UserPermissions userPermissions = UserPermissions.from(request);
         final long startTimeMsec = System.currentTimeMillis();
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
@@ -136,6 +135,10 @@ public class BrokerController implements HttpController {
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
         analysisRequest.populateTask(task, accessGroup);
 
+        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
+        // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
+        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest
+                .populateTask(new TravelTimeSurfaceTask(), project, userPermissions);
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
             // Look up all destination opportunity data sets from the database and derive their storage keys.
@@ -146,7 +149,7 @@ public class BrokerController implements HttpController {
             for (String destinationPointSetId : analysisRequest.destinationPointSetIds) {
                 OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
                         destinationPointSetId,
-                        accessGroup
+                        userPermissions
                 );
                 checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
                 opportunityDatasets.add(opportunityDataset);
@@ -171,6 +174,7 @@ public class BrokerController implements HttpController {
         if (address == null) {
             // There are no workers that can handle this request. Request some.
             WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, analysisRequest.projectId, analysisRequest.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, project._id, project.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
@@ -211,7 +215,7 @@ public class BrokerController implements HttpController {
                         analysisRequest.bundleId,
                         analysisRequest.regionId,
                         durationMsec
-                    ).forUser(userEmail, accessGroup)
+                    ).forUser(userPermissions)
                 );
             }
             // If you return a stream to the Spark Framework, its SerializerChain will copy that stream out to the
@@ -366,7 +370,7 @@ public class BrokerController implements HttpController {
     }
 
     private static void enforceAdmin (Request request) {
-        if (!request.<UserPermissions>attribute("permissions").admin) {
+        if (!UserPermissions.from(request).admin) {
             throw AnalysisServerException.forbidden("You do not have access.");
         }
     }

@@ -1,5 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.RegionalAnalysis;
 
 /**
@@ -20,6 +21,10 @@ public class WorkerTags {
 
     /** The UUID for the region. */
     public final String regionId;
+
+    public WorkerTags (UserPermissions userPermissions, String projectId, String regionId) {
+        this(userPermissions.accessGroup, userPermissions.email, projectId, regionId);
+    }
 
     public WorkerTags (String group, String user, String projectId, String regionId) {
         this.group = group;

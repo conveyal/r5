@@ -1,6 +1,7 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;

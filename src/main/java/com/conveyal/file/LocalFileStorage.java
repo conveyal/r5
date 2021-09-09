@@ -9,6 +9,11 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.Set;
+
+import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
+import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
 
 /**
  * This implementation of FileStorage stores files in a local directory hierarchy and does not mirror anything to
@@ -38,7 +43,7 @@ public class LocalFileStorage implements FileStorage {
      * Move the File into the FileStorage by moving the passed in file to the Path represented by the FileStorageKey.
      */
     @Override
-    public void moveIntoStorage(FileStorageKey key, File file) {
+    public void moveIntoStorage(FileStorageKey key, File sourceFile) {
         // Get a pointer to the local file
         File storedFile = getFile(key);
         // Ensure the directories exist
@@ -46,16 +51,18 @@ public class LocalFileStorage implements FileStorage {
         try {
             try {
                 // Move the temporary file to the permanent file location.
-                Files.move(file.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.move(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (FileSystemException e) {
                 // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so certain files (e.g.
                 // mapdb) cannot be moved or deleted. This workaround may cause temporary files to accumulate, but it
                 // should not be triggered for default Linux filesystems (ext).
                 // See https://github.com/jankotek/MapDB/issues/326
-                Files.copy(file.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
-                        file.getName());
+                        sourceFile.getName());
             }
+            // Set the file to be read-only and accessible only by the current user.
+            Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -83,7 +90,18 @@ public class LocalFileStorage implements FileStorage {
 
     @Override
     public void delete (FileStorageKey key) {
-        getFile(key).delete();
+        try {
+            File storedFile = getFile(key);
+            if (storedFile.exists()) {
+                // File permissions are set read-only to prevent corruption, so must be changed to allow deletion.
+                Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ, OWNER_WRITE));
+                storedFile.delete();
+            } else {
+                LOG.warn("Attempted to delete non-existing file: " + storedFile);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Exception while deleting stored file.", e);
+        }
     }
 
     @Override

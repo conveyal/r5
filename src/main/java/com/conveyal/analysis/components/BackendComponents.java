@@ -12,6 +12,7 @@ import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
+import com.conveyal.analysis.controllers.DataSourceController;
 import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
@@ -87,8 +88,8 @@ public abstract class BackendComponents {
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
                 new RegionalAnalysisController(broker, fileStorage),
-                new AggregationAreaController(fileStorage),
                 new FileStorageController(fileStorage, database),
+                new AggregationAreaController(fileStorage, database, taskScheduler),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
                 // is exempted from authentication and authorization, but should be hidden from the world
                 // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
@@ -96,7 +97,8 @@ public abstract class BackendComponents {
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
-                new GtfsTileController(gtfsCache)
+                new GtfsTileController(gtfsCache),
+                new DataSourceController(fileStorage, database, taskScheduler, censusExtractor)
         );
     }
 

@@ -5,6 +5,9 @@ package com.conveyal.r5.analyst.progress;
  * It's a single-method interface so it can be defined with lambda functions, or other objects can implement it.
  * When the action is run, it will receive an object implementing an interface through which it can report progress
  * and errors.
+ *
+ * Alteratively, TaskAction could have more methods: return a title, heaviness, user details, etc. to be seen by Task,
+ * instead of having only one method to make it a functional interface. I'd like to discourage anonymous functions anyway.
  */
 public interface TaskAction {
 

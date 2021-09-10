@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           repository: conveyal/analysis-ui
-          ref: 8218cfeb98962c25841daf7db0791443a743b707
+          ref: 68040a2e83039539d47b43fc204cfadcdb795cb5
           path: ui
       - uses: actions/checkout@v2
         with:

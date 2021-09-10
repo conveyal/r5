@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -259,9 +261,9 @@ public class TransportNetworkCache {
         network.streetLayer = new StreetLayer();
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
         if (config.ltsDataSource != null) {
+            File ltsShapefile = prefetchShapefile(fileStorage, config.ltsDataSource);
             // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded
             // code. Maybe some of that labeling and cleanup should be deferred until after the edges already exist.
-            File ltsShapefile = fileStorage.getFile(new FileStorageKey(DATASOURCES, config.ltsDataSource, "shp"));
             new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), config.ltsAttributeName);
         }
         network.streetLayer.parentNetwork = network;
@@ -284,6 +286,30 @@ public class TransportNetworkCache {
         transferFinder.findParkRideTransfer();
 
         return network;
+    }
+
+    /**
+     * Return a File for the .shp file with the given dataSourceId, ensuring all associated sidecar files are local.
+     * Shapefiles are usually accessed using only the .shp file's name. The reading code will look for sidecar files of
+     * the same name in the same filesystem directory. If only the .shp is requested from the FileStorage it will not
+     * pull down any of the associated sidecar files from cloud storage. This method will ensure that they are all on
+     * the local filesystem before we try to read the .shp.
+     */
+    public static File prefetchShapefile (FileStorage fileStorage, String dataSourceId) {
+        // TODO Clarify FileStorage semantics: which methods cause files to be pulled down;
+        //      which methods tolerate non-existing file and how do they react?
+        for (String extension : List.of("shp", "shx", "dbf", "prj")) {
+            FileStorageKey subfileKey = new FileStorageKey(DATASOURCES, dataSourceId, extension);
+            if (fileStorage.exists(subfileKey)) {
+                fileStorage.getFile(subfileKey);
+            } else {
+                if (!extension.equals("shx")) {
+                    String filename = String.join(".", dataSourceId, extension);
+                    throw new DataSourceException("Required shapefile sub-file was not found: " + filename);
+                }
+            }
+        }
+        return fileStorage.getFile(new FileStorageKey(DATASOURCES, dataSourceId, "shp"));
     }
 
     private String getNetworkConfigFilename (String networkId) {

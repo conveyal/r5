@@ -98,6 +98,22 @@ public class GTFSCache {
         return feed;
     }
 
+    /**
+     * Retrieve the feed with the given id, lazily creating it if it's not yet loaded or built. Does not actually use
+     * the cache - each caller will get a fresh GTFSFeed object wrapping a fresh MapDB instance.
+     * The caller must close this GTFSFeed when it's done using it!
+     * NOTE this introduces a race condition where the .db is built from the .zip. Multiple threads could
+     * cause this to happen at once if no .db exists, and they would all try to move their files to storage.
+     */
+    public @Nonnull GTFSFeed getBypassingCache (String id) {
+        GTFSFeed feed = retrieveAndProcessFeed(id);
+        if (feed == null) {
+            throw new IllegalStateException("Cache should always return a feed or throw an exception.");
+        }
+        feed.uniqueId = id;
+        return feed;
+    }
+
     /** This method should only ever be called by the cache loader. */
     private @Nonnull GTFSFeed retrieveAndProcessFeed(String id) throws GtfsLibException {
         FileStorageKey dbKey = getFileKey(id, "db");

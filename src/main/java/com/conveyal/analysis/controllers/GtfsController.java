@@ -69,7 +69,8 @@ public class GtfsController implements HttpController {
 
     private GTFSFeed getFeedFromRequest (Request req) {
         String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
-        return gtfsCache.get(bundleScopedFeedId);
+        // return gtfsCache.get(bundleScopedFeedId);
+        return gtfsCache.getBypassingCache(bundleScopedFeedId);
     }
 
     static class RouteApiResponse extends BaseApiResponse {
@@ -92,18 +93,20 @@ public class GtfsController implements HttpController {
 
     private RouteApiResponse getRoute(Request req, Response res) {
         addImmutableResponseHeader(res);
-        GTFSFeed feed = getFeedFromRequest(req);
-        return new RouteApiResponse(feed.routes.get(req.params("routeId")));
+        try (GTFSFeed feed = getFeedFromRequest(req)) {
+            return new RouteApiResponse(feed.routes.get(req.params("routeId")));
+        }
     }
 
     private List<RouteApiResponse> getRoutes(Request req, Response res) {
         addImmutableResponseHeader(res);
-        GTFSFeed feed = getFeedFromRequest(req);
-        return feed.routes
-                .values()
-                .stream()
-                .map(RouteApiResponse::new)
-                .collect(Collectors.toList());
+        try (GTFSFeed feed = getFeedFromRequest(req)) {
+            return feed.routes
+                    .values()
+                    .stream()
+                    .map(RouteApiResponse::new)
+                    .collect(Collectors.toList());
+        }
     }
 
     static class PatternApiResponse extends BaseApiResponse {
@@ -130,14 +133,15 @@ public class GtfsController implements HttpController {
 
     private List<PatternApiResponse> getPatternsForRoute (Request req, Response res) {
         addImmutableResponseHeader(res);
-        GTFSFeed feed = getFeedFromRequest(req);
-        final String routeId = req.params("routeId");
-        return feed.patterns
-                .values()
-                .stream()
-                .filter(p -> Objects.equals(p.route_id, routeId))
-                .map(PatternApiResponse::new)
-                .collect(Collectors.toList());
+        try (GTFSFeed feed = getFeedFromRequest(req)) {
+            final String routeId = req.params("routeId");
+            return feed.patterns
+                    .values()
+                    .stream()
+                    .filter(p -> Objects.equals(p.route_id, routeId))
+                    .map(PatternApiResponse::new)
+                    .collect(Collectors.toList());
+        }
     }
 
     static class StopApiResponse extends BaseApiResponse {
@@ -153,8 +157,9 @@ public class GtfsController implements HttpController {
 
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
         addImmutableResponseHeader(res);
-        GTFSFeed feed = getFeedFromRequest(req);
-        return feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
+        try (GTFSFeed feed = getFeedFromRequest(req)) {
+            return feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
+        }
     }
 
     static class FeedGroupStopsApiResponse {
@@ -211,14 +216,15 @@ public class GtfsController implements HttpController {
 
     private List<TripApiResponse> getTripsForRoute (Request req, Response res) {
         addImmutableResponseHeader(res);
-        final GTFSFeed feed = getFeedFromRequest(req);
-        final String routeId = req.params("routeId");
-        return feed.trips
-                .values().stream()
-                .filter(t -> Objects.equals(t.route_id, routeId))
-                .map(t -> new TripApiResponse(feed, t))
-                .sorted(Comparator.comparingInt(t -> t.startTime))
-                .collect(Collectors.toList());
+        try (GTFSFeed feed = getFeedFromRequest(req)) {
+            final String routeId = req.params("routeId");
+            return feed.trips
+                    .values().stream()
+                    .filter(t -> Objects.equals(t.route_id, routeId))
+                    .map(t -> new TripApiResponse(feed, t))
+                    .sorted(Comparator.comparingInt(t -> t.startTime))
+                    .collect(Collectors.toList());
+        }
     }
 
     @Override

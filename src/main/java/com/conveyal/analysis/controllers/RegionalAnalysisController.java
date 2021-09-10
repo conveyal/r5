@@ -7,7 +7,6 @@ import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
@@ -374,13 +373,13 @@ public class RegionalAnalysisController implements HttpController {
         }
 
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = (RegionalTask) analysisRequest.populateTask(new RegionalTask(), project, userPermissions);
+        RegionalTask task = new RegionalTask();
+        analysisRequest.populateTask(task, userPermissions);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
-        if (! analysisRequest.makeTauiSite) {
+        if (!analysisRequest.makeTauiSite) {
             checkNotNull(analysisRequest.destinationPointSetIds);
             checkState(analysisRequest.destinationPointSetIds.length > 0,
                 "At least one destination pointset ID must be supplied.");
@@ -475,13 +474,13 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.width = task.width;
 
         regionalAnalysis.accessGroup = userPermissions.accessGroup;
-        regionalAnalysis.bundleId = project.bundleId;
+        regionalAnalysis.bundleId = analysisRequest.bundleId;
         regionalAnalysis.createdBy = userPermissions.email;
         regionalAnalysis.destinationPointSetIds = analysisRequest.destinationPointSetIds;
         regionalAnalysis.name = analysisRequest.name;
         regionalAnalysis.projectId = analysisRequest.projectId;
-        regionalAnalysis.regionId = project.regionId;
-        regionalAnalysis.variant = analysisRequest.variantIndex;
+        regionalAnalysis.regionId = analysisRequest.regionId;
+        regionalAnalysis.scenarioId = analysisRequest.scenarioId;
         regionalAnalysis.workerVersion = analysisRequest.workerVersion;
         regionalAnalysis.zoom = task.zoom;
 

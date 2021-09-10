@@ -11,7 +11,6 @@ import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
@@ -130,11 +129,12 @@ public class BrokerController implements HttpController {
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
         UserPermissions userPermissions = UserPermissions.from(request);
         final long startTimeMsec = System.currentTimeMillis();
+
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, userPermissions);
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest
-                .populateTask(new TravelTimeSurfaceTask(), project, userPermissions);
+        TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
+        analysisRequest.populateTask(task, userPermissions);
+
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
             // Look up all destination opportunity data sets from the database and derive their storage keys.
@@ -169,7 +169,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(userPermissions, project._id, project.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.projectId, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
@@ -206,9 +206,9 @@ public class BrokerController implements HttpController {
             if (response.status() == 200) {
                 int durationMsec = (int) (System.currentTimeMillis() - startTimeMsec);
                 eventBus.send(new SinglePointEvent(
-                        task.scenarioId,
-                        analysisRequest.projectId,
-                        analysisRequest.variantIndex,
+                        analysisRequest.scenarioId,
+                        analysisRequest.bundleId,
+                        analysisRequest.regionId,
                         durationMsec
                     ).forUser(userPermissions)
                 );

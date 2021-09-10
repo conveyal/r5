@@ -1,7 +1,6 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
@@ -9,6 +8,7 @@ import com.conveyal.analysis.components.eventbus.HttpApiEvent;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
+import com.conveyal.r5.SoftwareVersion;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.fileupload.FileUploadException;
 import org.slf4j.Logger;
@@ -19,9 +19,7 @@ import spark.Response;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
 import static com.conveyal.analysis.AnalysisServerException.Type.FORBIDDEN;

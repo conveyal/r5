@@ -19,7 +19,7 @@ public class WorkerTags {
     /** The UUID for the project. */
     public final String projectId;
 
-    /** The UUID for the project. */
+    /** The UUID for the region. */
     public final String regionId;
 
     public WorkerTags (UserPermissions userPermissions, String projectId, String regionId) {

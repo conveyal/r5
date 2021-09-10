@@ -3,7 +3,6 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -46,7 +45,6 @@ public abstract class BackendMain {
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
         // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
-        ApiMain.initialize(components.gtfsCache);
         PointSetCache.initializeStatically(components.fileStorage);
 
         // TODO handle this via components without explicit "if (offline)"

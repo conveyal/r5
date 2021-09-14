@@ -147,8 +147,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
     public void action (ProgressListener progressListener) throws Exception {
 
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
-        String groupDescription = "Convert polygons to aggregation areas, " +
-                (mergePolygons ? "merging all polygons." : "one area per polygon.");
+        String groupDescription = "Aggregation areas from polygons";
         DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id.toString(), groupDescription);
 
         progressListener.beginTask("Reading data source", finalFeatures.size() + 1);

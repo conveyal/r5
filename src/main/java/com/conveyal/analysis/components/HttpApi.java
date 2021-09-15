@@ -83,27 +83,20 @@ public class HttpApi implements Component {
             // Record when the request started, so we can measure elapsed response time.
             req.attribute(REQUEST_START_TIME_ATTRIBUTE, Instant.now());
 
-            // Don't require authentication to view the main page, or for internal API endpoints contacted by workers.
-            // FIXME those internal endpoints should be hidden from the outside world by the reverse proxy.
-            //       Or now with non-static Spark we can run two HTTP servers on different ports.
-
-            // Set CORS headers, to allow requests to this API server from a frontend hosted on a different domain
+            // Set CORS headers to allow requests to this API server from a frontend hosted on a different domain.
             // This used to be hardwired to Access-Control-Allow-Origin: * but that leaves the server open to XSRF
             // attacks when authentication is disabled (e.g. when running locally).
-            if (config.allowOrigin() == null || config.allowOrigin().equals("null")) {
-                // Access-Control-Allow-Origin: null opens unintended security holes:
-                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-                throw new IllegalArgumentException("Access-Control-Allow-Origin should not be null");
-            }
-
             res.header("Access-Control-Allow-Origin", config.allowOrigin());
-            // for caching, signal to the browser that responses may be different based on origin
+            // For caching, signal to the browser that responses may be different based on origin.
+            // TODO clarify why this is important, considering that normally all requests come from the same origin.
             res.header("Vary", "Origin");
 
             // The default MIME type is JSON. This will be overridden by the few controllers that do not return JSON.
             res.type("application/json");
 
             // Do not require authentication for internal API endpoints contacted by workers or for OPTIONS requests.
+            // FIXME those internal endpoints should be hidden from the outside world by the reverse proxy.
+            //       Or now with non-static Spark we can run two HTTP servers on different ports.
             String method = req.requestMethod();
             String pathInfo = req.pathInfo();
             boolean authorize = pathInfo.startsWith("/api") && !"OPTIONS".equalsIgnoreCase(method);

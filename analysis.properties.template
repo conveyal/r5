@@ -9,11 +9,6 @@ database-uri=mongodb://localhost
 # The name of the database in the Mongo instance.
 database-name=analysis
 
-# The URL where the frontend is hosted.
-# In production this should point to a cached CDN for speed. e.g. https://d1uqjuy3laovxb.cloudfront.net
-# In staging this should be the underlying S3 URL so files are not cached and you see the most recent deployment.
-frontend-url=https://localhost
-
 # The S3 bucket where we can find tiles of the entire US census, built with Conveyal seamless-census.
 seamless-census-bucket=lodes-data-2014
 seamless-census-region=us-east-1
@@ -28,13 +23,9 @@ aws-region=eu-west-1
 # The port on which the server will listen for connections from clients and workers.
 server-port=7070
 
-# The origin where the frontend is hosted. Due to the same-origin policy, cross-origin requests are generally blocked.
-# However, setting this to an origin will add an Access-Control-Allow-Origin header to allow cross-origin requests from
-# that origin. For instance, when running locally, this will generally be http://localhost:3000. It is possible to set
-# this to *, but that allows requests from anywhere. While this should be relatively safe when authentication is enabled
-# since authentication is not handled through cookies, it does increase the attack surface and better practice is to set
-# this to the actual origin where the UI is hosted. This is different from frontend-url, since frontend-url is just where
-# the frontend code can be retrieved from, and may not even be a valid origin (e.g. if it has a path name).
+# The origin where the frontend is hosted. When running locally, this will generally be http://localhost:3000.
+# It should be relatively safe to set this to * (allowing requests from anywhere) when authentication is enabled.
+# This increases attack surface though, so it is preferable to set this to the specific origin where the UI is hosted.
 access-control-allow-origin=http://localhost:3000
 
 # A temporary location to store scratch files. The path can be absolute or relative.

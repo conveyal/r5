@@ -28,6 +28,15 @@ aws-region=eu-west-1
 # The port on which the server will listen for connections from clients and workers.
 server-port=7070
 
+# The origin where the frontend is hosted. Due to the same-origin policy, cross-origin requests are generally blocked.
+# However, setting this to an origin will add an Access-Control-Allow-Origin header to allow cross-origin requests from
+# that origin. For instance, when running locally, this will generally be http://localhost:3000. It is possible to set
+# this to *, but that allows requests from anywhere. While this should be relatively safe when authentication is enabled
+# since authentication is not handled through cookies, it does increase the attack surface and better practice is to set
+# this to the actual origin where the UI is hosted. This is different from frontend-url, since frontend-url is just where
+# the frontend code can be retrieved from, and may not even be a valid origin (e.g. if it has a path name).
+access-control-allow-origin=http://localhost:3000
+
 # A temporary location to store scratch files. The path can be absolute or relative.
 # This allows you to locate temporary storage on an extra drive in case your main drive does not have enough space.
 # local-cache=/home/ec2-user/cache

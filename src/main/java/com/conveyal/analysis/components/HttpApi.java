@@ -42,6 +42,7 @@ public class HttpApi implements Component {
     public interface Config {
         boolean offline (); // TODO remove this parameter, use different Components types instead
         int serverPort ();
+        String allowOrigin ();
     }
 
     private final FileStorage fileStorage;
@@ -86,8 +87,18 @@ public class HttpApi implements Component {
             // FIXME those internal endpoints should be hidden from the outside world by the reverse proxy.
             //       Or now with non-static Spark we can run two HTTP servers on different ports.
 
-            // Set CORS headers, to allow requests to this API server from any page.
-            res.header("Access-Control-Allow-Origin", "*");
+            // Set CORS headers, to allow requests to this API server from a frontend hosted on a different domain
+            // This used to be hardwired to Access-Control-Allow-Origin: * but that leaves the server open to XSRF
+            // attacks when authentication is disabled (e.g. when running locally).
+            if (config.allowOrigin() == null || config.allowOrigin().equals("null")) {
+                // Access-Control-Allow-Origin: null opens unintended security holes:
+                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
+                throw new IllegalArgumentException("Access-Control-Allow-Origin should not be null");
+            }
+
+            res.header("Access-Control-Allow-Origin", config.allowOrigin());
+            // for caching, signal to the browser that responses may be different based on origin
+            res.header("Vary", "Origin");
 
             // The default MIME type is JSON. This will be overridden by the few controllers that do not return JSON.
             res.type("application/json");
@@ -115,6 +126,7 @@ public class HttpApi implements Component {
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).
+        // See comment above about Access-Control-Allow-Origin
         sparkService.options("/*", (req, res) -> {
             res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
             res.header("Access-Control-Allow-Credentials", "true");

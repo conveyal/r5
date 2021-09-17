@@ -124,13 +124,16 @@ public class BrokerController implements HttpController {
         // Deserialize the task in the request body so we can see what kind of worker it wants.
         // Perhaps we should allow both travel time surface and accessibility calculation tasks to be done as single points.
         // AnalysisRequest (backend) vs. AnalysisTask (R5)
-        // The accessgroup stuff is copypasta from the old single point controller.
         // We already know the user is authenticated, and we need not check if they have access to the graphs etc,
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
         UserPermissions userPermissions = UserPermissions.from(request);
         final long startTimeMsec = System.currentTimeMillis();
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
+        // TODO discuss whether the UI should set the regionId, or if we even need it.
+        analysisRequest.regionId =
+                Persistence.bundles.findByIdIfPermitted(analysisRequest.bundleId, userPermissions).regionId;
+
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
         analysisRequest.populateTask(task, userPermissions);

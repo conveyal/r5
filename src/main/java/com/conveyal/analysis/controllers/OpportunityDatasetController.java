@@ -246,7 +246,7 @@ public class OpportunityDatasetController implements HttpController {
                 if (status.uploadedGrids == status.totalGrids) {
                     status.completeSuccessfully();
                 }
-                LOG.info("Completed {}/{} uploads for {}", status.uploadedGrids, status.totalGrids, status.name);
+                LOG.info("Moved {}/{} files into storage for {}", status.uploadedGrids, status.totalGrids, status.name);
             } catch (NumberFormatException e) {
                 throw new AnalysisServerException("Error attempting to parse number in uploaded file: " + e.toString());
             } catch (Exception e) {

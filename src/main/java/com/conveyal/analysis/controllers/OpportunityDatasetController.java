@@ -4,9 +4,12 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
+import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDataSource;
+import com.conveyal.analysis.persistence.AnalysisCollection;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.analysis.util.HttpUtils;
@@ -18,7 +21,10 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.analyst.progress.WorkProductType;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
@@ -59,6 +65,7 @@ import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormat
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.analyst.progress.WorkProductType.OPPORTUNITY_DATASET;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -67,22 +74,26 @@ public class OpportunityDatasetController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpportunityDatasetController.class);
 
-    private static final FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
-
     // Component Dependencies
 
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
     private final SeamlessCensusGridExtractor extractor;
 
+    // Database tables
+
+    private final AnalysisCollection<DataGroup> dataGroupCollection;
+
     public OpportunityDatasetController (
             FileStorage fileStorage,
             TaskScheduler taskScheduler,
-            SeamlessCensusGridExtractor extractor
+            SeamlessCensusGridExtractor extractor,
+            AnalysisDB database
     ) {
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.extractor = extractor;
+        this.dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
     }
 
     /** Store upload status objects FIXME trivial Javadoc */
@@ -134,29 +145,32 @@ public class OpportunityDatasetController implements HttpController {
         return uploadStatuses.removeIf(s -> s.id.equals(statusId));
     }
 
-    private OpportunityDatasetUploadStatus downloadLODES(Request req, Response res) {
+    private OpportunityDatasetUploadStatus downloadLODES (Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
         final UserPermissions userPermissions = UserPermissions.from(req);
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
-        // deleted as a batch using deleteSourceSet)
+        // deleted as a batch using deleteSourceSet) TODO use DataGroup and DataSource (creating only one DataSource per region).
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
         final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
         addStatusAndRemoveOldStatuses(status);
 
+        // TODO we should be reusing the same source from Mongo, not making new ephemeral ones on each extract operation
         SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
         source.regionId = regionId;
+        // Make a new group that will containin the N OpportunityDatasets we're saving.
+        String description = String.format("Import %s to %s", extractor.sourceName, region.name);
+        DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), description);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
                 .forUser(userPermissions)
                 .setHeavy(true)
-                .withWorkProduct(source)
                 .withAction((progressListener) -> {
                     try {
                         status.message = "Extracting census data for region";
-                        List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom);
-                        updateAndStoreDatasets(source, status, grids);
+                        List<Grid> grids = extractor.censusDataForBounds(region.bounds, zoom, progressListener);
+                        updateAndStoreDatasets(source, dataGroup, status, grids, progressListener);
                     } catch (IOException e) {
                         status.completeWithError(e);
                         LOG.error("Exception processing LODES data: " + ExceptionUtils.stackTraceString(e));
@@ -171,16 +185,21 @@ public class OpportunityDatasetController implements HttpController {
      * that PointSet and store it in Mongo.
      */
     private void updateAndStoreDatasets (SpatialDataSource source,
+                                         DataGroup dataGroup,
                                          OpportunityDatasetUploadStatus status,
-                                         List<? extends PointSet> pointSets) {
+                                         List<? extends PointSet> pointSets,
+                                         com.conveyal.r5.analyst.progress.ProgressListener progressListener) {
         status.status = Status.UPLOADING;
         status.totalGrids = pointSets.size();
+        progressListener.beginTask("Storing opportunity data", pointSets.size());
+
         // Create an OpportunityDataset holding some metadata about each PointSet (Grid or FreeForm).
         final List<OpportunityDataset> datasets = new ArrayList<>();
         for (PointSet pointSet : pointSets) {
             OpportunityDataset dataset = new OpportunityDataset();
             dataset.sourceName = source.name;
             dataset.sourceId = source._id.toString();
+            dataset.dataGroupId = dataGroup._id.toString();
             dataset.createdBy = source.createdBy;
             dataset.accessGroup = source.accessGroup;
             dataset.regionId = source.regionId;
@@ -234,7 +253,11 @@ public class OpportunityDatasetController implements HttpController {
                 status.completeWithError(e);
                 throw AnalysisServerException.unknown(e);
             }
+            progressListener.increment();
         }
+        // Set the workProduct - TODO update UI so it can handle a link to a group of OPPORTUNITY_DATASET
+        dataGroupCollection.insert(dataGroup);
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(OPPORTUNITY_DATASET, dataGroup, source.regionId));
     }
 
     private static FileStorageFormat getFormatCode (PointSet pointSet) {
@@ -374,9 +397,12 @@ public class OpportunityDatasetController implements HttpController {
                 // Create a single unique ID string that will be referenced by all opportunity datasets produced by
                 // this upload. This allows us to group together datasets from the same source and associate them with
                 // the file(s) that produced them.
+                // Currently we are creating the DataSource document in Mongo but not actually saving the source files.
+                // Some methods like createGridsFromShapefile above "consume" those files by moving them into a tempdir.
                 SpatialDataSource source = new SpatialDataSource(userPermissions, sourceName);
                 source.regionId = regionId;
-                updateAndStoreDatasets(source, status, pointsets);
+                DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), "Import opportunity data");
+                updateAndStoreDatasets(source, dataGroup, status, pointsets, new NoopProgressListener());
             } catch (Exception e) {
                 e.printStackTrace();
                 status.completeWithError(e);

@@ -3,6 +3,7 @@ package com.conveyal.data.census;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.conveyal.geojson.GeoJsonModule;
+import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.locationtech.jts.geom.Geometry;
 
@@ -47,7 +48,8 @@ public class CensusExtractor {
                     Double.parseDouble(args[2]),
                     Double.parseDouble(args[3]),
                     Double.parseDouble(args[4]),
-                    false
+                    false,
+                    new NoopProgressListener()
             );
         }
         else {
@@ -57,8 +59,7 @@ public class CensusExtractor {
             FileInputStream fis = new FileInputStream(new File(args[1]));
             FeatureCollection fc = om.readValue(fis, FeatureCollection.class);
             fis.close();
-
-            features = source.extract(fc.features.get(0).geometry, false);
+            features = source.extract(fc.features.get(0).geometry, false, new NoopProgressListener());
         }
 
         OutputStream out;

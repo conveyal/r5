@@ -86,7 +86,7 @@ public abstract class BackendComponents {
                 // and therefore subject to authentication and authorization.
                 new GtfsController(gtfsCache),
                 new BundleController(this),
-                new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
+                new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
                 new RegionalAnalysisController(broker, fileStorage),
                 new FileStorageController(fileStorage, database),
                 new AggregationAreaController(fileStorage, database, taskScheduler),

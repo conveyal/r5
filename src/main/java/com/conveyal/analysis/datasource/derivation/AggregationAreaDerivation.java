@@ -198,9 +198,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         });
         aggregationAreaCollection.insertMany(aggregationAreas);
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(
-                AGGREGATION_AREA, dataGroup._id.toString(), spatialDataSource.regionId)
-        );
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId));
         progressListener.increment();
 
     }

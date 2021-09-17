@@ -27,6 +27,8 @@ public abstract class HttpUtils {
         // handle and set the threshold a little higher. The downside is that if a tiny file is actually uploaded even
         // by accident, our code will not be able to get a file handle for it and fail. Some legitimate files like
         // Shapefile .prj sidecars can be really small.
+        // If we always saved the FileItems via write() or read them with getInputStream() they would not all need to
+        // be on disk.
         try {
             FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
             ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);

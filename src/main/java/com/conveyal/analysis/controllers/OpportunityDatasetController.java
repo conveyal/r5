@@ -67,7 +67,7 @@ public class OpportunityDatasetController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(OpportunityDatasetController.class);
 
-    private static final FileItemFactory fileItemFactory = new DiskFileItemFactory();
+    private static final FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
 
     // Component Dependencies
 
@@ -297,15 +297,9 @@ public class OpportunityDatasetController implements HttpController {
      * The request should be a multipart/form-data POST request, containing uploaded files and associated parameters.
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
+        // Extract user info, uploaded files and form fields from the incoming request.
         final UserPermissions userPermissions = UserPermissions.from(req);
-        final Map<String, List<FileItem>> formFields;
-        try {
-            ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
-            formFields = sfu.parseParameterMap(req.raw());
-        } catch (FileUploadException e) {
-            // We can't even get enough information to create a status tracking object. Re-throw an exception.
-            throw AnalysisServerException.fileUpload("Unable to parse opportunity dataset. " + ExceptionUtils.stackTraceString(e));
-        }
+        final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
 
         // Parse required fields. Will throw a ServerException on failure.
         final String sourceName = HttpUtils.getFormField(formFields, "Name", true);
@@ -376,7 +370,7 @@ public class OpportunityDatasetController implements HttpController {
                 if (pointsets.isEmpty()) {
                     throw new RuntimeException("No opportunity dataset was created from the files uploaded.");
                 }
-                LOG.info("Uploading opportunity datasets to S3 and storing metadata in database.");
+                LOG.info("Moving opportunity datasets into storage and adding metadata to database.");
                 // Create a single unique ID string that will be referenced by all opportunity datasets produced by
                 // this upload. This allows us to group together datasets from the same source and associate them with
                 // the file(s) that produced them.

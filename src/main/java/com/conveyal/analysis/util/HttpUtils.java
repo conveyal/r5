@@ -13,7 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 public abstract class HttpUtils {
-    /** Extract files from a Spark Request containing RFC 1867 multipart form-based file upload data. */
+
+    /**
+     * Extract files from a Spark Request containing RFC 1867 multipart form-based file upload data.
+     */
     public static Map<String, List<FileItem>> getRequestFiles (HttpServletRequest req) {
         // The Javadoc on this factory class doesn't say anything about thread safety. Looking at the source code it
         // all looks threadsafe. But also very lightweight to instantiate, so in this code run by multiple threads
@@ -22,13 +25,14 @@ public abstract class HttpUtils {
         // uniform way in other threads, after the request handler has returned. This does however cause some very
         // small form fields to be written to disk files. Ideally we'd identify the smallest actual file we'll ever
         // handle and set the threshold a little higher. The downside is that if a tiny file is actually uploaded even
-        // by accident, our code will not be able to get a file handle for it and fail.
-        FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
-        ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
+        // by accident, our code will not be able to get a file handle for it and fail. Some legitimate files like
+        // Shapefile .prj sidecars can be really small.
         try {
+            FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
+            ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
-            throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
+            throw AnalysisServerException.fileUpload(ExceptionUtils.stackTraceString(e));
         }
     }
 

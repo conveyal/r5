@@ -277,23 +277,30 @@ public class RegionalAnalysisController implements HttpController {
             if (!fileStorage.exists(singleCutoffFileStorageKey)) {
                 // An accessibility grid for this particular cutoff has apparently never been extracted from the
                 // regional results file before. Extract one and save it for future reuse. Older regional analyses
-                // may not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
+                // did not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
                 // filenames of such regional accessibility results will not have a percentile or pointset ID.
                 String multiCutoffKey;
-                if (analysis.travelTimePercentiles == null) {
-                    // Oldest form of results, single-percentile, single grid.
-                    multiCutoffKey = regionalAnalysisId + ".access";
-                } else {
-                    if (analysis.destinationPointSetIds == null) {
-                        // Newer form of regional results: multi-percentile, single grid.
-                        multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
-                    } else {
-                        // Newest form of regional results: multi-percentile, multi-grid.
-                        multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+                FileStorageKey multiCutoffFileStorageKey;
+                // Newest form of regional results: multi-percentile, multi-destination-grid.
+                multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+                multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                if (!fileStorage.exists(multiCutoffFileStorageKey)) {
+                    LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
+                    // Fall back to second-oldest form: multi-percentile, single destination grid.
+                    checkArgument(analysis.destinationPointSetIds.length == 1);
+                    multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
+                    multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                    if (!fileStorage.exists(multiCutoffFileStorageKey)) {
+                        // Fall back on oldest form of results, single-percentile, single-destination-grid.
+                        checkArgument(analysis.travelTimePercentiles.length == 1);
+                        multiCutoffKey = regionalAnalysisId + ".access";
+                        multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                        if (!fileStorage.exists(multiCutoffFileStorageKey)) {
+                            throw new IllegalArgumentException("Cannot find original source regional analysis output.");
+                        }
                     }
                 }
                 LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
-                FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
 
                 InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
                 Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);

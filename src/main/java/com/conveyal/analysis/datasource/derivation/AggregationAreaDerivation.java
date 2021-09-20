@@ -9,7 +9,9 @@ import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -98,6 +100,12 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         checkArgument(SHP.equals(spatialDataSource.fileFormat),
                 "Currently, only shapefiles can be converted to aggregation areas.");
 
+        this.fileStorage = fileStorage;
+        // Do not retain AnalysisDB reference, but grab the collections we need.
+        // TODO cache AnalysisCollection instances and reuse? Are they threadsafe?
+        aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
+        dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
+
         /*
           Implementation notes:
           Collecting all the Features to a List is a red flag for scalability, but the UnaryUnionOp used below (and the
@@ -114,6 +122,12 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
          */
         File sourceFile;
         if (SHP.equals(spatialDataSource.fileFormat)) {
+            // On a newly started backend, we can't be sure any sidecar files are on the local filesystem.
+            // We may want to factor this out when we use shapefile DataSources in other derivations.
+            String baseName = spatialDataSource._id.toString();
+            prefetchDataSource(baseName, "dbf");
+            prefetchDataSource(baseName, "shx");
+            prefetchDataSource(baseName, "prj");
             sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
             ShapefileReader reader = null;
             try {
@@ -135,12 +149,16 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             );
             throw new DataSourceException(message);
         }
-        
-        this.fileStorage = fileStorage;
-        // Do not retain AnalysisDB reference, but grab the collections we need.
-        // TODO cache AnalysisCollection instances and reuse? Are they threadsafe?
-        aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
+    }
+
+    /** Used primarily for shapefiles where we can't be sure whether all sidecar files have been synced locally. */
+    private void prefetchDataSource (String baseName, String extension) {
+        FileStorageKey key = new FileStorageKey(FileCategory.DATASOURCES, baseName, extension);
+        // We need to clarify the FileStorage API on which calls cause the file to be synced locally, and whether these
+        // getFile tolerates getting files that do not exist. This may all become irrelevant if we use NFS.
+        if (fileStorage.exists(key)) {
+            fileStorage.getFile(key);
+        }
     }
 
     @Override

@@ -130,9 +130,12 @@ public class BrokerController implements HttpController {
         final long startTimeMsec = System.currentTimeMillis();
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-        // TODO discuss whether the UI should set the regionId, or if we even need it.
-        analysisRequest.regionId =
-                Persistence.bundles.findByIdIfPermitted(analysisRequest.bundleId, userPermissions).regionId;
+        // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
+        checkNotNull(analysisRequest.regionId);
+        checkNotNull(analysisRequest.projectId);
+        checkNotNull(analysisRequest.bundleId);
+        checkNotNull(analysisRequest.modificationIds);
+        checkNotNull(analysisRequest.workerVersion);
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();

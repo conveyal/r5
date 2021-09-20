@@ -31,6 +31,13 @@ public class AnalysisRequest {
     private static int MAX_ZOOM = 12;
     private static int MAX_GRID_CELLS = 5_000_000;
 
+    /**
+     * These three IDs are redundant, and just help reduce the number of database lookups necessary.
+     * The bundleId and modificationIds should be considered the definitive source of truth (regionId and projectId are
+     * implied by the bundleId and the modification Ids). Behavior is undefined if the API caller sends inconsistent
+     * information (a different regionId or projectId than the one the bundleId belongs to).
+     * TODO add null checks all over.
+     */
     public String regionId;
     public String projectId;
     public String scenarioId;

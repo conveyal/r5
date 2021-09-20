@@ -175,7 +175,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.projectId, analysisRequest.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");

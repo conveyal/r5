@@ -41,7 +41,7 @@ public class SpatialDataSource extends DataSource {
     public SpatialDataSource () { }
 
     public FileStorageKey storageKey () {
-        return new FileStorageKey(DATASOURCES, this._id.toString(), fileFormat.toString());
+        return new FileStorageKey(DATASOURCES, this._id.toString(), fileFormat.extension);
     }
 
 }

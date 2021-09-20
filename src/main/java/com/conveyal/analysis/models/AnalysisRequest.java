@@ -36,7 +36,6 @@ public class AnalysisRequest {
      * The bundleId and modificationIds should be considered the definitive source of truth (regionId and projectId are
      * implied by the bundleId and the modification Ids). Behavior is undefined if the API caller sends inconsistent
      * information (a different regionId or projectId than the one the bundleId belongs to).
-     * TODO add null checks all over.
      */
     public String regionId;
     public String projectId;

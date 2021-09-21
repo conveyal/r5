@@ -3,6 +3,7 @@ package com.conveyal.analysis.datasource.derivation;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.analysis.datasource.SpatialAttribute;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
@@ -85,9 +86,6 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         zoom = parseZoom(req.queryParams("zoom"));
         mergePolygons = Boolean.parseBoolean(req.queryParams("mergePolygons"));
         checkNotNull(dataSourceId);
-        if (!mergePolygons) {
-            checkNotNull(nameProperty, "You must supply a nameProperty if mergePolygons is not true.");
-        }
 
         AnalysisCollection<DataSource> dataSourceCollection =
                 database.getAnalysisCollection("dataSources", DataSource.class);
@@ -99,6 +97,17 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
                 "Only polygons can be converted to aggregation areas. DataSource is: " + spatialDataSource.geometryType);
         checkArgument(SHP.equals(spatialDataSource.fileFormat),
                 "Currently, only shapefiles can be converted to aggregation areas.");
+
+        if (!mergePolygons) {
+            checkNotNull(nameProperty, "You must supply a nameProperty if mergePolygons is not true.");
+            SpatialAttribute sa = spatialDataSource.attributes.stream()
+                    .filter(a -> a.name.equals(nameProperty))
+                    .findFirst().orElseThrow(() ->
+                            new IllegalArgumentException("nameProperty does not exist: " + nameProperty));
+            if (sa.type == SpatialAttribute.Type.GEOM) {
+                throw new IllegalArgumentException("nameProperty must be of type TEXT or NUMBER, not GEOM.");
+            }
+        }
 
         this.fileStorage = fileStorage;
         // Do not retain AnalysisDB reference, but grab the collections we need.

@@ -129,14 +129,11 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             prefetchDataSource(baseName, "shx");
             prefetchDataSource(baseName, "prj");
             sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
-            ShapefileReader reader = null;
-            try {
-                reader = new ShapefileReader(sourceFile);
+            // Reading the shapefile into a list may actually take a moment, should this be done in the async part?
+            try (ShapefileReader reader = new ShapefileReader(sourceFile)) {
                 finalFeatures = reader.wgs84Stream().collect(Collectors.toList());
-            } catch (FactoryException | RuntimeException | IOException | TransformException e) {
+            } catch (Exception e) {
                 throw new DataSourceException("Failed to load shapefile.", e);
-            } finally {
-                if (reader != null) reader.close();
             }
         } else {
             // GeoJSON, GeoPackage etc.

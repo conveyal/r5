@@ -279,11 +279,9 @@ public class RegionalAnalysisController implements HttpController {
                 // regional results file before. Extract one and save it for future reuse. Older regional analyses
                 // did not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
                 // filenames of such regional accessibility results will not have a percentile or pointset ID.
-                String multiCutoffKey;
-                FileStorageKey multiCutoffFileStorageKey;
-                // Newest form of regional results: multi-percentile, multi-destination-grid.
-                multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
-                multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                // First try the newest form of regional results: multi-percentile, multi-destination-grid.
+                String multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+                FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
                 if (!fileStorage.exists(multiCutoffFileStorageKey)) {
                     LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
                     // Fall back to second-oldest form: multi-percentile, single destination grid.

@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
@@ -62,7 +61,15 @@ public class LocalFileStorage implements FileStorage {
                         sourceFile.getName());
             }
             // Set the file to be read-only and accessible only by the current user.
-            Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
+            try {
+                Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
+            } catch (UnsupportedOperationException e) {
+                LOG.info("Could not restrict permissions on {} to POSIX OWNER_READ (probably because OS is not POSIX " +
+                        "compatible)", sourceFile.getName());
+                if (storedFile.setReadOnly()) LOG.info("Marked {} read-only via alternative setReadOnly() method",
+                        sourceFile.getName());
+            }
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

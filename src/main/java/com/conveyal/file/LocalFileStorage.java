@@ -53,23 +53,17 @@ public class LocalFileStorage implements FileStorage {
                 Files.move(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (FileSystemException e) {
                 // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so certain files (e.g.
-                // mapdb) cannot be moved or deleted. This workaround may cause temporary files to accumulate, but it
-                // should not be triggered for default Linux filesystems (ext).
+                // mapdb Write Ahead Log) cannot be moved or deleted. This workaround may cause temporary files
+                // to accumulate, but it should not be triggered for default Linux filesystems (ext).
                 // See https://github.com/jankotek/MapDB/issues/326
                 Files.copy(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
+                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copied instead.",
                         sourceFile.getName());
             }
             // Set the file to be read-only and accessible only by the current user.
-            try {
-                Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
-            } catch (UnsupportedOperationException e) {
-                LOG.info("Could not restrict permissions on {} to POSIX OWNER_READ (probably because OS is not POSIX " +
-                        "compatible)", sourceFile.getName());
-                if (storedFile.setReadOnly()) LOG.info("Marked {} read-only via alternative setReadOnly() method",
-                        sourceFile.getName());
+            if (!storedFile.setWritable(false, false)) {
+                LOG.error("Could not restrict permissions on {} to read-only by owner: ", sourceFile.getName());
             }
-
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -121,7 +121,10 @@ public class HttpApi implements Component {
         // Handle CORS preflight requests (which are OPTIONS requests).
         // See comment above about Access-Control-Allow-Origin
         sparkService.options("/*", (req, res) -> {
+            // Cache the preflight response for up to one day (the maximum allowed by browsers)
+            res.header("Access-Control-Max-Age", "86400");
             res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+            // Allowing credentials is necessary to send an Authorization header
             res.header("Access-Control-Allow-Credentials", "true");
             res.header("Access-Control-Allow-Headers", "Accept,Authorization,Content-Type,Origin," +
                     "X-Requested-With,Content-Length,X-Conveyal-Access-Group"

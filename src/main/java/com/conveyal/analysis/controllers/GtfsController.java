@@ -150,20 +150,29 @@ public class GtfsController implements HttpController {
             lon = stop.stop_lon;
         }
     }
-
+    /**
+     * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed
+     */
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
         addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
-        return feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
+        return feed.stops.values().stream().filter(s -> s.location_type == 0)
+                .map(StopApiResponse::new).collect(Collectors.toList());
     }
 
+    /**
+     * Groups the feedId and stops (location_type = 0; not parent stations, entrances/exits, generic nodes, etc.) for a
+     * given GTFS feed
+     */
     static class FeedGroupStopsApiResponse {
         public final String feedId;
         public final List<StopApiResponse> stops;
 
         FeedGroupStopsApiResponse(GTFSFeed feed) {
             this.feedId = feed.feedId;
-            this.stops = feed.stops.values().stream().map(StopApiResponse::new).collect(Collectors.toList());
+            this.stops =
+                    feed.stops.values().stream().filter(s -> s.location_type == 0).
+                            map(StopApiResponse::new).collect(Collectors.toList());
         }
     }
 

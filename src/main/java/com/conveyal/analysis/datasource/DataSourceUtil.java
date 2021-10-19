@@ -1,7 +1,5 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.AnalysisServerException;
-
 import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
@@ -100,7 +98,7 @@ public abstract class DataSourceUtil {
             String fileName = fileItem.getName();
             String extension = FilenameUtils.getExtension(fileName);
             if (extension.isEmpty()) {
-                new DataSourceException("Filename has no extension: " + fileName);
+                throw new DataSourceException("Filename has no extension: " + fileName);
             }
             fileExtensions.add(extension.toLowerCase(Locale.ROOT));
         }

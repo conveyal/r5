@@ -492,15 +492,6 @@ public class Broker {
         }
     }
 
-    public File getPartialRegionalAnalysisResults (String jobId) {
-        MultiOriginAssembler resultAssembler = resultAssemblers.get(jobId);
-        if (resultAssembler == null) {
-            return null;
-        } else {
-            return null; // Was: resultAssembler.getGridBufferFile(); TODO implement fetching partially completed?
-        }
-    }
-
     public synchronized boolean anyJobsActive () {
         for (Job job : jobs.values()) {
             if (job.isActive()) return true;

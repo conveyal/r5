@@ -31,6 +31,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
 import org.mongojack.DBCursor;
@@ -233,7 +234,15 @@ public class BrokerController implements HttpController {
                     "complexity of this scenario, your request may have too many simulated schedules. If you are " +
                     "using Routing Engine version < 4.5.1, your scenario may still be in preparation and you should " +
                     "try again in a few minutes.");
-        } catch (NoRouteToHostException nrthe){
+        } catch (NoRouteToHostException | HttpHostConnectException e) {
+            // NoRouteToHostException occurs when a single-point worker shuts down (normally due to inactivity) but is
+            // not yet removed from the worker catalog.
+            // HttpHostConnectException has also been observed, presumably after a worker shuts down and a new one
+            // starts up but claims the same IP address as the defunct single point worker.
+            // Yet another even rarer case is possible, where a single point worker starts for a different network and
+            // is assigned the same IP as the defunct worker.
+            // All these cases could be avoided by more rapidly removing workers from the catalog via frequent regular
+            // polling with backpressure, potentially including an "I'm shutting down" flag.
             LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
                     "user made a single-point request within WORKER_RECORD_DURATION_MSEC after shutdown.", workerCategory);
             httpPost.abort();

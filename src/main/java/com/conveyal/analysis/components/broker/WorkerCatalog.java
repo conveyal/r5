@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A catalog of all the workers this broker has been contacted by recently.
@@ -164,7 +165,7 @@ public class WorkerCatalog {
         purgeDeadWorkers();
         if (ignoreWorkerVersion) {
             // Look for workers on the right network ID, independent of their worker software version.
-            return observationsByWorkerId.values().stream().noneMatch(obs -> obs.category.graphId.equals(category.graphId));
+            return observationsByWorkerId.values().stream().noneMatch(obs -> Objects.equals(category.graphId, obs.category.graphId));
         }
         return workerIdsByCategory.get(category).isEmpty();
     }

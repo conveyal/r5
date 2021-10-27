@@ -238,6 +238,10 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
         }
 
+        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        // aren't any (only CSV, because origins are freeform).
+        // How can we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
+
         // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
         LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
                 cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
@@ -265,16 +269,19 @@ public class RegionalAnalysisController implements HttpController {
             if (!fileStorage.exists(multiCutoffFileStorageKey)) {
                 LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
                 // Fall back to second-oldest form: multi-percentile, single destination grid.
-                checkArgument(analysis.destinationPointSetIds.length == 1);
                 multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
                 multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                if (!fileStorage.exists(multiCutoffFileStorageKey)) {
+                if (fileStorage.exists(multiCutoffFileStorageKey)) {
+                    checkArgument(analysis.destinationPointSetIds.length == 1);
+                } else {
                     // Fall back on oldest form of results, single-percentile, single-destination-grid.
-                    checkArgument(analysis.travelTimePercentiles.length == 1);
                     multiCutoffKey = regionalAnalysisId + ".access";
                     multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                    if (!fileStorage.exists(multiCutoffFileStorageKey)) {
-                        throw new IllegalArgumentException("Cannot find original source regional analysis output.");
+                    if (fileStorage.exists(multiCutoffFileStorageKey)) {
+                        checkArgument(analysis.travelTimePercentiles.length == 1);
+                        checkArgument(analysis.destinationPointSetIds.length == 1);
+                    } else {
+                        throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
                     }
                 }
             }

@@ -186,7 +186,8 @@ public class BrokerController implements HttpController {
             // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
             broker.recentlyRequestedWorkers.remove(workerCategory);
         }
-        String workerUrl = "http://" + address + ":7080/single"; // TODO remove hard-coded port number.
+        // Port number is hard-coded until we have a good reason to make it configurable.
+        String workerUrl = "http://" + address + ":7080/single";
         LOG.debug("Re-issuing HTTP request from UI to worker at {}", workerUrl);
         HttpPost httpPost = new HttpPost(workerUrl);
         // httpPost.setHeader("Accept", "application/x-analysis-time-grid");

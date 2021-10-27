@@ -111,6 +111,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         // Get the set of points to which we are measuring travel time. Any smaller sub-grids created here will
         // reference the scenarioNetwork's built-in full-extent pointset, so can reuse its linkage.
         // TODO handle multiple destination grids.
+
+        if (key.destinationGridExtents == null) {
+            // Special (and ideally temporary) case for regional freeform destinations, where there is no grid to link.
+            // The null destinationGridExtents are created by the WebMercatorExtents#forPointsets else clause.
+            return scenarioNetwork;
+        }
+
         setProgress(key, 0, "Fetching gridded point set...");
         PointSet pointSet = AnalysisWorkerTask.gridPointSetCache.get(key.destinationGridExtents, scenarioNetwork.fullExtentGridPointSet);
 

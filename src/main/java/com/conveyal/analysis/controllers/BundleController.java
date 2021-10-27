@@ -164,6 +164,8 @@ public class BundleController implements HttpController {
                     // Wrapping in buffered input stream should reduce number of progress updates.
                     osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
                     // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
+                    osm.close();
+                    // Store the source OSM file. Note that we're not storing the derived MapDB file here.
                     fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
                 }
 

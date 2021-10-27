@@ -51,6 +51,7 @@ public abstract class BackendMain {
         if (components.config.offline()) {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");
+            // WorkerCategory(null, null) means a worker is not on any network, and is waiting to be assigned one.
             components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, 0);
         }
 

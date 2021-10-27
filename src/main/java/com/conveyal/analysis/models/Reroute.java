@@ -10,6 +10,7 @@ public class Reroute extends Modification {
         return "reroute";
     }
 
+    /** The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification. */
     public String feed;
     public String[] routes;
     public String[] trips;

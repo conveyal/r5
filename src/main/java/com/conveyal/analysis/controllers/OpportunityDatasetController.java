@@ -571,13 +571,15 @@ public class OpportunityDatasetController implements HttpController {
      */
     private Object downloadOpportunityDataset (Request req, Response res) throws IOException {
         FileStorageFormat downloadFormat;
+        String format = req.params("format");
         try {
-            downloadFormat = FileStorageFormat.valueOf(req.params("format").toUpperCase());
+            downloadFormat = FileStorageFormat.valueOf(format.toUpperCase());
         } catch (IllegalArgumentException iae) {
-            // This code handles the deprecated endpoint for retrieving opportunity datasets
-            // get("/api/opportunities/:regionId/:gridKey") is the same signature as this endpoint.
+            LOG.warn("Unable to interpret format path parameter '{}', using legacy code path.", format);
+            // This code handles the deprecated endpoint for retrieving opportunity datasets.
+            // get("/api/opportunities/:regionId/:gridKey") has the same path pattern as this endpoint.
             String regionId = req.params("_id");
-            String gridKey = req.params("format");
+            String gridKey = format;
             FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
             return getJsonUrl(storageKey);
         }

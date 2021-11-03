@@ -122,15 +122,17 @@ public class GeometryUtils {
 
     /**
      * Throw an exception if the envelope appears to be constructed from points spanning the 180 degree meridian.
-     * We check whether the envelope becomes narrower when its left edge is shifted by 180 degrees (expressed as a
-     * longitude greater than 180). The envelope must already be validated with checkWgsEnvelopeRange to ensure
-     * meaningful results.
+     * We check whether the envelope becomes narrower when its left edge is expressed as a longitude greater than 180
+     * (shifted east by 180 degrees) and has points anywhere near the 180 degree line.
+     * The envelope must already be validated with checkWgsEnvelopeRange to ensure meaningful results.
      */
-    private static void checkWgsEnvelopeAntimeridian (Envelope envelope) {
+    private static void checkWgsEnvelopeAntimeridian (Envelope envelope, String thingBeingChecked) {
         double widthAcrossAntimeridian = (envelope.getMinX() + 180) - envelope.getMaxX();
+        boolean nearAntimeridian =
+                Math.abs(envelope.getMinX() - 180D) < 10 || Math.abs(envelope.getMaxX() - 180D) < 10;
         checkArgument(
-                envelope.getWidth() < widthAcrossAntimeridian,
-                "Data sets may not span the antimeridian (180 degrees longitude)."
+                !nearAntimeridian || envelope.getWidth() < widthAcrossAntimeridian,
+                thingBeingChecked + " may not span the antimeridian (180 degrees longitude)."
         );
     }
 
@@ -161,9 +163,9 @@ public class GeometryUtils {
      */
     public static void checkWgsEnvelopeSize (Envelope envelope, String thingBeingChecked) {
         checkWgsEnvelopeRange(envelope);
-        checkWgsEnvelopeAntimeridian(envelope);
+        checkWgsEnvelopeAntimeridian(envelope, thingBeingChecked);
         if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
-            throw new DataSourceException(String.format(
+            throw new IllegalArgumentException(String.format(
                     "Geographic extent of %s (%.0f km2) exceeds limit of %.0f km2.",
                     thingBeingChecked, roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM
             ));

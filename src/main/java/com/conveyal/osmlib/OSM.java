@@ -69,7 +69,7 @@ public class OSM implements OSMEntitySource, OSMEntitySink {
     /* If true, track which nodes are referenced by more than one way. */
     public boolean intersectionDetection = false;
 
-    /** If true we are reading already filled OSM mapdv **/
+    /** If true we are reading already filled OSM mapdb **/
     private boolean reading = false;
 
     /**

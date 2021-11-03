@@ -12,7 +12,6 @@ import org.opengis.referencing.operation.TransformException;
 
 import java.io.File;
 
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
 
 /**
  * Logic to create SpatialDataSource metadata from a comma separated file.

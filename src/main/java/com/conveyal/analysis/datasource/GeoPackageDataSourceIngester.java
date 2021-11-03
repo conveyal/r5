@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.util.ShapefileReader.attributes;
 import static com.conveyal.r5.util.ShapefileReader.geometryType;
 import static com.google.common.base.Preconditions.checkState;
@@ -77,7 +77,7 @@ public class GeoPackageDataSourceIngester extends DataSourceIngester {
             query.setCoordinateSystemReproject(DefaultGeographicCRS.WGS84);
             FeatureCollection<SimpleFeatureType, SimpleFeature> wgsFeatureCollection = featureSource.getFeatures(query);
             Envelope wgsEnvelope = wgsFeatureCollection.getBounds();
-            checkWgsEnvelopeSize(wgsEnvelope);
+            checkWgsEnvelopeSize(wgsEnvelope, "GeoPackage");
             progressListener.increment();
             FeatureIterator<SimpleFeature> wgsFeatureIterator = wgsFeatureCollection.features();
             while (wgsFeatureIterator.hasNext()) {

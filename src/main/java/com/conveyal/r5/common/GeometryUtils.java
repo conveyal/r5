@@ -1,5 +1,6 @@
 package com.conveyal.r5.common;
 
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.r5.streets.VertexStore;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Coordinate;
@@ -10,15 +11,20 @@ import org.locationtech.jts.geom.LineSegment;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
+ * Also contains reusable methods for validating WGS84 envelopes and latitude and longitude values.
  */
 public class GeometryUtils {
     public static final GeometryFactory geometryFactory = new GeometryFactory();
 
-    // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
+    /** Average of polar and equatorial radii, https://en.wikipedia.org/wiki/Earth */
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
+
+    /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
+    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
 
     /**
      * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this
@@ -86,6 +92,82 @@ public class GeometryUtils {
         double fixedMinY = floatingDegreesToFixed(floatingWgsEnvelope.getMinY());
         double fixedMaxY = floatingDegreesToFixed(floatingWgsEnvelope.getMaxY());
         return new Envelope(fixedMinX, fixedMaxX, fixedMinY, fixedMaxY);
+    }
+
+    //// Methods for range-checking points and envelopes in WGS84
+
+    /**
+     * We have to range-check the envelope before checking its size. Large unprojected y values interpreted as latitudes
+     * can yield negative cosines, producing negative estimated areas, producing false negatives on size checks.
+     */
+    private static void checkWgsEnvelopeRange (Envelope envelope) {
+        checkLon(envelope.getMinX());
+        checkLon(envelope.getMaxX());
+        checkLat(envelope.getMinY());
+        checkLat(envelope.getMaxY());
+    }
+
+    private static void checkLon (double longitude) {
+        if (!Double.isFinite(longitude) || Math.abs(longitude) > 180) {
+            throw new DataSourceException("Longitude is not a finite number with absolute value below 180.");
+        }
+    }
+
+    private static void checkLat (double latitude) {
+        // Longyearbyen on the Svalbard archipelago is the world's northernmost permanent settlement (78 degrees N).
+        if (!Double.isFinite(latitude) || Math.abs(latitude) > 80) {
+            throw new DataSourceException("Longitude is not a finite number with absolute value below 80.");
+        }
+    }
+
+    /**
+     * Throw an exception if the envelope appears to be constructed from points spanning the 180 degree meridian.
+     * We check whether the envelope becomes narrower when its left edge is shifted by 180 degrees (expressed as a
+     * longitude greater than 180). The envelope must already be validated with checkWgsEnvelopeRange to ensure
+     * meaningful results.
+     */
+    private static void checkWgsEnvelopeAntimeridian (Envelope envelope) {
+        double widthAcrossAntimeridian = (envelope.getMinX() + 180) - envelope.getMaxX();
+        checkArgument(
+                envelope.getWidth() < widthAcrossAntimeridian,
+                "Data sets may not span the antimeridian (180 degrees longitude)."
+        );
+    }
+
+    /**
+     * @return the approximate area of an Envelope in WGS84 lat/lon coordinates, in square kilometers.
+     */
+    public static double roughWgsEnvelopeArea (Envelope wgsEnvelope) {
+        double lon0 = wgsEnvelope.getMinX();
+        double lon1 = wgsEnvelope.getMaxX();
+        double lat0 = wgsEnvelope.getMinY();
+        double lat1 = wgsEnvelope.getMaxY();
+        double height = lat1 - lat0;
+        double width = lon1 - lon0;
+        final double KM_PER_DEGREE_LAT = 111.133;
+        // Scale the x direction as if the Earth was a sphere.
+        // Error above the middle latitude should approximately cancel out error below that latitude.
+        double averageLat = (lat0 + lat1) / 2;
+        double xScale = FastMath.cos(FastMath.toRadians(averageLat));
+        double area = (height * KM_PER_DEGREE_LAT) * (width * KM_PER_DEGREE_LAT * xScale);
+        return area;
+    }
+
+    /**
+     * Throw an exception if the provided envelope is too big for a reasonable destination grid.
+     * Should also catch cases where data sets include points on both sides of the 180 degree meridian.
+     * This static utility method can be reused to test other automatically determined bounds such as those
+     * from OSM or GTFS uploads.
+     */
+    public static void checkWgsEnvelopeSize (Envelope envelope, String thingBeingChecked) {
+        checkWgsEnvelopeRange(envelope);
+        checkWgsEnvelopeAntimeridian(envelope);
+        if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
+            throw new DataSourceException(String.format(
+                    "Geographic extent of %s (%.0f km2) exceeds limit of %.0f km2.",
+                    thingBeingChecked, roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM
+            ));
+        }
     }
 
 }

@@ -8,15 +8,16 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -43,9 +44,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 
 /**
  * This Controller provides HTTP REST endpoints for manipulating Bundles. Bundles are sets of GTFS feeds and OSM
@@ -164,7 +166,12 @@ public class BundleController implements HttpController {
                     // Wrapping in buffered input stream should reduce number of progress updates.
                     osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
                     // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
+                    Envelope osmBounds = new Envelope();
+                    for (Node n : osm.nodes.values()) {
+                        osmBounds.expandToInclude(n.getLon(), n.getLat());
+                    }
                     osm.close();
+                    checkWgsEnvelopeSize(osmBounds, "OSM data");
                     // Store the source OSM file. Note that we're not storing the derived MapDB file here.
                     fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
                 }
@@ -198,6 +205,7 @@ public class BundleController implements HttpController {
                         for (Stop s : feed.stops.values()) {
                             bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                         }
+                        checkWgsEnvelopeSize(bundleBounds, "GTFS data");
 
                         if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
                             bundle.serviceStart = feedSummary.serviceStart;
@@ -228,7 +236,6 @@ public class BundleController implements HttpController {
                     // Set legacy progress field to indicate that all feeds have been loaded.
                     bundle.feedsComplete = bundle.totalFeeds;
 
-                    // TODO Handle crossing the antimeridian
                     bundle.north = bundleBounds.getMaxY();
                     bundle.south = bundleBounds.getMinY();
                     bundle.east = bundleBounds.getMaxX();

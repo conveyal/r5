@@ -31,7 +31,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.conveyal.analysis.models.DataSourceValidationIssue.Level.ERROR;
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 
 /**
  * Logic to create SpatialDataSource metadata from an uploaded GeoJSON file and perform validation.
@@ -140,7 +140,7 @@ public class GeoJsonDataSourceIngester extends DataSourceIngester {
             }
             checkCrs(featureType);
             Envelope wgsEnvelope = wgsFeatureCollection.getBounds();
-            checkWgsEnvelopeSize(wgsEnvelope);
+            checkWgsEnvelopeSize(wgsEnvelope, "GeoJSON");
 
             // Set SpatialDataSource fields (Conveyal metadata) from GeoTools model
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(wgsEnvelope);

@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 
 /**
@@ -379,6 +380,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (!saveVertexIndex)
             vertexIndexForOsmNode = null;
 
+        checkWgsEnvelopeSize(envelope, "street layer");
         osm = null;
     }
 

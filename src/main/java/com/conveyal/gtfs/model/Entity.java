@@ -92,7 +92,7 @@ public abstract class Entity implements Serializable {
         /** @return whether the number actual is in the range [min, max] */
         protected boolean checkRangeInclusive(double min, double max, double actual) {
             if (actual < min || actual > max) {
-                feed.errors.add(new RangeError(tableName, row, null, min, max, actual)); // TODO set column name in loader so it's available in methods
+                feed.addError(new RangeError(tableName, row, null, min, max, actual)); // TODO set column name in loader so it's available in methods
                 return false;
             }
             return true;
@@ -110,12 +110,12 @@ public abstract class Entity implements Serializable {
             String str = reader.get(column);
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
-                    feed.errors.add(new MissingColumnError(tableName, column));
+                    feed.addError(new MissingColumnError(tableName, column));
                     missingRequiredColumns.add(column);
                 }
             } else if (str.isEmpty()) {
                 if (required) {
-                    feed.errors.add(new EmptyFieldError(tableName, row, column));
+                    feed.addError(new EmptyFieldError(tableName, row, column));
                 }
                 str = null;
             }
@@ -142,7 +142,7 @@ public abstract class Entity implements Serializable {
                 val = Integer.parseInt(str);
                 checkRangeInclusive(min, max, val);
             } catch (NumberFormatException nfe) {
-                feed.errors.add(new NumberParseError(tableName, row, column));
+                feed.addError(new NumberParseError(tableName, row, column));
             }
             return val;
         }
@@ -158,7 +158,7 @@ public abstract class Entity implements Serializable {
             if (str != null) {
                 String[] fields = str.split(":");
                 if (fields.length != 3) {
-                    feed.errors.add(new TimeParseError(tableName, row, column));
+                    feed.addError(new TimeParseError(tableName, row, column));
                 } else {
                     try {
                         int hours = Integer.parseInt(fields[0]);
@@ -169,7 +169,7 @@ public abstract class Entity implements Serializable {
                         checkRangeInclusive(0, 59, seconds);
                         val = (hours * 60 * 60) + minutes * 60 + seconds;
                     } catch (NumberFormatException nfe) {
-                        feed.errors.add(new TimeParseError(tableName, row, column));
+                        feed.addError(new TimeParseError(tableName, row, column));
                     }
                 }
             }
@@ -188,7 +188,7 @@ public abstract class Entity implements Serializable {
                 dateTime = LocalDate.parse(str, DateTimeFormatter.BASIC_ISO_DATE);
                 checkRangeInclusive(2000, 2100, dateTime.getYear());
             } catch (IllegalArgumentException iae) {
-                feed.errors.add(new DateParseError(tableName, row, column));
+                feed.addError(new DateParseError(tableName, row, column));
             }
             return dateTime;
         }
@@ -203,7 +203,7 @@ public abstract class Entity implements Serializable {
             if (str != null) try {
                 url = new URL(str);
             } catch (MalformedURLException mue) {
-                feed.errors.add(new URLParseError(tableName, row, column));
+                feed.addError(new URLParseError(tableName, row, column));
             }
             return url;
         }
@@ -215,7 +215,7 @@ public abstract class Entity implements Serializable {
                 val = Double.parseDouble(str);
                 checkRangeInclusive(min, max, val);
             } catch (NumberFormatException nfe) {
-                feed.errors.add(new NumberParseError(tableName, row, column));
+                feed.addError(new NumberParseError(tableName, row, column));
             }
             return val;
         }
@@ -234,7 +234,7 @@ public abstract class Entity implements Serializable {
                 if (!feed.transitIds.contains(transitId)) {
                     feed.transitIds.add(transitId);
                     if (val == null) {
-                        feed.errors.add(new ReferentialIntegrityError(tableName, row, column, str));
+                        feed.addError(new ReferentialIntegrityError(tableName, row, column, str));
                     }
                 }
             }
@@ -261,12 +261,12 @@ public abstract class Entity implements Serializable {
                     ZipEntry e = entries.nextElement();
                     if (e.getName().endsWith(tableName + ".txt")) {
                         entry = e;
-                        feed.errors.add(new TableInSubdirectoryError(tableName, entry.getName().replace(tableName + ".txt", "")));
+                        feed.addError(new TableInSubdirectoryError(tableName, entry.getName().replace(tableName + ".txt", "")));
                     }
                 }
                 /* This GTFS table did not exist in the zip. */
                 if (this.isRequired()) {
-                    feed.errors.add(new MissingTableError(tableName));
+                    feed.addError(new MissingTableError(tableName));
                 } else {
                     LOG.info("Table {} was missing but it is not required.", tableName);
                 }
@@ -286,7 +286,7 @@ public abstract class Entity implements Serializable {
             this.reader = reader;
             boolean hasHeaders = reader.readHeaders();
             if (!hasHeaders) {
-                feed.errors.add(new EmptyTableError(tableName));
+                feed.addError(new EmptyTableError(tableName));
             }
             while (reader.readRecord()) {
                 // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
@@ -296,7 +296,7 @@ public abstract class Entity implements Serializable {
                 loadOneRow(); // Call subclass method to produce an entity from the current row.
             }
             if (row == 0) {
-                feed.errors.add(new EmptyTableError(tableName));
+                feed.addError(new EmptyTableError(tableName));
             }
         }
 

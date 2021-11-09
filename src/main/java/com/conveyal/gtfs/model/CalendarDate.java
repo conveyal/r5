@@ -51,7 +51,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
             Service service = services.computeIfAbsent(service_id, Service::new);
             LocalDate date = getDateField("date", true);
             if (service.calendar_dates.containsKey(date)) {
-                feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
+                feed.addError(new DuplicateKeyError(tableName, row, "(service_id, date)"));
             } else {
                 CalendarDate cd = new CalendarDate();
                 cd.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index

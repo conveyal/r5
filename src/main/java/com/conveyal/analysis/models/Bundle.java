@@ -110,7 +110,7 @@ public class Bundle extends Model implements Cloneable {
             checksum = feed.checksum;
             setServiceDates(feed); // TODO expand to record hours per day by mode.
             createFeedName(feed);
-            summarizeErrors(feed);
+            errors = new ArrayList<>(feed.errorSummariesByType.values());
         }
 
         /**
@@ -163,28 +163,6 @@ public class Bundle extends Model implements Cloneable {
             datesOfService.sort(Comparator.naturalOrder());
             serviceStart = datesOfService.get(0);
             serviceEnd = datesOfService.get(datesOfService.size() - 1);
-        }
-
-        /**
-         * This summarization could be done on the fly during loading.
-         * However some users will want the whole pile of errors.
-         */
-        private void summarizeErrors (GTFSFeed feed) {
-            final int maxErrorsPerType = 10;
-            Map<String, GtfsErrorTypeSummary> sortedErrors = new HashMap<>();
-            for (GTFSError error : feed.errors) {
-                String type = error.errorType;
-                GtfsErrorTypeSummary summary = sortedErrors.get(type);
-                if (summary == null) {
-                    summary = new GtfsErrorTypeSummary(error);
-                    sortedErrors.put(type, summary);
-                }
-                summary.count += 1;
-                if (summary.someErrors.size() < maxErrorsPerType) {
-                    summary.someErrors.add(new GtfsErrorSummary(error));
-                }
-            }
-            errors = new ArrayList<>(sortedErrors.values());
         }
 
         public FeedSummary clone () {

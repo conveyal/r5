@@ -215,15 +215,6 @@ public class BundleController implements HttpController {
                             bundle.serviceEnd = feedSummary.serviceEnd;
                         }
 
-                        // Save all errors to a file.
-                        try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
-                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                        // Release some memory after we've summarized the errors to Mongo and a JSON file.
-                        feed.errors.clear();
-
                         // Flush db files to disk
                         feed.close();
 

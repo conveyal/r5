@@ -55,7 +55,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
                 if (feed.agency.size() == 1) {
                     r.agency_id = feed.agency.values().iterator().next().agency_id;
                 } else if (feed.agency.isEmpty()) {
-                    feed.errors.add(new NoAgencyInFeedError());
+                    feed.addError(new NoAgencyInFeedError());
                 }
             } else {
                 r.agency_id = agency.agency_id;

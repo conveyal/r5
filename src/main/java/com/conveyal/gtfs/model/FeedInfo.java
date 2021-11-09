@@ -53,7 +53,7 @@ public class FeedInfo extends Entity implements Cloneable {
                 feed.feedInfo.put("NONE", fi);
                 feed.feedId = fi.feed_id;
             } else {
-                feed.errors.add(new GeneralError(tableName, row, null, "FeedInfo contains more than one record."));
+                feed.addError(new GeneralError(tableName, row, null, "FeedInfo contains more than one record."));
             }
         }
     }

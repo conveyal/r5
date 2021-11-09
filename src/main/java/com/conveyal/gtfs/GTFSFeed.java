@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.analysis.models.Bundle;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
@@ -20,7 +21,6 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -46,9 +46,10 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
+import java.io.Writer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -148,13 +149,31 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** A service is a calendar entry and all calendar_dates that modify that calendar entry. TODO what is the path? */
     public final BTreeMap<String, Service> services;
 
+    /** A place to accumulate summaries of errors while the feed is loaded. */
+    public final Map<String, Bundle.GtfsErrorTypeSummary> errorSummariesByType = new HashMap<>();
+
+    private File errorJsonFile;
+
+    private final int MAX_ERRORS_PER_TYPE = 10;
+
     /**
-     * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
-     * Note that this set is in memory, not in the MapDB file. We save these into a JSON file to avoid shuttling
-     * all the serialized errors back and forth to workers. Older workers do have a MapDB table here, but when they
-     * try to reopen newer MapDB files without that table, even in read-only mode, they'll just receive an empty Set.
+     * Errors can be very numerous. Rather than accumulating errors during load, we process them as they arise.
+     * Tolerate as many errors as possible and keep on loading to provide a complete picture of problems to the user.
      */
-    public final Set<GTFSError> errors;
+    public void addError (GTFSError error) {
+        // Add the error to the GtfsErrorTypeSummary for storage in Mongo
+        String type = error.errorType;
+        Bundle.GtfsErrorTypeSummary summary = errorSummariesByType.get(type);
+        if (summary == null) {
+            summary = new Bundle.GtfsErrorTypeSummary(error);
+            errorSummariesByType.put(type, summary);
+        }
+        summary.count += 1;
+        if (summary.someErrors.size() < MAX_ERRORS_PER_TYPE) {
+            summary.someErrors.add(new Bundle.GtfsErrorSummary(error));
+        }
+        // TODO write the error out to the JSON file containing all errors.
+    }
 
     // TODO eliminate if not used by Analysis
     /** Merged stop buffers polygon built lazily by getMergedBuffers() */
@@ -257,7 +276,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
-        LOG.info("Detected {} errors in feed.", errors.size());
+        LOG.info("Detected {} types of errors in feed.", errorSummariesByType.keySet().size());
     }
 
     public void toFile (String file) {
@@ -779,9 +798,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .makeOrGet();
 
         patternForTrip = db.getTreeMap("patternForTrip");
-
-        // Note that this is an in-memory Java HashSet instead of MapDB table (as it was in past versions).
-        errors = new HashSet<>();
     }
 
     // One critical point when constructing the MapDB is the instance cache type and size.

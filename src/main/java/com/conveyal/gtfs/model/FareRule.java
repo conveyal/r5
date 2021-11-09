@@ -38,7 +38,7 @@ public class FareRule extends Entity {
 
             /* Referential integrity check for fare id */
             if (!fares.containsKey(fareId)) {
-                this.feed.errors.add(new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
+                this.feed.addError(new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
             }
 
             Fare fare = fares.computeIfAbsent(fareId, Fare::new);

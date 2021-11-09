@@ -221,7 +221,7 @@ public class BundleController implements HttpController {
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                        // Save some space in the MapDB after we've summarized the errors to Mongo and a JSON file.
+                        // Release some memory after we've summarized the errors to Mongo and a JSON file.
                         feed.errors.clear();
 
                         // Flush db files to disk

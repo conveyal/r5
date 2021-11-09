@@ -150,10 +150,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /**
      * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
-     * TODO store these outside the mapdb for size? If we just don't create this map, old workers should not fail.
-     * Ideally we'd report the errors to the backend when it first builds the MapDB.
+     * Note that this set is in memory, not in the MapDB file. We save these into a JSON file to avoid shuttling
+     * all the serialized errors back and forth to workers. Older workers do have a MapDB table here, but when they
+     * try to reopen newer MapDB files without that table, even in read-only mode, they'll just receive an empty Set.
      */
-    public final NavigableSet<GTFSError> errors;
+    public final Set<GTFSError> errors;
 
     // TODO eliminate if not used by Analysis
     /** Merged stop buffers polygon built lazily by getMergedBuffers() */
@@ -779,7 +780,8 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         patternForTrip = db.getTreeMap("patternForTrip");
 
-        errors = db.getTreeSet("errors");
+        // Note that this is an in-memory Java HashSet instead of MapDB table (as it was in past versions).
+        errors = new HashSet<>();
     }
 
     // One critical point when constructing the MapDB is the instance cache type and size.

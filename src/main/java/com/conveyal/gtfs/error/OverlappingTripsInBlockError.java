@@ -15,12 +15,16 @@ public class OverlappingTripsInBlockError extends GTFSError implements Serializa
     public final String routeId;
 
     public OverlappingTripsInBlockError(long line, String field, String affectedEntityId, String routeId, String[] tripIds) {
-        super("trips", line, field, Priority.MEDIUM, affectedEntityId);
+        super("trips", line, field, affectedEntityId);
         this.tripIds = tripIds;
         this.routeId = routeId;
     }
 
     @Override public String getMessage() {
         return String.format("Trip Ids %s overlap (route: %s) and share block ID %s", String.join(" & ", tripIds), routeId, affectedEntityId);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

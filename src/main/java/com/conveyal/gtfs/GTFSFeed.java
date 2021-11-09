@@ -794,7 +794,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     // Initial tests show similar speeds for the default hashtable cache of 64k or 32k size and the hardRef cache.
     // By not calling any of the cacheEnable or cacheSize methods on the DB builder, we use the default values
     // that seem to perform well.
-    private static DB constructMapDb (File dbFile, boolean readOnly) {
+    private static DB constructMapDb (File dbFile, boolean writable) {
         DBMaker dbMaker;
         // TODO also allow for in-memory
         if (dbFile == null) {
@@ -802,10 +802,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         } else {
             dbMaker = DBMaker.newFileDB(dbFile);
         }
-        if (readOnly) {
-            dbMaker.readOnly();
-        } else {
+        if (writable) {
             dbMaker.asyncWriteEnable();
+        } else {
+            dbMaker.readOnly();
         }
         try{
             return dbMaker
@@ -826,7 +826,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     public static GTFSFeed reopenReadOnly (File file) {
         if (file.exists()) {
-            return new GTFSFeed(file, true);
+            return new GTFSFeed(file, false);
         } else {
             throw new GtfsLibException("Cannot reopen file, it does not exist.");
         }
@@ -863,7 +863,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         if (dbFile != null && dbFile.exists() && dbFile.length() > 0) {
             throw new GtfsLibException("Cannot create new file, it already exists.");
         }
-        return new GTFSFeed(dbFile, false);
+        return new GTFSFeed(dbFile, true);
     }
 
     /**
@@ -871,7 +871,7 @@ public class GTFSFeed implements Cloneable, Closeable {
      * the GTFS file at the supplied filesystem path. This could probably be combined with some other factory methods.
      */
     public static GTFSFeed writableTempFileFromGtfs (String file) {
-        GTFSFeed feed = new GTFSFeed(null, false);
+        GTFSFeed feed = new GTFSFeed(null, true);
         try {
             ZipFile zip = new ZipFile(file);
             feed.loadFromFile(zip, null);

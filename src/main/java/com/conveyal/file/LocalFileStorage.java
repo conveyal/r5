@@ -60,10 +60,7 @@ public class LocalFileStorage implements FileStorage {
                 LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copied instead.",
                         sourceFile.getName());
             }
-            // Set the file to be read-only and accessible only by the current user.
-            if (!storedFile.setWritable(false, false)) {
-                LOG.error("Could not restrict permissions on {} to read-only by owner: ", sourceFile.getName());
-            }
+            setReadOnly(storedFile);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -108,6 +105,16 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public boolean exists(FileStorageKey key) {
         return getFile(key).exists();
+    }
+
+    /**
+     * Set the file to be read-only and accessible only by the current user.
+     * There are several ways to set read-only, but this one works on both POSIX and Windows systems.
+     */
+    public static void setReadOnly (File file) {
+        if (!file.setWritable(false, false)) {
+            LOG.error("Could not restrict permissions on {} to read-only by owner: ", file.getName());
+        }
     }
 
 }

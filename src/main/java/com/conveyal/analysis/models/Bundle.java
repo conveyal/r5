@@ -83,6 +83,7 @@ public class Bundle extends Model implements Cloneable {
         public GtfsErrorTypeSummary () { /* For deserialization. */ }
         public GtfsErrorTypeSummary (GTFSError error) {
             this.type = error.errorType;
+            this.priority = error.getPriority();
         }
     }
 

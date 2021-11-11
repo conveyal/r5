@@ -26,6 +26,7 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,7 +44,7 @@ import java.util.stream.StreamSupport;
 /**
  * Encapsulate Shapefile reading logic
  */
-public class ShapefileReader {
+public class ShapefileReader implements Closeable {
     private final FeatureCollection<SimpleFeatureType, SimpleFeature> features;
     private final DataStore store;
     private final FeatureSource<SimpleFeatureType, SimpleFeature> source;
@@ -134,6 +135,7 @@ public class ShapefileReader {
     /**
      * Failure to call this will leave the shapefile locked, which may mess with future attempts to use it.
      */
+    @Override
     public void close () {
         // Note that you also have to close the iterator, see iterator wrapper code above.
         store.dispose();

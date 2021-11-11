@@ -14,6 +14,7 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Cache for GTFSFeed objects, a disk-backed (MapDB) representation of data from one GTFS feed. The source GTFS
@@ -99,24 +100,31 @@ public class GTFSCache {
     }
 
     /** This method should only ever be called by the cache loader. */
-    private @Nonnull GTFSFeed retrieveAndProcessFeed(String id) throws GtfsLibException {
-        FileStorageKey dbKey = getFileKey(id, "db");
-        FileStorageKey dbpKey = getFileKey(id, "db.p");
+    private @Nonnull GTFSFeed retrieveAndProcessFeed(String bundeScopedFeedId) throws GtfsLibException {
+        FileStorageKey dbKey = getFileKey(bundeScopedFeedId, "db");
+        FileStorageKey dbpKey = getFileKey(bundeScopedFeedId, "db.p");
         if (fileStorage.exists(dbKey) && fileStorage.exists(dbpKey)) {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
             fileStorage.getFile(dbKey);
             fileStorage.getFile(dbpKey);
             return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
         }
-        FileStorageKey zipKey = getFileKey(id, "zip");
+        FileStorageKey zipKey = getFileKey(bundeScopedFeedId, "zip");
         if (!fileStorage.exists(zipKey)) {
             throw new GtfsLibException("Original GTFS zip file could not be found: " + zipKey);
         }
+        // This code path is rarely run because we usually pre-build GTFS MapDBs in bundleController and cache them.
+        // This will only be run when the resultant MapDB has been deleted or is otherwise unavailable.
         LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
         try {
             File tempDbFile = FileUtils.createScratchFile("db");
             File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey));
+            // An unpleasant hack since we do not have separate references to the GTFS ID and Bundle ID here,
+            // only a concatenation of the two joined with an underscore. We have to force-override feed ID because
+            // references to its contents (e.g. in scenarios) are scoped only by the feed ID not the bundle ID.
+            final String[] feedAndBundleId = bundeScopedFeedId.split("_");
+            checkState(feedAndBundleId.length == 2, "Expected underscore-joined feedId and bundleId.");
+            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey), feedAndBundleId[0]);
             // The DB file should already be closed and flushed to disk.
             // Put the DB and DB.p files in local cache, and mirror to remote storage if configured.
             fileStorage.moveIntoStorage(dbKey, tempDbFile);

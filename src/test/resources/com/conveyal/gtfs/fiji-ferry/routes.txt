@@ -1,0 +1,2 @@
+﻿route_id,agency_id,route_short_name,route_long_name,route_desc,route_type
+FF,FijiFerry,FF1,Fiji Ferry,The Ferry operates across the 180 degree antimeridian,4

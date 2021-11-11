@@ -13,11 +13,15 @@ public class TableInSubdirectoryError extends GTFSError implements Serializable 
     public final String directory;
 
     public TableInSubdirectoryError(String file, String directory) {
-        super(file, 0, null, Priority.HIGH);
+        super(file, 0, null);
         this.directory = directory;
     }
 
     @Override public String getMessage() {
         return String.format("All GTFS files (including %s.txt) should be at root of zipfile, not nested in subdirectory (%s)", file, directory);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.HIGH;
     }
 }

@@ -3,13 +3,16 @@ package com.conveyal.analysis.datasource.derivation;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.analysis.datasource.SpatialAttribute;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -83,9 +86,6 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         zoom = parseZoom(req.queryParams("zoom"));
         mergePolygons = Boolean.parseBoolean(req.queryParams("mergePolygons"));
         checkNotNull(dataSourceId);
-        if (!mergePolygons) {
-            checkNotNull(nameProperty, "You must supply a nameProperty if mergePolygons is not true.");
-        }
 
         AnalysisCollection<DataSource> dataSourceCollection =
                 database.getAnalysisCollection("dataSources", DataSource.class);
@@ -97,6 +97,23 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
                 "Only polygons can be converted to aggregation areas. DataSource is: " + spatialDataSource.geometryType);
         checkArgument(SHP.equals(spatialDataSource.fileFormat),
                 "Currently, only shapefiles can be converted to aggregation areas.");
+
+        if (!mergePolygons) {
+            checkNotNull(nameProperty, "You must supply a nameProperty if mergePolygons is not true.");
+            SpatialAttribute sa = spatialDataSource.attributes.stream()
+                    .filter(a -> a.name.equals(nameProperty))
+                    .findFirst().orElseThrow(() ->
+                            new IllegalArgumentException("nameProperty does not exist: " + nameProperty));
+            if (sa.type == SpatialAttribute.Type.GEOM) {
+                throw new IllegalArgumentException("nameProperty must be of type TEXT or NUMBER, not GEOM.");
+            }
+        }
+
+        this.fileStorage = fileStorage;
+        // Do not retain AnalysisDB reference, but grab the collections we need.
+        // TODO cache AnalysisCollection instances and reuse? Are they threadsafe?
+        aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
+        dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
 
         /*
           Implementation notes:
@@ -114,15 +131,18 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
          */
         File sourceFile;
         if (SHP.equals(spatialDataSource.fileFormat)) {
+            // On a newly started backend, we can't be sure any sidecar files are on the local filesystem.
+            // We may want to factor this out when we use shapefile DataSources in other derivations.
+            String baseName = spatialDataSource._id.toString();
+            prefetchDataSource(baseName, "dbf");
+            prefetchDataSource(baseName, "shx");
+            prefetchDataSource(baseName, "prj");
             sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
-            ShapefileReader reader = null;
-            try {
-                reader = new ShapefileReader(sourceFile);
+            // Reading the shapefile into a list may actually take a moment, should this be done in the async part?
+            try (ShapefileReader reader = new ShapefileReader(sourceFile)) {
                 finalFeatures = reader.wgs84Stream().collect(Collectors.toList());
-            } catch (FactoryException | RuntimeException | IOException | TransformException e) {
+            } catch (Exception e) {
                 throw new DataSourceException("Failed to load shapefile.", e);
-            } finally {
-                if (reader != null) reader.close();
             }
         } else {
             // GeoJSON, GeoPackage etc.
@@ -135,12 +155,16 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             );
             throw new DataSourceException(message);
         }
-        
-        this.fileStorage = fileStorage;
-        // Do not retain AnalysisDB reference, but grab the collections we need.
-        // TODO cache AnalysisCollection instances and reuse? Are they threadsafe?
-        aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
+    }
+
+    /** Used primarily for shapefiles where we can't be sure whether all sidecar files have been synced locally. */
+    private void prefetchDataSource (String baseName, String extension) {
+        FileStorageKey key = new FileStorageKey(FileCategory.DATASOURCES, baseName, extension);
+        // We need to clarify the FileStorage API on which calls cause the file to be synced locally, and whether these
+        // getFile tolerates getting files that do not exist. This may all become irrelevant if we use NFS.
+        if (fileStorage.exists(key)) {
+            fileStorage.getFile(key);
+        }
     }
 
     @Override
@@ -198,9 +222,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         });
         aggregationAreaCollection.insertMany(aggregationAreas);
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(
-                AGGREGATION_AREA, dataGroup._id.toString(), spatialDataSource.regionId)
-        );
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId));
         progressListener.increment();
 
     }

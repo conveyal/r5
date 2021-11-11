@@ -69,16 +69,7 @@ public class BackendConfig extends ConfigBase implements
         lightThreads = intProp("light-threads");
         heavyThreads = intProp("heavy-threads");
         maxWorkers = intProp("max-workers");
-        validate();
         exitIfErrors();
-    }
-
-    private final void validate () {
-        if (allowOrigin() == null || allowOrigin().equals("null")) {
-            // Access-Control-Allow-Origin: null opens unintended security holes:
-            // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-            throw new IllegalArgumentException("Access-Control-Allow-Origin should not be null");
-        }
     }
 
     // INTERFACE IMPLEMENTATIONS

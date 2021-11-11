@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
@@ -54,15 +53,14 @@ public class LocalFileStorage implements FileStorage {
                 Files.move(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (FileSystemException e) {
                 // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so certain files (e.g.
-                // mapdb) cannot be moved or deleted. This workaround may cause temporary files to accumulate, but it
-                // should not be triggered for default Linux filesystems (ext).
+                // mapdb Write Ahead Log) cannot be moved or deleted. This workaround may cause temporary files
+                // to accumulate, but it should not be triggered for default Linux filesystems (ext).
                 // See https://github.com/jankotek/MapDB/issues/326
                 Files.copy(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
+                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copied instead.",
                         sourceFile.getName());
             }
-            // Set the file to be read-only and accessible only by the current user.
-            Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
+            setReadOnly(storedFile);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -107,6 +105,16 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public boolean exists(FileStorageKey key) {
         return getFile(key).exists();
+    }
+
+    /**
+     * Set the file to be read-only and accessible only by the current user.
+     * There are several ways to set read-only, but this one works on both POSIX and Windows systems.
+     */
+    public static void setReadOnly (File file) {
+        if (!file.setWritable(false, false)) {
+            LOG.error("Could not restrict permissions on {} to read-only by owner: ", file.getName());
+        }
     }
 
 }

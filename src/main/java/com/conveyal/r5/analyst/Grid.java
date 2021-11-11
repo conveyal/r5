@@ -63,6 +63,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
@@ -92,9 +94,6 @@ public class Grid extends PointSet {
      * The data values for each pixel within this grid. Dimension order is (x, y), with range [0, width) and [0, height).
      */
     public final double[][] grid;
-
-    /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
-    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
 
     /** Maximum area allowed for features in a shapefile upload */
     private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
@@ -599,7 +598,7 @@ public class Grid extends PointSet {
         // This will also close the InputStreams.
         reader.close();
 
-        checkWgsEnvelopeSize(envelope);
+        checkWgsEnvelopeSize(envelope, "CSV points");
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
         checkPixelCount(extents, numericColumns.size());
 
@@ -671,7 +670,7 @@ public class Grid extends PointSet {
 
         ShapefileReader reader = new ShapefileReader(shapefile);
         Envelope envelope = reader.wgs84Bounds();
-        checkWgsEnvelopeSize(envelope);
+        checkWgsEnvelopeSize(envelope, "Shapefile");
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
         List<String> numericAttributes = reader.numericAttributes();
         Set<String> uniqueNumericAttributes = new HashSet<>(numericAttributes);
@@ -776,38 +775,6 @@ public class Grid extends PointSet {
         return extents;
     }
 
-    /**
-     * @return the approximate area of an Envelope in WGS84 lat/lon coordinates, in square kilometers.
-     */
-    public static double roughWgsEnvelopeArea (Envelope wgsEnvelope) {
-        double lon0 = wgsEnvelope.getMinX();
-        double lon1 = wgsEnvelope.getMaxX();
-        double lat0 = wgsEnvelope.getMinY();
-        double lat1 = wgsEnvelope.getMaxY();
-        double height = lat1 - lat0;
-        double width = lon1 - lon0;
-        final double KM_PER_DEGREE_LAT = 111.133;
-        // Scale the x direction as if the Earth was a sphere.
-        // Error above the middle latitude should approximately cancel out error below that latitude.
-        double averageLat = (lat0 + lat1) / 2;
-        double xScale = FastMath.cos(FastMath.toRadians(averageLat));
-        double area = (height * KM_PER_DEGREE_LAT) * (width * KM_PER_DEGREE_LAT * xScale);
-        return area;
-    }
-
-    /**
-     * Throw an exception if the provided envelope is too big for a reasonable destination grid.
-     */
-    public static void checkWgsEnvelopeSize (Envelope envelope) {
-        checkWgsEnvelopeRange(envelope);
-        if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
-            throw new DataSourceException(String.format(
-                    "Geographic extent of spatial layer (%.0f km2) exceeds limit of %.0f km2.",
-                    roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM
-            ));
-        }
-    }
-
     public static void checkPixelCount (WebMercatorExtents extents, int layers) {
         int pixels = extents.width * extents.height * layers;
         if (pixels > MAX_PIXELS) {
@@ -817,28 +784,6 @@ public class Grid extends PointSet {
         }
     }
 
-    /**
-     * We have to range-check the envelope before checking its size. Large unprojected y values interpreted as latitudes
-     * can yield negaive cosines, producing negative estimated areas, producing false negatives on size checks.
-     */
-    private static void checkWgsEnvelopeRange (Envelope envelope) {
-        checkLon(envelope.getMinX());
-        checkLon(envelope.getMaxX());
-        checkLat(envelope.getMinY());
-        checkLat(envelope.getMaxY());
-    }
 
-    private static void checkLon (double longitude) {
-        if (!Double.isFinite(longitude) || Math.abs(longitude) > 180) {
-            throw new DataSourceException("Longitude is not a finite number with absolute value below 180.");
-        }
-    }
-
-    private static void checkLat (double latitude) {
-        // Longyearbyen on the Svalbard archipelago is the world's northernmost permanent settlement (78 degrees N).
-        if (!Double.isFinite(latitude) || Math.abs(latitude) > 80) {
-            throw new DataSourceException("Longitude is not a finite number with absolute value below 80.");
-        }
-    }
 
 }

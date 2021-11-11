@@ -13,12 +13,16 @@ public class DuplicateStopError extends GTFSError implements Serializable {
     public final DuplicateStops duplicateStop;
 
     public DuplicateStopError(DuplicateStops duplicateStop) {
-        super("stop", duplicateStop.getDuplicatedStop().sourceFileLine, "stop_lat,stop_lon", Priority.MEDIUM, duplicateStop.getDuplicatedStop().stop_id);
+        super("stop", duplicateStop.getDuplicatedStop().sourceFileLine, "stop_lat,stop_lon", duplicateStop.getDuplicatedStop().stop_id);
         this.message = duplicateStop.toString();
         this.duplicateStop = duplicateStop;
     }
 
     @Override public String getMessage() {
         return message;
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

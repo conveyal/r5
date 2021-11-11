@@ -140,15 +140,15 @@ public class TransportNetworkCache {
         return scenarioNetwork;
     }
 
-    private String getScenarioFilename(String networkId, String scenarioId) {
+    public static String getScenarioFilename (String networkId, String scenarioId) {
         return String.format("%s_%s.json", networkId, scenarioId);
     }
 
-    private String getR5NetworkFilename(String networkId) {
+    private static String getR5NetworkFilename (String networkId) {
         return String.format("%s_%s.dat", networkId, KryoNetworkSerializer.NETWORK_FORMAT_VERSION);
     }
 
-    private FileStorageKey getR5NetworkFileStorageKey (String networkId) {
+    private static FileStorageKey getR5NetworkFileStorageKey (String networkId) {
         return new FileStorageKey(BUNDLES, getR5NetworkFilename(networkId));
     }
 

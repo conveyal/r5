@@ -61,7 +61,7 @@ public class WorkerProxyController implements HttpController {
         if (address == null) {
             Bundle bundle = null;
             // There are no workers that can handle this request. Request one and ask the UI to retry later.
-            WorkerTags workerTags = new WorkerTags(UserPermissions.from(request), "anyProjectId", bundle.regionId);
+            WorkerTags workerTags = new WorkerTags(UserPermissions.from(request), bundle.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             response.status(HttpStatus.ACCEPTED_202);
             response.header("Retry-After", "30");

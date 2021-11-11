@@ -18,6 +18,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
@@ -118,7 +119,7 @@ public class FreeFormPointSet extends PointSet {
                 // If count column was specified and present, use it. Otherwise, one opportunity per point.
                 ret.counts[rec] = countCol < 0 ? 1D : Double.parseDouble(reader.get(countCol));
             }
-            Grid.checkWgsEnvelopeSize(ret.getWgsEnvelope());
+            checkWgsEnvelopeSize(ret.getWgsEnvelope(), "freeform pointset");
             return ret;
         } catch (NumberFormatException nfe) {
             throw new ParameterException(

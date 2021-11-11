@@ -150,10 +150,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /**
      * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
-     * TODO store these outside the mapdb for size? If we just don't create this map, old workers should not fail.
-     * Ideally we'd report the errors to the backend when it first builds the MapDB.
+     * Note that this set is in memory, not in the MapDB file. We save these into a JSON file to avoid shuttling
+     * all the serialized errors back and forth to workers. Older workers do have a MapDB table here, but when they
+     * try to reopen newer MapDB files without that table, even in read-only mode, they'll just receive an empty Set.
      */
-    public final NavigableSet<GTFSError> errors;
+    public final Set<GTFSError> errors;
 
     // TODO eliminate if not used by Analysis
     /** Merged stop buffers polygon built lazily by getMergedBuffers() */
@@ -187,6 +188,8 @@ public class GTFSFeed implements Cloneable, Closeable {
      * Interestingly, all references are resolvable when tables are loaded in alphabetical order.
      *
      * @param zip the source ZIP file to load, which will be closed when done loading.
+     * @param fid the feedId to be set on the feed. If null, any feedId declared in the feed will be used, falling back
+     *            on the filename without any .zip extension.
      */
     public void loadFromFile(ZipFile zip, String fid) throws Exception {
         if (this.loaded) throw new UnsupportedOperationException("Attempt to load GTFS into existing database");
@@ -207,13 +210,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
         if (fid != null) {
             feedId = fid;
-            LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
-        }
-        else if (feedId == null || feedId.isEmpty()) {
+            LOG.info("Forcing feedId in MapDB to supplied string: {}.", feedId);
+        } else if (feedId == null || feedId.isEmpty()) {
             feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
-            LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
-        }
-        else {
+            LOG.info("No feedId supplied and feed does not declare one. Using file name {}.", feedId);
+        } else {
             LOG.info("Feed ID is '{}'.", feedId);
         }
 
@@ -257,10 +258,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
         LOG.info("Detected {} errors in feed.", errors.size());
-    }
-
-    public void loadFromFile(ZipFile zip) throws Exception {
-        loadFromFile(zip, null);
     }
 
     public void toFile (String file) {
@@ -783,7 +780,8 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         patternForTrip = db.getTreeMap("patternForTrip");
 
-        errors = db.getTreeSet("errors");
+        // Note that this is an in-memory Java HashSet instead of MapDB table (as it was in past versions).
+        errors = new HashSet<>();
     }
 
     // One critical point when constructing the MapDB is the instance cache type and size.
@@ -838,14 +836,16 @@ public class GTFSFeed implements Cloneable, Closeable {
      * Create a new DB file and load the specified GTFS ZIP into it. The resulting writable feed object is not returned
      * and must be reopened for subsequent read-only access.
      * @param dbFile the new file in which to store the database, or null to use a temporary file
+     * @param feedId the feedId to be set on the feed. If null, any feedId declared in the feed will be used, falling
+     *               back on the filename without its .zip extension.
      */
-    public static void newFileFromGtfs (File dbFile, File gtfsFile) {
+    public static void newFileFromGtfs (File dbFile, File gtfsFile, String feedId) {
         if (gtfsFile == null || !gtfsFile.exists()) {
             throw new GtfsLibException("Cannot load from GTFS feed, file does not exist.");
         }
         try {
             GTFSFeed feed = newWritableFile(dbFile);
-            feed.loadFromFile(new ZipFile(gtfsFile));
+            feed.loadFromFile(new ZipFile(gtfsFile), feedId);
             feed.close();
         } catch (Exception e) {
             throw new GtfsLibException("Cannot load GTFS from feed ZIP.", e);
@@ -874,7 +874,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         GTFSFeed feed = new GTFSFeed(null, false);
         try {
             ZipFile zip = new ZipFile(file);
-            feed.loadFromFile(zip);
+            feed.loadFromFile(zip, null);
             zip.close();
             return feed;
         } catch (Exception e) {
@@ -883,11 +883,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    // NOTE the feedId within the MapDB created here will be the one declared by the feed or based on its filename.
+    // This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
     public static GTFSFeed readOnlyTempFileFromGtfs (String fileName) {
         try {
             File tempFile = File.createTempFile("com.conveyal.gtfs.", ".db");
             tempFile.deleteOnExit();
-            GTFSFeed.newFileFromGtfs(tempFile, new File(fileName));
+            GTFSFeed.newFileFromGtfs(tempFile, new File(fileName), null);
             return GTFSFeed.reopenReadOnly(tempFile);
         } catch (Exception e) {
             throw new GtfsLibException("Error loading GTFS.", e);

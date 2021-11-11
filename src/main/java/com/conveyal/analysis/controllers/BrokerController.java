@@ -31,6 +31,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
 import org.mongojack.DBCursor;
@@ -124,13 +125,19 @@ public class BrokerController implements HttpController {
         // Deserialize the task in the request body so we can see what kind of worker it wants.
         // Perhaps we should allow both travel time surface and accessibility calculation tasks to be done as single points.
         // AnalysisRequest (backend) vs. AnalysisTask (R5)
-        // The accessgroup stuff is copypasta from the old single point controller.
         // We already know the user is authenticated, and we need not check if they have access to the graphs etc,
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
         UserPermissions userPermissions = UserPermissions.from(request);
         final long startTimeMsec = System.currentTimeMillis();
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
+        // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
+        checkNotNull(analysisRequest.regionId);
+        checkNotNull(analysisRequest.projectId);
+        checkNotNull(analysisRequest.bundleId);
+        checkNotNull(analysisRequest.modificationIds);
+        checkNotNull(analysisRequest.workerVersion);
+
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
         analysisRequest.populateTask(task, userPermissions);
@@ -169,7 +176,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.projectId, analysisRequest.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
@@ -179,7 +186,8 @@ public class BrokerController implements HttpController {
             // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
             broker.recentlyRequestedWorkers.remove(workerCategory);
         }
-        String workerUrl = "http://" + address + ":7080/single"; // TODO remove hard-coded port number.
+        // Port number is hard-coded until we have a good reason to make it configurable.
+        String workerUrl = "http://" + address + ":7080/single";
         LOG.debug("Re-issuing HTTP request from UI to worker at {}", workerUrl);
         HttpPost httpPost = new HttpPost(workerUrl);
         // httpPost.setHeader("Accept", "application/x-analysis-time-grid");
@@ -227,7 +235,15 @@ public class BrokerController implements HttpController {
                     "complexity of this scenario, your request may have too many simulated schedules. If you are " +
                     "using Routing Engine version < 4.5.1, your scenario may still be in preparation and you should " +
                     "try again in a few minutes.");
-        } catch (NoRouteToHostException nrthe){
+        } catch (NoRouteToHostException | HttpHostConnectException e) {
+            // NoRouteToHostException occurs when a single-point worker shuts down (normally due to inactivity) but is
+            // not yet removed from the worker catalog.
+            // HttpHostConnectException has also been observed, presumably after a worker shuts down and a new one
+            // starts up but claims the same IP address as the defunct single point worker.
+            // Yet another even rarer case is possible, where a single point worker starts for a different network and
+            // is assigned the same IP as the defunct worker.
+            // All these cases could be avoided by more rapidly removing workers from the catalog via frequent regular
+            // polling with backpressure, potentially including an "I'm shutting down" flag.
             LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
                     "user made a single-point request within WORKER_RECORD_DURATION_MSEC after shutdown.", workerCategory);
             httpPost.abort();

@@ -19,13 +19,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.conveyal.file.FileCategory.POLYGONS;
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * This is an abstraction for the polygons used to configure the road congestion modification type and the ride hailing
@@ -107,8 +106,8 @@ public class IndexedPolygonCollection {
     }
 
     public void loadFromS3GeoJson() throws Exception {
-        // FIXME this needs to be adapted to new SpatialDataSource. How will we handle .gz data?
-        File polygonInputFile = WorkerComponents.fileStorage.getFile(new FileStorageKey(POLYGONS, polygonLayer));
+        // FIXME How will we handle .gz data?
+        File polygonInputFile = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, polygonLayer));
         GeoJSONDataStore dataStore = new GeoJSONDataStore(polygonInputFile);
         SimpleFeatureSource featureSource = dataStore.getFeatureSource();
         FeatureCollection featureCollection = featureSource.getFeatures();

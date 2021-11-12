@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
 import java.util.Set;
 
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
@@ -40,12 +42,13 @@ public class LocalFileStorage implements FileStorage {
 
     /**
      * Move the File into the FileStorage by moving the passed in file to the Path represented by the FileStorageKey.
+     * It is possible that on some systems (Windows) the file cannot be moved and it will be copied instead, leaving
+     * the source file in place.
      */
     @Override
     public void moveIntoStorage(FileStorageKey key, File sourceFile) {
-        // Get a pointer to the local file
+        // Get the destination file path inside FileStorage, and ensure all its parent directories exist.
         File storedFile = getFile(key);
-        // Ensure the directories exist
         storedFile.getParentFile().mkdirs();
         try {
             try {
@@ -109,11 +112,32 @@ public class LocalFileStorage implements FileStorage {
 
     /**
      * Set the file to be read-only and accessible only by the current user.
-     * There are several ways to set read-only, but this one works on both POSIX and Windows systems.
+     * All files in our FileStorage are set to read-only as a safeguard against corruption under concurrent access.
+     * Because the method Files.setPosixFilePermissions fails on Windows with an UnsupportedOperationException,
+     * we attempted to use the portable File.setReadable and File.setWritable methods to cover both POSIX and Windows
+     * filesystems, but these require multiple calls in succession to achieve fine grained control on POSIX filesystems.
+     * Specifically, there is no way to atomically set a file readable by its owner but non-readable by all other users.
+     * The setReadable/Writable ownerOnly parameter just leaves group and others permissions untouched and unchanged.
+     * To get the desired result on systems with user-group-other permissions granularity, you have to do something like:
+     * success &= file.setReadable(false, false);
+     * success &= file.setWritable(false, false);
+     * success &= file.setReadable(true, true);
+     *
+     * Instead, we first do the POSIX atomic call, which should cover all deployment environments, then fall back on the
+     * NIO call to cover any development environments using other filesystems.
      */
     public static void setReadOnly (File file) {
-        if (!file.setWritable(false, false)) {
-            LOG.error("Could not restrict permissions on {} to read-only by owner: ", file.getName());
+        try {
+            try {
+                Files.setPosixFilePermissions(file.toPath(), EnumSet.of(PosixFilePermission.OWNER_READ));
+            } catch (UnsupportedOperationException e) {
+                LOG.warn("POSIX permissions unsupported on this filesystem. Falling back on portable NIO methods.");
+                if (!(file.setReadable(true) && file.setWritable(false))) {
+                    LOG.error("Could not set read-only permissions on file {}", file);
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Could not set read-only permissions on file {}", file, e);
         }
     }
 

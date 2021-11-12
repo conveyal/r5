@@ -107,7 +107,16 @@ public class GTFSCache {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
             fileStorage.getFile(dbKey);
             fileStorage.getFile(dbpKey);
-            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
+            try {
+                return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
+            } catch (GtfsLibException e) {
+                if (e.getCause().getMessage().contains("Could not set field value: priority")) {
+                    // Swallow exception and fall through - rebuild bad MapDB and upload to S3.
+                    LOG.warn("Detected poisoned MapDB containing GTFSError.priority serializer. Rebuilding.");
+                } else {
+                    throw e;
+                }
+            }
         }
         FileStorageKey zipKey = getFileKey(bundeScopedFeedId, "zip");
         if (!fileStorage.exists(zipKey)) {

@@ -100,9 +100,9 @@ public class GTFSCache {
     }
 
     /** This method should only ever be called by the cache loader. */
-    private @Nonnull GTFSFeed retrieveAndProcessFeed(String bundeScopedFeedId) throws GtfsLibException {
-        FileStorageKey dbKey = getFileKey(bundeScopedFeedId, "db");
-        FileStorageKey dbpKey = getFileKey(bundeScopedFeedId, "db.p");
+    private @Nonnull GTFSFeed retrieveAndProcessFeed(String bundleScopedFeedId) throws GtfsLibException {
+        FileStorageKey dbKey = getFileKey(bundleScopedFeedId, "db");
+        FileStorageKey dbpKey = getFileKey(bundleScopedFeedId, "db.p");
         if (fileStorage.exists(dbKey) && fileStorage.exists(dbpKey)) {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
             fileStorage.getFile(dbKey);
@@ -118,7 +118,7 @@ public class GTFSCache {
                 }
             }
         }
-        FileStorageKey zipKey = getFileKey(bundeScopedFeedId, "zip");
+        FileStorageKey zipKey = getFileKey(bundleScopedFeedId, "zip");
         if (!fileStorage.exists(zipKey)) {
             throw new GtfsLibException("Original GTFS zip file could not be found: " + zipKey);
         }
@@ -128,12 +128,19 @@ public class GTFSCache {
         try {
             File tempDbFile = FileUtils.createScratchFile("db");
             File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-            // An unpleasant hack since we do not have separate references to the GTFS ID and Bundle ID here,
+            // An unpleasant hack since we do not have separate references to the GTFS feed ID and Bundle ID here,
             // only a concatenation of the two joined with an underscore. We have to force-override feed ID because
             // references to its contents (e.g. in scenarios) are scoped only by the feed ID not the bundle ID.
-            final String[] feedAndBundleId = bundeScopedFeedId.split("_");
-            checkState(feedAndBundleId.length == 2, "Expected underscore-joined feedId and bundleId.");
-            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey), feedAndBundleId[0]);
+            // The bundle ID is expected to always be an underscore-free UUID, but old feed IDs may contain underscores
+            // (yielding filenames like old_feed_id_bundleuuid) so we look for the last underscore as a split point.
+            // GTFS feeds may now be referenced by multiple bundles with different IDs, so the last part of the file
+            // name is rather arbitrary - it's just the bundleId with which this feed was first associated.
+            // We don't really need to scope newer feeds by bundleId since they now have globally unique UUIDs.
+            int splitIndex = bundleScopedFeedId.lastIndexOf("_");
+            checkState(splitIndex > 0 && splitIndex < bundleScopedFeedId.length() - 1,
+                "Expected underscore-joined feedId and bundleId.");
+            String feedId = bundleScopedFeedId.substring(0, splitIndex);
+            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey), feedId);
             // The DB file should already be closed and flushed to disk.
             // Put the DB and DB.p files in local cache, and mirror to remote storage if configured.
             fileStorage.moveIntoStorage(dbKey, tempDbFile);

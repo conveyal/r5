@@ -113,6 +113,9 @@ public class TransportNetwork implements Serializable {
      * doesn't really matter, particularly for analytics. Loading all he feeds into memory simulataneously shouldn't be
      * so bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap allocations etc.)
      * Therefore we create the feeds within a stream which loads them one by one on demand.
+     *
+     * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
+     * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
     public static TransportNetwork fromFiles (
             String osmSourceFile,
@@ -194,7 +197,12 @@ public class TransportNetwork implements Serializable {
         return transportNetwork;
     }
 
-    /** Scan a directory detecting all the files that are network inputs, then build a network from those files. */
+    /**
+     * Scan a directory detecting all the files that are network inputs, then build a network from those files.
+     *
+     * NOTE the feedId of the gtfs feeds laoded here will be the ones declared by the feeds or based on their filenames.
+     * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
+     */
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();

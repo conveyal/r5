@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -27,6 +28,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      * Level 10 is probably ideal but will quadruple calculation relative to 9.
      */
     public static final int DEFAULT_ZOOM = 9;
+
+    public static final int MIN_ZOOM = 9;
+
+    public static final int MAX_ZOOM = 12;
 
     /** web mercator zoom level */
     public final int zoom;
@@ -75,6 +80,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      */
     public WebMercatorGridPointSet (Envelope wgsEnvelope) {
         LOG.info("Creating WebMercatorGridPointSet with WGS84 extents {}", wgsEnvelope);
+        checkWgsEnvelopeSize(wgsEnvelope, "grid point set");
         this.zoom = DEFAULT_ZOOM;
         int west = lonToPixel(wgsEnvelope.getMinX());
         int east = lonToPixel(wgsEnvelope.getMaxX());
@@ -229,12 +235,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return new WebMercatorExtents(west, north, width, height, zoom);
     }
 
-    public static int parseZoom(String zoom) {
-        if (zoom != null) {
-            return Integer.parseInt(zoom);
-        } else {
-            return DEFAULT_ZOOM;
-        }
+    public static int parseZoom(String zoomString) {
+        int zoom = (zoomString == null) ? DEFAULT_ZOOM : Integer.parseInt(zoomString);
+        checkArgument(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM);
+        return zoom;
     }
 
 }

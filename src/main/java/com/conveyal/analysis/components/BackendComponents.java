@@ -7,14 +7,12 @@ import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.FileStorageController;
-import com.conveyal.analysis.controllers.GTFSGraphQLController;
+import com.conveyal.analysis.controllers.GtfsController;
 import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
-import com.conveyal.analysis.controllers.ModificationController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
-import com.conveyal.analysis.controllers.ProjectController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
-import com.conveyal.analysis.controllers.TimetableController;
+import com.conveyal.analysis.controllers.DataSourceController;
 import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
@@ -86,15 +84,12 @@ public abstract class BackendComponents {
         return Lists.newArrayList(
                 // These handlers are at paths beginning with /api
                 // and therefore subject to authentication and authorization.
-                new ModificationController(),
-                new ProjectController(),
-                new GTFSGraphQLController(gtfsCache),
+                new GtfsController(gtfsCache),
                 new BundleController(this),
-                new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor),
+                new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
                 new RegionalAnalysisController(broker, fileStorage),
-                new AggregationAreaController(fileStorage),
-                new TimetableController(),
                 new FileStorageController(fileStorage, database),
+                new AggregationAreaController(fileStorage, database, taskScheduler),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
                 // is exempted from authentication and authorization, but should be hidden from the world
                 // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
@@ -102,7 +97,8 @@ public abstract class BackendComponents {
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
-                new GtfsTileController(gtfsCache)
+                new GtfsTileController(gtfsCache),
+                new DataSourceController(fileStorage, database, taskScheduler, censusExtractor)
         );
     }
 

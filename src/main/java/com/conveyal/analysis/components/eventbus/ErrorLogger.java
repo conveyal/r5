@@ -15,7 +15,8 @@ public class ErrorLogger implements EventHandler {
     public void handleEvent (Event event) {
         if (event instanceof ErrorEvent) {
             ErrorEvent errorEvent = (ErrorEvent) event;
-            LOG.error("User {} of {}: {}", errorEvent.user, errorEvent.accessGroup, errorEvent.stackTrace);
+            // Verbose message (full stack traces) for console logs.
+            LOG.error(errorEvent.traceWithContext(true));
         }
     }
 

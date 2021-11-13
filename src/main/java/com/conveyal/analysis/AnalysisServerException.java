@@ -1,11 +1,8 @@
 package com.conveyal.analysis;
 
 import com.conveyal.r5.util.ExceptionUtils;
-import graphql.GraphQLError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 public class AnalysisServerException extends RuntimeException {
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisServerException.class);
@@ -40,17 +37,6 @@ public class AnalysisServerException extends RuntimeException {
         return new AnalysisServerException(Type.FORBIDDEN, message, 403);
     }
 
-    public static AnalysisServerException graphQL(List<GraphQLError> errors) {
-        return new AnalysisServerException(
-                Type.GRAPHQL,
-                errors
-                    .stream()
-                    .map(e -> e.getMessage())
-                    .reduce("", (a, b) -> a + " " + b),
-                400
-        );
-    }
-
     public static AnalysisServerException nonce() {
         return new AnalysisServerException(Type.NONCE, "The data you attempted to change is out of date and could not be " +
                 "updated. This project may be open by another user or in another browser tab.", 400);
@@ -60,6 +46,8 @@ public class AnalysisServerException extends RuntimeException {
         return new AnalysisServerException(Type.NOT_FOUND, message, 404);
     }
 
+    // Note that there is a naming mistake in the HTTP codes. 401 "unauthorized" actually means "unauthenticated".
+    // 403 "forbidden" is what is usually referred to as "unauthorized" in other contexts.
     public static AnalysisServerException unauthorized(String message) {
         return new AnalysisServerException(Type.UNAUTHORIZED, message, 401);
     }

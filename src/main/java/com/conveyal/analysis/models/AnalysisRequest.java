@@ -1,39 +1,48 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.common.JsonUtilities;
 import com.mongodb.QueryBuilder;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.zip.CRC32;
 
 /**
  * Request sent from the UI to the backend. It is actually distinct from the task that the broker
  * sends/forwards to R5 workers (see {@link AnalysisWorkerTask}), though it has many of the same fields.
  */
 public class AnalysisRequest {
-
     private static int MIN_ZOOM = 9;
     private static int MAX_ZOOM = 12;
     private static int MAX_GRID_CELLS = 5_000_000;
 
+    /**
+     * These three IDs are redundant, and just help reduce the number of database lookups necessary.
+     * The bundleId and modificationIds should be considered the definitive source of truth (regionId and projectId are
+     * implied by the bundleId and the modification Ids). Behavior is undefined if the API caller sends inconsistent
+     * information (a different regionId or projectId than the one the bundleId belongs to).
+     */
+    public String regionId;
     public String projectId;
-    public int variantIndex;
+    public String scenarioId;
+
+    public String bundleId;
+    public List<String> modificationIds = new ArrayList<>();
     public String workerVersion;
 
     public String accessModes;
@@ -149,20 +158,20 @@ public class AnalysisRequest {
     public DecayFunction decayFunction;
 
     /**
-     * Get all of the modifications for a project id that are in the Variant and map them to their
-     * corresponding r5 mod
+     * Create the R5 `Scenario` from this request.
      */
-    private static List<Modification> modificationsForProject (
-            String accessGroup,
-            String projectId,
-            int variantIndex)
-    {
-        return Persistence.modifications
-                .findPermitted(QueryBuilder.start("projectId").is(projectId).get(), accessGroup)
-                .stream()
-                .filter(m -> variantIndex < m.variants.length && m.variants[variantIndex])
-                .map(com.conveyal.analysis.models.Modification::toR5)
-                .collect(Collectors.toList());
+    public Scenario createScenario (UserPermissions userPermissions) {
+        QueryBuilder query = "all".equals(scenarioId)
+                ? QueryBuilder.start("projectId").is(projectId)
+                : QueryBuilder.start("_id").in(modificationIds);
+        Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), userPermissions);
+        // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
+        String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
+        String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
+        Scenario scenario = new Scenario();
+        scenario.id = scenarioId;
+        scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
+        return scenario;
     }
 
     /**
@@ -178,58 +187,23 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public AnalysisWorkerTask populateTask (AnalysisWorkerTask task, Project project) {
+    public void populateTask (AnalysisWorkerTask task, UserPermissions userPermissions) {
+        if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
 
-        // Fetch the modifications associated with this project, filtering for the selected scenario
-        // (denoted here as "variant"). There are no modifications in the baseline scenario
-        // (which is denoted by special index -1).
-        List<Modification> modifications = new ArrayList<>();
-        String scenarioName;
-        if (variantIndex > -1) {
-            modifications = modificationsForProject(project.accessGroup, projectId, variantIndex);
-            scenarioName = project.variants[variantIndex];
-        } else {
-            scenarioName = "Baseline";
-        }
-
-        // The CRC of the modifications in this scenario is appended to the scenario ID to
-        // identify a unique revision of the scenario (still denoted here as variant) allowing
-        // the worker to cache and reuse networks built by applying that exact revision of the
-        // scenario to a base network.
-        CRC32 crc = new CRC32();
-        crc.update(JsonUtilities.objectToJsonBytes(modifications));
-        long crcValue = crc.getValue();
-
-        task.scenario = new Scenario();
-        // FIXME Job IDs need to be unique. Why are we setting this to the project and variant?
-        //       This only works because the job ID is overwritten when the job is enqueued.
-        //       Its main effect is to cause the scenario ID to have this same pattern!
-        //       We should probably leave the JobID null on single point tasks. Needed: polymorphic task initialization.
-        task.jobId = String.format("%s-%s-%s", projectId, variantIndex, crcValue);
-        task.scenario.id = task.scenarioId = task.jobId;
-        task.scenario.modifications = modifications;
-        task.scenario.description = scenarioName;
-        task.graphId = project.bundleId;
+        task.scenario = createScenario(userPermissions);
+        task.graphId = bundleId;
         task.workerVersion = workerVersion;
-        task.maxFare = this.maxFare;
-        task.inRoutingFareCalculator = this.inRoutingFareCalculator;
-
-        Bounds bounds = this.bounds;
-        if (bounds == null) {
-            // If no bounds were specified, fall back on the bounds of the entire region.
-            Region region = Persistence.regions.findByIdIfPermitted(project.regionId, project.accessGroup);
-            bounds = region.bounds;
-        }
+        task.maxFare = maxFare;
+        task.inRoutingFareCalculator = inRoutingFareCalculator;
 
         // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
         //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
-
-        Grid grid = new Grid(zoom, bounds.envelope());
-        checkZoom(grid);
-        task.height = grid.height;
-        task.north = grid.north;
-        task.west = grid.west;
-        task.width = grid.width;
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
+        checkGridSize(extents);
+        task.height = extents.height;
+        task.north = extents.north;
+        task.west = extents.west;
+        task.width = extents.width;
         task.zoom = zoom;
 
         task.date = date;
@@ -279,21 +253,19 @@ public class AnalysisRequest {
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
         }
-
-        return task;
     }
 
-    private static void checkZoom(Grid grid) {
-        if (grid.zoom < MIN_ZOOM || grid.zoom > MAX_ZOOM) {
+    private static void checkGridSize (WebMercatorExtents extents) {
+        if (extents.zoom < MIN_ZOOM || extents.zoom > MAX_ZOOM) {
             throw AnalysisServerException.badRequest(String.format(
-                    "Requested zoom (%s) is outside valid range (%s - %s)", grid.zoom, MIN_ZOOM, MAX_ZOOM
+                    "Requested zoom (%s) is outside valid range (%s - %s)", extents.zoom, MIN_ZOOM, MAX_ZOOM
             ));
         }
-        if (grid.height * grid.width > MAX_GRID_CELLS) {
+        if (extents.height * extents.width > MAX_GRID_CELLS) {
             throw AnalysisServerException.badRequest(String.format(
                     "Requested number of destinations (%s) exceeds limit (%s). " +
                             "Set smaller custom geographic bounds or a lower zoom level.",
-                            grid.height * grid.width, MAX_GRID_CELLS
+                            extents.height * extents.width, MAX_GRID_CELLS
             ));
         }
     }

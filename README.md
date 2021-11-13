@@ -1,14 +1,11 @@
 # Conveyal R5 Routing Engine
 
 ## R5: Rapid Realistic Routing on Real-world and Reimagined networks
+R5 is the routing engine for [Conveyal](https://www.conveyal.com/learn), a web-based system that allows users to create transportation scenarios and evaluate them in terms of cumulative opportunities accessibility indicators. See the [Conveyal user manual](https://docs.conveyal.com/) for more information.
 
-R5 is Conveyal's routing engine for multimodal (transit/bike/walk/car) networks, with a particular focus on public transit. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opportunities accessibility indicators). 
-
-We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. R5 handles both scheduled public transit and headway-based lines, using novel methods to characterize variation and uncertainty in travel times.
+We refer to the routing method as "realistic" because it works by planning door-to-door trips at many different departure times in a time window, which better reflects how people use transportation systems than planning a single trip at an exact departure time. R5 handles both scheduled public transit and headway-based lines, using novel methods to characterize variation and uncertainty in travel times. It is designed for one-to-many and many-to-many travel-time calculations used in access indicators, offering substantially better performance than repeated calls to older tools that provide one-to-one routing results. For a comparison with OpenTripPlanner, see [this background](http://docs.opentripplanner.org/en/latest/Version-Comparison/#commentary-on-otp1-features-removed-from-otp2).
 
 We say "Real-world and Reimagined" networks because R5's networks are built from widely available open OSM and GTFS data describing baseline transportation systems, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
-
-R5 is a core component of [Conveyal Analysis](https://www.conveyal.com/learn), which allows users to create transportation scenarios and evaluate them in terms of cumulative opportunities accessibility indicators. See the [methodology section](https://docs.conveyal.com/analysis/methodology) of the [Conveyal user manual](https://docs.conveyal.com/) for more information.
 
 **Please note** that the Conveyal team does not provide technical support for third-party deployments of its analysis platform. We provide paid subscriptions to a cloud-based deployment of this system, which performs these complex calculations hundreds of times faster using a compute cluster. This project is open source primarily to ensure transparency and reproducibility in public planning and decision making processes, and in hopes that it may help researchers, students, and potential collaborators to understand and build upon our methodology.
 

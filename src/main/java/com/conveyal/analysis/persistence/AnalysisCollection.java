@@ -1,6 +1,7 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.analysis.util.JsonUtil;
 import com.mongodb.client.MongoCollection;
@@ -21,12 +22,10 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class AnalysisCollection<T extends BaseModel> {
 
-    public MongoCollection<T> collection;
-    private Class<T> type;
+    public static final String MONGO_PROP_ACCESS_GROUP = "accessGroup";
 
-    private String getAccessGroup (Request req) {
-        return req.attribute("accessGroup");
-    }
+    public final MongoCollection<T> collection;
+    private final Class<T> type;
 
     private AnalysisServerException invalidAccessGroup() {
         return AnalysisServerException.forbidden("Permission denied. Invalid access group.");
@@ -41,8 +40,14 @@ public class AnalysisCollection<T extends BaseModel> {
         return collection.deleteOne(eq("_id", value._id));
     }
 
-    public List<T> findPermitted(Bson query, String accessGroup) {
-        return find(and(eq("accessGroup", accessGroup), query));
+    public DeleteResult deleteByIdParamIfPermitted (Request request) {
+        String _id = request.params("_id");
+        UserPermissions user = UserPermissions.from(request);
+        return collection.deleteOne(and(eq("_id", new ObjectId(_id)), eq("accessGroup", user.accessGroup)));
+    }
+
+    public List<T> findPermitted(Bson query, UserPermissions userPermissions) {
+        return find(and(eq(MONGO_PROP_ACCESS_GROUP, userPermissions.accessGroup), query));
     }
 
     public List<T> find(Bson query) {
@@ -62,15 +67,40 @@ public class AnalysisCollection<T extends BaseModel> {
         return collection.find(eq("_id", _id)).first();
     }
 
-    public T create(T newModel, String accessGroup, String creatorEmail) {
-        newModel.accessGroup = accessGroup;
-        newModel.createdBy = creatorEmail;
-        newModel.updatedBy = creatorEmail;
+    public T findByIdIfPermitted (String _id, UserPermissions userPermissions) {
+        T item = findById(_id);
+        if (item.accessGroup.equals(userPermissions.accessGroup)) {
+            return item;
+        } else {
+            // TODO: To simplify stack traces this should be refactored to "throw new InvalidAccessGroupException()"
+            //       which should be a subtype of AnalysisServerException with methods like getHttpCode().
+            throw invalidAccessGroup();
+        }
+    }
 
-        // This creates the `_id` automatically
+    public T create(T newModel, UserPermissions userPermissions) {
+        newModel.accessGroup = userPermissions.accessGroup;
+        newModel.createdBy = userPermissions.email;
+        newModel.updatedBy = userPermissions.email;
+
+        // This creates the `_id` automatically if it is missing
         collection.insertOne(newModel);
 
         return newModel;
+    }
+
+    /**
+     * Note that if the supplied model has _id = null, the Mongo insertOne method will overwrite it with a new
+     * ObjectId(). We consider it good practice to set the _id for any model object ourselves, avoiding this behavior.
+     * It looks like we could remove the OBJECT_ID_GENERATORS convention to force explicit ID creation.
+     * https://mongodb.github.io/mongo-java-driver/3.11/bson/pojos/#conventions
+     */
+    public void insert (T model) {
+        collection.insertOne(model);
+    }
+
+    public void insertMany (List<? extends T> models) {
+        collection.insertMany(models);
     }
 
     public T update(T value) {
@@ -86,7 +116,7 @@ public class AnalysisCollection<T extends BaseModel> {
         UpdateResult result = collection.replaceOne(and(
                 eq("_id", value._id),
                 eq("nonce", oldNonce),
-                eq("accessGroup", accessGroup)
+                eq(MONGO_PROP_ACCESS_GROUP, accessGroup)
         ), value);
 
         // If no documents were modified try to find the document to find out why
@@ -106,29 +136,27 @@ public class AnalysisCollection<T extends BaseModel> {
         return value;
     }
 
+    // TODO should all below be static helpers on HttpController? Passing the whole request in seems to defy encapsulation.
+    //  On the other hand, making them instance methods reduces the number of parameters and gives access to Class<T>.
+
     /**
      * Controller creation helper.
      */
     public T create(Request req, Response res) throws IOException {
         T value = JsonUtil.objectMapper.readValue(req.body(), type);
-
-        String accessGroup = getAccessGroup(req);
-        String email = req.attribute("email");
-        return create(value, accessGroup, email);
+        return create(value, UserPermissions.from(req));
     }
 
     /**
-     * Controller find by id helper.
+     * Helper for HttpControllers - find a document by the _id path parameter in the request, checking permissions.
      */
-    public T findPermittedByRequestParamId(Request req, Response res) {
-        String accessGroup = getAccessGroup(req);
+    public T findPermittedByRequestParamId (Request req) {
+        UserPermissions user = UserPermissions.from(req);
         T value = findById(req.params("_id"));
-
         // Throw if or does not have permission
-        if (!value.accessGroup.equals(accessGroup)) {
+        if (!value.accessGroup.equals(user.accessGroup)) {
             throw invalidAccessGroup();
         }
-
         return value;
     }
 
@@ -137,12 +165,12 @@ public class AnalysisCollection<T extends BaseModel> {
      */
     public T update(Request req, Response res) throws IOException {
         T value = JsonUtil.objectMapper.readValue(req.body(), type);
-
-        String accessGroup = getAccessGroup(req);
-        value.updatedBy = req.attribute("email");
-
-        if (!value.accessGroup.equals(accessGroup)) throw invalidAccessGroup();
-
-        return update(value, accessGroup);
+        final UserPermissions user = UserPermissions.from(req);
+        value.updatedBy = user.email;
+        if (!value.accessGroup.equals(user.accessGroup)) {
+            throw invalidAccessGroup();
+        }
+        return update(value, user.accessGroup);
     }
+
 }

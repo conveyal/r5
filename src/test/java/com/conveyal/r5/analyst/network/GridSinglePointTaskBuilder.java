@@ -14,7 +14,8 @@ import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.analyst.network.GridGtfsGenerator.GTFS_DATE;
+import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
+import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
 /**
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
@@ -35,7 +36,7 @@ public class GridSinglePointTaskBuilder {
         this.gridLayout = gridLayout;
         // We will accumulate settings into this task.
         task = new TravelTimeSurfaceTask();
-        task.date = GTFS_DATE;
+        task.date = WEEKDAY_DATE;
         // Set defaults that can be overridden by calling builder methods.
         task.accessModes = EnumSet.of(LegMode.WALK);
         task.egressModes = EnumSet.of(LegMode.WALK);
@@ -78,6 +79,18 @@ public class GridSinglePointTaskBuilder {
         return this;
     }
 
+    public GridSinglePointTaskBuilder weekdayMorningPeak () {
+        task.date = WEEKDAY_DATE;
+        morningPeak();
+        return this;
+    }
+
+    public GridSinglePointTaskBuilder weekendMorningPeak () {
+        task.date = WEEKEND_DATE;
+        morningPeak();
+        return this;
+    }
+
     public GridSinglePointTaskBuilder morningPeak () {
         task.fromTime = LocalTime.of(7, 00).toSecondOfDay();
         task.toTime = LocalTime.of(9, 00).toSecondOfDay();
@@ -102,11 +115,11 @@ public class GridSinglePointTaskBuilder {
 
         // In a single point task, the grid of destinations is given with these fields, not from the pointset object.
         // The destination point set (containing the opportunity densities) must then match these same dimensions.
-        task.zoom = grid.zoom;
-        task.north = grid.north;
-        task.west = grid.west;
-        task.width = grid.width;
-        task.height = grid.height;
+        task.zoom = grid.extents.zoom;
+        task.north = grid.extents.north;
+        task.west = grid.extents.west;
+        task.width = grid.extents.width;
+        task.height = grid.extents.height;
 
         return this;
     }

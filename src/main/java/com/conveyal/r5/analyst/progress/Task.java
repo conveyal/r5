@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.models.Model;
+import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.time.Duration;
@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * This is a draft for a more advanced task progress system. It is not yet complete.
- * Task is intended for background tasks whose progress the end user should be aware of, such as file uploads.
- * It should not be used for automatic internal actions (such as Events) which would clutter a user's active task list.
+ * This newer task progress system coexists with several older mechanisms, which it is intended to supersede. It is
+ * still evolving as we adapt it to new use cases. The Task class is intended to represent background tasks whose
+ * progress the end user should be aware of, such as processing uploaded files. It should not be used for automatic
+ * internal actions (such as Events) which would clutter a user's active task list.
  *
  * A Task (or some interface that it implements) could be used by the AsyncLoader to track progress. Together with some
  * AsyncLoader functionality it will be a bit like a Future with progress reporting. Use of AsyncLoader could then be
@@ -32,7 +33,7 @@ public class Task implements Runnable, ProgressListener {
         QUEUED, ACTIVE, DONE, ERROR
     }
 
-    /** Every has an ID so the UI can update tasks it already knows about with new information after polling. */
+    /** Every Task has an ID so the UI can update tasks it already knows about with new information after polling. */
     public final UUID id = UUID.randomUUID();
 
     // User and group are only relevant on the backend. On workers, we want to show network or cost table build progress
@@ -106,7 +107,7 @@ public class Task implements Runnable, ProgressListener {
 
     List<Task> subtasks = new ArrayList<>();
 
-    // TODO find a better way to set this than directly inside a closure
+    // TODO find a better way to set this than directly inside a closure - possibly using ProgressListener
     public WorkProduct workProduct;
 
     public void addSubtask (Task subtask) {
@@ -188,11 +189,13 @@ public class Task implements Runnable, ProgressListener {
 
     @Override
     public void beginTask(String description, int totalElements) {
-        // In the absence of subtasks we can call this repeatedly on the same task, which will cause the UI progress
-        // bar to reset to zero at each stage, while keeping the same top level title.
+        // In the absence of a real subtask mechanism, we can call this repeatedly on the same task with totalElements
+        // of zero, allow the UI progress while changing the detail message without resetting progress to zero.
         this.description = description;
-        this.totalWorkUnits = totalElements;
-        this.currentWorkUnit = 0;
+        if (totalElements > 0) {
+            this.totalWorkUnits = totalElements;
+            this.currentWorkUnit = 0;
+        }
     }
 
     @Override
@@ -204,6 +207,7 @@ public class Task implements Runnable, ProgressListener {
     }
 
     // Methods for reporting elapsed times over API
+    // Durations are reported instead of times to avoid problems with clock skew between backend and client.
 
     public Duration durationInQueue () {
         Instant endTime = (began == null) ? Instant.now() : began;
@@ -251,15 +255,26 @@ public class Task implements Runnable, ProgressListener {
     // We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
     // It is also awkward to make a method to set it on ProgressListener - it's not really progress.
     // So we set it directly on the task before submitting it. Requires pre-setting (not necessarily storing) Model._id.
-    public Task withWorkProduct (Model model) {
+    // Update: I've started setting it via progressListener, it's just more encapsulated to create inside the TaskAction.
+    // But this then requires the TaskAction to hold a UserPermissions instance.
+    public Task withWorkProduct (BaseModel model) {
         this.workProduct = WorkProduct.forModel(model);
         return this;
     }
 
-    /** Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel(). */
+    /**
+     * Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel().
+     * This can now be reported via ProgressListener interface for better encapsulation, potentially only revealing the
+     * work product when it's acutally in the database.
+     */
     public Task withWorkProduct (WorkProductType type, String id, String region) {
         this.workProduct = new WorkProduct(type, id, region);
         return this;
+    }
+
+    @Override
+    public void setWorkProduct (WorkProduct workProduct) {
+        this.workProduct = workProduct;
     }
 
     public Task setHeavy (boolean heavy) {

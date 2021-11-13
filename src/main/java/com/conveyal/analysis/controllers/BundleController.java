@@ -8,15 +8,16 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -43,10 +44,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
-import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 
 /**
  * This Controller provides HTTP REST endpoints for manipulating Bundles. Bundles are sets of GTFS feeds and OSM
@@ -134,8 +135,9 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
-            bundle.accessGroup = req.attribute("accessGroup");
-            bundle.createdBy = req.attribute("email");
+            UserPermissions userPermissions = UserPermissions.from(req);
+            bundle.accessGroup = userPermissions.accessGroup;
+            bundle.createdBy = userPermissions.email;
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
@@ -146,7 +148,7 @@ public class BundleController implements HttpController {
 
         // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
         // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        final UserPermissions userPermissions = UserPermissions.from(req);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
             .forUser(userPermissions)
             .setHeavy(true)
@@ -164,6 +166,13 @@ public class BundleController implements HttpController {
                     // Wrapping in buffered input stream should reduce number of progress updates.
                     osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
                     // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
+                    Envelope osmBounds = new Envelope();
+                    for (Node n : osm.nodes.values()) {
+                        osmBounds.expandToInclude(n.getLon(), n.getLat());
+                    }
+                    osm.close();
+                    checkWgsEnvelopeSize(osmBounds, "OSM data");
+                    // Store the source OSM file. Note that we're not storing the derived MapDB file here.
                     fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
                 }
 
@@ -196,6 +205,7 @@ public class BundleController implements HttpController {
                         for (Stop s : feed.stops.values()) {
                             bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                         }
+                        checkWgsEnvelopeSize(bundleBounds, "GTFS data");
 
                         if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
                             bundle.serviceStart = feedSummary.serviceStart;
@@ -211,7 +221,7 @@ public class BundleController implements HttpController {
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                        // Save some space in the MapDB after we've summarized the errors to Mongo and a JSON file.
+                        // Release some memory after we've summarized the errors to Mongo and a JSON file.
                         feed.errors.clear();
 
                         // Flush db files to disk
@@ -226,7 +236,6 @@ public class BundleController implements HttpController {
                     // Set legacy progress field to indicate that all feeds have been loaded.
                     bundle.feedsComplete = bundle.totalFeeds;
 
-                    // TODO Handle crossing the antimeridian
                     bundle.north = bundleBounds.getMaxY();
                     bundle.south = bundleBounds.getMinY();
                     bundle.east = bundleBounds.getMaxX();
@@ -265,7 +274,7 @@ public class BundleController implements HttpController {
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
-        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
         FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
         fileStorage.delete(key);
 

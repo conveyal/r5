@@ -4,7 +4,7 @@ package com.conveyal.file;
  * A unique identifier for a file within a namespace drawn from an enum of known categories.
  * This maps to a subdirectory and filename in local storage, and a bucket and object key in S3-style cloud storage.
  * While keeping stored files in multiple distinct categories, this avoids passing around a lot of directory/bucket
- * names as strings, and avoids mistakes where such strings are mismatched accross different function calls.
+ * names as strings, and avoids mistakes where such strings are mismatched across different function calls.
  */
 public class FileStorageKey {
 

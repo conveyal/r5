@@ -82,8 +82,8 @@ public class Bundle extends Model implements Cloneable {
         public Priority priority;
         public GtfsErrorTypeSummary () { /* For deserialization. */ }
         public GtfsErrorTypeSummary (GTFSError error) {
-            this.priority = error.priority;
             this.type = error.errorType;
+            this.priority = error.getPriority();
         }
     }
 

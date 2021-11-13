@@ -1,8 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.analysis.components.WorkerComponents;
-import com.conveyal.file.FileCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -10,9 +9,10 @@ import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.geotools.data.geojson.GeoJSONDataStore;
+import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
-import org.geotools.geojson.feature.FeatureJSON;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
@@ -25,11 +25,10 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
+import java.io.File;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
 
-import static com.conveyal.file.FileCategory.POLYGONS;
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * To simulate traffic congestion, apply a slow-down (or speed-up) factor to roads, according to attributes of polygon
@@ -110,10 +109,11 @@ public class RoadCongestion extends Modification {
         // and errors can all be easily recorded and bubbled back up to the UI.
         // Polygon should only need to be fetched once when the scenario is applied, then the resulting network is cached.
         // this.features = polygonLayerCache.getPolygonFeatureCollection(this.polygonLayer);
-        // Note: Newer JTS now has GeoJsonReader
-        try (InputStream inputStream = WorkerComponents.fileStorage.getInputStream(POLYGONS, polygonLayer)) {
-            FeatureJSON featureJSON = new FeatureJSON();
-            FeatureCollection featureCollection = featureJSON.readFeatureCollection(inputStream);
+        try {
+            File polygonInputFile = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, polygonLayer));
+            GeoJSONDataStore dataStore = new GeoJSONDataStore(polygonInputFile);
+            SimpleFeatureSource featureSource = dataStore.getFeatureSource();
+            FeatureCollection featureCollection = featureSource.getFeatures();
             LOG.info("Validating features and creating spatial index...");
             polygonSpatialIndex = new STRtree();
             FeatureType featureType = featureCollection.getSchema();

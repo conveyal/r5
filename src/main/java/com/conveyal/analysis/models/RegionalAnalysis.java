@@ -16,6 +16,7 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public String regionId;
     public String bundleId;
     public String projectId;
+    public String scenarioId;
 
     public int variant;
 

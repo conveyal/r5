@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.FileInfo;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
@@ -21,6 +22,8 @@ import static com.mongodb.client.model.Filters.eq;
 /**
  * HTTP request handler methods allowing users to upload/download files from FileStorage implementations and CRUDing
  * metadata about those files in the database.
+ * NOTE: THIS CLASS IS UNUSED AND IS RETAINED FOR DOCUMENTATION PURPOSES - TO DEMONSTRATE HOW FILESTORAGE IS USED.
+ * In practice we don't need direct HTTP API access to FileStorage - it's always used in some more complex process.
  */
 public class FileStorageController implements HttpController {
 
@@ -59,12 +62,14 @@ public class FileStorageController implements HttpController {
      * Find all associated FileInfo records for a region.
      */
     private List<FileInfo> findAllForRegion(Request req, Response res) {
-        return fileCollection.findPermitted(and(eq("regionId", req.queryParams("regionId"))), req.attribute("accessGroup"));
+        return fileCollection.findPermitted(
+                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
+        );
     }
 
     /**
      * Create the metadata object used to represent a file in FileStorage. Note: this does not handle the process of
-     * storing the file itself. See `addFile` for that.
+     * storing the file itself. See `uploadFile` for that.
      */
     private FileInfo createFileInfo(Request req, Response res) throws IOException {
         FileInfo fileInfo = fileCollection.create(req, res);
@@ -77,7 +82,7 @@ public class FileStorageController implements HttpController {
      * Remove the FileInfo record from the database and the file from the FileStorage.
      */
     private boolean deleteFile(Request req, Response res) {
-        FileInfo file = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo file = fileCollection.findPermittedByRequestParamId(req);
         fileStorage.delete(file.getKey());
         return fileCollection.delete(file).wasAcknowledged();
     }
@@ -87,7 +92,7 @@ public class FileStorageController implements HttpController {
      * file.
      */
     private String generateDownloadURL(Request req, Response res) {
-        FileInfo file = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo file = fileCollection.findPermittedByRequestParamId(req);
         res.type("text/plain");
         return fileStorage.getURL(file.getKey());
     }
@@ -96,7 +101,7 @@ public class FileStorageController implements HttpController {
      * Find FileInfo by passing in and _id and download the corresponding file by returning an InputStream.
      */
     private InputStream downloadFile(Request req, Response res) throws IOException {
-        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req);
         File file = fileStorage.getFile(fileInfo.getKey());
         res.type(fileInfo.format.mimeType);
         if (FileUtils.isGzip(file)) {
@@ -110,13 +115,13 @@ public class FileStorageController implements HttpController {
      * file.
      */
     private FileInfo uploadFile(Request req, Response res) throws Exception {
-        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req, res);
+        FileInfo fileInfo = fileCollection.findPermittedByRequestParamId(req);
         File file = FileUtils.createScratchFile(req.raw().getInputStream());
         fileStorage.moveIntoStorage(fileInfo.getKey(), file);
 
         // Set status to ready
         fileInfo.isReady = true;
-        fileInfo.updatedBy = req.attribute("email");
+        fileInfo.updatedBy = UserPermissions.from(req).email;
 
         // Store changes to the file info
         fileCollection.update(fileInfo);

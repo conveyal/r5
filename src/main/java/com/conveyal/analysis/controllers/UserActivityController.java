@@ -3,13 +3,15 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.r5.analyst.progress.ApiTask;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import spark.Request;
 import spark.Response;
 import spark.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import static com.conveyal.analysis.components.HttpApi.USER_PERMISSIONS_ATTRIBUTE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -41,11 +43,13 @@ public class UserActivityController implements HttpController {
     }
 
     private ResponseModel getActivity (Request req, Response res) {
-        UserPermissions userPermissions = req.attribute(USER_PERMISSIONS_ATTRIBUTE);
+        UserPermissions userPermissions = UserPermissions.from(req);
         ResponseModel responseModel = new ResponseModel();
         responseModel.systemStatusMessages = List.of();
         responseModel.taskBacklog = taskScheduler.getBacklog();
-        responseModel.taskProgress = taskScheduler.getTasksForUser(userPermissions.email);
+        boolean system = Boolean.parseBoolean(req.queryParams("system")); // false if param not present
+        String user = system ? "SYSTEM" : userPermissions.email;
+        responseModel.taskProgress = taskScheduler.getTasksForUser(user);
         return responseModel;
     }
 

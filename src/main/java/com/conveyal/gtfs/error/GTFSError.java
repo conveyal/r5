@@ -18,21 +18,17 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
     public final String field;
     public final String affectedEntityId;
     public final String errorType;
-    // NOTE: Do not remove this field. Though this field is somewhat redundant (since every instance of each class has
-    // the same priority) we have old MapDB files around that contain serialized errors. They would all break.
-    public final Priority priority;
 
-    public GTFSError(String file, long line, String field, Priority priority) {
-        this(file, line, field, priority, null);
+    public GTFSError(String file, long line, String field) {
+        this(file, line, field, null);
     }
 
-    public GTFSError(String file, long line, String field, Priority priority, String affectedEntityId) {
+    public GTFSError(String file, long line, String field, String affectedEntityId) {
         this.file  = file;
         this.line  = line;
         this.field = field;
         this.affectedEntityId = affectedEntityId;
         this.errorType = this.getClass().getSimpleName();
-        this.priority = priority;
     }
 
     /**
@@ -44,7 +40,6 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
         this.field = null;
         this.errorType = null;
         this.affectedEntityId = entityId;
-        this.priority = Priority.UNKNOWN;
     }
 
     /**
@@ -53,6 +48,13 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
      */
     public final String getErrorCode () {
         return this.getClass().getSimpleName();
+    }
+
+    /**
+     * @return The Error priority level associated with this class.
+     */
+    public Priority getPriority() {
+        return Priority.UNKNOWN;
     }
 
     /**

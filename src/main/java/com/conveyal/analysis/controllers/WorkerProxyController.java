@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.analysis.models.Bundle;
@@ -60,9 +61,7 @@ public class WorkerProxyController implements HttpController {
         if (address == null) {
             Bundle bundle = null;
             // There are no workers that can handle this request. Request one and ask the UI to retry later.
-            final String accessGroup = request.attribute("accessGroup");
-            final String userEmail = request.attribute("email");
-            WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, "anyProjectId", bundle.regionId);
+            WorkerTags workerTags = new WorkerTags(UserPermissions.from(request), bundle.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             response.status(HttpStatus.ACCEPTED_202);
             response.header("Retry-After", "30");

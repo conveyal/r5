@@ -71,7 +71,7 @@ public class TransferFinder {
 
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
             // FIXME the following is technically incorrect, measure that it's actually improving calculation speed
-            retainClosestStopsOnPatterns(distancesToReachedStops);
+            retainClosestStopsOnPatterns(distancesToReachedStops, -1);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
@@ -134,7 +134,7 @@ public class TransferFinder {
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
             // TODO the following optimization is incorrect for some loop and U-shaped routes, measure that it's actually improving routing speed
-            retainClosestStopsOnPatterns(distancesToReachedStops);
+            retainClosestStopsOnPatterns(distancesToReachedStops, sourceStopIndex);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
@@ -181,17 +181,50 @@ public class TransferFinder {
 
 
     /**
-     * Filter down a map from target stop indexes to distances so it only includes those stops that are the
-     * closest on some pattern. This is technically incorrect (think of transfers to a U shaped metro from a bus line
-     * running across the legs of the U, a situation which actually exists in Washington, DC with the
-     * red line and the Q4) but anecdotally it speeds up computation by up to 40 percent. We may want to look into
-     * other ways to optimize transfers (or why the transfers are making routing so much slower) if this turns out to
-     * affect results.
+     * Filters down a map of potential transfer target stops so that it only includes those stops that are the
+     * closest (to the source stop) on any pattern, as well as the source stop itself.
+     *
+     * Two details help limit the situations that will lead to this filtering being too aggressive and eliminating
+     * stops that would actually be suitable transfers.
+     *
+     * First, this filtering is called when evaluating transfer source stops separately, which helps address
+     * concerns about certain strange transit network structures (such as a U-shaped or looping routes). The
+     * filtering will only be incorrect if all potential source stops are closer to one of the target stops than the
+     * other. Examples:
+     * 1. Transfers from the WMATA Q6 could be logical to the same Red Line pattern at Rockville or Wheaton. But these
+     * are far apart, with multiple different bus stops available as transfer sources for each rail station, so results
+     * should be correct.
+     * 2. Transfers from Singapore bus routes to the Downtown Line at Rochor (DT13) or Jalan Besar (DT22). If someone
+     * wants to transfer at Jalan Besar and travel onward to Bedok North (DT29), it is conceivable this method could
+     * erroneously filter out their preferred transfer, forcing them to ride around the Downtown loop, but all the
+     * bus's stops would need to be closer to stops DT1-13 than DT22-29, which seems unlikely given the Singapore
+     * street network.
+     *
+     * Second, when considering transfers at a given stop (i.e. the source and target of the transfer are the same),
+     * we make the filtering include another nearby stop in addition to the given stop (which is generally the
+     * first-closest, except in edge cases related to street linking). This helps handle situations with routes that
+     * provide service in different "directions" on the same pattern -- for example, a journey from Paulina (Brown) to
+     * Howard (Purple) on the CTA El. Assume the CTA codes Purple Line Express service as a single pattern
+     * (south, around the loop, and back north), with separate stops for the boarding platforms at Belmont.
+     * Transferring from the Brown Line southbound at Belmont, the closest Purple Line Express stop would be the same
+     * platform. But for this journey, the desired transfer would actually be switching platforms at Belmont.
+     * Ignoring the source transfer in the search for the nearest stop, then adding it back at the end, should handle
+     * this case.
+     *
+     * So, this filtering can be incorrect in certain situations, but anecdotally it speeds up computation by up
+     * to 40 percent. We may want to look into ways to optimize transfers (or why the transfers are making routing so
+     * much slower).
+     * @param timesToReachedStops map from stop index to distance (along the street network) to it
+     * @param sourceStopIndex the stop from which transfers are being computed, or -1 if the search is not from a
+     *                        transit stop
      */
-    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops) {
+    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, int sourceStopIndex) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
         // For every reached stop,
         timesToReachedStops.forEachEntry((stopIndex, distanceToStop) -> {
+            // We can always transfer to a different pattern at the source stop. Ignore it for now, and add it after
+            // the search for the closest stop.
+            if (stopIndex == sourceStopIndex) return true;
             // For every pattern passing through that stop,
             transitLayer.patternsForStop.get(stopIndex).forEach(patternIndex -> {
                 int currentBestStop = bestStopOnPattern.get(patternIndex);
@@ -208,6 +241,8 @@ public class TransferFinder {
             });
             return true; // iteration should continue
         });
+        // Add the source stop so it is retained.
+        bestStopOnPattern.put(-1, sourceStopIndex);
         timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
     }
 

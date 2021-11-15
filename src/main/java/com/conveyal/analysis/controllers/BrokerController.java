@@ -132,11 +132,12 @@ public class BrokerController implements HttpController {
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
         // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
-        checkNotNull(analysisRequest.regionId);
-        checkNotNull(analysisRequest.projectId);
-        checkNotNull(analysisRequest.bundleId);
-        checkNotNull(analysisRequest.modificationIds);
-        checkNotNull(analysisRequest.workerVersion);
+        String notNullMessage = "The %s in the request is not set.";
+        checkNotNull(analysisRequest.regionId, String.format(notNullMessage, "region ID"));
+        checkNotNull(analysisRequest.projectId, String.format(notNullMessage, "project ID"));
+        checkNotNull(analysisRequest.bundleId, String.format(notNullMessage, "bundle ID"));
+        checkNotNull(analysisRequest.modificationIds, String.format(notNullMessage, "modification IDs"));
+        checkNotNull(analysisRequest.workerVersion, String.format(notNullMessage, "worker version"));
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();

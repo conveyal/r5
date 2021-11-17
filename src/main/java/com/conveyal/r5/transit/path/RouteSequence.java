@@ -32,7 +32,7 @@ public class RouteSequence {
         StringJoiner alightStopIds = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), false));
+            routeIds.add(transitLayer.routeString(routes.get(i), true));
             boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), false));
             alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), false));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));

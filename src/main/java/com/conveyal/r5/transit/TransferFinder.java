@@ -232,8 +232,8 @@ public class TransferFinder {
                 if (currentBestStop == -1) {
                     bestStopOnPattern.put(patternIndex, stopIndex);
                 } else {
-                    int currentBestTime = timesToReachedStops.get(currentBestStop);
-                    if (currentBestTime > distanceToStop) {
+                    int currentShortestDistance = timesToReachedStops.get(currentBestStop);
+                    if (currentShortestDistance > distanceToStop) {
                         bestStopOnPattern.put(patternIndex, stopIndex);
                     }
                 }

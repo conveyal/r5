@@ -49,6 +49,7 @@ public class LocalFilesController implements HttpController {
             //      Is Jetty ServletOutputStream implementation automatically threaded or buffered?
             //      It appears to be buffered because the response has a Content-Length header.
             FileUtils.transferFromFileTo(file, res.raw().getOutputStream());
+            // Despite writing to output stream, non-null return value required: https://stackoverflow.com/a/32794875
             return "";
         } else {
             return FileUtils.getInputStream(file);

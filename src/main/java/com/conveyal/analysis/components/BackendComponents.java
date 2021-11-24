@@ -6,7 +6,6 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
-import com.conveyal.analysis.controllers.FileStorageController;
 import com.conveyal.analysis.controllers.GtfsController;
 import com.conveyal.analysis.controllers.GtfsTileController;
 import com.conveyal.analysis.controllers.HttpController;
@@ -88,7 +87,6 @@ public abstract class BackendComponents {
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
                 new RegionalAnalysisController(broker, fileStorage),
-                new FileStorageController(fileStorage, database),
                 new AggregationAreaController(fileStorage, database, taskScheduler),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
                 // is exempted from authentication and authorization, but should be hidden from the world

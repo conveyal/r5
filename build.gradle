@@ -34,7 +34,13 @@ shadowJar {
     mergeServiceFiles()
 }
 
+// Allow reflective access by Kryo to normally closed Java internals.
+// This is used for testing equality, but also for building automatic Kryo (de)serializers.
 test {
+    jvmArgs = ['--add-opens=java.base/java.io=ALL-UNNAMED',
+               '--add-opens=java.base/java.time=ALL-UNNAMED',
+               '--add-opens=java.base/java.time.zone=ALL-UNNAMED',
+               '--add-opens=java.base/java.lang=ALL-UNNAMED']
     useJUnitPlatform()
 }
 

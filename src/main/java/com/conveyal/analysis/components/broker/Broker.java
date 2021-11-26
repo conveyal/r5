@@ -327,12 +327,11 @@ public class Broker {
             LOG.error("Failed to mark task {} completed on job {}.", taskId, job.jobId);
         }
         // Once the last task is marked as completed, the job is finished.
-        // Purge it from the list to free memory.
+        // Remove it and its associated result assembler from the maps.
+        // The caller should already have a reference to the result assembler so it can process the final results.
         if (job.isComplete()) {
             job.verifyComplete();
             jobs.remove(job.workerCategory, job);
-            // This method is called after the regional work results are handled, finishing and closing the local file.
-            // So we can harmlessly remove the MultiOriginAssembler now that the job is removed.
             resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
@@ -461,11 +460,16 @@ public class Broker {
             recordJobError(job, workResult.error);
             return;
         }
-        // When the last task is received, this will build up to 5 grids and upload them to S3. That should probably
-        // not be done synchronously in an HTTP handler called by the worker (likewise for starting workers below).
+        // When the last task is received, the method call on the result assembler will build multiple grids and upload
+        // them to S3. That should probably not be done synchronously in an HTTP handler called by the worker. Likewise
+        // for starting workers below. We should probably synchronize this entire method, then enqueue slower async
+        // completion and cleanup tasks in the caller.
         try {
-            assembler.handleMessage(workResult);
+            // Mark tasks completed first before passing results to the assembler. On the final result received, this
+            // will minimize the risk of race conditions by quickly making the job invisible to incoming stray results
+            // from spurious redeliveries, while the assembler is busy finalizing and uploading results.
             markTaskCompleted(job, workResult.taskId);
+            assembler.handleMessage(workResult);
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));

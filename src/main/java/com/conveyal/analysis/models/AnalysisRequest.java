@@ -260,8 +260,10 @@ public class AnalysisRequest {
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
         }
-        // Intentionally introduce errors for testing purposes.
-        task.injectFault = injectFault;
+        // Intentionally introduce errors for testing purposes, but only for admin users.
+        if (userPermissions.admin) {
+            task.injectFault = injectFault;
+        }
     }
 
     private static void checkGridSize (WebMercatorExtents extents) {

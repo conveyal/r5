@@ -5,6 +5,7 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.ChaosParameters;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
@@ -158,6 +159,12 @@ public class AnalysisRequest {
     public DecayFunction decayFunction;
 
     /**
+     * If this field is non-null, it will intentionally cause failures on workers handling the task. This is done on
+     * testing or even production systems in order to observe and improve their robustness to failure.
+     */
+    public ChaosParameters injectFault;
+
+    /**
      * Create the R5 `Scenario` from this request.
      */
     public Scenario createScenario (UserPermissions userPermissions) {
@@ -253,6 +260,8 @@ public class AnalysisRequest {
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
         }
+        // Intentionally introduce errors for testing purposes.
+        task.injectFault = injectFault;
     }
 
     private static void checkGridSize (WebMercatorExtents extents) {

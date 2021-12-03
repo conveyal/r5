@@ -70,7 +70,7 @@ public class TransferFinder {
             streetRouter.route();
 
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
-            retainClosestStopsOnPatterns(distancesToReachedStops, -1);
+            retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
@@ -132,7 +132,11 @@ public class TransferFinder {
 
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
-            retainClosestStopsOnPatterns(distancesToReachedStops, sourceStopIndex);
+            // Same-stop "transfers" are handled in the router and do not need to be materialized in our list of
+            // transfer distances. It's actually important to remove the source stop to handle certain cases with
+            // loop routes (see CTA Brown Line to Purple Line example in discussion on #763).
+            distancesToReachedStops.remove(sourceStopIndex);
+            retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
@@ -179,15 +183,20 @@ public class TransferFinder {
 
 
     /**
-     * Filters down a map of potential transfer target stops so that, for each pattern, only the closest target stop
-     * is retained; if the closest stop is the source stop itself, the next closest stop is also retained. This
-     * filtering is an optimization. If it is too aggressive, it can eliminate stops that are actually suitable
-     * transfer targets. Two details help limit this possibility.
+     * Filters down a map of potential transfer target stops so that for each pattern, only the closest other stop is
+     * retained. This method mutates the timesToReachedStops parameter. This method must be called separately for
+     * each stop on a pattern, with that source stop excluded from the timeToReachedStops map.
      *
-     * First, the filtering should be called separately for each source stop, which helps address concerns about
-     * certain irregular route shapes (such as a U-shaped or looping routes where two different target stops might be
-     * optimal depending on the direction of travel). The filtering will be correct unless all stops on the source
-     * pattern are closer to one of the target stops than the other. Examples:
+     * This filtering is an optimization. It can be incorrect in certain situations (more rarely after R5 #763),
+     * filtering out stops that are actually suitable transfer targets, but anecdotally it speeds up computation by up
+     * to 40 percent. TODO confirm this performance gain with more systematic measurement, and look into other ways to
+     * optimize transfers (or why the transfers make routing so slow).
+     *
+     * Calling separately for each source stop addresses concerns about certain irregular route shapes (such as
+     * U-shaped or looping routes where two different target stops might be optimal depending on the direction of
+     * travel). The filtering will be correct unless all stops on the source pattern are closer to one of the target
+     * stops than the other. Examples:
+     *
      * 1. Depending on the destination, transfers from the WMATA Q6 to the same pattern on the U-shaped Red Line could
      * be logical at Rockville or Wheaton. But these are far apart, with multiple different bus stops available as
      * transfer sources for each rail station, so results should be correct.
@@ -195,36 +204,16 @@ public class TransferFinder {
      * wants to transfer at Jalan Besar and travel onward to Bedok North (DT29), it is conceivable this method could
      * erroneously filter out their preferred transfer, forcing them to ride around the Downtown loop. But all the
      * bus's stops would need to be closer to stops DT1-13 than DT22-29, which seems unlikely given the Singapore
-     * street network.
+     * street network. TODO we could check stop positions in the target pattern to help handle a case like this -- for
+     * any continuous sequence of stops, retain only the closest.
      *
-     * Second, when considering transfers from a given source stop, the filtering retains a different nearby stop as
-     * a potential target. If the source stop is also being considered as a target (i.e. it is served by both the
-     * source and target patterns), it will generally be the closest (except conceivably in edge cases related to
-     * street linking) and is retained separately. This logic helps handle situations with routes that provide
-     * service in different "directions" on the same pattern -- for example, a journey from Paulina (Brown) to Howard
-     * (Purple) on the CTA El. Assume the CTA codes Purple Line Express service as a single pattern (south, around
-     * the Loop, and back north), with separate stops for the northbound and southbound boarding platforms at Belmont.
-     * Transferring from the Brown Line southbound at Belmont, the closest stop on the Purple Line Express pattern would
-     * be the same platform. But for this journey, the desired transfer would actually imply switching platforms at
-     * Belmont. Ignoring the source transfer in the search for the nearest stop, then adding it back at the end,
-     * should handle this case.
-     *
-     * So, this filtering can be incorrect in certain rare situations, but anecdotally it speeds up computation by up
-     * to 40 percent. TODO confirm this performance gain with more systematic measurement, and look into other ways to
-     * optimize transfers (or why the transfers make routing so slow).
-     *
-     * @param timesToReachedStops map from target stop index to distance (along the street network) to it
-     * @param sourceStopIndex the stop from which transfers are being computed, or -1 if the search is not from a
-     *                        transit stop
+     * @param timesToReachedStops map from target stop index to distance (along the street network) to it. The method
+     *                           mutates this parameter.
      */
-    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, int sourceStopIndex) {
+    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
         // For every reached stop,
         timesToReachedStops.forEachEntry((stopIndex, distanceToStop) -> {
-            // We can always transfer to a different pattern at the source stop (i.e., make a same-stop transfer).
-            // Ignore this possibility for now and continue iteration. We then add the source stop after the search for
-            // the closest stop.
-            if (stopIndex == sourceStopIndex) return true; // continue iteration
             // For every pattern passing through the reached stop,
             transitLayer.patternsForStop.get(stopIndex).forEach(patternIndex -> {
                 int currentBestStop = bestStopOnPattern.get(patternIndex);
@@ -241,9 +230,6 @@ public class TransferFinder {
             });
             return true; // continue iteration
         });
-        // Add the source stop so it is retained. After this point, only the map's values are used, so it's safe to use
-        // patternIndex -1 for the key.
-        bestStopOnPattern.put(-1, sourceStopIndex);
         timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
     }
 

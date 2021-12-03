@@ -168,13 +168,22 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int maxRides = 8;
 
-    /** A non-destructive scenario to apply when executing this request */
+    /**
+     * A non-destructive scenario to apply when executing this request.
+     * This contains the entire nested structure of the whole scenario, so can be quite voluminous when serialized.
+     * For this reason, on regional analyses where there can be millions of tasks going over HTTP, we send only the
+     * scenarioId to the workers instead of the full nested scenario object.
+     */
     public Scenario scenario;
 
     /**
-     * The ID of a scenario stored in S3 as JSON.
-     * You must specify one (but only one) of scenario or scenarioId.
-     * It is an error if both scenario and the scenarioId are specified.
+     * The ID of a scenario stored in S3 as JSON. A less voluminous alternative to including the entire scenario.
+     * When communicating with workers, you must specify only one of scenario or scenarioId.
+     * Typically we send the whole serialized scenario for rapidly-changing single point requests, but send the ID
+     * for regional jobs made up of potentially millions of near-identical requests.
+     * When requests are stored in a database, or once they're in use within the worker, this requirement is relaxed.
+     * Note that this is distinct from the database _id of Scenario objects (which didn't exist when this was created).
+     * This string represents a particular version of the scenario, which can change over time as it's edited.
      */
     public String scenarioId;
 

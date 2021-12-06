@@ -173,7 +173,11 @@ public class TravelTimeReducer {
      * boundaries.
      */
     private static int findPercentileIndex(int nElements, double percentile) {
-        return (int)(Math.ceil(percentile / 100 * nElements) - 1);
+        // Note that the commented-out definition is used in modern version of Conveyal Analysis, and the other version
+        // was removed by #563. However, we used the previous version for the Getting Charlie off the MTA paper, and this
+        // hacks it back in for comparability.
+        //return (int)(Math.ceil(percentile / 100 * nElements) - 1);
+        return (int) Math.round(percentile / 100 * nElements);
     }
 
     /**

@@ -302,7 +302,6 @@ public class PerTargetPropagater {
          * doubles rather than floats.
          */
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
-        int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
         // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
         // FIXME ensure this ^ is baked into the PickupDelay class
@@ -321,7 +320,6 @@ public class PerTargetPropagater {
                 } else {
                     throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                 }
-                if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
                         if (timeAtStop >= maxTravelTimeSeconds || timeAtStop >= perIterationTravelTimes[iteration]) {
@@ -363,7 +361,6 @@ public class PerTargetPropagater {
                             }
                         }
                     }
-                }
                 return true; // Trove "continue iteration" signal.
             });
         }

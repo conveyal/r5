@@ -191,6 +191,7 @@ public class AnalysisRequest {
         if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
 
         task.scenario = createScenario(userPermissions);
+        task.scenarioId = task.scenario.id;
         task.graphId = bundleId;
         task.workerVersion = workerVersion;
         task.maxFare = maxFare;

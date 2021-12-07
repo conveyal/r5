@@ -1,7 +1,5 @@
 package com.conveyal.file;
 
-import org.bson.codecs.pojo.annotations.BsonIgnore;
-
 /**
  * An enumeration of all the file types we handle as uploads, derived internal data, or work products.
  * Really this should be a union of several enumerated types (upload/internal/product) but Java does not allow this.
@@ -24,6 +22,7 @@ public enum FileStorageFormat {
     // Also can be application/geo+json, see https://www.iana.org/assignments/media-types/application/geo+json
     // The extension used to be defined as .json TODO ensure that changing it to .geojson hasn't broken anything.
     GEOJSON("geojson", "application/json"),
+    JSON("json", "application/json"),
     // See requirement 3 http://www.geopackage.org/spec130/#_file_extension_name
     GEOPACKAGE("gpkg", "application/geopackage+sqlite3");
 

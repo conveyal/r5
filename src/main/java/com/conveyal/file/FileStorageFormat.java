@@ -15,12 +15,11 @@ public enum FileStorageFormat {
     // SHP implies .dbf and .prj, and optionally .shx
     SHP("shp", "application/octet-stream"),
 
-    // Some of these are not yet used.
+    // Some of these are not yet used. Any file type that can be downloaded through `FileStorage` is required here.
     // In our internal storage, we may want to force less ambiguous .gtfs.zip .osm.pbf and .geojson.
     GTFS("zip", "application/zip"),
     OSMPBF("pbf", "application/octet-stream"),
     // Also can be application/geo+json, see https://www.iana.org/assignments/media-types/application/geo+json
-    // The extension used to be defined as .json TODO ensure that changing it to .geojson hasn't broken anything.
     GEOJSON("geojson", "application/json"),
     JSON("json", "application/json"),
     // See requirement 3 http://www.geopackage.org/spec130/#_file_extension_name

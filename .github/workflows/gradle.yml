@@ -12,6 +12,7 @@ on:
   #     - master
 jobs:
   build:
+    # requires a machine of our own to be running the GitHub Actions Runner service
     runs-on: self-hosted
     # runs-on: ubuntu-latest
     # Start a separate docker container that we can contact over TCP (for tests)

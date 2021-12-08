@@ -12,7 +12,8 @@ on:
   #     - master
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    # runs-on: ubuntu-latest
     # Start a separate docker container that we can contact over TCP (for tests)
     # Apparently there's something tricky going on with the port binding though
     # https://help.github.com/en/articles/workflow-syntax-for-github-actions#jobsjob_idservices

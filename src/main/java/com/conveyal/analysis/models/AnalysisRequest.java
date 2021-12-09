@@ -261,8 +261,12 @@ public class AnalysisRequest {
             task.decayFunction = new StepDecayFunction();
         }
         // Intentionally introduce errors for testing purposes, but only for admin users.
-        if (userPermissions.admin) {
-            task.injectFault = injectFault;
+        if (injectFault != null) {
+            if (userPermissions.admin) {
+                task.injectFault = injectFault;
+            } else {
+                throw new IllegalArgumentException("Must be admin user to inject faults.");
+            }
         }
     }
 

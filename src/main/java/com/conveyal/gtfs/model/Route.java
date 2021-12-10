@@ -64,7 +64,9 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_short_name = getStringField("route_short_name", false); // one or the other required, needs a special validator
             r.route_long_name = getStringField("route_long_name", false);
             r.route_desc = getStringField("route_desc", false);
-            r.route_type = getIntField("route_type", true, 0, 7);
+            // Original range is 0 to 7, expanded to include 11 and 12, plus extended TPEG codes from 100 to 1500.
+            // See com.conveyal.r5.transit.TransitLayer.getTransitModes
+            r.route_type = getIntField("route_type", true, 0, 1500);
             r.route_url = getUrlField("route_url", false);
             r.route_color = getStringField("route_color", false);
             r.route_text_color = getStringField("route_text_color", false);

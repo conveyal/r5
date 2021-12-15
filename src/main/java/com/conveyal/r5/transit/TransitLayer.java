@@ -726,7 +726,7 @@ public class TransitLayer implements Serializable, Cloneable {
         case 11:
             return TransitModes.BUS;  // Trolleybus
         case 12:
-            return TransitModes.RAIL; // Monorail
+            return TransitModes.TRAM; // Monorail
         default:
             throw new IllegalArgumentException("Unknown GTFS route_type code: " + routeType);
         }

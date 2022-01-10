@@ -23,12 +23,10 @@ public class LocalWorkerLauncher implements WorkerLauncher {
 
     private static final Logger LOG = LoggerFactory.getLogger(LocalWorkerLauncher.class);
     private static final int N_WORKERS_LOCAL = 1;
-    private static final int N_WORKERS_LOCAL_TESTING = 4;
 
     public interface Config {
         int serverPort ();
         String localCacheDirectory ();
-        boolean testTaskRedelivery();
     }
 
     private final TransportNetworkCache transportNetworkCache;
@@ -47,22 +45,11 @@ public class LocalWorkerLauncher implements WorkerLauncher {
         workerConfig.setProperty("broker-address", "localhost");
         workerConfig.setProperty("broker-port", Integer.toString(config.serverPort()));
         workerConfig.setProperty("cache-dir", config.localCacheDirectory());
-        workerConfig.setProperty("test-task-redelivery", "false");
-
 
         // From a throughput perspective there is no point in running more than one worker locally, since each worker
         // has at least as many threads as there are processor cores. But for testing purposes (e.g. testing that task
         // redelivery works right) we may want to start more workers to simulate running on a cluster.
-        if (config.testTaskRedelivery()) {
-            // When testing we want multiple workers. Below, all but one will have single point listening disabled
-            // to allow them to run on the same machine without port conflicts.
-            nWorkers = N_WORKERS_LOCAL_TESTING;
-            // Tell the workers to return fake results, but fail part of the time.
-            workerConfig.setProperty("test-task-redelivery", "true");
-        } else {
-            nWorkers = N_WORKERS_LOCAL;
-        }
-
+        nWorkers = N_WORKERS_LOCAL;
     }
 
     @Override

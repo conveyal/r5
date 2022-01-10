@@ -111,7 +111,7 @@ public class MultiOriginAssembler {
                 if (job.templateTask.originPointSet != null) {
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
-                    resultWriters.add( new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
+                    resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
                 }
             }
 
@@ -161,12 +161,12 @@ public class MultiOriginAssembler {
     }
 
     /**
-     * There is a bit of logic in this method that wouldn't strictly need to be synchronized (the
-     * dimension checks) but those should take a trivial amount of time. For safety and simplicity
-     * we will synchronize the whole method. The downside is that this prevents one thread from
-     * writing accessibility while another was writing travel time CSV, but this should not be
-     * assumed to have any impact on performance unless measured. The writeOneValue methods are also synchronized
-     * for good measure. There should be no additional cost to retaining the lock when entering those methods.
+     * There is a bit of logic in this method that wouldn't strictly need to be synchronized (the dimension checks) but
+     * those should take a trivial amount of time. For safety and simplicity we synchronize the whole method. The
+     * downside is that this prevents one thread from writing accessibility while another was writing travel time CSV,
+     * but this should not be assumed to have any impact on performance unless measured. The writeOneValue methods on
+     * this class are also synchronized for good measure. There should be no additional cost to retaining the lock when
+     * entering those methods.
      */
     public synchronized void handleMessage (RegionalWorkResult workResult) throws Exception {
         for (RegionalResultWriter writer : resultWriters) {

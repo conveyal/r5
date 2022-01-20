@@ -199,11 +199,7 @@ public class BundleController implements HttpController {
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
 
-                        // Populate the metadata while the feed is open
-                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
-                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
-                        bundle.feeds.add(feedSummary);
-
+                        // Find and validate the extents of the GTFS, defined by all stops in the feed.
                         for (Stop s : feed.stops.values()) {
                             bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                         }
@@ -217,6 +213,12 @@ public class BundleController implements HttpController {
                             // which may extend far beyond the analysis area without causing problems.
                             feed.errors.add(new GeneralError("stops", -1, null, iae.getMessage()));
                         }
+
+                        // Populate the metadata while the feed is still open.
+                        // This must be done after all errors have been added to the feed.
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
+                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
+                        bundle.feeds.add(feedSummary);
 
                         if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
                             bundle.serviceStart = feedSummary.serviceStart;

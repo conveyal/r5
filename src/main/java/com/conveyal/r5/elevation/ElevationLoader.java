@@ -1,14 +1,12 @@
 package com.conveyal.r5.elevation;
 
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.util.LambdaCounter;
 import gnu.trove.list.array.TFloatArrayList;
 import gnu.trove.list.array.TShortArrayList;
-import org.apache.commons.math3.stat.descriptive.StatisticalSummary;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -26,7 +24,6 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.gtfs.util.Util.METERS_PER_DEGREE_LATITUDE;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * 
@@ -115,7 +112,7 @@ public class ElevationLoader {
         OSM osm = new OSM(osmSourceFile + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
-        StreetLayer streetLayer = new StreetLayer(new TNBuilderConfig());
+        StreetLayer streetLayer = new StreetLayer();
         streetLayer.loadFromOsm(osm);
         osm.close();
         return streetLayer;

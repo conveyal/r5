@@ -39,8 +39,8 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
 
-import static com.conveyal.r5.elevation.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
-import static com.conveyal.r5.elevation.ToblerCalculator.DECIMETERS_PER_METER;
+import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
+import static com.conveyal.r5.rastercost.ToblerCalculator.DECIMETERS_PER_METER;
 import static com.google.common.base.Preconditions.checkState;
 
 /**

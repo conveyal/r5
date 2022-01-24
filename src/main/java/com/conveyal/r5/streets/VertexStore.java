@@ -15,7 +15,7 @@ import org.locationtech.jts.geom.Point;
 
 import java.io.Serializable;
 
-import static com.conveyal.r5.elevation.ToblerCalculator.DECIMETERS_PER_METER;
+import static com.conveyal.r5.rastercost.ToblerCalculator.DECIMETERS_PER_METER;
 
 /**
  * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.

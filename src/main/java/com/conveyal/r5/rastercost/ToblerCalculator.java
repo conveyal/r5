@@ -1,4 +1,4 @@
-package com.conveyal.r5.elevation;
+package com.conveyal.r5.rastercost;
 
 import com.conveyal.r5.streets.EdgeStore;
 import org.apache.commons.math3.util.FastMath;

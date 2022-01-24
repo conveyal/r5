@@ -1,4 +1,4 @@
-package com.conveyal.r5.elevation;
+package com.conveyal.r5.rastercost;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.streets.EdgeStore;

@@ -158,6 +158,12 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     public transient PointSet[] destinationPointSets;
 
     /**
+     * If this field is non-null, it will intentionally cause failures on workers handling the task. This is done on
+     * testing or even production systems in order to observe and improve their robustness to failure.
+     */
+    public ChaosParameters injectFault;
+
+    /**
      * Is this a single point or regional request? Needed to encode types in JSON serialization. Can that type field be
      * added automatically with a serializer annotation instead of by defining a getter method and two dummy methods?
      */

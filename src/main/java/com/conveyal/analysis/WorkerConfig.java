@@ -18,7 +18,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
     private final String  brokerPort;
     private final int     lightThreads;
     private final int     heavyThreads;
-    private final boolean testTaskRedelivery;
     private final boolean listenForSinglePoint;
 
     // CONSTRUCTORS
@@ -34,7 +33,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
             lightThreads = availableProcessors;
             heavyThreads = availableProcessors;
         }
-        testTaskRedelivery = boolProp("test-task-redelivery");
         listenForSinglePoint = boolProp("listen-for-single-point");
         // No call to exitIfErrors() here, that should be done in concrete subclasses.
     }
@@ -47,7 +45,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
     @Override public String  brokerPort()      { return brokerPort; }
     @Override public int     lightThreads ()   { return lightThreads; }
     @Override public int     heavyThreads ()   { return heavyThreads; }
-    @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public boolean listenForSinglePoint() { return listenForSinglePoint; }
 
 }

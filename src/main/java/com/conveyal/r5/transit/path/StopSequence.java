@@ -70,7 +70,7 @@ public class StopSequence {
         } else {
             int transferTimeSeconds =
                     iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
-            checkState(transferTimeSeconds >= 0);
+            // checkState(transferTimeSeconds >= 0);
             return transferTimeSeconds;
         }
     }

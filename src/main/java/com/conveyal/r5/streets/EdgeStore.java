@@ -5,6 +5,7 @@ import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
@@ -183,14 +184,11 @@ public class EdgeStore implements Serializable {
     public EdgeTraversalTimes edgeTraversalTimes;
 
     /**
-     * For each edge in the network, an array containing elevation sampled every 10 meters along the edge.
-     * Units currently unspecified, probably decimeters. To be resolved: relative to geoid, ellipdoid?
-     * Will be null unless elevation data is added to the street layer.
+     * Holds zero or more sets of data, typically derived from rasters, which represent scalar or boolean fields through
+     * which the streets pass. Traversal costs are evaluated over these fields, in the manner of a path integral.
+     * If this is null or empty no such costs will be applied.
      */
-    public List<short[]> elevationProfiles;
-
-    public TFloatList toblerAverages;
-
+    public List<CostField> costFields;
 
     /** The street layer of a transport network that the edges in this edgestore make up. */
     public StreetLayer layer;
@@ -225,7 +223,7 @@ public class EdgeStore implements Serializable {
         turnRestrictions = new TIntIntHashMultimap();
         turnRestrictionsReverse = new TIntIntHashMultimap();
         edgeTraversalTimes = null;
-        elevationProfiles = null;
+        costFields = null;
     }
 
     /**
@@ -986,34 +984,6 @@ public class EdgeStore implements Serializable {
             pointConsumer.consumePoint(p, vertex.getFixedLat(), vertex.getFixedLon());
         }
 
-        /**
-         * Call a function for every segment in this edge's elevation profile.
-         * Always iterates forward over the profile, whether we are on a forward or backward edge.
-         * FIXME: reverse iteration is needed because the walking speed function is not symmetric.
-         *         But we could just invert the sign of the elevation change, order is often not important.
-         */
-        public void forEachElevationSegment (ElevationSegmentConsumer consumer) {
-            double remainingMeters = getLengthM();
-            // Do not go through getFromVertex method because we do not currently support reverse edges.
-            VertexStore.Vertex vertex = vertexStore.getCursor(fromVertices.get(pairIndex));
-            int i = 0;
-            double prevElevationMeters = vertex.getElevationMeters();
-            for (short elevationDecimeters : elevationProfiles.get(pairIndex)) {
-                final double elevationMeters = elevationDecimeters / DECIMETERS_PER_METER;
-                final double elevationChangeMeters = elevationMeters - prevElevationMeters;
-                consumer.consumeElevationSegment(i, ELEVATION_SAMPLE_SPACING_METERS, elevationChangeMeters);
-                remainingMeters -= ELEVATION_SAMPLE_SPACING_METERS;
-                i += 1;
-                prevElevationMeters = elevationMeters;
-            }
-            if (remainingMeters >= 0 && remainingMeters < ELEVATION_SAMPLE_SPACING_METERS) {
-                vertex.seek(toVertices.get(pairIndex));
-                consumer.consumeElevationSegment(i, remainingMeters, vertex.getElevationMeters() - prevElevationMeters);
-            } else {
-                LOG.warn("Unexpected remainder {}m on edge of length {}m", remainingMeters, getLengthM());
-            }
-        }
-
         /** @return an envelope around the whole edge geometry, in fixed-point WGS84 degrees. */
         public Envelope getEnvelope () {
             Envelope envelope = new Envelope();
@@ -1189,15 +1159,6 @@ public class EdgeStore implements Serializable {
     @FunctionalInterface
     public static interface SegmentConsumer {
         public void consumeSegment (int index, int fixedLat0, int fixedLon0, int fixedLat1, int fixedLon1);
-    }
-
-    /**
-     * A functional interface that consumes segments in a street edge's elevation profile one by one.
-     * Each segment is represented as a distance across the ground (always positive) and a signed vertical change.
-     */
-    @FunctionalInterface
-    public static interface ElevationSegmentConsumer {
-        public void consumeElevationSegment (int index, double xMeters, double yMeters);
     }
 
     /** A functional interface that consumes the points in a street geometry one by one. */

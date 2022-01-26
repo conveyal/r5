@@ -35,7 +35,6 @@ public class VertexStore implements Serializable {
     public TIntList fixedLats;
     public TIntList fixedLons;
     public TByteList vertexFlags;
-    public TShortList elevations;
 
     public VertexStore (int initialSize) {
         fixedLats = new TIntArrayList(initialSize);
@@ -127,8 +126,6 @@ public class VertexStore implements Serializable {
         public Coordinate getJTSCoordinateFloating () {
             return new Coordinate(getLon(), getLat());
         }
-
-        public double getElevationMeters () { return elevations.get(index) / DECIMETERS_PER_METER; };
 
     }
 

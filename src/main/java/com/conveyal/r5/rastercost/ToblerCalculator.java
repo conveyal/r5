@@ -6,7 +6,7 @@ import org.apache.commons.math3.util.FastMath;
 /**
  * Created by abyrd on 2021-07-20
  */
-public class ToblerCalculator implements EdgeStore.ElevationSegmentConsumer {
+public class ToblerCalculator implements ElevationCostField.ElevationSegmentConsumer {
 
     public static final double DECIMETERS_PER_METER = 10;
 
@@ -35,12 +35,6 @@ public class ToblerCalculator implements EdgeStore.ElevationSegmentConsumer {
      */
     public static double tobler (double dx, double dy) {
         return FastMath.exp(-3.5 * FastMath.abs((dy/dx) + 0.05));
-    }
-
-    public static double weightedAverageForEdge (EdgeStore.Edge edge) {
-        ToblerCalculator calculator = new ToblerCalculator();
-        edge.forEachElevationSegment(calculator);
-        return calculator.weightedToblerAverage();
     }
 
 }

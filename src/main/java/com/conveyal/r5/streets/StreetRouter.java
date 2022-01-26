@@ -35,6 +35,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
 import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
@@ -81,8 +83,8 @@ public class StreetRouter {
     public int flagSearchQuantity = 20;
 
     /**
-     * The reason this is pluggable is to account for left and right hand drive (as well as any other country-specific
-     * details you might want to implement)
+     * This is pluggable is to account for left and right hand drive (as well as any other country-specific details you
+     * might want to implement). It could also allow for user-specified cost fields etc.
      */
     public TraversalTimeCalculator timeCalculator;
 
@@ -297,8 +299,11 @@ public class StreetRouter {
         this.timeCalculator = streetLayer.edgeStore.edgeTraversalTimes;
         // If no per-edge timings were supplied in the network, fall back on simple default timings
         if (this.timeCalculator == null) {
-            // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+            // TODO either: 1) don't hardwire drive-on-right, or 2) global https://en.wikipedia.org/wiki/Dagen_H
             this.timeCalculator = new BasicTraversalTimeCalculator(streetLayer, true);
+        }
+        if (notNullOrEmpty(streetLayer.edgeStore.costFields)) {
+            this.timeCalculator = new MultistageTraversalTimeCalculator(this.timeCalculator, streetLayer.edgeStore.costFields);
         }
     }
 

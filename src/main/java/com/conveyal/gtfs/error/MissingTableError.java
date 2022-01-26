@@ -9,11 +9,14 @@ public class MissingTableError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public MissingTableError(String file) {
-        super(file, 0, null, Priority.MEDIUM);
+        super(file, 0, null);
     }
 
     @Override public String getMessage() {
         return String.format("This table is required by the GTFS specification but is missing.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

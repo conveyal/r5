@@ -1,6 +1,5 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.JsonViews;
 import com.conveyal.analysis.models.Model;

@@ -15,7 +15,7 @@ import org.opengis.referencing.operation.TransformException;
 import java.io.File;
 import java.io.IOException;
 
-import static com.conveyal.r5.analyst.Grid.checkWgsEnvelopeSize;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -45,7 +45,7 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
             ShapefileReader reader = new ShapefileReader(file);
             // Iterate over all features to ensure file is readable, geometries are valid, and can be reprojected.
             Envelope envelope = reader.wgs84Bounds();
-            checkWgsEnvelopeSize(envelope);
+            checkWgsEnvelopeSize(envelope, "Shapefile");
             reader.wgs84Stream().forEach(f -> {
                 checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
             });

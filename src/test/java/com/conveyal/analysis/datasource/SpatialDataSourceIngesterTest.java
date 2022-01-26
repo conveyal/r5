@@ -63,7 +63,7 @@ class SpatialDataSourceIngesterTest {
     @ParameterizedTest
     @EnumSource(names = {"GEOPACKAGE", "GEOJSON", "SHP"})
     void continentalScale (FileStorageFormat format) {
-        assertIngestException(format, "continents", DataSourceException.class, "exceeds");
+        assertIngestException(format, "continents", IllegalArgumentException.class, "exceeds");
     }
 
     /**
@@ -73,8 +73,7 @@ class SpatialDataSourceIngesterTest {
     @ParameterizedTest
     @EnumSource(names = {"GEOPACKAGE", "GEOJSON", "SHP"})
     void newZealandAntimeridian (FileStorageFormat format) {
-        // TODO generate message specifically about 180 degree meridian, not excessive bbox size
-        assertIngestException(format, "new-zealand-antimeridian", DataSourceException.class, "exceeds");
+        assertIngestException(format, "new-zealand-antimeridian", IllegalArgumentException.class, "180");
     }
 
     public static SpatialDataSource testIngest (FileStorageFormat format, String inputFile) {

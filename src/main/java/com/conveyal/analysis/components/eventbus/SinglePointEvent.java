@@ -9,16 +9,16 @@ public class SinglePointEvent extends Event {
     // but also has a CRC since the scenario with a given index can change over time.
     public final String scenarioId;
 
-    public final String projectId;
+    public final String bundleId;
 
-    public final int variant;
+    public final String regionId;
 
     public final int durationMsec;
 
-    public SinglePointEvent (String scenarioId, String projectId, int variant, int durationMsec) {
+    public SinglePointEvent (String scenarioId, String bundleId, String regionId, int durationMsec) {
         this.scenarioId = scenarioId;
-        this.projectId = projectId;
-        this.variant = variant;
+        this.bundleId = bundleId;
+        this.regionId = regionId;
         this.durationMsec = durationMsec;
     }
 
@@ -26,8 +26,8 @@ public class SinglePointEvent extends Event {
     public String toString () {
         return "SinglePointEvent{" +
                 "scenarioId='" + scenarioId + '\'' +
-                ", projectId='" + projectId + '\'' +
-                ", variant=" + variant +
+                ", regionId='" + regionId + '\'' +
+                ", bundleId=" + bundleId +
                 ", durationMsec=" + durationMsec +
                 ", user='" + user + '\'' +
                 ", accessGroup=" + accessGroup +

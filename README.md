@@ -3,7 +3,7 @@
 ## R5: Rapid Realistic Routing on Real-world and Reimagined networks
 R5 is the routing engine for [Conveyal](https://www.conveyal.com/learn), a web-based system that allows users to create transportation scenarios and evaluate them in terms of cumulative opportunities accessibility indicators. See the [Conveyal user manual](https://docs.conveyal.com/) for more information.
 
-We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. R5 handles both scheduled public transit and headway-based lines, using novel methods to characterize variation and uncertainty in travel times.
+We refer to the routing method as "realistic" because it works by planning door-to-door trips at many different departure times in a time window, which better reflects how people use transportation systems than planning a single trip at an exact departure time. R5 handles both scheduled public transit and headway-based lines, using novel methods to characterize variation and uncertainty in travel times. It is designed for one-to-many and many-to-many travel-time calculations used in access indicators, offering substantially better performance than repeated calls to older tools that provide one-to-one routing results. For a comparison with OpenTripPlanner, see [this background](http://docs.opentripplanner.org/en/latest/Version-Comparison/#commentary-on-otp1-features-removed-from-otp2).
 
 We say "Real-world and Reimagined" networks because R5's networks are built from widely available open OSM and GTFS data describing baseline transportation systems, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
 
@@ -13,7 +13,7 @@ We say "Real-world and Reimagined" networks because R5's networks are built from
 
 For details on the core methods implemented in Conveyal Analysis and R5, see:
 
-* [Conway, Byrd, and van der Linden (2017)](http://hdl.handle.net/2286/R.A.218654)
+* [Conway, Byrd, and van der Linden (2017)](https://keep.lib.asu.edu/items/127809)
 * [Conway, Byrd, and van Eggermond (2018)](https://www.jtlu.org/index.php/jtlu/article/view/1074)
 * [Conway and Stewart (2019)](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf)
 

@@ -9,11 +9,14 @@ public class NumberParseError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public NumberParseError(String file, long line, String field) {
-        super(file, line, field, Priority.HIGH);
+        super(file, line, field);
     }
 
     @Override public String getMessage() {
         return String.format("Error parsing a number from a string.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.HIGH;
+    }
 }

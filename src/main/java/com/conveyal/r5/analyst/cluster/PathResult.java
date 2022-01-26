@@ -32,6 +32,14 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathResult {
 
+    /**
+     * The maximum number of destinations for which we'll generate detailed path information in a single request.
+     * Detailed path information was added on to the original design, which returned a simple grid of travel times.
+     * These results are returned to the backend over an HTTP API so we don't want to risk making them too huge.
+     * This could be set to a higher number in cases where you know the result return channel can handle the size.
+     */
+    public static int maxDestinations = 5000;
+
     private final int nDestinations;
     /**
      * Array with one entry per destination. Each entry is a map from a "path template" to the associated iteration
@@ -62,8 +70,8 @@ public class PathResult {
             // In regional analyses, return paths to all destinations
             nDestinations = task.nTargetsPerOrigin();
             // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinations > 5000) {
-                throw new UnsupportedOperationException("Path results are limited to 5000 destinations");
+            if (nDestinations > maxDestinations) {
+                throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + maxDestinations);
             }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];

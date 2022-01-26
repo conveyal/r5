@@ -12,7 +12,7 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
     public final String badReference;
 
     public ReferentialIntegrityError(String tableName, long row, String field, String badReference) {
-        super(tableName, row, field, Priority.HIGH);
+        super(tableName, row, field);
         this.badReference = badReference;
     }
 
@@ -26,5 +26,9 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
 
     @Override public String getMessage() {
         return String.format(badReference);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.HIGH;
     }
 }

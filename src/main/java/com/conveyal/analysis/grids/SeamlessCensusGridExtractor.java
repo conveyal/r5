@@ -5,6 +5,7 @@ import com.conveyal.analysis.models.Bounds;
 import com.conveyal.data.census.S3SeamlessSource;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.progress.ProgressListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,16 +49,19 @@ public class SeamlessCensusGridExtractor implements Component {
     /**
      * Retrieve data for bounds and save to a bucket under a given key
      */
-    public List<Grid> censusDataForBounds (Bounds bounds, int zoom) throws IOException {
+    public List<Grid> censusDataForBounds (Bounds bounds, int zoom, ProgressListener progressListener) throws IOException {
         long startTime = System.currentTimeMillis();
 
         // All the features are buffered in a Map in memory. This could be problematic on large areas.
-        Map<Long, GeobufFeature> features = source.extract(bounds.north, bounds.east, bounds.south, bounds.west, false);
+        Map<Long, GeobufFeature> features =
+                source.extract(bounds.north, bounds.east, bounds.south, bounds.west, false, progressListener);
 
         if (features.isEmpty()) {
             LOG.info("No seamless census data found here, not pre-populating grids");
             return new ArrayList<>();
         }
+
+        progressListener.beginTask("Processing census blocks", features.size());
 
         // One string naming each attribute (column) in the incoming census data.
         Map<String, Grid> grids = new HashMap<>();
@@ -81,6 +85,7 @@ public class SeamlessCensusGridExtractor implements Component {
                 }
                 grid.incrementFromPixelWeights(weights, value.doubleValue());
             }
+            progressListener.increment();
         }
 
         long endTime = System.currentTimeMillis();

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.progress;
 
 import com.conveyal.analysis.models.BaseModel;
+import com.conveyal.analysis.models.DataGroup;
 
 /**
  * A unique identifier for the final product of a single TaskAction. Currently this serves as both an internal data
@@ -31,7 +32,7 @@ public class WorkProduct {
         return new WorkProduct(WorkProductType.forModel(model), model._id.toString(), null);
     }
 
-    public static WorkProduct forDataGroup (WorkProductType type, String dataGroupId, String regionId) {
-        return new WorkProduct(type, dataGroupId, regionId, true);
+    public static WorkProduct forDataGroup (WorkProductType type, DataGroup dataGroup, String regionId) {
+        return new WorkProduct(type, dataGroup._id.toString(), regionId, true);
     }
 }

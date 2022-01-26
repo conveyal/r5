@@ -3,7 +3,6 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.gtfs.api.ApiMain;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -46,20 +45,20 @@ public abstract class BackendMain {
         // TODO remove the static ApiMain abstraction layer. We do not use it anywhere but in handling GraphQL queries.
         // TODO we could move this to something like BackendComponents.initialize()
         Persistence.initializeStatically(components.config);
-        ApiMain.initialize(components.gtfsCache);
         PointSetCache.initializeStatically(components.fileStorage);
 
         // TODO handle this via components without explicit "if (offline)"
         if (components.config.offline()) {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");
+            // WorkerCategory(null, null) means a worker is not on any network, and is waiting to be assigned one.
             components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, 0);
         }
 
         LOG.info("Conveyal Analysis server is ready.");
         for (TaskAction taskAction : postStartupTasks) {
             components.taskScheduler.enqueue(
-                Task.create(Runnable.class.getSimpleName()).setHeavy(true).forUser("SYSTEM").withAction(taskAction)
+                Task.create(taskAction.getClass().getSimpleName()).setHeavy(true).forUser("SYSTEM").withAction(taskAction)
             );
         }
 

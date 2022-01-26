@@ -107,7 +107,7 @@ public class AggregationAreaController implements HttpController {
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.get("/api/aggregationArea", this::getAggregationAreas, toJson);
-        sparkService.get("/api/aggregationArea/:_id/gridUrl", this::getAggregationAreaGridUrl, toJson);
+        sparkService.get("/api/aggregationArea/:_id", this::getAggregationAreaGridUrl, toJson);
         sparkService.post("/api/aggregationArea", this::createAggregationAreas, toJson);
     }
 

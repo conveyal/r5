@@ -14,6 +14,7 @@ import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Cache for GTFSFeed objects, a disk-backed (MapDB) representation of data from one GTFS feed. The source GTFS
@@ -99,24 +100,47 @@ public class GTFSCache {
     }
 
     /** This method should only ever be called by the cache loader. */
-    private @Nonnull GTFSFeed retrieveAndProcessFeed(String id) throws GtfsLibException {
-        FileStorageKey dbKey = getFileKey(id, "db");
-        FileStorageKey dbpKey = getFileKey(id, "db.p");
+    private @Nonnull GTFSFeed retrieveAndProcessFeed(String bundleScopedFeedId) throws GtfsLibException {
+        FileStorageKey dbKey = getFileKey(bundleScopedFeedId, "db");
+        FileStorageKey dbpKey = getFileKey(bundleScopedFeedId, "db.p");
         if (fileStorage.exists(dbKey) && fileStorage.exists(dbpKey)) {
             // Ensure both MapDB files are local, pulling them down from remote storage as needed.
             fileStorage.getFile(dbKey);
             fileStorage.getFile(dbpKey);
-            return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
+            try {
+                return GTFSFeed.reopenReadOnly(fileStorage.getFile(dbKey));
+            } catch (GtfsLibException e) {
+                if (e.getCause().getMessage().contains("Could not set field value: priority")) {
+                    // Swallow exception and fall through - rebuild bad MapDB and upload to S3.
+                    LOG.warn("Detected poisoned MapDB containing GTFSError.priority serializer. Rebuilding.");
+                } else {
+                    throw e;
+                }
+            }
         }
-        FileStorageKey zipKey = getFileKey(id, "zip");
+        FileStorageKey zipKey = getFileKey(bundleScopedFeedId, "zip");
         if (!fileStorage.exists(zipKey)) {
             throw new GtfsLibException("Original GTFS zip file could not be found: " + zipKey);
         }
+        // This code path is rarely run because we usually pre-build GTFS MapDBs in bundleController and cache them.
+        // This will only be run when the resultant MapDB has been deleted or is otherwise unavailable.
         LOG.debug("Building or rebuilding MapDB from original GTFS ZIP file at {}...", zipKey);
         try {
             File tempDbFile = FileUtils.createScratchFile("db");
             File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
-            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey));
+            // An unpleasant hack since we do not have separate references to the GTFS feed ID and Bundle ID here,
+            // only a concatenation of the two joined with an underscore. We have to force-override feed ID because
+            // references to its contents (e.g. in scenarios) are scoped only by the feed ID not the bundle ID.
+            // The bundle ID is expected to always be an underscore-free UUID, but old feed IDs may contain underscores
+            // (yielding filenames like old_feed_id_bundleuuid) so we look for the last underscore as a split point.
+            // GTFS feeds may now be referenced by multiple bundles with different IDs, so the last part of the file
+            // name is rather arbitrary - it's just the bundleId with which this feed was first associated.
+            // We don't really need to scope newer feeds by bundleId since they now have globally unique UUIDs.
+            int splitIndex = bundleScopedFeedId.lastIndexOf("_");
+            checkState(splitIndex > 0 && splitIndex < bundleScopedFeedId.length() - 1,
+                "Expected underscore-joined feedId and bundleId.");
+            String feedId = bundleScopedFeedId.substring(0, splitIndex);
+            GTFSFeed.newFileFromGtfs(tempDbFile, fileStorage.getFile(zipKey), feedId);
             // The DB file should already be closed and flushed to disk.
             // Put the DB and DB.p files in local cache, and mirror to remote storage if configured.
             fileStorage.moveIntoStorage(dbKey, tempDbFile);

@@ -39,8 +39,10 @@ public abstract class KryoNetworkSerializer {
     private static final Logger LOG = LoggerFactory.getLogger(KryoNetworkSerializer.class);
 
     /**
-     * This string should be changed to a new value each time the network storage format changes.
-     * I considered using an ISO date string but that could get confusing when seen in filenames.
+     * This string should be changed to a new value (nv2, nv3...) each time the network storage format changes.
+     * It should also be changed when the semantic content changes from that produced by earlier versions, even when
+     * the serialization format itself does not change. This will ensure newer workers will not load cached older files.
+     * We considered using an ISO date string as the version but that could get confusing when seen in filenames.
      */
     public static final String NETWORK_FORMAT_VERSION = "nv1";
 

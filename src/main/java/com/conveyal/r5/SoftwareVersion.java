@@ -20,7 +20,7 @@ public class SoftwareVersion {
     private static final String UNKNOWN = "UNKNOWN";
 
     // This could potentially be made into a Component so it's non-static
-    public static SoftwareVersion instance = new SoftwareVersion();
+    public static SoftwareVersion instance = new SoftwareVersion("r5");
 
     private final Properties properties = new Properties();
 
@@ -29,7 +29,10 @@ public class SoftwareVersion {
     public final String commit;
     public final String branch;
 
-    protected SoftwareVersion () {
+    // Which software product is this a version of? Provides a scope or context for the version and commit strings.
+    public final String name;
+
+    protected SoftwareVersion (String productName) {
         try (InputStream is = getClass().getResourceAsStream(VERSION_PROPERTIES_FILE)) {
             properties.load(is);
         } catch (IOException | NullPointerException e) {
@@ -38,6 +41,7 @@ public class SoftwareVersion {
         version = getPropertyOrUnknown("version");
         commit = getPropertyOrUnknown("commit");
         branch = getPropertyOrUnknown("branch");
+        name = productName;
     }
 
     /**

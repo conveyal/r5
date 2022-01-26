@@ -10,6 +10,7 @@ import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
 import java.util.Set;
 
 import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
@@ -41,12 +42,13 @@ public class LocalFileStorage implements FileStorage {
 
     /**
      * Move the File into the FileStorage by moving the passed in file to the Path represented by the FileStorageKey.
+     * It is possible that on some systems (Windows) the file cannot be moved and it will be copied instead, leaving
+     * the source file in place.
      */
     @Override
     public void moveIntoStorage(FileStorageKey key, File sourceFile) {
-        // Get a pointer to the local file
+        // Get the destination file path inside FileStorage, and ensure all its parent directories exist.
         File storedFile = getFile(key);
-        // Ensure the directories exist
         storedFile.getParentFile().mkdirs();
         try {
             try {
@@ -54,15 +56,14 @@ public class LocalFileStorage implements FileStorage {
                 Files.move(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             } catch (FileSystemException e) {
                 // The default Windows filesystem (NTFS) does not unlock memory-mapped files, so certain files (e.g.
-                // mapdb) cannot be moved or deleted. This workaround may cause temporary files to accumulate, but it
-                // should not be triggered for default Linux filesystems (ext).
+                // mapdb Write Ahead Log) cannot be moved or deleted. This workaround may cause temporary files
+                // to accumulate, but it should not be triggered for default Linux filesystems (ext).
                 // See https://github.com/jankotek/MapDB/issues/326
                 Files.copy(sourceFile.toPath(), storedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copying instead.",
+                LOG.info("Could not move {} because of FileSystem restrictions (probably NTFS). Copied instead.",
                         sourceFile.getName());
             }
-            // Set the file to be read-only and accessible only by the current user.
-            Files.setPosixFilePermissions(storedFile.toPath(), Set.of(OWNER_READ));
+            setReadOnly(storedFile);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -107,6 +108,37 @@ public class LocalFileStorage implements FileStorage {
     @Override
     public boolean exists(FileStorageKey key) {
         return getFile(key).exists();
+    }
+
+    /**
+     * Set the file to be read-only and accessible only by the current user.
+     * All files in our FileStorage are set to read-only as a safeguard against corruption under concurrent access.
+     * Because the method Files.setPosixFilePermissions fails on Windows with an UnsupportedOperationException,
+     * we attempted to use the portable File.setReadable and File.setWritable methods to cover both POSIX and Windows
+     * filesystems, but these require multiple calls in succession to achieve fine grained control on POSIX filesystems.
+     * Specifically, there is no way to atomically set a file readable by its owner but non-readable by all other users.
+     * The setReadable/Writable ownerOnly parameter just leaves group and others permissions untouched and unchanged.
+     * To get the desired result on systems with user-group-other permissions granularity, you have to do something like:
+     * success &= file.setReadable(false, false);
+     * success &= file.setWritable(false, false);
+     * success &= file.setReadable(true, true);
+     *
+     * Instead, we first do the POSIX atomic call, which should cover all deployment environments, then fall back on the
+     * NIO call to cover any development environments using other filesystems.
+     */
+    public static void setReadOnly (File file) {
+        try {
+            try {
+                Files.setPosixFilePermissions(file.toPath(), EnumSet.of(PosixFilePermission.OWNER_READ));
+            } catch (UnsupportedOperationException e) {
+                LOG.warn("POSIX permissions unsupported on this filesystem. Falling back on portable NIO methods.");
+                if (!(file.setReadable(true) && file.setWritable(false))) {
+                    LOG.error("Could not set read-only permissions on file {}", file);
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Could not set read-only permissions on file {}", file, e);
+        }
     }
 
 }

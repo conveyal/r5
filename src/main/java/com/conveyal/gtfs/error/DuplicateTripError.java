@@ -20,7 +20,7 @@ public class DuplicateTripError extends GTFSError implements Serializable {
     String lastArrival;
 
     public DuplicateTripError(Trip trip, long line, String duplicateTripId, String patternName, String firstDeparture, String lastArrival) {
-        super("trips", line, "trip_id", Priority.MEDIUM, trip.trip_id);
+        super("trips", line, "trip_id", trip.trip_id);
         this.duplicateTripId = duplicateTripId;
         this.patternName = patternName;
         this.routeId = trip.route_id;
@@ -32,5 +32,9 @@ public class DuplicateTripError extends GTFSError implements Serializable {
 
     @Override public String getMessage() {
         return String.format("Trip Ids %s & %s (route %s) are duplicates (pattern: %s, calendar: %s, from %s to %s)", duplicateTripId, affectedEntityId, routeId, patternName, serviceId, firstDeparture, lastArrival);
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

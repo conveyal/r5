@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -79,6 +80,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      */
     public WebMercatorGridPointSet (Envelope wgsEnvelope) {
         LOG.info("Creating WebMercatorGridPointSet with WGS84 extents {}", wgsEnvelope);
+        checkWgsEnvelopeSize(wgsEnvelope, "grid point set");
         this.zoom = DEFAULT_ZOOM;
         int west = lonToPixel(wgsEnvelope.getMinX());
         int east = lonToPixel(wgsEnvelope.getMaxX());

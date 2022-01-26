@@ -79,6 +79,14 @@ public class AnalysisDB {
         return new AnalysisCollection<T>(database.getCollection(name, clazz), clazz);
     }
 
+    /**
+     * Lower-level access to Mongo collections without the user-oriented functionality of BaseModel (accessGroup etc.)
+     * This is useful when storing server monitoring data (time series or event data) in a cloud environment.
+     */
+    public MongoCollection getMongoCollection (String name, Class clazz) {
+        return database.getCollection(name, clazz);
+    }
+
     /** Interface to supply configuration to this component. */
     public interface Config {
         default String databaseUri() { return "mongodb://127.0.0.1:27017"; }

@@ -1,7 +1,5 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.AnalysisServerException;
-
 import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
@@ -82,11 +80,11 @@ public abstract class DataSourceUtil {
      */
     private static void checkFileCharacteristics (List<FileItem> fileItems) {
         for (FileItem fileItem : fileItems) {
-            checkState(fileItem instanceof DiskFileItem);
+            checkState(fileItem instanceof DiskFileItem, "Uploaded file was not stored to disk.");
             File diskFile = ((DiskFileItem)fileItem).getStoreLocation();
-            checkState(diskFile.exists());
-            checkState(diskFile.canRead());
-            checkState(diskFile.length() > 0);
+            checkState(diskFile.exists(), "Uploaded file does not exist on filesystem as expected.");
+            checkState(diskFile.canRead(), "Read permissions were not granted on uploaded file.");
+            checkState(diskFile.length() > 0, "Uploaded file was empty (contained no data).");
         }
     }
 
@@ -100,7 +98,7 @@ public abstract class DataSourceUtil {
             String fileName = fileItem.getName();
             String extension = FilenameUtils.getExtension(fileName);
             if (extension.isEmpty()) {
-                new DataSourceException("Filename has no extension: " + fileName);
+                throw new DataSourceException("Filename has no extension: " + fileName);
             }
             fileExtensions.add(extension.toLowerCase(Locale.ROOT));
         }

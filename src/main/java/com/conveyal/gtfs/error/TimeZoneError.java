@@ -22,11 +22,15 @@ public class TimeZoneError extends GTFSError implements Serializable {
      * @param message description of issue with timezone reference
      */
     public TimeZoneError(String tableName, long line, String field, String affectedEntityId, String message) {
-        super(tableName, line, field, Priority.MEDIUM, affectedEntityId);
+        super(tableName, line, field, affectedEntityId);
         this.message = message;
     }
 
     @Override public String getMessage() {
         return message + ". (" + field + ": " + affectedEntityId + ")";
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

@@ -1,17 +1,19 @@
 <configuration>
 
+    <!-- encoders are  by default assigned the type ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
+    <!-- We don't show line numbers because Logback documentation says this has a high computational cost. -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <!-- encoders are  by default assigned the type
-             ch.qos.logback.classic.encoder.PatternLayoutEncoder -->
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%date [%thread] %-5level %logger{10} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <root level="info">
+    <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
 
+    <!-- Some of these are set to the same level as the root. -->
+    <!-- They are just placeholders to allow tweaking levels in certain components and packages for debugging. -->
     <logger name="com.conveyal.osmlib" level="INFO" />
     <logger name="com.conveyal.gtfs" level="INFO" />
     <logger name="com.conveyal.r5.profile.ExecutionTimer" level="INFO"/>

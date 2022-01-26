@@ -135,7 +135,7 @@ public class DataSourceController implements HttpController {
 
     @Override
     public void registerEndpoints (spark.Service sparkService) {
-        sparkService.path("/api/datasource", () -> {
+        sparkService.path("/api/dataSource", () -> {
             sparkService.get("/", this::getAllDataSourcesForRegion, toJson);
             sparkService.get("/:_id", this::getOneDataSourceById, toJson);
             sparkService.delete("/:_id", this::deleteOneDataSourceById, toJson);

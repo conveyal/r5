@@ -12,10 +12,14 @@ public class MissingShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public MissingShapeError(Trip trip) {
-        super("trips", trip.sourceFileLine, "shape_id", Priority.LOW, trip.trip_id);
+        super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
     }
 
     @Override public String getMessage() {
         return "Trip " + affectedEntityId + " is missing a shape";
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.LOW;
     }
 }

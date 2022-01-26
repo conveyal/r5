@@ -18,7 +18,7 @@ public class ElevationCostField implements CostField {
 
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        return (int)(traversalTimeSeconds * multiplierForEdge(currentEdge));
+        return (int)Math.round(((double)traversalTimeSeconds) / factorForEdge(currentEdge));
     }
 
     /**
@@ -47,7 +47,7 @@ public class ElevationCostField implements CostField {
      */
     public TFloatList toblerAverages;
 
-    public double multiplierForEdge (EdgeStore.Edge edge) {
+    public double factorForEdge (EdgeStore.Edge edge) {
         return toblerAverages.get(edge.getEdgeIndex());
     }
 
@@ -68,14 +68,15 @@ public class ElevationCostField implements CostField {
         int i = 0;
         double prevElevationMeters = getVertexElevationMeters(startVertex);
         for (short elevationDecimeters : elevationProfiles.get(pairIndex)) {
-            double elevationMeters = elevationDecimeters / DECIMETERS_PER_METER;
-            double elevationChangeMeters = delta(prevElevationMeters, elevationMeters, invert);
+            final double elevationMeters = elevationDecimeters / DECIMETERS_PER_METER;
+            final double elevationChangeMeters = delta(prevElevationMeters, elevationMeters, invert);
             consumer.consumeElevationSegment(i, ELEVATION_SAMPLE_SPACING_METERS, elevationChangeMeters);
             remainingMeters -= ELEVATION_SAMPLE_SPACING_METERS;
             i += 1;
             prevElevationMeters = elevationMeters;
         }
-        if (remainingMeters >= 0 && remainingMeters < ELEVATION_SAMPLE_SPACING_METERS) {
+        // The remainder may be slightly larger than the normal sample spacing due to differing distance approximations.
+        if (remainingMeters >= 0 && remainingMeters <= ELEVATION_SAMPLE_SPACING_METERS + 0.5) {
             final double elevationChangeMeters = delta(prevElevationMeters, getVertexElevationMeters(endVertex), invert);
             consumer.consumeElevationSegment(i, remainingMeters, elevationChangeMeters);
         } else {

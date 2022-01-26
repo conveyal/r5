@@ -34,8 +34,10 @@ public class ElevationCostField implements CostField {
     };
 
     /**
-     * For each edge PAIR in the network, an array containing elevation sampled every 10 meters along the edge.
-     * Units currently unspecified, probably decimeters. To be resolved: relative to geoid, ellipdoid?
+     * Vertical elevation values for points along edges. One entry for each edge PAIR. These do not include the
+     * elevation of the start and end vertices, only evenly-spaced points along the interior of the edge geometry.
+     * Edges that are short enough will not contain any interior points, and will have an empty array (not null).
+     * Units are decimeters, which fit in a 16-bit signed integer for all but the highest mountain roads in the world.
      */
     public List<short[]> elevationProfiles;
 

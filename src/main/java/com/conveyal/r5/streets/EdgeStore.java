@@ -40,8 +40,6 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
 
-import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
-import static com.conveyal.r5.rastercost.ToblerCalculator.DECIMETERS_PER_METER;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -116,14 +114,6 @@ public class EdgeStore implements Serializable {
      * points). The entry for edges with no intermediate points will be a canonical zero-length array, not null.
      */
     public List<int[]> geometries;
-
-    /**
-     * Vertical elevation values for points along edges. One entry for each edge pair. These do not include the
-     * elevation of the start and end vertices, only evenly-spaced points along the interior of the edge geometry.
-     * Edges that are short enough will not contain any interior points, and will have an empty array (not null).
-     * Units are decimeters, which fit in a 16-bit signed integer for all but the highest mountain roads in the world.
-     */
-    public List<short[]> elevations;
 
     /**
      * The compass angle at the start of the edge geometry (binary radians clockwise from North).

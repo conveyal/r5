@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;
@@ -43,8 +44,10 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
             .put("remove-stops", RemoveStops.class)
             .put("remove-trips", RemoveTrips.class)
             .put("reroute", Reroute.class)
+            // Undocumented "custom" modifications
             .put("road-congestion", RoadCongestion.class)
             .put("raster-cost", RasterCost.class)
+            .put("shapefile-lts", ShapefileLts.class)
             .put("set-fare-calculator", SetFareCalculator.class)
             .build();
 

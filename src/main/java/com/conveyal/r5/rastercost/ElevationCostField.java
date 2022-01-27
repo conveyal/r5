@@ -12,6 +12,30 @@ import java.util.List;
 import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
 import static com.conveyal.r5.rastercost.ToblerCalculator.DECIMETERS_PER_METER;
 
+/**
+ * This represents the changes in elevation along every edge in the network, as well as the derived additional costs
+ * for traversing those elevation changes.
+ *
+ * Inspecting the resulting edge elevation profiles reveals that a large number of them are the same elevation over the
+ * entire length of the edge, or very smooth linear changes. These can be simplified and compressed in several ways:
+ * 1. Where both end vertices and every sample point are at the same elevation, the sample points can simply be removed.
+ * 2. Where the sample points fall roughly on a straight line between the two end vertices the sample points are not
+ * needed. Item 1 is a special case of item 2.
+ * 3. ...
+ * 4. If after all these simplifications less than half of the edges have an explicit elevation profile, we may want to
+ * store them in a map instead of an array for better cache efficiency.
+ *
+ * The underlying per-edge storage mechanism is not shared with the tree shade costs because they have different
+ * characteristics. The tree shade is boolean and can be stored as only the distances along the edge where we enter or
+ * exit shade.
+ *
+ * However, storing alternating (distance, elevation change) in a packed array of shorts or bytes would be much easier
+ * to deal with when splitting edges.
+ *
+ * In this case tree shade might be able to share the storage model. The value change elements would all be +/- 1 which
+ * would waste some space, but the code reuse might be worth it. And of course this would also allow greyscale shade
+ * instead of binary shade inputs.
+ */
 public class ElevationCostField implements CostField {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);

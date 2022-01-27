@@ -95,7 +95,7 @@ public class ShapefileMatcher {
                 if (lts < 1 || lts > 4) {
                     LOG.error("Clamping LTS value to range [1...4]. Value in attribute is {}", lts);
                 }
-                EdgeStore.EdgeFlag ltsFlag = intToLts((int) lts);
+                EdgeStore.EdgeFlag ltsFlag = intToLts(lts);
                 edge.setFlag(BIKE_LTS_EXPLICIT);
                 edge.setFlag(ltsFlag);
                 edge.advance();

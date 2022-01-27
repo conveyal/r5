@@ -176,7 +176,7 @@ public class TransportNetworkCache {
         // The linkage we create here will never be used directly, but serves as a basis for scenario linkages, making
         // analysis much faster to start up.
         network.transitLayer.buildDistanceTables(null);
-        network.rebuildLinkedGridPointSet(StreetMode.WALK);
+        network.rebuildLinkedGridPointSet(StreetMode.WALK, StreetMode.BICYCLE, StreetMode.CAR);
 
         // Cache the serialized network on the local filesystem and mirror it to any remote storage.
         try {

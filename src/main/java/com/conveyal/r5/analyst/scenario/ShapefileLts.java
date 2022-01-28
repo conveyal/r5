@@ -9,7 +9,6 @@ import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.util.ExceptionUtils;
-import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.File;
@@ -19,6 +18,9 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
 /**
  * Custom (experimental) Modification that loads LTS values from a shapefile and matches them to the street edges.
  * As a custom modification, a model class only exists in R5, there is no separate UI/backend modification class.
+ *
+ * TODO This modification is not effective together with transit - it doesn't cause the egress tables to be rebuilt.
+ * Hmm, actually we don't ever recompute bike egress. Changing the LTS value does not invalidate bike egress tables.
  */
 public class ShapefileLts extends Modification {
 
@@ -28,7 +30,7 @@ public class ShapefileLts extends Modification {
      */
     public String dataSourceId;
 
-    public String ltsAttribute = "lts_ov";
+    public String ltsAttribute = "lts";
 
     private FileStorageKey fileStorageKey;
 
@@ -51,8 +53,8 @@ public class ShapefileLts extends Modification {
 
     @Override
     public boolean apply (TransportNetwork network) {
-        // Replicate the entire flags array so we can write to it.
-        // Otherwise it's just extending the base graph and writing will fail.
+        // Replicate the entire flags array so we can write to it (following copy-on-write policy).
+        // Otherwise it only allows extending the base graph.
         // FIXME: TIntAugmentedList does not implement the iterator needed for a copy operation
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
         ShapefileMatcher shapefileMatcher = new ShapefileMatcher(network.streetLayer);

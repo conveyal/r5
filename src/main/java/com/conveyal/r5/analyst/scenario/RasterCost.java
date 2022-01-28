@@ -43,7 +43,7 @@ public class RasterCost extends Modification {
     public String dataSourceId;
 
     public enum CostFunction {
-        TOBLER, SHADE
+        TOBLER, SUN
     }
 
     /**
@@ -53,14 +53,14 @@ public class RasterCost extends Modification {
     public CostFunction costFunction;
 
     /**
-     * Scale the raster values before passing them to the cost function. For example, the inpur raster file
+     * Scale the raster values before passing them to the cost function. For example, the input raster file
      * may be in decimeters to make it more compact with less artificial precision.
      */
     public double inputScale = 1;
 
     /**
-     * Scale the cost after applying the function rather than the input,
-     * since cost functions are not necessarily linear.
+     * Scale the cost after applying the function rather than the input to calibrate cost, uniformly increasing or
+     * decreasing it. Separate from inputScale since cost functions are not necessarily linear.
      */
     public double outputScale = 1;
 
@@ -68,7 +68,7 @@ public class RasterCost extends Modification {
 
     private File localFile;
 
-    ElevationLoader loader;
+    private ElevationLoader loader;
 
     @Override
     public boolean resolve (TransportNetwork network) {

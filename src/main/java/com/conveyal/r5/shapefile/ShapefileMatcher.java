@@ -80,7 +80,7 @@ public class ShapefileMatcher {
         } catch (Throwable t) {
             throw new RuntimeException("Could not load and index shapefile.", t);
         }
-        LOG.info("Matching edges");
+        LOG.info("Matching edges and setting bike LTS flags...");
         // Even single-threaded this is pretty fast for small extracts, but it's readily paralellized.
         final LambdaCounter edgePairCounter =
                 new LambdaCounter(LOG, streets.edgeStore.nEdgePairs(), 25_000, "Edge pair {}/{}");
@@ -101,10 +101,13 @@ public class ShapefileMatcher {
                 edge.advance();
                 edge.setFlag(BIKE_LTS_EXPLICIT);
                 edge.setFlag(ltsFlag);
+                edgePairCounter.increment();
             }
-            edgePairCounter.increment();
         });
-        LOG.info("Done matching edges");
+        edgePairCounter.done();
+        LOG.info("Number of edge pairs matched {} using {} shapefile features ({} edge pairs unmatched).",
+                edgePairCounter.getCount(), featureIndex.size(),
+                streets.edgeStore.nEdgePairs() - edgePairCounter.getCount());
     }
 
     // Match metric is currently Hausdorff distance, eventually replace with something that accounts for overlap length.

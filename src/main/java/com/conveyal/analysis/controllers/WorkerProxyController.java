@@ -4,15 +4,20 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.analysis.models.Bundle;
+import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.util.ExceptionUtils;
+import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 import spark.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -43,8 +48,29 @@ public class WorkerProxyController implements HttpController {
         // Ideally we'd have region, project, bundle, and worker version parameters.
         // Those could be path parameters, x-conveyal-headers, etc.
         // Path starts with api to ensure authentication
-        sparkService.get("/api/bundles/:bundle/workerProxy/:workerVersion", this::proxyGet);
-        sparkService.get("/networkVectorTiles/:networkId/:z/:x/:y", this::proxyGet);
+        sparkService.path("/api/workers/:workerVersion/bundles/:bundleId", () -> {
+            sparkService.get("", this::getWorkerStatus, JsonUtil.toJson);
+            sparkService.get("/*", this::proxyRequest);
+        });
+    }
+
+    /**
+     * Get the address of an existing worker or create a new worker and return `null`.
+     */
+    private String getOrStartWorker (String bundleId, String workerVersion, UserPermissions userPermissions) {
+        Bundle bundle = Persistence.bundles.findByIdIfPermitted(bundleId, userPermissions);
+        WorkerCategory workerCategory = new WorkerCategory(bundle._id, workerVersion);
+        String address = broker.getWorkerAddress(workerCategory);
+        if (address == null) {
+            // There are no workers that can handle this request. Request one and ask the UI to retry later.
+            WorkerTags workerTags = new WorkerTags(userPermissions, bundle.regionId);
+            broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
+        } else {
+            // Workers exist in this category, clear out any record that we're waiting for one to start up.
+            // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
+            broker.recentlyRequestedWorkers.remove(workerCategory);
+        }
+        return address;
     }
 
     /**
@@ -52,37 +78,21 @@ public class WorkerProxyController implements HttpController {
      * These requests typically come from an interactive session where the user is using the web UI.
      * @return whatever the worker responds, usually an input stream. Spark serializer chain can properly handle streams.
      */
-    private Object proxyGet (Request request, Response response) {
+    private Object proxyRequest (Request request, Response response) throws IOException {
+        final String bundleId = request.params("bundleId");
+        final String workerVersion = request.params("workerVersion");
 
-        final long startTimeMsec = System.currentTimeMillis();
-
-        final String networkId = request.params("networkId");
-        final String z = request.params("z");
-        final String x = request.params("x");
-        final String y = request.params("y");
-        final String workerVersion = "UNKNOWN"; // TODO request.params("workerVersion");
-
-        WorkerCategory workerCategory = new WorkerCategory(networkId, workerVersion);
-        String address = broker.getWorkerAddress(workerCategory);
-        if (address == null) {
-            Bundle bundle = null;
-            // There are no workers that can handle this request. Request one and ask the UI to retry later.
-            WorkerTags workerTags = new WorkerTags(UserPermissions.from(request), bundle.regionId);
-            broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
+        String workerAddress = getOrStartWorker(bundleId, workerVersion, UserPermissions.from(request));
+        if (workerAddress == null) {
+            // There are no workers that can handle this request at this time, ask the UI to retry later.
             response.status(HttpStatus.ACCEPTED_202);
             response.header("Retry-After", "30");
-            response.body("Starting worker.");
-            return response;
-        } else {
-            // Workers exist in this category, clear out any record that we're waiting for one to start up.
-            // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
-            broker.recentlyRequestedWorkers.remove(workerCategory);
+            return JsonUtilities.objectMapper.writeValueAsString(ImmutableMap.of("message", "Starting worker."));
         }
 
-        String workerUrl = "http://" + address + ":7080/networkVectorTiles/" + networkId + "/" + z + "/" + x + "/" + y;
-        // TODO cleanup, remove hard-coded port number.
-        LOG.info("Re-issuing HTTP request from UI to worker at {}", workerUrl);
-
+        // Port number is hard-coded until we have a good reason to make it configurable.
+        String workerUrl = "http://" + workerAddress + ":7080/" + bundleId + "/" + String.join("/", request.splat());
+        LOG.debug("Re-issuing HTTP request from UI to worker at {}", workerUrl);
 
         HttpClient httpClient = HttpClient.newBuilder().build();
         HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -91,19 +101,39 @@ public class WorkerProxyController implements HttpController {
                 .build();
         try {
             HttpResponse resp = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofInputStream());
-            // TODO copied from NetworkTileController
-            response.header("Content-Type", "application/vnd.mapbox-vector-tile");
-            response.header("Content-Encoding", "gzip");
-            response.header("Cache-Control", "max-age=3600, immutable");
+            resp.headers().map().forEach((key, value) -> {
+                if (!value.isEmpty()) response.header(key, value.get(0));
+            });
             response.status(OK_200);
             return resp.body();
         } catch (Exception exception) {
-            response.status(HttpStatus.BAD_GATEWAY_502);
-            response.body(ExceptionUtils.stackTraceString(exception));
-            return response;
-        } finally {
-
+            response.status(HttpStatus.BAD_REQUEST_400);
+            return JsonUtilities.objectMapper.writeValueAsString(ImmutableMap.of(
+                    "message", exception.getMessage(),
+                    "stackTrace", ExceptionUtils.stackTraceString(exception)
+            ));
         }
+    }
+
+    /**
+     * Simple endpoint for checking if a worker exists.
+     */
+    private Object getWorkerStatus (Request request, Response response) {
+        final String bundleId = request.params("bundleId");
+        final String workerVersion = request.params("workerVersion");
+
+        WorkerCategory workerCategory = new WorkerCategory(bundleId, workerVersion);
+        String workerAddress = broker.getWorkerAddress(workerCategory);
+        if (workerAddress == null) {
+            response.status(404);
+            return ImmutableMap.of(
+                    "message", "Worker does not exist."
+            );
+        }
+
+        return ImmutableMap.of(
+                "message", "Worker ready."
+        );
     }
 
 }

@@ -1,15 +1,16 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.analysis.util.MapTile;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.google.common.collect.ImmutableMap;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.MvtEncoder;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.UserDataKeyValueMapConverter;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsLayer;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsMvt;
-import com.wdtinc.mapbox_vector_tile.build.MvtLayerBuild;
 import com.wdtinc.mapbox_vector_tile.build.MvtLayerParams;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
@@ -24,15 +25,12 @@ import spark.Request;
 import spark.Response;
 import spark.Service;
 
-import javax.sound.sampled.Line;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
@@ -66,9 +64,8 @@ public class NetworkTileController implements HttpController {
 
     private final TransportNetworkCache transportNetworkCache;
 
-    private final STRtree edgeIndex = new STRtree();
-
-    private final Set<String> indexedNetworks = new HashSet<>();
+    private final Map<String, STRtree> indexedEdges = new HashMap<>();
+    private String indexedOsm;
 
     public NetworkTileController (TransportNetworkCache transportNetworkCache) {
         this.transportNetworkCache = transportNetworkCache;
@@ -80,22 +77,26 @@ public class NetworkTileController implements HttpController {
         // Those could be path parameters, x-conveyal-headers, etc.
         // sparkService.get("/api/bundles/:gtfsId/vectorTiles/:x/:y/:z", this::getTile);
         // Should end in .mvt but not clear how to do that in Sparkframework.
-        sparkService.get("/networkVectorTiles/:networkId/:z/:x/:y", this::getTile);
+        sparkService.get("/:bundleId/tiles", this::buildIndex, JsonUtil.toJson);
+        sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getTile);
     }
 
-    private Object getTile (Request request, Response response) {
-        final String networkId = request.params("networkId");
-        final int zTile = Integer.parseInt(request.params("z"));
-        final int xTile = Integer.parseInt(request.params("x"));
-        final int yTile = Integer.parseInt(request.params("y"));
-
-        checkNotNull(networkId);
-        TransportNetwork network = transportNetworkCache.getNetwork(networkId);
+    private TransportNetwork getNetworkFromRequest (Request request) {
+        // "bundleId" is also the "graphId" in an `AnalysisWorkerTask`
+        final String bundleId = request.params("bundleId");
+        checkNotNull(bundleId);
+        TransportNetwork network = transportNetworkCache.getNetwork(bundleId);
         checkNotNull(network);
+        return network;
+    }
 
+    private STRtree getOsmIndex (TransportNetwork network) {
         // Ensure only one request lazy-indexes the edge geometries
         synchronized (this) {
-            if (!indexedNetworks.contains(networkId)) {
+            if (!indexedEdges.containsKey(network.scenarioId)) {
+                final long startTimeMs = System.currentTimeMillis();
+
+                STRtree edgeIndex = new STRtree();
                 EdgeStore edgeStore = network.streetLayer.edgeStore;
                 LOG.info("Indexing transport network with {} edges", edgeStore.fromVertices.size());
                 EdgeStore.Edge cursor = edgeStore.getCursor();
@@ -107,11 +108,31 @@ public class NetworkTileController implements HttpController {
                 } while (cursor.advance());
 
                 edgeIndex.build(); // can't index any more feeds after this.
-                indexedNetworks.add(networkId);
-                LOG.info("Done indexing edges.");
-            }
-        }
+                indexedEdges.put(network.scenarioId, edgeIndex);
 
+                LOG.info("Done indexing edges in {}s", Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+            }
+            return indexedEdges.get(network.scenarioId);
+        }
+    }
+
+    /**
+     * Handler for building the index separately from retrieving tiles.
+     */
+    private Object buildIndex (Request request, Response response) {
+        getOsmIndex(getNetworkFromRequest(request));
+        response.status(OK_200);
+        return ImmutableMap.of("message", "Network is ready.");
+    }
+
+    private Object getTile (Request request, Response response) {
+        TransportNetwork network = getNetworkFromRequest(request);
+        STRtree edgeIndex = getOsmIndex(network);
+
+        final long startTimeMs = System.currentTimeMillis();
+        final int zTile = Integer.parseInt(request.params("z"));
+        final int xTile = Integer.parseInt(request.params("x"));
+        final int yTile = Integer.parseInt(request.params("y"));
         final int tileExtent = 4096; // Standard is 4096, smaller can in theory make tiles more compact
 
         Envelope wgsEnvelope = MapTile.wgsEnvelope(zTile, xTile, yTile);
@@ -121,27 +142,27 @@ public class NetworkTileController implements HttpController {
             if (tileGeometry != null) {
                 // TODO tag these with route IDs, names etc. and include transit stops with names.
                 //  This will probably mean bypassing the JTS adapters and creating features individually.
+                tileGeometry.setUserData(edge.getUserData());
                 edgeGeoms.add(tileGeometry);
             }
         }
 
+        response.header("Content-Type", "application/vnd.mapbox-vector-tile");
+        response.header("Content-Encoding", "gzip");
+        response.status(OK_200);
         if (edgeGeoms.size() > 0) {
-            JtsLayer edgeLayer = new JtsLayer("edges", edgeGeoms, tileExtent);
+            JtsLayer edgeLayer = new JtsLayer("conveyal:osm:edges", edgeGeoms, tileExtent);
             JtsMvt mvt = new JtsMvt(edgeLayer);
             MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
             byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
-            response.header("Content-Type", "application/vnd.mapbox-vector-tile");
-            response.header("Content-Encoding", "gzip");
-            response.header("Cache-Control", "max-age=3600, immutable");
-            response.status(OK_200);
+
+            LOG.info("getTile({}, {}, {}, {}) in {}", network.scenarioId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+
             return pbfMessage;
         } else {
-            response.status(404);
             return new byte[]{};
         }
-
     }
-
 
     // Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
     // and reducing number of points to keep tile size down.

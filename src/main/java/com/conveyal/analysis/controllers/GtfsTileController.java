@@ -22,14 +22,13 @@ import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Defines HTTP API endpoints to return Mapbox vector tiles of GTFS feeds known to the Analysis backend.
@@ -57,55 +56,76 @@ public class GtfsTileController {
 
     private static final Logger LOG = LoggerFactory.getLogger(GtfsTileController.class);
 
-    // FIXME Super bad: one spatial index for all GTFS feeds. Ideally indexes could be shared with gtfs-api / gtfs-lib.
-    //  Also consider indexing by rasterizing into high-zoom web mercator tiles as bins, instead of general purpose
-    //  rectangle-tree. May also be integrated with efforts to convert general GraphQL API to few specialized endpoints.
-    private final STRtree shapesIndex = new STRtree();
+    // FIXME Eviction.
+    private final Map<String, STRtree> indexedShapes = new HashMap<>();
+    private final Map<String, STRtree> indexedStops = new HashMap<>();
 
-    private final STRtree stopsIndex = new STRtree();
-
-    private final Set<String> indexedGtfs = new HashSet<>();
-
-    public byte[] getTile (String bundleScopedId, GTFSFeed feed, int zTile, int xTile, int yTile) {
+    private STRtree getShapesIndex(String bundleScopedId, GTFSFeed feed) {
         // Ensure only one request lazy-indexes the gtfs shapes
         synchronized (this) {
-            if (!indexedGtfs.contains(bundleScopedId)) {
+            if (!indexedShapes.containsKey(bundleScopedId)) {
+                final long startTimeMs = System.currentTimeMillis();
+                STRtree shapesIndex = new STRtree();
                 // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
-                LOG.info("Indexing {} patterns", feed.patterns.size());
+                LOG.info("{}: indexing {} patterns", bundleScopedId, feed.patterns.size());
                 for (Pattern pattern : feed.patterns.values()) {
                     Route route = feed.routes.get(pattern.route_id);
                     String exemplarTripId = pattern.associatedTrips.get(0);
                     LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
 
                     Map<String, Object> userData = new HashMap<>();
-                    userData.put("name", route.route_long_name);
-                    userData.put("color", Objects.requireNonNullElse(route.route_color, "000000"));
-                    userData.put("type", route.route_type);
+                    userData.put("id", pattern.pattern_id);
+                    userData.put("name", pattern.name);
+                    userData.put("routeId", route.route_id);
+                    userData.put("routeName", route.route_long_name);
+                    userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
+                    userData.put("routeType", route.route_type);
                     wgsGeometry.setUserData(userData);
                     shapesIndex.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
                 }
+                shapesIndex.build();
+                indexedShapes.put(bundleScopedId, shapesIndex);
+                LOG.info("{}: pattern indexing finished in {}s", bundleScopedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+            }
+            return indexedShapes.get(bundleScopedId);
+        }
+    }
+
+    private STRtree getStopsIndex (String bundleScopedId, GTFSFeed feed) {
+        synchronized (this) {
+            if (!indexedStops.containsKey(bundleScopedId)) {
+                final long startTimeMs = System.currentTimeMillis();
+                STRtree stopsIndex = new STRtree();
+                LOG.info("{}: indexing {} stops", bundleScopedId, feed.stops.size());
                 for (Stop stop : feed.stops.values()) {
                     // This is inefficient, just bin points into mercator tiles.
                     Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
                     stopsIndex.insert(stopEnvelope, stop);
                 }
-                shapesIndex.build(); // can't index any more feeds after this.
-                stopsIndex.build();
-                indexedGtfs.add(bundleScopedId);
-            }
-        }
 
+                stopsIndex.build();
+                indexedStops.put(bundleScopedId, stopsIndex);
+                LOG.info("{}: stop indexing finished in {}s", bundleScopedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+            }
+            return indexedStops.get(bundleScopedId);
+        }
+    }
+
+    public byte[] getTile (String bundleScopedId, GTFSFeed feed, int zTile, int xTile, int yTile) {
+        STRtree shapesIndex = getShapesIndex(bundleScopedId, feed);
+        STRtree stopsIndex = getStopsIndex(bundleScopedId, feed);
+
+        final long startTimeMs = System.currentTimeMillis();
         final int tileExtent = 4096; // Standard is 4096, smaller can in theory make tiles more compact
         Envelope wgsEnvelope = MapTile.wgsEnvelope(zTile, xTile, yTile);
         Collection<Geometry> patternGeoms = new ArrayList<>(64);
         for (LineString wgsGeometry : (List<LineString>) shapesIndex.query(wgsEnvelope)) {
             Geometry tileGeometry = clipScaleAndSimplify(wgsGeometry, wgsEnvelope, tileExtent);
             if (tileGeometry != null) {
-                tileGeometry.setUserData(wgsGeometry.getUserData());
                 patternGeoms.add(tileGeometry);
             }
         }
-        JtsLayer patternLayer = new JtsLayer("gtfs-pattern-shapes", patternGeoms, tileExtent);
+        JtsLayer patternLayer = new JtsLayer("conveyal:gtfs:patternShapes", patternGeoms, tileExtent);
 
         Collection<Geometry> stopGeoms = new ArrayList<>(64);
         for (Stop stop : ((List<Stop>) stopsIndex.query(wgsEnvelope))) {
@@ -116,6 +136,7 @@ public class GtfsTileController {
 
             Map<String, Object> properties = new HashMap<>();
             properties.put("feedId", stop.feed_id);
+            properties.put("id", stop.stop_id);
             properties.put("name", stop.stop_name);
             properties.put("lat", stop.stop_lat);
             properties.put("lon", stop.stop_lon);
@@ -124,17 +145,19 @@ public class GtfsTileController {
             Coordinate tileCoord = wgsStopCoord.copy();
             tileCoord.x = ((tileCoord.x - wgsEnvelope.getMinX()) * tileExtent) / wgsEnvelope.getWidth();
             tileCoord.y = ((wgsEnvelope.getMaxY() - tileCoord.y) * tileExtent) / wgsEnvelope.getHeight();
+
             Point point =  GeometryUtils.geometryFactory.createPoint(tileCoord);
             point.setUserData(properties);
             stopGeoms.add(point);
         }
-        JtsLayer stopsLayer = new JtsLayer("gtfs-stops", stopGeoms, tileExtent);
+        JtsLayer stopsLayer = new JtsLayer("conveyal:gtfs:stops", stopGeoms, tileExtent);
 
         // Combine these two layers in a tile
         JtsMvt mvt = new JtsMvt(patternLayer, stopsLayer);
         MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
         byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
 
+        LOG.info("getTile({}, {}, {}, {}) in {}", bundleScopedId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
         return pbfMessage;
     }
 
@@ -167,6 +190,7 @@ public class GtfsTileController {
             DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
             simplifier.setDistanceTolerance(1);
             Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
+            simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
             return simplifiedTileGeometry;
         } else {
             return null;

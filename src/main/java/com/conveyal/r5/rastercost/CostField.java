@@ -23,4 +23,15 @@ public interface CostField {
 
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds);
 
+    /**
+     * A unique name to identify this cost field for display on a map. It should be usable as a JSON key, so it should
+     * not contain any spaces or non-alphanumeric characters.
+     */
+    public String getDisplayKey ();
+
+    /**
+     * Returns a length-independent value associated with a particular edge for the purpose of display on a map.
+     */
+    public double getDisplayValue (int edgeIndex);
+
 }

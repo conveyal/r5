@@ -45,6 +45,16 @@ public class ElevationCostField implements CostField {
         return (int)Math.round(((double)traversalTimeSeconds) / factorForEdge(currentEdge));
     }
 
+    @Override
+    public String getDisplayKey () {
+        return "elevation";
+    }
+
+    @Override
+    public double getDisplayValue (int edgeIndex) {
+        return toblerAverages.get(edgeIndex);
+    }
+
     /**
      * The elevation of each vertex in the network in decimeters.
      * This could be relative to the geoid or the spheroid depending on your data source.

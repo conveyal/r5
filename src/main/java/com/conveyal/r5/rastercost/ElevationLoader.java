@@ -29,7 +29,7 @@ import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
  *
  * Does geotools support mosaicing coverages together?
  */
-public class ElevationLoader {
+public class ElevationLoader implements CostField.Loader {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationLoader.class);
 
@@ -57,6 +57,7 @@ public class ElevationLoader {
         }
     }
 
+    @Override
     public ElevationCostField load (StreetLayer streets) {
         // For debugging: To check out in the debugger which ImageII implementations were loaded.
         IIORegistry registry = IIORegistry.getDefaultInstance();

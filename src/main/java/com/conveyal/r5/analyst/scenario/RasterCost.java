@@ -6,8 +6,10 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.gtfs.Geometries;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.rastercost.ElevationCostField;
 import com.conveyal.r5.rastercost.ElevationLoader;
+import com.conveyal.r5.rastercost.TreeLoader;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -27,6 +29,8 @@ import java.util.EnumSet;
 import java.util.List;
 
 import static com.conveyal.file.FileCategory.DATASOURCES;
+import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.SUN;
+import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
 import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
 
 /**
@@ -68,7 +72,7 @@ public class RasterCost extends Modification {
 
     private File localFile;
 
-    private ElevationLoader loader;
+    private CostField.Loader loader;
 
     @Override
     public boolean resolve (TransportNetwork network) {
@@ -80,7 +84,11 @@ public class RasterCost extends Modification {
             localFile = WorkerComponents.fileStorage.getFile(fileStorageKey);
             // Workers don't have a database connection so we can't examine the DataSource metadata.
             // Just open it to determine whether it's the right type, by creating the laader.
-            loader = ElevationLoader.forFile(localFile);
+            if (costFunction == TOBLER) {
+                loader = ElevationLoader.forFile(localFile);
+            } else if (costFunction == SUN) {
+                loader = TreeLoader.forFile(localFile);
+            }
             if (loader == null) {
                 errors.add(String.format("Could not read grid coverage from %s.", localFile));
             }
@@ -91,7 +99,7 @@ public class RasterCost extends Modification {
 
     @Override
     public boolean apply (TransportNetwork network) {
-        ElevationCostField costField = loader.load(network.streetLayer);
+        CostField costField = loader.load(network.streetLayer);
         EdgeStore edgeStore = network.streetLayer.edgeStore;
         if (edgeStore.costFields == null) {
             edgeStore.costFields = new ArrayList<>();

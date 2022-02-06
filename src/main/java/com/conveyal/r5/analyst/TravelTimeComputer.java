@@ -222,9 +222,12 @@ public class TravelTimeComputer {
                 );
 
                 if (accessService != NO_WAIT_ALL_STOPS) {
-                    LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
+                    LOG.info("Delaying on-demand service by {} seconds (to wait for {} pick-up).",
                             accessService.waitTimeSeconds, accessMode);
-                    if (accessService.stopsReachable != null) {
+                    if (accessService.serviceArea != null) {
+                        pointSetTimes.incrementWithinAndClip(accessService.serviceArea, accessService.waitTimeSeconds);
+                    }
+                    else if (accessService.stops != null) {
                         // Disallow direct travel to destination if pickupDelay zones are associated with stops.
                         pointSetTimes = PointSetTimes.allUnreached(destinations);
                     } else {

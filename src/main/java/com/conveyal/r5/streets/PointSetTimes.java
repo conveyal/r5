@@ -1,7 +1,10 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.gtfs.Geometries;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
 
 import java.util.Arrays;
 
@@ -31,6 +34,18 @@ public class PointSetTimes {
         int[] times = new int[pointSet.featureCount()];
         Arrays.fill(times, FastRaptorWorker.UNREACHED);
         return new PointSetTimes(pointSet, times);
+    }
+
+    public void incrementWithinAndClip(Geometry area, int seconds) {
+        for (int i = 0; i < travelTimes.length; i++) {
+            if (travelTimes[i] != UNREACHED &&
+                area.contains(Geometries.geometryFactory.createPoint(new Coordinate(pointSet.getLon(i), pointSet.getLat(i)))))
+            {
+                travelTimes[i] += seconds;
+            } else {
+                travelTimes[i] = UNREACHED;
+            }
+        }
     }
 
     public int size()  {

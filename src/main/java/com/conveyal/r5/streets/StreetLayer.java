@@ -54,7 +54,6 @@ import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.ondemand.AccessService.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.

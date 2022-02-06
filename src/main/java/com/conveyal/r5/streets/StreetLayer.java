@@ -7,6 +7,7 @@ import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
+import com.conveyal.r5.analyst.scenario.ondemand.AccessService;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -51,7 +52,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
+import static com.conveyal.r5.analyst.scenario.ondemand.AccessService.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 
@@ -1609,7 +1610,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param lon longitude the starting point in floating point degrees
      * @return object with pick-up time and stops served
      */
-    public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
+    public AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
         if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
             return pickupWaitTimes.getAccessService(lat, lon);
         } else {

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.analyst.scenario.ondemand.EgressService;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;

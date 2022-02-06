@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
+import com.conveyal.r5.analyst.scenario.ondemand.EgressService;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -277,7 +278,7 @@ public class EgressCostTable implements Serializable {
                 if (egressStopDelaysSeconds != null) {
                     // TODO handle case where stopsForZone is not specified in the modification, implying the main
                     //  polygon can be used for both access and egress service.
-                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
+                    EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
                     if (egressService == null) {
                         if (pickupWaitTimes.getDefaultWaitInSeconds() < 0) {
                             // Bail out early if egress from this stop is not specified and the default is no available

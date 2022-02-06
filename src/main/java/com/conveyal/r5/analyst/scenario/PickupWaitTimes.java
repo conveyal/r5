@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.analyst.scenario.ondemand.AccessService;
+import com.conveyal.r5.analyst.scenario.ondemand.EgressService;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.map.TIntObjectMap;
@@ -12,6 +14,8 @@ import org.locationtech.jts.geom.Point;
 
 import java.util.Collection;
 import java.util.Map;
+
+import static com.conveyal.r5.analyst.scenario.ondemand.AccessService.NO_SERVICE_HERE;
 
 /**
  * This is the internal form of a PickupDelay modification that has been resolved against a particular TransportNetwork.

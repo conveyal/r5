@@ -44,7 +44,7 @@ public abstract class KryoNetworkSerializer {
      * the serialization format itself does not change. This will ensure newer workers will not load cached older files.
      * We considered using an ISO date string as the version but that could get confusing when seen in filenames.
      */
-    public static final String NETWORK_FORMAT_VERSION = "361878c3";
+    public static final String NETWORK_FORMAT_VERSION = "48797a5a";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 

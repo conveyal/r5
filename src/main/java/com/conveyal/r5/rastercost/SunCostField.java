@@ -25,13 +25,12 @@ import java.util.List;
  */
 public class SunCostField implements CostField {
 
-    private static final BitSet ALL_TRUE = BitSet.valueOf(new byte[] { 1 });
-    private static final BitSet ALL_FALSE = BitSet.valueOf(new byte[] { 0 });
+    public static final BitSet ALL_TRUE = BitSet.valueOf(new byte[] { 1 });
+    public static final BitSet ALL_FALSE = BitSet.valueOf(new byte[] { 0 });
 
     /** For each edge in the network, a BitSet containing the sun/shade profile sampled every N meters along the edge. */
-    private List<BitSet> sunOnEdge = new ArrayList<>();
-
-    private TFloatList sunPenaltyForEdge = new TFloatArrayList();
+    List<BitSet> sunOnEdge = new ArrayList<>();
+    TFloatList sunProportions = new TFloatArrayList();
 
     /** Multiplicative factor applied to traversal time in the sun (as opposed to 1.0 for traversing in shade). */
     private final double sunPenalty;
@@ -45,7 +44,9 @@ public class SunCostField implements CostField {
 
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        return Math.round(sunPenaltyForEdge.get(currentEdge.getEdgeIndex()) * traversalTimeSeconds);
+        float sunProportion = sunProportions.get(currentEdge.getEdgeIndex() / 2);
+        double sunFactor = (1.0D - sunProportion) + (sunProportion * sunPenalty);
+        return (int) Math.round(sunFactor  * traversalTimeSeconds);
     }
 
     @Override

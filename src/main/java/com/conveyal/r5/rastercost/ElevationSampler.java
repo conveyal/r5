@@ -1,10 +1,20 @@
 package com.conveyal.r5.rastercost;
 
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.r5.streets.EdgeStore;
 import gnu.trove.list.array.TShortArrayList;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
+import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.geometry.DirectPosition;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
 
 import java.awt.geom.Point2D;
 
@@ -19,6 +29,7 @@ class ElevationSampler implements EdgeStore.PointConsumer {
 
     TShortArrayList elevations;
 
+    private final double sampleSpacingMeters;
     private boolean awaitingFirstPoint;
     private double cosLat;
     private double prevLon;
@@ -28,10 +39,29 @@ class ElevationSampler implements EdgeStore.PointConsumer {
     private final GridCoverage2D coverage;
     private final Envelope2D coverageWorldEnvelope;
 
-    public ElevationSampler (GridCoverage2D coverage) {
+    // Added to the floating point latitude to move each point a fixed distance
+    // This could probably be done somehow by composing MathTransforms, or by just preprocessing the inputs
+    // though it gets messy where the source and target grid systems are not axis-aligned.
+    // Shift street points 3 meters south to see which tree would cast a shadow on them.
+    // FIXME this must be configurable and disabled for elevation.
+    private final double latShift = -3.0 / METERS_PER_DEGREE_LATITUDE;
+
+    // This is where a reusable RasterDataSource would be handy.
+    // TODO consider disabling this on geographic coordinates if it causes any slowdown.
+    private final MathTransform wgsToCoverage;
+
+    public ElevationSampler (GridCoverage2D coverage, double sampleSpacingMeters) {
         this.coverage = coverage;
+        this.sampleSpacingMeters = sampleSpacingMeters;
         this.coverageWorldEnvelope = coverage.getEnvelope2D();
         reset();
+        // Set CRS transform from WGS84 to coverage, if any.
+        CoordinateReferenceSystem coverageCrs = coverage.getCoordinateReferenceSystem2D();
+        try {
+            wgsToCoverage = CRS.findMathTransform(DefaultGeographicCRS.WGS84, coverageCrs);
+        } catch (FactoryException e) {
+            throw new DataSourceException("Could not create coordinate transform from WGS84.");
+        }
     }
 
     /**
@@ -42,7 +72,7 @@ class ElevationSampler implements EdgeStore.PointConsumer {
         elevations = new TShortArrayList();
         awaitingFirstPoint = true;
         // Do not sample elevation at the first point provided (the start vertex).
-        metersToNextPoint = ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
+        metersToNextPoint = sampleSpacingMeters;
     }
 
     @Override
@@ -99,25 +129,33 @@ class ElevationSampler implements EdgeStore.PointConsumer {
             currLat += dy * stepFrac;
             elevations.add(ElevationLoader.clampToShort((int) readElevation(currLon, currLat)));
             remainingLengthMeters -= metersToNextPoint;
-            metersToNextPoint = ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
+            metersToNextPoint = sampleSpacingMeters;
         }
 
         metersToNextPoint -= remainingLengthMeters;
     }
 
-    // Objects reused in each call to recordElevationSample (so this class is not threadsafe).
-    // We may want to just make readElevation static and make these locals on the stack.
-    private final Point2D pointToRead = new Point2D.Double();
-    private final double[] elevation = new double[1];
 
     /**
      * Call to non-destructively read one elevation point at a time.
      * Objects are reused in each call to recordElevationSample, so this method is not re-entrant or threadsafe.
+     * TODO make static by passing in coordinate transform?
+     * TODO make transform conditional on a WGS envelope?
      */
     public double readElevation (double lon, double lat) {
-        pointToRead.setLocation(lon, lat);
-        if (coverageWorldEnvelope.contains(pointToRead)) {
-            coverage.evaluate(pointToRead, elevation);
+        final Point2D wgsPoint = new Point2D.Double();
+        wgsPoint.setLocation(lon, lat + latShift);
+        // Maybe should use constructor that sets CRS?
+        DirectPosition wgsPos = new DirectPosition2D(wgsPoint);
+        DirectPosition coveragePos = new DirectPosition2D();
+        try {
+            wgsToCoverage.transform(wgsPos, coveragePos);
+        } catch (TransformException e) {
+            throw new RuntimeException("Exception transforming coordinates.", e);
+        }
+        final double[] elevation = new double[1];
+        if (coverageWorldEnvelope.contains(coveragePos)) {
+            coverage.evaluate(coveragePos, elevation);
             return elevation[0];
         } else {
             return 0;
@@ -149,11 +187,11 @@ class ElevationSampler implements EdgeStore.PointConsumer {
      * Note that this utility method does not reuse the elevation sampler. This causes more garbage collection but
      * is stateless, making it more suitable for use in parallel streams. The speedup from parallel sampling is large.
      */
-    public static short[] profileForEdge (EdgeStore.Edge edge, GridCoverage2D coverage) {
-        if (edge.getLengthMm() < ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS * 1000) {
+    public static short[] profileForEdge (EdgeStore.Edge edge, GridCoverage2D coverage, double sampleSpacingMeters) {
+        if (edge.getLengthMm() < sampleSpacingMeters * 1000) {
             return ElevationLoader.EMPTY_SHORT_ARRAY;
         }
-        ElevationSampler sampler = new ElevationSampler(coverage);
+        ElevationSampler sampler = new ElevationSampler(coverage, sampleSpacingMeters);
         edge.forEachPoint(sampler);
         return sampler.elevations.toArray();
     }

@@ -79,7 +79,7 @@ public class ElevationLoader implements CostField.Loader {
                         .parallel()
                         .map(v -> {
                             VertexStore.Vertex vertex = streets.vertexStore.getCursor(v);
-                            ElevationSampler sampler = new ElevationSampler(interpolatedCoverage);
+                            ElevationSampler sampler = new ElevationSampler(interpolatedCoverage, ELEVATION_SAMPLE_SPACING_METERS);
                             vertexCounter.increment();
                             return (int) (sampler.readElevation(vertex.getLon(), vertex.getLat()));
                         }).toArray()
@@ -100,7 +100,7 @@ public class ElevationLoader implements CostField.Loader {
                 .mapToObj(ep -> {
                     EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
                     edgeCounter.increment();
-                    return ElevationSampler.profileForEdge(e, interpolatedCoverage);
+                    return ElevationSampler.profileForEdge(e, interpolatedCoverage, ELEVATION_SAMPLE_SPACING_METERS);
                 }).collect(Collectors.toList());
 
         // TODO filter out profiles for edges with near-constant slope. This may be an unnecessary optimization though.

@@ -142,7 +142,10 @@ public class PickupDelay extends Modification {
                         ModificationPolygon zonePolygon = tryToGetPolygon(polygons, zonePolygonId, "zone");
                         for (String id : destinationPolygonIds) {
                             ModificationPolygon destinationPolygon = tryToGetPolygon(polygons, id, "destination");
-                            destinationsForZonePolygon.put(zonePolygon, destinationPolygon.polygonal);
+                            Geometry polygon = destinationsForZonePolygon.get(zonePolygon) == null ?
+                                    destinationPolygon.polygonal :
+                                    destinationsForZonePolygon.get(zonePolygon).union(destinationPolygon.polygonal);
+                            destinationsForZonePolygon.put(zonePolygon, polygon);
                         }
                     });
                 }

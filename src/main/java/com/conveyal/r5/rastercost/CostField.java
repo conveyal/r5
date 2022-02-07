@@ -23,7 +23,11 @@ import java.util.List;
  */
 public interface CostField {
 
-    public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds);
+    /**
+     * TODO perhaps this and the base traversal time function should all return doubles, which are rounded only
+     *   once after they have all been applied.
+     */
+    int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds);
 
     /**
      * A unique name to identify this cost field for display on a map. It should be usable as a JSON key, so it should

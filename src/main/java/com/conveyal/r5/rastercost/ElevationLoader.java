@@ -91,7 +91,7 @@ public class ElevationLoader implements CostField.Loader {
         // DEVELOPMENT HACK: load only the first N edges to speed up loading.
         // final int nEdgePairsToLoad = 50_000; // streets.edgeStore.nEdgePairs();
 
-        // Anecdotally this parallel stream aproach is extremely effective. The speedup from parallelization seems to
+        // Anecdotally this parallel stream approach is extremely effective. The speedup from parallelization seems to
         // far surpass any speedup from object reuse and avoiding garbage collection which are easier single-threaded.
         // Storing these as shorts is not as effective as storing the vertex elevations as shorts because edge profiles
         // are many small arrays, often with only a few elements.

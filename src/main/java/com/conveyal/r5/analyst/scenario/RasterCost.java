@@ -3,35 +3,18 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.gtfs.Geometries;
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
-import com.conveyal.r5.rastercost.ElevationCostField;
 import com.conveyal.r5.rastercost.ElevationLoader;
-import com.conveyal.r5.rastercost.TreeLoader;
+import com.conveyal.r5.rastercost.SunLoader;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import gnu.trove.iterator.TIntIterator;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.MultiPolygon;
-import org.locationtech.jts.geom.Polygon;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
 
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.SUN;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
 
 /**
  * Custom (experimental) Modification that loads costs from a raster.
@@ -87,7 +70,7 @@ public class RasterCost extends Modification {
             if (costFunction == TOBLER) {
                 loader = ElevationLoader.forFile(localFile);
             } else if (costFunction == SUN) {
-                loader = TreeLoader.forFile(localFile);
+                loader = SunLoader.forFile(localFile);
             }
             if (loader == null) {
                 errors.add(String.format("Could not read grid coverage from %s.", localFile));

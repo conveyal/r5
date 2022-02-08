@@ -8,8 +8,6 @@ import org.apache.commons.math3.util.FastMath;
  */
 public class ToblerCalculator implements ElevationCostField.ElevationSegmentConsumer {
 
-    public static final double DECIMETERS_PER_METER = 10;
-
     private double weightedToblerSum = 0;
     private double xDistanceConsumed = 0;
 
@@ -28,13 +26,14 @@ public class ToblerCalculator implements ElevationCostField.ElevationSegmentCons
     }
 
     /**
-     * Tobler's hiking function, normalized to 1 rather than 6 m/sec so results can scale user-specified speeds.
+     * Tobler's hiking function, normalized to 1 rather than 5 on flat ground so results can scale user-specified speeds.
+     * The function peaks at 6 on a slight downgrade, so we apply the factor 6/5 or 1.2.
      * Elevation points are evenly spaced. We can store average normalized speeds over the linestring for an edge.
      * See: https://en.wikipedia.org/wiki/Tobler%27s_hiking_function
      * Also: https://wildfiretoday.com/documents/Slope_travel_rates.pdf
      */
     public static double tobler (double dx, double dy) {
-        return FastMath.exp(-3.5 * FastMath.abs((dy/dx) + 0.05));
+        return 1.2 * FastMath.exp(-3.5 * FastMath.abs((dy/dx) + 0.05));
     }
 
 }

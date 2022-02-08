@@ -37,37 +37,19 @@ public class ElevationLoader implements CostField.Loader {
 
     public static final double ELEVATION_SAMPLE_SPACING_METERS = 10;
 
-    private final GridCoverage2D coverage;
+    private final RasterDataSourceSampler rasterSampler;
 
-    private ElevationLoader (GridCoverage2D coverage) {
-        this.coverage = coverage;
-    }
-
-    public static ElevationLoader forFile (File rasterFile) {
-        // this.rasterFile = rasterFile;
-        // rasterFile = new File("/Users/abyrd/Downloads/USGS_13_n34w118_int16_dm_nocompress.tif");
-        AbstractGridFormat format = GridFormatFinder.findFormat(rasterFile);
-        Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-        var coverageReader = format.getReader(rasterFile, hints);
-        try {
-            GridCoverage2D coverage = coverageReader.read(null);
-            return new ElevationLoader(coverage);
-        } catch (Exception ex) {
-            return null;
-        }
+    public ElevationLoader (String dataSourceId) {
+        this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, true);
     }
 
     @Override
     public ElevationCostField load (StreetLayer streets) {
         // For debugging: To check out in the debugger which ImageII implementations were loaded.
-        IIORegistry registry = IIORegistry.getDefaultInstance();
+        // IIORegistry registry = IIORegistry.getDefaultInstance();
 
-        // Can interpolation instead be achieved with Hints.VALUE_INTERPOLATION_BICUBIC on the original raster?
-        // GridCoverage2D interpolatedCoverage = Interpolator2D.create(rawCoverage, new InterpolationBilinear());
-        GridCoverage2D interpolatedCoverage = coverage;
-
-        // Debug: load streets manually
-        // StreetLayer streets = loadStreetLayer("/Users/abyrd/geodata/la-reduced-1deg.osm.pbf");
+        // DEVELOPMENT HACK: load only the first N edges to speed up loading.
+        // final int nEdgePairsToLoad = 50_000; // streets.edgeStore.nEdgePairs();
 
         ElevationCostField result = new ElevationCostField();
 
@@ -77,19 +59,15 @@ public class ElevationLoader implements CostField.Loader {
         result.vertexElevationsDecimeters = copyToTShortArrayList(
                 IntStream.range(0, streets.vertexStore.getVertexCount())
                         .parallel()
-                        .map(v -> {
+                        .mapToDouble(v -> {
                             VertexStore.Vertex vertex = streets.vertexStore.getCursor(v);
-                            ElevationSampler sampler = new ElevationSampler(interpolatedCoverage, ELEVATION_SAMPLE_SPACING_METERS);
                             vertexCounter.increment();
-                            return (int) (sampler.readElevation(vertex.getLon(), vertex.getLat()));
+                            return rasterSampler.readElevation(vertex.getLon(), vertex.getLat());
                         }).toArray()
         );
 
         final LambdaCounter edgeCounter = new LambdaCounter(LOG, streets.edgeStore.nEdgePairs(), 100_000,
                 "Added elevation to {} of {} edge pairs.");
-
-        // DEVELOPMENT HACK: load only the first N edges to speed up loading.
-        // final int nEdgePairsToLoad = 50_000; // streets.edgeStore.nEdgePairs();
 
         // Anecdotally this parallel stream approach is extremely effective. The speedup from parallelization seems to
         // far surpass any speedup from object reuse and avoiding garbage collection which are easier single-threaded.
@@ -100,8 +78,10 @@ public class ElevationLoader implements CostField.Loader {
                 .mapToObj(ep -> {
                     EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
                     edgeCounter.increment();
-                    return ElevationSampler.profileForEdge(e, interpolatedCoverage, ELEVATION_SAMPLE_SPACING_METERS);
-                }).collect(Collectors.toList());
+                    return rasterSampler.sampleEdge(e);
+                })
+                .map(ElevationLoader::copyToShortArray)
+                .collect(Collectors.toList());
 
         // TODO filter out profiles for edges with near-constant slope. This may be an unnecessary optimization though.
 
@@ -111,43 +91,33 @@ public class ElevationLoader implements CostField.Loader {
         return result;
     }
 
-    private static StreetLayer loadStreetLayer (String osmSourceFile) {
-        OSM osm = new OSM(osmSourceFile + ".mapdb");
-        osm.intersectionDetection = true;
-        osm.readFromFile(osmSourceFile);
-        StreetLayer streetLayer = new StreetLayer();
-        streetLayer.loadFromOsm(osm);
-        osm.close();
-        return streetLayer;
-    }
-
-    // See http://osgeo-org.1560.x6.nabble.com/Combining-GridCoverages-td5077162.html
-    private GridCoverage2D mergeTiles (GridCoverage2D... coverages) {
-        // The envelope in world (not grid) coordinates.
-        Envelope mergedEnvelope = new Envelope();
-        // CoverageFactoryFinder.getGridCoverageFactory(null).create(
-        for (GridCoverage2D coverage : coverages) {
-            Envelope2D worldEnv = coverage.getEnvelope2D();
-        }
-        return null;
-    }
-
     /**
      * Although the JVM aligns objects to 8-byte boundaries, primitive values within arrays should take only their
-     * true width. Packing integers into a short array should gennuinely make it half as big and keep more in cache.
+     * true width. Packing rounded doubles into a short array should genuinely make it 1/4 as big and keep more in cache.
      */
-    public static TShortArrayList copyToTShortArrayList (int[] intArray) {
-        TShortArrayList result = new TShortArrayList(intArray.length);
-        for (int i : intArray) {
-            result.add(clampToShort(i));
+    public static TShortArrayList copyToTShortArrayList (double[] doubleArray) {
+        TShortArrayList result = new TShortArrayList(doubleArray.length);
+        for (double d : doubleArray) {
+            result.add(clampToShort(Math.round(d)));
         }
         return result;
     }
 
-    public static short clampToShort (int i) {
-        short s = (short) i;
-        if (s != i) {
-            LOG.warn("int value overflowed short: {}", i);
+    public static short[] copyToShortArray (double[] doubleArray) {
+        if (doubleArray.length == 0) {
+            return EMPTY_SHORT_ARRAY;
+        }
+        short[] result = new short[doubleArray.length];
+        for (int i = 0; i < doubleArray.length; i++) {
+            result[i] = clampToShort(Math.round(doubleArray[i]));
+        }
+        return result;
+    }
+
+    public static short clampToShort (long l) {
+        short s = (short) l;
+        if (s != l) {
+            LOG.warn("int value overflowed short: {}", l);
         }
         return s;
     }

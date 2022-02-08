@@ -1,6 +1,7 @@
 package com.conveyal.r5.rastercost;
 
 import com.conveyal.r5.streets.EdgeStore;
+import com.esotericsoftware.minlog.Log;
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TFloatArrayList;
@@ -14,6 +15,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+
+import static com.conveyal.r5.analyst.Grid.LOG;
 
 /**
  * Represents the additional cost of traversing edges that are not shaded from the sun.
@@ -46,6 +49,7 @@ public class SunCostField implements CostField {
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
         float sunProportion = sunProportions.get(currentEdge.getEdgeIndex() / 2);
         double sunFactor = (1.0D - sunProportion) + (sunProportion * sunPenalty);
+        // System.out.println("sun factor " + sunFactor);
         return (int) Math.round(sunFactor  * traversalTimeSeconds);
     }
 

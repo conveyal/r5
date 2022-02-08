@@ -5,14 +5,9 @@ import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.array.TFloatArrayList;
-import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.coverage.grid.io.GridFormatFinder;
-import org.geotools.util.factory.Hints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,13 +23,14 @@ public class SunLoader implements CostField.Loader {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationLoader.class);
 
-    private final GridCoverage2D coverage;
-
     /** If the input contains shade rather than sun, then boolean values must be inverted. */
     private final boolean invert = true;
 
-    private SunLoader (GridCoverage2D coverage) {
-        this.coverage = coverage;
+    private final RasterDataSourceSampler rasterSampler;
+
+    public SunLoader (String dataSourceId) {
+        rasterSampler = new RasterDataSourceSampler(dataSourceId, 1.0, false);
+        rasterSampler.setNorthShiftMeters(5); // Shift raster 5m north to simulate sun angle to road centerline.
     }
 
     @Override
@@ -47,8 +43,8 @@ public class SunLoader implements CostField.Loader {
             .mapToObj(ep -> {
                 EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
                 edgeCounter.increment();
-                return ElevationSampler.profileForEdge(e, coverage, 1.0);
-            }).map(SunLoader::bitSetWithSizeFromShorts).collect(Collectors.toList());
+                return rasterSampler.sampleEdge(e);
+            }).map(SunLoader::bitSetWithSizeFromDoubles).collect(Collectors.toList());
 
         LOG.info("Computing sun proportions for all edges...");
         TFloatList sunProportions = new TFloatArrayList(sunOnEdge.size());
@@ -56,18 +52,19 @@ public class SunLoader implements CostField.Loader {
             sunProportions.add(((float)soe.bitSet.cardinality()) / soe.size);
         }
         LOG.info("Done computing sun proportions.");
-        SunCostField result = new SunCostField(2.0, 1.0);
+        SunCostField result = new SunCostField(1.5, 1.0);
         result.sunOnEdge = sunOnEdge.stream().map(s -> s.bitSet).collect(Collectors.toList());
         result.sunProportions = sunProportions;
         return result;
     }
 
-    public static BitSet bitSetFromShorts (short[] shortArray, boolean invert) {
-        BitSet bitSet = new BitSet(shortArray.length);
+    /** Given an array of double-precision values, return a BitSet containing the indexes of all nonzero array elements. */
+    public static BitSet bitSetFromDoubles (double[] doubleArray, boolean invert) {
+        BitSet bitSet = new BitSet(doubleArray.length);
         boolean allFalse = true;
         boolean allTrue = true;
-        for (int i = 0; i < shortArray.length; i++) {
-            boolean sun = shortArray[i] != 0;
+        for (int i = 0; i < doubleArray.length; i++) {
+            boolean sun = doubleArray[i] != 0;
             if (invert) sun = !sun;
             if (sun) {
                 allFalse = false;
@@ -85,9 +82,10 @@ public class SunLoader implements CostField.Loader {
         return bitSet;
     }
 
-    private static BitSetWithSize bitSetWithSizeFromShorts (short[] shorts) {
-        BitSet bitSet = bitSetFromShorts(shorts, true);
-        int size = shorts.length;
+    private static BitSetWithSize bitSetWithSizeFromDoubles (double[] doubles) {
+        BitSet bitSet = bitSetFromDoubles(doubles, true);
+        int size = doubles.length;
+        // FIXME This is ugly, handle differently.
         if (bitSet == SunCostField.ALL_FALSE || bitSet == SunCostField.ALL_TRUE) {
             size = 1;
         }
@@ -106,22 +104,11 @@ public class SunLoader implements CostField.Loader {
             this.bitSet = bitSet;
             this.size = size;
         }
-        // FIXME this was broken because many entries were sharing the same "all true" and "all false" arrays.
+        /** Be careful about calling this on shared BitSets. We should really use shared BitSetWithSize instances. */
         void invert () {
             bitSet.flip(0, size);
         }
     }
 
-    public static SunLoader forFile (File rasterFile) {
-        AbstractGridFormat format = GridFormatFinder.findFormat(rasterFile);
-        Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-        var coverageReader = format.getReader(rasterFile, hints);
-        try {
-            GridCoverage2D coverage = coverageReader.read(null);
-            return new SunLoader(coverage);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
 
 }

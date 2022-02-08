@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
-import static com.conveyal.r5.rastercost.ToblerCalculator.DECIMETERS_PER_METER;
 
 /**
  * This represents the changes in elevation along every edge in the network, as well as the derived additional costs
@@ -40,6 +39,8 @@ public class ElevationCostField implements CostField {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);
 
+    private static final double DECIMETERS_PER_METER = 10;
+
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
         return (int)Math.round(((double)traversalTimeSeconds) / factorForEdge(currentEdge));
@@ -59,12 +60,13 @@ public class ElevationCostField implements CostField {
      * The elevation of each vertex in the network in decimeters.
      * This could be relative to the geoid or the spheroid depending on your data source.
      * It doesn't matter as long as only relative heights are used.
+     * FIXME CURRENTLY IN METERS
      */
     public TShortList vertexElevationsDecimeters;
 
     /** Perform the conversion from decimeters to meters. */
     private double getVertexElevationMeters (int vidx) {
-        return vertexElevationsDecimeters.get(vidx) / DECIMETERS_PER_METER;
+        return vertexElevationsDecimeters.get(vidx); // / DECIMETERS_PER_METER;
     };
 
     /**
@@ -76,7 +78,7 @@ public class ElevationCostField implements CostField {
     public List<short[]> elevationProfiles;
 
     /**
-     * For each edge in the network (not edge pair), an a multiplier. This multiplier is not symmetric with respect to
+     * For each edge in the network (not edge pair), a multiplier. This multiplier is not symmetric with respect to
      * travel direction, so unlike the elevation it's derived from it must be stored for each edge not edge pair.
      */
     public TFloatList toblerAverages;
@@ -102,7 +104,7 @@ public class ElevationCostField implements CostField {
         int i = 0;
         double prevElevationMeters = getVertexElevationMeters(startVertex);
         for (short elevationDecimeters : elevationProfiles.get(pairIndex)) {
-            final double elevationMeters = elevationDecimeters / DECIMETERS_PER_METER;
+            final double elevationMeters = elevationDecimeters; // / DECIMETERS_PER_METER;
             final double elevationChangeMeters = delta(prevElevationMeters, elevationMeters, invert);
             consumer.consumeElevationSegment(i, ELEVATION_SAMPLE_SPACING_METERS, elevationChangeMeters);
             remainingMeters -= ELEVATION_SAMPLE_SPACING_METERS;
@@ -131,14 +133,16 @@ public class ElevationCostField implements CostField {
      * Each segment is represented as a distance across the ground (always positive) and a signed vertical change.
      */
     @FunctionalInterface
-    public static interface ElevationSegmentConsumer {
-        public void consumeElevationSegment (int index, double xMeters, double yMeters);
+    public interface ElevationSegmentConsumer {
+        void consumeElevationSegment (int index, double xMeters, double yMeters);
     }
 
+    /**
+     * Computing and averaging Tobler factors is extremely fast, on the order of 2 million edges per second.
+     * It might be nice to bundle this into elevation sampling, but that's performed as a stream operation
+     * and there's no straightforward way to return both the profile and Tobler average.
+     */
     public void computeToblerAverages (EdgeStore edgeStore) {
-        // Computing and averaging Tobler factors is extremely fast, on the order of 2 million edges per second.
-        // It might be nice to bundle this into elevation sampling, but that's performed as a stream operation
-        // and there's no straightforward way to return both the profile and Tobler average.
         toblerAverages = new TFloatArrayList(edgeStore.nEdges());
         EdgeStore.Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); ++e) {
@@ -149,7 +153,7 @@ public class ElevationCostField implements CostField {
 
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
         ToblerCalculator calculator = new ToblerCalculator();
-        this.forEachElevationSegment(edge, calculator);
+        forEachElevationSegment(edge, calculator);
         return calculator.weightedToblerAverage();
     }
 

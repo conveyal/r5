@@ -5,6 +5,7 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.rastercost.ElevationLoader;
+import com.conveyal.r5.rastercost.RasterDataSourceSampler;
 import com.conveyal.r5.rastercost.SunLoader;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -51,31 +52,14 @@ public class RasterCost extends Modification {
      */
     public double outputScale = 1;
 
-    private FileStorageKey fileStorageKey;
-
-    private File localFile;
-
     private CostField.Loader loader;
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        // Check that the ID exists, and maybe by how much it overlaps the street network (what percentage of streets).
-        fileStorageKey = new FileStorageKey(DATASOURCES, dataSourceId, FileStorageFormat.GEOTIFF.extension);
-        if (!WorkerComponents.fileStorage.exists(fileStorageKey)) {
-            errors.add("No Data Source exists with key: " + fileStorageKey.toString());
-        } else {
-            localFile = WorkerComponents.fileStorage.getFile(fileStorageKey);
-            // Workers don't have a database connection so we can't examine the DataSource metadata.
-            // Just open it to determine whether it's the right type, by creating the laader.
-            if (costFunction == TOBLER) {
-                loader = ElevationLoader.forFile(localFile);
-            } else if (costFunction == SUN) {
-                loader = SunLoader.forFile(localFile);
-            }
-            if (loader == null) {
-                errors.add(String.format("Could not read grid coverage from %s.", localFile));
-            }
-            // info.add(String.format("Will affect %d edges out of %d candidates.", 1, 2));
+        if (costFunction == TOBLER) {
+            loader = new ElevationLoader(dataSourceId);
+        } else if (costFunction == SUN) {
+            loader = new SunLoader(dataSourceId);
         }
         return errors.size() > 0;
     }

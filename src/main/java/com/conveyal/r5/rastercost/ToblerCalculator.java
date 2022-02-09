@@ -1,6 +1,6 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.r5.streets.EdgeStore;
+import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 import org.apache.commons.math3.util.FastMath;
 
 /**
@@ -13,7 +13,8 @@ public class ToblerCalculator implements ElevationCostField.ElevationSegmentCons
 
     @Override
     public void consumeElevationSegment (int index, double xMeters, double yMeters) {
-        weightedToblerSum += xMeters * tobler(xMeters, yMeters);
+        //System.out.printf("Tobler: %f %f %f\n", xMeters, yMeters, tobler(xMeters, yMeters));
+        weightedToblerSum += xMeters * minettiCwi(xMeters, yMeters); // tobler(xMeters, yMeters);
         xDistanceConsumed += xMeters;
     }
 
@@ -21,7 +22,11 @@ public class ToblerCalculator implements ElevationCostField.ElevationSegmentCons
         return xDistanceConsumed;
     }
 
-    public double weightedToblerAverage() {
+    /**
+     * Return a travel time multiplier for the entire edge, a weighted sum of the factors for all segments.
+     * FIXME this will need to be inverted when we switch back to Tobler, which gives speed units not an effort multiplier.
+     */
+    public double weightedToblerFactor () {
         return weightedToblerSum / xDistanceConsumed;
     }
 
@@ -34,6 +39,22 @@ public class ToblerCalculator implements ElevationCostField.ElevationSegmentCons
      */
     public static double tobler (double dx, double dy) {
         return 1.2 * FastMath.exp(-3.5 * FastMath.abs((dy/dx) + 0.05));
+    }
+
+    public static final PolynomialFunction minettiCwiPolynomial = new PolynomialFunction(new double[] {
+        2.5, 19.6, 51.9, -76.8, -58.7, 280.5
+    });
+
+    public static final double minettiNormalizationFactor = 1 / minettiCwiPolynomial.value(0);
+
+    /**
+     * Energy consumption as a proxy for perceived effort.
+     * https://journals.physiology.org/doi/full/10.1152/japplphysiol.01177.2001
+     */
+    public static double minettiCwi (double dx, double dy) {
+        final double gradient = dy/dx;
+        final double cwi = minettiCwiPolynomial.value(gradient);
+        return cwi * minettiNormalizationFactor; // obviously it would be more efficient to scale the polynomial itself
     }
 
 }

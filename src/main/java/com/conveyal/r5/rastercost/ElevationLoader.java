@@ -1,27 +1,17 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.util.LambdaCounter;
-import gnu.trove.list.array.TFloatArrayList;
 import gnu.trove.list.array.TShortArrayList;
-import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.coverage.grid.io.GridFormatFinder;
-import org.geotools.geometry.Envelope2D;
-import org.geotools.util.factory.Hints;
-import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.spi.IIORegistry;
-import java.io.File;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.r5.rastercost.ElevationCostField.DECIMETERS_PER_METER;
 
 /**
  * Note that integer decimeters provide enough resolution to compactly store elevation data up to the highest
@@ -56,7 +46,7 @@ public class ElevationLoader implements CostField.Loader {
         final LambdaCounter vertexCounter = new LambdaCounter(LOG, streets.vertexStore.getVertexCount(), 100_000,
                 "Added elevation to {} of {} vertices.");
 
-        result.vertexElevationsDecimeters = copyToTShortArrayList(
+        result.vertexElevationsDecimeters = toDecimeterTShortArrayList(
                 IntStream.range(0, streets.vertexStore.getVertexCount())
                         .parallel()
                         .mapToDouble(v -> {
@@ -73,14 +63,14 @@ public class ElevationLoader implements CostField.Loader {
         // far surpass any speedup from object reuse and avoiding garbage collection which are easier single-threaded.
         // Storing these as shorts is not as effective as storing the vertex elevations as shorts because edge profiles
         // are many small arrays, often with only a few elements.
-        result.elevationProfiles = IntStream.range(0, streets.edgeStore.nEdgePairs())
+        result.elevationProfilesDecimeters = IntStream.range(0, streets.edgeStore.nEdgePairs())
                 .parallel()
                 .mapToObj(ep -> {
                     EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
                     edgeCounter.increment();
                     return rasterSampler.sampleEdge(e);
                 })
-                .map(ElevationLoader::copyToShortArray)
+                .map(ElevationLoader::toDecimeterArray)
                 .collect(Collectors.toList());
 
         // TODO filter out profiles for edges with near-constant slope. This may be an unnecessary optimization though.
@@ -95,21 +85,21 @@ public class ElevationLoader implements CostField.Loader {
      * Although the JVM aligns objects to 8-byte boundaries, primitive values within arrays should take only their
      * true width. Packing rounded doubles into a short array should genuinely make it 1/4 as big and keep more in cache.
      */
-    public static TShortArrayList copyToTShortArrayList (double[] doubleArray) {
+    public static TShortArrayList toDecimeterTShortArrayList (double[] doubleArray) {
         TShortArrayList result = new TShortArrayList(doubleArray.length);
         for (double d : doubleArray) {
-            result.add(clampToShort(Math.round(d)));
+            result.add(clampToShort(Math.round(d * DECIMETERS_PER_METER)));
         }
         return result;
     }
 
-    public static short[] copyToShortArray (double[] doubleArray) {
+    public static short[] toDecimeterArray (double[] doubleArray) {
         if (doubleArray.length == 0) {
             return EMPTY_SHORT_ARRAY;
         }
         short[] result = new short[doubleArray.length];
         for (int i = 0; i < doubleArray.length; i++) {
-            result[i] = clampToShort(Math.round(doubleArray[i]));
+            result[i] = clampToShort(Math.round(doubleArray[i] * DECIMETERS_PER_METER));
         }
         return result;
     }

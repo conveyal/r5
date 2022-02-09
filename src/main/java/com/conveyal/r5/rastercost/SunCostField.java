@@ -60,6 +60,6 @@ public class SunCostField implements CostField {
 
     @Override
     public double getDisplayValue (int edgeIndex) {
-        throw new UnsupportedOperationException();
+        return sunProportions.get(edgeIndex / 2);
     }
 }

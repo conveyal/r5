@@ -39,11 +39,11 @@ public class ElevationCostField implements CostField {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);
 
-    private static final double DECIMETERS_PER_METER = 10;
+    public static final double DECIMETERS_PER_METER = 10;
 
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        return (int)Math.round(((double)traversalTimeSeconds) / factorForEdge(currentEdge));
+        return (int) Math.round(traversalTimeSeconds * factorForEdge(currentEdge));
     }
 
     @Override
@@ -53,20 +53,20 @@ public class ElevationCostField implements CostField {
 
     @Override
     public double getDisplayValue (int edgeIndex) {
-        return toblerAverages.get(edgeIndex);
+
+        return toblerFactors.get(edgeIndex);
     }
 
     /**
      * The elevation of each vertex in the network in decimeters.
      * This could be relative to the geoid or the spheroid depending on your data source.
      * It doesn't matter as long as only relative heights are used.
-     * FIXME CURRENTLY IN METERS
      */
     public TShortList vertexElevationsDecimeters;
 
     /** Perform the conversion from decimeters to meters. */
     private double getVertexElevationMeters (int vidx) {
-        return vertexElevationsDecimeters.get(vidx); // / DECIMETERS_PER_METER;
+        return vertexElevationsDecimeters.get(vidx) / DECIMETERS_PER_METER;
     };
 
     /**
@@ -75,16 +75,17 @@ public class ElevationCostField implements CostField {
      * Edges that are short enough will not contain any interior points, and will have an empty array (not null).
      * Units are decimeters, which fit in a 16-bit signed integer for all but the highest mountain roads in the world.
      */
-    public List<short[]> elevationProfiles;
+    public List<short[]> elevationProfilesDecimeters;
 
     /**
-     * For each edge in the network (not edge pair), a multiplier. This multiplier is not symmetric with respect to
-     * travel direction, so unlike the elevation it's derived from it must be stored for each edge not edge pair.
+     * For each edge in the network (not edge pair), a traversal time multiplier.
+     * This multiplier is not symmetric with respect to travel direction,
+     * so unlike the elevation it's derived from it must be stored for each edge not edge pair.
      */
-    public TFloatList toblerAverages;
+    public TFloatList toblerFactors;
 
     public double factorForEdge (EdgeStore.Edge edge) {
-        return toblerAverages.get(edge.getEdgeIndex());
+        return toblerFactors.get(edge.getEdgeIndex());
     }
 
     /**
@@ -103,8 +104,8 @@ public class ElevationCostField implements CostField {
         int endVertex = edge.getEdgeStore().toVertices.get(pairIndex);
         int i = 0;
         double prevElevationMeters = getVertexElevationMeters(startVertex);
-        for (short elevationDecimeters : elevationProfiles.get(pairIndex)) {
-            final double elevationMeters = elevationDecimeters; // / DECIMETERS_PER_METER;
+        for (short elevationDecimeters : elevationProfilesDecimeters.get(pairIndex)) {
+            final double elevationMeters = elevationDecimeters / DECIMETERS_PER_METER;
             final double elevationChangeMeters = delta(prevElevationMeters, elevationMeters, invert);
             consumer.consumeElevationSegment(i, ELEVATION_SAMPLE_SPACING_METERS, elevationChangeMeters);
             remainingMeters -= ELEVATION_SAMPLE_SPACING_METERS;
@@ -143,18 +144,18 @@ public class ElevationCostField implements CostField {
      * and there's no straightforward way to return both the profile and Tobler average.
      */
     public void computeToblerAverages (EdgeStore edgeStore) {
-        toblerAverages = new TFloatArrayList(edgeStore.nEdges());
+        toblerFactors = new TFloatArrayList(edgeStore.nEdges());
         EdgeStore.Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); ++e) {
             edge.seek(e);
-            toblerAverages.add((float) weightedAverageForEdge(edge));
+            toblerFactors.add((float) weightedAverageForEdge(edge));
         }
     }
 
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
         ToblerCalculator calculator = new ToblerCalculator();
         forEachElevationSegment(edge, calculator);
-        return calculator.weightedToblerAverage();
+        return calculator.weightedToblerFactor();
     }
 
 }

@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
 import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
+import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
@@ -247,6 +248,7 @@ public class AnalysisWorker implements Runnable {
             // Use the newer non-static Spark framework syntax.
             sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+            new NetworkTileController(this.networkPreloader.transportNetworkCache).registerEndpoints(sparkHttpService);
         }
 
         // Main polling loop to fill the regional work queue.

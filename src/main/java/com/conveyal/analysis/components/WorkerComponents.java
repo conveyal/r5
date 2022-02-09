@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
@@ -30,5 +31,6 @@ public abstract class WorkerComponents {
     public EventBus eventBus;
     public TransportNetworkCache transportNetworkCache;
     public AnalysisWorker analysisWorker;
+    public NetworkTileController networkTileController;
 
 }

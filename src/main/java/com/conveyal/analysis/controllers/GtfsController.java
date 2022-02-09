@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.conveyal.analysis.util.HttpStatus.OK_200;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -35,8 +36,10 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
  */
 public class GtfsController implements HttpController {
     private final GTFSCache gtfsCache;
+    private final GtfsTileController gtfsTileController;
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
+        this.gtfsTileController = new GtfsTileController();
     }
 
     /**
@@ -44,13 +47,6 @@ public class GtfsController implements HttpController {
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
      */
     private final String cacheControlImmutable = "public, max-age=2592000, immutable";
-
-    /**
-     * Extracted into a common method to allow turning off during development.
-     */
-    private void addImmutableResponseHeader (Response res) {
-        res.header("Cache-Control", cacheControlImmutable);
-    }
 
     private static class BaseApiResponse {
         public final String _id;
@@ -91,13 +87,11 @@ public class GtfsController implements HttpController {
     }
 
     private RouteApiResponse getRoute(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return new RouteApiResponse(feed.routes.get(req.params("routeId")));
     }
 
     private List<RouteApiResponse> getRoutes(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.routes
                 .values()
@@ -129,7 +123,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<PatternApiResponse> getPatternsForRoute (Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
         return feed.patterns
@@ -154,7 +147,6 @@ public class GtfsController implements HttpController {
      * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed
      */
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.stops.values().stream().filter(s -> s.location_type == 0)
                 .map(StopApiResponse::new).collect(Collectors.toList());
@@ -177,7 +169,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<FeedGroupStopsApiResponse> getAllStopsForFeedGroup(Request req, Response res) {
-        addImmutableResponseHeader(res);
         String feedGroupId = req.params("feedGroupId");
         DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
         if (!cursor.hasNext()) {
@@ -192,6 +183,20 @@ public class GtfsController implements HttpController {
             allStopsByFeed.add(new FeedGroupStopsApiResponse(feed));
         }
         return allStopsByFeed;
+    }
+
+    private Object getTile (Request req, Response res) {
+        String feedGroupId = req.params("feedGroupId");
+        GTFSFeed feed = getFeedFromRequest(req);
+        String id = Bundle.bundleScopeFeedId(feed.feedId, feedGroupId);
+        final int z = Integer.parseInt(req.params("z"));
+        final int x = Integer.parseInt(req.params("x"));
+        final int y = Integer.parseInt(req.params("y"));
+        byte[] pbfMessage = this.gtfsTileController.getTile(id, feed, z, x, y);
+        res.header("Content-Type", "application/vnd.mapbox-vector-tile");
+        res.header("Content-Encoding", "gzip");
+        res.status(OK_200);
+        return pbfMessage;
     }
 
     static class TripApiResponse extends BaseApiResponse {
@@ -219,7 +224,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<TripApiResponse> getTripsForRoute (Request req, Response res) {
-        addImmutableResponseHeader(res);
         final GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
         return feed.trips
@@ -231,12 +235,26 @@ public class GtfsController implements HttpController {
     }
 
     @Override
-    public void registerEndpoints (spark.Service sparkService) {
-        sparkService.get("/api/gtfs/:feedGroupId/stops", this::getAllStopsForFeedGroup, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes", this::getRoutes, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId", this::getRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/stops", this::getAllStopsForOneFeed, toJson);
+    public void registerEndpoints (spark.Service ss) {
+        ss.path("/api/gtfs/:feedGroupId", () -> {
+            ss.before("*", (req, res) ->{
+                res.header("Cache-Control", cacheControlImmutable);
+            });
+            ss.get("/stops", this::getAllStopsForFeedGroup, toJson);
+            ss.path("/:feedId", () -> {
+                ss.get("/tiles/:z/:x/:y", this::getTile);
+
+                ss.path("/routes", () -> {
+                    ss.get("", this::getRoutes, toJson);
+                    ss.path("/:routeId", () -> {
+                        ss.get("", this::getRoute, toJson);
+                        ss.get("/patterns", this::getPatternsForRoute, toJson);
+                        ss.get("/trips", this::getTripsForRoute, toJson);
+                    });
+                });
+
+                ss.get("/stops", this::getAllStopsForOneFeed, toJson);
+            });
+        });
     }
 }

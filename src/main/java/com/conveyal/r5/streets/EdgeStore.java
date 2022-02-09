@@ -1131,17 +1131,24 @@ public class EdgeStore implements Serializable {
 
         public Map<String, Object> attributesForDisplay () {
             Map<String, Object> map = new HashMap<>();
-            map.put("id", getOSMID());
-            map.put("name", "Edge " + getOSMID());
+            map.put("id", edgeIndex); // UI seems to group-highlight edges on this basis
+            map.put("osmId", getOSMID());
+            map.put("name", "OSM Edge " + getOSMID());
             map.put("speedKph", getSpeedKph());
             map.put("lengthM", getLengthM());
-            int lts = getFlag(EdgeFlag.BIKE_LTS_1) ? 1 :
+            // FIXME we should employ a method like com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.ltsToInt for this
+            int lts =  getFlag(EdgeFlag.BIKE_LTS_1) ? 1 :
                         getFlag(EdgeFlag.BIKE_LTS_2) ? 2 :
                         getFlag(EdgeFlag.BIKE_LTS_3) ? 3 : 4;
             map.put("lts", lts);
             map.put("pedestrian", getFlag(EdgeFlag.ALLOWS_PEDESTRIAN));
             map.put("bike", getFlag(EdgeFlag.ALLOWS_BIKE));
             map.put("car", getFlag(EdgeFlag.ALLOWS_CAR));
+            if (costFields != null) {
+                for (CostField costField : costFields) {
+                    map.put(costField.getDisplayKey(), costField.getDisplayValue(edgeIndex));
+                }
+            }
             return map;
         }
 

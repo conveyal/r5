@@ -1,6 +1,7 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.components.WorkerHttpApi;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 /** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
-public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.Config, AnalysisWorker.Config {
+public abstract class WorkerConfig extends ConfigBase
+        implements TaskScheduler.Config, AnalysisWorker.Config, WorkerHttpApi.Config {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigBase.class);
 

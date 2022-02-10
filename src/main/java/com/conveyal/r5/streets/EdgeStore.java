@@ -1131,7 +1131,7 @@ public class EdgeStore implements Serializable {
 
         public Map<String, Object> attributesForDisplay () {
             Map<String, Object> map = new HashMap<>();
-            map.put("id", edgeIndex); // UI seems to group-highlight edges on this basis
+            map.put("id", edgeIndex); // Map UI component seems to group edges by this ID to span tile boundaries.
             map.put("osmId", getOSMID());
             map.put("name", "OSM Edge " + getOSMID());
             map.put("speedKph", getSpeedKph());

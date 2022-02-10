@@ -31,6 +31,6 @@ public abstract class WorkerComponents {
     public EventBus eventBus;
     public TransportNetworkCache transportNetworkCache;
     public AnalysisWorker analysisWorker;
-    public NetworkTileController networkTileController;
+    public WorkerHttpApi workerHttpApi;
 
 }

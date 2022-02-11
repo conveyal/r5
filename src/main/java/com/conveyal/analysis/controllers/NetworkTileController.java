@@ -12,6 +12,7 @@ import com.wdtinc.mapbox_vector_tile.adapt.jts.UserDataKeyValueMapConverter;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsLayer;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsMvt;
 import com.wdtinc.mapbox_vector_tile.build.MvtLayerParams;
+import gnu.trove.set.TIntSet;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Envelope;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
+import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -64,9 +66,6 @@ public class NetworkTileController implements HttpController {
 
     private final TransportNetworkCache transportNetworkCache;
 
-    private final Map<String, STRtree> indexedEdges = new HashMap<>();
-    private String indexedOsm;
-
     public NetworkTileController (TransportNetworkCache transportNetworkCache) {
         this.transportNetworkCache = transportNetworkCache;
     }
@@ -77,6 +76,7 @@ public class NetworkTileController implements HttpController {
         // Those could be path parameters, x-conveyal-headers, etc.
         // sparkService.get("/api/bundles/:gtfsId/vectorTiles/:x/:y/:z", this::getTile);
         // Should end in .mvt but not clear how to do that in Sparkframework.
+        //         sparkService.get("/:bundleId/:modificationNonceDigest/tiles", this::buildIndex, JsonUtil.toJson);
         sparkService.get("/:bundleId/tiles", this::buildIndex, JsonUtil.toJson);
         sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getTile);
     }
@@ -90,44 +90,26 @@ public class NetworkTileController implements HttpController {
         return network;
     }
 
-    private STRtree getOsmIndex (TransportNetwork network) {
-        // Ensure only one request lazy-indexes the edge geometries
-        synchronized (this) {
-            if (!indexedEdges.containsKey(network.scenarioId)) {
-                final long startTimeMs = System.currentTimeMillis();
-
-                STRtree edgeIndex = new STRtree();
-                EdgeStore edgeStore = network.streetLayer.edgeStore;
-                LOG.info("Indexing transport network with {} edges", edgeStore.fromVertices.size());
-                EdgeStore.Edge cursor = edgeStore.getCursor();
-                cursor.seek(0);
-                do {
-                    Geometry edgeGeometry = cursor.getGeometry();
-                    edgeGeometry.setUserData(cursor.attributesForDisplay());
-                    edgeIndex.insert(cursor.getEnvelope(), edgeGeometry);
-                } while (cursor.advance());
-
-                edgeIndex.build(); // can't index any more feeds after this.
-                indexedEdges.put(network.scenarioId, edgeIndex);
-
-                LOG.info("Done indexing edges in {}s", Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
-            }
-            return indexedEdges.get(network.scenarioId);
-        }
-    }
-
     /**
      * Handler for building the index separately from retrieving tiles.
+     * FIXME this is long-polling? Not building an index anymore. Maybe assert or check that Network has an index.
      */
     private Object buildIndex (Request request, Response response) {
-        getOsmIndex(getNetworkFromRequest(request));
+        getNetworkFromRequest(request);
         response.status(OK_200);
         return ImmutableMap.of("message", "Network is ready.");
     }
 
+    /**
+     * We have tried offsetting the edges for opposite directions using org.geotools.geometry.jts.OffsetCurveBuilder
+     * but this will offset in tile units and cause jumps at different zoom levels when rendered. Using offset styles
+     * in MapboxGL with exponential interpolation by zoom level seems to work better for showing opposite directions
+     * at high zoom levels. Alternatively we could just include one geometry per edge pair and report only one value
+     * per pair. For example, for elevation data this could be the direction with the largest value which should always
+     * be >= 1.
+     */
     private Object getTile (Request request, Response response) {
         TransportNetwork network = getNetworkFromRequest(request);
-        STRtree edgeIndex = getOsmIndex(network);
 
         final long startTimeMs = System.currentTimeMillis();
         final int zTile = Integer.parseInt(request.params("z"));
@@ -137,18 +119,25 @@ public class NetworkTileController implements HttpController {
 
         Envelope wgsEnvelope = MapTile.wgsEnvelope(zTile, xTile, yTile);
         Collection<Geometry> edgeGeoms = new ArrayList<>(64);
-        for (Geometry edge : (List<Geometry>) edgeIndex.query(floatingWgsEnvelopeToFixed(wgsEnvelope))) {
-            Geometry tileGeometry = clipScaleAndSimplify(edge, wgsEnvelope, tileExtent);
-            if (tileGeometry != null) {
-                // TODO tag these with route IDs, names etc. and include transit stops with names.
-                //  This will probably mean bypassing the JTS adapters and creating features individually.
-                tileGeometry.setUserData(edge.getUserData());
-                edgeGeoms.add(tileGeometry);
-            }
-        }
+
+        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(wgsEnvelope));
+        edges.forEach(e -> {
+            EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
+            Geometry edgeGeometry = edge.getGeometry();
+            edgeGeometry.setUserData(edge.attributesForDisplay());
+            edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));
+            // The index contains only forward edges in each pair. Also include the backward edges.
+            // TODO factor out repetitive code?
+            edge.advance();
+            edgeGeometry = edge.getGeometry();
+            edgeGeometry.setUserData(edge.attributesForDisplay());
+            edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));
+            return true;
+        });
 
         response.header("Content-Type", "application/vnd.mapbox-vector-tile");
         response.header("Content-Encoding", "gzip");
+        response.header("Cache-Control", CACHE_CONTROL_IMMUTABLE);
         response.status(OK_200);
         if (edgeGeoms.size() > 0) {
             JtsLayer edgeLayer = new JtsLayer("conveyal:osm:edges", edgeGeoms, tileExtent);
@@ -190,7 +179,8 @@ public class NetworkTileController implements HttpController {
         if (tileCoordinates.size() > 1) {
             LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates.toArray(new Coordinate[0]));
             DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
-            simplifier.setDistanceTolerance(1);
+            // TODO try higher tolerances, these are in tile pixels which are minuscule at 1/4096 of a tile
+            simplifier.setDistanceTolerance(5);
             Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
             simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
             return simplifiedTileGeometry;

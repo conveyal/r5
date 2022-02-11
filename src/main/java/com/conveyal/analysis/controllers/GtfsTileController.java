@@ -72,7 +72,10 @@ public class GtfsTileController {
                     Route route = feed.routes.get(pattern.route_id);
                     String exemplarTripId = pattern.associatedTrips.get(0);
                     LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
-
+                    if (wgsGeometry == null) {
+                        // Not sure why some of these are null.
+                        continue;
+                    }
                     Map<String, Object> userData = new HashMap<>();
                     userData.put("id", pattern.pattern_id);
                     userData.put("name", pattern.name);

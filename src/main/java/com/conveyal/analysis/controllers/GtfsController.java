@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
+import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
@@ -41,12 +42,6 @@ public class GtfsController implements HttpController {
         this.gtfsCache = gtfsCache;
         this.gtfsTileController = new GtfsTileController();
     }
-
-    /**
-     * Use the same Cache-Control header for each endpoint here. 2,592,000 seconds is one month.
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
-     */
-    private final String cacheControlImmutable = "public, max-age=2592000, immutable";
 
     private static class BaseApiResponse {
         public final String _id;
@@ -238,7 +233,7 @@ public class GtfsController implements HttpController {
     public void registerEndpoints (spark.Service ss) {
         ss.path("/api/gtfs/:feedGroupId", () -> {
             ss.before("*", (req, res) ->{
-                res.header("Cache-Control", cacheControlImmutable);
+                res.header("Cache-Control", CACHE_CONTROL_IMMUTABLE);
             });
             ss.get("/stops", this::getAllStopsForFeedGroup, toJson);
             ss.path("/:feedId", () -> {

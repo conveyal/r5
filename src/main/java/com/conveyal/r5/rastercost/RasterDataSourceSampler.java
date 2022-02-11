@@ -64,6 +64,7 @@ public class RasterDataSourceSampler {
     /**
      * The absolute envelope of the coverage in its own CRS.
      * This is not the relative envelope of the grid of pixels, and is not necessarily in geographic coordinates.
+     * @param interpolate whether to interpolate the raster. This takes most of the time during elevation loading.
      */
     private final Envelope2D coverageWorldEnvelope;
 

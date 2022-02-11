@@ -30,7 +30,8 @@ public class ElevationLoader implements CostField.Loader {
     private final RasterDataSourceSampler rasterSampler;
 
     public ElevationLoader (String dataSourceId) {
-        this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, true);
+        // TODO configurable interpolation
+        this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, false);
     }
 
     @Override

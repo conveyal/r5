@@ -9,11 +9,15 @@ import com.conveyal.r5.rastercost.RasterDataSourceSampler;
 import com.conveyal.r5.rastercost.SunLoader;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
+import org.geotools.referencing.operation.builder.LocalizationGrid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
 
 import static com.conveyal.file.FileCategory.DATASOURCES;
+import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.MINETTI;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.SUN;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
 
@@ -23,6 +27,8 @@ import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
  */
 public class RasterCost extends Modification {
 
+    private static final Logger LOG = LoggerFactory.getLogger(RasterCost.class);
+
     /**
      * The ID of the DataSource, which must be a geotiff raster.
      * This will define the field over which to evaluate the costs.
@@ -31,7 +37,7 @@ public class RasterCost extends Modification {
     public String dataSourceId;
 
     public enum CostFunction {
-        TOBLER, SUN
+        TOBLER, MINETTI, SUN
     }
 
     /**
@@ -56,16 +62,19 @@ public class RasterCost extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        if (costFunction == TOBLER) {
+        if (costFunction == TOBLER || costFunction == MINETTI) {
             loader = new ElevationLoader(dataSourceId);
         } else if (costFunction == SUN) {
             loader = new SunLoader(dataSourceId);
+        } else {
+            errors.add("Unrecognized cost function: " + costFunction);
         }
         return errors.size() > 0;
     }
 
     @Override
     public boolean apply (TransportNetwork network) {
+        LOG.info("Applying {} costs from raster DataSource {}.", costFunction, dataSourceId);
         CostField costField = loader.load(network.streetLayer);
         EdgeStore edgeStore = network.streetLayer.edgeStore;
         if (edgeStore.costFields == null) {

@@ -53,8 +53,7 @@ public class ElevationCostField implements CostField {
 
     @Override
     public double getDisplayValue (int edgeIndex) {
-
-        return toblerFactors.get(edgeIndex);
+        return edgeFactors.get(edgeIndex);
     }
 
     /**
@@ -82,10 +81,10 @@ public class ElevationCostField implements CostField {
      * This multiplier is not symmetric with respect to travel direction,
      * so unlike the elevation it's derived from it must be stored for each edge not edge pair.
      */
-    public TFloatList toblerFactors;
+    public TFloatList edgeFactors;
 
     public double factorForEdge (EdgeStore.Edge edge) {
-        return toblerFactors.get(edge.getEdgeIndex());
+        return edgeFactors.get(edge.getEdgeIndex());
     }
 
     /**
@@ -132,6 +131,7 @@ public class ElevationCostField implements CostField {
     /**
      * A functional interface that consumes segments in a street edge's elevation profile one by one.
      * Each segment is represented as a distance across the ground (always positive) and a signed vertical change.
+     * Both values are in meters.
      */
     @FunctionalInterface
     public interface ElevationSegmentConsumer {
@@ -139,23 +139,32 @@ public class ElevationCostField implements CostField {
     }
 
     /**
+     * An interface for converting edge elevations into scaling factors representing exertion relative to movement
+     * on flat ground. This is just an ElevationSegmentConsumer that has an additional method for retrieving the
+     * weighted result for all segments in an edge.
+     */
+    public interface ElevationCostCalculator extends ElevationCostField.ElevationSegmentConsumer {
+        double weightedElevationFactor ();
+    }
+
+    /**
      * Computing and averaging Tobler factors is extremely fast, on the order of 2 million edges per second.
      * It might be nice to bundle this into elevation sampling, but that's performed as a stream operation
      * and there's no straightforward way to return both the profile and Tobler average.
      */
-    public void computeToblerAverages (EdgeStore edgeStore) {
-        toblerFactors = new TFloatArrayList(edgeStore.nEdges());
+    public void computeWeightedAverages (EdgeStore edgeStore) {
+        edgeFactors = new TFloatArrayList(edgeStore.nEdges());
         EdgeStore.Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); ++e) {
             edge.seek(e);
-            toblerFactors.add((float) weightedAverageForEdge(edge));
+            edgeFactors.add((float) weightedAverageForEdge(edge));
         }
     }
 
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
-        ToblerCalculator calculator = new ToblerCalculator();
+        ElevationCostCalculator calculator = new MinettiCalculator();
         forEachElevationSegment(edge, calculator);
-        return calculator.weightedToblerFactor();
+        return calculator.weightedElevationFactor();
     }
 
 }

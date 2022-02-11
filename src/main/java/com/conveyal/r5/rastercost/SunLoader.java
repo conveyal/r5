@@ -21,7 +21,7 @@ import java.util.stream.IntStream;
  */
 public class SunLoader implements CostField.Loader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ElevationLoader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SunLoader.class);
 
     /** If the input contains shade rather than sun, then boolean values must be inverted. */
     private final boolean invert = true;

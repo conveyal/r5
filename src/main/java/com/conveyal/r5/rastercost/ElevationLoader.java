@@ -76,7 +76,7 @@ public class ElevationLoader implements CostField.Loader {
         // TODO filter out profiles for edges with near-constant slope. This may be an unnecessary optimization though.
 
         LOG.info("Averaging Tobler factors for all edges...");
-        result.computeToblerAverages(streets.edgeStore);
+        result.computeWeightedAverages(streets.edgeStore);
         LOG.info("Done averaging Tobler factors.");
         return result;
     }

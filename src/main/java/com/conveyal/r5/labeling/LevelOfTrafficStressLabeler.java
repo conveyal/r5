@@ -56,6 +56,7 @@ public class LevelOfTrafficStressLabeler {
                 if (lts < 1 || lts > 4) {
                     LOG.error("LTS value in OSM tag must be between 1 and 4. It is: " + lts);
                 }
+
                 EdgeStore.EdgeFlag ltsFlag = intToLts((int)lts);
                 forwardFlags.add(ltsFlag);
                 forwardFlags.add(BIKE_LTS_EXPLICIT);
@@ -70,7 +71,7 @@ public class LevelOfTrafficStressLabeler {
         if (!forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) && !backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
             // no cars permitted on this way, it is LTS 1
             // TODO on street bike lanes/cycletracks digitized as separate infrastructure?
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
+            forwardFlags.setLts(add(EdgeStore.EdgeFlag.BIKE_LTS_1);
             backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
             return;
         }
@@ -263,6 +264,7 @@ public class LevelOfTrafficStressLabeler {
                 if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts = Math.max(4, lts);
 
                 // clear existing markings
+                e.setBikeLts(lts);
                 e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_1);
                 e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_2);
                 e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_3);

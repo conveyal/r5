@@ -81,6 +81,15 @@ public class NetworkTileController implements HttpController {
         sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getTile);
     }
 
+    /**
+     * FIXME contains duplicate code from AnalysisRequest
+     * This method actually looks up the list of modifications from the database, while createScenario in
+     * AnalysisRequest ignores the supplied scenario ID and receives a full list of modifications.
+     * However this is running on a worker which doesn't have database access. It can look up scenarios on S3 though.
+     * Maybe the frontend can supply the full nonce hash. It could compute this, which requires mimicing a Java
+     * array toString method, or it could be filled in manually by the user who gets it from a request sent to R5.
+     * So no, we're not duplicating code here.
+     */
     private TransportNetwork getNetworkFromRequest (Request request) {
         // "bundleId" is also the "graphId" in an `AnalysisWorkerTask`
         final String bundleId = request.params("bundleId");

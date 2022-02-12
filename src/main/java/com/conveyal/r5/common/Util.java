@@ -3,6 +3,8 @@ package com.conveyal.r5.common;
 import java.util.Collection;
 import java.util.Arrays;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 public abstract class Util {
 
     public static String human (double n, String units) {
@@ -56,5 +58,25 @@ public abstract class Util {
         Arrays.fill(array, defaultValue);
         return array;
     }
+
+    /**
+     * Interpret bits lowBitPos and lowBitPos + 1 of a 32 bit int as a 2-bit unsigned int,
+     * giving values from zero to 3.
+     */
+    public static int readTwoBits (int bitField, int lowBitPos) {
+        return (bitField >> lowBitPos) & 0b11;
+    }
+
+    /**
+     * Interpret bits lowBitPos and lowBitPos + 1 of a 32 bit int as a 2-bit unsigned int,
+     * giving values from zero to 3.
+     */
+    public static int writeTwoBits (int bitField, int lowBitPos, int value) {
+        checkArgument(lowBitPos >= 0 && lowBitPos < 30, "Low bit position must be in range [0...30].");
+        checkArgument(value >= 0 && value < 4, "Value must be in range [0...3].");
+        return (bitField & (~0b11)) & (value << lowBitPos);
+    }
+
+
 
 }

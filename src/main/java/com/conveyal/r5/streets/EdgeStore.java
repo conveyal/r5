@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.common.Util;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
@@ -14,7 +15,6 @@ import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
-import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
@@ -25,6 +25,7 @@ import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.apache.commons.lang3.BitField;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
@@ -41,8 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
-
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This stores all the characteristics of the edges in the street graph layer of the transport network.
@@ -267,44 +266,13 @@ public class EdgeStore implements Serializable {
          * infer it. We jump to flag number 27 here to group all five LTS flags together at the high end of the 32-bit
          * integer flags field.
          */
-        BIKE_LTS_EXPLICIT (27),
+        BIKE_LTS_EXPLICIT (21),
 
-        /**
-         * Presenting little traffic stress and demanding little attention from cyclists, and attractive enough for a
-         * relaxing bike ride. Suitable for almost all cyclists, including children trained to safely cross intersections.
-         * On links, cyclists are either physically separated from traffic, or are in an exclusive bicycling zone next to
-         * a slow traffic stream with no more than one lane per direction, or are on a shared road where they interact
-         * with only occasional motor vehicles (as opposed to a stream of traffic) with a low speed differential. Where
-         * cyclists ride alongside a parking lane, they have ample operating space outside the zone into which car
-         * doors are opened. Intersections are easy to approach and cross.
-         */
-        BIKE_LTS_1 (28),
+        /** Two bit unsigned integer holding bike LTS minus one: LTS (1, 2, 3, 4) -> (0, 1, 2, 3). */
+        BIKE_LTS_2BIT (22),
 
-        /**
-         * Presenting little traffic stress and therefore suitable to most adult cyclists but demanding more attention
-         * than might be expected from children. On links, cyclists are either physically separated from traffic, or are
-         * in an exclusive bicycling zone next to a well-confined traffic stream with adequate clearance from a parking
-         * lane, or are on a shared road where they interact with only occasional motor vehicles (as opposed to a
-         * stream of traffic) with a low speed differential. Where a bike lane lies between a through lane and a rightturn
-         * lane, it is configured to give cyclists unambiguous priority where cars cross the bike lane and to keep
-         * car speed in the right-turn lane comparable to bicycling speeds. Crossings are not difficult for most adults.
-         */
-        BIKE_LTS_2 (29),
-
-        /**
-         * More traffic stress than LTS 2, yet markedly less than the stress of integrating with multilane traffic, and
-         * therefore welcome to many people currently riding bikes in American cities. Offering cyclists either an
-         * exclusive riding zone (lane) next to moderate-speed traffic or shared lanes on streets that are not multilane
-         * and have moderately low speed. Crossings may be longer or across higher-speed roads than allowed by
-         * LTS 2, but are still considered acceptably safe to most adult pedestrians.
-         */
-        BIKE_LTS_3 (30),
-
-        /**
-         * A level of stress beyond LTS3. (this is in fact the official definition. -Ed.)
-         * Also known as FLORIDA_AVENUE.
-         */
-        BIKE_LTS_4 (31);
+        /** Two bit unsigned integer where zero is motorway, 1, 2, 3 are primary, secondary, or tertiary. */
+        STREET_CLASS_2BIT (24);
 
         /**
          * In each enum value this field should contain an integer with only a single bit switched on (a power of two).
@@ -315,6 +283,29 @@ public class EdgeStore implements Serializable {
         private EdgeFlag (int bitNumber) {
             flag = 1 << bitNumber;
         }
+
+    }
+
+    public enum BikeLts {
+        LTS_1 (0), LTS_2 (1), LTS_3 (2), LTS_4 (3);
+        public final int code;
+        BikeLts (int code) {
+            this.code = code;
+        }
+        public int getLevel () {
+            return code + 1;
+        }
+    }
+
+    public enum StreetClass {
+        MOTORWAY (0), PRIMARY (1), SECONDARY (2), TERTIARY (3);
+        public final int code;
+        StreetClass (int code) {
+            this.code = code;
+        }
+    }
+
+    public void setLts (BikeLts bikeLts) {
 
     }
 
@@ -659,9 +650,9 @@ public class EdgeStore implements Serializable {
                 // If biking is not allowed on this edge, or if the traffic stress is too high, walk the bike.
                 boolean tryWalking = !getFlag(EdgeFlag.ALLOWS_BIKE);
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) tryWalking = true;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) tryWalking = true;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) tryWalking = true;
+                    if (req.bikeTrafficStress < getBikeLts()) {
+                        tryWalking = true;
+                    }
                 }
                 if (tryWalking) {
                     if (!getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
@@ -1129,6 +1120,14 @@ public class EdgeStore implements Serializable {
             edgeTraversalTimes.setBikeTimeFactor(edgeIndex, bikeTimeFactor);
         }
 
+        public void setBikeLts (BikeLts bikeLts) {
+            flags.set(edgeIndex, Util.writeTwoBits(flags.get(edgeIndex), EdgeFlag.BIKE_LTS_2BIT.flag, bikeLts.code));
+        }
+
+        public int getBikeLts () {
+            return Util.readTwoBits(flags.get(edgeIndex), EdgeFlag.BIKE_LTS_2BIT.flag) + 1;
+        }
+
         public Map<String, Object> attributesForDisplay () {
             Map<String, Object> map = new HashMap<>();
             map.put("id", edgeIndex); // Map UI component seems to group edges by this ID to span tile boundaries.
@@ -1136,11 +1135,7 @@ public class EdgeStore implements Serializable {
             map.put("name", "OSM Edge " + getOSMID());
             map.put("speedKph", getSpeedKph());
             map.put("lengthM", getLengthM());
-            // FIXME we should employ a method like com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.ltsToInt for this
-            int lts =  getFlag(EdgeFlag.BIKE_LTS_1) ? 1 :
-                        getFlag(EdgeFlag.BIKE_LTS_2) ? 2 :
-                        getFlag(EdgeFlag.BIKE_LTS_3) ? 3 : 4;
-            map.put("lts", lts);
+            map.put("lts", getBikeLts());
             map.put("pedestrian", getFlag(EdgeFlag.ALLOWS_PEDESTRIAN));
             map.put("bike", getFlag(EdgeFlag.ALLOWS_BIKE));
             map.put("car", getFlag(EdgeFlag.ALLOWS_CAR));

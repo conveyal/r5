@@ -323,10 +323,11 @@ public class StreetLayer implements Serializable, Cloneable {
         int lts1 = 0, lts2 = 0, lts3 = 0, lts4 = 0, ltsUnknown = 0;
 
         do {
-            if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_1)) lts1++;
-            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts2++;
-            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts3++;
-            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts4++;
+            int lts = cursor.getBikeLts();
+            if (lts == 1) lts1++;
+            else if (lts == 2) lts2++;
+            else if (lts == 3) lts3++;
+            else if (lts == 4) lts4++;
             else ltsUnknown++;
         } while (cursor.advance());
 

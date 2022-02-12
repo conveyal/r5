@@ -7,6 +7,7 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
+import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
@@ -246,7 +247,8 @@ public class TransportNetworkCache {
         TransportNetworkConfig config;
 
         try {
-            config = JsonUtilities.objectMapper.readValue(configFile, TransportNetworkConfig.class);
+            // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            config = JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
             throw new RuntimeException("Error reading TransportNetworkConfig.", e);
         }
@@ -260,12 +262,7 @@ public class TransportNetworkCache {
         network.scenarioId = networkId;
         network.streetLayer = new StreetLayer();
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
-        if (config.ltsDataSource != null) {
-            File ltsShapefile = prefetchShapefile(fileStorage, config.ltsDataSource);
-            // This should probably be done in LevelOfTrafficStressLabeler.label, but that's called in single-threaded
-            // code. Maybe some of that labeling and cleanup should be deferred until after the edges already exist.
-            new ShapefileMatcher(network.streetLayer).match(ltsShapefile.getAbsolutePath(), config.ltsAttributeName);
-        }
+
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
@@ -285,6 +282,18 @@ public class TransportNetworkCache {
         transferFinder.findTransfers();
         transferFinder.findParkRideTransfer();
 
+        // Apply modifications embedded in the TransportNetworkConfig JSON
+        if (config.modifications != null) {
+            // Scenario scenario = new Scenario();
+            // scenario.modifications = config.modifications;
+            // scenario.applyToTransportNetwork(network);
+            // This is applying the modifications _without creating a scenario copy_.
+            // This will destructively edit the network and will only work for certain modifications.
+            for (Modification modification : config.modifications) {
+                modification.resolve(network);
+                modification.apply(network);
+            }
+        }
         return network;
     }
 

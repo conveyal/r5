@@ -88,8 +88,8 @@ public class NetworkTileController implements HttpController {
         checkNotNull(bundleId);
         TransportNetwork network = transportNetworkCache.getNetwork(bundleId);
         // "61fe817974f6230b0363aae1-8c07ddd4f8bd29ac10a4a109dd27d7b58dabd56c" // elevation only
-        final String scenarioId = "61fe817974f6230b0363aae1-c38397b6249e9fa894ef39d667edbc3d9036c15b"; // elevation and sun
-        network = transportNetworkCache.getNetworkForScenario(bundleId, scenarioId);
+        // final String scenarioId = "61fe817974f6230b0363aae1-c38397b6249e9fa894ef39d667edbc3d9036c15b"; // elevation and sun
+        // network = transportNetworkCache.getNetworkForScenario(bundleId, scenarioId);
         checkNotNull(network);
         return network;
     }

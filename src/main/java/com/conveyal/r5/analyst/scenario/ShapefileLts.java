@@ -24,12 +24,15 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
  */
 public class ShapefileLts extends Modification {
 
+    public String ltsDataSource;
+
     /**
-     * The ID of the DataSource, which must be a Shapefile.
+     * ID of the linear shapefile DataSource containing bicycle LTS to be matched to streets.
      * We must assume its type because the workers don't have access to the DataStore metadata.
      */
     public String dataSourceId;
 
+    /** The name of the numeric attribute within the ltsDataSource containing LTS values from 1-4. */
     public String ltsAttribute = "lts";
 
     private FileStorageKey fileStorageKey;
@@ -54,8 +57,7 @@ public class ShapefileLts extends Modification {
     @Override
     public boolean apply (TransportNetwork network) {
         // Replicate the entire flags array so we can write to it (following copy-on-write policy).
-        // Otherwise it only allows extending the base graph.
-        // FIXME: TIntAugmentedList does not implement the iterator needed for a copy operation
+        // Otherwise the TIntAugmentedList only allows extending the base graph.
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
         ShapefileMatcher shapefileMatcher = new ShapefileMatcher(network.streetLayer);
         try {

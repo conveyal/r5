@@ -7,6 +7,7 @@ import gnu.trove.list.array.TFloatArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
@@ -35,7 +36,7 @@ import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACIN
  * would waste some space, but the code reuse might be worth it. And of course this would also allow greyscale shade
  * instead of binary shade inputs.
  */
-public class ElevationCostField implements CostField {
+public class ElevationCostField implements CostField, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);
 

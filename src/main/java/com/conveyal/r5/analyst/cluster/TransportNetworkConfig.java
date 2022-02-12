@@ -1,6 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RasterCost;
+import com.conveyal.r5.analyst.scenario.ShapefileLts;
 
 import java.util.List;
 
@@ -23,13 +26,7 @@ public class TransportNetworkConfig {
     /** The fare calculator for analysis, if any. TODO this is not yet wired up to TransportNetwork.setFareCalculator. */
     public InRoutingFareCalculator analysisFareCalculator;
 
-    /** ID of the DataSource containing the elevation raster, if any. */
-    public String elevationDataSource;
-
-    /** ID of the linear shapefile DataSource containing bicycle LTS to be matched to streets, if any. */
-    public String ltsDataSource;
-
-    /** The name of the numeric attribute within the ltsDataSource containing LTS values from 1-4. */
-    public String ltsAttributeName;
+    /** A list of _R5_ modifications to apply during network build. May be null. */
+    public List<Modification> modifications;
 
 }

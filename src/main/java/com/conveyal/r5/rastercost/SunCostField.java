@@ -12,6 +12,7 @@ import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.util.factory.Hints;
 
 import java.io.File;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -26,7 +27,7 @@ import static com.conveyal.r5.analyst.Grid.LOG;
  * We could also just look back at the raster on every request to split the new edges. But then every worker needs
  * to download this huge raster. Not sure if that's bigger or smaller than the data stored on the edges.
  */
-public class SunCostField implements CostField {
+public class SunCostField implements CostField, Serializable {
 
     public static final BitSet ALL_TRUE = BitSet.valueOf(new byte[] { 1 });
     public static final BitSet ALL_FALSE = BitSet.valueOf(new byte[] { 0 });

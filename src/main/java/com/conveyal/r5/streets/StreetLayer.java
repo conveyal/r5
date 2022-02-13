@@ -13,12 +13,12 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SpeedLabeler;
+import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -294,13 +294,11 @@ public class StreetLayer implements Serializable, Cloneable {
             if (!isWayRoutable(way)) {
                 continue;
             }
-            int nEdgesCreated = 0;
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
             for (int n = 1; n < way.nodes.length; n++) {
                 if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
-                    nEdgesCreated += 1;
                     beginIdx = n;
                 }
             }
@@ -1096,8 +1094,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
         Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, osmID);
         // newEdge is first pointing to the forward edge in the pair.
-        // Geometries apply to both edges in a pair.
+        // Geometries apply to both edges in a pair. Likewise for street classes.
         newEdge.setGeometry(nodes);
+        newEdge.setStreetClass(StreetClass.forWay(way));
+
         // If per-edge traversal time factors are being recorded for this StreetLayer, store these factors for the
         // pair of newly created edges based on the current OSM Way.
         // NOTE the unusual requirement here that each OSM way is exactly one routable network edge.
@@ -1110,6 +1110,7 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
+        // Now set characteristics that differ in the forward and backward directions.
         newEdge.setFlags(forwardFlags);
         newEdge.setSpeed(forwardSpeed);
         // Step ahead to the backward edge in the same pair.

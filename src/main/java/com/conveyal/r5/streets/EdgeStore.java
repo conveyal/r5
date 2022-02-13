@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
@@ -107,8 +108,14 @@ public class EdgeStore implements Serializable {
     /** Length of the edge along its geometry (millimeters). One entry for each edge pair. */
     public TIntList lengths_mm;
 
-    /** OSM ids of edges. One entry for each edge pair */
+    /** OSM ids of edges. One entry for each edge pair. Should we really be serializing this much data on every edge? */
     public TLongList osmids;
+
+    /**
+     * For each edge _pair_, the OSM highway class is was derived from. Integer codes are defined in the StreetClass
+     * enum. Like OSM IDs and street names, these could be factored out into a table of OSM way data.
+     */
+    public TByteList streetClasses;
 
     /**
      * Geometries. One entry for each edge pair. These are packed lists of lat, lon, lat, lon... as fixed-point
@@ -210,6 +217,7 @@ public class EdgeStore implements Serializable {
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
         osmids = new TLongArrayList(initialEdgePairs);
+        streetClasses = new TByteArrayList(initialEdgePairs);
         inAngles = new TByteArrayList(initialEdgePairs);
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
@@ -350,8 +358,9 @@ public class EdgeStore implements Serializable {
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
         osmids.add(osmID);
+        streetClasses.add(StreetClass.OTHER.code);
         inAngles.add((byte) 0);
-        outAngles.add((byte)0);
+        outAngles.add((byte) 0);
 
         // Speed and flags are stored separately for each edge in a pair (unlike length, geom, etc.)
 
@@ -838,6 +847,14 @@ public class EdgeStore implements Serializable {
 
         }
 
+        public void setStreetClass (StreetClass streetClass) {
+            streetClasses.set(pairIndex, streetClass.code);
+        }
+
+        public byte getStreetClassCode () {
+            return streetClasses.get(pairIndex);
+        }
+
         /**
          * Reads edge geometry and calculates in and out angle
          *
@@ -1132,8 +1149,8 @@ public class EdgeStore implements Serializable {
         public Map<String, Object> attributesForDisplay () {
             Map<String, Object> map = new HashMap<>();
             map.put("id", edgeIndex); // Map UI component seems to group edges by this ID to span tile boundaries.
-            map.put("osmId", getOSMID());
-            map.put("name", "OSM Edge " + getOSMID());
+            map.put("streetClass", (int) streetClasses.get(pairIndex)); // Serialization cannot handle Byte, cast it.
+            // map.put("osmId", getOSMID());
             map.put("speedKph", getSpeedKph());
             map.put("lengthM", getLengthM());
             // FIXME we should employ a method like com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.ltsToInt for this
@@ -1237,8 +1254,9 @@ public class EdgeStore implements Serializable {
         copy.geometries = new AugmentedList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
+        copy.streetClasses = new TByteArrayList(this.streetClasses); // FIXME Implement TByteAugmentedList
         copy.temporarilyDeletedEdges = new TIntHashSet();
-        //Angles are deep copy for now
+        // Angles are deep copy for now FIXME we are copying these entire arrays! Implement TByteAugmentedList
         copy.inAngles = new TByteArrayList(inAngles);
         copy.outAngles = new TByteArrayList(outAngles);
         // We don't expect to add/change any turn restrictions.

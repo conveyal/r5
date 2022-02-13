@@ -64,6 +64,9 @@ public class NetworkTileController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(NetworkTileController.class);
 
+    /** The zoom level at which each StreetClass appears, indexed by StreetClass.code from 0...4. */
+    private static final int[] zoomForStreetClass = new int[] {8, 10, 11, 12, 13};
+
     private final TransportNetworkCache transportNetworkCache;
 
     public NetworkTileController (TransportNetworkCache transportNetworkCache) {
@@ -127,6 +130,10 @@ public class NetworkTileController implements HttpController {
         TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(wgsEnvelope));
         edges.forEach(e -> {
             EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
+            // TODO at low zoom levels, include only edge pairs. At high, include different directions in pair.
+            if (zTile < zoomForStreetClass[edge.getStreetClassCode()]) {
+                return true; // Continue iteration.
+            }
             Geometry edgeGeometry = edge.getGeometry();
             edgeGeometry.setUserData(edge.attributesForDisplay());
             edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));

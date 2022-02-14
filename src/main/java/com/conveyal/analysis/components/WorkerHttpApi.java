@@ -17,7 +17,7 @@ import java.util.List;
  *
  * This could potentially be merged with the backend HttpApi component, with the two differing only by configuration.
  */
-public class WorkerHttpApi {
+public class WorkerHttpApi implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkerHttpApi.class);
 

@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
@@ -45,7 +46,7 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
  * However there may be many scenario networks derived from that base network, which  are stored in the scenarios
  * field of the baseNetwork.
  */
-public class TransportNetworkCache {
+public class TransportNetworkCache implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetworkCache.class);
 

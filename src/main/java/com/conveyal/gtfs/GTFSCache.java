@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -23,7 +24,7 @@ import static com.google.common.base.Preconditions.checkState;
  * to hold a reference to the evicted GTFSFeed will then fail if it tries to access the closed MapDB. The exact eviction
  * policy is discussed in Javadoc on the class fields and methods.
  */
-public class GTFSCache {
+public class GTFSCache implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
     private final LoadingCache<String, GTFSFeed> cache;

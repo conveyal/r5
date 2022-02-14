@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
@@ -79,7 +80,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO evaluate whether synchronizing all methods to make this threadsafe is a performance issue.
  */
-public class Broker {
+public class Broker implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
 

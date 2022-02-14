@@ -7,6 +7,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.r5.analyst.cluster.Worker;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import org.slf4j.Logger;
@@ -74,12 +75,11 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             singleWorkerConfig.setProperty("listen-for-single-point", Boolean.toString(i == 0).toLowerCase());
             WorkerConfig config = LocalWorkerConfig.fromProperties(singleWorkerConfig);
             WorkerComponents components = new LocalWorkerComponents(transportNetworkCache, config);
-            AnalysisWorker worker = components.analysisWorker;
-            Thread workerThread = new Thread(worker, "WORKER " + i);
+            Thread workerThread = new Thread(new Worker(components), "WORKER " + i);
             workerThreads.add(workerThread);
             workerThread.start();
             // Note that machineId is static, so all workers have the same machine ID for now. This should be fixed somehow.
-            LOG.info("Started worker {} with machine ID {}.", i, worker.machineId);
+            LOG.info("Started worker {} with machine ID {}.", i, components.analysisWorker.machineId);
         }
     }
 

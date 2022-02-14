@@ -32,35 +32,37 @@ public class WorkerHttpApi {
     /** The port on which the worker will listen for single point tasks forwarded from the backend. */
     public static final int WORKER_LISTEN_PORT = 7080;
 
+    private Config config;
+
     private spark.Service sparkService;
 
     private List<HttpController> controllers;
 
     public WorkerHttpApi (Config config, List<HttpController> controllers) {
+        this.config = config;
         this.controllers = controllers;
-        if (config.listenForSinglePoint()) {
-            LOG.info("This is a single-point worker. Enabling HTTP API.");
-            enable();
-        } else {
-            LOG.info("This is a regional-analysis-only worker. Worker HTTP API will not be available.");
-        }
     }
 
     /**
      * Most workers don't actually expose an HTTP API. Only the workers designated to handle single point requests do.
      * This method should be called on those specific workers to turn on the HTTP API.
      */
-    public void enable () {
-        // Use the newer non-static Spark framework syntax.
-        // Ideally we would limit the number of threads the worker will use to handle HTTP connections, in order to
-        // crudely limit memory consumption and load from simultaneous single point requests. Unfortunately we can't
-        // call sparkHttpService.threadPool(NTHREADS) because we get an error message saying we need over 10 threads:
-        // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
-        // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
-        // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-        sparkService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
-        for (HttpController controller : controllers) {
-            controller.registerEndpoints(sparkService);
+    public void conditionallyEnable () {
+        if (config.listenForSinglePoint()) {
+            LOG.info("This is a single-point worker. Enabling HTTP API.");
+            // Use the newer non-static Spark framework syntax.
+            // Ideally we would limit the number of threads the worker will use to handle HTTP connections, in order to
+            // crudely limit memory consumption and load from simultaneous single point requests. Unfortunately we can't
+            // call sparkHttpService.threadPool(NTHREADS) because we get an error message saying we need over 10 threads:
+            // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
+            // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
+            // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
+            sparkService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
+            for (HttpController controller : controllers) {
+                controller.registerEndpoints(sparkService);
+            }
+        } else {
+            LOG.info("This is a regional-analysis-only worker. Worker HTTP API will not be available.");
         }
     }
 

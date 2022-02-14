@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.components.WorkerHttpApi;
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
 import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
@@ -56,18 +56,16 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * This is a main class run by worker machines in our Analysis computation cluster. It polls a broker requesting work
- * over HTTP, telling the broker what networks and scenarios it has loaded. When it receives some work from the broker
- * it does the necessary work and returns the results back to the front end via the broker.
- * The worker may also listen for interactive single point requests that should return as fast as possible.
+ * This contains the main polling loop used by the worker to pull and asynchronously process regional analysis tasks.
+ * It polls the broker requesting work over HTTP, telling the broker what networks and scenarios it has loaded.
+ * It also contains methods invoked by the WorkerHttpApi for handling single-point requests, because they use many
+ * of the same Components, but it may be clearer in the long run to factor that out.
+ * Since this is now placed under Worker we should eventually rename it to something like RegionalTaskProcessor.
  */
-public class AnalysisWorker implements Runnable {
+public class AnalysisWorker implements Component {
 
-    /**
-     * All parameters needed to configure an AnalysisWorker instance.
-     * This config interface is kind of huge and includes most things in the WorkerConfig.
-     * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
-     */
+    //  CONFIGURATION
+
     public interface Config {
         String brokerAddress();
         String brokerPort();
@@ -200,8 +198,7 @@ public class AnalysisWorker implements Runnable {
     }
 
     /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
-    @Override
-    public void run() {
+    public void startPolling () {
 
         // Create executors with up to one thread per processor.
         // The default task rejection policy is "Abort".

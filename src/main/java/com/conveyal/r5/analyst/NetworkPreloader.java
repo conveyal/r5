@@ -175,8 +175,6 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
          * supplied in the request. The UI only sends these if the user has changed them to something other than
          * "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
          * the region.
-         *
-         * FIXME but should we really be injecting Grid objects into a class deserialized straight from JSON?
          */
         public Key (AnalysisWorkerTask task) {
             this.networkId = task.graphId;
@@ -186,7 +184,11 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // transit is used). See code in TravelTimeComputer for when each is used.
             // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
-            this.egressModes = LegMode.toStreetModeSet(task.egressModes);
+            this.egressModes = LegMode.toStreetModeSet(
+                // Avoid unnecessarily building egress tables by
+                // ignoring spurious egress modes in requests that do not have transit enabled.
+                task.transitModes.isEmpty() ? EnumSet.noneOf(LegMode.class) : task.egressModes
+            );
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 

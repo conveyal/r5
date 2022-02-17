@@ -4,6 +4,9 @@ import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.ShapefileLts;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
 
@@ -14,7 +17,14 @@ import java.util.List;
  * So "new-style" bundles are no longer zip files of data, they are just references to OSM and GTFS files on S3.
  * The fields in this class do not contain filenames but IDs that will be sanitized and have file extensions added
  * before being looked up as S3 objects.
+ *
+ * Workers will try to deserialize this with a strict object mapper that doesn't tolerate unrecognized fields.
+ * This is fine for TransportNetworkConfigs containing new features not supported by those old workers, where it's
+ * reasonable to fail fast. However, on older workers (v6.6 or older) the message may be something cryptic about not
+ * being able to read bundle manifest JSON, without mentioning the extra fields. Because of this fail-fast behavior,
+ * we have to be sure not to serialize null values for unused newer fields, which would confuse older workers.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransportNetworkConfig {
 
     /** ID of the OSM file, for use with OSMCache */

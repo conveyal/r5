@@ -251,7 +251,7 @@ public class TransportNetworkCache implements Component {
             // Use lenient mapper to mimic behavior in objectFromRequestBody.
             config = JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
-            throw new RuntimeException("Error reading TransportNetworkConfig.", e);
+            throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
         }
         // FIXME duplicate code. All internal building logic should be encapsulated in a method like
         //  TransportNetwork.build(osm, gtfs1, gtfs2...)

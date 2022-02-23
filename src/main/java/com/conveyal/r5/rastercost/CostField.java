@@ -42,6 +42,10 @@ public interface CostField {
 
     /** Interface for classes that create a CostField for a given StreetLayer, usually by overlaying a raster file. */
     interface Loader {
+        void setNorthShiftMeters (double northShiftMeters);
+        void setEastShiftMeters (double eastShiftMeters);
+        void setInputScale (double inputScale);
+        void setOutputScale (double outputScale);
         CostField load (StreetLayer streets);
     }
 

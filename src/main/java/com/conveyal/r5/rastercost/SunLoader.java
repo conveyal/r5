@@ -14,10 +14,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * This will reuse ElevationSampler#profileForEdge() to sample at very high resolution (1 meter) and return arrays
- * of shorts which will then be re-interpreted as true or false (nonzero or zero).
- * These will be stored as lists of distances at which the edge changes state from true to false. The value starts
- * as zero and can be toggled at any distance including zero itself.
+ * This reuses the same raster sampler as the ElevationLoader to sample at very high resolution (1 meter) and return
+ * arrays of doubles which will then be re-interpreted as true or false (nonzero or zero).
  */
 public class SunLoader implements CostField.Loader {
 
@@ -28,9 +26,10 @@ public class SunLoader implements CostField.Loader {
 
     private final RasterDataSourceSampler rasterSampler;
 
+    private double outputScale = 1;
+
     public SunLoader (String dataSourceId) {
         rasterSampler = new RasterDataSourceSampler(dataSourceId, 1.0, false);
-        rasterSampler.setNorthShiftMeters(5); // Shift raster 5m north to simulate sun angle to road centerline.
     }
 
     @Override
@@ -52,7 +51,7 @@ public class SunLoader implements CostField.Loader {
             sunProportions.add(((float)soe.bitSet.cardinality()) / soe.size);
         }
         LOG.info("Done computing sun proportions.");
-        SunCostField result = new SunCostField(1.5, 1.0);
+        SunCostField result = new SunCostField(outputScale, 1.0);
         result.sunOnEdge = sunOnEdge.stream().map(s -> s.bitSet).collect(Collectors.toList());
         result.sunProportions = sunProportions;
         return result;
@@ -110,5 +109,25 @@ public class SunLoader implements CostField.Loader {
         }
     }
 
+    @Override
+    public void setNorthShiftMeters (double northShiftMeters) {
+        rasterSampler.setNorthShiftMeters(northShiftMeters);
+    }
 
+    @Override
+    public void setEastShiftMeters (double eastShiftMeters) {
+        rasterSampler.setEastShiftMeters(eastShiftMeters);
+    }
+
+    @Override
+    public void setInputScale (double inputScale) {
+        if (inputScale != 1) {
+            LOG.warn("Scaling input of a sun/shade raster has no effect because it only sees zero/nonzero.");
+        }
+    }
+
+    @Override
+    public void setOutputScale (double outputScale) {
+        this.outputScale = outputScale;
+    }
 }

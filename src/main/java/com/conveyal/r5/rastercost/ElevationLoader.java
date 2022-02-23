@@ -29,8 +29,11 @@ public class ElevationLoader implements CostField.Loader {
 
     private final RasterDataSourceSampler rasterSampler;
 
+    private double outputScale;
+
     public ElevationLoader (String dataSourceId) {
-        // TODO configurable interpolation
+        // It could be useful to be able to configure interpolation.
+        // We never want it for the 1/0 tree shade raster, but may or may not want it for elevation.
         this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, false);
     }
 
@@ -42,7 +45,7 @@ public class ElevationLoader implements CostField.Loader {
         // DEVELOPMENT HACK: load only the first N edges to speed up loading.
         // final int nEdgePairsToLoad = 50_000; // streets.edgeStore.nEdgePairs();
 
-        ElevationCostField result = new ElevationCostField();
+        ElevationCostField result = new ElevationCostField(outputScale);
 
         final LambdaCounter vertexCounter = new LambdaCounter(LOG, streets.vertexStore.getVertexCount(), 100_000,
                 "Added elevation to {} of {} vertices.");
@@ -112,4 +115,26 @@ public class ElevationLoader implements CostField.Loader {
         }
         return s;
     }
+
+
+    @Override
+    public void setNorthShiftMeters (double northShiftMeters) {
+        rasterSampler.setNorthShiftMeters(northShiftMeters);
+    }
+
+    @Override
+    public void setEastShiftMeters (double eastShiftMeters) {
+        rasterSampler.setEastShiftMeters(eastShiftMeters);
+    }
+
+    @Override
+    public void setInputScale (double inputScale) {
+        rasterSampler.setInputScale(inputScale);
+    }
+
+    @Override
+    public void setOutputScale (double outputScale) {
+        this.outputScale = outputScale;
+    }
+
 }

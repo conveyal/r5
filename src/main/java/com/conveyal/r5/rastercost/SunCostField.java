@@ -21,11 +21,13 @@ import static com.conveyal.r5.analyst.Grid.LOG;
 
 /**
  * Represents the additional cost of traversing edges that are not shaded from the sun.
- * Requires a detailed input raster of which...
- * On second thought, after looking at the tree canopy, it tends to consist of many disjoint trees. Maybe we want to
- * just sample at high resolution and store the "profile" in a bitset.
- * We could also just look back at the raster on every request to split the new edges. But then every worker needs
- * to download this huge raster. Not sure if that's bigger or smaller than the data stored on the edges.
+ * This needs to support splitting the edges and getting accurate profiles for the split pieces.
+ * In the data set this was designed for, the tree canopy tends to consist of many disjoint trees.
+ * So rather than storing the points at which the street switches from sun to shade, we just sample at high resolution
+ * and store the "profile" of shade along the street in a bitset.
+ * We could in principle just look back at the original raster on every request to split the new edges.
+ * But then every worker needs to download this huge raster. We may want to investigate whether this is bigger or
+ * smaller than the bitest data stored on all the edges.
  */
 public class SunCostField implements CostField, Serializable {
 
@@ -63,4 +65,5 @@ public class SunCostField implements CostField, Serializable {
     public double getDisplayValue (int edgeIndex) {
         return sunProportions.get(edgeIndex / 2);
     }
+
 }

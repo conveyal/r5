@@ -23,7 +23,7 @@ import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
 
 /**
  * Custom (experimental) Modification that loads costs from a raster.
- * As a custom modification, a model class only exists in R5, there is no separate UI/backend modification class.
+ * As a custom modification, the model class only exists in R5, there is no separate UI/backend modification class.
  */
 public class RasterCost extends Modification {
 
@@ -54,9 +54,15 @@ public class RasterCost extends Modification {
 
     /**
      * Scale the cost after applying the function rather than the input to calibrate cost, uniformly increasing or
-     * decreasing it. Separate from inputScale since cost functions are not necessarily linear.
+     * decreasing it. Distinct from inputScale since cost functions are not necessarily linear.
      */
     public double outputScale = 1;
+
+    /** @see com.conveyal.r5.rastercost.RasterDataSourceSampler#setNorthShiftMeters(double) */
+    public double northShiftMeters = 0;
+
+    /** @see com.conveyal.r5.rastercost.RasterDataSourceSampler#setEastShiftMeters(double) */
+    public double eastShiftMeters = 0;
 
     private CostField.Loader loader;
 
@@ -69,7 +75,19 @@ public class RasterCost extends Modification {
         } else {
             errors.add("Unrecognized cost function: " + costFunction);
         }
+        loader.setNorthShiftMeters(northShiftMeters);
+        loader.setEastShiftMeters(eastShiftMeters);
+        checkScaleRange(inputScale);
+        checkScaleRange(outputScale);
+        loader.setInputScale(inputScale);
+        loader.setOutputScale(outputScale);
         return errors.size() > 0;
+    }
+
+    private void checkScaleRange (double scale) {
+        if (scale <= 0 || scale >= 100) {
+            errors.add("Scale parameters must be positive nonzero real numbers less than 100.");
+        }
     }
 
     @Override

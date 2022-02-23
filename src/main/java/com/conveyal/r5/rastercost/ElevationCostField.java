@@ -42,6 +42,12 @@ public class ElevationCostField implements CostField, Serializable {
 
     public static final double DECIMETERS_PER_METER = 10;
 
+    private double outputScale = 1;
+
+    public ElevationCostField (double outputScale) {
+        this.outputScale = outputScale;
+    }
+
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
         return (int) Math.round(traversalTimeSeconds * factorForEdge(currentEdge));
@@ -165,7 +171,7 @@ public class ElevationCostField implements CostField, Serializable {
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
         ElevationCostCalculator calculator = new MinettiCalculator();
         forEachElevationSegment(edge, calculator);
-        return calculator.weightedElevationFactor();
+        return calculator.weightedElevationFactor() * outputScale;
     }
 
 }

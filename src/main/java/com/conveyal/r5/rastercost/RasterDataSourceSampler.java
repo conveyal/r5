@@ -21,6 +21,8 @@ import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.media.jai.InterpolationBilinear;
 import java.awt.geom.Point2D;
@@ -29,6 +31,7 @@ import java.io.File;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.GEOTIFF;
 import static com.conveyal.gtfs.util.Util.METERS_PER_DEGREE_LATITUDE;
+import static com.conveyal.r5.common.GeometryUtils.checkLat;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -40,11 +43,13 @@ import static com.google.common.base.Preconditions.checkArgument;
  * We also want to perform the sampling in a multi-threaded way, so the sampler instance needs to expose methods that
  * are threadsafe when called in a parallel stream or thread pool. But all those millions of edge-sampling operations
  * will use the same configuration so we want to set all that here rather than on separate objects generated at each
- * edge-sampling. But certain state needs to be retained on each edge, which implies a class instance (inner?) per
- * edge.
+ * edge-sampling. But certain state needs to be retained on each edge, which implies a class instance per edge.
  *
+ * TODO replace all references to elevation with more general terms
  */
 public class RasterDataSourceSampler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RasterDataSourceSampler.class);
 
     private final String dataSourceId;
     private final double sampleSpacingMeters;
@@ -54,6 +59,8 @@ public class RasterDataSourceSampler {
     private final GridCoverage2D coverage;
 
     private double latShiftDegrees = 0;
+    private double lonShiftDegrees = 0;
+    private double inputScale = 1;
 
     /**
      * The transform from WGS84 geographic coordinates to whatever system is used by the grid coverage.
@@ -64,6 +71,7 @@ public class RasterDataSourceSampler {
     /**
      * The absolute envelope of the coverage in its own CRS.
      * This is not the relative envelope of the grid of pixels, and is not necessarily in geographic coordinates.
+     *
      * @param interpolate whether to interpolate the raster. This takes most of the time during elevation loading.
      */
     private final Envelope2D coverageWorldEnvelope;
@@ -98,13 +106,40 @@ public class RasterDataSourceSampler {
     }
 
     /**
-     * Shift the raster the specified number of meters north on the fly.
-     * This is actually accomplished by moving each sample point the equivalent number of degrees south.
+     * Shift the raster the specified number of meters toward the north on the fly. This is actually accomplished by
+     * moving each sample point the equivalent number of degrees south. Negative values will shift the raster south.
      */
     public void setNorthShiftMeters (double northShiftMeters) {
         checkArgument(northShiftMeters > -20 && northShiftMeters < 20, "northShiftMeters should be in range (-20...20).");
         // this.northShiftMeters = northShiftMeters;
-        this.latShiftDegrees = northShiftMeters / METERS_PER_DEGREE_LATITUDE;
+        latShiftDegrees = northShiftMeters / METERS_PER_DEGREE_LATITUDE;
+        LOG.info("Latitude of sampled points will be shifted by {} degrees.", latShiftDegrees);
+    }
+
+    /**
+     * Shift the raster the specified number of meters toward the east on the fly. This is actually accomplished by
+     * moving each sample point the equivalent number of degrees west. Negative values will shift the raster west.
+     */
+    public void setEastShiftMeters (double eastShiftMeters) {
+        checkArgument(eastShiftMeters > -20 && eastShiftMeters < 20, "eastShiftMeters should be in range (-20...20).");
+        if (eastShiftMeters == 0) {
+            // Bypass potentially problematic inversion of CRS transform below when not needed.
+            lonShiftDegrees = 0;
+            return;
+        }
+        try {
+            DirectPosition centerPosition = new DirectPosition2D(coverageWorldEnvelope.getCenterX(), coverageWorldEnvelope.getCenterY());
+            DirectPosition centerPositionWgs = new DirectPosition2D();
+            wgsToCoverage.inverse().transform(centerPosition, centerPositionWgs);
+            double lat = centerPositionWgs.getOrdinate(1);
+            checkLat(lat);
+            double cosLat = Math.cos(Math.toRadians(lat));
+            LOG.info("Center of raster is at WGS84 latitude {}, scaling longitude shift by {}.", cosLat);
+            lonShiftDegrees = cosLat * eastShiftMeters / METERS_PER_DEGREE_LATITUDE;
+            LOG.info("Longitude of sampled points will be shifted by {} degrees.", lonShiftDegrees);
+        } catch (TransformException e) {
+            throw new RuntimeException("Cannot invert CRS transform to determine latitude of raster.", e);
+        }
     }
 
     /**
@@ -114,7 +149,7 @@ public class RasterDataSourceSampler {
     public double readElevation (double lon, double lat) {
         // TODO make transform conditional on presence of a WGS envelope? Create DirectPosition directly, not Point2D.
         final Point2D wgsPoint = new Point2D.Double();
-        wgsPoint.setLocation(lon, lat - latShiftDegrees);
+        wgsPoint.setLocation(lon - lonShiftDegrees, lat - latShiftDegrees);
         // Maybe should use constructor that sets CRS?
         DirectPosition wgsPos = new DirectPosition2D(wgsPoint);
         DirectPosition coveragePos = new DirectPosition2D();
@@ -128,7 +163,7 @@ public class RasterDataSourceSampler {
         // Catch points outside the coverage, which would otherwise throw an exception, which is slow to handle.
         if (coverageWorldEnvelope.contains(coveragePos)) {
             coverage.evaluate(coveragePos, elevation);
-            return elevation[0];
+            return elevation[0] * inputScale;
         } else {
             return 0;
         }
@@ -234,5 +269,10 @@ public class RasterDataSourceSampler {
             metersToNextPoint -= remainingLengthMeters;
         }
     }
+
+    public void setInputScale (double inputScale) {
+        this.inputScale = inputScale;
+    }
+
 
 }

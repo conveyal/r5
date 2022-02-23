@@ -14,6 +14,7 @@ import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.common.GeoJsonFeature;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.slf4j.Logger;
@@ -22,6 +23,8 @@ import spark.Request;
 import spark.Response;
 
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +32,7 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
@@ -94,6 +98,17 @@ public class DataSourceController implements HttpController {
         return "Deleted " + nDeleted;
     }
 
+    /** Return a Map that can be trivially converted to GeoJSON representing the data source on a map. */
+    private Map<String, Object> getDataSourcePreview (Request request, Response response) {
+        DataSource dataSource = getOneDataSourceById(request, response);
+        GeoJsonFeature feature = new GeoJsonFeature(geometryFactory.toGeometry(dataSource.wgsBounds.envelope()));
+        feature.addProperty("name", dataSource.name);
+        Map<String, Object> featureCollection = new HashMap<>(2);
+        featureCollection.put("type", "FeatureCollection");
+        featureCollection.put("features", List.of(feature));
+        return featureCollection;
+    }
+
     private SpatialDataSource downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
@@ -139,9 +154,11 @@ public class DataSourceController implements HttpController {
             sparkService.get("/", this::getAllDataSourcesForRegion, toJson);
             sparkService.get("/:_id", this::getOneDataSourceById, toJson);
             sparkService.delete("/:_id", this::deleteOneDataSourceById, toJson);
+            sparkService.get("/:_id/preview", this::getDataSourcePreview, toJson);
             sparkService.post("", this::handleUpload, toJson);
             // regionId will be in query parameter
             sparkService.post("/addLodesDataSource", this::downloadLODES, toJson);
         });
     }
+
 }

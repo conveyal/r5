@@ -156,6 +156,10 @@ public class ShapefileReader implements Closeable {
             }
             try {
                 // TODO does this leak beyond this function?
+                // FIXME this is rewriting the geometry of the feature but not changing the CRS that will be returned
+                //  by f.getDefaultGeometryProperty().getDescriptor().getCoordinateReferenceSystem()
+                // We should try to do this using a more standard GeoTools approach
+                f.getDefaultGeometryProperty().getDescriptor().getCoordinateReferenceSystem();
                 f.setDefaultGeometry(JTS.transform(g, transform));
             } catch (TransformException e) {
                 throw new RuntimeException(e);

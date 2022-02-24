@@ -13,38 +13,25 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.util.ShapefileReader;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.geotools.data.geojson.GeoJSONWriter;
-import org.geotools.feature.simple.SimpleFeatureBuilder;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
-import java.io.File;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.mongodb.client.model.Filters.eq;
@@ -121,7 +108,11 @@ public class DataSourceController implements HttpController {
         final var generator = new DataSourcePreviewGenerator(fileStorage);
         try {
             GeoJSONWriter gjw = new GeoJSONWriter(response.raw().getOutputStream());
-            for (SimpleFeature feature : generator.wgsPreviewFeatures(dataSource)) {
+            // GeoJsonWriter automatically reprojects to WGS84 from the source CRS.
+            // Known problem: our wgs84Stream transforms coordinates but does not change the CRS, so the features
+            // are double-projected upon writing to GeoJSON. All sources of features used here should provide accurate
+            // CRS on the features, or none at all if they're already in WGS84.
+            for (SimpleFeature feature : generator.previewFeatures(dataSource)) {
                 gjw.write(feature);
             }
             gjw.close();

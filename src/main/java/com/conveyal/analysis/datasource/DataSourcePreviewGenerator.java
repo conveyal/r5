@@ -4,16 +4,28 @@ import com.conveyal.analysis.models.DataSource;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.util.ShapefileReader;
+import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.io.AbstractGridFormat;
+import org.geotools.coverage.grid.io.GridCoverage2DReader;
+import org.geotools.coverage.grid.io.GridFormatFinder;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.geotools.util.factory.Hints;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,7 +36,17 @@ import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
 
+/**
+ * DataSource and SpatialDataSource are data model objects used to structure metadata in the database and HTTP API.
+ * They don't hold references to components like FileStorage, so should not have attached methods to retrieve and
+ * visualize files. It is more conventional for an HttpController or Component to hold a reference to the FileStorage
+ * component, which it supplies to this class to generate a preview from a DataSource.
+ */
 public class DataSourcePreviewGenerator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+    public static final int MAX_FEATURES_IN_PREVIEW = 1000;
 
     private FileStorage fileStorage;
 
@@ -32,21 +54,20 @@ public class DataSourcePreviewGenerator {
         this.fileStorage = fileStorage;
     }
 
+    /**
+     * There may be some advantage to supplying a full FeatureCollection to the GeoJsonWriter instead of individual
+     * features. To be explored.
+     */
     public SimpleFeatureCollection wgsPreviewFeatureCollection (DataSource dataSource) {
-        return null;
+        throw new UnsupportedOperationException();
     }
 
-    // DataSource and SpatialDataSource are data model objects used to structure metadata in the database.
-    // They don't hold references to file storage components so should not have attached methods to retrieve files.
-    // It is more conventional for an HttpController or Component to hold a reference to the FileStorage component.
     /**
-     * Return a list of JTS Geometries in WGS84 longitude-first CRS. These will serve as a preview for display on a
-     * map. The number of features should be less than 1000. The userData on the first geometry in the list will
-     * determine the schema. It must be null or a Map<String, Object>. The user data on all subsequent features must
-     * have the same fields and types. All geometries in the list must be of the same type.
-     * Nonstatic just to get access to the fileStorage (should preview generation be a separate component?)
+     * Return a list of GeoTools features that will serve as a preview for display on a map. The number of features
+     * not exceed 1000. The CRS should be set on these features' geometries, as they will all automatically be projected
+     * into longitude-first WGS84 when written to GeoJson by the GeoJsonWriter.
      */
-    public List<SimpleFeature> wgsPreviewFeatures (DataSource dataSource) {
+    public List<SimpleFeature> previewFeatures (DataSource dataSource) {
         if (dataSource.fileFormat == FileStorageFormat.SHP) {
             File file = fileStorage.getFile(dataSource.fileStorageKey());
             try {
@@ -54,8 +75,8 @@ public class DataSourcePreviewGenerator {
                 // Stream will not be exhausted due to limit(), make sure underlying iterator is closed.
                 // If this is modified to return a stream, the caller will need to (auto)close the stream.
                 List<SimpleFeature> features;
-                try (Stream<SimpleFeature> wgsStream = reader.wgs84Stream()) {
-                    features = wgsStream.limit(1000).collect(Collectors.toList());
+                try (Stream<SimpleFeature> wgsStream = reader.stream()) {
+                    features = wgsStream.limit(MAX_FEATURES_IN_PREVIEW).collect(Collectors.toList());
                 }
                 // Also close the store/file to release lock, but only after the stream and iterator are closed.
                 reader.close();
@@ -64,18 +85,48 @@ public class DataSourcePreviewGenerator {
                 throw new RuntimeException(ex);
             }
         } else {
-            List<Geometry> geometries = wgsPreviewGeometries(dataSource);
-            return wgsPreviewFeaturesFromGeometries(geometries);
+            List<Geometry> geometries = previewGeometries(dataSource);
+            return previewFeaturesFromGeometries(geometries);
         }
     }
 
-    // return geometries with userData rather than features, then convert them.
-    private static List<Geometry> wgsPreviewGeometries (DataSource dataSource) {
+    /**
+     * As a simplification when generating previews for some kinds of DataSources, return JTS Geometries rather than
+     * complete GeoTools features. These Geometries will be converted to features for serialization to GeoJSON.
+     * The userData on the first geometry in the list will determine the attribute schema. This userData must be null
+     * or a Map<String, Object>. The user data on all subsequent features must have the same fields and types.
+     * All geometries in the list must be of the same type. They must have their CRS set as they will automatically be
+     * reprojected into longitude-first WGS84 by GeoTools when it writes GeoJSON.
+     * @return geometries with a map of attributes in userData, which can be converted to GeoTools features.
+     */
+    private List<Geometry> previewGeometries (DataSource dataSource) {
+        if (dataSource.fileFormat == FileStorageFormat.GEOTIFF) {
+            try {
+                // FIXME this duplicates a lot of code in RasterDataSourceSampler, raster reading should be factored out.
+                File localRasterFile = fileStorage.getFile(dataSource.fileStorageKey());
+                AbstractGridFormat format = GridFormatFinder.findFormat(localRasterFile);
+                // Only relevant for certain files with WGS CRS?
+                Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
+                GridCoverage2DReader coverageReader = format.getReader(localRasterFile, hints);
+                GridCoverage2D coverage = coverageReader.read(null);
+                // Set CRS transform from WGS84 to coverage, if any.
+                CoordinateReferenceSystem crs = coverage.getCoordinateReferenceSystem2D();
+                MathTransform coverageToWgs = CRS.findMathTransform(crs, DefaultGeographicCRS.WGS84);
+                Polygon projectedPolygon = JTS.toPolygon(coverage.getEnvelope2D());
+                Geometry wgsGeometry = JTS.transform(projectedPolygon, coverageToWgs);
+                wgsGeometry.setUserData(Map.of("name", dataSource.name));
+                return List.of(wgsGeometry);
+            } catch (Exception e) {
+                throw new RuntimeException("Exception reading raster:", e);
+            }
+        }
         return defaultWgsPreviewGeometries(dataSource);
     }
 
-    // Fallback preview - return a single geometry, which is the bounding box of the DataSource.
-    // These may not be tight geographic bounds on the data set, because many CRS are not axis-aligned with WGS84.
+    /**
+     * Fallback preview - return a single geometry, which is the bounding box of the DataSource.
+     * These may not be tight geographic bounds on the data set, because many CRS are not axis-aligned with WGS84.
+     */
     private static List<Geometry> defaultWgsPreviewGeometries (DataSource dataSource) {
         Geometry geometry = geometryFactory.toGeometry(dataSource.wgsBounds.envelope());
         geometry.setUserData(Map.of(
@@ -85,8 +136,11 @@ public class DataSourcePreviewGenerator {
         return List.of(geometry);
     }
 
-    // TODO convert everything to streams instead of buffering into lists. This will requre peeking at the first geometry.
-    private static List<SimpleFeature> wgsPreviewFeaturesFromGeometries (List<? extends Geometry> geometries) {
+    /**
+     * Convert a list of JTS geometries into features for display, following rules explained on previewGeometries().
+     * TODO convert everything to streams instead of buffering into lists. Requires peeking at the first geometry.
+     */
+    private static List<SimpleFeature> previewFeaturesFromGeometries (List<? extends Geometry> geometries) {
         // GeoTools now has support for GeoJson but it appears to still be in flux.
         // GeoJsonDataStore seems to be only for reading.
         // DataUtilities.createType uses a spec entirely expressed as a String which is not ideal.

@@ -2,6 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.datasource.DataSourcePreviewGenerator;
 import com.conveyal.analysis.datasource.DataSourceUploadAction;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataSource;
@@ -12,36 +13,32 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.util.ShapefileReader;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
-import org.geotools.data.DataUtilities;
 import org.geotools.data.geojson.GeoJSONWriter;
-import org.geotools.feature.NameImpl;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.feature.type.AttributeDescriptorImpl;
-import org.geotools.feature.type.AttributeTypeImpl;
-import org.geotools.feature.type.GeometryDescriptorImpl;
-import org.geotools.feature.type.GeometryTypeImpl;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.feature.type.AttributeType;
-import org.opengis.feature.type.GeometryType;
-import org.opengis.feature.type.Name;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
+import java.io.File;
 import java.lang.invoke.MethodHandles;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
@@ -50,7 +47,6 @@ import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
@@ -121,46 +117,11 @@ public class DataSourceController implements HttpController {
      * in the data set and may exaggerate or distort some boundaries due to differences in coordinate system.
      */
     private Map<String, Object> getDataSourcePreview (Request request, Response response) {
-
         DataSource dataSource = getOneDataSourceById(request, response);
-
-        // GeoTools now has support for GeoJson but it appears to still be in flux.
-        // GeoJsonDataStore seems to be only for reading.
-        // DataUtilities.createType uses a spec entirely expressed as a String which is not ideal.
-        // Also, annoyingly, when using this method you can only force XY axis order with a global system property.
-        // https://docs.geotools.org/latest/userguide/library/referencing/order.html explains the situation and
-        // advises us to always create CRS programmatically, not with Strings. This can take you down a rabbit hole of
-        // using chains of verbose constructors and builders, but in fact the SimpleFeatureTypeBuilder has a
-        // strightforward add(String, Class) method which will respect the specified CRS when adding geometry types.
+        final var generator = new DataSourcePreviewGenerator(fileStorage);
         try {
-            // Check inputs and extract the first (exemplar) geometry to establish attribute schema.
-            List<? extends Geometry> featureGeometries = dataSource.wgsPreview();
-            checkArgument(notNullOrEmpty(featureGeometries));
-            Geometry exemplarGeometry = featureGeometries.get(0);
-            final SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
-            typeBuilder.setName("DataSource Preview");
-            typeBuilder.setCRS(DefaultGeographicCRS.WGS84); // This constant has (lon, lat) axis order used by R5.
-            typeBuilder.setDefaultGeometry("the_geom");
-            // Attributes are ordered in GeoTools, and can be set later by index number or add() call order.
-            typeBuilder.add(typeBuilder.getDefaultGeometry(), Polygon.class);
-            if (exemplarGeometry.getUserData() != null) {
-                ((Map<String, Object>) exemplarGeometry.getUserData()).forEach((k, v) -> {
-                    typeBuilder.add(k, v.getClass());
-                });
-            };
-            final SimpleFeatureType featureType = typeBuilder.buildFeatureType();
-            final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
-            // Call add() or addAll() in predetermined order. It's possible to set attributes out of order with set().
             GeoJSONWriter gjw = new GeoJSONWriter(response.raw().getOutputStream());
-            int featureNumber = 0;
-            for (Geometry geometry : dataSource.wgsPreview()) {
-                featureBuilder.add(geometry);
-                if (geometry.getUserData() != null) {
-                    ((Map<String, Object>) geometry.getUserData()).forEach((k, v) -> {
-                        featureBuilder.set(k, v);
-                    });
-                };
-                SimpleFeature feature = featureBuilder.buildFeature(Integer.toString(featureNumber++));
+            for (SimpleFeature feature : generator.wgsPreviewFeatures(dataSource)) {
                 gjw.write(feature);
             }
             gjw.close();

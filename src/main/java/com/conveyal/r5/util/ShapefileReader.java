@@ -72,16 +72,23 @@ public class ShapefileReader implements Closeable {
     }
 
     public Stream<SimpleFeature> stream () throws IOException {
+        // You have to actually close (or auto-close in try-with-resources) the stream to close this iterator.
+        // Just closing the store or file will generate an error - the iterator itself must be closed.
+        // This creates a lot of ugly manual resource-releasing code in the caller - maybe we should instead just
+        // track every iterator created and close them all when close() is called on the ShapefileReader.
+        final FeatureIterator<SimpleFeature> wrapped = features.features();
+
+        // This anonymous wrapper class exists only to close the iterator when iteration completes.
+        // There has to be a better way to do this, especially considering that it fails to close on partial iteration.
         Iterator<SimpleFeature> wrappedIterator = new Iterator<SimpleFeature>() {
-            FeatureIterator<SimpleFeature> wrapped = features.features();
 
             @Override
             public boolean hasNext () {
                 boolean hasNext = wrapped.hasNext();
                 if (!hasNext) {
                     // Prevent keeping a lock on the shapefile.
-                    // This doesn't help though when iteration is not completed. Ideally we need to keep a set of any
-                    // open iterators and close them all in the close method on the ShapefileReader.
+                    // This doesn't happen when iteration is not complete (e.g. via limit()).
+                    // The user of the stream should close() it, or use it in try-with-resources for auto-close.
                     wrapped.close();
                 }
                 return hasNext;
@@ -91,9 +98,13 @@ public class ShapefileReader implements Closeable {
             public SimpleFeature next () {
                 return wrapped.next();
             }
+
+            public void close () { wrapped.close(); }
         };
 
-        return StreamSupport.stream(Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED), false);
+        return StreamSupport.stream(
+                Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED), false
+        ).onClose(() -> wrapped.close());
     }
 
     public ReferencedEnvelope getBounds () throws IOException {

@@ -85,8 +85,8 @@ public class DataSourcePreviewGenerator {
                 throw new RuntimeException(ex);
             }
         } else {
-            List<Geometry> geometries = previewGeometries(dataSource);
-            return previewFeaturesFromGeometries(geometries);
+            List<Geometry> geometries = wgsPreviewGeometries(dataSource);
+            return previewFeaturesFromWgsGeometries(geometries);
         }
     }
 
@@ -95,14 +95,18 @@ public class DataSourcePreviewGenerator {
      * complete GeoTools features. These Geometries will be converted to features for serialization to GeoJSON.
      * The userData on the first geometry in the list will determine the attribute schema. This userData must be null
      * or a Map<String, Object>. The user data on all subsequent features must have the same fields and types.
-     * All geometries in the list must be of the same type. They must have their CRS set as they will automatically be
-     * reprojected into longitude-first WGS84 by GeoTools when it writes GeoJSON.
-     * @return geometries with a map of attributes in userData, which can be converted to GeoTools features.
+     * All geometries in the list must be of the same type. They must all be in longitude-first WGS84, as JTS
+     * geometries do not have rich CRS data associated with them and cannot be automatically reprojected by GeoTools
+     * when it writes GeoJSON.
+     * @return wgs84 geometries with a map of attributes in userData, which can be converted to GeoTools features.
      */
-    private List<Geometry> previewGeometries (DataSource dataSource) {
+    private List<Geometry> wgsPreviewGeometries (DataSource dataSource) {
         if (dataSource.fileFormat == FileStorageFormat.GEOTIFF) {
             try {
                 // FIXME this duplicates a lot of code in RasterDataSourceSampler, raster reading should be factored out.
+                // This is crazy verbose considering that we're taking an Envelope with CRS from a GeoTools object
+                // and have the final objective of turning it into a GeoTools feature, but we're passing through JTS
+                // where we lose the CRS information.
                 File localRasterFile = fileStorage.getFile(dataSource.fileStorageKey());
                 AbstractGridFormat format = GridFormatFinder.findFormat(localRasterFile);
                 // Only relevant for certain files with WGS CRS?
@@ -140,7 +144,7 @@ public class DataSourcePreviewGenerator {
      * Convert a list of JTS geometries into features for display, following rules explained on previewGeometries().
      * TODO convert everything to streams instead of buffering into lists. Requires peeking at the first geometry.
      */
-    private static List<SimpleFeature> previewFeaturesFromGeometries (List<? extends Geometry> geometries) {
+    private static List<SimpleFeature> previewFeaturesFromWgsGeometries (List<? extends Geometry> geometries) {
         // GeoTools now has support for GeoJson but it appears to still be in flux.
         // GeoJsonDataStore seems to be only for reading.
         // DataUtilities.createType uses a spec entirely expressed as a String which is not ideal.

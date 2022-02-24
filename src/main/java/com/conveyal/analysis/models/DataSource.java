@@ -6,11 +6,16 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+import org.locationtech.jts.geom.Geometry;
+import org.opengis.feature.simple.SimpleFeature;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
+import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 
 /**
  * This represents a file which was uploaded by the user and validated by the backend. Instances are persisted to Mongo.
@@ -74,6 +79,23 @@ public abstract class DataSource extends BaseModel {
 
     public FileStorageKey fileStorageKey () {
         return new FileStorageKey(FileCategory.DATASOURCES, _id.toString(), fileFormat.extension);
+    }
+
+    /**
+     * Return a list of JTS Geometries in WGS84 longitude-first CRS. These will serve as a preview for display on a
+     * map. The number of features should be less than 1000. The userData on the first geometry in the list will
+     * determine the schema. It must be null or a Map<String, Object>. The user data on all subsequent features must
+     * have the same fields and types. All geometries in the list must be of the same type.
+     * The default implementation returns a single feature, which is the bounding box of the DataSource.
+     * These may not be tight geographic bounds on the data set, because many CRS are not axis-aligned with WGS84.
+     */
+    public List<? extends Geometry> wgsPreview () {
+        Geometry geometry = geometryFactory.toGeometry(wgsBounds.envelope());
+        geometry.setUserData(Map.of(
+            "name", this.name,
+            "id", this._id.toString()
+        ));
+        return List.of(geometry);
     }
 
 }

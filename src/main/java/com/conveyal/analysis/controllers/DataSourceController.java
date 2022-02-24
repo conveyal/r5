@@ -48,6 +48,9 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
@@ -130,22 +133,37 @@ public class DataSourceController implements HttpController {
         // using chains of verbose constructors and builders, but in fact the SimpleFeatureTypeBuilder has a
         // strightforward add(String, Class) method which will respect the specified CRS when adding geometry types.
         try {
+            // Check inputs and extract the first (exemplar) geometry to establish attribute schema.
+            List<? extends Geometry> featureGeometries = dataSource.wgsPreview();
+            checkArgument(notNullOrEmpty(featureGeometries));
+            Geometry exemplarGeometry = featureGeometries.get(0);
             final SimpleFeatureTypeBuilder typeBuilder = new SimpleFeatureTypeBuilder();
             typeBuilder.setName("DataSource Preview");
             typeBuilder.setCRS(DefaultGeographicCRS.WGS84); // This constant has (lon, lat) axis order used by R5.
             typeBuilder.setDefaultGeometry("the_geom");
             // Attributes are ordered in GeoTools, and can be set later by index number or add() call order.
             typeBuilder.add(typeBuilder.getDefaultGeometry(), Polygon.class);
-            typeBuilder.add("name", String.class);
+            if (exemplarGeometry.getUserData() != null) {
+                ((Map<String, Object>) exemplarGeometry.getUserData()).forEach((k, v) -> {
+                    typeBuilder.add(k, v.getClass());
+                });
+            };
             final SimpleFeatureType featureType = typeBuilder.buildFeatureType();
             final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
             // Call add() or addAll() in predetermined order. It's possible to set attributes out of order with set().
-            Geometry geometry = geometryFactory.toGeometry(dataSource.wgsBounds.envelope());
-            featureBuilder.add(geometry);
-            featureBuilder.add(dataSource.name);
-            SimpleFeature feature = featureBuilder.buildFeature(dataSource._id.toString());
             GeoJSONWriter gjw = new GeoJSONWriter(response.raw().getOutputStream());
-            gjw.write(feature);
+            int featureNumber = 0;
+            for (Geometry geometry : dataSource.wgsPreview()) {
+                featureBuilder.add(geometry);
+                if (geometry.getUserData() != null) {
+                    ((Map<String, Object>) geometry.getUserData()).forEach((k, v) -> {
+                        featureBuilder.set(k, v);
+                    });
+                };
+                SimpleFeature feature = featureBuilder.buildFeature(Integer.toString(featureNumber++));
+                gjw.write(feature);
+            }
+            gjw.close();
         } catch (Exception e) {
             throw new RuntimeException("Failed to write GeoJSON DataSource preview:", e);
         }

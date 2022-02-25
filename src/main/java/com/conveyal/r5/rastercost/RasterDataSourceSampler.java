@@ -134,7 +134,7 @@ public class RasterDataSourceSampler {
             double lat = centerPositionWgs.getOrdinate(1);
             checkLat(lat);
             double cosLat = Math.cos(Math.toRadians(lat));
-            LOG.info("Center of raster is at WGS84 latitude {}, scaling longitude shift by {}.", cosLat);
+            LOG.info("Center of raster is at WGS84 latitude {}, scaling longitude shift by {}.", lat, cosLat);
             lonShiftDegrees = cosLat * eastShiftMeters / METERS_PER_DEGREE_LATITUDE;
             LOG.info("Longitude of sampled points will be shifted by {} degrees.", lonShiftDegrees);
         } catch (TransformException e) {

@@ -171,7 +171,7 @@ public class ElevationCostField implements CostField, Serializable {
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
         ElevationCostCalculator calculator = new MinettiCalculator();
         forEachElevationSegment(edge, calculator);
-        return calculator.weightedElevationFactor() * outputScale;
+        return 1 + (calculator.weightedElevationFactor() - 1) * outputScale;
     }
 
 }

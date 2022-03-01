@@ -13,6 +13,7 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
 import com.mongodb.client.result.DeleteResult;
@@ -24,7 +25,10 @@ import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
+import java.io.File;
+import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +36,6 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
@@ -99,14 +101,28 @@ public class DataSourceController implements HttpController {
         return "Deleted " + nDeleted;
     }
 
+    static final long MAX_GEOJSON_SIZE = 4 * 1024 * 1024; // 4 MB
+
     /**
      * Produces GeoJSON representing the data source on a map. For preview purposes only, may not contain all features
      * in the data set and may exaggerate or distort some boundaries due to differences in coordinate system.
      */
     private Map<String, Object> getDataSourcePreview (Request request, Response response) {
         DataSource dataSource = getOneDataSourceById(request, response);
-        final var generator = new DataSourcePreviewGenerator(fileStorage);
         try {
+            // Special case for small GeoJSON files: return the whole file as its preview.
+            // Use try-with-resources to auto-close the output stream when done.
+            // Otherwise Spark will append the text "null" when it sees the null return value, creating invalid JSON.
+            if (dataSource.fileFormat == FileStorageFormat.GEOJSON) {
+                File file = fileStorage.getFile(dataSource.fileStorageKey());
+                if (file.length() < MAX_GEOJSON_SIZE) {
+                    try (OutputStream out = response.raw().getOutputStream()) {
+                        Files.copy(file.toPath(), response.raw().getOutputStream());
+                    }
+                    return null;
+                }
+            }
+            final var generator = new DataSourcePreviewGenerator(fileStorage);
             GeoJSONWriter gjw = new GeoJSONWriter(response.raw().getOutputStream());
             // GeoJsonWriter automatically reprojects to WGS84 from the source CRS.
             // Known problem: our wgs84Stream transforms coordinates but does not change the CRS, so the features

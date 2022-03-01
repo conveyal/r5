@@ -39,8 +39,6 @@ public class ShapefileLts extends Modification {
 
     private File localFile;
 
-    ElevationLoader loader;
-
     @Override
     public boolean resolve (TransportNetwork network) {
         try {

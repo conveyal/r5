@@ -64,7 +64,7 @@ public class DataSourcePreviewGenerator {
 
     /**
      * Return a list of GeoTools features that will serve as a preview for display on a map. The number of features
-     * not exceed 1000. The CRS should be set on these features' geometries, as they will all automatically be projected
+     * not exceed MAX_FEATURES_IN_PREVIEW. The CRS should be set on these features' geometries, as they will all automatically be projected
      * into longitude-first WGS84 when written to GeoJson by the GeoJsonWriter.
      */
     public List<SimpleFeature> previewFeatures (DataSource dataSource) {

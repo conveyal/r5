@@ -238,7 +238,7 @@ public class TransportNetworkCache implements Component {
     }
 
     /**
-     * Build a network from a JSON TransportNetworkConfig in S3.
+     * Build a network from a JSON TransportNetworkConfig in file storage.
      * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */

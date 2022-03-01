@@ -39,30 +39,21 @@ import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Defines HTTP API endpoints to return Mapbox vector tiles of GTFS feeds known to the Analysis backend.
- * For the moment this is just a basic proof of concept.
- *
- * A basic example client for browsing the tiles is at src/main/resources/vector-client
- * For testing, find tile numbers with https://www.maptiler.com/google-maps-coordinates-tile-bounds-projection/
- * Examine and analyze individual tiles with https://observablehq.com/@henrythasler/mapbox-vector-tile-dissector
- *
- * The tile format specification is at https://github.com/mapbox/vector-tile-spec/tree/master/2.1
- * To summarize:
- * Extension should be .mvt and MIME content type application/vnd.mapbox-vector-tile
- * A Vector Tile represents data based on a square extent within a projection.
- * Vector Tiles may be used to represent data with any projection and tile extent scheme.
- * The reference projection is Web Mercator; the reference tile scheme is Google's.
- * The tile should not contain information about its bounds and projection.
- * The decoder already knows the bounds and projection of a Vector Tile it requested when decoding it.
- * A Vector Tile should contain at least one layer, and a layer should contain at least one feature.
- * Feature coordinates are integers relative to the top left of the tile.
- * The extent of a tile is the number of integer units across its width and height, typically 4096.
- *
- * TODO handle cancellation of HTTP requests (Mapbox client cancels requests when zooming/panning)
+ * Defines HTTP API endpoints to return Mapbox vector tiles of the street network. This is not simply the underlying
+ * OSM data, but the street edges created from that OSM data. This allows the user to verify how the OSM tags have
+ * been interpreted as mode permissions, speeds, etc. and eventually should allow visualizing the effets of scenarios
+ * on the street nework, includng scenarios that change the characteristics of street edges or create new streets.
+ * See GtfsVectorTileMaker for more information on the vector tile spec and tile numbers.
  */
 public class NetworkTileController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(NetworkTileController.class);
+
+    /**
+     * Complex street geometries will be simplified, but the geometry will not deviate from the original by more
+     * than this many tile units. These are minuscule at 1/4096 of the tile width or height.
+     */
+    private static final int LINE_SIMPLIFY_TOLERANCE = 5;
 
     /** The zoom level at which each StreetClass appears, indexed by StreetClass.code from 0...4. */
     private static final int[] zoomForStreetClass = new int[] {8, 10, 11, 12, 13};
@@ -166,6 +157,7 @@ public class NetworkTileController implements HttpController {
 
     // Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
     // and reducing number of points to keep tile size down.
+    // TODO Factor out of both tile generation classes
     private static Geometry clipScaleAndSimplify (Geometry wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
         CoordinateSequence wgsCoordinates = ((LineString) wgsGeometry).getCoordinateSequence();
         boolean[] coordInsideEnvelope = new boolean[wgsCoordinates.size()];
@@ -190,8 +182,7 @@ public class NetworkTileController implements HttpController {
         if (tileCoordinates.size() > 1) {
             LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates.toArray(new Coordinate[0]));
             DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
-            // TODO try higher tolerances, these are in tile pixels which are minuscule at 1/4096 of a tile
-            simplifier.setDistanceTolerance(5);
+            simplifier.setDistanceTolerance(LINE_SIMPLIFY_TOLERANCE);
             Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
             simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
             return simplifiedTileGeometry;

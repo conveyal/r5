@@ -31,10 +31,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Defines HTTP API endpoints to return Mapbox vector tiles of GTFS feeds known to the Analysis backend.
- * For the moment this is just a basic proof of concept.
+ * This class maintains a spatial index of data inside GTFS feeds and produces vector tiles of it for use as a
+ * preview display. It is used by GtfsController, which defines the associated HTTP endpoints.
  *
- * A basic example client for browsing the tiles is at src/main/resources/vector-client
  * For testing, find tile numbers with https://www.maptiler.com/google-maps-coordinates-tile-bounds-projection/
  * Examine and analyze individual tiles with https://observablehq.com/@henrythasler/mapbox-vector-tile-dissector
  *
@@ -52,11 +51,11 @@ import java.util.Objects;
  *
  * TODO handle cancellation of HTTP requests (Mapbox client cancels requests when zooming/panning)
  */
-public class GtfsTileController {
+public class GtfsVectorTileMaker {
 
-    private static final Logger LOG = LoggerFactory.getLogger(GtfsTileController.class);
+    private static final Logger LOG = LoggerFactory.getLogger(GtfsVectorTileMaker.class);
 
-    // FIXME Eviction.
+    // FIXME Eviction: initially just use a LoadingCache
     private final Map<String, STRtree> indexedShapes = new HashMap<>();
     private final Map<String, STRtree> indexedStops = new HashMap<>();
 

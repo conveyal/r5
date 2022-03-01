@@ -1,7 +1,6 @@
 package com.conveyal.analysis.models;
 
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Polygon;
 
 /**
  * Represents a bounding box in degrees in the HTTP API.

@@ -1,22 +1,17 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.analysis.components.WorkerComponents;
-import com.conveyal.file.FileStorageFormat;
-import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.rastercost.ElevationLoader;
-import com.conveyal.r5.rastercost.RasterDataSourceSampler;
+import com.conveyal.r5.rastercost.MinettiCalculator;
 import com.conveyal.r5.rastercost.SunLoader;
+import com.conveyal.r5.rastercost.ToblerCalculator;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
-import org.geotools.referencing.operation.builder.LocalizationGrid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.util.ArrayList;
 
-import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.MINETTI;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.SUN;
 import static com.conveyal.r5.analyst.scenario.RasterCost.CostFunction.TOBLER;
@@ -68,8 +63,10 @@ public class RasterCost extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        if (costFunction == TOBLER || costFunction == MINETTI) {
-            loader = new ElevationLoader(dataSourceId);
+        if (costFunction == TOBLER) {
+            loader = new ElevationLoader(dataSourceId, new ToblerCalculator());
+        } else if (costFunction == MINETTI) {
+            loader = new ElevationLoader(dataSourceId, new MinettiCalculator());
         } else if (costFunction == SUN) {
             loader = new SunLoader(dataSourceId);
         } else {

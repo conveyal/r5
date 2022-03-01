@@ -40,11 +40,22 @@ public class ElevationCostField implements CostField, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);
 
+    /**
+     * This is actually independent of inputScale. It's an attempt to keep the storage of elevation data down to a
+     * reasonable size since we are keeping a profile for every edge just to facilitate splitting them. Note that
+     * vertexElevationsDecimeters is a TShortList and elevationProfilesDecimeters contains short arrays, so all our
+     * elevation measurements take half as much space as 32 bit ints or a quarter as much as double precision floats.
+     * 2^15/10 meters is enough to store all elevations outside very high mountain passes. This may be considered
+     * premature or misguided optimization, its effectiveness should be evaluated.
+     */
     public static final double DECIMETERS_PER_METER = 10;
 
-    private double outputScale = 1;
+    private final ElevationCostCalculator costCalculator;
 
-    public ElevationCostField (double outputScale) {
+    private final double outputScale;
+
+    public ElevationCostField (ElevationCostCalculator costCalculator, double outputScale) {
+        this.costCalculator = costCalculator;
         this.outputScale = outputScale;
     }
 
@@ -155,11 +166,13 @@ public class ElevationCostField implements CostField, Serializable {
     }
 
     /**
-     * Computing and averaging Tobler factors is extremely fast, on the order of 2 million edges per second.
+     * Computing and averaging edge speed factors is extremely fast, on the order of 2 million edges per second.
      * It might be nice to bundle this into elevation sampling, but that's performed as a stream operation
-     * and there's no straightforward way to return both the profile and Tobler average.
+     * and there's no straightforward way to return both the profile and speed factor together.
+     * FIXME the ElevationCostCalculators are not threadsafe. They are curently used single-threaded in scenario or
+     *       network builds. But if used in parallel requests at runtime, they'll need to be created on each operation.
      */
-    public void computeWeightedAverages (EdgeStore edgeStore) {
+    public synchronized void computeWeightedAverages (EdgeStore edgeStore) {
         edgeFactors = new TFloatArrayList(edgeStore.nEdges());
         EdgeStore.Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); ++e) {
@@ -169,9 +182,8 @@ public class ElevationCostField implements CostField, Serializable {
     }
 
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
-        ElevationCostCalculator calculator = new MinettiCalculator();
-        forEachElevationSegment(edge, calculator);
-        return 1 + (calculator.weightedElevationFactor() - 1) * outputScale;
+        forEachElevationSegment(edge, costCalculator);
+        return 1 + (costCalculator.weightedElevationFactor() - 1) * outputScale;
     }
 
 }

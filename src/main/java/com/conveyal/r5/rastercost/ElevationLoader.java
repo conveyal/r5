@@ -1,5 +1,6 @@
 package com.conveyal.r5.rastercost;
 
+import com.conveyal.r5.rastercost.ElevationCostField.ElevationCostCalculator;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
@@ -27,14 +28,17 @@ public class ElevationLoader implements CostField.Loader {
 
     public static final double ELEVATION_SAMPLE_SPACING_METERS = 10;
 
+    private final ElevationCostCalculator costCalculator;
+
     private final RasterDataSourceSampler rasterSampler;
 
     private double outputScale;
 
-    public ElevationLoader (String dataSourceId) {
+    public ElevationLoader (String dataSourceId, ElevationCostCalculator costCalculator) {
         // It could be useful to be able to configure interpolation.
         // We never want it for the 1/0 tree shade raster, but may or may not want it for elevation.
         this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, false);
+        this.costCalculator = costCalculator;
     }
 
     @Override
@@ -42,10 +46,7 @@ public class ElevationLoader implements CostField.Loader {
         // For debugging: To check out in the debugger which ImageII implementations were loaded.
         // IIORegistry registry = IIORegistry.getDefaultInstance();
 
-        // DEVELOPMENT HACK: load only the first N edges to speed up loading.
-        // final int nEdgePairsToLoad = 50_000; // streets.edgeStore.nEdgePairs();
-
-        ElevationCostField result = new ElevationCostField(outputScale);
+        ElevationCostField result = new ElevationCostField(costCalculator, outputScale);
 
         final LambdaCounter vertexCounter = new LambdaCounter(LOG, streets.vertexStore.getVertexCount(), 100_000,
                 "Added elevation to {} of {} vertices.");

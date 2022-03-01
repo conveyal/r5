@@ -6,16 +6,11 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-import org.locationtech.jts.geom.Geometry;
-import org.opengis.feature.simple.SimpleFeature;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
-import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 
 /**
  * This represents a file which was uploaded by the user and validated by the backend. Instances are persisted to Mongo.

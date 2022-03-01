@@ -9,6 +9,7 @@ import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
@@ -291,6 +292,9 @@ public class TransportNetworkCache implements Component {
             // This is applying the modifications _without creating a scenario copy_.
             // This will destructively edit the network and will only work for certain modifications.
             for (Modification modification : config.modifications) {
+                if (!(modification instanceof RasterCost)) {
+                    throw new UnsupportedOperationException("Only RasterCost has been evaluated for application at network build time.");
+                }
                 modification.resolve(network);
                 modification.apply(network);
             }

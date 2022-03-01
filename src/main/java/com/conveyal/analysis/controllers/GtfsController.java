@@ -27,20 +27,23 @@ import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
- * Controller for retrieving data from the GTFS cache.
+ * Controller for retrieving contents of GTFS feeds that have been converted to MapDB files via the GTFS cache.
  *
  * Each endpoint starts with it's `feedGroupId` and `feedId` for retrieving the feed from the cache. No database
  * interaction is done. This assumes that if the user is logged in and retrieving the feed by the appropriate ID then
  * they have access to it, without checking the access group. This setup will allow for putting this endpoint behind a
  * CDN in the future. Everything retrieved is immutable. Once it's retrieved and stored in the CDN, it doesn't need to
  * be pulled from the cache again.
+ *
+ * Also defines HTTP API endpoints to return Mapbox vector tiles of GTFS feeds known to the Analysis backend.
+ * A basic example client for browsing the tiles is at src/main/resources/vector-client
  */
 public class GtfsController implements HttpController {
     private final GTFSCache gtfsCache;
-    private final GtfsTileController gtfsTileController;
+    private final GtfsVectorTileMaker gtfsVectorTileMaker;
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-        this.gtfsTileController = new GtfsTileController();
+        this.gtfsVectorTileMaker = new GtfsVectorTileMaker();
     }
 
     private static class BaseApiResponse {
@@ -187,7 +190,7 @@ public class GtfsController implements HttpController {
         final int z = Integer.parseInt(req.params("z"));
         final int x = Integer.parseInt(req.params("x"));
         final int y = Integer.parseInt(req.params("y"));
-        byte[] pbfMessage = this.gtfsTileController.getTile(id, feed, z, x, y);
+        byte[] pbfMessage = this.gtfsVectorTileMaker.getTile(id, feed, z, x, y);
         res.header("Content-Type", "application/vnd.mapbox-vector-tile");
         res.header("Content-Encoding", "gzip");
         res.status(OK_200);

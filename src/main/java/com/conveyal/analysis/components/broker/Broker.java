@@ -400,7 +400,7 @@ public class Broker implements Component {
 
     /**
      * Given a worker commit ID and transport network, return the IP or DNS name of a worker that has that software
-     * and network already loaded. If none exist, return null and try to start one.
+     * and network already loaded. If none exist, return null. The caller can then try to start one.
      */
     public synchronized String getWorkerAddress(WorkerCategory workerCategory) {
         if (config.offline()) {

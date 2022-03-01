@@ -116,7 +116,8 @@ public class WorkerProxyController implements HttpController {
     }
 
     /**
-     * Simple endpoint for checking if a worker exists.
+     * HTTP handler that checks whether a worker exists in the category specified in the request parameters.
+     * If the client discovers that no worker exists it can take an action to ensure one starts up.
      */
     private Object getWorkerStatus (Request request, Response response) {
         final String bundleId = request.params("bundleId");

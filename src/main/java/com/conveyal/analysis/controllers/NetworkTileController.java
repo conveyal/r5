@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.conveyal.analysis.controllers.GtfsVectorTileMaker.clipScaleAndSimplify;
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
 import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
@@ -125,7 +126,7 @@ public class NetworkTileController implements HttpController {
             if (zTile < zoomForStreetClass[edge.getStreetClassCode()]) {
                 return true; // Continue iteration.
             }
-            Geometry edgeGeometry = edge.getGeometry();
+            LineString edgeGeometry = edge.getGeometry();
             edgeGeometry.setUserData(edge.attributesForDisplay());
             edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));
             // The index contains only forward edges in each pair. Also include the backward edges.
@@ -152,42 +153,6 @@ public class NetworkTileController implements HttpController {
             return pbfMessage;
         } else {
             return new byte[]{};
-        }
-    }
-
-    // Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
-    // and reducing number of points to keep tile size down.
-    // TODO Factor out of both tile generation classes
-    private static Geometry clipScaleAndSimplify (Geometry wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
-        CoordinateSequence wgsCoordinates = ((LineString) wgsGeometry).getCoordinateSequence();
-        boolean[] coordInsideEnvelope = new boolean[wgsCoordinates.size()];
-        for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-            coordInsideEnvelope[c] = wgsEnvelope.contains(wgsCoordinates.getCoordinate(c));
-        }
-        List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
-        for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-            boolean prevInside = (c > 0) ? coordInsideEnvelope[c-1] : false;
-            boolean nextInside = (c < coordInsideEnvelope.length - 1) ? coordInsideEnvelope[c+1] : false;
-            boolean thisInside = coordInsideEnvelope[c];
-            if (thisInside || prevInside || nextInside) {
-                Coordinate coord = wgsCoordinates.getCoordinateCopy(c);
-                // JtsAdapter.createTileGeom clips and uses full JTS math transform and is much too slow.
-                // The following seems sufficient - tile edges should be parallel to lines of latitude and longitude.
-                coord.x = ((coord.x - wgsEnvelope.getMinX()) * tileExtent) / wgsEnvelope.getWidth();
-                coord.y = ((wgsEnvelope.getMaxY() - coord.y) * tileExtent) / wgsEnvelope.getHeight();
-                tileCoordinates.add(coord);
-                // TODO handle exit and re-enter by splitting into multiple linestrings
-            }
-        }
-        if (tileCoordinates.size() > 1) {
-            LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates.toArray(new Coordinate[0]));
-            DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
-            simplifier.setDistanceTolerance(LINE_SIMPLIFY_TOLERANCE);
-            Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
-            simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
-            return simplifiedTileGeometry;
-        } else {
-            return null;
         }
     }
 

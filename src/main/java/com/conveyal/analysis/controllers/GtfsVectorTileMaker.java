@@ -55,6 +55,12 @@ public class GtfsVectorTileMaker {
 
     private static final Logger LOG = LoggerFactory.getLogger(GtfsVectorTileMaker.class);
 
+    /**
+     * Complex street geometries will be simplified, but the geometry will not deviate from the original by more
+     * than this many tile units. These are minuscule at 1/4096 of the tile width or height.
+     */
+    private static final int LINE_SIMPLIFY_TOLERANCE = 5;
+
     // FIXME Eviction: initially just use a LoadingCache
     private final Map<String, STRtree> indexedShapes = new HashMap<>();
     private final Map<String, STRtree> indexedStops = new HashMap<>();
@@ -164,9 +170,12 @@ public class GtfsVectorTileMaker {
     }
 
 
-    // Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
-    // and reducing number of points to keep tile size down.
-    private static Geometry clipScaleAndSimplify (LineString wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
+    /**
+     * Utility method reusable in other classes that produce vector tiles.
+     * Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
+     * and reducing number of points to keep tile size down.
+     */
+    public static Geometry clipScaleAndSimplify (LineString wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
         CoordinateSequence wgsCoordinates = wgsGeometry.getCoordinateSequence();
         boolean[] coordInsideEnvelope = new boolean[wgsCoordinates.size()];
         for (int c = 0; c < wgsCoordinates.size(); c += 1) {
@@ -190,7 +199,7 @@ public class GtfsVectorTileMaker {
         if (tileCoordinates.size() > 1) {
             LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates.toArray(new Coordinate[0]));
             DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
-            simplifier.setDistanceTolerance(1);
+            simplifier.setDistanceTolerance(LINE_SIMPLIFY_TOLERANCE);
             Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
             simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
             return simplifiedTileGeometry;

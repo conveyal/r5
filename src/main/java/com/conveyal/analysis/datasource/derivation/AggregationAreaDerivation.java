@@ -134,9 +134,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             // On a newly started backend, we can't be sure any sidecar files are on the local filesystem.
             // We may want to factor this out when we use shapefile DataSources in other derivations.
             String baseName = spatialDataSource._id.toString();
-            prefetchDataSource(baseName, "dbf");
-            prefetchDataSource(baseName, "shx");
-            prefetchDataSource(baseName, "prj");
+            prefetchShpSidecarFiles(baseName, fileStorage);
             sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
             // Reading the shapefile into a list may actually take a moment, should this be done in the async part?
             try (ShapefileReader reader = new ShapefileReader(sourceFile)) {
@@ -157,8 +155,14 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         }
     }
 
+    public static void prefetchShpSidecarFiles (String baseName, FileStorage fileStorage) {
+        prefetchDataSource(baseName, "dbf", fileStorage);
+        prefetchDataSource(baseName, "shx", fileStorage);
+        prefetchDataSource(baseName, "prj", fileStorage);
+    }
+
     /** Used primarily for shapefiles where we can't be sure whether all sidecar files have been synced locally. */
-    private void prefetchDataSource (String baseName, String extension) {
+    private static void prefetchDataSource (String baseName, String extension, FileStorage fileStorage) {
         FileStorageKey key = new FileStorageKey(FileCategory.DATASOURCES, baseName, extension);
         // We need to clarify the FileStorage API on which calls cause the file to be synced locally, and whether these
         // getFile tolerates getting files that do not exist. This may all become irrelevant if we use NFS.

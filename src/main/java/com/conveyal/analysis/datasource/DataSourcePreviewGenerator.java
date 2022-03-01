@@ -26,12 +26,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.conveyal.analysis.datasource.derivation.AggregationAreaDerivation.prefetchShpSidecarFiles;
 import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -69,6 +71,9 @@ public class DataSourcePreviewGenerator {
      */
     public List<SimpleFeature> previewFeatures (DataSource dataSource) {
         if (dataSource.fileFormat == FileStorageFormat.SHP) {
+            // Factor this process of getting and opening the shapefile for iteration out of
+            // This preview generator and the AggregationAreaDerivation.
+            prefetchShpSidecarFiles(dataSource._id.toString(), fileStorage);
             File file = fileStorage.getFile(dataSource.fileStorageKey());
             try {
                 ShapefileReader reader = new ShapefileReader(file);

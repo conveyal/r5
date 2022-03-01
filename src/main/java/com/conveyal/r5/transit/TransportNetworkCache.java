@@ -11,6 +11,7 @@ import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
@@ -285,6 +286,9 @@ public class TransportNetworkCache implements Component {
         transferFinder.findParkRideTransfer();
 
         // Apply modifications embedded in the TransportNetworkConfig JSON
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
+                RasterCost.class, ShapefileLts.class
+        );
         if (config.modifications != null) {
             // Scenario scenario = new Scenario();
             // scenario.modifications = config.modifications;
@@ -292,8 +296,11 @@ public class TransportNetworkCache implements Component {
             // This is applying the modifications _without creating a scenario copy_.
             // This will destructively edit the network and will only work for certain modifications.
             for (Modification modification : config.modifications) {
-                if (!(modification instanceof RasterCost)) {
-                    throw new UnsupportedOperationException("Only RasterCost has been evaluated for application at network build time.");
+                if (!ACCEPT_MODIFICATIONS.contains(modification.getClass())) {
+                    throw new UnsupportedOperationException(
+                        "Modification type has not been evaluated for application at network build time:" +
+                        modification.getClass().toString()
+                    );
                 }
                 modification.resolve(network);
                 modification.apply(network);

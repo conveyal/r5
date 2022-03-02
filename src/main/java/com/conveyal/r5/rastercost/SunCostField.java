@@ -36,6 +36,8 @@ public class SunCostField implements CostField, Serializable {
 
     /** For each edge in the network, a BitSet containing the sun/shade profile sampled every N meters along the edge. */
     List<BitSet> sunOnEdge = new ArrayList<>();
+
+    /** These could probably be made 4x smaller by storing them in bytes, to be measured. */
     TFloatList sunProportions = new TFloatArrayList();
 
     /** Multiplicative factor applied to traversal time in the sun (as opposed to 1.0 for traversing in shade). */
@@ -48,11 +50,16 @@ public class SunCostField implements CostField, Serializable {
         this.sampleSpacingMeters = sampleSpacingMeters;
     }
 
+    /** @return a multiplicative factor that makes an edge feel shorter (0..<1) longer (>1) or the same (1). */
+    private double getSunFactor (int edgeIndex) {
+        float sunProportion = sunProportions.get(edgeIndex / 2);
+        double sunFactor = (1.0D - sunProportion) + (sunProportion * sunPenalty);
+        return sunFactor;
+    }
+
     @Override
     public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        float sunProportion = sunProportions.get(currentEdge.getEdgeIndex() / 2);
-        double sunFactor = (1.0D - sunProportion) + (sunProportion * sunPenalty);
-        // System.out.println("sun factor " + sunFactor);
+        double sunFactor = getSunFactor(currentEdge.getEdgeIndex());
         return (int) Math.round(sunFactor  * traversalTimeSeconds);
     }
 
@@ -63,7 +70,7 @@ public class SunCostField implements CostField, Serializable {
 
     @Override
     public double getDisplayValue (int edgeIndex) {
-        return sunProportions.get(edgeIndex / 2);
+        return getSunFactor(edgeIndex);
     }
 
 }

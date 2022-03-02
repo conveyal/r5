@@ -1,23 +1,13 @@
 package com.conveyal.r5.rastercost;
 
 import com.conveyal.r5.streets.EdgeStore;
-import com.esotericsoftware.minlog.Log;
 import gnu.trove.list.TFloatList;
-import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TFloatArrayList;
-import gnu.trove.list.array.TIntArrayList;
-import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.coverage.grid.io.GridFormatFinder;
-import org.geotools.util.factory.Hints;
 
-import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-
-import static com.conveyal.r5.analyst.Grid.LOG;
 
 /**
  * Represents the additional cost of traversing edges that are not shaded from the sun.
@@ -37,10 +27,19 @@ public class SunCostField implements CostField, Serializable {
     /** For each edge in the network, a BitSet containing the sun/shade profile sampled every N meters along the edge. */
     List<BitSet> sunOnEdge = new ArrayList<>();
 
-    /** These could probably be made 4x smaller by storing them in bytes, to be measured. */
+    /**
+     * Number in the range 0...1 representing the proportion of each edge pair that is in the shade.
+     * Floating point numbers are densest in this range, so 32 bits are more than sufficent.
+     * These could probably be made 2-4x smaller by storing them in shorts or bytes; we should measure this.
+     */
     TFloatList sunProportions = new TFloatArrayList();
 
-    /** Multiplicative factor applied to traversal time in the sun (as opposed to 1.0 for traversing in shade). */
+    /**
+     * Multiplicative factor applied to traversal time to determine extra cost of traversing in sun instead of shade.
+     * 0.5 will make walking in the sun feel 1.5x worse than walking in the shade. Negative numbers with absolute
+     * value less than 1 also work: -0.5 will penalize shade such that walking in the sun is twice as good as walking
+     * in the shade.
+     */
     private final double sunPenalty;
 
     private final double sampleSpacingMeters;
@@ -50,17 +49,20 @@ public class SunCostField implements CostField, Serializable {
         this.sampleSpacingMeters = sampleSpacingMeters;
     }
 
-    /** @return a multiplicative factor that makes an edge feel shorter (0..<1) longer (>1) or the same (1). */
+    /**
+     * TODO sunPenalty could be pre-multiplied into sunProportion, making this method unnecessary.
+     * @return a multiplicative factor for a particular edge to yield the extra cost due to sun.
+     */
     private double getSunFactor (int edgeIndex) {
         float sunProportion = sunProportions.get(edgeIndex / 2);
-        double sunFactor = (1.0D - sunProportion) + (sunProportion * sunPenalty);
+        double sunFactor = sunProportion * sunPenalty;
         return sunFactor;
     }
 
     @Override
-    public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
+    public int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
         double sunFactor = getSunFactor(currentEdge.getEdgeIndex());
-        return (int) Math.round(sunFactor  * traversalTimeSeconds);
+        return (int) Math.round(sunFactor * traversalTimeSeconds);
     }
 
     @Override

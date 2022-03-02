@@ -60,8 +60,8 @@ public class ElevationCostField implements CostField, Serializable {
     }
 
     @Override
-    public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        return (int) Math.round(traversalTimeSeconds * factorForEdge(currentEdge));
+    public int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
+        return (int) Math.round(traversalTimeSeconds * (factorForEdge(currentEdge) - 1));
     }
 
     @Override

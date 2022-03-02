@@ -8,6 +8,7 @@ import gnu.trove.list.array.TFloatArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,9 +18,9 @@ import java.util.stream.IntStream;
  * This reuses the same raster sampler as the ElevationLoader to sample at very high resolution (1 meter) and return
  * arrays of doubles which will then be re-interpreted as true or false (nonzero or zero).
  */
-public class SunLoader implements CostField.Loader {
+public class SunLoader implements CostField.Loader<SunCostField> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(SunLoader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     /** If the input contains shade rather than sun, then boolean values must be inverted. */
     private final boolean invert = true;
@@ -33,7 +34,7 @@ public class SunLoader implements CostField.Loader {
     }
 
     @Override
-    public CostField load (StreetLayer streets) {
+    public SunCostField load (StreetLayer streets) {
         final LambdaCounter edgeCounter = new LambdaCounter(LOG, streets.edgeStore.nEdgePairs(), 100_000,
                 "Sampled sun/shade for {} of {} edge pairs.");
 

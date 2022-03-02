@@ -23,6 +23,12 @@ public class ToblerCalculator implements ElevationCostField.ElevationCostCalcula
     }
 
     @Override
+    public void reset () {
+        weightedToblerSum = 0;
+        xDistance = 0;
+    }
+
+    @Override
     public void consumeElevationSegment (int index, double xMeters, double yMeters) {
         weightedToblerSum += xMeters * tobler(xMeters, yMeters);
         xDistance += xMeters;

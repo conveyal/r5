@@ -1161,6 +1161,10 @@ public class EdgeStore implements Serializable {
             map.put("pedestrian", getFlag(EdgeFlag.ALLOWS_PEDESTRIAN));
             map.put("bike", getFlag(EdgeFlag.ALLOWS_BIKE));
             map.put("car", getFlag(EdgeFlag.ALLOWS_CAR));
+            if (edgeTraversalTimes != null) {
+                map.put("walkTimeFactor", edgeTraversalTimes.getWalkTimeFactor(edgeIndex));
+                map.put("bikeTimeFactor", edgeTraversalTimes.getBikeTimeFactor(edgeIndex));
+            }
             if (costFields != null) {
                 for (CostField costField : costFields) {
                     map.put(costField.getDisplayKey(), costField.getDisplayValue(edgeIndex));

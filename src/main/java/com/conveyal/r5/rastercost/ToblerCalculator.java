@@ -38,6 +38,7 @@ public class ToblerCalculator implements ElevationCostField.ElevationCostCalcula
      * Return a travel time multiplier for the entire edge, a weighted sum of the factors for all segments.
      * This is inverted, as Tobler produces speed units and we want a time or effort multiplier.
      */
+    @Override
     public double weightedElevationFactor () {
         return 1 / (weightedToblerSum / xDistance);
     }

@@ -30,6 +30,12 @@ public class MinettiCalculator implements ElevationCostField.ElevationCostCalcul
     private double xDistance = 0;
 
     @Override
+    public void reset () {
+        weightedSum = 0;
+        xDistance = 0;
+    }
+
+    @Override
     public void consumeElevationSegment (int index, double xMeters, double yMeters) {
         weightedSum += xMeters * minettiCwi(xMeters, yMeters);
         xDistance += xMeters;

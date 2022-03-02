@@ -112,6 +112,7 @@ public class ElevationCostField implements CostField, Serializable {
      * but it works fine for a memoryless difficulty scaling function like the Tobler hiking function.
      */
     public void forEachElevationSegment (EdgeStore.Edge edge, ElevationSegmentConsumer consumer) {
+        consumer.reset(); // Zero out any state from previous usage of the instance.
         double remainingMeters = edge.getLengthM();
         // Do not go through getFromVertex method because we do not currently truly reverse edges.
         // This is only to keep the iteration logic below simple until we actually need reverse iteration.
@@ -149,10 +150,12 @@ public class ElevationCostField implements CostField, Serializable {
     /**
      * A functional interface that consumes segments in a street edge's elevation profile one by one.
      * Each segment is represented as a distance across the ground (always positive) and a signed vertical change.
-     * Both values are in meters.
+     * Both values are in meters. The reset() function allows consumer instances to be reused, which could lead to
+     * thread safety issues. Considering how efficient Java garbage collection has become, we may want to change this
+     * and require one instance per calculation with no reset().
      */
-    @FunctionalInterface
     public interface ElevationSegmentConsumer {
+        void reset ();
         void consumeElevationSegment (int index, double xMeters, double yMeters);
     }
 

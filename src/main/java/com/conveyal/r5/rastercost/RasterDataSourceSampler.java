@@ -113,7 +113,9 @@ public class RasterDataSourceSampler {
         checkArgument(northShiftMeters > -20 && northShiftMeters < 20, "northShiftMeters should be in range (-20...20).");
         // this.northShiftMeters = northShiftMeters;
         latShiftDegrees = northShiftMeters / METERS_PER_DEGREE_LATITUDE;
-        LOG.info("Latitude of sampled points will be shifted by {} degrees.", latShiftDegrees);
+        if (latShiftDegrees != 0) {
+            LOG.info("Latitude of sampled points will be shifted by {} degrees.", latShiftDegrees);
+        }
     }
 
     /**

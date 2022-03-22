@@ -22,10 +22,15 @@ import java.util.List;
 public interface CostField {
 
     /**
-     * TODO perhaps this and the base traversal time function should all return doubles, which are rounded only
-     *   once after they have all been applied.
+     * Return a number of (perceived) seconds to add or subtract from the baseTraversalTimeSeconds due to an additional
+     * consideration such as elevation change or sun or noise exposure. This is typically computed by multiplying the
+     * base traversal time by a per-edge factor, but other approaches may be used. Negative values may be returned,
+     * but if the sum of additionalTraversalTimeSeconds for all different CostFields yields a negative overall
+     * traversal time for an edge during routing, this time will be clamped to the smallest allowed value (1 second).
+     * TODO This and the base traversal time function could all return doubles, which are rounded only once after they
+     *      have all been summed. This should reduce roundoff error.
      */
-    int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds);
+    int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int baseTraversalTimeSeconds);
 
     /**
      * A unique name to identify this cost field for display on a map. It should be usable as a JSON key, so it should
@@ -35,16 +40,17 @@ public interface CostField {
 
     /**
      * Returns a length-independent value associated with a particular edge for the purpose of display on a map.
+     * Typically a multiplier that this class applies to the base traversal cost to find additional traversal cost.
      */
     double getDisplayValue (int edgeIndex);
 
     /** Interface for classes that create a CostField for a given StreetLayer, usually by overlaying a raster file. */
-    interface Loader {
+    interface Loader<T extends CostField> {
         void setNorthShiftMeters (double northShiftMeters);
         void setEastShiftMeters (double eastShiftMeters);
         void setInputScale (double inputScale);
         void setOutputScale (double outputScale);
-        CostField load (StreetLayer streets);
+        T load (StreetLayer streets);
     }
 
 }

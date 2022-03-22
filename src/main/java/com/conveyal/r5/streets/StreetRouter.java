@@ -302,6 +302,7 @@ public class StreetRouter {
             // TODO either: 1) don't hardwire drive-on-right, or 2) global https://en.wikipedia.org/wiki/Dagen_H
             this.timeCalculator = new BasicTraversalTimeCalculator(streetLayer, true);
         }
+        // If any additional costs such as hills or sun are defined, add them on to the base traversal times.
         if (notNullOrEmpty(streetLayer.edgeStore.costFields)) {
             this.timeCalculator = new MultistageTraversalTimeCalculator(this.timeCalculator, streetLayer.edgeStore.costFields);
         }

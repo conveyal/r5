@@ -42,10 +42,10 @@ public class MinettiCalculator implements ElevationCostField.ElevationCostCalcul
     }
 
     /** Return a travel time multiplier for the entire edge, a weighted sum of the factors for all segments. */
+    @Override
     public double weightedElevationFactor () {
         return weightedSum / xDistance;
     }
-
 
     public static double minettiCwi (double dx, double dy) {
         double gradient = dy/dx;

@@ -147,9 +147,8 @@ public class NetworkTileController implements HttpController {
             JtsMvt mvt = new JtsMvt(edgeLayer);
             MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
             byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
-
-            LOG.info("getTile({}, {}, {}, {}) in {}", network.scenarioId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
-
+            LOG.debug("getTile({}, {}, {}, {}) in {}", network.scenarioId, zTile, xTile, yTile,
+                    Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
             return pbfMessage;
         } else {
             return new byte[]{};

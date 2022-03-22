@@ -9,6 +9,7 @@ import gnu.trove.list.array.TShortArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -20,9 +21,9 @@ import static com.conveyal.r5.rastercost.ElevationCostField.DECIMETERS_PER_METER
  *
  * Does geotools support mosaicing coverages together?
  */
-public class ElevationLoader implements CostField.Loader {
+public class ElevationLoader implements CostField.Loader<ElevationCostField> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ElevationLoader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     public static final short[] EMPTY_SHORT_ARRAY = new short[0];
 

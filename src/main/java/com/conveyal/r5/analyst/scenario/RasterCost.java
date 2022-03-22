@@ -69,15 +69,17 @@ public class RasterCost extends Modification {
             loader = new ElevationLoader(dataSourceId, new MinettiCalculator());
         } else if (costFunction == SUN) {
             loader = new SunLoader(dataSourceId);
-        } else {
-            errors.add("Unrecognized cost function: " + costFunction);
         }
-        loader.setNorthShiftMeters(northShiftMeters);
-        loader.setEastShiftMeters(eastShiftMeters);
-        checkScaleRange(inputScale);
-        checkScaleRange(outputScale);
-        loader.setInputScale(inputScale);
-        loader.setOutputScale(outputScale);
+        if (loader == null) {
+            errors.add("Unrecognized cost function: " + costFunction);
+        } else {
+            loader.setNorthShiftMeters(northShiftMeters);
+            loader.setEastShiftMeters(eastShiftMeters);
+            checkScaleRange(inputScale);
+            checkScaleRange(outputScale);
+            loader.setInputScale(inputScale);
+            loader.setOutputScale(outputScale);
+        }
         return errors.size() > 0;
     }
 

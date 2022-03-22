@@ -60,8 +60,8 @@ public class ElevationCostField implements CostField, Serializable {
     }
 
     @Override
-    public int transformTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
-        return (int) Math.round(traversalTimeSeconds * factorForEdge(currentEdge));
+    public int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
+        return (int) Math.round(traversalTimeSeconds * edgeFactors.get(currentEdge.getEdgeIndex()));
     }
 
     @Override
@@ -98,12 +98,10 @@ public class ElevationCostField implements CostField, Serializable {
      * For each edge in the network (not edge pair), a traversal time multiplier.
      * This multiplier is not symmetric with respect to travel direction,
      * so unlike the elevation it's derived from it must be stored for each edge not edge pair.
+     * The edge factors we store will yield the _difference_ in perceived travel time (cost) to be chained additively
+     * Thus 0 means no adjustment to the base traversal time, and 1 means to double the base traversal time.
      */
     public TFloatList edgeFactors;
-
-    public double factorForEdge (EdgeStore.Edge edge) {
-        return edgeFactors.get(edge.getEdgeIndex());
-    }
 
     /**
      * Call a function for every segment in this edge's elevation profile.
@@ -165,6 +163,7 @@ public class ElevationCostField implements CostField, Serializable {
      * weighted result for all segments in an edge.
      */
     public interface ElevationCostCalculator extends ElevationCostField.ElevationSegmentConsumer {
+        /** Return a nonzero positive multiplier for edge traversal time normalized to 1 for flat ground. */
         double weightedElevationFactor ();
     }
 
@@ -184,9 +183,15 @@ public class ElevationCostField implements CostField, Serializable {
         }
     }
 
+    /**
+     * Adjust the factors returned by the elevation cost calculators, which should be 1 on flat ground,
+     * to account for the user-specified outputScale and the fact that we want to return the _difference_ in cost
+     * to be included in a series of additive terms.
+     */
     private double weightedAverageForEdge (EdgeStore.Edge edge) {
+
         forEachElevationSegment(edge, costCalculator);
-        return 1 + (costCalculator.weightedElevationFactor() - 1) * outputScale;
+        return (costCalculator.weightedElevationFactor() - 1) * outputScale;
     }
 
 }

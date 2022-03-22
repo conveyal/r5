@@ -13,7 +13,7 @@ We say "Real-world and Reimagined" networks because R5's networks are built from
 
 For details on the core methods implemented in Conveyal Analysis and R5, see:
 
-* [Conway, Byrd, and van der Linden (2017)](http://hdl.handle.net/2286/R.A.218654)
+* [Conway, Byrd, and van der Linden (2017)](https://keep.lib.asu.edu/items/127809)
 * [Conway, Byrd, and van Eggermond (2018)](https://www.jtlu.org/index.php/jtlu/article/view/1074)
 * [Conway and Stewart (2019)](https://files.indicatrix.org/Conway-Stewart-2019-Charlie-Fare-Constraints.pdf)
 

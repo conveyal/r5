@@ -68,24 +68,15 @@ public class AnalysisWorker implements Runnable {
      * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
      */
     public interface Config {
-
         /**
          * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
          * Setting this to false before running creates a regional-only cluster worker.
          * This is useful in testing when running many workers on the same machine.
          */
         boolean listenForSinglePoint();
-
-        /**
-         * If this is true, the worker will not actually do any work. It will just report all tasks as completed
-         * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
-         * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
-         */
-        boolean testTaskRedelivery();
         String brokerAddress();
         String brokerPort();
         String initialGraphId();
-
     }
 
     // CONSTANTS
@@ -416,11 +407,11 @@ public class AnalysisWorker implements Runnable {
 
         LOG.debug("Handling regional task {}", task.toString());
 
-        // If this worker is being used in a test of the task redelivery mechanism. Report most work as completed
-        // without actually doing anything, but fail to report results a certain percentage of the time.
-        if (config.testTaskRedelivery()) {
-            pretendToDoWork(task);
-            return;
+        if (task.injectFault != null) {
+            task.injectFault.considerShutdownOrException(task.taskId);
+            if (task.injectFault.shouldDropTaskBeforeCompute(task.taskId)) {
+                return;
+            }
         }
 
         // Ensure we don't try to calculate accessibility to missing opportunity data points.
@@ -515,27 +506,6 @@ public class AnalysisWorker implements Runnable {
             workResults.add(new RegionalWorkResult(oneOriginResult, task));
         }
         throughputTracker.recordTaskCompletion(task.jobId);
-    }
-
-    /**
-     * Used in tests of the task redelivery mechanism. Report work as completed without actually doing anything,
-     * but fail to report results a certain percentage of the time.
-     */
-    private void pretendToDoWork (RegionalTask task) {
-        try {
-            // Pretend the task takes 1-2 seconds to complete.
-            Thread.sleep(random.nextInt(1000) + 1000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-            OneOriginResult emptyContainer = new OneOriginResult(null, new AccessibilityResult(), null);
-            synchronized (workResults) {
-                workResults.add(new RegionalWorkResult(emptyContainer, task));
-            }
-        } else {
-            LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);
-        }
     }
 
     /**

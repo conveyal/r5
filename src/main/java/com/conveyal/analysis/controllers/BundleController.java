@@ -13,6 +13,8 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
@@ -197,15 +199,26 @@ public class BundleController implements HttpController {
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
 
-                        // Populate the metadata while the feed is open
-                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
-                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
-                        bundle.feeds.add(feedSummary);
-
+                        // Find and validate the extents of the GTFS, defined by all stops in the feed.
                         for (Stop s : feed.stops.values()) {
                             bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                         }
-                        checkWgsEnvelopeSize(bundleBounds, "GTFS data");
+                        try {
+                            checkWgsEnvelopeSize(bundleBounds, "GTFS data");
+                        } catch (IllegalArgumentException iae) {
+                            // Convert envelope size or antimeridian crossing exceptions to feed import errors.
+                            // Out of range lat/lon values will throw DataSourceException and bundle import will fail.
+                            // Envelope size or antimeridian crossing will throw IllegalArgumentException. We want to
+                            // soft-fail on these because some feeds contain small amounts of long-distance service
+                            // which may extend far beyond the analysis area without causing problems.
+                            feed.errors.add(new GeneralError("stops", -1, null, iae.getMessage()));
+                        }
+
+                        // Populate the metadata while the feed is still open.
+                        // This must be done after all errors have been added to the feed.
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
+                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
+                        bundle.feeds.add(feedSummary);
 
                         if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
                             bundle.serviceStart = feedSummary.serviceStart;

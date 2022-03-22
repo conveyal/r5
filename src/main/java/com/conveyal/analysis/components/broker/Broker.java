@@ -327,12 +327,11 @@ public class Broker {
             LOG.error("Failed to mark task {} completed on job {}.", taskId, job.jobId);
         }
         // Once the last task is marked as completed, the job is finished.
-        // Purge it from the list to free memory.
+        // Remove it and its associated result assembler from the maps.
+        // The caller should already have a reference to the result assembler so it can process the final results.
         if (job.isComplete()) {
             job.verifyComplete();
             jobs.remove(job.workerCategory, job);
-            // This method is called after the regional work results are handled, finishing and closing the local file.
-            // So we can harmlessly remove the MultiOriginAssembler now that the job is removed.
             resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
@@ -345,7 +344,9 @@ public class Broker {
      * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
      */
     private synchronized void recordJobError (Job job, String error) {
-        job.errors.add(error);
+        if (job != null) {
+            job.errors.add(error);
+        }
     }
 
     /**
@@ -431,41 +432,40 @@ public class Broker {
     }
 
     /**
-     * Slots a single regional work result received from a worker into the appropriate position in
-     * the appropriate file. Also considers requesting extra spot instances after a few results have
-     * been received. The checks in place should prevent an unduly large number of workers from
-     * proliferating, assuming jobs for a given worker category (transport network + R5 version) are
-     * completed sequentially.
-     *
-     * @param workResult an object representing accessibility results for a single origin point,
-     *                   sent by a worker.
+     * Slots a single regional work result received from a worker into the appropriate position in the appropriate
+     * files. Also considers requesting extra spot instances after a few results have been received.
+     * @param workResult an object representing accessibility results for a single origin point, sent by a worker.
      */
     public void handleRegionalWorkResult(RegionalWorkResult workResult) {
-        // Retrieving the job and assembler from their maps is not threadsafe, so we do so in a
-        // synchronized block here. Once the job is retrieved, it can be used to
-        // requestExtraWorkers below without synchronization, because that method only uses final
-        // fields of the job.
-        Job job;
+        // Retrieving the job and assembler from their maps is not thread safe, so we use synchronized block here.
+        // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
+        // because that method only uses final fields of the job.
+        Job job = null;
         MultiOriginAssembler assembler;
-        synchronized (this) {
-            job = findJob(workResult.jobId);
-            assembler = resultAssemblers.get(workResult.jobId);
-        }
-        if (job == null || assembler == null || !job.isActive()) {
-            // This will happen naturally for all delivered tasks when a job is deleted by the user or after it errors.
-            LOG.debug("Received result for unrecognized, deleted, or inactive job ID {}, discarding.", workResult.jobId);
-            return;
-        }
-        if (workResult.error != null) {
-            // Record any error reported by the worker and don't pass the (bad) result on to regional result assembly.
-            recordJobError(job, workResult.error);
-            return;
-        }
-        // When the last task is received, this will build up to 5 grids and upload them to S3. That should probably
-        // not be done synchronously in an HTTP handler called by the worker (likewise for starting workers below).
         try {
+            synchronized (this) {
+                job = findJob(workResult.jobId);
+                assembler = resultAssemblers.get(workResult.jobId);
+                if (job == null || assembler == null || !job.isActive()) {
+                    // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
+                    LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
+                    return;
+                }
+                if (workResult.error != null) {
+                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                    recordJobError(job, workResult.error);
+                    return;
+                }
+                // Mark tasks completed first before passing results to the assembler. On the final result received,
+                // this will minimize the risk of race conditions by quickly making the job invisible to incoming stray
+                // results from spurious redeliveries, before the assembler is busy finalizing and uploading results.
+                markTaskCompleted(job, workResult.taskId);
+            }
+            // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
+            // It contains some slow nested operations to move completed results into storage. Really we should not do
+            // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
+            // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
             assembler.handleMessage(workResult);
-            markTaskCompleted(job, workResult.taskId);
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));

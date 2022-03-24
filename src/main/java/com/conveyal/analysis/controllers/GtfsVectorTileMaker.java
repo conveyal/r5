@@ -169,17 +169,54 @@ public class GtfsVectorTileMaker {
         return pbfMessage;
     }
 
-
     /**
      * Utility method reusable in other classes that produce vector tiles.
      * Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
      * and reducing number of points to keep tile size down.
+     *
+     * We don't want to include all points of huge geometries when only a small piece of them passes through the tile.
+     * This kind of clipping is considered a "standard" and not part of the vector tile specification. See:
+     * https://docs.mapbox.com/data/tilesets/guides/vector-tiles-standards/#clipping
+     *
+     * To handle cases where a geometry passes outside the tile and then back in (e.g. U-shaped sections of routes) we
+     * could break the geometry into separate pieces when it passes outside the tile, or just skip sequences of points
+     * that are outside the tile, yielding a straight line from one piece to the other that's located entirely outside
+     * the tile, relying on the display client to clip this out of the rendered tiles.
+     *
+     * When we do this, we have to make sure the movements are far enough outside the tile that they don't leave
+     * artifacts inside the tile, accounting for line width, endcaps etc. so we apply a margin or buffer when deciding
+     * which points are outside the tile.
+     *
+     * Ideally we'd move the "pen" from one place to another outside the tile with drawing switched off, but it's not
+     * clear how to do this using JTS geometries. This issue would be easier to deal with if we were writing directly
+     * to MBVT instead of using the GeoTools abstractions, because MBVT has separate MoveTo and LineTo commands.
+     *
+     * FIXME this still doesn't handle the case where a line passes through a tile but has zero points inside the tile.
+     *       We will need to test whether each individual segment intersects the tile, which is a slower operation.
+     *
+     * @return a Geometry representing the input wgsGeometry in tile units, clipped to the wgsEnvelope with a margin,
+     *         or null if the geometry has no points inside the tile.
      */
     public static Geometry clipScaleAndSimplify (LineString wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
+        // At first we are only reading the Coordinates so no protective copy is made.
         CoordinateSequence wgsCoordinates = wgsGeometry.getCoordinateSequence();
         boolean[] coordInsideEnvelope = new boolean[wgsCoordinates.size()];
-        for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-            coordInsideEnvelope[c] = wgsEnvelope.contains(wgsCoordinates.getCoordinate(c));
+        {
+            // Add a 5% margin to the envelope make sure any artifacts are outside it.
+            // This takes care of the fact that lines have endcaps and widths.
+            // Unfortunately this is copying the envelope and adding a margin each time this method is called, so once
+            // for each individual geometry within the tile. We can't just pass the envelope in with the margin already
+            // added, because we need the true envelope to project all the coordinates into tile units.
+            // We may want to refactor to process a whole collection of geometries at once to avoid this problem.
+            final double bufferProportion = 0.05;
+            Envelope wgsEnvWithMargin = wgsEnvelope.copy(); // Protective copy before adding margin in place.
+            wgsEnvWithMargin.expandBy(
+                    wgsEnvelope.getWidth() * bufferProportion,
+                    wgsEnvelope.getHeight() * bufferProportion
+            );
+            for (int c = 0; c < wgsCoordinates.size(); c += 1) {
+                coordInsideEnvelope[c] = wgsEnvWithMargin.contains(wgsCoordinates.getCoordinate(c));
+            }
         }
         List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
         for (int c = 0; c < wgsCoordinates.size(); c += 1) {
@@ -187,7 +224,7 @@ public class GtfsVectorTileMaker {
             boolean nextInside = (c < coordInsideEnvelope.length - 1) ? coordInsideEnvelope[c+1] : false;
             boolean thisInside = coordInsideEnvelope[c];
             if (thisInside || prevInside || nextInside) {
-                Coordinate coord = wgsCoordinates.getCoordinateCopy(c);
+                Coordinate coord = wgsCoordinates.getCoordinateCopy(c); // Protective copy before projecting Coordinate.
                 // JtsAdapter.createTileGeom clips and uses full JTS math transform and is much too slow.
                 // The following seems sufficient - tile edges should be parallel to lines of latitude and longitude.
                 coord.x = ((coord.x - wgsEnvelope.getMinX()) * tileExtent) / wgsEnvelope.getWidth();

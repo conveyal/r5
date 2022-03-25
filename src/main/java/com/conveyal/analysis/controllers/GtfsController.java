@@ -43,7 +43,7 @@ public class GtfsController implements HttpController {
     private final GtfsVectorTileMaker gtfsVectorTileMaker;
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-        this.gtfsVectorTileMaker = new GtfsVectorTileMaker();
+        this.gtfsVectorTileMaker = new GtfsVectorTileMaker(gtfsCache);
     }
 
     private static class BaseApiResponse {
@@ -61,9 +61,12 @@ public class GtfsController implements HttpController {
         public double[][] coordinates;
     }
 
+    private static String bundleScopedFeedIdFromRequest (Request req) {
+        return Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
+    }
+
     private GTFSFeed getFeedFromRequest (Request req) {
-        String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
-        return gtfsCache.get(bundleScopedFeedId);
+        return gtfsCache.get(bundleScopedFeedIdFromRequest(req));
     }
 
     static class RouteApiResponse extends BaseApiResponse {
@@ -184,13 +187,11 @@ public class GtfsController implements HttpController {
     }
 
     private Object getTile (Request req, Response res) {
-        String feedGroupId = req.params("feedGroupId");
-        GTFSFeed feed = getFeedFromRequest(req);
-        String id = Bundle.bundleScopeFeedId(feed.feedId, feedGroupId);
+        String bundleScopedFeedId = bundleScopedFeedIdFromRequest(req);
         final int z = Integer.parseInt(req.params("z"));
         final int x = Integer.parseInt(req.params("x"));
         final int y = Integer.parseInt(req.params("y"));
-        byte[] pbfMessage = this.gtfsVectorTileMaker.getTile(id, feed, z, x, y);
+        byte[] pbfMessage = this.gtfsVectorTileMaker.getTile(bundleScopedFeedId, z, x, y);
         res.header("Content-Type", "application/vnd.mapbox-vector-tile");
         res.header("Content-Encoding", "gzip");
         res.status(OK_200);

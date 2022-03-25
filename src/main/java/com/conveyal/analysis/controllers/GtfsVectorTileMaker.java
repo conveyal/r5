@@ -1,16 +1,22 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.util.MapTile;
+import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.common.GeometryUtils;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.MvtEncoder;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.UserDataKeyValueMapConverter;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsLayer;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsMvt;
 import com.wdtinc.mapbox_vector_tile.build.MvtLayerParams;
+import org.checkerframework.checker.nullness.qual.NonNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Envelope;
@@ -29,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class maintains a spatial index of data inside GTFS feeds and produces vector tiles of it for use as a
@@ -55,73 +62,96 @@ public class GtfsVectorTileMaker {
 
     private static final Logger LOG = LoggerFactory.getLogger(GtfsVectorTileMaker.class);
 
+    private final GTFSCache gtfsCache;
+
     /**
      * Complex street geometries will be simplified, but the geometry will not deviate from the original by more
      * than this many tile units. These are minuscule at 1/4096 of the tile width or height.
      */
     private static final int LINE_SIMPLIFY_TOLERANCE = 5;
 
-    // FIXME Eviction: initially just use a LoadingCache
-    private final Map<String, STRtree> indexedShapes = new HashMap<>();
-    private final Map<String, STRtree> indexedStops = new HashMap<>();
+    /** How long after it was last accessed to keep a GTFS spatial index in memory. */
+    private static final Duration EXPIRE_AFTER_ACCESS = Duration.ofMinutes(10);
 
-    private STRtree getShapesIndex(String bundleScopedId, GTFSFeed feed) {
-        // Ensure only one request lazy-indexes the gtfs shapes
-        synchronized (this) {
-            if (!indexedShapes.containsKey(bundleScopedId)) {
-                final long startTimeMs = System.currentTimeMillis();
-                STRtree shapesIndex = new STRtree();
-                // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
-                LOG.info("{}: indexing {} patterns", bundleScopedId, feed.patterns.size());
-                for (Pattern pattern : feed.patterns.values()) {
-                    Route route = feed.routes.get(pattern.route_id);
-                    String exemplarTripId = pattern.associatedTrips.get(0);
-                    LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
-                    if (wgsGeometry == null) {
-                        // Not sure why some of these are null.
-                        continue;
-                    }
-                    Map<String, Object> userData = new HashMap<>();
-                    userData.put("id", pattern.pattern_id);
-                    userData.put("name", pattern.name);
-                    userData.put("routeId", route.route_id);
-                    userData.put("routeName", route.route_long_name);
-                    userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
-                    userData.put("routeType", route.route_type);
-                    wgsGeometry.setUserData(userData);
-                    shapesIndex.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
-                }
-                shapesIndex.build();
-                indexedShapes.put(bundleScopedId, shapesIndex);
-                LOG.info("{}: pattern indexing finished in {}s", bundleScopedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
-            }
-            return indexedShapes.get(bundleScopedId);
-        }
+    /** The maximum number of feeds for which we keep GTFS spatial indexes in memory at once. */
+    private static final int MAX_SPATIAL_INDEXES = 4;
+
+    /** A cache of spatial indexes of the trip pattern shapes, keyed on the BundleScopedFeedId. */
+    private final LoadingCache<String, STRtree> shapeIndexCache = Caffeine.newBuilder()
+            .maximumSize(MAX_SPATIAL_INDEXES)
+            .expireAfterAccess(EXPIRE_AFTER_ACCESS)
+            .removalListener(this::logCacheEviction)
+            .build(this::buildShapesIndex);
+
+    /** A cache of spatial indexes of the transit stops, keyed on the BundleScopedFeedId. */
+    private final LoadingCache<String, STRtree> stopIndexCache = Caffeine.newBuilder()
+            .maximumSize(MAX_SPATIAL_INDEXES)
+            .expireAfterAccess(EXPIRE_AFTER_ACCESS)
+            .removalListener(this::logCacheEviction)
+            .build(this::buildStopsIndex);
+
+    /** Constructor taking a GTFSCache component so we can look up feeds by ID as needed. */
+    public GtfsVectorTileMaker (GTFSCache gtfsCache) {
+        this.gtfsCache = gtfsCache;
     }
 
-    private STRtree getStopsIndex (String bundleScopedId, GTFSFeed feed) {
-        synchronized (this) {
-            if (!indexedStops.containsKey(bundleScopedId)) {
-                final long startTimeMs = System.currentTimeMillis();
-                STRtree stopsIndex = new STRtree();
-                LOG.info("{}: indexing {} stops", bundleScopedId, feed.stops.size());
-                for (Stop stop : feed.stops.values()) {
-                    // This is inefficient, just bin points into mercator tiles.
-                    Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
-                    stopsIndex.insert(stopEnvelope, stop);
-                }
-
-                stopsIndex.build();
-                indexedStops.put(bundleScopedId, stopsIndex);
-                LOG.info("{}: stop indexing finished in {}s", bundleScopedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+    /** CacheLoader implementation making spatial indexes of stop pattern shapes for a single feed. */
+    private STRtree buildShapesIndex (String bundleScopedId) {
+        final long startTimeMs = System.currentTimeMillis();
+        GTFSFeed feed = gtfsCache.get(bundleScopedId);
+        STRtree shapesIndex = new STRtree();
+        // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
+        LOG.info("{}: indexing {} patterns", bundleScopedId, feed.patterns.size());
+        for (Pattern pattern : feed.patterns.values()) {
+            Route route = feed.routes.get(pattern.route_id);
+            String exemplarTripId = pattern.associatedTrips.get(0);
+            LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
+            if (wgsGeometry == null) {
+                // Not sure why some of these are null.
+                continue;
             }
-            return indexedStops.get(bundleScopedId);
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", pattern.pattern_id);
+            userData.put("name", pattern.name);
+            userData.put("routeId", route.route_id);
+            userData.put("routeName", route.route_long_name);
+            userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
+            userData.put("routeType", route.route_type);
+            wgsGeometry.setUserData(userData);
+            shapesIndex.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
         }
+        shapesIndex.build();
+        LOG.info("Created vector tile spatial index for patterns in feed {} ({} ms)", bundleScopedId, System.currentTimeMillis() - startTimeMs);
+        return shapesIndex;
     }
 
-    public byte[] getTile (String bundleScopedId, GTFSFeed feed, int zTile, int xTile, int yTile) {
-        STRtree shapesIndex = getShapesIndex(bundleScopedId, feed);
-        STRtree stopsIndex = getStopsIndex(bundleScopedId, feed);
+    /** CacheLoader implementation making spatial indexes of transit stops for a single feed. */
+    private STRtree buildStopsIndex (String bundleScopedId) {
+        final long startTimeMs = System.currentTimeMillis();
+        GTFSFeed feed = gtfsCache.get(bundleScopedId);
+        STRtree stopsIndex = new STRtree();
+        LOG.info("{}: indexing {} stops", bundleScopedId, feed.stops.size());
+        for (Stop stop : feed.stops.values()) {
+            // This is inefficient, TODO specialized spatial index to bin points into mercator tiles (like hashgrid).
+            Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
+            stopsIndex.insert(stopEnvelope, stop);
+        }
+        stopsIndex.build();
+        LOG.info("Creating vector tile spatial index for stops in feed {} ({} ms)", bundleScopedId, System.currentTimeMillis() - startTimeMs);
+        return stopsIndex;
+    }
+
+    /** RemovalListener triggered when a spatial index is evicted from the cache. */
+    private void logCacheEviction (String feedId, STRtree value, RemovalCause cause) {
+        LOG.info("Vector tile spatial index removed. Feed {}, cause {}.", feedId, cause);
+    }
+
+    /** Produce a single Mapbox vector tile for the given unique GTFS feed ID and tile coordinates. */
+    public byte[] getTile (String bundleScopedFeedId, int zTile, int xTile, int yTile) {
+
+        // It might make sense to unify these two values into a single compound object.
+        STRtree shapesIndex = shapeIndexCache.get(bundleScopedFeedId);
+        STRtree stopsIndex = stopIndexCache.get(bundleScopedFeedId);
 
         final long startTimeMs = System.currentTimeMillis();
         final int tileExtent = 4096; // Standard is 4096, smaller can in theory make tiles more compact
@@ -164,8 +194,7 @@ public class GtfsVectorTileMaker {
         JtsMvt mvt = new JtsMvt(patternLayer, stopsLayer);
         MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
         byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
-
-        LOG.info("getTile({}, {}, {}, {}) in {}", bundleScopedId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+        // LOG.info("getTile({}, {}, {}, {}) in {}", bundleScopedId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
         return pbfMessage;
     }
 

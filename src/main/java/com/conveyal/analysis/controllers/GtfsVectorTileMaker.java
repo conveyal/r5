@@ -6,6 +6,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.util.GeometryUtil;
 import com.conveyal.r5.common.GeometryUtils;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
@@ -22,6 +23,7 @@ import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
@@ -194,83 +196,98 @@ public class GtfsVectorTileMaker {
         JtsMvt mvt = new JtsMvt(patternLayer, stopsLayer);
         MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
         byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
-        // LOG.info("getTile({}, {}, {}, {}) in {}", bundleScopedId, zTile, xTile, yTile, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+        // LOG.info("GTFS vector tile for feed {} ({} {} {}) took {} ms size {} bytes", bundleScopedFeedId, zTile, xTile, yTile, System.currentTimeMillis() - startTimeMs, pbfMessage.length);
         return pbfMessage;
     }
 
     /**
-     * Utility method reusable in other classes that produce vector tiles.
-     * Convert from WGS84 to integer intra-tile coordinates, eliminating points outside the envelope
-     * and reducing number of points to keep tile size down.
+     * Utility method reusable in other classes that produce vector tiles. Convert from WGS84 to integer intra-tile
+     * coordinates, eliminating points outside the envelope and reducing number of points to keep tile size down.
      *
      * We don't want to include all points of huge geometries when only a small piece of them passes through the tile.
-     * This kind of clipping is considered a "standard" and not part of the vector tile specification. See:
-     * https://docs.mapbox.com/data/tilesets/guides/vector-tiles-standards/#clipping
+     * This kind of clipping is considered a "standard" but is not technically part of the vector tile specification.
+     * See: https://docs.mapbox.com/data/tilesets/guides/vector-tiles-standards/#clipping
      *
      * To handle cases where a geometry passes outside the tile and then back in (e.g. U-shaped sections of routes) we
-     * could break the geometry into separate pieces when it passes outside the tile, or just skip sequences of points
-     * that are outside the tile, yielding a straight line from one piece to the other that's located entirely outside
-     * the tile, relying on the display client to clip this out of the rendered tiles.
+     * break the geometry into separate pieces where it passes outside the tile.
      *
-     * When we do this, we have to make sure the movements are far enough outside the tile that they don't leave
+     * However this is done, we have to make sure the segments end far enough outside the tile that they don't leave
      * artifacts inside the tile, accounting for line width, endcaps etc. so we apply a margin or buffer when deciding
      * which points are outside the tile.
      *
-     * Ideally we'd move the "pen" from one place to another outside the tile with drawing switched off, but it's not
-     * clear how to do this using JTS geometries. This issue would be easier to deal with if we were writing directly
-     * to MBVT instead of using the GeoTools abstractions, because MBVT has separate MoveTo and LineTo commands.
+     * We used to use a simpler method where only line segments fully outside the tile were skipped, and originally the
+     * "pen" was not even lifted if a line exited the tile and re-entered. However this does not work well with shapes
+     * that have very widely spaced points, as it creates huge invisible sections outside the tile clipping area and
+     * appears to trigger some coordinate overflow or other problem in the serialization or rendering. It also required
+     * manual detection and handling of cases where all points were outside the clip area but the line passed through.
      *
-     * FIXME this still doesn't handle the case where a line passes through a tile but has zero points inside the tile.
-     *       We will need to test whether each individual segment intersects the tile, which is a slower operation.
+     * Therefore we apply JTS clipping to every feature and sometimes return MultiLineString GeometryCollections
+     * which will yield several separate sequences of pen movements in the resulting vector tile. JtsMvt and MvtEncoder
+     * don't seem to understand general GeometryCollections, but do interpret MultiLineStrings as expected.
      *
-     * @return a Geometry representing the input wgsGeometry in tile units, clipped to the wgsEnvelope with a margin,
-     *         or null if the geometry has no points inside the tile.
+     * @return a Geometry representing the input wgsGeometry in tile units, clipped to the wgsEnvelope with a margin.
+     *         The Geometry should always be a LineString or MultiLineString, or null if the geometry has no points
+     *         inside the tile.
      */
     public static Geometry clipScaleAndSimplify (LineString wgsGeometry, Envelope wgsEnvelope, int tileExtent) {
-        // At first we are only reading the Coordinates so no protective copy is made.
-        CoordinateSequence wgsCoordinates = wgsGeometry.getCoordinateSequence();
-        boolean[] coordInsideEnvelope = new boolean[wgsCoordinates.size()];
+        // Add a 5% margin to the envelope make sure any artifacts are outside it.
+        // This takes care of the fact that lines have endcaps and widths.
+        // Unfortunately this is copying the envelope and adding a margin each time this method is called, so once
+        // for each individual geometry within the tile. We can't just add the margin to the envelope before
+        // passing it in because we need the true envelope when projecting all the coordinates into tile units.
+        // We may want to refactor to process a whole collection of geometries at once to avoid this problem.
+        Geometry clippedWgsGeometry;
         {
-            // Add a 5% margin to the envelope make sure any artifacts are outside it.
-            // This takes care of the fact that lines have endcaps and widths.
-            // Unfortunately this is copying the envelope and adding a margin each time this method is called, so once
-            // for each individual geometry within the tile. We can't just pass the envelope in with the margin already
-            // added, because we need the true envelope to project all the coordinates into tile units.
-            // We may want to refactor to process a whole collection of geometries at once to avoid this problem.
             final double bufferProportion = 0.05;
             Envelope wgsEnvWithMargin = wgsEnvelope.copy(); // Protective copy before adding margin in place.
             wgsEnvWithMargin.expandBy(
                     wgsEnvelope.getWidth() * bufferProportion,
                     wgsEnvelope.getHeight() * bufferProportion
             );
-            for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-                coordInsideEnvelope[c] = wgsEnvWithMargin.contains(wgsCoordinates.getCoordinate(c));
-            }
+            clippedWgsGeometry = GeometryUtil.geometryFactory.toGeometry(wgsEnvWithMargin).intersection(wgsGeometry);
         }
-        List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
-        for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-            boolean prevInside = (c > 0) ? coordInsideEnvelope[c-1] : false;
-            boolean nextInside = (c < coordInsideEnvelope.length - 1) ? coordInsideEnvelope[c+1] : false;
-            boolean thisInside = coordInsideEnvelope[c];
-            if (thisInside || prevInside || nextInside) {
-                Coordinate coord = wgsCoordinates.getCoordinateCopy(c); // Protective copy before projecting Coordinate.
+        // Iterate over clipped geometry in case clipping broke the LineString into a MultiLineString
+        // or reduced it to nothing (zero elements). Self-intersecting geometries can yield a larger number of elements.
+        // For example, DC metro GTFS has notches at stops, which produce a lot of 5-10 element MultiLineStrings.
+        List<LineString> outputLineStrings = new ArrayList<>(clippedWgsGeometry.getNumGeometries());
+        for (int g = 0; g < clippedWgsGeometry.getNumGeometries(); g += 1) {
+            LineString wgsSubGeom = (LineString) clippedWgsGeometry.getGeometryN(g);
+            CoordinateSequence wgsCoordinates = wgsSubGeom.getCoordinateSequence();
+            if (wgsCoordinates.size() < 2) {
+                continue;
+            }
+            List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
+            for (int c = 0; c < wgsCoordinates.size(); c += 1) {
+                // Protective copy before projecting Coordinate.
+                Coordinate coord = wgsCoordinates.getCoordinateCopy(c);
                 // JtsAdapter.createTileGeom clips and uses full JTS math transform and is much too slow.
                 // The following seems sufficient - tile edges should be parallel to lines of latitude and longitude.
                 coord.x = ((coord.x - wgsEnvelope.getMinX()) * tileExtent) / wgsEnvelope.getWidth();
                 coord.y = ((wgsEnvelope.getMaxY() - coord.y) * tileExtent) / wgsEnvelope.getHeight();
                 tileCoordinates.add(coord);
-                // TODO handle exit and re-enter by splitting into multiple linestrings
             }
-        }
-        if (tileCoordinates.size() > 1) {
-            LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates.toArray(new Coordinate[0]));
+            LineString tileLineString = GeometryUtils.geometryFactory.createLineString(
+                    tileCoordinates.toArray(new Coordinate[0])
+            );
             DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
             simplifier.setDistanceTolerance(LINE_SIMPLIFY_TOLERANCE);
             Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
-            simplifiedTileGeometry.setUserData(wgsGeometry.getUserData());
-            return simplifiedTileGeometry;
-        } else {
+            outputLineStrings.add((LineString) simplifiedTileGeometry);
+        }
+        // Clipping will frequently leave zero elements.
+        if (outputLineStrings.isEmpty()) {
             return null;
         }
+        Geometry output;
+        if (outputLineStrings.size() == 1) {
+            output = outputLineStrings.get(0);
+        } else {
+            output = GeometryUtils.geometryFactory.createMultiLineString(
+                outputLineStrings.toArray(new LineString[outputLineStrings.size()])
+            );
+        }
+        // Copy attributes for display from input WGS geometry to output tile geometry.
+        output.setUserData(wgsGeometry.getUserData());
+        return output;
     }
 }

@@ -8,7 +8,6 @@ import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsLayer;
 import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsMvt;
 import com.wdtinc.mapbox_vector_tile.build.MvtLayerParams;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
@@ -18,10 +17,15 @@ import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Utilities for creating a slippy map tile and generating it's enveloper. Also for encapsulating it's properties that
+ * can be re-used for clipping, simplifying, projecting coordinates, creating layers, and generating tiles.
+ *
+ * References:
+ * - http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
+ * - http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Java
+ */
 public class MapTile {
-
-    // http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
-    // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Java
 
     public static final int DEFAULT_TILE_EXTENT = 4096;
     public static final int DEFAULT_TILE_SIZE = 256;
@@ -42,6 +46,7 @@ public class MapTile {
     public final int tileSize;
 
     public final Envelope envelope;
+    public final Geometry bufferedEnvelopeGeometry;
 
     public MapTile (int zoom, int x, int y) {
         this(zoom, x, y, DEFAULT_TILE_EXTENT, DEFAULT_TILE_SIZE);
@@ -52,6 +57,15 @@ public class MapTile {
         this.x = x;
         this.y = y;
         this.envelope = wgsEnvelope();
+
+        // Create the buffered envelope for clipping
+        var bufferedEnvelope = this.envelope.copy();
+        bufferedEnvelope.expandBy(
+                envelope.getWidth() * TILE_BUFFER_PROPORTION,
+                envelope.getHeight() * TILE_BUFFER_PROPORTION
+        );
+        this.bufferedEnvelopeGeometry = GeometryUtil.geometryFactory.toGeometry(bufferedEnvelope);
+
         this.tileExtent = tileExtent;
         this.tileSize = tileSize;
     }
@@ -88,6 +102,9 @@ public class MapTile {
         return Math.toDegrees(Math.atan(Math.sinh(n)));
     }
 
+    /**
+     * Run clipScaleAndSimplify on a List of LineStrings. Ensures the user data is copied into the new geometries.
+     */
     public List<Geometry> clipAndSimplifyLinesToTile (List<LineString> lineStrings) {
         List<Geometry> clippedLineStrings = new ArrayList<>(64);
         for (LineString wgsGeometry : lineStrings) {
@@ -100,6 +117,9 @@ public class MapTile {
         return clippedLineStrings;
     }
 
+    /**
+     * Re-project a List of Points into the current tile. Ensures the user data is copied to the new geometries.
+     */
     public List<Geometry> projectPointsToTile (List<Point> points) {
         List<Geometry> pointsInTile = new ArrayList<>(64);
         for (Point point : points) {
@@ -108,7 +128,7 @@ public class MapTile {
                 continue;
             }
 
-            Point pointInTile =  GeometryUtils.geometryFactory.createPoint(projectToTile(coordinate));
+            Point pointInTile = GeometryUtils.geometryFactory.createPoint(projectToTile(coordinate));
             point.setUserData(point.getUserData());
             pointsInTile.add(pointInTile);
         }
@@ -147,45 +167,38 @@ public class MapTile {
     public Geometry clipScaleAndSimplify (LineString wgsGeometry) {
         // Add a 5% margin to the envelope make sure any artifacts are outside it.
         // This takes care of the fact that lines have endcaps and widths.
-        // Unfortunately this is copying the envelope and adding a margin each time this method is called, so once
-        // for each individual geometry within the tile. We can't just add the margin to the envelope before
-        // passing it in because we need the true envelope when projecting all the coordinates into tile units.
-        // We may want to refactor to process a whole collection of geometries at once to avoid this problem.
-        Geometry clippedWgsGeometry;
-        {
-            Envelope wgsEnvWithMargin = envelope.copy(); // Protective copy before adding margin in place.
-            wgsEnvWithMargin.expandBy(
-                    envelope.getWidth() * TILE_BUFFER_PROPORTION,
-                    envelope.getHeight() * TILE_BUFFER_PROPORTION
-            );
-            clippedWgsGeometry = GeometryUtil.geometryFactory.toGeometry(wgsEnvWithMargin).intersection(wgsGeometry);
-        }
+        var clippedWgsGeometry = bufferedEnvelopeGeometry.intersection(wgsGeometry);
+
         // Iterate over clipped geometry in case clipping broke the LineString into a MultiLineString
         // or reduced it to nothing (zero elements). Self-intersecting geometries can yield a larger number of elements.
         // For example, DC metro GTFS has notches at stops, which produce a lot of 5-10 element MultiLineStrings.
         List<LineString> outputLineStrings = new ArrayList<>(clippedWgsGeometry.getNumGeometries());
         for (int g = 0; g < clippedWgsGeometry.getNumGeometries(); g += 1) {
             LineString wgsSubGeom = (LineString) clippedWgsGeometry.getGeometryN(g);
-            CoordinateSequence wgsCoordinates = wgsSubGeom.getCoordinateSequence();
-            if (wgsCoordinates.size() < 2) {
+            var wgsCoordinates = wgsSubGeom.getCoordinates();
+            if (wgsCoordinates.length < 2) {
                 continue;
             }
-            List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
-            for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-                tileCoordinates.add(projectToTile(wgsCoordinates.getCoordinate(c)));
+
+            var tileCoordinates = new Coordinate[wgsCoordinates.length];
+            for (int c = 0; c < wgsCoordinates.length; c += 1) {
+                tileCoordinates[c] = projectToTile(wgsCoordinates[c]);
             }
-            LineString tileLineString = GeometryUtils.geometryFactory.createLineString(
-                    tileCoordinates.toArray(new Coordinate[0])
+
+            var tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates);
+            var simplifiedTileGeometry = DouglasPeuckerSimplifier.simplify(
+                    tileLineString,
+                    LINE_SIMPLIFY_TOLERANCE
             );
-            Geometry simplifiedTileGeometry = DouglasPeuckerSimplifier.simplify(tileLineString, LINE_SIMPLIFY_TOLERANCE);
             outputLineStrings.add((LineString) simplifiedTileGeometry);
         }
+
         // Clipping will frequently leave zero elements.
         if (outputLineStrings.isEmpty()) {
             return null;
         }
 
-        if (outputLineStrings.size() == 1) {
+        if (outputLineStrings.size() <= 1) {
             return outputLineStrings.get(0);
         }
 
@@ -194,18 +207,27 @@ public class MapTile {
         );
     }
 
+    /**
+     * Convert from WGS84 to integer intra-tile coordinates.
+     */
     public Coordinate projectToTile(Coordinate c) {
         // JtsAdapter.createTileGeom clips and uses full JTS math transform and is much too slow.
         // The following seems sufficient - tile edges should be parallel to lines of latitude and longitude.
         double x = ((c.x - envelope.getMinX()) * tileExtent) / envelope.getWidth();
         double y = ((envelope.getMaxY() - c.y) * tileExtent) / envelope.getHeight();
-        return  new Coordinate(x, y);
+        return new Coordinate(x, y);
     }
 
+    /**
+     * Helper method to create a new JtsLayer for this tile.
+     */
     public JtsLayer createLayer(String name, List<Geometry> geometries) {
         return new JtsLayer(name, geometries, tileExtent);
     }
 
+    /**
+     * Helper method to combine a list of layers onto a Mapbox Vector Tile and encode it into a byte array.
+     */
     public byte[] encodeLayersToBytes(JtsLayer... layers) {
         JtsMvt vectorTile = new JtsMvt(layers);
         MvtLayerParams mvtLayerParams = new MvtLayerParams(tileSize, tileExtent);

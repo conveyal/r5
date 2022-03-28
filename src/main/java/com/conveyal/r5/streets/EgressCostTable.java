@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * The final stage of a one-to-many transit trip is what we call "propagation": extending travel times out from all
@@ -153,13 +155,6 @@ public class EgressCostTable implements Serializable {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         }
 
-        // The regions within which we want to link points to edges, then connect transit stops to points.
-        // Null means relink and rebuild everything. This will be constrained below if a base linkage was supplied, to
-        // encompass only areas near changed or created edges.
-        //
-        // Only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
-        // If null, build trees for all stops.
-        final Geometry rebuildZone;
 
         /**
          * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
@@ -172,10 +167,33 @@ public class EgressCostTable implements Serializable {
          */
         final int linkingDistanceLimitMeters;
 
-        if (baseLinkage != null) {
-            if (this.linkageCostUnit != baseEgressCostTable.linkageCostUnit) {
-                throw new AssertionError("The base linkage's cost table is in the wrong units.");
-            }
+        // This affects the distance that the street router will search, but in the case of selectively recalculating
+        // for a scenario, it also affects the distance around the scenario modifications where we look for stops.
+        if (streetMode == StreetMode.WALK) {
+            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
+        } else if (streetMode == StreetMode.BICYCLE) {
+            linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
+        } else if (streetMode == StreetMode.CAR) {
+            linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
+        } else {
+            throw new UnsupportedOperationException("Unrecognized streetMode");
+        }
+
+        // The regions within which we want to link points to edges, then connect transit stops to points.
+        // Null means relink and rebuild everything. This will be constrained below if a base linkage was supplied, to
+        // encompass only areas near changed or created edges.
+        //
+        // Only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
+        // If null, build trees for all stops.
+        final Geometry rebuildZone;
+        if (baseLinkage == null) {
+            // No base linkage was provided, we are not selectively rebuilding for a scenario. Rebuild everything.
+            rebuildZone = null;
+        } else {
+            checkArgument(
+                this.linkageCostUnit == baseEgressCostTable.linkageCostUnit,
+                "The base linkage's cost table is in the wrong units."
+            );
             // TODO perhaps create alternate constructor of EgressCostTable which copies an existing one
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // TODO check where and how we re-link to streets split/modified by the scenario.
@@ -188,22 +206,7 @@ public class EgressCostTable implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            // FIXME wait why are we only calculating a distance limit when a base linkage is supplied? Because
-            //       otherwise we link all points and don't need a radius.
-            if (streetMode == StreetMode.WALK) {
-                linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
-            } else if (streetMode == StreetMode.BICYCLE) {
-                linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
-            } else if (streetMode == StreetMode.CAR) {
-                linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
-            } else {
-                throw new UnsupportedOperationException("Unrecognized streetMode");
-            }
             rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
-        } else {
-            rebuildZone = null; // rebuild everything.
-            // TODO check pre-refactor code, isn't this assuming WALK mode unless there's a base linkage?
-            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
         }
 
         LOG.info("Creating EgressCostTables from each transit stop to PointSet points.");
@@ -305,6 +308,7 @@ public class EgressCostTable implements Serializable {
                 VertexStore.Vertex vertex = linkedPointSet.streetLayer.vertexStore.getCursor(vertexId);
                 sr.setOrigin(vertex.getLat(), vertex.getLon());
 
+                // WALK is handled above, this block is exhaustively handling all other modes.
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;
                 } else if (streetMode == StreetMode.CAR) {

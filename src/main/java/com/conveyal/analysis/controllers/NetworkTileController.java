@@ -31,7 +31,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * See GtfsVectorTileMaker for more information on the vector tile spec and tile numbers.
  */
 public class NetworkTileController implements HttpController {
-
     private static final Logger LOG = LoggerFactory.getLogger(NetworkTileController.class);
 
     // This must match UI code.
@@ -54,7 +53,7 @@ public class NetworkTileController implements HttpController {
         // Should end in .mvt but not clear how to do that in Sparkframework.
         //         sparkService.get("/:bundleId/:modificationNonceDigest/tiles", this::buildIndex, JsonUtil.toJson);
         sparkService.get("/:bundleId/tiles", this::buildIndex, JsonUtil.toJson);
-        sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getTile);
+        sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getEdgeGeometryVectorTile);
     }
 
     private TransportNetwork getNetworkFromRequest (Request request) {
@@ -77,6 +76,16 @@ public class NetworkTileController implements HttpController {
         return ImmutableMap.of("message", "Network is ready.");
     }
 
+    /**
+     * Get all of the edge geometries and attributes within a given map tile's envelope.
+     *
+     * We have tried offsetting the edges for opposite directions using org.geotools.geometry.jts.OffsetCurveBuilder
+     * but this will offset in tile units and cause jumps at different zoom levels when rendered. Using offset styles
+     * in MapboxGL with exponential interpolation by zoom level seems to work better for showing opposite directions
+     * at high zoom levels. Alternatively we could just include one geometry per edge pair and report only one value
+     * per pair. For example, for elevation data this could be the direction with the largest value which should always
+     * be >= 1.
+     */
     private List<Geometry> getEdgeGeometries (TransportNetwork network, MapTile mapTile) {
         List<Geometry> edgeGeoms = new ArrayList<>(64);
 
@@ -103,14 +112,9 @@ public class NetworkTileController implements HttpController {
     }
 
     /**
-     * We have tried offsetting the edges for opposite directions using org.geotools.geometry.jts.OffsetCurveBuilder
-     * but this will offset in tile units and cause jumps at different zoom levels when rendered. Using offset styles
-     * in MapboxGL with exponential interpolation by zoom level seems to work better for showing opposite directions
-     * at high zoom levels. Alternatively we could just include one geometry per edge pair and report only one value
-     * per pair. For example, for elevation data this could be the direction with the largest value which should always
-     * be >= 1.
+     * Create a Mapbox Vector Tile of a Transit Network's processed OSM Edges for the given Z/X/Y tile.
      */
-    private Object getTile (Request request, Response response) {
+    private Object getEdgeGeometryVectorTile(Request request, Response response) {
         final int zTile = Integer.parseInt(request.params("z"));
         final int xTile = Integer.parseInt(request.params("x"));
         final int yTile = Integer.parseInt(request.params("y"));

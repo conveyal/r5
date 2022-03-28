@@ -6,7 +6,7 @@ import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.MapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.GtfsVectorTileCache;
+import com.conveyal.gtfs.GtfsGeometryCache;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
@@ -46,10 +46,10 @@ public class GtfsController implements HttpController {
     private static final String STOP_LAYER_NAME = "conveyal:gtfs:stops";
 
     private final GTFSCache gtfsCache;
-    private final GtfsVectorTileCache gtfsVectorTileMaker;
+    private final GtfsGeometryCache gtfsGeometryCache;
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-        this.gtfsVectorTileMaker = new GtfsVectorTileCache(gtfsCache);
+        this.gtfsGeometryCache = new GtfsGeometryCache(gtfsCache);
     }
 
     private static class BaseApiResponse {
@@ -192,14 +192,17 @@ public class GtfsController implements HttpController {
         return allStopsByFeed;
     }
 
+    /**
+     * Generate a Mapbox Vector Tile of a GTFS feed's stops and pattern shapes for a given Z/X/Y tile.
+     */
     private Object getTile (Request req, Response res) {
         String bundleScopedFeedId = bundleScopedFeedIdFromRequest(req);
         MapTile tile = new MapTile(Integer.parseInt(req.params("z")), Integer.parseInt(req.params("x")), Integer.parseInt(req.params("y")));
         var patterns = tile.clipAndSimplifyLinesToTile(
-                gtfsVectorTileMaker.getPatternsInEnvelope(bundleScopedFeedId, tile.envelope)
+                gtfsGeometryCache.patternShapes.queryEnvelope(bundleScopedFeedId, tile.envelope)
         );
         var stops = tile.projectPointsToTile(
-                gtfsVectorTileMaker.getStopsInEnvelope(bundleScopedFeedId, tile.envelope)
+                gtfsGeometryCache.stops.queryEnvelope(bundleScopedFeedId, tile.envelope)
         );
 
         res.header("Content-Type", "application/vnd.mapbox-vector-tile");

@@ -97,14 +97,18 @@ public class NetworkTileController implements HttpController {
                 return true; // Continue iteration.
             }
             Geometry edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
-            edgeGeometry.setUserData(edge.attributesForDisplay());
-            edgeGeoms.add(edgeGeometry);
+            if (edgeGeometry != null) {
+                edgeGeometry.setUserData(edge.attributesForDisplay());
+                edgeGeoms.add(edgeGeometry);
+            }
             // The index contains only forward edges in each pair. Also include the backward edges.
             // TODO factor out repetitive code?
             edge.advance();
             edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
-            edgeGeometry.setUserData(edge.attributesForDisplay());
-            edgeGeoms.add(edgeGeometry);
+            if (edgeGeometry != null) {
+                edgeGeometry.setUserData(edge.attributesForDisplay());
+                edgeGeoms.add(edgeGeometry);
+            }
             return true;
         });
 

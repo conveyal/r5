@@ -108,7 +108,7 @@ public class MapTile {
                 continue;
             }
 
-            Point pointInTile =  GeometryUtils.geometryFactory.createPoint(project(coordinate));
+            Point pointInTile =  GeometryUtils.geometryFactory.createPoint(projectToTile(coordinate));
             point.setUserData(point.getUserData());
             pointsInTile.add(pointInTile);
         }
@@ -172,32 +172,29 @@ public class MapTile {
             }
             List<Coordinate> tileCoordinates = new ArrayList<>(wgsCoordinates.size());
             for (int c = 0; c < wgsCoordinates.size(); c += 1) {
-                tileCoordinates.add(project(wgsCoordinates.getCoordinate(c)));
+                tileCoordinates.add(projectToTile(wgsCoordinates.getCoordinate(c)));
             }
             LineString tileLineString = GeometryUtils.geometryFactory.createLineString(
                     tileCoordinates.toArray(new Coordinate[0])
             );
-            DouglasPeuckerSimplifier simplifier = new DouglasPeuckerSimplifier(tileLineString);
-            simplifier.setDistanceTolerance(LINE_SIMPLIFY_TOLERANCE);
-            Geometry simplifiedTileGeometry = simplifier.getResultGeometry();
+            Geometry simplifiedTileGeometry = DouglasPeuckerSimplifier.simplify(tileLineString, LINE_SIMPLIFY_TOLERANCE);
             outputLineStrings.add((LineString) simplifiedTileGeometry);
         }
         // Clipping will frequently leave zero elements.
         if (outputLineStrings.isEmpty()) {
             return null;
         }
-        Geometry output;
+
         if (outputLineStrings.size() == 1) {
-            output = outputLineStrings.get(0);
-        } else {
-            output = GeometryUtils.geometryFactory.createMultiLineString(
-                    outputLineStrings.toArray(new LineString[outputLineStrings.size()])
-            );
+            return outputLineStrings.get(0);
         }
-        return output;
+
+        return GeometryUtils.geometryFactory.createMultiLineString(
+                outputLineStrings.toArray(new LineString[outputLineStrings.size()])
+        );
     }
 
-    public Coordinate project(Coordinate c) {
+    public Coordinate projectToTile(Coordinate c) {
         // JtsAdapter.createTileGeom clips and uses full JTS math transform and is much too slow.
         // The following seems sufficient - tile edges should be parallel to lines of latitude and longitude.
         double x = ((c.x - envelope.getMinX()) * tileExtent) / envelope.getWidth();

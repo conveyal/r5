@@ -129,7 +129,7 @@ public class MapTile {
             }
 
             Point pointInTile = GeometryUtils.geometryFactory.createPoint(projectToTile(coordinate));
-            point.setUserData(point.getUserData());
+            pointInTile.setUserData(point.getUserData());
             pointsInTile.add(pointInTile);
         }
         return pointsInTile;

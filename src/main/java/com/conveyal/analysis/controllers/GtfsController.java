@@ -3,15 +3,15 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.MapTile;
+import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.GtfsGeometryCache;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
 import com.mongodb.QueryBuilder;
+import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
 import org.mongojack.DBCursor;
 import spark.Request;
@@ -41,15 +41,15 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
  * A basic example client for browsing the tiles is at src/main/resources/vector-client
  */
 public class GtfsController implements HttpController {
-    // Layer names must match UI code.
+
+    // Vector tile layer names. These must match the layer names expected in the UI code.
     private static final String PATTERN_LAYER_NAME = "conveyal:gtfs:patternShapes";
     private static final String STOP_LAYER_NAME = "conveyal:gtfs:stops";
 
     private final GTFSCache gtfsCache;
-    private final GtfsGeometryCache gtfsGeometryCache;
+
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-        this.gtfsGeometryCache = new GtfsGeometryCache(gtfsCache);
     }
 
     private static class BaseApiResponse {
@@ -197,12 +197,15 @@ public class GtfsController implements HttpController {
      */
     private Object getTile (Request req, Response res) {
         String bundleScopedFeedId = bundleScopedFeedIdFromRequest(req);
-        MapTile tile = new MapTile(Integer.parseInt(req.params("z")), Integer.parseInt(req.params("x")), Integer.parseInt(req.params("y")));
-        var patterns = tile.clipAndSimplifyLinesToTile(
-                gtfsGeometryCache.patternShapes.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        final int z = Integer.parseInt(req.params("z"));
+        final int x = Integer.parseInt(req.params("x"));
+        final int y = Integer.parseInt(req.params("y"));
+        VectorMapTile tile = new VectorMapTile(z, x, y);
+        List<Geometry> patternGeometries = tile.clipAndSimplifyLinesToTile(
+                gtfsCache.patternShapes.queryEnvelope(bundleScopedFeedId, tile.envelope)
         );
-        var stops = tile.projectPointsToTile(
-                gtfsGeometryCache.stops.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        List<Geometry> stopGeometries = tile.projectPointsToTile(
+                gtfsCache.stops.queryEnvelope(bundleScopedFeedId, tile.envelope)
         );
 
         res.header("Content-Type", "application/vnd.mapbox-vector-tile");
@@ -210,8 +213,8 @@ public class GtfsController implements HttpController {
         res.status(OK_200);
 
         return tile.encodeLayersToBytes(
-                tile.createLayer(PATTERN_LAYER_NAME, patterns),
-                tile.createLayer(STOP_LAYER_NAME, stops)
+                tile.createLayer(PATTERN_LAYER_NAME, patternGeometries),
+                tile.createLayer(STOP_LAYER_NAME, stopGeometries)
         );
     }
 

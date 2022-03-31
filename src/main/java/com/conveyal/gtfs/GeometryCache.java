@@ -47,7 +47,8 @@ public class GeometryCache<T extends Geometry> {
     }
 
     /**
-     * Find a List of all geometry within a given envelope.
+     * Return a List including all geometries that intersect a given envelope.
+     * Note that this overselects (can and will return some geometries outside the envelope).
      */
     public List<T> queryEnvelope(String key, Envelope envelope) {
         return cache.get(key).query(envelope);

@@ -18,16 +18,51 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Utilities for creating a slippy map tile and generating it's enveloper. Also for encapsulating it's properties that
- * can be re-used for clipping, simplifying, projecting coordinates, creating layers, and generating tiles.
+ * An instance of this class represents a single Mapbox Vector Tile (MVT) at the supplied Z, X, Y position.
+ * By convention the tiling scheme used is identical to the web Mercator raster tiles used by Google or OpenStreetMap.
+ * It would be possible to share the tile envelope code between this VectorMapTile and a hypothetical RasterMapTile,
+ * but we currently don't seem to have any Java code handling raster map tiles.
+ *
+ * When an instance is created, its bounding envelope is computed and retained for reuse.
+ * A JTS Geometry representing that same envelope with a small margin is also created for clipping purposes.
+ *
+ * This allows us to encapsulate and efficiently reuse properties for clipping, simplifying, projecting coordinates,
+ * creating layers, and generating tiles.
+ *
+ * For the Mapbox GL Client:
+ * All geometric coordinates in vector tiles must be between -1 * extent and (extent * 2) - 1 inclusive.
  *
  * References:
- * - http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
- * - http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Java
- */
-public class MapTile {
+ * The methods for finding WGS84 tile extents are from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Java
+ * For testing, find tile numbers with https://www.maptiler.com/google-maps-coordinates-tile-bounds-projection/
+ * Examine and analyze individual tiles with https://observablehq.com/@henrythasler/mapbox-vector-tile-dissector
+ *
+ * The vector tile format specification is at https://github.com/mapbox/vector-tile-spec/tree/master/2.1
+ * To summarize:
+ * Extension should be .mvt and MIME content type application/vnd.mapbox-vector-tile.
+ * A Vector Tile represents data based on a square extent within a projection.
+ * Vector Tiles may be used to represent data with any projection and tile extent scheme.
+ * The reference projection is Web Mercator; the reference tile scheme is Google's.
+ * The tile should not contain information about its bounds and projection.
+ * The decoder already knows the bounds and projection of a Vector Tile it requested when decoding it.
+ * A Vector Tile should contain at least one layer, and a layer should contain at least one feature.
+ * Feature coordinates are integers relative to the top left of the tile.
+ * The extent of a tile is the number of integer units across its width and height, typically 4096.
+ * */
+public class VectorMapTile {
 
+    /**
+     * The number of integer units across the map tile. Smaller numbers would in theory allow for smaller tile sizes
+     * (in bytes) as details would be truncated and variable width integers encode smaller numbers with less bytes.
+     * But it's probably best to stick with the standard extent - our tile file sizes are usually quite small anyway.
+     */
     public static final int DEFAULT_TILE_EXTENT = 4096;
+
+    /**
+     * MvtLayerParams Javadoc states that this is the dimension (width and height) of the tile in pixels.
+     * I'm not sure what this is for since vector tiles are of course not rasterized until they reach the client.
+     * This is just the standard value taken from example code, matching the standard non-retina raster tile dimension.
+     */
     public static final int DEFAULT_TILE_SIZE = 256;
 
     /**
@@ -48,18 +83,18 @@ public class MapTile {
     public final Envelope envelope;
     public final Geometry bufferedEnvelopeGeometry;
 
-    public MapTile (int zoom, int x, int y) {
+    public VectorMapTile (int zoom, int x, int y) {
         this(zoom, x, y, DEFAULT_TILE_EXTENT, DEFAULT_TILE_SIZE);
     }
 
-    public MapTile (int zoom, int x, int y, int tileExtent, int tileSize) {
+    public VectorMapTile (int zoom, int x, int y, int tileExtent, int tileSize) {
         this.zoom = zoom;
         this.x = x;
         this.y = y;
         this.envelope = wgsEnvelope();
 
         // Create the buffered envelope for clipping
-        var bufferedEnvelope = this.envelope.copy();
+        Envelope bufferedEnvelope = this.envelope.copy();
         bufferedEnvelope.expandBy(
                 envelope.getWidth() * TILE_BUFFER_PROPORTION,
                 envelope.getHeight() * TILE_BUFFER_PROPORTION
@@ -69,16 +104,6 @@ public class MapTile {
         this.tileExtent = tileExtent;
         this.tileSize = tileSize;
     }
-
-//    public static int xTile(double lon, int zoom) {
-//        return (int) Math.floor((lon + 180) / 360 * (1 << zoom));
-//    }
-//
-//    public static int yTile(double lat, int zoom) {
-//        return (int) Math.floor((1 - Math.log(Math.tan(Math.toRadians(lat))
-//                + 1 / Math.cos(Math.toRadians(lat))) / Math.PI) / 2 * (1 << zoom));
-//    }
-//
 
     public Envelope wgsEnvelope () {
         return wgsEnvelope(zoom, x, y);
@@ -167,7 +192,7 @@ public class MapTile {
     public Geometry clipScaleAndSimplify (LineString wgsGeometry) {
         // Add a 5% margin to the envelope make sure any artifacts are outside it.
         // This takes care of the fact that lines have endcaps and widths.
-        var clippedWgsGeometry = bufferedEnvelopeGeometry.intersection(wgsGeometry);
+        Geometry clippedWgsGeometry = bufferedEnvelopeGeometry.intersection(wgsGeometry);
 
         // Iterate over clipped geometry in case clipping broke the LineString into a MultiLineString
         // or reduced it to nothing (zero elements). Self-intersecting geometries can yield a larger number of elements.
@@ -175,7 +200,7 @@ public class MapTile {
         List<LineString> outputLineStrings = new ArrayList<>(clippedWgsGeometry.getNumGeometries());
         for (int g = 0; g < clippedWgsGeometry.getNumGeometries(); g += 1) {
             LineString wgsSubGeom = (LineString) clippedWgsGeometry.getGeometryN(g);
-            var wgsCoordinates = wgsSubGeom.getCoordinates();
+            Coordinate[] wgsCoordinates = wgsSubGeom.getCoordinates();
             if (wgsCoordinates.length < 2) {
                 continue;
             }
@@ -185,8 +210,8 @@ public class MapTile {
                 tileCoordinates[c] = projectToTile(wgsCoordinates[c]);
             }
 
-            var tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates);
-            var simplifiedTileGeometry = DouglasPeuckerSimplifier.simplify(
+            LineString tileLineString = GeometryUtils.geometryFactory.createLineString(tileCoordinates);
+            Geometry simplifiedTileGeometry = DouglasPeuckerSimplifier.simplify(
                     tileLineString,
                     LINE_SIMPLIFY_TOLERANCE
             );

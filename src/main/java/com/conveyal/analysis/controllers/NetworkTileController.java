@@ -1,7 +1,7 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.analysis.util.MapTile;
+import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -31,9 +31,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * See GtfsVectorTileMaker for more information on the vector tile spec and tile numbers.
  */
 public class NetworkTileController implements HttpController {
+
     private static final Logger LOG = LoggerFactory.getLogger(NetworkTileController.class);
 
-    // This must match UI code.
+    /** Vector tile layer name. This must match the layer name expected in the UI code. */
     private static final String EDGE_LAYER_NAME = "conveyal:osm:edges";
 
     /** The zoom level at which each StreetClass appears, indexed by StreetClass.code from 0...4. */
@@ -77,7 +78,8 @@ public class NetworkTileController implements HttpController {
     }
 
     /**
-     * Get all of the edge geometries and attributes within a given map tile's envelope.
+     * Get all of the edge geometries and attributes within a given map tile's envelope, clipping them to that envelope
+     * (plus a small buffer) and projecting their coordinates from WGS84 to intra-tile units.
      *
      * We have tried offsetting the edges for opposite directions using org.geotools.geometry.jts.OffsetCurveBuilder
      * but this will offset in tile units and cause jumps at different zoom levels when rendered. Using offset styles
@@ -86,17 +88,17 @@ public class NetworkTileController implements HttpController {
      * per pair. For example, for elevation data this could be the direction with the largest value which should always
      * be >= 1.
      */
-    private List<Geometry> getEdgeGeometries (TransportNetwork network, MapTile mapTile) {
+    private List<Geometry> getClippedAndProjectedEdgeGeometries (TransportNetwork network, VectorMapTile vectorMapTile) {
         List<Geometry> edgeGeoms = new ArrayList<>(64);
 
-        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(mapTile.envelope));
+        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(vectorMapTile.envelope));
         edges.forEach(e -> {
             EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
             // TODO at low zoom levels, include only edge pairs. At high, include different directions in pair.
-            if (mapTile.zoom < zoomForStreetClass[edge.getStreetClassCode()]) {
+            if (vectorMapTile.zoom < zoomForStreetClass[edge.getStreetClassCode()]) {
                 return true; // Continue iteration.
             }
-            Geometry edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
+            Geometry edgeGeometry = vectorMapTile.clipScaleAndSimplify(edge.getGeometry());
             if (edgeGeometry != null) {
                 edgeGeometry.setUserData(edge.attributesForDisplay());
                 edgeGeoms.add(edgeGeometry);
@@ -104,7 +106,7 @@ public class NetworkTileController implements HttpController {
             // The index contains only forward edges in each pair. Also include the backward edges.
             // TODO factor out repetitive code?
             edge.advance();
-            edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
+            edgeGeometry = vectorMapTile.clipScaleAndSimplify(edge.getGeometry());
             if (edgeGeometry != null) {
                 edgeGeometry.setUserData(edge.attributesForDisplay());
                 edgeGeoms.add(edgeGeometry);
@@ -116,7 +118,8 @@ public class NetworkTileController implements HttpController {
     }
 
     /**
-     * Create a Mapbox Vector Tile of a Transit Network's processed OSM Edges for the given Z/X/Y tile.
+     * Create a Mapbox Vector Tile (MVT) of a TransportNetwork's processed OSM Edges for the Z/X/Y tile numbers
+     * given in the request URL parameters.
      */
     private Object getEdgeGeometryVectorTile(Request request, Response response) {
         final int zTile = Integer.parseInt(request.params("z"));
@@ -124,7 +127,7 @@ public class NetworkTileController implements HttpController {
         final int yTile = Integer.parseInt(request.params("y"));
 
         TransportNetwork network = getNetworkFromRequest(request);
-        MapTile mapTile = new MapTile(zTile, xTile, yTile);
+        VectorMapTile vectorMapTile = new VectorMapTile(zTile, xTile, yTile);
 
         final long startTimeMs = System.currentTimeMillis();
 
@@ -133,10 +136,10 @@ public class NetworkTileController implements HttpController {
         response.header("Cache-Control", CACHE_CONTROL_IMMUTABLE);
         response.status(OK_200);
 
-        List<Geometry> edges = getEdgeGeometries(network, mapTile);
+        List<Geometry> edges = getClippedAndProjectedEdgeGeometries(network, vectorMapTile);
         if (edges.size() > 0) {
-            byte[] pbfMessage = mapTile.encodeLayersToBytes(
-                    mapTile.createLayer(EDGE_LAYER_NAME, edges)
+            byte[] pbfMessage = vectorMapTile.encodeLayersToBytes(
+                    vectorMapTile.createLayer(EDGE_LAYER_NAME, edges)
             );
             LOG.debug("getTile({}, {}, {}, {}) in {}", network.scenarioId, zTile, xTile, yTile,
                     Duration.ofMillis(System.currentTimeMillis() - startTimeMs));

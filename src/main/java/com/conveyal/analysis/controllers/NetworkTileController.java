@@ -2,24 +2,12 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.analysis.util.MapTile;
-import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.google.common.collect.ImmutableMap;
-import com.wdtinc.mapbox_vector_tile.adapt.jts.MvtEncoder;
-import com.wdtinc.mapbox_vector_tile.adapt.jts.UserDataKeyValueMapConverter;
-import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsLayer;
-import com.wdtinc.mapbox_vector_tile.adapt.jts.model.JtsMvt;
-import com.wdtinc.mapbox_vector_tile.build.MvtLayerParams;
 import gnu.trove.set.TIntSet;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateSequence;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.index.strtree.STRtree;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -28,12 +16,8 @@ import spark.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import static com.conveyal.analysis.controllers.GtfsVectorTileMaker.clipScaleAndSimplify;
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
 import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
@@ -42,19 +26,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Defines HTTP API endpoints to return Mapbox vector tiles of the street network. This is not simply the underlying
  * OSM data, but the street edges created from that OSM data. This allows the user to verify how the OSM tags have
- * been interpreted as mode permissions, speeds, etc. and eventually should allow visualizing the effets of scenarios
- * on the street nework, includng scenarios that change the characteristics of street edges or create new streets.
+ * been interpreted as mode permissions, speeds, etc. and eventually should allow visualizing the effects of scenarios
+ * on the street network, including scenarios that change the characteristics of street edges or create new streets.
  * See GtfsVectorTileMaker for more information on the vector tile spec and tile numbers.
  */
 public class NetworkTileController implements HttpController {
-
     private static final Logger LOG = LoggerFactory.getLogger(NetworkTileController.class);
 
-    /**
-     * Complex street geometries will be simplified, but the geometry will not deviate from the original by more
-     * than this many tile units. These are minuscule at 1/4096 of the tile width or height.
-     */
-    private static final int LINE_SIMPLIFY_TOLERANCE = 5;
+    // This must match UI code.
+    private static final String EDGE_LAYER_NAME = "conveyal:osm:edges";
 
     /** The zoom level at which each StreetClass appears, indexed by StreetClass.code from 0...4. */
     private static final int[] zoomForStreetClass = new int[] {8, 10, 11, 12, 13};
@@ -73,7 +53,7 @@ public class NetworkTileController implements HttpController {
         // Should end in .mvt but not clear how to do that in Sparkframework.
         //         sparkService.get("/:bundleId/:modificationNonceDigest/tiles", this::buildIndex, JsonUtil.toJson);
         sparkService.get("/:bundleId/tiles", this::buildIndex, JsonUtil.toJson);
-        sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getTile);
+        sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getEdgeGeometryVectorTile);
     }
 
     private TransportNetwork getNetworkFromRequest (Request request) {
@@ -82,9 +62,6 @@ public class NetworkTileController implements HttpController {
         // final String modificationNonceDigest = request.params("modificationNonceDigest");
         checkNotNull(bundleId);
         TransportNetwork network = transportNetworkCache.getNetwork(bundleId);
-        // "61fe817974f6230b0363aae1-8c07ddd4f8bd29ac10a4a109dd27d7b58dabd56c" // elevation only
-        // final String scenarioId = "61fe817974f6230b0363aae1-c38397b6249e9fa894ef39d667edbc3d9036c15b"; // elevation and sun
-        // network = transportNetworkCache.getNetworkForScenario(bundleId, scenarioId);
         checkNotNull(network);
         return network;
     }
@@ -100,6 +77,8 @@ public class NetworkTileController implements HttpController {
     }
 
     /**
+     * Get all of the edge geometries and attributes within a given map tile's envelope.
+     *
      * We have tried offsetting the edges for opposite directions using org.geotools.geometry.jts.OffsetCurveBuilder
      * but this will offset in tile units and cause jumps at different zoom levels when rendered. Using offset styles
      * in MapboxGL with exponential interpolation by zoom level seems to work better for showing opposite directions
@@ -107,46 +86,58 @@ public class NetworkTileController implements HttpController {
      * per pair. For example, for elevation data this could be the direction with the largest value which should always
      * be >= 1.
      */
-    private Object getTile (Request request, Response response) {
-        TransportNetwork network = getNetworkFromRequest(request);
+    private List<Geometry> getEdgeGeometries (TransportNetwork network, MapTile mapTile) {
+        List<Geometry> edgeGeoms = new ArrayList<>(64);
 
-        final long startTimeMs = System.currentTimeMillis();
-        final int zTile = Integer.parseInt(request.params("z"));
-        final int xTile = Integer.parseInt(request.params("x"));
-        final int yTile = Integer.parseInt(request.params("y"));
-        final int tileExtent = 4096; // Standard is 4096, smaller can in theory make tiles more compact
-
-        Envelope wgsEnvelope = MapTile.wgsEnvelope(zTile, xTile, yTile);
-        Collection<Geometry> edgeGeoms = new ArrayList<>(64);
-
-        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(wgsEnvelope));
+        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(mapTile.envelope));
         edges.forEach(e -> {
             EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
             // TODO at low zoom levels, include only edge pairs. At high, include different directions in pair.
-            if (zTile < zoomForStreetClass[edge.getStreetClassCode()]) {
+            if (mapTile.zoom < zoomForStreetClass[edge.getStreetClassCode()]) {
                 return true; // Continue iteration.
             }
-            LineString edgeGeometry = edge.getGeometry();
-            edgeGeometry.setUserData(edge.attributesForDisplay());
-            edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));
+            Geometry edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
+            if (edgeGeometry != null) {
+                edgeGeometry.setUserData(edge.attributesForDisplay());
+                edgeGeoms.add(edgeGeometry);
+            }
             // The index contains only forward edges in each pair. Also include the backward edges.
             // TODO factor out repetitive code?
             edge.advance();
-            edgeGeometry = edge.getGeometry();
-            edgeGeometry.setUserData(edge.attributesForDisplay());
-            edgeGeoms.add(clipScaleAndSimplify(edgeGeometry, wgsEnvelope, tileExtent));
+            edgeGeometry = mapTile.clipScaleAndSimplify(edge.getGeometry());
+            if (edgeGeometry != null) {
+                edgeGeometry.setUserData(edge.attributesForDisplay());
+                edgeGeoms.add(edgeGeometry);
+            }
             return true;
         });
+
+        return edgeGeoms;
+    }
+
+    /**
+     * Create a Mapbox Vector Tile of a Transit Network's processed OSM Edges for the given Z/X/Y tile.
+     */
+    private Object getEdgeGeometryVectorTile(Request request, Response response) {
+        final int zTile = Integer.parseInt(request.params("z"));
+        final int xTile = Integer.parseInt(request.params("x"));
+        final int yTile = Integer.parseInt(request.params("y"));
+
+        TransportNetwork network = getNetworkFromRequest(request);
+        MapTile mapTile = new MapTile(zTile, xTile, yTile);
+
+        final long startTimeMs = System.currentTimeMillis();
 
         response.header("Content-Type", "application/vnd.mapbox-vector-tile");
         response.header("Content-Encoding", "gzip");
         response.header("Cache-Control", CACHE_CONTROL_IMMUTABLE);
         response.status(OK_200);
-        if (edgeGeoms.size() > 0) {
-            JtsLayer edgeLayer = new JtsLayer("conveyal:osm:edges", edgeGeoms, tileExtent);
-            JtsMvt mvt = new JtsMvt(edgeLayer);
-            MvtLayerParams mvtLayerParams = new MvtLayerParams(256, tileExtent);
-            byte[] pbfMessage = MvtEncoder.encode(mvt, mvtLayerParams, new UserDataKeyValueMapConverter());
+
+        List<Geometry> edges = getEdgeGeometries(network, mapTile);
+        if (edges.size() > 0) {
+            byte[] pbfMessage = mapTile.encodeLayersToBytes(
+                    mapTile.createLayer(EDGE_LAYER_NAME, edges)
+            );
             LOG.debug("getTile({}, {}, {}, {}) in {}", network.scenarioId, zTile, xTile, yTile,
                     Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
             return pbfMessage;

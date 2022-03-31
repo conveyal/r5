@@ -3,8 +3,10 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.util.MapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.GtfsGeometryCache;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
@@ -39,11 +41,15 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
  * A basic example client for browsing the tiles is at src/main/resources/vector-client
  */
 public class GtfsController implements HttpController {
+    // Layer names must match UI code.
+    private static final String PATTERN_LAYER_NAME = "conveyal:gtfs:patternShapes";
+    private static final String STOP_LAYER_NAME = "conveyal:gtfs:stops";
+
     private final GTFSCache gtfsCache;
-    private final GtfsVectorTileMaker gtfsVectorTileMaker;
+    private final GtfsGeometryCache gtfsGeometryCache;
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-        this.gtfsVectorTileMaker = new GtfsVectorTileMaker(gtfsCache);
+        this.gtfsGeometryCache = new GtfsGeometryCache(gtfsCache);
     }
 
     private static class BaseApiResponse {
@@ -186,16 +192,27 @@ public class GtfsController implements HttpController {
         return allStopsByFeed;
     }
 
+    /**
+     * Generate a Mapbox Vector Tile of a GTFS feed's stops and pattern shapes for a given Z/X/Y tile.
+     */
     private Object getTile (Request req, Response res) {
         String bundleScopedFeedId = bundleScopedFeedIdFromRequest(req);
-        final int z = Integer.parseInt(req.params("z"));
-        final int x = Integer.parseInt(req.params("x"));
-        final int y = Integer.parseInt(req.params("y"));
-        byte[] pbfMessage = this.gtfsVectorTileMaker.getTile(bundleScopedFeedId, z, x, y);
+        MapTile tile = new MapTile(Integer.parseInt(req.params("z")), Integer.parseInt(req.params("x")), Integer.parseInt(req.params("y")));
+        var patterns = tile.clipAndSimplifyLinesToTile(
+                gtfsGeometryCache.patternShapes.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        );
+        var stops = tile.projectPointsToTile(
+                gtfsGeometryCache.stops.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        );
+
         res.header("Content-Type", "application/vnd.mapbox-vector-tile");
         res.header("Content-Encoding", "gzip");
         res.status(OK_200);
-        return pbfMessage;
+
+        return tile.encodeLayersToBytes(
+                tile.createLayer(PATTERN_LAYER_NAME, patterns),
+                tile.createLayer(STOP_LAYER_NAME, stops)
+        );
     }
 
     static class TripApiResponse extends BaseApiResponse {

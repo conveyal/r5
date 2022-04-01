@@ -72,16 +72,23 @@ public class ShapefileReader implements Closeable {
     }
 
     public Stream<SimpleFeature> stream () throws IOException {
+        // You have to actually close (or auto-close in try-with-resources) the stream to close this iterator.
+        // Just closing the store or file will generate an error - the iterator itself must be closed.
+        // This creates a lot of ugly manual resource-releasing code in the caller - maybe we should instead just
+        // track every iterator created and close them all when close() is called on the ShapefileReader.
+        final FeatureIterator<SimpleFeature> wrapped = features.features();
+
+        // This anonymous wrapper class exists only to close the iterator when iteration completes.
+        // There has to be a better way to do this, especially considering that it fails to close on partial iteration.
         Iterator<SimpleFeature> wrappedIterator = new Iterator<SimpleFeature>() {
-            FeatureIterator<SimpleFeature> wrapped = features.features();
 
             @Override
             public boolean hasNext () {
                 boolean hasNext = wrapped.hasNext();
                 if (!hasNext) {
                     // Prevent keeping a lock on the shapefile.
-                    // This doesn't help though when iteration is not completed. Ideally we need to keep a set of any
-                    // open iterators and close them all in the close method on the ShapefileReader.
+                    // This doesn't happen when iteration is not complete (e.g. via limit()).
+                    // The user of the stream should close() it, or use it in try-with-resources for auto-close.
                     wrapped.close();
                 }
                 return hasNext;
@@ -91,17 +98,47 @@ public class ShapefileReader implements Closeable {
             public SimpleFeature next () {
                 return wrapped.next();
             }
+
+            public void close () { wrapped.close(); }
         };
 
-        return StreamSupport.stream(Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED), false);
+        return StreamSupport.stream(
+                Spliterators.spliterator(wrappedIterator, features.size(), Spliterator.SIZED), false
+        ).onClose(() -> wrapped.close());
     }
 
     public ReferencedEnvelope getBounds () throws IOException {
         return source.getBounds();
     }
 
+    public List<String> attributesAssignableTo (Class<?> theClass) {
+        return features.getSchema()
+                .getAttributeDescriptors()
+                .stream()
+                .filter(d -> theClass.isAssignableFrom(d.getType().getBinding()))
+                .map(AttributeDescriptor::getLocalName)
+                .collect(Collectors.toList());
+    }
+
     public List<String> numericAttributes () {
-        return features.getSchema().getAttributeDescriptors().stream().filter(d -> Number.class.isAssignableFrom(d.getType().getBinding())).map(AttributeDescriptor::getLocalName).collect(Collectors.toList());
+        return attributesAssignableTo(Number.class);
+    }
+
+    /**
+     * Find an attribute by name _ignoring case_ and ensure it is assignable to variables of a particular class.
+     * @return the index of this attribute, so it can be fetched on each feature by index instead of name.
+     */
+    public int findAttribute (String name, Class<?> assignableTo) {
+        SimpleFeatureType featureSchema = features.getSchema();
+        int nAttributes = featureSchema.getAttributeCount();
+        for (int i = 0; i < nAttributes; i++) {
+            AttributeDescriptor descriptor = featureSchema.getDescriptor(i);
+            if (descriptor.getName().getLocalPart().equalsIgnoreCase(name) &&
+                assignableTo.isAssignableFrom(descriptor.getType().getBinding())) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Could not find attribute with specified name and type.");
     }
 
     public double getAreaSqKm () throws IOException, TransformException, FactoryException {
@@ -109,7 +146,6 @@ public class ShapefileReader implements Closeable {
         MathTransform webMercatorTransform = CRS.findMathTransform(crs, webMercatorCRS, true);
         Envelope mercatorEnvelope = JTS.transform(getBounds(), webMercatorTransform);
         return mercatorEnvelope.getArea() / 1000 / 1000;
-
     }
 
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {
@@ -120,6 +156,10 @@ public class ShapefileReader implements Closeable {
             }
             try {
                 // TODO does this leak beyond this function?
+                // FIXME this is rewriting the geometry of the feature but not changing the CRS that will be returned
+                //  by f.getDefaultGeometryProperty().getDescriptor().getCoordinateReferenceSystem()
+                // We should try to do this using a more standard GeoTools approach
+                f.getDefaultGeometryProperty().getDescriptor().getCoordinateReferenceSystem();
                 f.setDefaultGeometry(JTS.transform(g, transform));
             } catch (TransformException e) {
                 throw new RuntimeException(e);

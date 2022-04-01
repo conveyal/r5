@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
@@ -79,7 +80,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO evaluate whether synchronizing all methods to make this threadsafe is a performance issue.
  */
-public class Broker {
+public class Broker implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
 
@@ -399,7 +400,7 @@ public class Broker {
 
     /**
      * Given a worker commit ID and transport network, return the IP or DNS name of a worker that has that software
-     * and network already loaded. If none exist, return null and try to start one.
+     * and network already loaded. If none exist, return null. The caller can then try to start one.
      */
     public synchronized String getWorkerAddress(WorkerCategory workerCategory) {
         if (config.offline()) {

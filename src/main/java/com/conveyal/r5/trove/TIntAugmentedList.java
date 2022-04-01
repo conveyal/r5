@@ -270,7 +270,44 @@ public class TIntAugmentedList implements TIntList {
 
     @Override
     public TIntIterator iterator() {
-        throw new UnsupportedOperationException();
+        return new Iterator();
+    }
+
+    /**
+     * An iterator that iterates over a concatenated view of the base ane extended lists.
+     * Among other common iteration cases, this is useful for copying the full augmented list into a fresh TIntList.
+     */
+    private class Iterator implements TIntIterator {
+        boolean inExtension = false;
+        int pos = 0;
+
+        @Override
+        public int next () {
+            if (!inExtension && pos >= base.size()) {
+                inExtension = true;
+                pos = 0;
+            }
+            if (inExtension) {
+                return extension.get(pos++);
+            } else {
+                return base.get(pos++);
+            }
+        }
+
+        @Override
+        public boolean hasNext () {
+            if (inExtension) {
+                return pos < extension.size();
+            } else {
+                return pos < base.size() || extension.size() > 0;
+            }
+        }
+
+        @Override
+        public void remove () {
+            throw new UnsupportedOperationException();
+        }
+
     }
 
     @Override

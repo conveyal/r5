@@ -28,7 +28,8 @@ import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
 
 /**
- * This Component is a web server that serves up our HTTP API endpoints, both to the UI and to the workers.
+ * This Component is a web server that serves up our HTTP API endpoints, contacted by both the UI and the workers.
+ * This provides the backend HTTP API, not the much smaller HTTP API exposed by single-point workers.
  * It must be supplied with a list of HttpController instances implementing the endpoints.
  */
 public class HttpApi implements Component {

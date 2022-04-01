@@ -1,5 +1,6 @@
 package com.conveyal.analysis.persistence;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.models.BaseModel;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -17,7 +18,7 @@ import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 /** TODO should we pre-create all the AnalysisCollections and fetch them by Class? */
-public class AnalysisDB {
+public class AnalysisDB implements Component {
 
     private final Logger LOG = LoggerFactory.getLogger(AnalysisDB.class);
     private final MongoClient mongo;

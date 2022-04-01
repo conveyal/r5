@@ -1,5 +1,6 @@
 package com.conveyal.file;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 
@@ -18,7 +19,7 @@ import java.util.zip.GZIPInputStream;
  * metadata in MongoDB. That is a separate concern. Workers need to get files without looking into our database.
  * Our file metadata handling component could wrap FileStorage, so all backend file operations implicitly had metadata.
  */
-public interface FileStorage {
+public interface FileStorage extends Component {
 
     /**
      * Takes an already existing file on the local filesystem and registers it as a permanent, immutable file to be

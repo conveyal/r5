@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
 import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
@@ -55,25 +56,17 @@ import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * This is a main class run by worker machines in our Analysis computation cluster. It polls a broker requesting work
- * over HTTP, telling the broker what networks and scenarios it has loaded. When it receives some work from the broker
- * it does the necessary work and returns the results back to the front end via the broker.
- * The worker may also listen for interactive single point requests that should return as fast as possible.
+ * This contains the main polling loop used by the worker to pull and asynchronously process regional analysis tasks.
+ * It polls the broker requesting work over HTTP, telling the broker what networks and scenarios it has loaded.
+ * It also contains methods invoked by the WorkerHttpApi for handling single-point requests, because they use many
+ * of the same Components, but it may be clearer in the long run to factor that out.
+ * Since this is now placed under Worker we should eventually rename it to something like RegionalTaskProcessor.
  */
-public class AnalysisWorker implements Runnable {
+public class AnalysisWorker implements Component {
 
-    /**
-     * All parameters needed to configure an AnalysisWorker instance.
-     * This config interface is kind of huge and includes most things in the WorkerConfig.
-     * This implies too much functionality is concentrated in AnalysisWorker and should be compartmentalized.
-     */
+    //  CONFIGURATION
+
     public interface Config {
-        /**
-         * This worker will only listen for incoming single point requests if this field is true when run() is invoked.
-         * Setting this to false before running creates a regional-only cluster worker.
-         * This is useful in testing when running many workers on the same machine.
-         */
-        boolean listenForSinglePoint();
         String brokerAddress();
         String brokerPort();
         String initialGraphId();
@@ -92,16 +85,6 @@ public class AnalysisWorker implements Runnable {
      * WorkerNotReadyException.
      */
     private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
-
-    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
-    public static final int WORKER_LISTEN_PORT = 7080;
-
-    /**
-     * When testTaskRedelivery=true, how often the worker will fail to return a result for a task.
-     * TODO merge this with the boolean config parameter to enable intentional failure.
-     */
-    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
-
 
     // STATIC FIELDS
 
@@ -188,9 +171,6 @@ public class AnalysisWorker implements Runnable {
      */
     private ThreadPoolExecutor regionalTaskExecutor;
 
-    /** The HTTP server that receives single-point requests. TODO make this more consistent with the backend HTTP API components. */
-    private spark.Service sparkHttpService;
-
     private final EventBus eventBus;
 
     /** Constructor that takes injected components. */
@@ -218,8 +198,7 @@ public class AnalysisWorker implements Runnable {
     }
 
     /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
-    @Override
-    public void run() {
+    public void startPolling () {
 
         // Create executors with up to one thread per processor.
         // The default task rejection policy is "Abort".
@@ -232,24 +211,8 @@ public class AnalysisWorker implements Runnable {
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
         regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
-        // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
-        // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
-        // This is listening on a different port than the backend API so that a worker can be running on the backend.
-        // When testing cluster functionality, e.g. task redelivery, many  workers run on the same machine. In that
-        // case, this HTTP server is disabled on all workers but one to avoid port conflicts.
-        // Ideally we would limit the number of threads the worker will use to handle HTTP connections, in order to
-        // crudely limit memory consumption and load from simultaneous single point requests. Unfortunately we can't
-        // call sparkHttpService.threadPool(NTHREADS) because we get an error message saying we need over 10 threads:
-        // "needed(acceptors=1 + selectors=8 + request=1)". Even worse, in container-based testing environments this
-        // required number of threads is even higher and any value we specify can cause the server (and tests) to fail.
-        // TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
-        if (config.listenForSinglePoint()) {
-            // Use the newer non-static Spark framework syntax.
-            sparkHttpService = spark.Service.ignite().port(WORKER_LISTEN_PORT);
-            sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
-        }
-
         // Main polling loop to fill the regional work queue.
+        // Go into an endless loop polling for regional tasks that can be computed asynchronously.
         // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
         // people all over the world have been jumping through hoops to try to achieve this simple behavior
         // with no real success, at least without writing bug and deadlock-prone custom executor services.

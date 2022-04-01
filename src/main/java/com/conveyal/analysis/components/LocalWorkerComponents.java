@@ -2,9 +2,13 @@ package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.r5.analyst.cluster.AnalysisWorkerController;
 import com.conveyal.r5.transit.TransportNetworkCache;
+
+import java.util.List;
 
 /**
  * Wires up the components for a local worker instance (as opposed to a cloud-hosted worker instance).
@@ -25,8 +29,10 @@ public class LocalWorkerComponents extends WorkerComponents {
         taskScheduler = new TaskScheduler(config);
         eventBus = new EventBus(taskScheduler);
         analysisWorker = new AnalysisWorker(fileStorage, transportNetworkCache, eventBus, config);
-        // taskScheduler.repeatRegularly(...);
-        // eventBus.addHandlers(...);
+        workerHttpApi = new WorkerHttpApi(config, List.of(
+                new AnalysisWorkerController(analysisWorker),
+                new NetworkTileController(transportNetworkCache)
+        ));
     }
 
 }

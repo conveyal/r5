@@ -62,6 +62,10 @@ public abstract class JsonUtilities {
 
     /**
      * Deserializes an object of the given type from the body of the supplied Spark request.
+     * We use the lenient mapper for two reasons: 1. We use the type JSON property to select the Java class to
+     * deserialize into, but that field doesn't exist on the resulting Java classes; 2. R5 modificaton classes may
+     * evolve, usually in a backward compatible way by adding new fields, and we want older modifications without those
+     * fields to deserialize without errors.
      */
     public static <T> T objectFromRequestBody(spark.Request request, Class<T> classe) {
         try {

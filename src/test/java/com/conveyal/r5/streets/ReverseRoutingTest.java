@@ -1,6 +1,5 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
@@ -32,7 +31,7 @@ public class ReverseRoutingTest {
 
     @BeforeEach
     public void setUp() throws Exception {
-        streetLayer = new StreetLayer(new TNBuilderConfig());
+        streetLayer = new StreetLayer();
         transportNetwork = new TransportNetwork();
         transportNetwork.streetLayer = streetLayer;
         vertexNames = new ArrayList<>(6);

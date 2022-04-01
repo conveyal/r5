@@ -6,7 +6,7 @@ package com.conveyal.analysis.components;
  * This would encapsulate any logic that manages a compute cluster.
  * In practice, the backend currently relays the requests to a cluster of local or remote workers running R5.
  */
-public class Compute {
+public class Compute implements Component {
 
     public void handleRequest () {
 

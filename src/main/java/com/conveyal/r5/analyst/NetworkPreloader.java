@@ -180,15 +180,17 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             this.networkId = task.graphId;
             // A supplied scenario ID will always override any full scenario that is present.
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
-            // We need to link for all of access modes, egress modes, and direct modes (depending on whether
-            // transit is used). See code in TravelTimeComputer for when each is used.
             // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
-            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
             this.egressModes = LegMode.toStreetModeSet(
                 // Avoid unnecessarily building egress tables by
                 // ignoring spurious egress modes in requests that do not have transit enabled.
                 task.transitModes.isEmpty() ? EnumSet.noneOf(LegMode.class) : task.egressModes
             );
+            // We need to link for all of access modes, egress modes, and direct modes (depending on whether
+            // transit is used). See code in TravelTimeComputer for when each is used.
+            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
+            this.allModes.addAll(this.egressModes);
+
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 

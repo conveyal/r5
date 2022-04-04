@@ -109,7 +109,7 @@ public class EdgeStore implements Serializable {
     public TLongList osmids;
 
     /**
-     * For each edge _pair_, the OSM highway class is was derived from. Integer codes are defined in the StreetClass
+     * For each edge _pair_, the OSM highway class it was derived from. Integer codes are defined in the StreetClass
      * enum. Like OSM IDs and street names, these could be factored out into a table of OSM way data.
      */
     public TByteList streetClasses;
@@ -562,6 +562,7 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+            streetClasses.set(pairIndex, other.getEdgeStore().streetClasses.get(pairIndex));
         }
 
         public void copyPairGeometry(Edge other) {

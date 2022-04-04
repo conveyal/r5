@@ -15,7 +15,6 @@ import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
-import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
@@ -42,8 +41,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
-
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This stores all the characteristics of the edges in the street graph layer of the transport network.

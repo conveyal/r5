@@ -13,10 +13,11 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SpeedLabeler;
+import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
@@ -53,7 +54,6 @@ import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -196,8 +196,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public boolean bikeSharing = false;
 
-    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
-        speedLabeler = new SpeedLabeler(tnBuilderConfig.speeds);
+    public StreetLayer() {
+        speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
     }
 
     /** Load street layer from an OSM-lib OSM DB */
@@ -282,7 +282,7 @@ public class StreetLayer implements Serializable, Cloneable {
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
-        // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
+        // TEMPORARY HACK: create a EdgeTraversalTimes object to hold costs from preprocessed OSM data, and indicate that
         // we are loading them. Eventually this should be done based on configuration settings.
         this.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(edgeStore);
 
@@ -294,17 +294,16 @@ public class StreetLayer implements Serializable, Cloneable {
             if (!isWayRoutable(way)) {
                 continue;
             }
-            int nEdgesCreated = 0;
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
             for (int n = 1; n < way.nodes.length; n++) {
                 if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
-                    nEdgesCreated += 1;
                     beginIdx = n;
                 }
             }
         }
+        // Initial bike LTS values were added in makeEdgePair calls above via LevelOfTrafficStressLabeler.label
         stressLabeler.logErrors();
 
         if (edgeStore.edgeTraversalTimes != null) {
@@ -1095,8 +1094,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
         Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, osmID);
         // newEdge is first pointing to the forward edge in the pair.
-        // Geometries apply to both edges in a pair.
+        // Geometries apply to both edges in a pair. Likewise for street classes.
         newEdge.setGeometry(nodes);
+        newEdge.setStreetClass(StreetClass.forWay(way));
+
         // If per-edge traversal time factors are being recorded for this StreetLayer, store these factors for the
         // pair of newly created edges based on the current OSM Way.
         // NOTE the unusual requirement here that each OSM way is exactly one routable network edge.
@@ -1109,6 +1110,7 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
+        // Now set characteristics that differ in the forward and backward directions.
         newEdge.setFlags(forwardFlags);
         newEdge.setSpeed(forwardSpeed);
         // Step ahead to the backward edge in the same pair.
@@ -1122,6 +1124,7 @@ public class StreetLayer implements Serializable, Cloneable {
         LOG.info("Indexing streets...");
         spatialIndex = new IntHashGrid();
         // Skip by twos, we only need to index forward (even) edges. Their odd companions have the same geometry.
+        // Ideally shouldn't we then be recording the edge pair numbers, i.e. the edgeIndex/2 ?
         Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); e += 2) {
             edge.seek(e);
@@ -1446,10 +1449,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Creates vertices to represent each bike rental station.
+     * CURRENTLY UNUSED. Should this be configuratble in the network build configuration?
      */
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) {
-        LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
-        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
+    public void associateBikeSharing(File bikeRentalFile) {
+        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(bikeRentalFile);
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
         bikeRentalStationMap = new TIntObjectHashMap<>(bikeRentalStations.size());
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());

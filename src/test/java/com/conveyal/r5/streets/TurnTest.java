@@ -1,6 +1,5 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +26,7 @@ public abstract class TurnTest {
 
         double latOffset = southernHemisphere ? -60 : 0;
 
-        streetLayer = new StreetLayer(new TNBuilderConfig());
+        streetLayer = new StreetLayer();
         vcenter = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.123);
         vn = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.123);
         vs = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.123);

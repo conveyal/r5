@@ -200,7 +200,7 @@ public class IntHashGrid implements Serializable {
         // Check sanity before iterating
         long dx = (maxXKey - minXKey);
         long dy = (maxYKey - minYKey);
-        if (dx * dy > 10000) {
+        if (dx * dy > 100_000) {
             LOG.error("Visiting too many spatial index cells.");
             return;
         }

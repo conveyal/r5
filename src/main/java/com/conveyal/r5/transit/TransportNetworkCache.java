@@ -1,16 +1,21 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.analysis.components.Component;
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.cluster.BundleManifest;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -26,12 +31,14 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
@@ -41,7 +48,7 @@ import static com.conveyal.file.FileCategory.BUNDLES;
  * However there may be many scenario networks derived from that base network, which  are stored in the scenarios
  * field of the baseNetwork.
  */
-public class TransportNetworkCache {
+public class TransportNetworkCache implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetworkCache.class);
 
@@ -158,12 +165,9 @@ public class TransportNetworkCache {
      */
     private @Nonnull TransportNetwork buildNetwork (String networkId) {
         TransportNetwork network;
-
-        // Check if we have a new-format bundle with a JSON manifest.
-        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
-        if (fileStorage.exists(manifestFileKey)) {
-            LOG.debug("Detected new-format bundle with manifest.");
-            network = buildNetworkFromManifest(networkId);
+        FileStorageKey networkConfigKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
+        if (fileStorage.exists(networkConfigKey)) {
+            network = buildNetworkFromConfig(networkId);
         } else {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
             network = buildNetworkFromBundleZip(networkId);
@@ -236,35 +240,38 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Build a network from a JSON manifest in S3.
-     * A manifest describes the locations of files used to create a bundle.
+     * Build a network from a JSON TransportNetworkConfig in file storage.
+     * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
-    private TransportNetwork buildNetworkFromManifest (String networkId) {
-        FileStorageKey manifestFileKey = new FileStorageKey(BUNDLES, getManifestFilename(networkId));
-        File manifestFile = fileStorage.getFile(manifestFileKey);
-        BundleManifest manifest;
+    private TransportNetwork buildNetworkFromConfig (String networkId) {
+        FileStorageKey configFileKey = new FileStorageKey(BUNDLES, getNetworkConfigFilename(networkId));
+        File configFile = fileStorage.getFile(configFileKey);
+        TransportNetworkConfig config;
 
         try {
-            manifest = JsonUtilities.objectMapper.readValue(manifestFile, BundleManifest.class);
+            // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            config = JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
-            LOG.error("Error reading manifest", e);
-            return null;
+            throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
         }
-        // FIXME duplicate code. All internal building logic should be encapsulated in a method like TransportNetwork.build(osm, gtfs1, gtfs2...)
-        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip
-        // So you've got to remember to do certain things like set the network ID of the network in multiple places in the code.
+        // FIXME duplicate code. All internal building logic should be encapsulated in a method like
+        //  TransportNetwork.build(osm, gtfs1, gtfs2...)
+        // We currently have multiple copies of it, in buildNetworkFromConfig and buildNetworkFromBundleZip so you've
+        // got to remember to do certain things like set the network ID of the network in multiple places in the code.
+        // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
 
         TransportNetwork network = new TransportNetwork();
         network.scenarioId = networkId;
-        network.streetLayer = new StreetLayer(new TNBuilderConfig()); // TODO builderConfig
-        network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
+        network.streetLayer = new StreetLayer();
+        network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
+
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
         network.transitLayer = new TransitLayer();
 
-        manifest.gtfsIds.stream()
+        config.gtfsIds.stream()
                 .map(gtfsCache::get)
                 .forEach(network.transitLayer::loadFromGtfs);
 
@@ -278,10 +285,55 @@ public class TransportNetworkCache {
         transferFinder.findTransfers();
         transferFinder.findParkRideTransfer();
 
+        // Apply modifications embedded in the TransportNetworkConfig JSON
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
+                RasterCost.class, ShapefileLts.class
+        );
+        if (config.modifications != null) {
+            // Scenario scenario = new Scenario();
+            // scenario.modifications = config.modifications;
+            // scenario.applyToTransportNetwork(network);
+            // This is applying the modifications _without creating a scenario copy_.
+            // This will destructively edit the network and will only work for certain modifications.
+            for (Modification modification : config.modifications) {
+                if (!ACCEPT_MODIFICATIONS.contains(modification.getClass())) {
+                    throw new UnsupportedOperationException(
+                        "Modification type has not been evaluated for application at network build time:" +
+                        modification.getClass().toString()
+                    );
+                }
+                modification.resolve(network);
+                modification.apply(network);
+            }
+        }
         return network;
     }
 
-    private String getManifestFilename(String networkId) {
+    /**
+     * Return a File for the .shp file with the given dataSourceId, ensuring all associated sidecar files are local.
+     * Shapefiles are usually accessed using only the .shp file's name. The reading code will look for sidecar files of
+     * the same name in the same filesystem directory. If only the .shp is requested from the FileStorage it will not
+     * pull down any of the associated sidecar files from cloud storage. This method will ensure that they are all on
+     * the local filesystem before we try to read the .shp.
+     */
+    public static File prefetchShapefile (FileStorage fileStorage, String dataSourceId) {
+        // TODO Clarify FileStorage semantics: which methods cause files to be pulled down;
+        //      which methods tolerate non-existing file and how do they react?
+        for (String extension : List.of("shp", "shx", "dbf", "prj")) {
+            FileStorageKey subfileKey = new FileStorageKey(DATASOURCES, dataSourceId, extension);
+            if (fileStorage.exists(subfileKey)) {
+                fileStorage.getFile(subfileKey);
+            } else {
+                if (!extension.equals("shx")) {
+                    String filename = String.join(".", dataSourceId, extension);
+                    throw new DataSourceException("Required shapefile sub-file was not found: " + filename);
+                }
+            }
+        }
+        return fileStorage.getFile(new FileStorageKey(DATASOURCES, dataSourceId, "shp"));
+    }
+
+    private String getNetworkConfigFilename (String networkId) {
         return GTFSCache.cleanId(networkId) + ".json";
     }
 

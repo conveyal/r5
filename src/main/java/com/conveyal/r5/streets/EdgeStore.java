@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.trove.AugmentedList;
+import com.conveyal.r5.trove.TByteAugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.P2;
@@ -15,7 +16,6 @@ import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
-import gnu.trove.list.TFloatList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
@@ -42,8 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
-
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This stores all the characteristics of the edges in the street graph layer of the transport network.
@@ -112,7 +110,7 @@ public class EdgeStore implements Serializable {
     public TLongList osmids;
 
     /**
-     * For each edge _pair_, the OSM highway class is was derived from. Integer codes are defined in the StreetClass
+     * For each edge _pair_, the OSM highway class it was derived from. Integer codes are defined in the StreetClass
      * enum. Like OSM IDs and street names, these could be factored out into a table of OSM way data.
      */
     public TByteList streetClasses;
@@ -565,6 +563,7 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+            streetClasses.set(pairIndex, other.getEdgeStore().streetClasses.get(pairIndex));
         }
 
         public void copyPairGeometry(Edge other) {
@@ -1258,12 +1257,11 @@ public class EdgeStore implements Serializable {
         copy.geometries = new AugmentedList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
-        copy.streetClasses = new TByteArrayList(this.streetClasses); // FIXME Implement TByteAugmentedList
+        copy.streetClasses = new TByteAugmentedList(this.streetClasses);
         copy.temporarilyDeletedEdges = new TIntHashSet();
-        // Angles are deep copy for now FIXME we are copying these entire arrays! Implement TByteAugmentedList
-        copy.inAngles = new TByteArrayList(inAngles);
-        copy.outAngles = new TByteArrayList(outAngles);
-        // We don't expect to add/change any turn restrictions.
+        copy.inAngles = new TByteAugmentedList(inAngles);
+        copy.outAngles = new TByteAugmentedList(outAngles);
+        // We don't expect to add/change any turn restrictions. TODO Consider split streets though.
         copy.turnRestrictions = turnRestrictions;
         copy.turnRestrictionsReverse = turnRestrictionsReverse;
         if (edgeTraversalTimes != null) {

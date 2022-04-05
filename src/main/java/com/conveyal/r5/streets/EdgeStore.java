@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.trove.AugmentedList;
+import com.conveyal.r5.trove.TByteAugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.P2;
@@ -1256,12 +1257,11 @@ public class EdgeStore implements Serializable {
         copy.geometries = new AugmentedList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
-        copy.streetClasses = new TByteArrayList(this.streetClasses); // FIXME Implement TByteAugmentedList
+        copy.streetClasses = new TByteAugmentedList(this.streetClasses);
         copy.temporarilyDeletedEdges = new TIntHashSet();
-        // Angles are deep copy for now FIXME we are copying these entire arrays! Implement TByteAugmentedList
-        copy.inAngles = new TByteArrayList(inAngles);
-        copy.outAngles = new TByteArrayList(outAngles);
-        // We don't expect to add/change any turn restrictions.
+        copy.inAngles = new TByteAugmentedList(inAngles);
+        copy.outAngles = new TByteAugmentedList(outAngles);
+        // We don't expect to add/change any turn restrictions. TODO Consider split streets though.
         copy.turnRestrictions = turnRestrictions;
         copy.turnRestrictionsReverse = turnRestrictionsReverse;
         if (edgeTraversalTimes != null) {

@@ -1,6 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.analysis.components.Component;
+import com.conveyal.analysis.util.ReferenceCountingCache;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -8,9 +9,6 @@ import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.common.GeometryUtils;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.github.benmanes.caffeine.cache.RemovalListener;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
@@ -25,7 +23,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.google.common.base.Preconditions.checkState;
@@ -43,7 +40,7 @@ public class GTFSCache implements Component {
 
     public final FileStorage fileStorage;
 
-    private final LoadingCache<String, GTFSFeed> cache;
+    private final ReferenceCountingCache<String, GTFSFeed> cache;
 
     // The following two caches hold spatial indexes of GTFS geometries for generating Mapbox vector tiles, one spatial
     // index per feed keyed on BundleScopedFeedId. They could potentially be combined such that cache values are a
@@ -63,7 +60,7 @@ public class GTFSCache implements Component {
     public GTFSCache (FileStorage fileStorage) {
         LOG.info("Initializing the GTFS cache...");
         this.fileStorage = fileStorage;
-        this.cache = makeCaffeineCache();
+        this.cache = makeReferenceCountingCache();
         this.patternShapes = new GeometryCache<>(this::buildShapesIndex);
         this.stops = new GeometryCache<>(this::buildStopsIndex);
     }
@@ -96,17 +93,19 @@ public class GTFSCache implements Component {
      * space allocated to memory-mapped files. I believe this cost should be roughly constant per feed. The
      * maximum size interacts with the instance cache size of MapDB itself, and whether MapDB memory is on or off heap.
      */
-    private LoadingCache<String, GTFSFeed> makeCaffeineCache () {
-        RemovalListener<String, GTFSFeed> removalListener = (uniqueId, feed, cause) -> {
-            LOG.info("Evicting feed {} from GTFSCache and closing MapDB file. Reason: {}", uniqueId, cause);
-            // Close DB to avoid leaking (off-heap allocated) memory for MapDB object cache, and MapDB corruption.
-            feed.close();
+    private ReferenceCountingCache<String, GTFSFeed> makeReferenceCountingCache () {
+        return new ReferenceCountingCache<String, GTFSFeed>() {
+            @Override
+            public GTFSFeed loadValue (String bundleScopedFeedId) {
+                return retrieveAndProcessFeed(bundleScopedFeedId);
+            }
+            @Override
+            public void postEvictCleanup (String bundleScopedFeedId, GTFSFeed feed) {
+                LOG.info("Evicting feed {} from GTFSCache and closing MapDB file.", bundleScopedFeedId);
+                // Close DB to avoid leaking (off-heap allocated) memory for MapDB object cache, and MapDB corruption.
+                feed.close();
+            }
         };
-        return Caffeine.newBuilder()
-                .maximumSize(20L)
-                .expireAfterAccess(60L, TimeUnit.MINUTES)
-                .removalListener(removalListener)
-                .build(this::retrieveAndProcessFeed);
     }
 
     public FileStorageKey getFileKey (String id, String extension) {
@@ -119,16 +118,21 @@ public class GTFSCache implements Component {
      * must be closed manually to avoid corruption, so it's preferable to have a single synchronized component managing
      * when files shared between threads are opened and closed.
      */
-    public @Nonnull GTFSFeed get(String id) {
-        GTFSFeed feed = cache.get(id);
+    public @Nonnull
+    ReferenceCountingCache<String, GTFSFeed>.RefCount get(String id) {
+        ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = cache.get(id);
         // The cache can in principle return null, but only if its loader method returns null.
         // This should never happen in normal use - the loader should be revised to throw a clear exception.
-        if (feed == null) throw new IllegalStateException("Cache should always return a feed or throw an exception.");
+        if (rcFeed.get() == null) throw new IllegalStateException("Cache should always return a feed or throw an exception.");
         // The feedId of the GTFSFeed objects may not be unique - we can have multiple versions of the same feed
         // covering different time periods, uploaded by different users. Therefore we record another ID here that is
         // known to be unique across the whole application - the ID used to fetch the feed.
-        feed.uniqueId = id;
-        return feed;
+        rcFeed.get().uniqueId = id;
+        return rcFeed;
+    }
+
+    public void release (String id) {
+        cache.release(id);
     }
 
     /** This method should only ever be called by the cache loader. */
@@ -187,28 +191,30 @@ public class GTFSCache implements Component {
     /** CacheLoader implementation making spatial indexes of stop pattern shapes for a single feed. */
     private void buildShapesIndex (String bundleScopedFeedId, STRtree tree) {
         final long startTimeMs = System.currentTimeMillis();
-        final GTFSFeed feed = this.get(bundleScopedFeedId);
-        // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
-        LOG.info("{}: indexing {} patterns", feed.feedId, feed.patterns.size());
-        for (Pattern pattern : feed.patterns.values()) {
-            Route route = feed.routes.get(pattern.route_id);
-            String exemplarTripId = pattern.associatedTrips.get(0);
-            LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
-            if (wgsGeometry == null) {
-                // Not sure why some of these are null.
-                continue;
+        try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = this.get(bundleScopedFeedId)) {
+            GTFSFeed feed = rcFeed.get();
+            // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
+            LOG.info("{}: indexing {} patterns", feed.feedId, feed.patterns.size());
+            for (Pattern pattern : feed.patterns.values()) {
+                Route route = feed.routes.get(pattern.route_id);
+                String exemplarTripId = pattern.associatedTrips.get(0);
+                LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
+                if (wgsGeometry == null) {
+                    // Not sure why some of these are null.
+                    continue;
+                }
+                Map<String, Object> userData = new HashMap<>();
+                userData.put("id", pattern.pattern_id);
+                userData.put("name", pattern.name);
+                userData.put("routeId", route.route_id);
+                userData.put("routeName", route.route_long_name);
+                userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
+                userData.put("routeType", route.route_type);
+                wgsGeometry.setUserData(userData);
+                tree.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
             }
-            Map<String, Object> userData = new HashMap<>();
-            userData.put("id", pattern.pattern_id);
-            userData.put("name", pattern.name);
-            userData.put("routeId", route.route_id);
-            userData.put("routeName", route.route_long_name);
-            userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
-            userData.put("routeType", route.route_type);
-            wgsGeometry.setUserData(userData);
-            tree.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
+            LOG.info("Created vector tile spatial index for patterns in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
         }
-        LOG.info("Created vector tile spatial index for patterns in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
     }
 
     /**
@@ -217,23 +223,25 @@ public class GTFSCache implements Component {
      */
     private void buildStopsIndex (String bundleScopedFeedId, STRtree tree) {
         final long startTimeMs = System.currentTimeMillis();
-        final GTFSFeed feed = this.get(bundleScopedFeedId);
-        LOG.info("{}: indexing {} stops", feed.feedId, feed.stops.size());
-        for (Stop stop : feed.stops.values()) {
-            Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
-            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
+        try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = this.get(bundleScopedFeedId)) {
+            GTFSFeed feed = rcFeed.get();
+            LOG.info("{}: indexing {} stops", feed.feedId, feed.stops.size());
+            for (Stop stop : feed.stops.values()) {
+                Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
+                Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
 
-            Map<String, Object> properties = new HashMap<>();
-            properties.put("feedId", stop.feed_id);
-            properties.put("id", stop.stop_id);
-            properties.put("name", stop.stop_name);
-            properties.put("lat", stop.stop_lat);
-            properties.put("lon", stop.stop_lon);
+                Map<String, Object> properties = new HashMap<>();
+                properties.put("feedId", stop.feed_id);
+                properties.put("id", stop.stop_id);
+                properties.put("name", stop.stop_name);
+                properties.put("lat", stop.stop_lat);
+                properties.put("lon", stop.stop_lon);
 
-            point.setUserData(properties);
-            tree.insert(stopEnvelope, point);
+                point.setUserData(properties);
+                tree.insert(stopEnvelope, point);
+            }
+            LOG.info("Created spatial index for stops in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
         }
-        LOG.info("Created spatial index for stops in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
     }
 
 }

@@ -2,10 +2,12 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.analysis.util.ReferenceCountingCache;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Modification;
@@ -271,9 +273,11 @@ public class TransportNetworkCache implements Component {
 
         network.transitLayer = new TransitLayer();
 
-        config.gtfsIds.stream()
-                .map(gtfsCache::get)
-                .forEach(network.transitLayer::loadFromGtfs);
+        for (String gtfsId : config.gtfsIds) {
+            try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = gtfsCache.get(gtfsId)) {
+                network.transitLayer.loadFromGtfs(rcFeed.get());
+            }
+        }
 
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);

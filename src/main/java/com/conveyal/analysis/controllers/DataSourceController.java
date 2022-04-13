@@ -2,6 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.datasource.DataSourcePreviewGenerator;
 import com.conveyal.analysis.datasource.DataSourceUploadAction;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataSource;
@@ -12,16 +13,22 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
+import org.geotools.data.geojson.GeoJSONWriter;
+import org.opengis.feature.simple.SimpleFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
+import java.io.File;
+import java.io.OutputStream;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
@@ -94,6 +101,43 @@ public class DataSourceController implements HttpController {
         return "Deleted " + nDeleted;
     }
 
+    static final long MAX_GEOJSON_SIZE = 4 * 1024 * 1024; // 4 MB
+
+    /**
+     * Produces GeoJSON representing the data source on a map. For preview purposes only, may not contain all features
+     * in the data set and may exaggerate or distort some boundaries due to differences in coordinate system.
+     */
+    private Map<String, Object> getDataSourcePreview (Request request, Response response) {
+        DataSource dataSource = getOneDataSourceById(request, response);
+        try {
+            // Special case for small GeoJSON files: return the whole file as its preview.
+            // Use try-with-resources to auto-close the output stream when done.
+            // Otherwise Spark will append the text "null" when it sees the null return value, creating invalid JSON.
+            if (dataSource.fileFormat == FileStorageFormat.GEOJSON) {
+                File file = fileStorage.getFile(dataSource.fileStorageKey());
+                if (file.length() < MAX_GEOJSON_SIZE) {
+                    try (OutputStream out = response.raw().getOutputStream()) {
+                        Files.copy(file.toPath(), response.raw().getOutputStream());
+                    }
+                    return null;
+                }
+            }
+            final var generator = new DataSourcePreviewGenerator(fileStorage);
+            GeoJSONWriter gjw = new GeoJSONWriter(response.raw().getOutputStream());
+            // GeoJsonWriter automatically reprojects to WGS84 from the source CRS.
+            // Known problem: our wgs84Stream transforms coordinates but does not change the CRS, so the features
+            // are double-projected upon writing to GeoJSON. All sources of features used here should provide accurate
+            // CRS on the features, or none at all if they're already in WGS84.
+            for (SimpleFeature feature : generator.previewFeatures(dataSource)) {
+                gjw.write(feature);
+            }
+            gjw.close();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to write GeoJSON DataSource preview:", e);
+        }
+        return null;
+    }
+
     private SpatialDataSource downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
@@ -139,9 +183,11 @@ public class DataSourceController implements HttpController {
             sparkService.get("/", this::getAllDataSourcesForRegion, toJson);
             sparkService.get("/:_id", this::getOneDataSourceById, toJson);
             sparkService.delete("/:_id", this::deleteOneDataSourceById, toJson);
+            sparkService.get("/:_id/preview", this::getDataSourcePreview, toJson);
             sparkService.post("", this::handleUpload, toJson);
             // regionId will be in query parameter
             sparkService.post("/addLodesDataSource", this::downloadLODES, toJson);
         });
     }
+
 }

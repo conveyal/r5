@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
@@ -16,7 +17,7 @@ import java.util.concurrent.ExecutionException;
  * TODO this should be moved so we don't need to have a dependency on AWS S3 SDK and multiple S3 clients.
  * Maybe a general local+S3 object storage mechanism for externalizable objects, using the TransferManager.
  */
-public class OSMCache {
+public class OSMCache implements Component {
 
     private final FileStorage fileStorage;
 

@@ -15,6 +15,12 @@ import java.util.Map;
 public abstract class HttpUtils {
 
     /**
+     * A Cache-Control header cvalue for immutable data. 2,592,000 seconds is one month.
+     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
+     */
+    public static final String CACHE_CONTROL_IMMUTABLE = "public, max-age=2592000, immutable";
+
+    /**
      * Extract files from a Spark Request containing RFC 1867 multipart form-based file upload data.
      */
     public static Map<String, List<FileItem>> getRequestFiles (HttpServletRequest req) {

@@ -93,4 +93,17 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
     public void setBikeTimeFactor (int edgeIndex, double bikeTimeFactor) {
         bikeTraversalTimes.perceivedLengthMultipliers.set(edgeIndex, bikeTimeFactor);
     }
+
+    /**
+     * This breaks encapsulation a bit and reveals private fields, so it should only be used for display purposes,
+     * such as map displays for checking input data and settings.
+     */
+    public double getWalkTimeFactor (int edgeIndex) {
+        return walkTraversalTimes.perceivedLengthMultipliers.get(edgeIndex);
+    }
+
+    /** see getWalkTimeFactor() */
+    public double getBikeTimeFactor (int edgeIndex) {
+        return bikeTraversalTimes.perceivedLengthMultipliers.get(edgeIndex);
+    }
 }

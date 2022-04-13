@@ -61,10 +61,7 @@ import java.util.stream.StreamSupport;
  */
 public class TransitLayer implements Serializable, Cloneable {
 
-    /**
-     * Maximum distance to record in distance tables, in meters.
-     * Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS but TODO should probably be reduced after Kansas City project.
-     */
+    /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
 
     public static final boolean SAVE_SHAPES = true;

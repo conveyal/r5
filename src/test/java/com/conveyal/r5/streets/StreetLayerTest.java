@@ -1,7 +1,6 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
@@ -29,7 +28,7 @@ public class StreetLayerTest {
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("subgraph.pbf").toString());
 
-        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
+        StreetLayer sl = new StreetLayer();
         // load from OSM and don't remove floating subgraphs
         sl.loadFromOsm(osm, false, true);
 
@@ -73,7 +72,7 @@ public class StreetLayerTest {
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("speedFlagsTest.pbf").toString());
 
-        StreetLayer streetLayer = new StreetLayer(TNBuilderConfig.defaultConfig());
+        StreetLayer streetLayer = new StreetLayer();
         streetLayer.loadFromOsm(osm, false, true);
         osm.close();
 
@@ -150,7 +149,7 @@ public class StreetLayerTest {
          List<Coordinate> stopCoordinates = new ArrayList<>();
          stopCoordinates.add(new Coordinate(-122.206863, 37.825161));
          stopCoordinates.add(new Coordinate(-122.206751, 37.826258));
-         StreetLayer streetLayer = new StreetLayer(TNBuilderConfig.defaultConfig());
+         StreetLayer streetLayer = new StreetLayer();
          streetLayer.loadFromOsm(osm, false, true);
          osm.close();
          //This is needed for inserting new vertices around coordinates
@@ -255,7 +254,7 @@ public class StreetLayerTest {
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("cathedral-no-left.pbf").toString());
 
-        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
+        StreetLayer sl = new StreetLayer();
         // load from OSM and don't remove floating subgraphs
         sl.loadFromOsm(osm, false, true);
 
@@ -299,7 +298,7 @@ public class StreetLayerTest {
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("reisterstown-via-restriction.pbf").toString());
 
-        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
+        StreetLayer sl = new StreetLayer();
         // load from OSM and don't remove floating subgraphs
         sl.loadFromOsm(osm, false, true);
 

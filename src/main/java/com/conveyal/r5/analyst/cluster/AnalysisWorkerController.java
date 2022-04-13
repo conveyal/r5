@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -9,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
+import spark.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -22,10 +24,9 @@ import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTI
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
- * Currently the worker exposes only a single method that allows the broker to push it single point requests for
- * immediate processing.
+ * This is a single POST method that allows the broker to push it single point requests for immediate processing.
  */
-public class AnalysisWorkerController {
+public class AnalysisWorkerController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorkerController.class);
 
@@ -91,6 +92,11 @@ public class AnalysisWorkerController {
         addJsonToGrid(byteArrayOutputStream, null, taskErrors, Collections.emptyList(), null);
         byteArrayOutputStream.close();
         return byteArrayOutputStream.toByteArray();
+    }
+
+    @Override
+    public void registerEndpoints (Service sparkService) {
+        sparkService.post("/single", this::handleSinglePoint);
     }
 
 }

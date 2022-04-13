@@ -132,7 +132,7 @@ public class IndexedPolygonCollection {
             boolean indexThisFeature = true;
             if (id == null) {
                 allPolygonsHaveIds = false;
-            } else if (!(name instanceof String)) {
+            } else if (!(id instanceof String)) {
                 errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
                         id, idAttribute, featureNumber));
                 indexThisFeature = false;

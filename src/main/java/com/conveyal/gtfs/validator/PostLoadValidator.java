@@ -8,6 +8,8 @@ import com.conveyal.gtfs.error.RangeError;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.model.Stop;
 
+import java.util.List;
+
 /**
  * Currently we perform a lot of validation while we're loading the rows out of the input GTFS feed.
  * This can only catch certain categories of problems. Other problems must be found after tables are fully loaded.
@@ -44,61 +46,90 @@ public class PostLoadValidator {
         }
     }
 
-    /**
-     * Validate location_type and parent_station constraints as well as referential integrity.
-     */
+    /** Validate location_type and parent_station constraints as well as referential integrity. */
     private void validateStopStationConstraints () {
         for (Stop stop : feed.stops.values()) {
-            if (checkRule(stop, 0, Requirement.OPTIONAL, 1)) continue;
-            if (checkRule(stop, 1, Requirement.FORBIDDEN, 0)) continue;
-            if (checkRule(stop, 2, Requirement.REQUIRED, 1)) continue;
-            if (checkRule(stop, 3, Requirement.REQUIRED, 1)) continue;
-            if (checkRule(stop, 4, Requirement.REQUIRED, 0)) continue;
+            for (Rule rule : rules) {
+                if (rule.check(stop, feed)) break;
+            }
+        }
+    }
+
+    private static final String FILE = "stops.txt";
+    private static final String FIELD = "parent_station";
+
+    /** GTFS location_type codes. */
+    private enum LocType {
+        STOP(0),
+        STATION(1),
+        ENTRANCE(2),
+        GENERIC(3),
+        BOARDING(4);
+        public final int code;
+        LocType (int code) {
+            this.code = code;
         }
     }
 
     private enum Requirement {
         OPTIONAL, REQUIRED, FORBIDDEN
     }
-    private static final String FILE = "stops.txt";
-    private static final String FIELD = "parent_station";
 
-    /**
-     * Call this method once for each location_type, defining a rules about that location_type's parent_station.
-     * @param location_type the location_type to which the rule applies
-     * @param parent_station_requirement whether the parent_station is required, forbidden, or optional
-     * @param parent_station_location_type if the parent_station is present, what location_type it must be
-     * @return true if this rule validated the stop, or false if more rules must be checked
-     */
-    public boolean checkRule (
-            Stop stop, int location_type,
-            Requirement parent_station_requirement,
-            int parent_station_location_type
-    ) {
-        // If this rule does not apply to this stop, do not perform checks.
-        if (stop.location_type != location_type) {
-            return false;
+    private static class Rule {
+        // The location_type to which the rule applies.
+        LocType fromLocType;
+        // Whether the parent_station is required, forbidden, or optional.
+        Requirement parentRequirement;
+        // If the parent_station is present and not forbidden, what location_type it must be.
+        LocType parentLocType;
+
+        public Rule (LocType fromLocType, Requirement parentRequirement, LocType parentLocType) {
+            this.fromLocType = fromLocType;
+            this.parentRequirement = parentRequirement;
+            this.parentLocType = parentLocType;
         }
-        if (stop.parent_station == null) {
-            if (parent_station_requirement == Requirement.REQUIRED) {
-                feed.errors.add(new EmptyFieldError(FILE, stop.sourceFileLine, FIELD));
+
+        /**
+         * Call this method once for each location_type, defining a rules about that location_type's parent_station.
+         * @return true if this rule validated the stop, or false if more rules must be checked
+         */
+        public boolean check (Stop stop, GTFSFeed feed) {
+            // If this rule does not apply to this stop, do not perform checks.
+            if (stop.location_type != fromLocType.code) {
+                return false;
             }
-        } else {
-            // Parent station reference was supplied.
-            if (parent_station_requirement == Requirement.FORBIDDEN) {
-                feed.errors.add(new ForbiddenFieldError(FILE, stop.sourceFileLine, FIELD));
-            }
-            Stop parent_station = feed.stops.get(stop.parent_station);
-            if (parent_station == null) {
-                feed.errors.add(new ReferentialIntegrityError(FILE, stop.sourceFileLine, FIELD, stop.parent_station));
+            if (stop.parent_station == null) {
+                if (parentRequirement == Requirement.REQUIRED) {
+                    feed.errors.add(new EmptyFieldError(FILE, stop.sourceFileLine, FIELD));
+                }
             } else {
-                if (parent_station.location_type != parent_station_location_type) {
-                    feed.errors.add(new RangeError(FILE, stop.sourceFileLine, FIELD,
-                            parent_station_location_type, parent_station_location_type, parent_station.location_type));
+                // Parent station reference was supplied.
+                if (parentRequirement == Requirement.FORBIDDEN) {
+                    feed.errors.add(new ForbiddenFieldError(FILE, stop.sourceFileLine, FIELD));
+                }
+                Stop parentStation = feed.stops.get(stop.parent_station);
+                if (parentStation == null) {
+                    feed.errors.add(new ReferentialIntegrityError(FILE, stop.sourceFileLine, FIELD, stop.parent_station));
+                } else {
+                    if (parentStation.location_type != parentLocType.code) {
+                        feed.errors.add(new RangeError(
+                                FILE, stop.sourceFileLine, FIELD,
+                                parentLocType.code, parentLocType.code,
+                                parentStation.location_type)
+                        );
+                    }
                 }
             }
+            return true;
         }
-        return true;
     }
+
+    private static final List<Rule> rules = List.of(
+            new Rule(LocType.STOP,     Requirement.OPTIONAL,  LocType.STATION),
+            new Rule(LocType.STATION,  Requirement.FORBIDDEN, LocType.STATION),
+            new Rule(LocType.ENTRANCE, Requirement.REQUIRED,  LocType.STATION),
+            new Rule(LocType.GENERIC,  Requirement.REQUIRED,  LocType.STATION),
+            new Rule(LocType.BOARDING, Requirement.REQUIRED,  LocType.STOP)
+    );
 
 }

@@ -208,6 +208,7 @@ public abstract class Entity implements Serializable {
             return url;
         }
 
+        /** @return NaN if the number is missing or cannot be parsed. */
         protected double getDoubleField(String column, boolean required, double min, double max) throws IOException {
             String str = getFieldCheckRequired(column, required);
             double val = Double.NaN;

@@ -555,15 +555,16 @@ public class EdgeStore implements Serializable {
          * This is a hack and should be done some other way.
          */
         public void copyPairFlagsAndSpeeds(Edge other) {
-            int foreEdge = pairIndex * 2;
-            int backEdge = foreEdge + 1;
-            int otherForeEdge = other.pairIndex * 2;
-            int otherBackEdge = otherForeEdge + 1;
-            flags.set(foreEdge, other.getEdgeStore().flags.get(otherForeEdge));
-            flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
-            speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
-            speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
-            streetClasses.set(pairIndex, other.getEdgeStore().streetClasses.get(pairIndex));
+            final int foreEdge = pairIndex * 2;
+            final int backEdge = foreEdge + 1;
+            final int otherForeEdge = other.pairIndex * 2;
+            final int otherBackEdge = otherForeEdge + 1;
+            final EdgeStore otherStore = other.getEdgeStore();
+            flags.set(foreEdge, otherStore.flags.get(otherForeEdge));
+            flags.set(backEdge, otherStore.flags.get(otherBackEdge));
+            speeds.set(foreEdge, otherStore.speeds.get(otherForeEdge));
+            speeds.set(backEdge, otherStore.speeds.get(otherBackEdge));
+            streetClasses.set(pairIndex, otherStore.streetClasses.get(other.pairIndex));
         }
 
         public void copyPairGeometry(Edge other) {

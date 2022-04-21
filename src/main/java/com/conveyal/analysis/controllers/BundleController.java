@@ -8,13 +8,12 @@ import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.analysis.util.ReferenceCountingCache;
+import com.conveyal.analysis.util.LimitedPool;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
@@ -337,8 +336,8 @@ public class BundleController implements HttpController {
             // Compute the feed start and end dates
             if (summary.serviceStart == null || summary.serviceEnd == null) {
                 String bundleScopeFeedId = Bundle.bundleScopeFeedId(summary.feedId, bundle.feedGroupId);
-                try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = gtfsCache.get(bundleScopeFeedId)) {
-                    GTFSFeed feed = rcFeed.get();
+                try (LimitedPool<String, GTFSFeed>.Entry feedEntry = gtfsCache.get(bundleScopeFeedId)) {
+                    GTFSFeed feed = feedEntry.value();
                     summary.setServiceDates(feed);
                 }
             }

@@ -22,4 +22,6 @@
     <logger name="org.eclipse.jetty" level="WARN" />
     <logger name="com.conveyal.r5.profile.FastRaptorWorker" level="INFO" />
 
+    <logger name="com.conveyal.analysis.util.LimitedPool" level="DEBUG" />
+
 </configuration>

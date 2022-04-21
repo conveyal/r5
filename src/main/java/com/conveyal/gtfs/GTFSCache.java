@@ -1,7 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.analysis.components.Component;
-import com.conveyal.analysis.util.ReferenceCountingCache;
+import com.conveyal.analysis.util.LimitedPool;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -40,7 +40,10 @@ public class GTFSCache implements Component {
 
     public final FileStorage fileStorage;
 
-    private final ReferenceCountingCache<String, GTFSFeed> cache;
+    // TODO increase this value, this is low to induce contention in testing.
+    private static final int MAX_SIMULTANEOUS_FEEDS = 2;
+
+    private final LimitedPool<String, GTFSFeed> cache;
 
     // The following two caches hold spatial indexes of GTFS geometries for generating Mapbox vector tiles, one spatial
     // index per feed keyed on BundleScopedFeedId. They could potentially be combined such that cache values are a
@@ -60,9 +63,9 @@ public class GTFSCache implements Component {
     public GTFSCache (FileStorage fileStorage) {
         LOG.info("Initializing the GTFS cache...");
         this.fileStorage = fileStorage;
-        this.cache = makeReferenceCountingCache();
-        this.patternShapes = new GeometryCache<>(this::buildShapesIndex);
-        this.stops = new GeometryCache<>(this::buildStopsIndex);
+        this.cache = makeLimitedPool();
+        this.patternShapes = new GeometryCache<>(this::buildShapesIndex, "PATTERNS");
+        this.stops = new GeometryCache<>(this::buildStopsIndex, "STOPS");
     }
 
     public static String cleanId(String id) {
@@ -93,15 +96,14 @@ public class GTFSCache implements Component {
      * space allocated to memory-mapped files. I believe this cost should be roughly constant per feed. The
      * maximum size interacts with the instance cache size of MapDB itself, and whether MapDB memory is on or off heap.
      */
-    private ReferenceCountingCache<String, GTFSFeed> makeReferenceCountingCache () {
-        return new ReferenceCountingCache<String, GTFSFeed>() {
+    private LimitedPool<String, GTFSFeed> makeLimitedPool () {
+        return new LimitedPool<String, GTFSFeed>("GTFS" , MAX_SIMULTANEOUS_FEEDS) {
             @Override
             public GTFSFeed loadValue (String bundleScopedFeedId) {
                 return retrieveAndProcessFeed(bundleScopedFeedId);
             }
             @Override
             public void postEvictCleanup (String bundleScopedFeedId, GTFSFeed feed) {
-                LOG.info("Evicting feed {} from GTFSCache and closing MapDB file.", bundleScopedFeedId);
                 // Close DB to avoid leaking (off-heap allocated) memory for MapDB object cache, and MapDB corruption.
                 feed.close();
             }
@@ -119,20 +121,16 @@ public class GTFSCache implements Component {
      * when files shared between threads are opened and closed.
      */
     public @Nonnull
-    ReferenceCountingCache<String, GTFSFeed>.RefCount get(String id) {
-        ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = cache.get(id);
+    LimitedPool<String, GTFSFeed>.Entry get(String id) {
+        LimitedPool<String, GTFSFeed>.Entry feedEntry = cache.get(id);
         // The cache can in principle return null, but only if its loader method returns null.
         // This should never happen in normal use - the loader should be revised to throw a clear exception.
-        if (rcFeed.get() == null) throw new IllegalStateException("Cache should always return a feed or throw an exception.");
+        if (feedEntry.value() == null) throw new IllegalStateException("Cache should always return a feed or throw an exception.");
         // The feedId of the GTFSFeed objects may not be unique - we can have multiple versions of the same feed
         // covering different time periods, uploaded by different users. Therefore we record another ID here that is
         // known to be unique across the whole application - the ID used to fetch the feed.
-        rcFeed.get().uniqueId = id;
-        return rcFeed;
-    }
-
-    public void release (String id) {
-        cache.release(id);
+        feedEntry.value().uniqueId = id;
+        return feedEntry;
     }
 
     /** This method should only ever be called by the cache loader. */
@@ -191,8 +189,8 @@ public class GTFSCache implements Component {
     /** CacheLoader implementation making spatial indexes of stop pattern shapes for a single feed. */
     private void buildShapesIndex (String bundleScopedFeedId, STRtree tree) {
         final long startTimeMs = System.currentTimeMillis();
-        try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = this.get(bundleScopedFeedId)) {
-            GTFSFeed feed = rcFeed.get();
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = this.get(bundleScopedFeedId)) {
+            GTFSFeed feed = feedEntry.value();
             // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
             LOG.info("{}: indexing {} patterns", feed.feedId, feed.patterns.size());
             for (Pattern pattern : feed.patterns.values()) {
@@ -223,8 +221,8 @@ public class GTFSCache implements Component {
      */
     private void buildStopsIndex (String bundleScopedFeedId, STRtree tree) {
         final long startTimeMs = System.currentTimeMillis();
-        try (ReferenceCountingCache<String, GTFSFeed>.RefCount rcFeed = this.get(bundleScopedFeedId)) {
-            GTFSFeed feed = rcFeed.get();
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = this.get(bundleScopedFeedId)) {
+            GTFSFeed feed = feedEntry.value();
             LOG.info("{}: indexing {} stops", feed.feedId, feed.stops.size());
             for (Stop stop : feed.stops.values()) {
                 Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);

@@ -24,7 +24,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.analyst.progress.WorkProduct;
-import com.conveyal.r5.analyst.progress.WorkProductType;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
@@ -32,10 +31,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemFactory;
-import org.apache.commons.fileupload.FileUploadException;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.apache.commons.io.FilenameUtils;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -327,7 +322,7 @@ public class OpportunityDatasetController implements HttpController {
         // Parse required fields. Will throw a ServerException on failure.
         final String sourceName = HttpUtils.getFormField(formFields, "Name", true);
         final String regionId = HttpUtils.getFormField(formFields, "regionId", true);
-        final int zoom = parseZoom(HttpUtils.getFormField(formFields, "zoom", false));
+        final int zoom = parseZoom(HttpUtils.getFormField(formFields, "zoom", true));
 
         // Create a region-wide status object tracking the processing of opportunity data.
         // Create the status object before doing anything including input and parameter validation, so that any problems

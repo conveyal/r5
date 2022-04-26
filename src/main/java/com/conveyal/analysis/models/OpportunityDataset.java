@@ -7,7 +7,6 @@ import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import static com.conveyal.file.FileCategory.GRIDS;
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
@@ -34,12 +33,17 @@ public class OpportunityDataset extends Model {
     public String bucketName;
 
     /**
-     * Bounds in web Mercator pixels.  Note that no zoom level is specified here, it's fixed to a constant 9.
+     * Bounds in web Mercator pixels.
      */
     public int north;
     public int west;
     public int width;
     public int height;
+
+    /**
+     * The zoom level this opportunity dataset was rasterized at.
+     */
+    public int webMercatorZoom;
 
     /**
      * Total number of opportunities in the dataset, i.e. the sum of all opportunity counts at all points / grid cells.
@@ -104,7 +108,7 @@ public class OpportunityDataset extends Model {
 
     @JsonIgnore
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, DEFAULT_ZOOM);
+        return new WebMercatorExtents(west, north, width, height, webMercatorZoom);
     }
 
     @JsonIgnore
@@ -118,6 +122,7 @@ public class OpportunityDataset extends Model {
         this.north = extents.north;
         this.width = extents.width;
         this.height = extents.height;
+        this.webMercatorZoom = extents.zoom;
     }
 
     /** Analysis region this dataset was uploaded in. */

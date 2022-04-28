@@ -2,10 +2,12 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.analysis.util.LimitedPool;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.scenario.Modification;
@@ -15,7 +17,6 @@ import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -271,9 +272,11 @@ public class TransportNetworkCache implements Component {
 
         network.transitLayer = new TransitLayer();
 
-        config.gtfsIds.stream()
-                .map(gtfsCache::get)
-                .forEach(network.transitLayer::loadFromGtfs);
+        for (String gtfsId : config.gtfsIds) {
+            try (LimitedPool<String, GTFSFeed>.Entry feedEntry = gtfsCache.get(gtfsId)) {
+                network.transitLayer.loadFromGtfs(feedEntry.value());
+            }
+        }
 
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);

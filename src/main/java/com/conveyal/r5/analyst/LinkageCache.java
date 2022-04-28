@@ -21,7 +21,10 @@ import java.util.concurrent.ExecutionException;
  * There could instead be one instance per AnalystWorker or per JVM (static), but this would cause the mappings
  * including PointSets, StreetLayers, and Linkages (which hold references to the TransportNetwork) to stick around
  * even when we try to garbage collect a TransportNetwork. This is less of an issue now that we don't plan to have
- * workers migrate between TransportNetworks.
+ * workers migrate between TransportNetworks, but would still affect standalone local operation.
+ * Arguably the cache Key should not contain object references but rather unique IDs for the PointSet and StreetLayer.
+ * Then the various cached items could be evicted independently without cross-references preventing garbage collection.
+ * This might not change a lot in the case of the LinkageCache but could be a good approach for all caches.
  */
 public class LinkageCache {
 
@@ -32,9 +35,8 @@ public class LinkageCache {
      * consumption, and should eventually be replaced with a WeighingCache. Since every Scenario including the
      * baseline has its own StreetLayer instance now, this means we can hold walk, bike, and car linkages (with
      * distance tables) for 2 scenarios plus the baseline at once.
-     * FIXME this used to be per-PointSet, now it's one single limit per TransportNetwork.
      */
-    public static int LINKAGE_CACHE_SIZE = 9;
+    public static int MAX_LINKAGES_PER_TRANSPORTNETWORK = 9;
 
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
@@ -147,7 +149,7 @@ public class LinkageCache {
 
     public LinkageCache () {
         this.linkageCache = CacheBuilder.newBuilder()
-                .maximumSize(LINKAGE_CACHE_SIZE)
+                .maximumSize(MAX_LINKAGES_PER_TRANSPORTNETWORK)
                 .removalListener(notification -> LOG.warn(
                         "LINKAGE CACHE EVICTION. key: {}, cause: {}",
                         notification.getKey(),
@@ -177,6 +179,9 @@ public class LinkageCache {
 
     /**
      * Combines the attributes that uniquely identify a linkage.
+     * TODO ideally key on identifiers for PointSet and StreetLayer instead of object references.
+     * This would allow having one linkage cache per worker (instead of per TransportNetwork) and allow cached items
+     * to be evicted independently of the objects they reference.
      */
     private static class Key implements Serializable {
         PointSet pointSet;

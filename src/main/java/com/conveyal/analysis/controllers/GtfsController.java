@@ -3,6 +3,7 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.util.LimitedPool;
 import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
@@ -71,7 +72,7 @@ public class GtfsController implements HttpController {
         return Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
     }
 
-    private GTFSFeed getFeedFromRequest (Request req) {
+    private LimitedPool.Entry getFeedFromRequest (Request req) {
         return gtfsCache.get(bundleScopedFeedIdFromRequest(req));
     }
 
@@ -94,17 +95,17 @@ public class GtfsController implements HttpController {
     }
 
     private RouteApiResponse getRoute(Request req, Response res) {
-        GTFSFeed feed = getFeedFromRequest(req);
-        return new RouteApiResponse(feed.routes.get(req.params("routeId")));
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = getFeedFromRequest(req)) {
+            GTFSFeed feed = feedEntry.value();
+            return new RouteApiResponse(feed.routes.get(req.params("routeId")));
+        }
     }
 
     private List<RouteApiResponse> getRoutes(Request req, Response res) {
-        GTFSFeed feed = getFeedFromRequest(req);
-        return feed.routes
-                .values()
-                .stream()
-                .map(RouteApiResponse::new)
-                .collect(Collectors.toList());
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = getFeedFromRequest(req)) {
+            GTFSFeed feed = feedEntry.value();
+            return feed.routes.values().stream().map(RouteApiResponse::new).collect(Collectors.toList());
+        }
     }
 
     static class PatternApiResponse extends BaseApiResponse {
@@ -130,14 +131,14 @@ public class GtfsController implements HttpController {
     }
 
     private List<PatternApiResponse> getPatternsForRoute (Request req, Response res) {
-        GTFSFeed feed = getFeedFromRequest(req);
-        final String routeId = req.params("routeId");
-        return feed.patterns
-                .values()
-                .stream()
-                .filter(p -> Objects.equals(p.route_id, routeId))
-                .map(PatternApiResponse::new)
-                .collect(Collectors.toList());
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = getFeedFromRequest(req)) {
+            GTFSFeed feed = feedEntry.value();
+            final String routeId = req.params("routeId");
+            return feed.patterns.values().stream()
+                    .filter(p -> Objects.equals(p.route_id, routeId))
+                    .map(PatternApiResponse::new)
+                    .collect(Collectors.toList());
+        }
     }
 
     static class StopApiResponse extends BaseApiResponse {
@@ -154,9 +155,11 @@ public class GtfsController implements HttpController {
      * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed
      */
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
-        GTFSFeed feed = getFeedFromRequest(req);
-        return feed.stops.values().stream().filter(s -> s.location_type == 0)
-                .map(StopApiResponse::new).collect(Collectors.toList());
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = getFeedFromRequest(req)) {
+            GTFSFeed feed = feedEntry.value();
+            return feed.stops.values().stream().filter(s -> s.location_type == 0)
+                    .map(StopApiResponse::new).collect(Collectors.toList());
+        }
     }
 
     /**
@@ -186,8 +189,10 @@ public class GtfsController implements HttpController {
         Bundle bundle = cursor.next();
         for (Bundle.FeedSummary feedSummary : bundle.feeds) {
             String bundleScopedFeedId = Bundle.bundleScopeFeedId(feedSummary.feedId, feedGroupId);
-            GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
-            allStopsByFeed.add(new FeedGroupStopsApiResponse(feed));
+            try (LimitedPool<String, GTFSFeed>.Entry feedEntry = gtfsCache.get(bundleScopedFeedId)) {
+                GTFSFeed feed = feedEntry.value();
+                allStopsByFeed.add(new FeedGroupStopsApiResponse(feed));
+            }
         }
         return allStopsByFeed;
     }
@@ -243,14 +248,16 @@ public class GtfsController implements HttpController {
     }
 
     private List<TripApiResponse> getTripsForRoute (Request req, Response res) {
-        final GTFSFeed feed = getFeedFromRequest(req);
-        final String routeId = req.params("routeId");
-        return feed.trips
-                .values().stream()
-                .filter(t -> Objects.equals(t.route_id, routeId))
-                .map(t -> new TripApiResponse(feed, t))
-                .sorted(Comparator.comparingInt(t -> t.startTime))
-                .collect(Collectors.toList());
+        try (LimitedPool<String, GTFSFeed>.Entry feedEntry = getFeedFromRequest(req)) {
+            GTFSFeed feed = feedEntry.value();
+            final String routeId = req.params("routeId");
+            return feed.trips
+                    .values().stream()
+                    .filter(t -> Objects.equals(t.route_id, routeId))
+                    .map(t -> new TripApiResponse(feed, t))
+                    .sorted(Comparator.comparingInt(t -> t.startTime))
+                    .collect(Collectors.toList());
+        }
     }
 
     @Override

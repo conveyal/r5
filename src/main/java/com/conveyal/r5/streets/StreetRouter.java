@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import static com.conveyal.r5.common.Util.isNullOrEmpty;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
@@ -968,8 +967,8 @@ public class StreetRouter {
                 durationSeconds-=seconds;
                 durationFromOriginSeconds -= seconds;
             } else {
-                durationSeconds+=seconds;
-                durationFromOriginSeconds += seconds;
+                durationSeconds += (int) seconds;
+                durationFromOriginSeconds += (int) seconds;
             }
 
         }

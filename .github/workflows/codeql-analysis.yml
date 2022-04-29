@@ -1,3 +1,6 @@
+# This file was created by CodeQL for this repository. The only change was 
+# removing 'python' and 'javascript' from the language array.
+#
 # For most projects, this workflow file will not need changing; you simply need
 # to commit it to your repository.
 #

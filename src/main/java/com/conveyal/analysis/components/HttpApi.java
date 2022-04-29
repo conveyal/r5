@@ -78,6 +78,9 @@ public class HttpApi implements Component {
         LOG.info("Analysis server will listen for HTTP connections on port {}.", config.serverPort());
         spark.Service sparkService = spark.Service.ignite();
         sparkService.port(config.serverPort());
+        // Serve up UI files. staticFileLocation("vector-client") inside classpath will not see changes to files.
+        // Note that this eliminates the need for CORS.
+        sparkService.externalStaticFileLocation("src/main/resources/vector-client");
 
         // Specify actions to take before the main logic of handling each HTTP request.
         sparkService.before((req, res) -> {
@@ -87,10 +90,10 @@ public class HttpApi implements Component {
             // Set CORS headers to allow requests to this API server from a frontend hosted on a different domain.
             // This used to be hardwired to Access-Control-Allow-Origin: * but that leaves the server open to XSRF
             // attacks when authentication is disabled (e.g. when running locally).
-            res.header("Access-Control-Allow-Origin", config.allowOrigin());
-            // For caching, signal to the browser that responses may be different based on origin.
-            // TODO clarify why this is important, considering that normally all requests come from the same origin.
-            res.header("Vary", "Origin");
+//            res.header("Access-Control-Allow-Origin", config.allowOrigin());
+//            // For caching, signal to the browser that responses may be different based on origin.
+//            // TODO clarify why this is important, considering that normally all requests come from the same origin.
+//            res.header("Vary", "Origin");
 
             // The default MIME type is JSON. This will be overridden by the few controllers that do not return JSON.
             res.type("application/json");
@@ -121,17 +124,17 @@ public class HttpApi implements Component {
 
         // Handle CORS preflight requests (which are OPTIONS requests).
         // See comment above about Access-Control-Allow-Origin
-        sparkService.options("/*", (req, res) -> {
-            // Cache the preflight response for up to one day (the maximum allowed by browsers)
-            res.header("Access-Control-Max-Age", "86400");
-            res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
-            // Allowing credentials is necessary to send an Authorization header
-            res.header("Access-Control-Allow-Credentials", "true");
-            res.header("Access-Control-Allow-Headers", "Accept,Authorization,Content-Type,Origin," +
-                    "X-Requested-With,Content-Length,X-Conveyal-Access-Group"
-            );
-            return "OK";
-        });
+//        sparkService.options("/*", (req, res) -> {
+//            // Cache the preflight response for up to one day (the maximum allowed by browsers)
+//            res.header("Access-Control-Max-Age", "86400");
+//            res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
+//            // Allowing credentials is necessary to send an Authorization header
+//            res.header("Access-Control-Allow-Credentials", "true");
+//            res.header("Access-Control-Allow-Headers", "Accept,Authorization,Content-Type,Origin," +
+//                    "X-Requested-With,Content-Length,X-Conveyal-Access-Group"
+//            );
+//            return "OK";
+//        });
 
         // Allow client to fetch information about the backend build version.
         sparkService.get(

@@ -6,6 +6,7 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.Conventions;
@@ -86,6 +87,14 @@ public class AnalysisDB implements Component {
      */
     public MongoCollection getMongoCollection (String name, Class clazz) {
         return database.getCollection(name, clazz);
+    }
+
+    /**
+     * Lowest-level access to Mongo collections, viewed as BSON rather than mapped to Java classes.
+     */
+    public MongoCollection<Document> getBsonCollection (String name) {
+        // If MongoCollections are threadsafe
+        return database.getCollection(name);
     }
 
     /** Interface to supply configuration to this component. */

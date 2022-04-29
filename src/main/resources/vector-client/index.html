@@ -4,28 +4,135 @@
     <meta charset="utf-8" />
     <title>Conveyal GTFS Vector Map</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.0.0/mapbox-gl.js"></script>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.0.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.8.2/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.8.2/mapbox-gl.css" rel="stylesheet" />
     <style>
-	    body { margin: 0; padding: 0; }
-	    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+	    body { margin: 0; padding: 0; font-family: sans-serif}
+        #container {
+            display: flex; flex-direction: row; flex-wrap: nowrap; justify-content: space-between;
+            position: absolute; top: 0; bottom: 0; width: 100%
+        }
+        #panel {
+            float: left; display: flex; flex-direction: column; width: 20%; padding: 10px;
+        }
+	    #map { float: right; width: 80%; }
     </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="container">
+    <div id="panel">
+        <label for="region">Region:</label>
+        <select name="region" id="regions"></select>
+        <label for="bundle">Bundle:</label>
+        <select name="bundle" id="bundles"></select>
+        <label for="feed">Feed:</label>
+        <select name="feed" id="feeds"></select>
+    </div>
+    <div id="map"></div>
+</div>
 <script>
-mapboxgl.accessToken = 'fill in';
+
+mapboxgl.accessToken = 'TOKEN_HERE';
+
+const regionSelectElement = document.getElementById("regions")
+function updateRegionSelector () {
+    regionSelectElement.add(new Option("None"));
+    // Returns an array of regions. Add them to the region selector DOM element.
+    fetch('http://localhost:7070/api/db/regions')
+        .then(response => response.json())
+        .then(regions => {
+            for (const region of regions) {
+                regionSelectElement.add(new Option(region.name, value = region._id));
+            }
+        });
+}
+updateRegionSelector();
+
+const bundleSelectElement = document.getElementById("bundles");
+function updateBundleSelector (regionId) {
+    // Returns an array of bundles. Add them to the bundle selector DOM element.
+    document.querySelectorAll('#bundles option').forEach(option => option.remove())
+    bundleSelectElement.add(new Option("None"));
+    fetch(`http://localhost:7070/api/db/bundles?regionId=${regionId}`)
+        .then(response => response.json())
+        .then(bundles => {
+            for (const bundle of bundles) {
+                bundleSelectElement.add(new Option(bundle.name, value = bundle._id));
+            }
+        });
+}
+
+const feedSelectElement = document.getElementById("feeds");
+function updateFeedSelector (bundle) {
+    document.querySelectorAll('#feeds option').forEach(option => option.remove())
+    feedSelectElement.add(new Option("None"));
+    for (const feed of bundle.feeds) {
+        feedSelectElement.add(new Option(feed.name, value = feed.feedId));
+    }
+}
+
+// TODO better encapsulation of state/model with let state = { ... }
+// Also load URL query parameters into state.
+regionId = null;
+region = null;
+bundleId = null;
+bundle = null;
+feedId = null;
+
+function updateRegion (regionId) {
+    fetch(`http://localhost:7070/api/db/regions?_id=${regionId}`)
+        .then(response => response.json())
+        .then(r => {
+            region = r[0];
+            let centerLon = region.bounds.west + (region.bounds.east - region.bounds.west) / 2;
+            let centerLat = region.bounds.south + (region.bounds.north - region.bounds.south) / 2;
+            map.setCenter([centerLon, centerLat]);
+        });
+}
+
+function updateBundle (bundleId) {
+    fetch(`http://localhost:7070/api/db/bundles?_id=${bundleId}`)
+        .then(response => response.json())
+        .then(b => {
+            bundle = b[0];
+            updateFeedSelector(bundle);
+        });
+}
+
+regionSelectElement.onchange = function (event) {
+    regionId = event.target.value;
+    updateRegion(regionId);
+    updateBundleSelector(regionId);
+}
+
+bundleSelectElement.onchange = function (event) {
+    bundleId = event.target.value;
+    updateBundle(bundleId);
+}
+
+feedSelectElement.onchange = function (event) {
+    feedId = event.target.value;
+    // setUrl expects a URL to TileJSON, not a URL to the tiles themselves.
+    map.getSource('r5').setTiles([`http://localhost:7070/api/gtfs/${bundle.feedGroupId}/${feedId}/tiles/{z}/{x}/{y}`]);
+}
 
 let map = new mapboxgl.Map({
     container: 'map',
     center: [7.4475, 46.948056],
-    // center: [-122.68, 45.52],
     zoom: 9,
     style: 'vectorstyle.json'
-    // style: 'mapbox://styles/mapbox/outdoors-v10'
+});
+
+map.on('click', (e) => {
+    const bbox = [
+        [e.point.x - 5, e.point.y - 5],
+        [e.point.x + 5, e.point.y + 5]
+    ];
+    const selectedFeatures = map.queryRenderedFeatures(bbox, { layers: ['patterns'] });
+    const names = selectedFeatures.map(feature => feature.properties.name);
+    console.log(names);
 });
 
 </script>
-
 </body>
 </html>

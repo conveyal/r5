@@ -11,6 +11,7 @@ import com.conveyal.analysis.controllers.GtfsController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
+import com.conveyal.analysis.controllers.DatabaseController;
 import com.conveyal.analysis.controllers.UserActivityController;
 import com.conveyal.analysis.controllers.WorkerProxyController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
@@ -96,6 +97,7 @@ public abstract class BackendComponents {
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
                 new DataSourceController(fileStorage, database, taskScheduler, censusExtractor),
+                new DatabaseController(database),
                 new WorkerProxyController(broker)
         );
     }

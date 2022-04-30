@@ -46,13 +46,16 @@ public class TokenAuthentication implements Authentication {
 
     @Override
     public UserPermissions authenticate(Request request) {
-        String authHeader = request.headers("authorization").strip();
+        String authHeader = request.headers("authorization");
+        if (authHeader == null) {
+            throw new AnalysisServerException(UNAUTHORIZED, "Authorization header mising.", 401);
+        }
         if ("sesame".equalsIgnoreCase(authHeader)) {
             return new UserPermissions("local", true, "local");
         }
-        String[] authHeaderParts = authHeader.split(" ");
+        String[] authHeaderParts = authHeader.split(" +");
         if (authHeaderParts.length != 2 || !authHeaderParts[0].contains("@")) {
-            throw new AnalysisServerException(UNAUTHORIZED, "Authorization header should be '[email] [token]", 401);
+            throw new AnalysisServerException(UNAUTHORIZED, "Authorization header should be '[email] [token]'.", 401);
         }
         String email = authHeaderParts[0];
         String token = authHeaderParts[1];

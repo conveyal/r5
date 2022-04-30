@@ -9,10 +9,10 @@ import spark.Request;
 import spark.Response;
 
 import java.lang.invoke.MethodHandles;
+import java.util.Map;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.conveyal.r5.analyst.cluster.AnalysisWorker.sleepSeconds;
 
 /**
  * HTTP API Controller that handles user accounts and authentication.
@@ -47,16 +47,17 @@ public class AuthTokenController implements HttpController {
     /**
      * Create a new token, replacing any existing one for the same user (email).
      */
-    private TokenAuthentication.Token getTokenForEmail (Request req, Response res) {
+    private Map getTokenForEmail (Request req, Response res) {
         String email = req.queryParams("email");
         String password = req.queryParams("password");
         // Crude rate limiting, might just lead to connections piling up in event of attack.
         // sleepSeconds(2);
-        TokenAuthentication.Token token = tokenAuthentication.getTokenForEmail(email, password);
+        // TODO clear out any expired tokens, limiting to one or two per email
+        String token = tokenAuthentication.makeToken(email, password);
         if (token == null) {
             throw new AnalysisServerException(UNAUTHORIZED, "Incorrect email/password combination.", 401);
         } else {
-            return token;
+            return Map.of("token", token);
         }
     }
 

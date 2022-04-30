@@ -2,25 +2,23 @@ package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.controllers.AuthTokenController;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.mongodb.client.MongoCollection;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
-import spark.Response;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import java.lang.invoke.MethodHandles;
+import java.security.SecureRandom;
 import java.security.spec.KeySpec;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
@@ -36,8 +34,18 @@ public class TokenAuthentication implements Authentication {
 
     private final MongoCollection<Document> users;
 
-    private LoadingCache<String, Token> tokenForEmail =
-            Caffeine.newBuilder().expireAfterAccess(Duration.ofMinutes(10)).build(Token::forEmail);
+    /**
+     * Bundles UserPermissions together with a last read time to allow expiry.
+     */
+    private static class TokenValue {
+        long lastUsed = System.currentTimeMillis();
+        final UserPermissions userPermissions;
+        public TokenValue(UserPermissions userPermissions) {
+            this.userPermissions = userPermissions;
+        }
+    }
+
+    private Map<String, TokenValue> userForToken = new HashMap<>();
 
     public TokenAuthentication (AnalysisDB database) {
         // TODO verify that sharing a MongoCollection across threads is safe
@@ -53,43 +61,38 @@ public class TokenAuthentication implements Authentication {
         if ("sesame".equalsIgnoreCase(authHeader)) {
             return new UserPermissions("local", true, "local");
         }
-        String[] authHeaderParts = authHeader.split(" +");
-        if (authHeaderParts.length != 2 || !authHeaderParts[0].contains("@")) {
-            throw new AnalysisServerException(UNAUTHORIZED, "Authorization header should be '[email] [token]'.", 401);
-        }
-        String email = authHeaderParts[0];
-        String token = authHeaderParts[1];
-        if (tokenValid(email, token)) {
-            return new UserPermissions(email, true, "local");
-        } else {
+        UserPermissions userPermissions = userForToken(authHeader);
+        if (userPermissions == null) {
             throw new AnalysisServerException(UNAUTHORIZED, "Inalid authorization token.", 401);
+        } else {
+            return userPermissions;
         }
     }
 
     /**
-     * Token is just a string, but use this class to keep things more typed and produce more structured JSON responses.
-     * Add fields for expiration etc. if not handled by cache.
+     * TODO is SecureRandom a sufficiently secure source of randomness when used this way?
+     * Should we be creating a new instance each time?
+     * @return A Base64 encoded representation of 32 random bytes
      */
-    public static class Token {
-        public final String token;
-        public Token() {
-            Random random = new Random();
-            byte[] tokenBytes = new byte[32];
-            random.nextBytes(tokenBytes);
-            token = Base64.getEncoder().encodeToString(tokenBytes);
-        }
-        public static Token forEmail (String _email) {
-            return new Token();
-        }
+    public static String generateToken () {
+        Random random = new SecureRandom();
+        byte[] tokenBytes = new byte[32];
+        random.nextBytes(tokenBytes);
+        String token = Base64.getEncoder().encodeToString(tokenBytes);
+        return token;
     }
 
-    /**
-     * Ideally we could do this without the email, using a secondary map from token -> UserPermissions.
-     */
-    public boolean tokenValid (String email, String token) {
-        // Here a loadingCache is not appropriate. We want to be able to check if a token is present without creating one.
-        // Though in practice this still works, it just generates tokens for any user that's queried and they don't match.
-        return token.equals(tokenForEmail.get(email).token);
+    public UserPermissions userForToken (String token) {
+        TokenValue tokenValue = null;
+        synchronized (userForToken) {
+            tokenValue = userForToken.get(token);
+            if (tokenValue == null) {
+                return null;
+            } else {
+                tokenValue.lastUsed = System.currentTimeMillis();
+                return tokenValue.userPermissions;
+            }
+        }
     }
 
     /**
@@ -132,19 +135,22 @@ public class TokenAuthentication implements Authentication {
      * Create a new token, replacing any existing one for the same user (email) as long as the password is correct.
      * @return a new token, or null if the supplied password is incorrect.
      */
-    public Token getTokenForEmail (String email, String password) {
+    public String makeToken (String email, String password) {
         Document userDocument = users.find(eq("_id", email)).first();
         if (userDocument == null) {
             throw new IllegalArgumentException("User unknown: " + email);
         }
         Binary salt = (Binary) userDocument.get("salt");
         Binary hash = (Binary) userDocument.get("hash");
+        String group = userDocument.getString("group");
         byte[] hashForComparison = hashWithSalt(password, salt.getData());
         if (Arrays.equals(hash.getData(), hashForComparison)) {
             // Maybe invalidation is pointless and we can continue to return the same key indefinitely.
-            tokenForEmail.invalidate(email);
-            Token token = tokenForEmail.get(email);
-            return token;
+            String token = generateToken();
+            synchronized (userForToken) {
+                userForToken.put(token, new TokenValue(new UserPermissions(email, false, group)));
+                return token;
+            }
         } else {
             return null;
         }

@@ -5,7 +5,7 @@
     "r5": {
       "type": "vector",
       "tiles": [
-        "http://localhost:7070/api/gtfs/61137f589919c7627cb5647f/61137f589919c7627cb56480/tiles/{z}/{x}/{y}"
+        "http://localhost:7070/dummy"
       ],
       "maxzoom": 14
     },

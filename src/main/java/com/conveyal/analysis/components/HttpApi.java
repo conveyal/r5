@@ -78,9 +78,21 @@ public class HttpApi implements Component {
         LOG.info("Analysis server will listen for HTTP connections on port {}.", config.serverPort());
         spark.Service sparkService = spark.Service.ignite();
         sparkService.port(config.serverPort());
+        //sparkService.threadPool(1000);
+
+        // Set up TLS (HTTPS). Unfortunately Spark HTTP only accepts String paths to keystore files.
+        // We want to build a Keystore instance programmatically from PEM files.
+        // Digging through the Spark source code it seems extremely convoluted to directly inject a Keystore instance.
+        // sparkService.secure();
+        // Usage examples at:
+        // https://github.com/Hakky54/sslcontext-kickstart/blob/master/sslcontext-kickstart-for-pem/src/test/java/nl/altindag/ssl/util/PemUtilsShould.java
+        // Dependency:
+        // Tools to load PEM files into Java Keystore (so we don't have to use arcane Java keytool)
+        // implementation 'io.github.hakky54:sslcontext-kickstart-for-pem:7.4.1'
+
         // Serve up UI files. staticFileLocation("vector-client") inside classpath will not see changes to files.
-        // Note that this eliminates the need for CORS.
-        sparkService.externalStaticFileLocation("src/main/resources/vector-client");
+        // Note that this eliminates the need for CORS headers and eliminates CORS preflight request latency.
+        sparkService.externalStaticFileLocation("../r5/src/main/resources/vector-client");
 
         // Specify actions to take before the main logic of handling each HTTP request.
         sparkService.before((req, res) -> {

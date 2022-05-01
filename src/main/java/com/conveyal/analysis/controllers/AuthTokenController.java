@@ -48,6 +48,7 @@ public class AuthTokenController implements HttpController {
      * Create a new token, replacing any existing one for the same user (email).
      */
     private Map getTokenForEmail (Request req, Response res) {
+        // These should probably be in the body not URL, to prevent them from appearing as plaintext in history.
         String email = req.queryParams("email");
         String password = req.queryParams("password");
         // Crude rate limiting, might just lead to connections piling up in event of attack.

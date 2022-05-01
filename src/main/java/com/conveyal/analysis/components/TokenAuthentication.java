@@ -54,16 +54,21 @@ public class TokenAuthentication implements Authentication {
 
     @Override
     public UserPermissions authenticate(Request request) {
-        String authHeader = request.headers("authorization");
-        if (authHeader == null) {
-            throw new AnalysisServerException(UNAUTHORIZED, "Authorization header mising.", 401);
+        String token = request.headers("authorization");
+        // Some places such as MopboxGL do not make it easy to add headers, so also accept token in query parameter.
+        // The MapboxGL transformUrl setting seems to be missing from recent versions of the library.
+        if (token == null) {
+            token = request.queryParams("token");
         }
-        if ("sesame".equalsIgnoreCase(authHeader)) {
+        if (token == null) {
+            throw new AnalysisServerException(UNAUTHORIZED, "Authorization token mising.", 401);
+        }
+        if ("sesame".equalsIgnoreCase(token)) {
             return new UserPermissions("local", true, "local");
         }
-        UserPermissions userPermissions = userForToken(authHeader);
+        UserPermissions userPermissions = userForToken(token);
         if (userPermissions == null) {
-            throw new AnalysisServerException(UNAUTHORIZED, "Inalid authorization token.", 401);
+            throw new AnalysisServerException(UNAUTHORIZED, "Invalid authorization token.", 401);
         } else {
             return userPermissions;
         }
@@ -71,14 +76,15 @@ public class TokenAuthentication implements Authentication {
 
     /**
      * TODO is SecureRandom a sufficiently secure source of randomness when used this way?
-     * Should we be creating a new instance each time?
-     * @return A Base64 encoded representation of 32 random bytes
+     * Should we be creating a new instance of SecureRandom each time or reusing it?
+     * Do not use basic Base64 encoding since it contains some characters that are invalid in URLs.
+     * @return A url-safe representation of 32 random bytes
      */
     public static String generateToken () {
         Random random = new SecureRandom();
         byte[] tokenBytes = new byte[32];
         random.nextBytes(tokenBytes);
-        String token = Base64.getEncoder().encodeToString(tokenBytes);
+        String token = Base64.getUrlEncoder().encodeToString(tokenBytes);
         return token;
     }
 

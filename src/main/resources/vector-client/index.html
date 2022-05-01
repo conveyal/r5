@@ -34,11 +34,16 @@
 
 mapboxgl.accessToken = 'TOKEN_HERE';
 
+let token = new URLSearchParams(window.location.search).get('token')
+function authFetch (url) {
+    return fetch(url, { headers: {'Authorization': token }})
+}
+
 const regionSelectElement = document.getElementById("regions")
 function updateRegionSelector () {
     regionSelectElement.add(new Option("None"));
     // Returns an array of regions. Add them to the region selector DOM element.
-    fetch('http://localhost:7070/api/db/regions')
+    authFetch('http://localhost:7070/api/db/regions')
         .then(response => response.json())
         .then(regions => {
             for (const region of regions) {
@@ -53,7 +58,7 @@ function updateBundleSelector (regionId) {
     // Returns an array of bundles. Add them to the bundle selector DOM element.
     document.querySelectorAll('#bundles option').forEach(option => option.remove())
     bundleSelectElement.add(new Option("None"));
-    fetch(`http://localhost:7070/api/db/bundles?regionId=${regionId}`)
+    authFetch(`http://localhost:7070/api/db/bundles?regionId=${regionId}`)
         .then(response => response.json())
         .then(bundles => {
             for (const bundle of bundles) {
@@ -80,7 +85,7 @@ bundle = null;
 feedId = null;
 
 function updateRegion (regionId) {
-    fetch(`http://localhost:7070/api/db/regions?_id=${regionId}`)
+    authFetch(`http://localhost:7070/api/db/regions?_id=${regionId}`)
         .then(response => response.json())
         .then(r => {
             region = r[0];
@@ -91,7 +96,7 @@ function updateRegion (regionId) {
 }
 
 function updateBundle (bundleId) {
-    fetch(`http://localhost:7070/api/db/bundles?_id=${bundleId}`)
+    authFetch(`http://localhost:7070/api/db/bundles?_id=${bundleId}`)
         .then(response => response.json())
         .then(b => {
             bundle = b[0];
@@ -112,8 +117,8 @@ bundleSelectElement.onchange = function (event) {
 
 feedSelectElement.onchange = function (event) {
     feedId = event.target.value;
-    // setUrl expects a URL to TileJSON, not a URL to the tiles themselves.
-    map.getSource('r5').setTiles([`http://localhost:7070/api/gtfs/${bundle.feedGroupId}/${feedId}/tiles/{z}/{x}/{y}`]);
+    // setUrl expects a URL to TileJSON, not a URL to the tiles themselves (use setTiles()).
+    map.getSource('r5').setTiles([`http://localhost:7070/api/gtfs/${bundle.feedGroupId}/${feedId}/tiles/{z}/{x}/{y}?token=${token}`]);
 }
 
 let map = new mapboxgl.Map({

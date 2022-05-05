@@ -2,7 +2,6 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -43,7 +42,7 @@ public class OpportunityDataset extends Model {
     /**
      * The zoom level this opportunity dataset was rasterized at.
      */
-    public int webMercatorZoom;
+    public int zoom;
 
     /**
      * Total number of opportunities in the dataset, i.e. the sum of all opportunity counts at all points / grid cells.
@@ -107,22 +106,16 @@ public class OpportunityDataset extends Model {
     }
 
     @JsonIgnore
-    public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, webMercatorZoom);
-    }
-
-    @JsonIgnore
-    public void setWebMercatorExtents (PointSet pointset) {
+    public void setWebMercatorExtents (WebMercatorExtents extents) {
         // These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
         // for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets if
-        // the zoom level is fixed in OpportunityDataset (FIXME we may change this soon).
+        // the zoom level is fixed in OpportunityDataset.
         // Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
-        WebMercatorExtents extents = pointset.getWebMercatorExtents();
         this.west = extents.west;
         this.north = extents.north;
         this.width = extents.width;
         this.height = extents.height;
-        this.webMercatorZoom = extents.zoom;
+        this.zoom = extents.zoom;
     }
 
     /** Analysis region this dataset was uploaded in. */

@@ -205,7 +205,7 @@ public class OpportunityDatasetController implements HttpController {
             if (dataset.format == FileStorageFormat.FREEFORM) {
                 dataset.name = String.join(" ", pointSet.name, "(freeform)");
             }
-            dataset.setWebMercatorExtents(pointSet);
+            dataset.setWebMercatorExtents(pointSet.getWebMercatorExtents());
             // TODO make origin and destination pointsets reference each other and indicate they are suitable
             //      for one-to-one analyses
 

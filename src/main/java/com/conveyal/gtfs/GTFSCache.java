@@ -220,6 +220,12 @@ public class GTFSCache implements Component {
         final GTFSFeed feed = this.get(bundleScopedFeedId);
         LOG.info("{}: indexing {} stops", feed.feedId, feed.stops.size());
         for (Stop stop : feed.stops.values()) {
+            // To match existing GTFS API, include only stop objects that have location_type 0.
+            // All other location_types (station, entrance, generic node, boarding area) are skipped.
+            // Missing (NaN) coordinates will confuse the spatial index and cascade hundreds of errors.
+            if (stop.location_type != 0 || !Double.isFinite(stop.stop_lat) || !Double.isFinite(stop.stop_lon)) {
+                continue;
+            }
             Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
             Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
 

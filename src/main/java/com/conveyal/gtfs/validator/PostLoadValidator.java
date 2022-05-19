@@ -32,7 +32,7 @@ public class PostLoadValidator {
 
     public void validate () {
         validateCalendarServices();
-        validateStopStationConstraints();
+        validateParentStations();
     }
 
     /**
@@ -46,11 +46,15 @@ public class PostLoadValidator {
         }
     }
 
-    /** Validate location_type and parent_station constraints as well as referential integrity. */
-    private void validateStopStationConstraints () {
+    /**
+     * Validate location_type and parent_station constraints as well as referential integrity.
+     * Individual validation actions like this could be factored out into separate classes (PostLoadValidators)
+     * but as long as we only have two or three of them they can live together as methods in this one class.
+     */
+    private void validateParentStations() {
         for (Stop stop : feed.stops.values()) {
-            for (Rule rule : rules) {
-                if (rule.check(stop, feed)) break;
+            for (ParentStationRule parentStationRule : PARENT_STATION_RULES) {
+                if (parentStationRule.check(stop, feed)) break;
             }
         }
     }
@@ -59,14 +63,14 @@ public class PostLoadValidator {
     private static final String FIELD = "parent_station";
 
     /** GTFS location_type codes. */
-    private enum LocType {
+    private enum LocationType {
         STOP(0),
         STATION(1),
         ENTRANCE(2),
         GENERIC(3),
         BOARDING(4);
         public final int code;
-        LocType (int code) {
+        LocationType(int code) {
             this.code = code;
         }
     }
@@ -75,27 +79,36 @@ public class PostLoadValidator {
         OPTIONAL, REQUIRED, FORBIDDEN
     }
 
-    private static class Rule {
-        // The location_type to which the rule applies.
-        LocType fromLocType;
+    /**
+     * These rules are used specifically for validating parent_stations on stops.txt entries.
+     * For now we only have two kind of post-load validation, so these classes specific to one kind of validation
+     * are all grouped together under the PostLoadValidator class.
+     */
+    private static class ParentStationRule {
+        // The location_type to which the constraint applies.
+        LocationType fromLocationType;
         // Whether the parent_station is required, forbidden, or optional.
         Requirement parentRequirement;
         // If the parent_station is present and not forbidden, what location_type it must be.
-        LocType parentLocType;
+        LocationType parentLocationType;
 
-        public Rule (LocType fromLocType, Requirement parentRequirement, LocType parentLocType) {
-            this.fromLocType = fromLocType;
+        public ParentStationRule(
+                LocationType fromLocationType,
+                Requirement parentRequirement,
+                LocationType parentLocationType
+        ) {
+            this.fromLocationType = fromLocationType;
             this.parentRequirement = parentRequirement;
-            this.parentLocType = parentLocType;
+            this.parentLocationType = parentLocationType;
         }
 
         /**
-         * Call this method once for each location_type, defining a rules about that location_type's parent_station.
-         * @return true if this rule validated the stop, or false if more rules must be checked
+         * Call this method on rules for each location_type in turn, enforcing the rule when the supplied stop matches.
+         * @return true if this rule validated the stop, or false if more rules for other location_types must be checked.
          */
         public boolean check (Stop stop, GTFSFeed feed) {
-            // If this rule does not apply to this stop, do not perform checks.
-            if (stop.location_type != fromLocType.code) {
+            // If this rule does not apply to this stop (does not apply to its location_type), do not perform checks.
+            if (stop.location_type != fromLocationType.code) {
                 return false;
             }
             if (stop.parent_station == null) {
@@ -111,10 +124,10 @@ public class PostLoadValidator {
                 if (parentStation == null) {
                     feed.errors.add(new ReferentialIntegrityError(FILE, stop.sourceFileLine, FIELD, stop.parent_station));
                 } else {
-                    if (parentStation.location_type != parentLocType.code) {
+                    if (parentStation.location_type != parentLocationType.code) {
                         feed.errors.add(new RangeError(
                                 FILE, stop.sourceFileLine, FIELD,
-                                parentLocType.code, parentLocType.code,
+                                parentLocationType.code, parentLocationType.code,
                                 parentStation.location_type)
                         );
                     }
@@ -124,12 +137,16 @@ public class PostLoadValidator {
         }
     }
 
-    private static final List<Rule> rules = List.of(
-            new Rule(LocType.STOP,     Requirement.OPTIONAL,  LocType.STATION),
-            new Rule(LocType.STATION,  Requirement.FORBIDDEN, LocType.STATION),
-            new Rule(LocType.ENTRANCE, Requirement.REQUIRED,  LocType.STATION),
-            new Rule(LocType.GENERIC,  Requirement.REQUIRED,  LocType.STATION),
-            new Rule(LocType.BOARDING, Requirement.REQUIRED,  LocType.STOP)
+    /**
+     * Representation in code of the constraints described at https://gtfs.org/schedule/reference/#stopstxt
+     * subsections on location_type and parent_station.
+     */
+    private static final List<ParentStationRule> PARENT_STATION_RULES = List.of(
+            new ParentStationRule(LocationType.STOP,     Requirement.OPTIONAL,  LocationType.STATION),
+            new ParentStationRule(LocationType.STATION,  Requirement.FORBIDDEN, LocationType.STATION),
+            new ParentStationRule(LocationType.ENTRANCE, Requirement.REQUIRED,  LocationType.STATION),
+            new ParentStationRule(LocationType.GENERIC,  Requirement.REQUIRED,  LocationType.STATION),
+            new ParentStationRule(LocationType.BOARDING, Requirement.REQUIRED,  LocationType.STOP)
     );
 
 }

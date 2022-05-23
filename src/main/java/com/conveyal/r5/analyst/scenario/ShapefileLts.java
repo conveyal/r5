@@ -4,8 +4,7 @@ import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.rastercost.ElevationLoader;
-import com.conveyal.r5.shapefile.ShapefileMatcher;
+import com.conveyal.r5.shapefile.LtsMatcher;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -57,7 +56,7 @@ public class ShapefileLts extends Modification {
         // Replicate the entire flags array so we can write to it (following copy-on-write policy).
         // Otherwise the TIntAugmentedList only allows extending the base graph.
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
-        ShapefileMatcher shapefileMatcher = new ShapefileMatcher(network.streetLayer);
+        LtsMatcher shapefileMatcher = new LtsMatcher(network.streetLayer);
         try {
             shapefileMatcher.match(localFile.getAbsolutePath(), ltsAttribute);
         } catch (Exception e) {

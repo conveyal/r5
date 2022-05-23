@@ -1,6 +1,5 @@
 package com.conveyal.r5.shapefile;
 
-import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;
@@ -10,7 +9,6 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.index.strtree.STRtree;
-import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +17,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.List;
 import java.util.stream.IntStream;
-
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
-import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
 
 /**
  * The class ShapefileMain converts shapefiles to OSM data, which is in turn converted to R5 street networks.
@@ -32,7 +27,7 @@ import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
  * two main ways: by creating new nodes wherever shapes cross, or by assuming any nodes in the same location are the
  * same node (and not two nodes stacked vertically for example). The former does not allow for separation of tunnels
  * and bridges. The latter requires exactly placed nodes on two or more features for every intersection. For example,
- * the end of a road at a T insersection requires a node in the same location on the perpendicular road.
+ * the end of a road at a T intersection requires a node in the same location on the perpendicular road.
  * It would be possible to hybridize these approaches, for example automatically inserting nodes at T intersections but
  * requiring explicit duplicate nodes at crossing intersections to distinguish them from bridges and tunnels. The
  * details get tricky though: specifically, how close does a line or point have to be to another before it's connected?
@@ -53,26 +48,20 @@ import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
  *
  * This class matches a supplied shapefile to an already-built network.
  */
-public class ShapefileMatcher {
+public abstract class ShapefileMatcher {
 
     public static final Logger LOG = LoggerFactory.getLogger(ShapefileMatcher.class);
 
     private STRtree featureIndex;
     private StreetLayer streets;
-    private int ltsAttributeIndex = -1;
+    private int attributeIndex = -1;
 
     public ShapefileMatcher (StreetLayer streets) {
         this.streets = streets;
     }
 
     /**
-     * Match each pair of edges in the street layer to a feature in the shapefile. Copy LTS attribute from that feature
-     * to the pair of edges, setting the BIKE_LTS_EXPLICIT flag. This will prevent Conveyal OSM-inferred LTS from
-     * overwriting the shapefile-derived LTS.
-     * In current usage this is applied after the OSM is already completely loaded and converted to network edges, so
-     * it overwrites any data from OSM. Perhaps instead of BIKE_LTS_EXPLICIT we should have an LTS source flag:
-     * OSM_INFERRED, OSM_EXPLICIT, SHAPEFILE_MATCH etc. This could also apply to things like speeds and slopes.
-     * The values could be retained only for the duration of network building unless we have a reason to keep them.
+     * Match each pair of edges in the street layer to a feature in the shapefile, then set flags on the edges.
      */
     public void match (String shapefileName, String attributeName) {
         try {
@@ -89,18 +78,7 @@ public class ShapefileMatcher {
             LineString edgeGeometry = edge.getGeometry();
             SimpleFeature bestFeature = findBestMatch(edgeGeometry);
             if (bestFeature != null) {
-                // Set flags on forward and backward edges to match those on feature attribute
-                // TODO reuse code from LevelOfTrafficStressLabeler.label()
-                int lts = ((Number) bestFeature.getAttribute(ltsAttributeIndex)).intValue();
-                if (lts < 1 || lts > 4) {
-                    LOG.error("Clamping LTS value to range [1...4]. Value in attribute is {}", lts);
-                }
-                EdgeStore.EdgeFlag ltsFlag = intToLts(lts);
-                edge.setFlag(BIKE_LTS_EXPLICIT);
-                edge.setFlag(ltsFlag);
-                edge.advance();
-                edge.setFlag(BIKE_LTS_EXPLICIT);
-                edge.setFlag(ltsFlag);
+                setEdgePair(bestFeature, attributeIndex, edge);
                 edgePairCounter.increment();
             }
         });
@@ -108,6 +86,14 @@ public class ShapefileMatcher {
         LOG.info("Number of edge pairs matched {} using {} shapefile features ({} edge pairs unmatched).",
                 edgePairCounter.getCount(), featureIndex.size(),
                 streets.edgeStore.nEdgePairs() - edgePairCounter.getCount());
+    }
+
+    /**
+     * Set the appropriate edge flag to the value of the specified attribute in the corresponding (matched) feature.
+     * Subclasses are responsible for implementation details on which flag to set.
+     */
+    void setEdgePair (SimpleFeature feature, int attributeIndex, EdgeStore.Edge edge) {
+        // Do nothing; subclasses should override.
     }
 
     // Match metric is currently Hausdorff distance, eventually replace with something that accounts for overlap length.
@@ -129,7 +115,7 @@ public class ShapefileMatcher {
     }
 
     // Index is in floating-point WGS84
-    public void indexFeatures (String shapefileName, String attributeName) throws Throwable {
+    private void indexFeatures (String shapefileName, String attributeName) throws Throwable {
         featureIndex = new STRtree();
         ShapefileReader reader = new ShapefileReader(new File(shapefileName));
         Envelope envelope = reader.wgs84Bounds();
@@ -140,7 +126,7 @@ public class ShapefileMatcher {
             featureIndex.insert(featureGeom.getEnvelopeInternal(), feature);
         });
         featureIndex.build(); // Index is now immutable.
-        ltsAttributeIndex = reader.findAttribute(attributeName, Number.class);
+        attributeIndex = reader.findAttribute(attributeName, Number.class);
     }
 
     // All the repetitive casting for multilinestring features containing a single linestring.

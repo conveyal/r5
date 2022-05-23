@@ -20,7 +20,7 @@ public class ShapefileMatcherMain {
 
     public static void main (String[] args) throws Throwable {
         StreetLayer streetLayer = loadStreetLayer();
-        ShapefileMatcher shapefileMatcher = new ShapefileMatcher(streetLayer);
+        ShapefileMatcher shapefileMatcher = new LtsMatcher(streetLayer);
         shapefileMatcher.match(SHAPE_FILE, SHAPE_FILE_ATTRIBUTE);
     }
 

@@ -5,7 +5,6 @@ import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;
 import com.conveyal.r5.util.ShapefileReader;
 import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.index.strtree.STRtree;
@@ -69,7 +68,7 @@ public abstract class ShapefileMatcher {
         } catch (Throwable t) {
             throw new RuntimeException("Could not load and index shapefile.", t);
         }
-        LOG.info("Matching edges and setting bike LTS flags...");
+        LOG.info("Matching edges and setting flags...");
         // Even single-threaded this is pretty fast for small extracts, but it's readily paralellized.
         final LambdaCounter edgePairCounter =
                 new LambdaCounter(LOG, streets.edgeStore.nEdgePairs(), 25_000, "Edge pair {}/{}");
@@ -118,7 +117,6 @@ public abstract class ShapefileMatcher {
     private void indexFeatures (String shapefileName, String attributeName) throws Throwable {
         featureIndex = new STRtree();
         ShapefileReader reader = new ShapefileReader(new File(shapefileName));
-        Envelope envelope = reader.wgs84Bounds();
         LOG.info("Indexing shapefile features");
         // TODO add wgs84List(), pre-unwrap linestrings and attributes
         reader.wgs84Stream().forEach(feature -> {

@@ -16,6 +16,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
@@ -198,6 +199,9 @@ public class BundleController implements HttpController {
                         GTFSFeed feed = GTFSFeed.newWritableFile(tempDbFile);
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
+
+                        // Perform any more complex validation that requires cross-table checks.
+                        new PostLoadValidator(feed).validate();
 
                         // Find and validate the extents of the GTFS, defined by all stops in the feed.
                         for (Stop s : feed.stops.values()) {

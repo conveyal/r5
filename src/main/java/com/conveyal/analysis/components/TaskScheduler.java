@@ -173,6 +173,14 @@ public class TaskScheduler implements Component {
         }
     }
 
+    public boolean removeTaskForUser (String userEmail, String taskId) {
+        synchronized (tasksForUser) {
+            Set<Task> tasks = tasksForUser.get(userEmail);
+            if (tasks == null) return false;
+            return tasks.removeIf(t -> t.id.toString().equals(taskId));
+        }
+    }
+
     // Q: Should the caller ever create its own Tasks, or if are tasks created here inside the TaskScheduler from
     // other raw information? Having the caller creating a Task seems like a good way to configure execution details
     // like heavy/light/periodic, and submit user information without passing it in. That task request could be separate

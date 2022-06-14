@@ -4,6 +4,7 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.r5.analyst.progress.ApiTask;
+import com.conveyal.r5.analyst.progress.Task;
 import com.google.common.collect.ImmutableMap;
 import spark.Request;
 import spark.Response;
@@ -56,10 +57,15 @@ public class UserActivityController implements HttpController {
     private Object removeActivity (Request req, Response res) {
         UserPermissions userPermissions = UserPermissions.from(req);
         String id = req.params("id");
+        Task task = taskScheduler.getTaskForUser(userPermissions.email, id);
+        // Disallow removing active tasks via the API.
+        if (task.state.equals(Task.State.ACTIVE)) {
+            throw AnalysisServerException.badRequest("Cannot clear an active task.");
+        }
         if (taskScheduler.removeTaskForUser(userPermissions.email, id)) {
-            return ImmutableMap.of("message", "Successfully cleared activity.");
+            return ImmutableMap.of("message", "Successfully cleared task.");
         } else {
-            throw AnalysisServerException.badRequest("Failed to clear activity.");
+            throw AnalysisServerException.badRequest("Failed to clear task.");
         }
     }
 

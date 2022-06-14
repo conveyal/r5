@@ -174,6 +174,19 @@ public class TaskScheduler implements Component {
         }
     }
 
+    public Task getTaskForUser (String userEmail, String taskId) {
+        synchronized (tasksForUser) {
+            Set<Task> tasks = tasksForUser.get(userEmail);
+            if (tasks == null) return null;
+            for (Task t : tasks) {
+                if (t.id.toString().equals(taskId)) {
+                    return t;
+                }
+            }
+            return null;
+        }
+    }
+
     public boolean removeTaskForUser (String userEmail, String taskId) {
         synchronized (tasksForUser) {
             Set<Task> tasks = tasksForUser.get(userEmail);

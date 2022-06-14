@@ -57,9 +57,9 @@ public class UserActivityController implements HttpController {
         UserPermissions userPermissions = UserPermissions.from(req);
         String id = req.params("id");
         if (taskScheduler.removeTaskForUser(userPermissions.email, id)) {
-            return ImmutableMap.of("message", "Successfully removed activity.");
+            return ImmutableMap.of("message", "Successfully cleared activity.");
         } else {
-            throw AnalysisServerException.badRequest("Failed to remove activity.");
+            throw AnalysisServerException.badRequest("Failed to clear activity.");
         }
     }
 

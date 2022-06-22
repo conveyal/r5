@@ -174,6 +174,9 @@ public class TaskScheduler implements Component {
         }
     }
 
+    /**
+     * Return a single task. Does not purge old tasks.
+     */
     public Task getTaskForUser (String userEmail, String taskId) {
         synchronized (tasksForUser) {
             Set<Task> tasks = tasksForUser.get(userEmail);
@@ -187,6 +190,9 @@ public class TaskScheduler implements Component {
         }
     }
 
+    /**
+     * Remove a task. Returns false if task does not exist. Returns true if task exists and is properly removed.
+     */
     public boolean removeTaskForUser (String userEmail, String taskId) {
         synchronized (tasksForUser) {
             Set<Task> tasks = tasksForUser.get(userEmail);

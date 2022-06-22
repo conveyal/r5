@@ -168,7 +168,7 @@ public class TaskScheduler implements Component {
             List<ApiTask> apiTaskList = tasks.stream()
                     .map(Task::toApiTask)
                     .collect(Collectors.toUnmodifiableList());
-            // Purge tasks older than one day.
+            // Purge old tasks.
             tasks.removeIf(t -> t.durationComplete().toDays() > 3);
             return apiTaskList;
         }

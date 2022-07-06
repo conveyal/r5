@@ -7,7 +7,7 @@ We refer to the routing method as "realistic" because it works by planning door-
 
 We say "Real-world and Reimagined" networks because R5's networks are built from widely available open OSM and GTFS data describing baseline transportation systems, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
 
-**Please note** that the Conveyal team does not provide technical support for third-party deployments of its analysis platform. We provide paid subscriptions to a cloud-based deployment of this system, which performs these complex calculations hundreds of times faster using a compute cluster. This project is open source primarily to ensure transparency and reproducibility in public planning and decision making processes, and in hopes that it may help researchers, students, and potential collaborators to understand and build upon our methodology.
+**Please note** that the Conveyal team does not provide technical support for third-party deployments. R5 is a component of a specialized commercial system, and we align development efforts with our roadmap and the needs of subscribers to our hosted service. This service is designed to facilitate secure online collaboration, user-friendly data management and scenario editing through a web interface, and complex calculations performed hundreds of times faster using a compute cluster. These design goals may not align with other use cases. R5 does not currently expose a stable programming interface ("API" or "SDK"). While the Conveyal team provides ongoing support and compatibility to subscribers, third-party projects using R5 as a library may not work with future releases. As we release new features, previous functions and data types may change. The practical effect is that third-party wrappers or language bindings (e.g. for R or Python) may need to continue using an older release of R5 for feature compatibility (though not necessarily result compatibility, as the methods used in R5 are relatively stable). This project is open source primarily to ensure transparency and reproducibility in public planning and decision making processes, and in hopes that it may help researchers, students, and potential collaborators to understand and build upon our methodology.
 
 ## Methodology
 
@@ -19,7 +19,7 @@ For details on the core methods implemented in Conveyal Analysis and R5, see:
 
 ### Citations
 
-The Conveyal team is always eager to see cutting-edge uses of our software, so feel free to send us a copy of any thesis, report, or paper produced using this software. We also ask that any academic publications using this software cite the papers above, where relevant and appropriate.
+The Conveyal team is always eager to see cutting-edge uses of our software, so feel free to send us a copy of any thesis, report, or paper produced using this software. We also ask that any academic or research publications using this software cite the papers above, where relevant and appropriate.
 
 ## Configuration
 
@@ -52,7 +52,7 @@ By default, IntelliJ will follow common Gradle practice and build R5 using the "
 
 ## Structured Commit Messages
 
-We use structured commit messages to help generate changelogs and determine version numbers.
+We use structured commit messages to help generate changelogs.
 
 The first line of these messages is in the following format: `<type>(<scope>): <summary>` 
 
@@ -68,10 +68,6 @@ The `(<scope>)` is optional and is often a class name. The `<summary>` should be
 - devops: Changes to code that only affect deployment, logging, etc. No changes to user code.
 - chore: Any other changes causing no changes to user code.
 
-The body of the commit message (if any) should begin after one blank line. If the commit meets the definition of a major version change according to semantic versioning (e.g. a change in API visible to an external module), the commit message body should begin with `BREAKING CHANGE: <description>`.
+The body of the commit message (if any) should begin after one blank line. 
 
-Presence of a `fix` commit in a release should increment the number in the third (PATCH) position.
-Presence of a `feat` commit in a release should increment the number in the second (MINOR) position.
-Presence of a `BREAKING CHANGE` commit in a release should increment the number in the first (MAJOR) position.
-
-This is based on https://www.conventionalcommits.org.
+From 2018 to 2020, we used major/minor/patch release numbering as suggested by https://www.conventionalcommits.org. Starting in 2021, we switched to major/minor release numbering, incrementing the minor version with regular feature releases and the major version only when there are substantial changes to the cluster computing components of our system. Because there is no public API at this time, the conventional definition of breaking changes under semantic versioning does not apply. 

@@ -59,6 +59,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -283,6 +284,8 @@ public class Grid extends PointSet {
         // The rest of the file is 32-bit integers in row-major order (x changes faster than y), delta-coded.
         // Delta coding and error diffusion are reset on each row to avoid wrapping.
         int prev = 0;
+        // Deterministic pseudo-random source for dithering values very close to zero.
+        Random random = new Random(grid.length);
         for (int y = 0; y < extents.height; y++) {
             // Reset error on each row to avoid diffusing to distant locations.
             // An alternative is to use serpentine iteration or iterative diffusion.
@@ -290,17 +293,21 @@ public class Grid extends PointSet {
             for (int x = 0; x < extents.width; x++) {
                 double val = grid[x][y];
                 checkState(val >= 0, "Opportunity density should never be negative.");
-                val += error;
-                int rounded = ((int) Math.round(val));
-                // For values that round down to zero, probabilistically fire pixels to avoid vertical striping.
-                // This will yield an error term < -0.5, effectively borrowing against downstream cells.
-                // Due to streaming application of delta coding, we can't readily track the number of successive cells
-                // that rounded to zero and rewind to situate isolated opportunities randomly in those runs of zeroes.
-                if (rounded == 0 && val > 0 && random() < val) {
-                    rounded = 1;
-                } else if (rounded < 0) {
-                    rounded = 0;
+                if (val == 0) {
+                    // Do not propagate error into or across gaps (outside rasterized polygons)
+                    error = 0;
+                } else {
+                    val += error;
+                    // For counts that will round down to zero, fire probabilistically to avoid vertical banding.
+                    // This will still create vertical banding of voids for values in range [0.5, 1]. Treating
+                    // all values less than one probabilistically will eliminate all visible 0-1 banding.
+                    // This trades off conservation of the total number of opportunities against spatial bias.
+                    if (val < 0.5) {
+                        val = (random.nextDouble() < val) ? 1 : 0;
+                    }
                 }
+                int rounded = ((int) Math.round(val));
+                checkState(rounded >= 0);
                 error = val - rounded;
                 int delta = rounded - prev;
                 out.writeInt(delta);

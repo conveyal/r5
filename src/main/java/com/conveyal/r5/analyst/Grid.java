@@ -289,6 +289,7 @@ public class Grid extends PointSet {
         int prev = 0;
         for (int y = 0; y < extents.height; y++) {
             // Reset error on each row to avoid diffusing to distant locations.
+            // Recall that we are saving the result of rasterizing N polygons of different densities, not one polygon.
             // An alternative is to use serpentine iteration or iterative diffusion.
             double error = 0;
             for (int x = 0; x < extents.width; x++) {

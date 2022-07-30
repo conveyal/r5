@@ -67,11 +67,7 @@ import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
-import static org.apache.commons.math3.util.FastMath.atan;
-import static org.apache.commons.math3.util.FastMath.cos;
-import static org.apache.commons.math3.util.FastMath.log;
-import static org.apache.commons.math3.util.FastMath.sinh;
-import static org.apache.commons.math3.util.FastMath.tan;
+import static org.apache.commons.math3.util.FastMath.*;
 
 /**
  * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
@@ -289,7 +285,6 @@ public class Grid extends PointSet {
         int prev = 0;
         for (int y = 0; y < extents.height; y++) {
             // Reset error on each row to avoid diffusing to distant locations.
-            // Recall that we are saving the result of rasterizing N polygons of different densities, not one polygon.
             // An alternative is to use serpentine iteration or iterative diffusion.
             double error = 0;
             for (int x = 0; x < extents.width; x++) {
@@ -297,7 +292,15 @@ public class Grid extends PointSet {
                 checkState(val >= 0, "Opportunity density should never be negative.");
                 val += error;
                 int rounded = ((int) Math.round(val));
-                checkState(rounded >= 0, "Rounded opportunity density should never be negative.");
+                // For values that round down to zero, probabilistically fire pixels to avoid vertical striping.
+                // This will yield an error term < -0.5, effectively borrowing against downstream cells.
+                // Due to streaming application of delta coding, we can't readily track the number of successive cells
+                // that rounded to zero and rewind to situate isolated opportunities randomly in those runs of zeroes.
+                if (rounded == 0 && val > 0 && random() < val) {
+                    rounded = 1;
+                } else if (rounded < 0) {
+                    rounded = 0;
+                }
                 error = val - rounded;
                 int delta = rounded - prev;
                 out.writeInt(delta);

@@ -1,5 +1,7 @@
 package com.conveyal.file;
 
+import java.util.Locale;
+
 /**
  * An enumeration of all the file types we handle as uploads, derived internal data, or work products.
  * Really this should be a union of several enumerated types (upload/internal/product) but Java does not allow this.
@@ -37,7 +39,14 @@ public enum FileStorageFormat {
     }
 
     public static FileStorageFormat fromFilename (String filename) {
-        String extension = filename.substring(filename.lastIndexOf(".") + 1);
-        return FileStorageFormat.valueOf(extension.toUpperCase());
+        String extension = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase(Locale.ROOT);
+        // Linear search through the values since there are only 12 of them.
+        // The enum values themselves are descriptive names, their extension field is the actual expected file extension.
+        for (FileStorageFormat format : FileStorageFormat.values()) {
+            if (extension.equals(format.extension)) {
+                return format;
+            }
+        }
+        return null;
     }
 }

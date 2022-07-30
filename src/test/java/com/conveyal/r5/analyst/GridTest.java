@@ -133,7 +133,7 @@ public class GridTest {
             boolean tolerateRounding
     ) {
         // Each individual cell can be off by 1/2 due to rounding, plus error term of up to 1/2 from previous cell
-        double cellTolerance = tolerateRounding ? 1 : 0;
+        double cellTolerance = tolerateRounding ? 1.5 : 0;
         assertEquals(a.length, b.length);
         for (int i = 0; i < a.length; i++) {
             double[] ai = a[i];
@@ -149,9 +149,9 @@ public class GridTest {
             // The grid must be transposed to check row sums, its first index is column (x coordinate).
             final int nCols = a.length;
             final int nRows = a[0].length;
-            final double pairSumTolerance = 1; // count of two adjacent cells should be off by max of 1
-            final double rowSumTolerance = 0.5; // rounding error may "fall off" the end of a row
-            final double gridSumTolerance = 0.5 * nRows; // rounding error on each row is independent
+            final double pairSumTolerance = 1.5; // count of two adjacent cells should be off by max of 1
+            final double rowSumTolerance = 1.5; // rounding error may "fall off" the end of a row
+            final double gridSumTolerance = 1.5; // rounding error on each row is independent
             double aSum = 0;
             double bSum = 0;
             for (int y = 0; y < nRows; y++) {

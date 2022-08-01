@@ -48,17 +48,20 @@ public class Stop extends Entity {
             s.stop_code = getStringField("stop_code", false);
             s.stop_name = getStringField("stop_name", true);
             s.stop_desc = getStringField("stop_desc", false);
-            s.stop_lat  = getDoubleField("stop_lat", true, -90D, 90D);
-            s.stop_lon  = getDoubleField("stop_lon", true, -180D, 180D);
             s.zone_id   = getStringField("zone_id", false);
             s.stop_url  = getUrlField("stop_url", false);
-            s.location_type  = getIntField("location_type", false, 0, 1);
-            s.parent_station = getStringField("parent_station", false);
+            s.location_type  = getIntField("location_type", false, 0, 4);
+            // 0...2 are stop, station, and entrance which must have lat and lon. Other nodes do not need coordinates.
+            boolean coord_required = s.location_type <= 2;
+            s.stop_lat  = getDoubleField("stop_lat", coord_required, -90D, 90D);
+            s.stop_lon  = getDoubleField("stop_lon", coord_required, -180D, 180D);
+            // Required for entrances, generic nodes, and boarding areas. Optional for stops, forbidden for stations.
+            boolean parent_station_required = s.location_type >= 2;
+            s.parent_station = getStringField("parent_station", parent_station_required);
             s.stop_timezone  = getStringField("stop_timezone", false);
             s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
             s.feed_id = feed.feedId;
             /* TODO check ref integrity later, this table self-references via parent_station */
-
             feed.stops.put(s.stop_id, s);
         }
 

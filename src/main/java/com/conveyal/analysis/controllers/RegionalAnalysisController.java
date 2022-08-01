@@ -4,7 +4,6 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
@@ -33,7 +32,6 @@ import spark.Response;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -402,7 +400,7 @@ public class RegionalAnalysisController implements HttpController {
                     );
                 } else {
                     checkArgument(
-                        dataset.getWebMercatorExtents().zoom == opportunityDatasets.get(0).getWebMercatorExtents().zoom,
+                        dataset.zoom == opportunityDatasets.get(0).zoom,
                         "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
                     );
                 }

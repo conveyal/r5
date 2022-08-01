@@ -168,8 +168,36 @@ public class TaskScheduler implements Component {
             List<ApiTask> apiTaskList = tasks.stream()
                     .map(Task::toApiTask)
                     .collect(Collectors.toUnmodifiableList());
-            tasks.removeIf(t -> t.durationComplete().getSeconds() > 60);
+            // Purge old tasks.
+            tasks.removeIf(t -> t.durationComplete().toDays() > 3);
             return apiTaskList;
+        }
+    }
+
+    /**
+     * Return a single task. Does not purge old tasks.
+     */
+    public Task getTaskForUser (String userEmail, String taskId) {
+        synchronized (tasksForUser) {
+            Set<Task> tasks = tasksForUser.get(userEmail);
+            if (tasks == null) return null;
+            for (Task t : tasks) {
+                if (t.id.toString().equals(taskId)) {
+                    return t;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Remove a task. Returns false if task does not exist. Returns true if task exists and is properly removed.
+     */
+    public boolean removeTaskForUser (String userEmail, String taskId) {
+        synchronized (tasksForUser) {
+            Set<Task> tasks = tasksForUser.get(userEmail);
+            if (tasks == null) return false;
+            return tasks.removeIf(t -> t.id.toString().equals(taskId));
         }
     }
 

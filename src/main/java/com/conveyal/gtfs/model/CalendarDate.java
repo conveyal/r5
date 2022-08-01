@@ -41,6 +41,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
         @Override
         protected boolean isRequired() {
+            // One of calendar or calendar_dates must be present - check in more flexible modular validation later.
             return false;
         }
 

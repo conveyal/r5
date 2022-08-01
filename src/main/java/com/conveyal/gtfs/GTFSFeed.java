@@ -20,7 +20,6 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -48,7 +47,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -225,20 +223,22 @@ public class GTFSFeed implements Cloneable, Closeable {
         // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
         // we're done loading them
-        Map<String, Service> serviceTable = new HashMap<>();
-        new Calendar.Loader(this, serviceTable).loadTable(zip);
-        new CalendarDate.Loader(this, serviceTable).loadTable(zip);
-        this.services.putAll(serviceTable);
-        // Joined Services have been persisted to MapDB. Release in-memory HashMap for garbage collection.
-        serviceTable = null;
+        {
+            Map<String, Service> serviceTable = new HashMap<>();
+            new Calendar.Loader(this, serviceTable).loadTable(zip);
+            new CalendarDate.Loader(this, serviceTable).loadTable(zip);
+            this.services.putAll(serviceTable);
+            // Joined Services have been persisted to MapDB. In-memory HashMap goes out of scope for garbage collection.
+        }
 
         // Joining is performed for Fares as for Services above.
-        Map<String, Fare> fares = new HashMap<>();
-        new FareAttribute.Loader(this, fares).loadTable(zip);
-        new FareRule.Loader(this, fares).loadTable(zip);
-        this.fares.putAll(fares);
-        // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
-        fares = null;
+        {
+            Map<String, Fare> fares = new HashMap<>();
+            new FareAttribute.Loader(this, fares).loadTable(zip);
+            new FareRule.Loader(this, fares).loadTable(zip);
+            this.fares.putAll(fares);
+            // Joined Fares have been persisted to MapDB. In-memory HashMap goes out of scope for garbage collection.
+        }
 
         // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
         new Route.Loader(this).loadTable(zip);

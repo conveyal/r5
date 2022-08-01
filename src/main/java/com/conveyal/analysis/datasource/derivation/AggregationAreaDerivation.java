@@ -22,8 +22,6 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
 import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.TransformException;
 import spark.Request;
 
 import java.io.File;
@@ -37,7 +35,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
 import static com.conveyal.r5.analyst.progress.WorkProductType.AGGREGATION_AREA;
@@ -175,7 +172,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
     public void action (ProgressListener progressListener) throws Exception {
 
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
-        String groupDescription = "Aggregation areas from polygons";
+        String groupDescription = "z" + this.zoom + ": aggregation areas";
         DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id.toString(), groupDescription);
 
         progressListener.beginTask("Reading data source", finalFeatures.size() + 1);
@@ -209,7 +206,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
                 maskGrid.grid[pixel.x][pixel.y] = pixel.weight * 100_000;
             });
 
-            AggregationArea aggregationArea = new AggregationArea(userPermissions, name, spatialDataSource);
+            AggregationArea aggregationArea = new AggregationArea(userPermissions, name, spatialDataSource, zoom);
 
             try {
                 File gridFile = FileUtils.createScratchFile("grid");

@@ -151,7 +151,8 @@ public class GtfsController implements HttpController {
         }
     }
     /**
-     * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed
+     * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed.
+     * All other location_types (station, entrance, generic node, boarding area) are skipped.
      */
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
         GTFSFeed feed = getFeedFromRequest(req);
@@ -160,8 +161,8 @@ public class GtfsController implements HttpController {
     }
 
     /**
-     * Groups the feedId and stops (location_type = 0; not parent stations, entrances/exits, generic nodes, etc.) for a
-     * given GTFS feed
+     * Compound return type for the feedId and stops with location_type = 0 for a given GTFS feed.
+     * All other location_types (station, entrance, generic node, boarding area) are skipped.
      */
     static class FeedGroupStopsApiResponse {
         public final String feedId;

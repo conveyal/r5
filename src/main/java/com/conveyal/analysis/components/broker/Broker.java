@@ -244,7 +244,8 @@ public class Broker implements Component {
     /**
      * Create on-demand/spot workers for a given job, after certain checks
      * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot EC2 spot instances to request
+     * @param nSpot Target number of EC2 spot instances to request. The actual number requested may be lower if the
+     *              total number of workers running is approaching the maximum specified in the Broker config.
      */
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
@@ -256,6 +257,12 @@ public class Broker implements Component {
         if (nOnDemand < 0 || nSpot < 0){
             LOG.info("Negative number of workers requested, not starting any");
             return;
+        }
+
+        // Backoff: reduce the nSpot requested when the number of already running workers starts approaching the
+        // configured maximum
+        if (workerCatalog.totalWorkerCount() * 2 > config.maxWorkers()) {
+            nSpot = Math.min(nSpot, (config.maxWorkers() - workerCatalog.totalWorkerCount()) / 2);
         }
 
         if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {

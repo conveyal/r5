@@ -108,7 +108,8 @@ public class Broker implements Component {
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER = 800;
+    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
@@ -483,9 +484,27 @@ public class Broker implements Component {
         WorkerCategory workerCategory = job.workerCategory;
         int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-            // Start a number of workers that scales with the number of total tasks, up to a fixed number.
-            // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
-            int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
+            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+            int targetWorkerTotal;
+            if (job.templateTask.hasTransit()) {
+                // Total computation for a task with transit depends on the number of stops and whether the
+                // network has frequency-based routes. The total computation for the job depends on these
+                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+                //  this worth adding a field to Job or RegionalTask?
+                float transitScaleFactor = (9f / job.templateTask.zoom);
+                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+            } else {
+                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+                // the job increases roughly with linearly with the number of origins.
+                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+            }
+
+            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
+            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
             // Guardrail until freeform pointsets are tested more thoroughly
             if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;

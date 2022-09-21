@@ -263,6 +263,7 @@ public class Broker implements Component {
         // configured maximum
         if (workerCatalog.totalWorkerCount() * 2 > config.maxWorkers()) {
             nSpot = Math.min(nSpot, (config.maxWorkers() - workerCatalog.totalWorkerCount()) / 2);
+            LOG.info("Worker pool over half of maximum size. Number of new spot instances set to {}", nSpot);
         }
 
         if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {

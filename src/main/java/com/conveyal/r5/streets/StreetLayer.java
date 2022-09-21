@@ -871,7 +871,12 @@ public class StreetLayer implements Serializable, Cloneable {
             final long fromWayId = from.id; // more effectively final nonsense
             final boolean[] bad = new boolean[] { false };
 
-            int fromVertex = vertexIndexForOsmNode.get(pathNodes[0]);
+            final long fromNode = pathNodes[0];
+            final int fromVertex = vertexIndexForOsmNode.get(fromNode);
+            if (fromVertex == -1) {
+                LOG.warn("Vertex not found for from-node {} of restriction {}, skipping this restriction", fromNode, osmRelationId);
+                return;
+            }
 
             // find the edges
             incomingEdges.get(fromVertex).forEach(eidx -> {
@@ -889,7 +894,12 @@ public class StreetLayer implements Serializable, Cloneable {
                 return true; // iteration should continue
             });
 
-            int toVertex = vertexIndexForOsmNode.get(pathNodes[pathNodes.length - 1]);
+            final long toNode = pathNodes[pathNodes.length - 1];
+            final int toVertex = vertexIndexForOsmNode.get(toNode);
+            if (toVertex == -1) {
+                LOG.warn("Vertex not found for to-node {} of restriction {}, skipping this restriction", toNode, osmRelationId);
+                return;
+            }
 
             final int[] toEdge = new int[] { -1 };
             final long toWayId = to.id; // more effectively final nonsense

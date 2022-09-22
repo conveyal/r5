@@ -57,7 +57,7 @@ public abstract class TraversalPermissionLabeler {
         addPermissions("motorway", "access=yes;bicycle=no;foot=no");
         addPermissions("trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|service|track", "access=yes");
         addPermissions("pedestrian", "access=no;foot=yes");
-        addPermissions("path", "access=no;foot=yes;bicycle=yes");
+        addPermissions("path", "access=no;foot=yes");
         addPermissions("bridleway", "access=no"); //horse=yes but we don't support horse
         addPermissions("cycleway", "access=no;bicycle=yes");
         addPermissions("footway|steps|platform|public_transport=platform|railway=platform|corridor", "access=no;foot=yes");

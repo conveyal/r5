@@ -7,7 +7,6 @@ package com.conveyal.r5.labeling;
  */
 public class USTraversalPermissionLabeler extends TraversalPermissionLabeler {
     static {
-        addPermissions("pedestrian", "bicycle=yes");
         addPermissions("bridleway", "bicycle=yes;foot=yes"); //horse=yes but we don't support horse
         addPermissions("cycleway", "bicycle=yes;foot=yes");
     }

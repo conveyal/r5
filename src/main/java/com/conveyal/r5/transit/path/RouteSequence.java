@@ -67,13 +67,13 @@ public class RouteSequence {
      */
     public static class TransitLeg {
         public String route;
-        public double inVehicleTime;
+        public int inVehicleTime;
         public String board;
         public String alight;
 
         public TransitLeg (String route, int inVehicleTime, String boardStop, String alightStop) {
             this.route = route;
-            this.inVehicleTime = Math.round(inVehicleTime / 60f * 10) / 10.0;
+            this.inVehicleTime = inVehicleTime;
             this.board = boardStop;
             this.alight = alightStop;
         }

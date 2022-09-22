@@ -79,8 +79,9 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testPath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=path;access=private");
-        EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+        EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE,
+                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
         roadFlagComparision(osmWay, expectedPermissions, expectedPermissions);
     }

@@ -1,6 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.util.HttpServerRuntimeException;
 
 /**
  * Represents a region.
@@ -17,7 +17,7 @@ public class Region extends Model implements Cloneable {
             return (Region) super.clone();
         } catch (CloneNotSupportedException e) {
             // can't happen.
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         }
     }
 }

@@ -16,8 +16,8 @@ public class RemoveTrips extends Modification {
 
     public String[] trips;
 
-    public com.conveyal.r5.analyst.scenario.RemoveTrips toR5 () {
-        com.conveyal.r5.analyst.scenario.RemoveTrips rt = new com.conveyal.r5.analyst.scenario.RemoveTrips();
+    public com.conveyal.r5.scenario.RemoveTrips toR5 () {
+        com.conveyal.r5.scenario.RemoveTrips rt = new com.conveyal.r5.scenario.RemoveTrips();
         rt.comment = name;
 
         if (trips == null) {

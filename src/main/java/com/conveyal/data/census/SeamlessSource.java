@@ -2,7 +2,7 @@ package com.conveyal.data.census;
 
 import com.conveyal.data.geobuf.GeobufDecoder;
 import com.conveyal.data.geobuf.GeobufFeature;
-import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.progress.ProgressListener;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;

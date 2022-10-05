@@ -1,29 +1,29 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.BackendComponents;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.HttpUtils;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.components.HttpController;
+import com.conveyal.components.TaskScheduler;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
-import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
-import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.streets.OSMCache;
-import com.conveyal.r5.util.ExceptionUtils;
+import com.conveyal.osmlib.OSMCache;
+import com.conveyal.r5.progress.ProgressInputStream;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.r5.transit.TransportNetworkConfig;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.UserPermissions;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
@@ -47,10 +47,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
-import static com.conveyal.r5.analyst.progress.WorkProductType.BUNDLE;
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.r5.progress.WorkProductType.BUNDLE;
+import static com.conveyal.util.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.util.HttpUtils.toJson;
 
 /**
  * This Controller provides HTTP REST endpoints for manipulating Bundles. Bundles are sets of GTFS feeds and OSM
@@ -118,7 +118,7 @@ public class BundleController implements HttpController {
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
                 Bundle bundleWithOsm = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get()).next();
                 if (bundleWithOsm == null) {
-                    throw AnalysisServerException.badRequest("Selected OSM does not exist.");
+                    throw HttpServerRuntimeException.badRequest("Selected OSM does not exist.");
                 }
             }
 
@@ -126,7 +126,7 @@ public class BundleController implements HttpController {
                 bundle.feedGroupId = files.get("feedGroupId").get(0).getString("UTF-8");
                 Bundle bundleWithFeed = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get()).next();
                 if (bundleWithFeed == null) {
-                    throw AnalysisServerException.badRequest("Selected GTFS does not exist.");
+                    throw HttpServerRuntimeException.badRequest("Selected GTFS does not exist.");
                 }
                 bundle.north = bundleWithFeed.north;
                 bundle.south = bundleWithFeed.south;
@@ -138,11 +138,11 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
-            UserPermissions userPermissions = UserPermissions.from(req);
+            UserPermissions userPermissions = HttpUtils.userFromRequest(req);
             bundle.accessGroup = userPermissions.accessGroup;
             bundle.createdBy = userPermissions.email;
         } catch (Exception e) {
-            throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
+            throw HttpServerRuntimeException.badRequest(ExceptionUtils.stackTraceString(e));
         }
         // ID and create/update times are assigned here when we push into Mongo.
         // FIXME Ideally we'd only set and retain the ID without inserting in Mongo,
@@ -151,7 +151,7 @@ public class BundleController implements HttpController {
 
         // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
         // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
-        final UserPermissions userPermissions = UserPermissions.from(req);
+        final UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
             .forUser(userPermissions)
             .setHeavy(true)
@@ -234,7 +234,7 @@ public class BundleController implements HttpController {
 
                         // Save all errors to a file.
                         try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
-                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
+                            JsonUtils.objectMapper.writeValue(jsonWriter, feed.errors);
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -284,14 +284,14 @@ public class BundleController implements HttpController {
 
         String configFileName = bundle._id + ".json";
         File configFile = FileUtils.createScratchFile("json");
-        JsonUtil.objectMapper.writeValue(configFile, networkConfig);
+        JsonUtils.objectMapper.writeValue(configFile, networkConfig);
 
         FileStorageKey key = new FileStorageKey(BUNDLES, configFileName);
         fileStorage.moveIntoStorage(key, configFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {
-        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
+        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), HttpUtils.userFromRequest(req));
         FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
         fileStorage.delete(key);
 
@@ -309,7 +309,7 @@ public class BundleController implements HttpController {
         try {
             setBundleServiceDates(bundle, gtfsCache);
         } catch (Exception e) {
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         }
 
         return bundle;

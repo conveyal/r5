@@ -1,11 +1,8 @@
 package com.conveyal.analysis.datasource.derivation;
 
 import com.conveyal.analysis.models.BaseModel;
-import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
-import com.conveyal.r5.analyst.progress.TaskAction;
-
-import java.util.Collection;
+import com.conveyal.r5.progress.TaskAction;
 
 /**
  * An interface for unary operators mapping DataSources into other data sets represented in our Mongo database.

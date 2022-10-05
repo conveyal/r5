@@ -1,8 +1,8 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.AnalysisWorkerTask;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +55,7 @@ public class RandomFrequencyPhasingTests {
                 .build();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+        OneOriginResult oneOriginResult = computer.computeTravelTimes(task.destinationPointSets[0]);
 
     }
 

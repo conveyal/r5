@@ -1,8 +1,8 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
 
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.BACKWARD;
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.FORWARD;
@@ -21,7 +21,7 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
     }
 
     @Override
-    public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
+    public int traversalTimeSeconds (Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
         if (streetMode == StreetMode.WALK) {
             return walkTraversalTimes.traversalTimeSeconds(currentEdge, req.walkSpeed);
         } else if (streetMode == StreetMode.BICYCLE) {

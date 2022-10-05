@@ -6,17 +6,10 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
-import com.google.common.base.Strings;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 
 /**

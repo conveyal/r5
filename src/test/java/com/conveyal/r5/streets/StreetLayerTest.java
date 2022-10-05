@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -48,17 +48,17 @@ public class StreetLayerTest {
         int e0 = sl.incomingEdges.get(v).get(0);
         int e1 = e0 % 2 == 0 ? e0 + 1 : e0 - 1;
 
-        assertEquals(v, sl.edgeStore.getCursor(e0).getToVertex());
-        assertEquals(v, sl.edgeStore.getCursor(e1).getFromVertex());
+        assertEquals(v, sl.getEdgeCursor(e0).getToVertex());
+        assertEquals(v, sl.getEdgeCursor(e1).getFromVertex());
 
         new TarjanIslandPruner(sl, 40, StreetMode.WALK).run();
 
         // note: disconnected subgraphs are not removed, they are de-pedestrianized
-        final EdgeStore.Edge edge = sl.edgeStore.getCursor();
+        final Edge edge = sl.getEdgeCursor();
         assertTrue(Arrays.stream(sl.incomingEdges.get(v).toArray())
-                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
+                .noneMatch(i -> sl.getEdgeCursor(i).getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)));
         assertTrue(Arrays.stream(sl.outgoingEdges.get(v).toArray())
-                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
+                .noneMatch(i -> sl.getEdgeCursor(i).getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)));
     }
 
     /**
@@ -94,38 +94,38 @@ public class StreetLayerTest {
         double lat = 46.5558163;
         double lon = 15.6126969;
 
-        EnumSet<EdgeStore.EdgeFlag> forwardEdgeFlags = streetLayer.edgeStore.getCursor(0).getFlags();
-        int forwardEdgeSpeed = streetLayer.edgeStore.getCursor(0).getSpeed();
+        EnumSet<EdgeFlag> forwardEdgeFlags = streetLayer.getEdgeCursor(0).getFlags();
+        int forwardEdgeSpeed = streetLayer.getEdgeCursor(0).getSpeed();
         //String forwardEdgeName = streetLayer.edgeStore.getCursor(0).getName();
 
-        EnumSet<EdgeStore.EdgeFlag> backwardEdgeFlags = streetLayer.edgeStore.getCursor(1).getFlags();
-        int backwardEdgeSpeed = streetLayer.edgeStore.getCursor(1).getSpeed();
+        EnumSet<EdgeFlag> backwardEdgeFlags = streetLayer.getEdgeCursor(1).getFlags();
+        int backwardEdgeSpeed = streetLayer.getEdgeCursor(1).getSpeed();
         //String backwardEdgeName = streetLayer.edgeStore.getCursor(1).getName();
 
         //This inserts vertex around the middle of the way.
         //Vertices are A->B->C B is new vertex
         int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         //Edge from A to B
-        EdgeStore.Edge oldForwardEdge = streetLayer.edgeStore.getCursor(0);
+        Edge oldForwardEdge = streetLayer.getEdgeCursor(0);
         //This should always work since in existing edges only length and toVertex changes
         assertEquals(forwardEdgeFlags, oldForwardEdge.getFlags());
         assertEquals(forwardEdgeSpeed, oldForwardEdge.getSpeed());
         //assertEquals(forwardEdgeName, oldForwardEdge.getName());
         //Edge from B to A
-        EdgeStore.Edge oldBackwardEdge = streetLayer.edgeStore.getCursor(1);
+        Edge oldBackwardEdge = streetLayer.getEdgeCursor(1);
         assertEquals(backwardEdgeFlags, oldBackwardEdge.getFlags());
         assertEquals(backwardEdgeSpeed, oldBackwardEdge.getSpeed());
         //assertEquals(backwardEdgeName, oldBackwardEdge.getName());
 
         //Here errors can happen since flags, names, speeds and everything needs to be copied to new edges
         //Edge from B to C
-        EdgeStore.Edge newForwardEdge = streetLayer.edgeStore.getCursor(2);
+        Edge newForwardEdge = streetLayer.getEdgeCursor(2);
         assertEquals(forwardEdgeFlags, newForwardEdge.getFlags());
         assertEquals(forwardEdgeSpeed, newForwardEdge.getSpeed());
         //assertEquals(forwardEdgeName, newForwardEdge.getName());
 
         //Edge from C to B
-        EdgeStore.Edge newBackwardEdge = streetLayer.edgeStore.getCursor(3);
+        Edge newBackwardEdge = streetLayer.getEdgeCursor(3);
         assertEquals(backwardEdgeFlags, newBackwardEdge.getFlags());
         assertEquals(backwardEdgeSpeed, newBackwardEdge.getSpeed());
         //assertEquals(backwardEdgeName, newBackwardEdge.getName());
@@ -159,7 +159,7 @@ public class StreetLayerTest {
          assertEquals(streetLayer.edgeStore.nEdges(), 2);
          assertEquals(streetLayer.edgeStore.nEdgePairs(), 1);
 
-         EdgeStore.Edge snakeEdge = streetLayer.edgeStore.getCursor(0);
+         Edge snakeEdge = streetLayer.getEdgeCursor(0);
 
          long originalOsmId = snakeEdge.getOSMID();
          int originalLength = snakeEdge.getLengthMm();
@@ -187,10 +187,10 @@ public class StreetLayerTest {
          // Iterate over all edges from 0..N accumulating lengths and sorting geometries.
          Coordinate[][] forwardEdgeGeometries = new Coordinate[3][];
          Coordinate[][] backwardEdgeGeometries = new Coordinate[3][];
-         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+         Edge edge = streetLayer.getEdgeCursor();
          int nLinkEdges = 0;
          while(edge.advance()) {
-             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) {
+             if (edge.getFlag(EdgeFlag.LINK)) {
                  nLinkEdges += 1;
                  continue;
              }
@@ -263,7 +263,7 @@ public class StreetLayerTest {
         // locate the turn restriction from northbound Connecticut Ave NW onto westbound Cathedral Ave NW (in the District of Columbia)
         int v = sl.vertexIndexForOsmNode.get(49815553L);
         int e = -1;
-        EdgeStore.Edge edge = sl.edgeStore.getCursor();
+        Edge edge = sl.getEdgeCursor();
 
         for (TIntIterator it = sl.incomingEdges.get(v).iterator(); it.hasNext();) {
             e = it.next();
@@ -307,7 +307,7 @@ public class StreetLayerTest {
         // Node at the start of U-turn restriction on Reisterstown Road just south of the Baltimore Beltway in Pikesville, MD, USA
         int v = sl.vertexIndexForOsmNode.get(2460634038L);
         int e = -1;
-        EdgeStore.Edge edge = sl.edgeStore.getCursor();
+        Edge edge = sl.getEdgeCursor();
 
         for (TIntIterator it = sl.incomingEdges.get(v).iterator(); it.hasNext();) {
             e = it.next();

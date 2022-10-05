@@ -1,9 +1,10 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.Model;
-import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.UserPermissions;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
@@ -44,18 +45,18 @@ public class MongoMap<V extends Model> {
     }
 
     public V findByIdFromRequestIfPermitted(Request request) {
-        return findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+        return findByIdIfPermitted(request.params("_id"), HttpUtils.userFromRequest(request));
     }
 
     public V findByIdIfPermitted(String id, UserPermissions userPermissions) {
         V result = wrappedCollection.findOneById(id);
 
         if (result == null) {
-            throw AnalysisServerException.notFound(String.format(
+            throw HttpServerRuntimeException.notFound(String.format(
                     "The resource you requested (_id %s) could not be found. Has it been deleted?", id
             ));
         } else if (!userPermissions.accessGroup.equals(result.accessGroup)) {
-            throw AnalysisServerException.forbidden("You do not have permission to access this data.");
+            throw HttpServerRuntimeException.forbidden("You do not have permission to access this data.");
         } else {
             return result;
         }
@@ -66,7 +67,7 @@ public class MongoMap<V extends Model> {
     }
 
     public Collection<V> findAllForRequest(Request req) {
-        return find(QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(UserPermissions.from(req).accessGroup).get()).toArray();
+        return find(QueryBuilder.start(MONGO_PROP_ACCESS_GROUP).is(HttpUtils.userFromRequest(req).accessGroup).get()).toArray();
     }
 
     /**
@@ -101,7 +102,7 @@ public class MongoMap<V extends Model> {
         req.queryParams().forEach(name -> {
             query.and(name).is(req.queryParams(name));
         });
-        return findPermitted(query.get(), UserPermissions.from(req));
+        return findPermitted(query.get(), HttpUtils.userFromRequest(req));
     }
 
     /**
@@ -121,8 +122,8 @@ public class MongoMap<V extends Model> {
     }
 
     public V createFromJSONRequest(Request request) throws IOException {
-        V json = JsonUtilities.objectMapper.readValue(request.body(), this.type);
-        UserPermissions userPermissions = UserPermissions.from(request);
+        V json = JsonUtils.objectMapper.readValue(request.body(), this.type);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(request);
         json.accessGroup = userPermissions.accessGroup;
         json.createdBy = userPermissions.email;
         return create(json);
@@ -151,9 +152,9 @@ public class MongoMap<V extends Model> {
     }
 
     public V updateFromJSONRequest(Request request) throws IOException {
-        V json = JsonUtilities.objectMapper.readValue(request.body(), this.type);
+        V json = JsonUtils.objectMapper.readValue(request.body(), this.type);
         // Add the additional check for the same access group
-        return updateByUserIfPermitted(json, UserPermissions.from(request));
+        return updateByUserIfPermitted(json, HttpUtils.userFromRequest(request));
     }
 
     public V updateByUserIfPermitted(V value, UserPermissions userPermissions) {
@@ -164,7 +165,7 @@ public class MongoMap<V extends Model> {
     }
 
     public V put(String key, V value) {
-        if (!key.equals(value._id)) throw AnalysisServerException.badRequest("ID does not match");
+        if (!key.equals(value._id)) throw HttpServerRuntimeException.badRequest("ID does not match");
         return put(value, null);
     }
 
@@ -191,7 +192,7 @@ public class MongoMap<V extends Model> {
         if (value.createdBy == null) value.createdBy = value.updatedBy;
 
         // Convert the model into a db object
-        BasicDBObject dbObject = JsonUtilities.objectMapper.convertValue(value, BasicDBObject.class);
+        BasicDBObject dbObject = JsonUtils.objectMapper.convertValue(value, BasicDBObject.class);
 
         // Update
         V result = wrappedCollection.findAndModify(query.get(), null, null, false, dbObject, true, false);
@@ -200,11 +201,11 @@ public class MongoMap<V extends Model> {
         if (result == null) {
             result = wrappedCollection.findOneById(value._id);
             if (result == null) {
-                throw AnalysisServerException.notFound("The data you attempted to update could not be found. ");
+                throw HttpServerRuntimeException.notFound("The data you attempted to update could not be found. ");
             } else if (!currentNonce.equals(result.nonce)) {
-                throw AnalysisServerException.nonce();
+                throw HttpServerRuntimeException.nonce();
             } else {
-                throw AnalysisServerException.forbidden("The data you attempted to update is not in your access group.");
+                throw HttpServerRuntimeException.forbidden("The data you attempted to update is not in your access group.");
             }
         }
         LOG.debug("{} of {} updated {} ({})", result.updatedBy, result.accessGroup, result.name, result._id);
@@ -231,7 +232,7 @@ public class MongoMap<V extends Model> {
         V result = wrappedCollection.findAndRemove(query);
 
         if (result == null) {
-            throw AnalysisServerException.notFound("The data you attempted to remove could not be found.");
+            throw HttpServerRuntimeException.notFound("The data you attempted to remove could not be found.");
         }
 
         return result;
@@ -241,7 +242,7 @@ public class MongoMap<V extends Model> {
         WriteResult<V, String> result = wrappedCollection.removeById(key);
         LOG.info(result.toString());
         if (result.getN() == 0) {
-            throw AnalysisServerException.notFound(String.format("The data for _id %s does not exist", key));
+            throw HttpServerRuntimeException.notFound(String.format("The data for _id %s does not exist", key));
         }
 
         return null;

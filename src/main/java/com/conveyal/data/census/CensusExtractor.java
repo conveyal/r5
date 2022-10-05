@@ -3,7 +3,7 @@ package com.conveyal.data.census;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.conveyal.geojson.GeoJsonModule;
-import com.conveyal.r5.analyst.progress.NoopProgressListener;
+import com.conveyal.r5.progress.NoopProgressListener;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.locationtech.jts.geom.Geometry;
 

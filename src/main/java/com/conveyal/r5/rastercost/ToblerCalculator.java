@@ -1,6 +1,5 @@
 package com.conveyal.r5.rastercost;
 
-import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 import org.apache.commons.math3.util.FastMath;
 
 /**

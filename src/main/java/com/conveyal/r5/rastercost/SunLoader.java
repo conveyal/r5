@@ -1,8 +1,8 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.util.LambdaCounter;
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.array.TFloatArrayList;
 import org.slf4j.Logger;
@@ -29,8 +29,8 @@ public class SunLoader implements CostField.Loader<SunCostField> {
 
     private double outputScale = 1;
 
-    public SunLoader (String dataSourceId) {
-        rasterSampler = new RasterDataSourceSampler(dataSourceId, 1.0, false);
+    public SunLoader (RasterDataSourceSampler rasterSampler) {
+        this.rasterSampler = rasterSampler;
     }
 
     @Override
@@ -41,7 +41,7 @@ public class SunLoader implements CostField.Loader<SunCostField> {
         List<BitSetWithSize> sunOnEdge = IntStream.range(0, streets.edgeStore.nEdgePairs())
             .parallel()
             .mapToObj(ep -> {
-                EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
+                Edge e = streets.getEdgeCursor(ep * 2);
                 edgeCounter.increment();
                 return rasterSampler.sampleEdge(e);
             }).map(SunLoader::bitSetWithSizeFromDoubles).collect(Collectors.toList());

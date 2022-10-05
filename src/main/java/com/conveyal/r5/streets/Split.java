@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
+import com.conveyal.util.GeometryUtils;
 import gnu.trove.TIntCollection;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.referencing.GeodeticCalculator;
@@ -72,8 +72,8 @@ public class Split {
                               StreetMode streetMode) {
 
         // After this conversion, the entire geometric calculation is happening in fixed precision int degrees.
-        int fixedLat = VertexStore.floatingDegreesToFixed(lat);
-        int fixedLon = VertexStore.floatingDegreesToFixed(lon);
+        int fixedLat = GeometryUtils.floatingDegreesToFixed(lat);
+        int fixedLon = GeometryUtils.floatingDegreesToFixed(lon);
 
         // We won't worry about the perpendicular walks yet.
         // Just insert or find a vertex on the nearest road and return that vertex.
@@ -82,12 +82,12 @@ public class Split {
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
 
         // Use longs for radii and their square because squaring the fixed-point radius _will_ overflow a signed int32.
-        long radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
+        long radiusFixedLat = GeometryUtils.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
         long radiusFixedLon = (int)(radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
         Envelope envelope = new Envelope(fixedLon, fixedLon, fixedLat, fixedLat);
         envelope.expandBy(radiusFixedLon, radiusFixedLat);
         long squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat;
-        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        Edge edge = streetLayer.getEdgeCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
         TIntCollection candidateEdges = streetLayer.findEdgesInEnvelope(envelope);
         // The split location currently being examined and the best one seen so far.
@@ -100,18 +100,18 @@ public class Split {
             // Do not consider linking to edges that are links to streets from transit stops, P+Rs, and bike shares.
             // These edges allow all modes to traverse, but may be connected to roads with more restrictive permissions.
             // On a given edge pair both directions will have the same flag.
-            if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
+            if (edge.getFlag(EdgeFlag.LINK)) return true;
 
             // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
             // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block
             // below). This system has odd effects in areas with lots of one-way streets or divided roads.
             // TODO Really, we want to allow linking to two different edge-pairs in such cases but that is more complex.
             // Do not consider linking to edges that are not marked "linkable". This excludes e.g. tunnels and motorways.
-            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.advance();
-            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.retreat();
@@ -172,7 +172,7 @@ public class Split {
             }
         });
         // Convert the fixed-precision degree measurements into (milli)meters
-        double lengthBefore_floatDeg = VertexStore.fixedDegreesToFloating((int)lengthBefore_fixedDeg[0]);
+        double lengthBefore_floatDeg = GeometryUtils.fixedDegreesToFloating((int)lengthBefore_fixedDeg[0]);
         best.distance0_mm = (int)(lengthBefore_floatDeg * metersPerDegreeLat * 1000);
         // FIXME perhaps we should be using the sphericalDistanceLibrary here, or the other way around.
         // The initial edge lengths are set using that library on OSM node coordinates, and they are slightly different.
@@ -198,7 +198,7 @@ public class Split {
         // latitude then multiply by the metersPerDegreeLat factor above and 1000 to convert to millimeters.
         // This is accurate enough for our purposes.
         double distanceToEdge_fixedDegrees = FastMath.sqrt(best.distanceToEdge_squaredFixedDegrees);
-        double distanceToEdge_floatingDegrees = VertexStore.fixedDegreesToFloating(distanceToEdge_fixedDegrees);
+        double distanceToEdge_floatingDegrees = GeometryUtils.fixedDegreesToFloating(distanceToEdge_fixedDegrees);
         best.distanceToEdge_mm = (int) (distanceToEdge_floatingDegrees * metersPerDegreeLat * 1000);
         return best;
     }
@@ -208,11 +208,11 @@ public class Split {
      * FIXME this contains way too much duplicate code. We can reuse the code in Split.find().
      * we just need a way to supply an edge or edges, instead of using the spatial index.
      */
-    public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
+    public static Split findOnEdge (double lat, double lon, Edge edge) {
 
         // After this conversion, the entire geometric calculation is happening in fixed precision int degrees.
-        int fixedLat = VertexStore.floatingDegreesToFixed(lat);
-        int fixedLon = VertexStore.floatingDegreesToFixed(lon);
+        int fixedLat = GeometryUtils.floatingDegreesToFixed(lat);
+        int fixedLon = GeometryUtils.floatingDegreesToFixed(lon);
 
         // We won't worry about the perpendicular walks yet.
         // Just insert or find a vertex on the nearest road and return that vertex.

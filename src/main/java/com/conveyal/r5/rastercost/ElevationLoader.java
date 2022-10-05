@@ -1,10 +1,10 @@
 package com.conveyal.r5.rastercost;
 
 import com.conveyal.r5.rastercost.ElevationCostField.ElevationCostCalculator;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
-import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.util.LambdaCounter;
 import gnu.trove.list.array.TShortArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,18 +27,16 @@ public class ElevationLoader implements CostField.Loader<ElevationCostField> {
 
     public static final short[] EMPTY_SHORT_ARRAY = new short[0];
 
-    public static final double ELEVATION_SAMPLE_SPACING_METERS = 10;
-
     private final ElevationCostCalculator costCalculator;
 
     private final RasterDataSourceSampler rasterSampler;
 
     private double outputScale;
 
-    public ElevationLoader (String dataSourceId, ElevationCostCalculator costCalculator) {
+    public ElevationLoader (RasterDataSourceSampler rasterSampler, ElevationCostCalculator costCalculator) {
         // It could be useful to be able to configure interpolation.
         // We never want it for the 1/0 tree shade raster, but may or may not want it for elevation.
-        this.rasterSampler = new RasterDataSourceSampler(dataSourceId, ELEVATION_SAMPLE_SPACING_METERS, false);
+        this.rasterSampler = rasterSampler;
         this.costCalculator = costCalculator;
     }
 
@@ -72,7 +70,7 @@ public class ElevationLoader implements CostField.Loader<ElevationCostField> {
         result.elevationProfilesDecimeters = IntStream.range(0, streets.edgeStore.nEdgePairs())
                 .parallel()
                 .mapToObj(ep -> {
-                    EdgeStore.Edge e = streets.edgeStore.getCursor(ep * 2);
+                    Edge e = streets.getEdgeCursor(ep * 2);
                     edgeCounter.increment();
                     return rasterSampler.sampleEdge(e);
                 })

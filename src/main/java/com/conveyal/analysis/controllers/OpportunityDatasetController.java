@@ -1,9 +1,6 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
+import com.conveyal.analysis.components.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
@@ -11,9 +8,9 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.FileItemInputStreamProvider;
-import com.conveyal.analysis.util.HttpUtils;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.components.HttpController;
+import com.conveyal.components.TaskScheduler;
+import com.conveyal.file.FileItemInputStreamProvider;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -21,12 +18,15 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.progress.NoopProgressListener;
-import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.WorkProduct;
-import com.conveyal.r5.util.ExceptionUtils;
-import com.conveyal.r5.util.InputStreamProvider;
-import com.conveyal.r5.util.ProgressListener;
+import com.conveyal.r5.progress.NoopProgressListener;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.r5.progress.WorkProduct;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.ProgressListener;
+import com.conveyal.util.UserPermissions;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
@@ -57,10 +57,10 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
-import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.analyst.progress.WorkProductType.OPPORTUNITY_DATASET;
+import static com.conveyal.r5.progress.WorkProductType.OPPORTUNITY_DATASET;
+import static com.conveyal.util.HttpUtils.toJson;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -95,7 +95,7 @@ public class OpportunityDatasetController implements HttpController {
     private final List<OpportunityDatasetUploadStatus> uploadStatuses = new ArrayList<>();
 
     private ObjectNode getJsonUrl (FileStorageKey key) {
-        return JsonUtil.objectNode().put("url", fileStorage.getURL(key));
+        return JsonUtils.objectNode().put("url", fileStorage.getURL(key));
     }
 
     private void addStatusAndRemoveOldStatuses(OpportunityDatasetUploadStatus status) {
@@ -109,7 +109,7 @@ public class OpportunityDatasetController implements HttpController {
     private Collection<OpportunityDataset> getRegionDatasets(Request req, Response res) {
         return Persistence.opportunityDatasets.findPermitted(
                 QueryBuilder.start("regionId").is(req.params("regionId")).get(),
-                UserPermissions.from(req)
+                HttpUtils.userFromRequest(req)
         );
     }
 
@@ -143,7 +143,7 @@ public class OpportunityDatasetController implements HttpController {
     private OpportunityDatasetUploadStatus downloadLODES (Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
-        final UserPermissions userPermissions = UserPermissions.from(req);
+        final UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet) TODO use DataGroup and DataSource (creating only one DataSource per region).
@@ -183,7 +183,7 @@ public class OpportunityDatasetController implements HttpController {
                                          DataGroup dataGroup,
                                          OpportunityDatasetUploadStatus status,
                                          List<? extends PointSet> pointSets,
-                                         com.conveyal.r5.analyst.progress.ProgressListener progressListener) {
+                                         com.conveyal.r5.progress.ProgressListener progressListener) {
         status.status = Status.UPLOADING;
         status.totalGrids = pointSets.size();
         progressListener.beginTask("Storing opportunity data", pointSets.size());
@@ -243,16 +243,16 @@ public class OpportunityDatasetController implements HttpController {
                 }
                 LOG.info("Moved {}/{} files into storage for {}", status.uploadedGrids, status.totalGrids, status.name);
             } catch (NumberFormatException e) {
-                throw new AnalysisServerException("Error attempting to parse number in uploaded file: " + e.toString());
+                throw new HttpServerRuntimeException("Error attempting to parse number in uploaded file: " + e.toString());
             } catch (Exception e) {
                 status.completeWithError(e);
-                throw AnalysisServerException.unknown(e);
+                throw HttpServerRuntimeException.unknown(e);
             }
             progressListener.increment();
         }
         // Set the workProduct - TODO update UI so it can handle a link to a group of OPPORTUNITY_DATASET
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(OPPORTUNITY_DATASET, dataGroup, source.regionId));
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(OPPORTUNITY_DATASET, dataGroup._id.toString(), source.regionId));
     }
 
     private static FileStorageFormat getFormatCode (PointSet pointSet) {
@@ -280,7 +280,7 @@ public class OpportunityDatasetController implements HttpController {
         String latField = params.get("latField");
         String lonField = params.get("lonField");
         if (latField == null || lonField == null) {
-            throw AnalysisServerException.fileUpload("You must specify a latitude and longitude column.");
+            throw HttpServerRuntimeException.fileUpload("You must specify a latitude and longitude column.");
         }
 
         // The name of the column containing a unique identifier for each row. May be missing (null).
@@ -296,7 +296,7 @@ public class OpportunityDatasetController implements HttpController {
 
         try {
             List<FreeFormPointSet> pointSets = new ArrayList<>();
-            InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
+            FileItemInputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
             pointSets.add(FreeFormPointSet.fromCsv(csvStreamProvider, latField, lonField, idField, countField));
             // The second pair of lat and lon fields allow creating two matched pointsets from the same CSV.
             // This is used for one-to-one travel times between specific origins/destinations.
@@ -305,7 +305,7 @@ public class OpportunityDatasetController implements HttpController {
             }
             return pointSets;
         } catch (Exception e) {
-            throw AnalysisServerException.fileUpload("Could not convert CSV to Freeform PointSet: " + e.toString());
+            throw HttpServerRuntimeException.fileUpload("Could not convert CSV to Freeform PointSet: " + e.toString());
         }
 
     }
@@ -316,7 +316,7 @@ public class OpportunityDatasetController implements HttpController {
      */
     private OpportunityDatasetUploadStatus createOpportunityDataset(Request req, Response res) {
         // Extract user info, uploaded files and form fields from the incoming request.
-        final UserPermissions userPermissions = UserPermissions.from(req);
+        final UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
 
         // Parse required fields. Will throw a ServerException on failure.
@@ -439,7 +439,7 @@ public class OpportunityDatasetController implements HttpController {
 
     private Collection<OpportunityDataset> deleteSourceSet(Request request, Response response) {
         String sourceId = request.params("sourceId");
-        UserPermissions userPermissions = UserPermissions.from(request);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(request);
         Collection<OpportunityDataset> datasets = Persistence.opportunityDatasets.findPermitted(
                 QueryBuilder.start("sourceId").is(sourceId).get(), userPermissions);
         datasets.forEach(dataset -> deleteDataset(dataset._id, userPermissions));
@@ -448,7 +448,7 @@ public class OpportunityDatasetController implements HttpController {
 
     private OpportunityDataset deleteOpportunityDataset(Request request, Response response) {
         String opportunityDatasetId = request.params("_id");
-        return deleteDataset(opportunityDatasetId, UserPermissions.from(request));
+        return deleteDataset(opportunityDatasetId, HttpUtils.userFromRequest(request));
     }
 
     /**
@@ -457,7 +457,7 @@ public class OpportunityDatasetController implements HttpController {
     private OpportunityDataset deleteDataset(String id, UserPermissions userPermissions) {
         OpportunityDataset dataset = Persistence.opportunityDatasets.removeIfPermitted(id, userPermissions);
         if (dataset == null) {
-            throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
+            throw HttpServerRuntimeException.notFound("Opportunity dataset could not be found.");
         } else {
             // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
             fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GRID));
@@ -488,7 +488,7 @@ public class OpportunityDatasetController implements HttpController {
         String lonField2 = HttpUtils.getFormField(query, "lonField2", false);
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
-        InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
+        FileItemInputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
         List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, status);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
@@ -588,7 +588,7 @@ public class OpportunityDatasetController implements HttpController {
 
         // if this grid is not on S3 in the requested format, try to get the .grid format
         if (!fileStorage.exists(gridKey)) {
-            throw AnalysisServerException.notFound("Requested grid does not exist.");
+            throw HttpServerRuntimeException.notFound("Requested grid does not exist.");
         }
 
         if (!fileStorage.exists(formatKey)) {

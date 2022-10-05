@@ -1,7 +1,8 @@
 package com.conveyal.analysis.components;
 
-import com.conveyal.analysis.components.broker.WorkerTags;
-import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.components.Component;
+import com.conveyal.worker.WorkerCategory;
+import com.conveyal.worker.WorkerTags;
 
 /** Interface for Components that start workers. */
 public interface WorkerLauncher extends Component {

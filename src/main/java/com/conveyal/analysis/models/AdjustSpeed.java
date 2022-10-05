@@ -1,8 +1,6 @@
 package com.conveyal.analysis.models;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 
 /**
  * Adjust the speed of a route.
@@ -25,8 +23,8 @@ public class AdjustSpeed extends Modification {
     /** the factor by which to scale speed. 1 means no change, 2 means faster. */
     public double scale;
 
-    public com.conveyal.r5.analyst.scenario.AdjustSpeed toR5 () {
-        com.conveyal.r5.analyst.scenario.AdjustSpeed as = new com.conveyal.r5.analyst.scenario.AdjustSpeed();
+    public com.conveyal.r5.scenario.AdjustSpeed toR5 () {
+        com.conveyal.r5.scenario.AdjustSpeed as = new com.conveyal.r5.scenario.AdjustSpeed();
         as.comment = name;
 
         if (trips == null) {

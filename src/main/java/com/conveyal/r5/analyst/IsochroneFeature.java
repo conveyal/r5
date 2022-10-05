@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.util.GeometryUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.locationtech.jts.geom.Coordinate;

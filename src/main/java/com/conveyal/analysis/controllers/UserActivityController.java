@@ -1,10 +1,12 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.r5.analyst.progress.ApiTask;
-import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.components.HttpController;
+import com.conveyal.components.TaskScheduler;
+import com.conveyal.r5.progress.ApiTask;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.UserPermissions;
 import com.google.common.collect.ImmutableMap;
 import spark.Request;
 import spark.Response;
@@ -12,7 +14,7 @@ import spark.Service;
 
 import java.util.List;
 
-import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.util.HttpUtils.toJson;
 
 /**
  * Provides a lightweight heartbeat endpoint by which the UI signals that a user is active, and the backend reports
@@ -44,7 +46,7 @@ public class UserActivityController implements HttpController {
     }
 
     private ResponseModel getActivity (Request req, Response res) {
-        UserPermissions userPermissions = UserPermissions.from(req);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         ResponseModel responseModel = new ResponseModel();
         responseModel.systemStatusMessages = List.of();
         responseModel.taskBacklog = taskScheduler.getBacklog();
@@ -55,17 +57,17 @@ public class UserActivityController implements HttpController {
     }
 
     private Object removeActivity (Request req, Response res) {
-        UserPermissions userPermissions = UserPermissions.from(req);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         String id = req.params("id");
         Task task = taskScheduler.getTaskForUser(userPermissions.email, id);
         // Disallow removing active tasks via the API.
         if (task.state.equals(Task.State.ACTIVE)) {
-            throw AnalysisServerException.badRequest("Cannot clear an active task.");
+            throw HttpServerRuntimeException.badRequest("Cannot clear an active task.");
         }
         if (taskScheduler.removeTaskForUser(userPermissions.email, id)) {
             return ImmutableMap.of("message", "Successfully cleared task.");
         } else {
-            throw AnalysisServerException.badRequest("Failed to clear task.");
+            throw HttpServerRuntimeException.badRequest("Failed to clear task.");
         }
     }
 

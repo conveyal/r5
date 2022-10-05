@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.util.UserPermissions;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 

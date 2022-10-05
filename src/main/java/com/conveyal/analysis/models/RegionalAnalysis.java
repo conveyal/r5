@@ -1,8 +1,8 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.results.CsvResultType;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.util.HttpServerRuntimeException;
 import org.locationtech.jts.geom.Geometry;
 
 import java.util.HashMap;
@@ -106,7 +106,7 @@ public class RegionalAnalysis extends Model implements Cloneable {
         try {
             return (RegionalAnalysis) super.clone();
         } catch (CloneNotSupportedException e) {
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         }
     }
 }

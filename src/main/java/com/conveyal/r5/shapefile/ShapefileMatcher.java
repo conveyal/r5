@@ -1,16 +1,15 @@
 package com.conveyal.r5.shapefile;
 
-import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Edge;
+import com.conveyal.r5.streets.EdgeFlag;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.util.LambdaCounter;
-import com.conveyal.r5.util.ShapefileReader;
+import com.conveyal.util.LambdaCounter;
+import com.conveyal.util.ShapefileReader;
 import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.index.strtree.STRtree;
-import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
-import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
+import static com.conveyal.r5.streets.EdgeFlag.BIKE_LTS_EXPLICIT;
 
 /**
  * The class ShapefileMain converts shapefiles to OSM data, which is in turn converted to R5 street networks.
@@ -85,7 +84,7 @@ public class ShapefileMatcher {
         final LambdaCounter edgePairCounter =
                 new LambdaCounter(LOG, streets.edgeStore.nEdgePairs(), 25_000, "Edge pair {}/{}");
         IntStream.range(0, streets.edgeStore.nEdgePairs()).parallel().forEach(edgePair -> {
-            EdgeStore.Edge edge = streets.edgeStore.getCursor(edgePair * 2);
+            Edge edge = streets.getEdgeCursor(edgePair * 2);
             LineString edgeGeometry = edge.getGeometry();
             SimpleFeature bestFeature = findBestMatch(edgeGeometry);
             if (bestFeature != null) {
@@ -95,7 +94,7 @@ public class ShapefileMatcher {
                 if (lts < 1 || lts > 4) {
                     LOG.error("Clamping LTS value to range [1...4]. Value in attribute is {}", lts);
                 }
-                EdgeStore.EdgeFlag ltsFlag = intToLts(lts);
+                EdgeFlag ltsFlag = intToLts(lts);
                 edge.setFlag(BIKE_LTS_EXPLICIT);
                 edge.setFlag(ltsFlag);
                 edge.advance();

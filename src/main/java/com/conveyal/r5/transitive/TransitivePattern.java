@@ -1,6 +1,6 @@
 package com.conveyal.r5.transitive;
 
-import com.conveyal.r5.util.EncodedPolylineSerializer;
+import com.conveyal.util.EncodedPolylineSerializer;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.locationtech.jts.geom.LineString;
 

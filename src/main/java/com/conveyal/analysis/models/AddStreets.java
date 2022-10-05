@@ -1,6 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
 
 import java.util.EnumSet;
 
@@ -23,8 +23,8 @@ public class AddStreets extends Modification {
     }
 
     @Override
-    public com.conveyal.r5.analyst.scenario.Modification toR5() {
-        com.conveyal.r5.analyst.scenario.AddStreets mod = new com.conveyal.r5.analyst.scenario.AddStreets();
+    public com.conveyal.r5.scenario.Modification toR5() {
+        com.conveyal.r5.scenario.AddStreets mod = new com.conveyal.r5.scenario.AddStreets();
         mod.comment = name;
 
         mod.lineStrings = lineStrings;

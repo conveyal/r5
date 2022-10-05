@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
 import com.conveyal.gtfs.error.EmptyFieldError;
@@ -15,6 +14,7 @@ import com.conveyal.gtfs.error.TableInSubdirectoryError;
 import com.conveyal.gtfs.error.TimeParseError;
 import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
+import com.conveyal.r5.progress.ProgressInputStream;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
 import org.apache.commons.io.input.BOMInputStream;

@@ -1,7 +1,6 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +14,6 @@ import static systems.uom.common.USCustomary.KNOT;
 import static systems.uom.common.USCustomary.MILE_PER_HOUR;
 import static tech.units.indriya.unit.Units.KILOMETRE_PER_HOUR;
 import static tech.units.indriya.unit.Units.METRE_PER_SECOND;
-import static tech.units.indriya.unit.Units.KILOMETRE_PER_HOUR;
 
 /**
  * Gets information about max speeds based on highway tags from build-config
@@ -33,6 +31,10 @@ public class SpeedLabeler {
 
     private static Map<String, Float> highwaySpeedMap; // FIXME this is probably not supposed to be static.
     private Float defaultSpeed;
+
+    public SpeedLabeler () {
+        this(SpeedConfig.defaultConfig());
+    }
 
     public SpeedLabeler(SpeedConfig speedConfig) {
         //Converts all speeds from units to m/s

@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.cache.CacheBuilder;

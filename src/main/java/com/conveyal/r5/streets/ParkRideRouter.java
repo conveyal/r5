@@ -1,7 +1,5 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.api.util.ParkRideParking;
-import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
@@ -19,7 +17,7 @@ public class ParkRideRouter extends StreetRouter {
     TIntIntMap streetVertexDurationMap;
 
     //Key is streetVertex value is state from park ride to this stop for making path
-    TIntObjectMap<State> transitStopStreetIndexParkRideState;
+    TIntObjectMap<RoutingState> transitStopStreetIndexParkRideState;
 
     public ParkRideRouter(StreetLayer streetLayer) {
         super(streetLayer);
@@ -35,7 +33,7 @@ public class ParkRideRouter extends StreetRouter {
      * @param carParks
      * @param transitLayer Used to get StreetVertex from stopIndex
      */
-    public void addParks(TIntObjectMap<State> carParks, TransitLayer transitLayer) {
+    public void addParks(TIntObjectMap<RoutingState> carParks, TransitLayer transitLayer) {
         transitStopIndexDurationMap = new TIntIntHashMap(carParks.size() * 3);
         streetVertexDurationMap = new TIntIntHashMap(carParks.size() * 3);
         TIntObjectMap<ParkRideParking> parkRideLocationsMap = streetLayer.parkRideLocationsMap;
@@ -45,7 +43,7 @@ public class ParkRideRouter extends StreetRouter {
         carParks.forEachValue((state) -> {
             int parkRideStreetVertexIdx = state.vertex;
             int timeToParkRide = state.getDurationSeconds();
-            TIntObjectMap<State> parkRideTransitStops = parkRideLocationsMap
+            TIntObjectMap<RoutingState> parkRideTransitStops = parkRideLocationsMap
                 .get(parkRideStreetVertexIdx).closestTransfers;
             // for each transit stop reached from this P+R
             parkRideTransitStops.forEachEntry((toStop, pr_state) ->  {
@@ -53,7 +51,7 @@ public class ParkRideRouter extends StreetRouter {
                 int stopStreetVertexIdx = transitLayer.streetVertexForStop.get(toStop);
                 int timeToStop = (int) (distanceMillimeters / walkSpeedMillimetersPerSecond);
                 int totalTime =
-                    timeToParkRide + timeToStop + PointToPointQuery.CAR_PARK_DROPOFF_TIME_S;
+                    timeToParkRide + timeToStop + StreetPath.CAR_PARK_DROPOFF_TIME_S;
                 // Adds time to to get to this stop and saves from which P+R we get from STOP
                 // if this is the first time we see the stop
                 if (!transitStopIndexDurationMap.containsKey(toStop)) {
@@ -99,7 +97,7 @@ public class ParkRideRouter extends StreetRouter {
      * @param vertexIndex
      */
     @Override
-    public State getStateAtVertex(int vertexIndex) {
+    public RoutingState getStateAtVertex(int vertexIndex) {
         //TODO: calculate correct distance and duration since currently only walk part has distance and duration added
         if (this.transitStopStreetIndexParkRideState.containsKey(vertexIndex)) {
             return this.transitStopStreetIndexParkRideState.get(vertexIndex);

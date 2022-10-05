@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.UUID;
 
-import static com.conveyal.gtfs.util.GeometryUtil.toLegacyLineString;
+import static com.conveyal.gtfs.util.LegacyGeometryUtil.toLegacyLineString;
 
 /**
  * Created by landon on 2/5/16.

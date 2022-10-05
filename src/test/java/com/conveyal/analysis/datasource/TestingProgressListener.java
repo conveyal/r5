@@ -1,8 +1,7 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.progress.WorkProduct;
-import org.junit.jupiter.api.Assertions;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.r5.progress.WorkProduct;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;

@@ -1,6 +1,5 @@
 package com.conveyal.file;
 
-import com.conveyal.r5.analyst.PersistenceBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -33,6 +33,15 @@ public class LocalFileStorage implements FileStorage {
 
     public final String directory;
     private final String urlPrefix;
+
+    /**
+     * For testing.
+     */
+    public LocalFileStorage () {
+        this.directory = Paths.get("").toAbsolutePath().toString();
+        this.urlPrefix = "http://localhost:7070/files";
+        new File(directory).mkdirs();
+    }
 
     public LocalFileStorage (Config config) {
         this.directory = config.localCacheDirectory();

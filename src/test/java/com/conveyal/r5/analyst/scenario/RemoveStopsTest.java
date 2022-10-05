@@ -1,5 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.scenario.RemoveStops;
+import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -21,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Created by matthewc on 4/21/16.
  */
 public class RemoveStopsTest {
+    public FileStorage fileStorage = new LocalFileStorage();
 @Test
     public void testRemoveStops () {
         TransportNetwork network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_PATTERNS);
@@ -38,7 +43,7 @@ public class RemoveStopsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rs);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // should not have affected base network
         assertTrue(network.transitLayer.tripPatterns.stream()
@@ -104,7 +109,7 @@ public class RemoveStopsTest {
         rs.secondsSavedAtEachStop = 60;
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rs);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // make sure the stops and times were removed
         for (TripSchedule schedule : mod.transitLayer.tripPatterns.get(0).tripSchedules) {
@@ -128,7 +133,7 @@ public class RemoveStopsTest {
         rs.secondsSavedAtEachStop = 1000;
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rs);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // make sure the stops and times were removed
         for (TripSchedule schedule : mod.transitLayer.tripPatterns.get(0).tripSchedules) {
@@ -152,7 +157,7 @@ public class RemoveStopsTest {
         rs.secondsSavedAtEachStop = 60;
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rs);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // make sure the stops and times were removed.
         for (int i = 0; i < mod.transitLayer.tripPatterns.get(0).tripSchedules.size(); i++) {

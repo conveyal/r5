@@ -1,10 +1,10 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.validator.model.Priority;
+import com.conveyal.util.HttpServerRuntimeException;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -55,7 +55,7 @@ public class Bundle extends Model implements Cloneable {
         try {
             return (Bundle) super.clone();
         } catch (CloneNotSupportedException e) {
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         }
     }
 
@@ -192,7 +192,7 @@ public class Bundle extends Model implements Cloneable {
             try {
                 return (FeedSummary) super.clone();
             } catch (CloneNotSupportedException e) {
-                throw AnalysisServerException.unknown(e);
+                throw HttpServerRuntimeException.unknown(e);
             }
         }
     }

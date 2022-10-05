@@ -1,5 +1,6 @@
 package com.conveyal.analysis.datasource;
 
+import com.conveyal.file.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-import static com.conveyal.r5.common.Util.isNullOrEmpty;
+import static com.conveyal.util.Util.isNullOrEmpty;
 import static com.google.common.base.Preconditions.checkState;
 
 /**

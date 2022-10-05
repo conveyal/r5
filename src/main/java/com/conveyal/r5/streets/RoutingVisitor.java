@@ -6,7 +6,7 @@ package com.conveyal.r5.streets;
  */
 public interface RoutingVisitor {
     /** Called after search algorithms dequeue a vertex */
-    void visitVertex(StreetRouter.State state);
+    void visitVertex(RoutingState state);
 
     /**
      * Called right after visitVertex

@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -19,7 +18,7 @@ import java.io.OutputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.file.FileCategory.RESULTS;
-import static com.conveyal.r5.common.Util.human;
+import static com.conveyal.util.Util.human;
 
 /**
  * This is an abstract base class for writing regional analysis results into a file for long term

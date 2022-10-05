@@ -1,17 +1,17 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.util.UserPermissions;
 import org.bson.types.ObjectId;
 
 import java.io.File;
 
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.GEOPACKAGE;
-import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.file.FileStorageFormat.GEOTIFF;
+import static com.conveyal.file.FileStorageFormat.SHP;
 
 /**
  * Logic for loading and validating a specific kind of input file, yielding a specific subclass of DataSource.

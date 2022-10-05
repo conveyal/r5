@@ -1,16 +1,16 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.progress.WorkProduct;
+import com.conveyal.util.UserPermissions;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
+import static com.conveyal.r5.progress.WorkProductType.DATA_SOURCE;
 
 /**
  * This represents a file which was uploaded by the user and validated by the backend. Instances are persisted to Mongo.

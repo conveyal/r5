@@ -1,7 +1,7 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeFlag;
 
 import java.util.EnumSet;
 
@@ -98,45 +98,45 @@ public class TypeOfEdgeLabeler {
      * Adds Stairs, bike path, sidewalk and crossing flags to ways.
      * This sets flags (passed in as the second and third parameters) from the tags on the OSM Way (first parameter).
      */
-    public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
+    public void label (Way way, EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags) {
         if (way.hasTag("highway", "steps")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.STAIRS);
-            backFlags.add(EdgeStore.EdgeFlag.STAIRS);
+            forwardFlags.add(EdgeFlag.STAIRS);
+            backFlags.add(EdgeFlag.STAIRS);
         }
         // Tunnels, covered roads and motorways are unlikely places for origins, destinations, or park and rides.
         if (!(way.hasTag("tunnel", "yes") || way.hasTag("covered", "yes") || way.hasTag("highway", "motorway"))) {
-            forwardFlags.add(EdgeStore.EdgeFlag.LINKABLE);
-            backFlags.add(EdgeStore.EdgeFlag.LINKABLE);
+            forwardFlags.add(EdgeFlag.LINKABLE);
+            backFlags.add(EdgeFlag.LINKABLE);
         }
-        if (forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE) && isCycleway(way , false)) {
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        if (forwardFlags.contains(EdgeFlag.ALLOWS_BIKE) && isCycleway(way , false)) {
+            forwardFlags.add(EdgeFlag.BIKE_PATH);
         }
-        if (backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE) && isCycleway(way, true)) {
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        if (backFlags.contains(EdgeFlag.ALLOWS_BIKE) && isCycleway(way, true)) {
+            backFlags.add(EdgeFlag.BIKE_PATH);
         }
 
         if (isSidewalk(way, false)) {
-            forwardFlags.add(EdgeStore.EdgeFlag.SIDEWALK);
+            forwardFlags.add(EdgeFlag.SIDEWALK);
         }
         if (isSidewalk(way, true)) {
-            backFlags.add(EdgeStore.EdgeFlag.SIDEWALK);
+            backFlags.add(EdgeFlag.SIDEWALK);
         }
 
         if (way.hasTag("footway", "crossing") || way.hasTag("cycleway", "crossing")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.CROSSING);
-            backFlags.add(EdgeStore.EdgeFlag.CROSSING);
+            forwardFlags.add(EdgeFlag.CROSSING);
+            backFlags.add(EdgeFlag.CROSSING);
         }
 
         if (way.hasTag("junction", "roundabout")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.ROUNDABOUT);
-            backFlags.add(EdgeStore.EdgeFlag.ROUNDABOUT);
+            forwardFlags.add(EdgeFlag.ROUNDABOUT);
+            backFlags.add(EdgeFlag.ROUNDABOUT);
         }
 
         if (way.hasTag("highway", "platform")
             || way.hasTag("public_transport", "platform")
             || way.hasTag("railway", "platform")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.PLATFORM);
-            backFlags.add(EdgeStore.EdgeFlag.PLATFORM);
+            forwardFlags.add(EdgeFlag.PLATFORM);
+            backFlags.add(EdgeFlag.PLATFORM);
         }
     }
 

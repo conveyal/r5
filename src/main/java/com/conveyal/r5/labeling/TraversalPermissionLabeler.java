@@ -1,7 +1,7 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeFlag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,38 +70,38 @@ public abstract class TraversalPermissionLabeler {
 
         applyWheelchairPermissions(tree, way);
 
-        EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
+        EnumSet<EdgeFlag> ret = EnumSet.noneOf(EdgeFlag.class);
 
         Label walk = walk(tree, Node.FOOT);
         Label bicycle = walk(tree, Node.BICYCLE);
         Label car = walk(tree, Node.CAR);
         Label wheelchair = walk(tree, Node.WHEELCHAIR);
         if (walk == Label.YES) {
-            ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            ret.add(EdgeFlag.ALLOWS_PEDESTRIAN);
         } else if (walk == Label.NO_THRU_TRAFFIC) {
-            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
+            ret.add(EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
         }
         if (wheelchair == Label.YES) {
-            ret.add(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            ret.add(EdgeFlag.ALLOWS_WHEELCHAIR);
         }
 
         if (wheelchair == Label.LIMITED) {
-                ret.add(EdgeStore.EdgeFlag.LIMITED_WHEELCHAIR);
+                ret.add(EdgeFlag.LIMITED_WHEELCHAIR);
         }
         if (bicycle == Label.YES) {
-            ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            ret.add(EdgeFlag.ALLOWS_BIKE);
         } else if (bicycle == Label.NO_THRU_TRAFFIC) {
-            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE);
+            ret.add(EdgeFlag.NO_THRU_TRAFFIC_BIKE);
         }
         if (car == Label.YES) {
-            ret.add(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            ret.add(EdgeFlag.ALLOWS_CAR);
         } else if (car == Label.NO_THRU_TRAFFIC) {
-            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+            ret.add(EdgeFlag.NO_THRU_TRAFFIC_CAR);
         }
 
 
-        EnumSet<EdgeStore.EdgeFlag> forward = EnumSet.copyOf(ret);
-        EnumSet<EdgeStore.EdgeFlag> backward = EnumSet.copyOf(ret);
+        EnumSet<EdgeFlag> forward = EnumSet.copyOf(ret);
+        EnumSet<EdgeFlag> backward = EnumSet.copyOf(ret);
 
         applyDirectionalPermissions(way, forward, backward);
 
@@ -111,15 +111,15 @@ public abstract class TraversalPermissionLabeler {
 
         //Backward edge
         // you can traverse back if this is not one way or it is one way reverse
-        if (dir.get(Node.CAR) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        if (dir.get(Node.BICYCLE) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        if (dir.get(Node.FOOT) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        if (dir.get(Node.CAR) == OneWay.YES) backward.remove(EdgeFlag.ALLOWS_CAR);
+        if (dir.get(Node.BICYCLE) == OneWay.YES) backward.remove(EdgeFlag.ALLOWS_BIKE);
+        if (dir.get(Node.FOOT) == OneWay.YES) backward.remove(EdgeFlag.ALLOWS_PEDESTRIAN);
 
         //Forward edge
         // you can always forward traverse unless this is a rare reversed one-way street
-        if (dir.get(Node.CAR) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        if (dir.get(Node.BICYCLE) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        if (dir.get(Node.FOOT) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        if (dir.get(Node.CAR) == OneWay.REVERSE) forward.remove(EdgeFlag.ALLOWS_CAR);
+        if (dir.get(Node.BICYCLE) == OneWay.REVERSE) forward.remove(EdgeFlag.ALLOWS_BIKE);
+        if (dir.get(Node.FOOT) == OneWay.REVERSE) forward.remove(EdgeFlag.ALLOWS_PEDESTRIAN);
 
         //This needs to be called after permissions were removed in directionalTree
         //it is moved from directional tree since we can only remove permissions there
@@ -167,23 +167,23 @@ public abstract class TraversalPermissionLabeler {
      * @param way
      * @param backward
      */
-    private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
+    private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
         String cyclewayTagValue = way.getTag("cycleway");
         boolean addedBikePermissions = false;
         if (cyclewayTagValue != null && cyclewayTagValue.startsWith("opposite")) {
-            backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            backward.add(EdgeFlag.ALLOWS_BIKE);
             addedBikePermissions = true;
         } else if (cyclewayRightTagValue != null) {
             if (cyclewayRightTagValue.startsWith("opposite")){
-                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                backward.add(EdgeFlag.ALLOWS_BIKE);
                 addedBikePermissions = true;
             }
         }
         if (!addedBikePermissions && cyclewayLeftTagValue != null) {
             if (cyclewayLeftTagValue.startsWith("opposite")) {
-                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                backward.add(EdgeFlag.ALLOWS_BIKE);
             }
         }
 
@@ -197,28 +197,28 @@ public abstract class TraversalPermissionLabeler {
      * @param forward
      * @param backward
      */
-    private void applyDirectionalPermissions(Way way, EnumSet<EdgeStore.EdgeFlag> forward,
-        EnumSet<EdgeStore.EdgeFlag> backward) {
+    private void applyDirectionalPermissions(Way way, EnumSet<EdgeFlag> forward,
+        EnumSet<EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
 
         if (cyclewayRightTagValue != null) {
             Label cyclewayRight = Label.fromTag(cyclewayRightTagValue);
             if (cyclewayRight == Label.YES) {
-                forward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                forward.add(EdgeFlag.ALLOWS_BIKE);
             }
         }
 
         if (cyclewayLeftTagValue != null) {
             Label cyclewayLeft = Label.fromTag(cyclewayLeftTagValue);
             if (cyclewayLeft == Label.YES) {
-                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                backward.add(EdgeFlag.ALLOWS_BIKE);
             }
         }
     }
 
     @Deprecated
-    public EnumSet<EdgeStore.EdgeFlag> getPermissions(Way way, boolean back) {
+    public EnumSet<EdgeFlag> getPermissions(Way way, boolean back) {
         RoadPermission roadPermission = getPermissions(way);
         if (back) {
             return roadPermission.backward;

@@ -1,15 +1,16 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.components.broker.WorkerTags;
+import com.conveyal.analysis.broker.Broker;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.HttpStatus;
-import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.util.ExceptionUtils;
+import com.conveyal.components.HttpController;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.util.HttpStatus;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.UserPermissions;
+import com.conveyal.worker.WorkerCategory;
+import com.conveyal.worker.WorkerTags;
 import com.google.common.collect.ImmutableMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import static com.conveyal.analysis.util.HttpStatus.OK_200;
+import static com.conveyal.util.HttpStatus.OK_200;
 
 /**
  * This proxies requests coming from the UI over to any currently active worker for the specified network bundle.
@@ -49,7 +50,7 @@ public class WorkerProxyController implements HttpController {
         // Those could be path parameters, x-conveyal-headers, etc.
         // Path starts with api to ensure authentication
         sparkService.path("/api/workers/:workerVersion/bundles/:bundleId", () -> {
-            sparkService.get("", this::getWorkerStatus, JsonUtil.toJson);
+            sparkService.get("", this::getWorkerStatus, HttpUtils.toJson);
             sparkService.get("/*", this::proxyRequest);
         });
     }
@@ -82,12 +83,12 @@ public class WorkerProxyController implements HttpController {
         final String bundleId = request.params("bundleId");
         final String workerVersion = request.params("workerVersion");
 
-        String workerAddress = getOrStartWorker(bundleId, workerVersion, UserPermissions.from(request));
+        String workerAddress = getOrStartWorker(bundleId, workerVersion, HttpUtils.userFromRequest(request));
         if (workerAddress == null) {
             // There are no workers that can handle this request at this time, ask the UI to retry later.
             response.status(HttpStatus.ACCEPTED_202);
             response.header("Retry-After", "30");
-            return JsonUtilities.objectMapper.writeValueAsString(ImmutableMap.of("message", "Starting worker."));
+            return JsonUtils.objectMapper.writeValueAsString(ImmutableMap.of("message", "Starting worker."));
         }
 
         // Port number is hard-coded until we have a good reason to make it configurable.
@@ -108,7 +109,7 @@ public class WorkerProxyController implements HttpController {
             return resp.body();
         } catch (Exception exception) {
             response.status(HttpStatus.BAD_REQUEST_400);
-            return JsonUtilities.objectMapper.writeValueAsString(ImmutableMap.of(
+            return JsonUtils.objectMapper.writeValueAsString(ImmutableMap.of(
                     "message", exception.getMessage(),
                     "stackTrace", ExceptionUtils.stackTraceString(exception)
             ));

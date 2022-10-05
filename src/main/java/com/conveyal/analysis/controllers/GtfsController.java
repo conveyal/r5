@@ -1,15 +1,16 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.VectorMapTile;
+import com.conveyal.components.HttpController;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.VectorMapTile;
 import com.mongodb.QueryBuilder;
 import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
@@ -24,9 +25,9 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.conveyal.analysis.util.HttpStatus.OK_200;
-import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
-import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.util.HttpStatus.OK_200;
+import static com.conveyal.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
+import static com.conveyal.util.HttpUtils.toJson;
 
 /**
  * Controller for retrieving contents of GTFS feeds that have been converted to MapDB files via the GTFS cache.
@@ -180,7 +181,7 @@ public class GtfsController implements HttpController {
         String feedGroupId = req.params("feedGroupId");
         DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
         if (!cursor.hasNext()) {
-            throw AnalysisServerException.notFound("Bundle could not be found for the given feed group ID.");
+            throw HttpServerRuntimeException.notFound("Bundle could not be found for the given feed group ID.");
         }
 
         List<FeedGroupStopsApiResponse> allStopsByFeed = new ArrayList<>();

@@ -2,7 +2,7 @@ package com.conveyal.gtfs.util;
 
 import org.junit.jupiter.api.Test;
 
-import static com.conveyal.gtfs.util.Util.human;
+import static com.conveyal.util.Util.human;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**

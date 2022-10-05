@@ -3,7 +3,7 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.util.ShapefileReader;
+import com.conveyal.util.ShapefileReader;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.coverage.grid.io.GridCoverage2DReader;
@@ -26,7 +26,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.lang.invoke.MethodHandles;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,8 +33,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.conveyal.analysis.datasource.derivation.AggregationAreaDerivation.prefetchShpSidecarFiles;
-import static com.conveyal.r5.common.GeometryUtils.geometryFactory;
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.conveyal.util.GeometryUtils.geometryFactory;
+import static com.conveyal.util.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**

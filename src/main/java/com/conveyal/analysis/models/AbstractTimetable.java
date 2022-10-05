@@ -1,6 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.r5.analyst.scenario.AddTrips;
+import com.conveyal.r5.scenario.AddTrips;
 
 public abstract class AbstractTimetable {
     public String _id;

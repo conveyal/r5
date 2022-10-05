@@ -100,7 +100,7 @@ public class TurnRestriction implements Serializable {
                 }
                 LOG.debug("POI:{} FROM:{} next:{}", posInTurnRestriction, currentEdgeIdx, next);
 
-                EdgeStore.Edge e = streetLayer.edgeStore.getCursor(currentEdgeIdx);
+                Edge e = streetLayer.getEdgeCursor(currentEdgeIdx);
                 int fromEdgeToVertex = e.getToVertex();
                 int finalPosInTurnRestriction = posInTurnRestriction;
                 //Goes over all outgoing CAR/BIKE traversable edges of toVertex of currentEdgeIdx an adds NO TURN turn restriction
@@ -111,7 +111,7 @@ public class TurnRestriction implements Serializable {
                     }
                     e.seek(eidx);
                     //filter car and bicycle traversible and add turn restriction from from and on this edges which aren't via/to
-                    if (e.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR) || e.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) {
+                    if (e.getFlag(EdgeFlag.ALLOWS_CAR) || e.getFlag(EdgeFlag.ALLOWS_BIKE)) {
                         TurnRestriction restriction = new TurnRestriction();
                         restriction.fromEdge = fromEdge;
                         //Adds via edges which are via edges in original turn restriction up to this point

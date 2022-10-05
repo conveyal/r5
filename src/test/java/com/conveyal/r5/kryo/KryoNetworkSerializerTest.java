@@ -3,7 +3,7 @@ package com.conveyal.r5.kryo;
 import ch.qos.logback.classic.Logger;
 import com.conveyal.object_differ.ObjectDiffer;
 import com.conveyal.r5.analyst.scenario.FakeGraph;
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;

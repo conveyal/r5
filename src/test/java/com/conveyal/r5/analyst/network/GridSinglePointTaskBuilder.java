@@ -3,11 +3,11 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.decay.StepDecayFunction;
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.analyst.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.TravelTimeSurfaceTask;
+import com.conveyal.r5.decay.StepDecayFunction;
+import com.conveyal.modes.LegMode;
+import com.conveyal.modes.TransitModes;
 import org.locationtech.jts.geom.Coordinate;
 
 import java.time.LocalTime;

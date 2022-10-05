@@ -29,9 +29,9 @@ public class CustomModificationHolder extends Modification {
         this.freeformProperties.put(key, value);
     }
 
-    public com.conveyal.r5.analyst.scenario.CustomModificationHolder toR5 () {
-        com.conveyal.r5.analyst.scenario.CustomModificationHolder customR5 =
-                new com.conveyal.r5.analyst.scenario.CustomModificationHolder(freeformProperties, name);
+    public com.conveyal.r5.scenario.CustomModificationHolder toR5 () {
+        com.conveyal.r5.scenario.CustomModificationHolder customR5 =
+                new com.conveyal.r5.scenario.CustomModificationHolder(freeformProperties, name);
         return customR5;
     }
 

@@ -2,8 +2,6 @@ package com.conveyal.r5.rastercost;
 
 import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
 
-import static com.google.common.base.Preconditions.checkState;
-
 /**
  * Based on elevation changes along a road segment, computes energy consumption as a proxy for perceived effort.
  * https://journals.physiology.org/doi/full/10.1152/japplphysiol.01177.2001

@@ -1,8 +1,10 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.UserPermissions;
+import com.conveyal.util.UserPermissions;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
+import com.conveyal.file.SpatialAttribute;
+import com.conveyal.file.DataSourceException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.locationtech.jts.geom.Envelope;
@@ -11,11 +13,10 @@ import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
-import static com.conveyal.analysis.datasource.SpatialAttribute.Type.NUMBER;
-import static com.conveyal.analysis.datasource.SpatialAttribute.Type.TEXT;
+import static com.conveyal.file.SpatialAttribute.Type.NUMBER;
+import static com.conveyal.file.SpatialAttribute.Type.TEXT;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
-import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
+import static com.conveyal.util.ShapefileReader.GeometryType.POLYGON;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;

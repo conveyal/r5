@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.core;
 
-import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.util.JsonUtils;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -16,9 +16,9 @@ public class LocalDateSerialization {
     public void testSerializationDeserialization() throws Exception {
         LocalDate date = LocalDate.now();
 
-        String jsonDate = JsonUtilities.objectMapper.writeValueAsString(date);
+        String jsonDate = JsonUtils.objectMapper.writeValueAsString(date);
 
-        LocalDate deserializedDate = JsonUtilities.objectMapper.readValue(jsonDate, LocalDate.class);
+        LocalDate deserializedDate = JsonUtils.objectMapper.readValue(jsonDate, LocalDate.class);
         assertEquals(date, deserializedDate);
 
 

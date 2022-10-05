@@ -1,10 +1,11 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.analysis.util.VectorMapTile;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.components.HttpController;
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.VectorMapTile;
+import com.conveyal.worker.TransportNetworkCache;
 import com.google.common.collect.ImmutableMap;
 import gnu.trove.set.TIntSet;
 import org.locationtech.jts.geom.Geometry;
@@ -18,9 +19,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.conveyal.analysis.util.HttpStatus.OK_200;
-import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
-import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.util.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.util.HttpStatus.OK_200;
+import static com.conveyal.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -53,7 +54,7 @@ public class NetworkTileController implements HttpController {
         // sparkService.get("/api/bundles/:gtfsId/vectorTiles/:x/:y/:z", this::getTile);
         // Should end in .mvt but not clear how to do that in Sparkframework.
         //         sparkService.get("/:bundleId/:modificationNonceDigest/tiles", this::buildIndex, JsonUtil.toJson);
-        sparkService.get("/:bundleId/tiles", this::buildIndex, JsonUtil.toJson);
+        sparkService.get("/:bundleId/tiles", this::buildIndex, HttpUtils.toJson);
         sparkService.get("/:bundleId/tiles/:z/:x/:y", this::getEdgeGeometryVectorTile);
     }
 
@@ -93,7 +94,7 @@ public class NetworkTileController implements HttpController {
 
         TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(vectorMapTile.envelope));
         edges.forEach(e -> {
-            EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
+            Edge edge = network.streetLayer.getEdgeCursor(e);
             // TODO at low zoom levels, include only edge pairs. At high, include different directions in pair.
             if (vectorMapTile.zoom < zoomForStreetClass[edge.getStreetClassCode()]) {
                 return true; // Continue iteration.

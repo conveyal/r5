@@ -1,12 +1,11 @@
 package com.conveyal.r5.transit.path;
 
-import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.profile.RaptorState;
+import com.conveyal.r5.transit.PatternSequence;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import static com.google.common.base.Preconditions.checkState;
 

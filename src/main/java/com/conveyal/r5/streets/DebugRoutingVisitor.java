@@ -1,6 +1,6 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeoJsonFeature;
+import com.conveyal.util.GeoJsonFeature;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,10 +32,10 @@ public class DebugRoutingVisitor implements RoutingVisitor {
      * @param state
      */
     @Override
-    public void visitVertex(StreetRouter.State state) {
+    public void visitVertex(RoutingState state) {
         Integer edgeIdx = state.backEdge;
         if (!(edgeIdx == null || edgeIdx == -1)) {
-            EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
+            Edge edge = new Edge(edgeStore, edgeIdx);
             GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
             feature.addProperty("mode", state.streetMode);
             feature.addProperty("backEdge", state.backEdge);

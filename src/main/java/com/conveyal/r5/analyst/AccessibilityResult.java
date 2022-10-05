@@ -1,7 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-
 /**
  * This holds and accumulates multiple accessibility indicator values for a single origin as they are computed.
  * The different accessibility indicator values are for different opportunity PointSets, different percentiles of travel

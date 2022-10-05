@@ -1,8 +1,6 @@
 package com.conveyal.file;
 
-import com.conveyal.analysis.components.Component;
-import com.conveyal.r5.analyst.PersistenceBuffer;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.components.Component;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -75,14 +73,7 @@ public interface FileStorage extends Component {
      */
     boolean exists(FileStorageKey fileStorageKey);
 
-
     //// Convenience methods usable with all concrete subclasses.
-
-    /** Store Taui output in subfolders by job ID. */
-    default void saveTauiData (AnalysisWorkerTask task, String fileName, PersistenceBuffer buffer) {
-        FileStorageKey key = new FileStorageKey(FileCategory.TAUI, String.join("/", task.jobId, fileName));
-        moveIntoStorage(key, buffer);
-    }
 
     /** Read from a file as a stream, decompressing if the name indicates it's gzipped. */
     default InputStream getInputStream (FileCategory fileCategory, String fileName) throws IOException {

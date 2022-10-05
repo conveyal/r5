@@ -1,9 +1,11 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.streets.ParkRideParking;
+import com.conveyal.r5.streets.RoutingState;
+import com.conveyal.r5.streets.RoutingVariable;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.util.LambdaCounter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -16,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
 import static com.conveyal.r5.transit.TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
 import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
 
@@ -32,7 +33,7 @@ public class TransferFinder {
     private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList();
 
     // Optimization: use the same empty list for all stops with no transfers
-    private static final TIntObjectMap<StreetRouter.State> EMPTY_STATE_MAP = new TIntObjectHashMap<>();
+    private static final TIntObjectMap<RoutingState> EMPTY_STATE_MAP = new TIntObjectHashMap<>();
 
     TransitLayer transitLayer;
 
@@ -73,10 +74,10 @@ public class TransferFinder {
             retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
-            TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
+            TIntObjectMap<RoutingState> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
             distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
                 int stopStreetVertexIdx = transitLayer.streetVertexForStop.get(targetStopIndex);
-                StreetRouter.State path = streetRouter.getStateAtVertex(stopStreetVertexIdx);
+                RoutingState path = streetRouter.getStateAtVertex(stopStreetVertexIdx);
                 pathToreachedStops.put(targetStopIndex, path);
                 return true;
             });

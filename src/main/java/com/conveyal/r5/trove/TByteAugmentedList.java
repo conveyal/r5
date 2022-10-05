@@ -4,9 +4,7 @@ import gnu.trove.TByteCollection;
 import gnu.trove.function.TByteFunction;
 import gnu.trove.iterator.TByteIterator;
 import gnu.trove.list.TByteList;
-import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TByteArrayList;
-import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.procedure.TByteProcedure;
 
 import java.util.Collection;

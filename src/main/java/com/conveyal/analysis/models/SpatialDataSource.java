@@ -1,19 +1,14 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.datasource.SpatialAttribute;
-import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.util.ShapefileReader;
+import com.conveyal.file.SpatialAttribute;
+import com.conveyal.util.ShapefileReader;
+import com.conveyal.util.UserPermissions;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
 
 import java.util.List;
 
 import static com.conveyal.file.FileCategory.DATASOURCES;
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * A SpatialDataSource is metadata about a user-uploaded file containing geospatial features (e.g. shapefile, GeoJSON,

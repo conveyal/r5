@@ -1,8 +1,8 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.r5.analyst.scenario.StopSpec;
-import com.conveyal.r5.util.ExceptionUtils;
+import com.conveyal.r5.scenario.StopSpec;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.util.HttpServerRuntimeException;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Coordinate;
@@ -102,7 +102,7 @@ class ModificationStop {
 
             Coordinate[] coords = segment.geometry.getCoordinates();
             if (previousSegmentFinalCoordinate != null && !coords[0].equals2D(previousSegmentFinalCoordinate)) {
-                throw AnalysisServerException.unknown("Start of segment " + i + 1 + " not at end of previous segment:" +
+                throw HttpServerRuntimeException.unknown("Start of segment " + i + 1 + " not at end of previous segment:" +
                         " " + previousSegmentFinalCoordinate + " and " + coords[0]);
             }
 
@@ -115,7 +115,7 @@ class ModificationStop {
                     // JTS orthodromic distance returns meters, considering the input coordinate system.
                     lineSegmentMeters = JTS.orthodromicDistance(c0, c1, crs);
                 } catch (TransformException e) {
-                    throw AnalysisServerException.unknown(ExceptionUtils.stackTraceString(e));
+                    throw HttpServerRuntimeException.unknown(ExceptionUtils.stackTraceString(e));
                 }
                 double metersAtEndOfSegment = metersFromPatternStart + lineSegmentMeters;
 

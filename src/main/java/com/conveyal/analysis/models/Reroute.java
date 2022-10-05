@@ -30,8 +30,8 @@ public class Reroute extends Modification {
     // using Integer not int because Integers can be null
     public Integer[] dwellTimes;
 
-    public com.conveyal.r5.analyst.scenario.Reroute toR5 () {
-        com.conveyal.r5.analyst.scenario.Reroute rr = new com.conveyal.r5.analyst.scenario.Reroute();
+    public com.conveyal.r5.scenario.Reroute toR5 () {
+        com.conveyal.r5.scenario.Reroute rr = new com.conveyal.r5.scenario.Reroute();
         rr.comment = name;
 
         List<ModificationStop> stops = ModificationStop.getStopsFromSegments(segments, dwellTimes, dwellTime, segmentSpeeds);

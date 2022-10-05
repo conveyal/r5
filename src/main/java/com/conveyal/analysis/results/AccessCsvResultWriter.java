@@ -1,8 +1,8 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.r5.analyst.RegionalWorkResult;
 
 import java.io.IOException;
 import java.util.ArrayList;

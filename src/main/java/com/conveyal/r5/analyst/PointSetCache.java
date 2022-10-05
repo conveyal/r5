@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;

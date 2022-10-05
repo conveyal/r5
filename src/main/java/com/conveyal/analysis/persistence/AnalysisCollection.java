@@ -1,9 +1,9 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.BaseModel;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.UserPermissions;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.DeleteResult;
@@ -27,8 +27,8 @@ public class AnalysisCollection<T extends BaseModel> {
     public final MongoCollection<T> collection;
     private final Class<T> type;
 
-    private AnalysisServerException invalidAccessGroup() {
-        return AnalysisServerException.forbidden("Permission denied. Invalid access group.");
+    private HttpServerRuntimeException invalidAccessGroup() {
+        return HttpServerRuntimeException.forbidden("Permission denied. Invalid access group.");
     }
 
     public AnalysisCollection(MongoCollection<T> collection, Class<T> clazz) {
@@ -42,7 +42,7 @@ public class AnalysisCollection<T extends BaseModel> {
 
     public DeleteResult deleteByIdParamIfPermitted (Request request) {
         String _id = request.params("_id");
-        UserPermissions user = UserPermissions.from(request);
+        UserPermissions user = HttpUtils.userFromRequest(request);
         return collection.deleteOne(and(eq("_id", new ObjectId(_id)), eq("accessGroup", user.accessGroup)));
     }
 
@@ -123,13 +123,13 @@ public class AnalysisCollection<T extends BaseModel> {
         if (result.getModifiedCount() != 1) {
             T model = findById(value._id);
             if (model == null) {
-                throw AnalysisServerException.notFound(type.getName() + " was not found.");
+                throw HttpServerRuntimeException.notFound(type.getName() + " was not found.");
             } else if (model.nonce != oldNonce) {
-                throw AnalysisServerException.nonce();
+                throw HttpServerRuntimeException.nonce();
             } else if (!model.accessGroup.equals(accessGroup)) {
                 throw invalidAccessGroup();
             } else {
-                throw AnalysisServerException.unknown("Unable to update model.");
+                throw HttpServerRuntimeException.unknown("Unable to update model.");
             }
         }
 
@@ -143,15 +143,15 @@ public class AnalysisCollection<T extends BaseModel> {
      * Controller creation helper.
      */
     public T create(Request req, Response res) throws IOException {
-        T value = JsonUtil.objectMapper.readValue(req.body(), type);
-        return create(value, UserPermissions.from(req));
+        T value = HttpUtils.objectFromRequestBody(req, type);
+        return create(value, HttpUtils.userFromRequest(req));
     }
 
     /**
      * Helper for HttpControllers - find a document by the _id path parameter in the request, checking permissions.
      */
     public T findPermittedByRequestParamId (Request req) {
-        UserPermissions user = UserPermissions.from(req);
+        UserPermissions user = HttpUtils.userFromRequest(req);
         T value = findById(req.params("_id"));
         // Throw if or does not have permission
         if (!value.accessGroup.equals(user.accessGroup)) {
@@ -164,8 +164,8 @@ public class AnalysisCollection<T extends BaseModel> {
      * Controller update helper.
      */
     public T update(Request req, Response res) throws IOException {
-        T value = JsonUtil.objectMapper.readValue(req.body(), type);
-        final UserPermissions user = UserPermissions.from(req);
+        T value = HttpUtils.objectFromRequestBody(req, type);
+        final UserPermissions user = HttpUtils.userFromRequest(req);
         value.updatedBy = user.email;
         if (!value.accessGroup.equals(user.accessGroup)) {
             throw invalidAccessGroup();

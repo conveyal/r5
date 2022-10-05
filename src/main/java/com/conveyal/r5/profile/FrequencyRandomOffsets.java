@@ -12,8 +12,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkElementIndex;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**

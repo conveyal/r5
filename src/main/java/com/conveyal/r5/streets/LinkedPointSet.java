@@ -1,13 +1,12 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.progress.NoopProgressListener;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.streets.EdgeStore.Edge;
-import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.r5.progress.NoopProgressListener;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.util.GeometryUtils;
+import com.conveyal.util.LambdaCounter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -18,13 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
-import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
+import static com.conveyal.util.GeometryUtils.floatingDegreesToFixed;
 
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
@@ -432,7 +429,7 @@ public class LinkedPointSet implements Serializable {
                 Split origin
             ) {
         int[] travelTimes = new int[edges.length];
-        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        Edge edge = streetLayer.getEdgeCursor();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {
                 // Target point is unlinked.
@@ -501,7 +498,7 @@ public class LinkedPointSet implements Serializable {
                                      Geometry egressArea) {
         int nPoints = this.size();
         TIntIntMap costToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
-        Edge edge = streetLayer.edgeStore.getCursor();
+        Edge edge = streetLayer.getEdgeCursor();
         // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
         TIntList relevantPoints = pointSet.getPointsInEnvelope(envelopeAroundStop);
         // This is not correcting for the fact that the method returns false positives, but that should be harmless.
@@ -557,7 +554,7 @@ public class LinkedPointSet implements Serializable {
                 if (edgeIndex < 0) continue;
                 double pointLat = pointSet.getLat(p);
                 double pointLon = pointSet.getLon(p);
-                Edge edge = streetLayer.edgeStore.getCursor(edgeIndex);
+                Edge edge = streetLayer.getEdgeCursor(edgeIndex);
                 VertexStore.Vertex fromVertex = streetLayer.vertexStore.getCursor(edge.getFromVertex());
                 VertexStore.Vertex toVertex = streetLayer.vertexStore.getCursor(edge.getToVertex());
                 String wkt = String.format(

@@ -1,8 +1,8 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.r5.analyst.RegionalWorkResult;
 import com.csvreader.CsvWriter;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;

@@ -1,5 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.scenario.Reroute;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.r5.scenario.StopSpec;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
@@ -27,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class RerouteTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -49,7 +55,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -97,7 +103,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -153,7 +159,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -202,7 +208,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -272,7 +278,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Collections.singletonList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -315,7 +321,7 @@ public class RerouteTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Collections.singletonList(reroute);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 

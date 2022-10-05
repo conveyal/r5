@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -20,11 +20,11 @@ public class TimeDependentRoutingTest {
         streetLayer.edgeStore.addStreetPair(one, two, 15000, 1);
         streetLayer.edgeStore.addStreetPair(two, three, 15000, 2);
 
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
+        Edge e = streetLayer.getEdgeCursor(0);
 
         do {
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            e.setFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
+            e.setFlag(EdgeFlag.ALLOWS_CAR);
         } while (e.advance());
 
         streetLayer.indexStreets();
@@ -33,14 +33,14 @@ public class TimeDependentRoutingTest {
         StreetRouter streetRouter = new StreetRouter(streetLayer);
         streetRouter.setOrigin(one);
         streetRouter.route();
-        StreetRouter.State stateAtVertex = streetRouter.getStateAtVertex(three);
+        RoutingState stateAtVertex = streetRouter.getStateAtVertex(three);
 
         assertEquals(24, stateAtVertex.durationSeconds);
 
         StreetRouter anotherStreetRouter = new StreetRouter(streetLayer);
         anotherStreetRouter.timeCalculator = new TraversalTimeCalculator() {
             @Override
-            public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
+            public int traversalTimeSeconds (Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
                 return 30;
             }
 
@@ -51,7 +51,7 @@ public class TimeDependentRoutingTest {
         };
         anotherStreetRouter.setOrigin(one);
         anotherStreetRouter.route();
-        StreetRouter.State anotherStateAtVertex = anotherStreetRouter.getStateAtVertex(three);
+        RoutingState anotherStateAtVertex = anotherStreetRouter.getStateAtVertex(three);
 
         assertEquals(60, anotherStateAtVertex.durationSeconds);
 

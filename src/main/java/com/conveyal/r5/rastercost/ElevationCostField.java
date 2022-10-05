@@ -1,5 +1,6 @@
 package com.conveyal.r5.rastercost;
 
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.streets.EdgeStore;
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.TShortList;
@@ -9,8 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.List;
-
-import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACING_METERS;
 
 /**
  * This represents the changes in elevation along every edge in the network, as well as the derived additional costs
@@ -38,6 +37,7 @@ import static com.conveyal.r5.rastercost.ElevationLoader.ELEVATION_SAMPLE_SPACIN
  */
 public class ElevationCostField implements CostField, Serializable {
 
+    public static final double ELEVATION_SAMPLE_SPACING_METERS = 10;
     private static final Logger LOG = LoggerFactory.getLogger(ElevationCostField.class);
 
     /**
@@ -60,7 +60,7 @@ public class ElevationCostField implements CostField, Serializable {
     }
 
     @Override
-    public int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
+    public int additionalTraversalTimeSeconds (Edge currentEdge, int traversalTimeSeconds) {
         return (int) Math.round(traversalTimeSeconds * edgeFactors.get(currentEdge.getEdgeIndex()));
     }
 
@@ -109,7 +109,7 @@ public class ElevationCostField implements CostField, Serializable {
      * the elevation change will be inverted for a backward edge. This is not appropriate for all imaginable consumers
      * but it works fine for a memoryless difficulty scaling function like the Tobler hiking function.
      */
-    public void forEachElevationSegment (EdgeStore.Edge edge, ElevationSegmentConsumer consumer) {
+    public void forEachElevationSegment (Edge edge, ElevationSegmentConsumer consumer) {
         consumer.reset(); // Zero out any state from previous usage of the instance.
         double remainingMeters = edge.getLengthM();
         // Do not go through getFromVertex method because we do not currently truly reverse edges.
@@ -176,7 +176,7 @@ public class ElevationCostField implements CostField, Serializable {
      */
     public synchronized void computeWeightedAverages (EdgeStore edgeStore) {
         edgeFactors = new TFloatArrayList(edgeStore.nEdges());
-        EdgeStore.Edge edge = edgeStore.getCursor();
+        Edge edge = new Edge(edgeStore);
         for (int e = 0; e < edgeStore.nEdges(); ++e) {
             edge.seek(e);
             edgeFactors.add((float) weightedAverageForEdge(edge));
@@ -188,7 +188,7 @@ public class ElevationCostField implements CostField, Serializable {
      * to account for the user-specified outputScale and the fact that we want to return the _difference_ in cost
      * to be included in a series of additive terms.
      */
-    private double weightedAverageForEdge (EdgeStore.Edge edge) {
+    private double weightedAverageForEdge (Edge edge) {
 
         forEachElevationSegment(edge, costCalculator);
         return (costCalculator.weightedElevationFactor() - 1) * outputScale;

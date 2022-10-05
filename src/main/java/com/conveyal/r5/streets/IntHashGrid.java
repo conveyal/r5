@@ -13,6 +13,7 @@
 
 package com.conveyal.r5.streets;
 
+import com.conveyal.util.GeometryUtils;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
@@ -63,7 +64,7 @@ public class IntHashGrid implements Serializable {
     private int nEntries = 0;
 
     public IntHashGrid(double binSizeDegrees) {
-        yBinSize = VertexStore.floatingDegreesToFixed(binSizeDegrees);
+        yBinSize = GeometryUtils.floatingDegreesToFixed(binSizeDegrees);
         // FIXME Assuming about 45 degrees latitude for now, cos(45deg)
         xBinSize = (int)(yBinSize / 0.7);
         if (binSizeDegrees <= 0) {
@@ -122,13 +123,13 @@ public class IntHashGrid implements Serializable {
             for (int s = 0; s < segments; s++) {
                 // interpolate the coordinates
                 Coordinate c0 = new Coordinate(
-                        VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * s),
-                        VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * s)
+                        GeometryUtils.floatingDegreesToFixed(coord[i].x + dX * segFrac * s),
+                        GeometryUtils.floatingDegreesToFixed(coord[i].y + dY * segFrac * s)
                 );
 
                 Coordinate c1 = new Coordinate(
-                        VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * (s + 1)),
-                        VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * (s + 1))
+                        GeometryUtils.floatingDegreesToFixed(coord[i].x + dX * segFrac * (s + 1)),
+                        GeometryUtils.floatingDegreesToFixed(coord[i].y + dY * segFrac * (s + 1))
                 );
 
                 Envelope env = new Envelope(c0, c1);

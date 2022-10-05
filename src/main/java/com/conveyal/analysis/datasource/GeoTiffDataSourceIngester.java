@@ -3,7 +3,9 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
-import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.file.DataSourceException;
+import com.conveyal.file.SpatialAttribute;
+import com.conveyal.r5.progress.ProgressListener;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
@@ -25,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.conveyal.file.FileStorageFormat.GEOTIFF;
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.PIXEL;
+import static com.conveyal.util.ShapefileReader.GeometryType.PIXEL;
 
 /**
  * GoeTIFFs are used as inputs in network building as digital elevation profiles, and eventually expected to

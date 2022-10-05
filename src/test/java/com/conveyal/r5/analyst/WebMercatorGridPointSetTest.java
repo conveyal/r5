@@ -10,7 +10,7 @@ import java.util.List;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.INSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.OUTSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.PARTIAL;
-import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.util.GeometryUtils.floatingWgsEnvelopeToFixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

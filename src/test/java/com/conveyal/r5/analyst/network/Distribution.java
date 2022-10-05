@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.r5.analyst.cluster.TravelTimeResult;
+import com.conveyal.r5.analyst.TravelTimeResult;
 
 import java.util.Arrays;
 

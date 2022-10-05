@@ -2,7 +2,7 @@ package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeFlag;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -24,31 +24,31 @@ public class TraversalPermissionLabelerTest {
 
     static TraversalPermissionLabeler traversalPermissionLabeler;
 
-    public static final EnumSet<EdgeStore.EdgeFlag> ALL = EnumSet
-        .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
-    public static final EnumSet<EdgeStore.EdgeFlag> ALLPERMISSIONS = EnumSet
-        .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
-    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_BICYCLE = EnumSet.of(
-        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.ALLOWS_BIKE);
-    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_CAR = EnumSet.of(
-        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.ALLOWS_CAR );
-    public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE_AND_CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-        EdgeStore.EdgeFlag.ALLOWS_CAR);
-    public static final EnumSet<EdgeStore.EdgeFlag> NONE = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
+    public static final EnumSet<EdgeFlag> ALL = EnumSet
+        .of(EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR,
+            EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_WHEELCHAIR);
+    public static final EnumSet<EdgeFlag> ALLPERMISSIONS = EnumSet
+        .of(EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR,
+            EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_WHEELCHAIR,
+            EdgeFlag.NO_THRU_TRAFFIC,
+            EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
+            EdgeFlag.NO_THRU_TRAFFIC_CAR);
+    public static final EnumSet<EdgeFlag> PEDESTRIAN_AND_BICYCLE = EnumSet.of(
+        EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_WHEELCHAIR, EdgeFlag.ALLOWS_BIKE);
+    public static final EnumSet<EdgeFlag> PEDESTRIAN_AND_CAR = EnumSet.of(
+        EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_WHEELCHAIR, EdgeFlag.ALLOWS_CAR );
+    public static final EnumSet<EdgeFlag> BICYCLE_AND_CAR = EnumSet.of(EdgeFlag.ALLOWS_BIKE,
+        EdgeFlag.ALLOWS_CAR);
+    public static final EnumSet<EdgeFlag> NONE = EnumSet.noneOf(EdgeFlag.class);
 
-    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-        EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+    public static final EnumSet<EdgeFlag> PEDESTRIAN = EnumSet.of(EdgeFlag.ALLOWS_PEDESTRIAN,
+        EdgeFlag.ALLOWS_WHEELCHAIR);
 
-    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_ONLY = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+    public static final EnumSet<EdgeFlag> PEDESTRIAN_ONLY = EnumSet.of(EdgeFlag.ALLOWS_PEDESTRIAN);
 
-    public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+    public static final EnumSet<EdgeFlag> BICYCLE = EnumSet.of(EdgeFlag.ALLOWS_BIKE);
 
-    public static final EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_CAR);
+    public static final EnumSet<EdgeFlag> CAR = EnumSet.of(EdgeFlag.ALLOWS_CAR);
 
     @BeforeAll
     public static void setUpClass() {
@@ -60,10 +60,10 @@ public class TraversalPermissionLabelerTest {
         Way osmWay = makeOSMWayFromTags("highway=cycleway");
         roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
         roadFlagComparision(osmWay, "access", "destination",
-            EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR),
-            EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR));
+            EnumSet.of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE,
+                EdgeFlag.ALLOWS_WHEELCHAIR, EdgeFlag.NO_THRU_TRAFFIC_CAR),
+            EnumSet.of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE,
+                EdgeFlag.ALLOWS_WHEELCHAIR, EdgeFlag.NO_THRU_TRAFFIC_CAR));
 
     }
 
@@ -79,9 +79,9 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testPath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=path;access=private");
-        EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+        EnumSet<EdgeFlag> expectedPermissions = EnumSet.of(EdgeFlag.ALLOWS_BIKE,
+            EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_WHEELCHAIR,
+            EdgeFlag.NO_THRU_TRAFFIC_CAR);
         roadFlagComparision(osmWay, expectedPermissions, expectedPermissions);
     }
 
@@ -154,8 +154,8 @@ public class TraversalPermissionLabelerTest {
         //Private road which can be only used as destination for motor vehicles but can be used normally for pedestrian and bicycle traffic
         Way osmWay = makeOSMWayFromTags("access=private;bicycle=designated;foot=yes;highway=service;motor_vehicle=private");
 
-        EnumSet<EdgeStore.EdgeFlag> NO_THRU_CAR_PEDESTRIAN_BICYCLE = EnumSet.copyOf(PEDESTRIAN_AND_BICYCLE);
-        NO_THRU_CAR_PEDESTRIAN_BICYCLE.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+        EnumSet<EdgeFlag> NO_THRU_CAR_PEDESTRIAN_BICYCLE = EnumSet.copyOf(PEDESTRIAN_AND_BICYCLE);
+        NO_THRU_CAR_PEDESTRIAN_BICYCLE.add(EdgeFlag.NO_THRU_TRAFFIC_CAR);
 
 
         RoadPermission roadPermission = roadFlagComparision(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
@@ -231,8 +231,8 @@ public class TraversalPermissionLabelerTest {
 
     }
 
-    private RoadPermission roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
-        EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+    private RoadPermission roadFlagComparision(Way osmWay, EnumSet<EdgeFlag> forwardExpected,
+        EnumSet<EdgeFlag> backwardExpected) {
         return roadFlagComparision(osmWay, null, null, forwardExpected, backwardExpected);
     }
 
@@ -246,7 +246,7 @@ public class TraversalPermissionLabelerTest {
      * @param forwardExpected
      * @param backwardExpected
      */
-    private static RoadPermission roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+    private static RoadPermission roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeFlag> forwardExpected, EnumSet<EdgeFlag> backwardExpected) {
         Way osmWay = new Way();
 
         StringJoiner stringJoiner = new StringJoiner(";");
@@ -259,8 +259,8 @@ public class TraversalPermissionLabelerTest {
             osmWay.addTag(newTag, newValue);
             stringJoiner.add(newTag+"="+newValue);
         }
-        Set<EdgeStore.EdgeFlag> forwardFiltered;
-        Set<EdgeStore.EdgeFlag> backwardFiltered;
+        Set<EdgeFlag> forwardFiltered;
+        Set<EdgeFlag> backwardFiltered;
 
         RoadPermission roadPermission = traversalPermissionLabeler.getPermissions(osmWay);
 
@@ -306,7 +306,7 @@ public class TraversalPermissionLabelerTest {
      * @param permissions
      * @return
      */
-    private static Set<EdgeStore.EdgeFlag> filterFlags(EnumSet<EdgeStore.EdgeFlag> permissions) {
+    private static Set<EdgeFlag> filterFlags(EnumSet<EdgeFlag> permissions) {
         return permissions.stream()
             .filter(ALLPERMISSIONS::contains)
             .collect(Collectors.toSet());

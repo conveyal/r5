@@ -2,8 +2,8 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.file.FileStorage;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.r5.analyst.RegionalWorkResult;
 
 /**
  * Adapts our collection of grid writers (one for each destination pointset and percentile) to give them the

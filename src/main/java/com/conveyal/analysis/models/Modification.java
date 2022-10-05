@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.Sets;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -88,5 +85,5 @@ public abstract class Modification extends Model implements Cloneable {
         return String.format("%s:%s", feed, id);
     }
 
-    public abstract com.conveyal.r5.analyst.scenario.Modification toR5 ();
+    public abstract com.conveyal.r5.scenario.Modification toR5 ();
 }

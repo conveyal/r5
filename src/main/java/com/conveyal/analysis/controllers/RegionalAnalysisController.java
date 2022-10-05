@@ -1,16 +1,14 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.components.broker.JobStatus;
+import com.conveyal.analysis.broker.Broker;
+import com.conveyal.analysis.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.components.HttpController;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -19,7 +17,11 @@ import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.UserPermissions;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -41,10 +43,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
-import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
+import static com.conveyal.util.HttpUtils.toJson;
+import static com.conveyal.worker.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -86,12 +88,12 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(Request req, Response res) {
-        return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
+        return getRegionalAnalysesForRegion(req.params("regionId"), HttpUtils.userFromRequest(req));
     }
 
     // Note: this includes the modifications object which can be very large
     private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
+        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), HttpUtils.userFromRequest(req));
     }
 
     /**
@@ -100,7 +102,7 @@ public class RegionalAnalysisController implements HttpController {
      * @return JobStatues with associated regional analysis embedded
      */
     private Collection<JobStatus> getRunningAnalyses(Request req, Response res) {
-        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
+        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), HttpUtils.userFromRequest(req));
         List<JobStatus> runningStatusesForRegion = new ArrayList<>();
         Collection<JobStatus> allJobStatuses = broker.getAllJobStatuses();
         for (RegionalAnalysis ra : allAnalysesInRegion) {
@@ -115,7 +117,7 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private RegionalAnalysis deleteRegionalAnalysis (Request req, Response res) {
-        UserPermissions userPermissions = UserPermissions.from(req);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start().and(
                         QueryBuilder.start("_id").is(req.params("_id")).get(),
@@ -172,11 +174,11 @@ public class RegionalAnalysisController implements HttpController {
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(req.params("_id")).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
+                HttpUtils.userFromRequest(req)
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+            throw HttpServerRuntimeException.notFound("The specified regional analysis is unknown or has been deleted.");
         }
 
         // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
@@ -233,7 +235,7 @@ public class RegionalAnalysisController implements HttpController {
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
 
         if (broker.findJob(regionalAnalysisId) != null) {
-            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
+            throw HttpServerRuntimeException.notFound("Analysis is incomplete, no results file is available.");
         }
 
         // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
@@ -245,7 +247,7 @@ public class RegionalAnalysisController implements HttpController {
                 cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
         FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
         if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
+            throw HttpServerRuntimeException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
         }
 
         // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
@@ -279,7 +281,7 @@ public class RegionalAnalysisController implements HttpController {
                         checkArgument(analysis.travelTimePercentiles.length == 1);
                         checkArgument(analysis.destinationPointSetIds.length == 1);
                     } else {
-                        throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
+                        throw HttpServerRuntimeException.notFound("Cannot find original source regional analysis output.");
                     }
                 }
             }
@@ -305,8 +307,8 @@ public class RegionalAnalysisController implements HttpController {
 
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
         }
-        return JsonUtil.toJsonString(
-                JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
+        return JsonUtils.objectToJsonString(
+                JsonUtils.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
         );
     }
 
@@ -318,16 +320,16 @@ public class RegionalAnalysisController implements HttpController {
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(regionalAnalysisId).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
+                HttpUtils.userFromRequest(req)
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
+            throw HttpServerRuntimeException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
 
         String storageKey = analysis.resultStorage.get(resultType);
         if (storageKey == null) {
-            throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
+            throw HttpServerRuntimeException.notFound("This regional analysis does not contain CSV results of type " + resultType);
         }
 
         FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, storageKey);
@@ -342,9 +344,9 @@ public class RegionalAnalysisController implements HttpController {
      * in the body of the HTTP response.
      */
     private RegionalAnalysis createRegionalAnalysis (Request req, Response res) throws IOException {
-        final UserPermissions userPermissions = UserPermissions.from(req);
+        final UserPermissions userPermissions = HttpUtils.userFromRequest(req);
 
-        AnalysisRequest analysisRequest = JsonUtil.objectMapper.readValue(req.body(), AnalysisRequest.class);
+        AnalysisRequest analysisRequest = HttpUtils.objectFromRequestBody(req, AnalysisRequest.class);
 
         // If the UI has requested creation of a "static site", set all the necessary switches on the requests
         // that will go to the worker: break travel time down into waiting, riding, and walking, record paths to
@@ -517,9 +519,9 @@ public class RegionalAnalysisController implements HttpController {
         return regionalAnalysis;
     }
 
-    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
-        RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
+    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) {
+        RegionalAnalysis regionalAnalysis = HttpUtils.objectFromRequestBody(request, RegionalAnalysis.class);
+        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, HttpUtils.userFromRequest(request));
     }
 
     /**
@@ -528,7 +530,7 @@ public class RegionalAnalysisController implements HttpController {
      */
     private JsonNode getScenarioJsonUrl (Request request, Response response) {
         RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
-                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+                .findByIdIfPermitted(request.params("_id"), HttpUtils.userFromRequest(request));
         // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
         final String networkId = regionalAnalysis.bundleId;
         final String scenarioId = regionalAnalysis.request.scenarioId;
@@ -536,7 +538,7 @@ public class RegionalAnalysisController implements HttpController {
         checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
         String scenarioUrl = fileStorage.getURL(
                 new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
-        return JsonUtil.objectNode().put("url", scenarioUrl);
+        return JsonUtils.objectNode().put("url", scenarioUrl);
     }
 
     @Override

@@ -1,21 +1,23 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.components.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.datasource.DataSourcePreviewGenerator;
 import com.conveyal.analysis.datasource.DataSourceUploadAction;
-import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.GtfsDataSource;
 import com.conveyal.analysis.models.OsmDataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.util.HttpUtils;
+import com.conveyal.components.HttpController;
+import com.conveyal.components.TaskScheduler;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.r5.progress.WorkProductType;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.UserPermissions;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.geotools.data.geojson.GeoJSONWriter;
@@ -32,10 +34,10 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
-import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.util.HttpUtils.toJson;
 import static com.mongodb.client.model.Filters.eq;
 
 /**
@@ -75,7 +77,7 @@ public class DataSourceController implements HttpController {
     /** HTTP GET: Retrieve all DataSource records, filtered by the (required) regionId query parameter. */
     private List<DataSource> getAllDataSourcesForRegion (Request req, Response res) {
         return dataSourceCollection.findPermitted(
-                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
+                eq("regionId", req.queryParams("regionId")), HttpUtils.userFromRequest(req)
         );
     }
 
@@ -141,14 +143,14 @@ public class DataSourceController implements HttpController {
     private SpatialDataSource downloadLODES(Request req, Response res) {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
-        UserPermissions userPermissions = UserPermissions.from(req);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
         source.regionId = regionId;
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
                 .forUser(userPermissions)
                 .setHeavy(true)
-                .withWorkProduct(source)
+                .withWorkProduct(WorkProductType.DATA_SOURCE, source._id.toString(), regionId)
                 .withAction((progressListener) -> {
                     // TODO implement
                     throw new UnsupportedOperationException();
@@ -164,7 +166,7 @@ public class DataSourceController implements HttpController {
      * async background process, so we return the ID of the enqueued Task (rather than its work product, the DataSource).
      */
     private String handleUpload (Request req, Response res) {
-        final UserPermissions userPermissions = UserPermissions.from(req);
+        final UserPermissions userPermissions = HttpUtils.userFromRequest(req);
         final Map<String, List<FileItem>> formFields = HttpUtils.getRequestFiles(req.raw());
         DataSourceUploadAction uploadAction = DataSourceUploadAction.forFormFields(
                 fileStorage, dataSourceCollection, formFields, userPermissions

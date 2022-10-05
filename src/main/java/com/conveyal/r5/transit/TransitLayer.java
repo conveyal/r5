@@ -10,13 +10,15 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.modes.TransitModes;
+import com.conveyal.r5.streets.Edge;
+import com.conveyal.r5.streets.EdgeFlag;
+import com.conveyal.r5.streets.RoutingVariable;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
-import com.conveyal.r5.util.LambdaCounter;
-import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
+import com.conveyal.util.GeometryUtils;
+import com.conveyal.util.LambdaCounter;
+import com.conveyal.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -46,7 +48,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -588,7 +589,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
         // by a speed to get time when we use these tables.
-        router.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        router.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
         router.setOrigin(originVertex);
         router.route();
 
@@ -755,51 +756,21 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Finds all the transit stops in given envelope and returns it. Stops also have mode which is mode of route in
-     * first pattern that this stop is found in. Stop coordinates are jittered
-     * {@link com.conveyal.r5.point_to_point.PointToPointRouterServer#jitter(VertexStore.Vertex)}. Meaning they are
-     * moved a little from their actual coordinate so that multiple stops at same coordinate can be seen.
-     *
-     * This will overselect from the spatial index but this is only used for visualizations.
-     *
-     * @param env Envelope in float degrees
-     */
-    public Collection<com.conveyal.r5.api.util.Stop> findApiStopsInEnvelope (Envelope env) {
-        List<com.conveyal.r5.api.util.Stop> stops = new ArrayList<>();
-        EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
-        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(VertexStore.envelopeToFixed(env));
-
-        nearbyEdges.forEach(eidx -> {
-            e.seek(eidx);
-            if (e.getFlag(EdgeStore.EdgeFlag.LINK) && stopForStreetVertex.containsKey(e.getFromVertex())) {
-                int stopIdx = stopForStreetVertex.get(e.getFromVertex());
-
-                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true,
-                    true);
-                stops.add(stop);
-            }
-            return true;
-        });
-
-        return stops;
-    }
-
-    /**
      * Find all the transit stops inside the given Geometry. Filtering is performed - this should not overselect.
      * This should include stops added by the scenario, minus those removed by the scenario.
      * @param geometry a JTS geometry in floating point WGS84 degrees
      */
     public TIntSet findStopsInGeometry (Geometry geometry) {
         Envelope envelopeFloating = geometry.getEnvelopeInternal();
-        Envelope envelopeFixed = VertexStore.envelopeToFixed(envelopeFloating);
+        Envelope envelopeFixed = GeometryUtils.envelopeToFixed(envelopeFloating);
         // This should get all the edges including ones added by a scenario, minus those removed by a scenario.
         TIntSet nearbyEdges = this.parentNetwork.streetLayer.findEdgesInEnvelope(envelopeFixed);
-        EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
+        Edge e = this.parentNetwork.streetLayer.getEdgeCursor();
         VertexStore.Vertex v = this.parentNetwork.streetLayer.vertexStore.getCursor();
         final TIntSet stops = new TIntHashSet();
         nearbyEdges.forEach(eidx -> {
             e.seek(eidx);
-            if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+            if (e.getFlag(EdgeFlag.LINK)) {
                 int fromStreetVertex = e.getFromVertex();
                 if (stopForStreetVertex.containsKey(fromStreetVertex)) {
                     v.seek(fromStreetVertex);

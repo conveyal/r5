@@ -1,14 +1,8 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.analyst.FreeFormPointSet;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.util.ShapefileReader;
-import org.locationtech.jts.geom.Envelope;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.TransformException;
+import com.conveyal.r5.progress.ProgressListener;
 
 import java.io.File;
 

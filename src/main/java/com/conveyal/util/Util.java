@@ -1,0 +1,75 @@
+package com.conveyal.util;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Map;
+
+public abstract class Util {
+
+    public static String human (double n, String units) {
+        String prefix = "";
+        if (n > 1024) {
+            n /= 1024;
+            prefix = "ki";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            prefix = "Mi";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            prefix = "Gi";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            prefix = "Ti";
+        }
+        return String.format("%1.1f %s%s", n, prefix, units);
+    }
+
+    public static boolean isNullOrEmpty (Collection collection) {
+        return collection == null || collection.isEmpty();
+    }
+
+    public static boolean notNullOrEmpty (Collection collection) {
+        return !isNullOrEmpty(collection);
+    }
+
+    public static boolean isNullOrEmpty (Map map) {
+        return map == null || map.isEmpty();
+    }
+
+    public static boolean notNullOrEmpty (Map map) {
+        return !isNullOrEmpty(map);
+    }
+
+    public static <T> boolean isNullOrEmpty (T[] array) {
+        return array == null || array.length == 0;
+    }
+
+    public static <T> boolean notNullOrEmpty (T[] array) {
+        return !isNullOrEmpty(array);
+    }
+
+    public static boolean isNullOrEmpty (int[] array) {
+        return array == null || array.length == 0;
+    }
+
+    public static <T> boolean notNullOrEmpty (int[] array) {
+        return !isNullOrEmpty(array);
+    }
+
+    /** Convenience method to create an array and fill it immediately with a single value. */
+    public static int[] newIntArray (int length, int defaultValue) {
+        int[] array = new int[length];
+        Arrays.fill(array, defaultValue);
+        return array;
+    }
+
+    public static String human (int n) {
+        if (n >= 1000000000) return String.format("%.1fG", n/1000000000.0);
+        if (n >= 1000000) return String.format("%.1fM", n/1000000.0);
+        if (n >= 1000) return String.format("%dk", n/1000);
+        else return String.format("%d", n);
+    }
+}

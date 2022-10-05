@@ -1,15 +1,15 @@
 package com.conveyal.analysis.components;
 
-import com.conveyal.analysis.LocalWorkerConfig;
-import com.conveyal.analysis.WorkerConfig;
-import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
-import com.conveyal.r5.analyst.cluster.Worker;
-import com.conveyal.r5.streets.OSMCache;
-import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.osmlib.OSMCache;
+import com.conveyal.worker.LocalWorkerConfig;
+import com.conveyal.worker.TransportNetworkCache;
+import com.conveyal.worker.WorkerCategory;
+import com.conveyal.worker.WorkerComponents;
+import com.conveyal.worker.WorkerConfig;
+import com.conveyal.worker.WorkerMain;
+import com.conveyal.worker.WorkerTags;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +38,6 @@ public class LocalWorkerLauncher implements WorkerLauncher {
 
     public LocalWorkerLauncher (Config config, FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         LOG.debug("Running in OFFLINE mode, a maximum of {} worker threads will be started locally.", N_WORKERS_LOCAL);
-        WorkerComponents.fileStorage = fileStorage; // Note this is a static field for now, should eventually be changed.
         transportNetworkCache = new TransportNetworkCache(fileStorage, gtfsCache, osmCache);
         // Create configuration for the locally running worker
         workerConfig.setProperty("work-offline", "true");
@@ -75,7 +74,7 @@ public class LocalWorkerLauncher implements WorkerLauncher {
             singleWorkerConfig.setProperty("listen-for-single-point", Boolean.toString(i == 0).toLowerCase());
             WorkerConfig config = LocalWorkerConfig.fromProperties(singleWorkerConfig);
             WorkerComponents components = new LocalWorkerComponents(transportNetworkCache, config);
-            Thread workerThread = new Thread(new Worker(components), "WORKER " + i);
+            Thread workerThread = new Thread(new WorkerMain(components), "WORKER " + i);
             workerThreads.add(workerThread);
             workerThread.start();
             // Note that machineId is static, so all workers have the same machine ID for now. This should be fixed somehow.

@@ -1,7 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.UserPermissions;
-import org.bson.types.ObjectId;
+import com.conveyal.util.UserPermissions;
 
 /**
  * When deriving data (layers, networks, etc.) from a DataSource, we sometimes produce many outputs at once from

@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import org.apache.commons.math3.util.FastMath;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Coordinate;
@@ -9,12 +9,15 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.util.Arrays;
 
-import static com.conveyal.r5.analyst.Grid.latToPixel;
-import static com.conveyal.r5.analyst.Grid.lonToPixel;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static org.apache.commons.math3.util.FastMath.atan;
+import static org.apache.commons.math3.util.FastMath.cos;
+import static org.apache.commons.math3.util.FastMath.log;
+import static org.apache.commons.math3.util.FastMath.sinh;
+import static org.apache.commons.math3.util.FastMath.tan;
 
 /**
  * Really we should be embedding one of these in the tasks, grids, etc. to factor out all the common fields.
@@ -53,15 +56,6 @@ public class WebMercatorExtents {
     }
 
     /**
-     * Return the analysis extents embedded in the task object itself.
-     * Sometimes these imply gridded origin points (non-Taui regional tasks without freeform origins specified) and
-     * sometimes these imply gridded destination points (single point tasks and Taui regional tasks).
-     */
-    public static WebMercatorExtents forTask (AnalysisWorkerTask task) {
-        return new WebMercatorExtents(task.west, task.north, task.width, task.height, task.zoom);
-    }
-
-    /**
      * If pointSets are all gridded, return the minimum bounding WebMercatorExtents containing them all.
      * Otherwise return null (this null is a hack explained below and should eventually be made more consistent).
      */
@@ -82,6 +76,55 @@ public class WebMercatorExtents {
             checkArgument(pointSets.length == 1, "You may only specify one non-gridded PointSet.");
             return null;
         }
+    }
+
+    /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
+
+    /**
+     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
+     * zoom level.
+     */
+    public static int lonToPixel (double lon, int zoom) {
+        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+    }
+
+    /**
+     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
+     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     */
+    public static double pixelToLon (double xPixel, int zoom) {
+        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+    }
+
+    /**
+     * Return the longitude of the center of all pixels at the given zoom and x pixel number, measured from the west
+     * edge of the world.
+     */
+    public static double pixelToCenterLon (int xPixel, int zoom) {
+        return pixelToLon(xPixel + 0.5, zoom);
+    }
+
+    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
+    public static int latToPixel (double lat, int zoom) {
+        double latRad = FastMath.toRadians(lat);
+        return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
+    }
+
+    /**
+     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
+     * measured southward from the north edge of the world.
+     */
+    public static double pixelToCenterLat (int yPixel, int zoom) {
+        return pixelToLat(yPixel + 0.5, zoom);
+    }
+
+    /**
+     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
+     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
+     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+     */
+    public static double pixelToLat (double yPixel, int zoom) {
+        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /** Create the minimum-size immutable WebMercatorExtents containing both this one and the other one. */
@@ -158,7 +201,7 @@ public class WebMercatorExtents {
     }
 
     /**
-     * This static utility method returns a Coordinate in units of meters (as defined in the CRS EPSG:3857) for the
+     * This utility method returns a Coordinate in units of meters (as defined in the CRS EPSG:3857) for the
      * given absolute (world) x and y pixel numbers at the given zoom level.
      *
      * Typically we express spherical mercator coordinates as pixels at some non-negative integer zoom level. At zoom
@@ -197,7 +240,7 @@ public class WebMercatorExtents {
      * @param yPixel absolute (world) y pixel number at the specified zoom level, increasing southward
      * @return a Coordinate in units of meters, as defined in the CRS EPSG:3857
      */
-    public static Coordinate mercatorPixelToMeters (double xPixel, double yPixel, int zoom) {
+    private Coordinate mercatorPixelToMeters (double xPixel, double yPixel, int zoom) {
         double worldWidthPixels = Math.pow(2, zoom) * 256D;
         // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
         // The 0.5 terms below shift the origin from the upper left of the world (pixels) to WGS84 (0,0) (for meters).

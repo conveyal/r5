@@ -1,16 +1,7 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.TraversalTimeCalculator;
-import com.conveyal.r5.streets.VertexStore;
-import gnu.trove.list.TFloatList;
-import gnu.trove.list.TShortList;
-
-import java.io.File;
-import java.util.List;
 
 /**
  * Subclasses or plugin functions will provide costs for hills, sun, noise, pollution etc.
@@ -30,7 +21,7 @@ public interface CostField {
      * TODO This and the base traversal time function could all return doubles, which are rounded only once after they
      *      have all been summed. This should reduce roundoff error.
      */
-    int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int baseTraversalTimeSeconds);
+    int additionalTraversalTimeSeconds (Edge currentEdge, int baseTraversalTimeSeconds);
 
     /**
      * A unique name to identify this cost field for display on a map. It should be usable as a JSON key, so it should

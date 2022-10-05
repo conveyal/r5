@@ -1,8 +1,8 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.util.GeometryUtils;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.algorithm.Angle;
 import org.locationtech.jts.geom.Coordinate;
@@ -33,7 +33,7 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
     }
 
     @Override
-    public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
+    public int traversalTimeSeconds (Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
         float speedMetersPerSecond = currentEdge.calculateSpeed(req, streetMode);
         double traversalTimeSeconds = currentEdge.getLengthM() / speedMetersPerSecond;
         return (int) FastMath.ceil(traversalTimeSeconds);
@@ -67,9 +67,9 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
      * @return angle in degrees from 0-360
      */
     private double calculateNewTurnAngle(int fromEdge, int toEdge) {
-        EdgeStore.Edge e = layer.edgeStore.getCursor(fromEdge);
+        Edge e = layer.getEdgeCursor(fromEdge);
         int outAngle = e.getOutAngle();
-        e = layer.edgeStore.getCursor(toEdge);
+        e = layer.getEdgeCursor(toEdge);
         int inAngle = e.getInAngle();
         return calculateTurnAngle(outAngle, inAngle);
     }
@@ -98,7 +98,7 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
     /** Compute the angle between two edges, positive, from 0 to 2 * Pi. The angle is _counterclockwise_ because that's how it's done in JTS. */
     public double computeAngle (int fromEdge, int toEdge) {
         // figure out turn angle
-        EdgeStore.Edge e = layer.edgeStore.getCursor(fromEdge);
+        Edge e = layer.getEdgeCursor(fromEdge);
         VertexStore.Vertex v = layer.vertexStore.getCursor(e.getToVertex());
 
         Coordinate p1 = pointOnLine(e.getGeometry(), true);

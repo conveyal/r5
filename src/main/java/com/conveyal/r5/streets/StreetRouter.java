@@ -1,22 +1,20 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
+import com.conveyal.modes.LegMode;
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.util.TIntObjectHashMultimap;
-import com.conveyal.r5.util.TIntObjectMultimap;
+import com.conveyal.util.GeometryUtils;
+import com.conveyal.util.SphericalDistanceLibrary;
+import com.conveyal.util.TIntObjectHashMultimap;
+import com.conveyal.util.TIntObjectMultimap;
+import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +25,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -35,9 +32,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import static com.conveyal.r5.common.Util.isNullOrEmpty;
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+import static com.conveyal.util.Util.notNullOrEmpty;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
 import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
 
@@ -73,9 +69,15 @@ public class StreetRouter {
     public VertexStore.VertexFlag flagSearch = null;
 
     /**
+     * The largest number of stops to consider boarding at.
+     * If there are 1000 stops within 2km, only consider boarding at the closest 200.
+     * It's not clear this has a major effect on speed, so we could consider removing it.
+     */
+    public static final int MAX_ACCESS_STOPS = 200;
+    /**
      * How many transit stops should we find
      */
-    public int transitStopSearchQuantity = PointToPointQuery.MAX_ACCESS_STOPS;
+    public int transitStopSearchQuantity = MAX_ACCESS_STOPS;
 
     /**
      * How many vertices with flags should we find
@@ -91,7 +93,7 @@ public class StreetRouter {
     // These are used for scaling coordinates in approximate distance calculations.
     // The lon value must be properly scaled to underestimate distances in the region where we're routing.
     private static final double MM_PER_UNIT_LAT_FIXED =
-            (SphericalDistanceLibrary.EARTH_CIRCUMFERENCE_METERS * 1000) / (360 * VertexStore.FIXED_FACTOR);
+            (SphericalDistanceLibrary.EARTH_CIRCUMFERENCE_METERS * 1000) / (360 * GeometryUtils.FIXED_DEGREES_FACTOR);
     private double millimetersPerUnitLonFixed;
     // Yes, that's indeed the speed unit "seconds per millimeter", to avoid computing 1/x repeatedly.
     private double maxSpeedSecondsPerMillimeter;
@@ -111,7 +113,7 @@ public class StreetRouter {
      * search-wide settings is fine). Pruning based on other path characteristics is referred to in the literature as a
      * "resource limiting" problem and requires computing pareto-optimal paths, which we don't do on the street network.
      */
-    public State.RoutingVariable quantityToMinimize = State.RoutingVariable.DURATION_SECONDS;
+    public RoutingVariable quantityToMinimize = RoutingVariable.DURATION_SECONDS;
 
     /**
      * Store the best state at the end of each edge. Although we think of states being located at vertices, from a
@@ -151,10 +153,10 @@ public class StreetRouter {
      * by taking advantage of the fact that we almost always have a single state per edge
      * (the only time we don't is when we're in the middle of a turn restriction).
      */
-    TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
+    TIntObjectMultimap<RoutingState> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
     // The queue is prioritized by the specified optimization objective variable.
-    PriorityQueue<State> queue = new PriorityQueue<>(
+    PriorityQueue<RoutingState> queue = new PriorityQueue<>(
             Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic)));
 
     /**
@@ -221,7 +223,7 @@ public class StreetRouter {
         TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
         transitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
             if (streetVertex == -1) return true;
-            State state = getStateAtVertex(streetVertex);
+            RoutingState state = getStateAtVertex(streetVertex);
             if (state != null) result.put(stop, state.getRoutingVariable(quantityToMinimize));
             return true; // continue iteration
         });
@@ -238,12 +240,12 @@ public class StreetRouter {
         // TODO use and return a more clearly defined type than this TIntIntMap, such as CostToVertexFunction (which has
         //  Javadoc stating that MAX_VALUE always means unreachable). See suggestion in R5 #647.
         TIntIntMap result = new TIntIntHashMap(DEFAULT_CAPACITY, DEFAULT_LOAD_FACTOR, -1, Integer.MAX_VALUE);
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
+        Edge e = streetLayer.getEdgeCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
             // Iterating over a little list and reducing the values with a stream might be slow.
             // TODO We should try replacing this with states.get(0) and see if it makes building distance tables faster.
-            State state = states.stream()
+            RoutingState state = states.stream()
                     .reduce((s0, s1) -> s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
@@ -266,17 +268,17 @@ public class StreetRouter {
      *
      * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
-    public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
+    public TIntObjectMap<RoutingState> getReachedVertices (VertexStore.VertexFlag flag) {
         if (flagSearch == flag && routingVisitor instanceof VertexFlagVisitor) {
             return ((VertexFlagVisitor) routingVisitor).getVertices();
         }
-        TIntObjectMap<State> result = new TIntObjectHashMap<>();
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
+        TIntObjectMap<RoutingState> result = new TIntObjectHashMap<>();
+        Edge e = streetLayer.getEdgeCursor();
         VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
 
-            State state = states.stream().reduce((s0, s1) ->
+            RoutingState state = states.stream().reduce((s0, s1) ->
                     s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
@@ -335,9 +337,9 @@ public class StreetRouter {
         queue.clear();
         // The states are located at the end of edges. Vertex0 is at the end of the reverse edge (split.edge + 1).
         // In these states we must specify which edge was traversed to reach them, so that turn costs work.
-        State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
-        State startState1 = new State(split.vertex1, split.edge, streetMode);
-        EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
+        RoutingState startState0 = new RoutingState(split.vertex0, split.edge + 1, streetMode);
+        RoutingState startState1 = new RoutingState(split.vertex1, split.edge, streetMode);
+        Edge edge = streetLayer.getEdgeCursor(split.edge);
         int offStreetTime = split.distanceToEdge_mm / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
 
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
@@ -382,7 +384,7 @@ public class StreetRouter {
         maxAbsOriginLat = vertex.getFixedLat();
 
         // NB backEdge of -1 is no problem as it is a special case that indicates that the origin was a vertex.
-        State startState = new State(fromVertex, -1, streetMode);
+        RoutingState startState = new RoutingState(fromVertex, -1, streetMode);
         queue.add(startState);
     }
 
@@ -397,7 +399,7 @@ public class StreetRouter {
      * @param switchCost This is added to the weight and is a cost of switching modes
      * @param legMode What origin search is this bike share or P+R
      */
-    public void setOrigin(TIntObjectMap<State> previousStates, int switchTime, int switchCost, LegMode legMode) {
+    public void setOrigin(TIntObjectMap<RoutingState> previousStates, int switchTime, int switchCost, LegMode legMode) {
         bestStatesAtEdge.clear();
         queue.clear();
         //Maximal origin latitude is used in goal direction heuristic.
@@ -406,7 +408,7 @@ public class StreetRouter {
         previousStates.forEachEntry((vertexIdx, previousState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
-            State state = new State(vertexIdx, previousState.backEdge, streetMode);
+            RoutingState state = new RoutingState(vertexIdx, previousState.backEdge, streetMode);
             state.durationSeconds = previousState.durationSeconds;
             state.incrementTimeInSeconds(switchTime);
             if (legMode == LegMode.BICYCLE_RENT) {
@@ -468,7 +470,7 @@ public class StreetRouter {
             // as required for the A* heuristic to be admissible.
             // TODO this should really use the max latitude of the whole street layer.
             int maxAbsLatFixed = Math.max(Math.abs(destinationSplit.fixedLat), Math.abs(maxAbsOriginLat));
-            double maxAbsLatRadians = Math.toRadians(VertexStore.fixedDegreesToFloating(maxAbsLatFixed));
+            double maxAbsLatRadians = Math.toRadians(GeometryUtils.fixedDegreesToFloating(maxAbsLatFixed));
             millimetersPerUnitLonFixed = MM_PER_UNIT_LAT_FIXED * Math.cos(maxAbsLatRadians);
             // FIXME account for speeds of individual street segments, not just speed in request
             double maxSpeedMetersPerSecond = profileRequest.getSpeedForMode(streetMode);
@@ -480,7 +482,7 @@ public class StreetRouter {
         if (distanceLimitMeters > 0) {
             // Distance in State is in millimeters. Distance limit is in meters, requiring a conversion.
             distanceLimitMm = distanceLimitMeters * 1000;
-            if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
+            if (quantityToMinimize != RoutingVariable.DISTANCE_MILLIMETERS) {
                 LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
             }
         } else {
@@ -490,7 +492,7 @@ public class StreetRouter {
 
         if (timeLimitSeconds > 0) {
             tmpTimeLimitSeconds = timeLimitSeconds;
-            if (quantityToMinimize != State.RoutingVariable.DURATION_SECONDS) {
+            if (quantityToMinimize != RoutingVariable.DURATION_SECONDS) {
                 LOG.warn("Setting a time limit when time is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
             }
         } else {
@@ -525,7 +527,7 @@ public class StreetRouter {
             debugPrintStream.println("lat,lon,weight");
         }
 
-        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        Edge edge = streetLayer.getEdgeCursor();
 
         if (transitStopSearch) {
             routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
@@ -533,7 +535,7 @@ public class StreetRouter {
             routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         }
         while (!queue.isEmpty()) {
-            State s0 = queue.poll();
+            RoutingState s0 = queue.poll();
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
@@ -542,7 +544,7 @@ public class StreetRouter {
                 double lon = v.getLon();
 
                 if (s0.backEdge != -1) {
-                    EdgeStore.Edge e = streetLayer.edgeStore.getCursor(s0.backEdge);
+                    Edge e = streetLayer.getEdgeCursor(s0.backEdge);
                     v.seek(e.getFromVertex());
                     lat = (lat + v.getLat()) / 2;
                     lon = (lon + v.getLon()) / 2;
@@ -580,7 +582,7 @@ public class StreetRouter {
             // By using getState(split) we include turn restrictions and turn costs.
             // We've already added this state to bestStates so getState will be correct.
             if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
-                State atDest = getState(destinationSplit);
+                RoutingState atDest = getState(destinationSplit);
                 // atDest could be null even though we've found a nearby vertex because of a turn restriction
                 if (atDest != null && bestValueAtDestination > atDest.getRoutingVariable(quantityToMinimize)) {
                     bestValueAtDestination = atDest.getRoutingVariable(quantityToMinimize);
@@ -596,7 +598,7 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
-                State s1 = edge.traverse(s0, streetMode, profileRequest, timeCalculator);
+                RoutingState s1 = traverseEdge(edge, s0);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -619,12 +621,12 @@ public class StreetRouter {
      * Given a new state, check whether it is dominated by any existing state that resulted from traversing the
      * same edge. Side effect: Boot out any existing states that are dominated by the new one.
      */
-    private boolean isDominated(State newState) {
+    private boolean isDominated(RoutingState newState) {
         // States in turn restrictions are incomparable (don't dominate and aren't dominated by other states)
         // If the new state is not in a turn restriction, check whether it dominates any existing states and remove them.
         // Multimap returns empty list for missing keys.
-        for (Iterator<State> it = bestStatesAtEdge.get(newState.backEdge).iterator(); it.hasNext(); ) {
-            State existingState = it.next();
+        for (Iterator<RoutingState> it = bestStatesAtEdge.get(newState.backEdge).iterator(); it.hasNext(); ) {
+            RoutingState existingState = it.next();
             if (dominates(existingState, newState)) {
                 // If any existing state dominates the new one, bail out early and declare the new state dominated.
                 // We want to check if the existing state dominates the new one before the other way around because
@@ -640,7 +642,7 @@ public class StreetRouter {
     /**
      * Provide an underestimate on the remaining distance/weight/time to the destination (the A* heuristic).
      */
-    private int calcHeuristic (State state) {
+    private int calcHeuristic (RoutingState state) {
         // If there's no destination, there's no goal direction. Zero is always a valid underestimate.
         if (destinationSplit == null) return 0;
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(state.vertex);
@@ -650,7 +652,7 @@ public class StreetRouter {
         double millimetersY = MM_PER_UNIT_LAT_FIXED * deltaLatFixed;
         double distanceMillimeters = FastMath.sqrt(millimetersX * millimetersX + millimetersY * millimetersY);
         double estimate = distanceMillimeters;
-        if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
+        if (quantityToMinimize != RoutingVariable.DISTANCE_MILLIMETERS) {
             // Calculate time in seconds to traverse this distance in a straight line.
             // Weight should always be greater than or equal to time in seconds.
             estimate *= maxSpeedSecondsPerMillimeter;
@@ -661,7 +663,7 @@ public class StreetRouter {
     /**
      * @return true if s1 is better *or equal* to s2, otherwise return false.
      */
-    private boolean dominates (State s1, State s2) {
+    private boolean dominates (RoutingState s1, RoutingState s2) {
         if (s1.turnRestrictions == null && s2.turnRestrictions == null) {
             // The simple case where neither state has turn restrictions.
             // Note this is <= rather than < because we want an existing state with the same weight to beat a new one.
@@ -693,8 +695,8 @@ public class StreetRouter {
      * Get a single best state at the end of an edge.
      * There can be more than one state at the end of an edge due to turn restrictions
      */
-    public State getStateAtEdge (int edgeIndex) {
-        Collection<State> states = bestStatesAtEdge.get(edgeIndex);
+    public RoutingState getStateAtEdge (int edgeIndex) {
+        Collection<RoutingState> states = bestStatesAtEdge.get(edgeIndex);
         if (states.isEmpty()) {
             return null; // Unreachable
         }
@@ -707,8 +709,8 @@ public class StreetRouter {
      * Get a single best state at a vertex. NB this should not be used for propagating to samples, as you need to apply
      * turn costs/restrictions during propagation.
      */
-    public State getStateAtVertex (int vertexIndex) {
-        State ret = null;
+    public RoutingState getStateAtVertex (int vertexIndex) {
+        RoutingState ret = null;
 
         TIntList edgeList;
         if (profileRequest.reverseSearch) {
@@ -720,7 +722,7 @@ public class StreetRouter {
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             int eidx = it.next();
 
-            State state = getStateAtEdge(eidx);
+            RoutingState state = getStateAtEdge(eidx);
 
             if (state == null) continue;
 
@@ -734,7 +736,7 @@ public class StreetRouter {
     }
 
     public int getTravelTimeToVertex (int vertexIndex) {
-        State state = getStateAtVertex(vertexIndex);
+        RoutingState state = getStateAtVertex(vertexIndex);
         return state != null ? state.durationSeconds : Integer.MAX_VALUE;
     }
 
@@ -747,11 +749,11 @@ public class StreetRouter {
      * logic in their eval method). The PointSet implementation only needs to produce times, not States. But ideally
      * some common logic can be factored out.
      */
-    public State getState (Split split) {
-        List<State> candidateStates = new ArrayList<>();
+    public RoutingState getState (Split split) {
+        List<RoutingState> candidateStates = new ArrayList<>();
 
         // Start on the forward edge of the pair that was split
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
+        Edge e = streetLayer.getEdgeCursor(split.edge);
 
         TIntList edgeList;
         if (profileRequest.reverseSearch) {
@@ -761,12 +763,12 @@ public class StreetRouter {
         }
         // TODO change iteration style to imperative
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
-            Collection<State> states = bestStatesAtEdge.get(it.next());
+            Collection<RoutingState> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
             // we don't need the turn restrictions any more because we're at the end of the search
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), profileRequest.reverseSearch))
+            states.stream().filter(s -> canTurnFromEdge(s, new RoutingState(-1, split.edge, s), profileRequest.reverseSearch))
                     .map(s -> {
-                        State ret = new State(-1, split.edge, s);
+                        RoutingState ret = new RoutingState(-1, split.edge, s);
                         ret.streetMode = s.streetMode;
 
                         // figure out the turn cost
@@ -792,12 +794,12 @@ public class StreetRouter {
         }
 
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
-            Collection<State> states = bestStatesAtEdge.get(it.next());
-            for (State state : states) {
-                if (!e.canTurnFrom(state, new State(-1, split.edge + 1, state), profileRequest.reverseSearch)) {
+            Collection<RoutingState> states = bestStatesAtEdge.get(it.next());
+            for (RoutingState state : states) {
+                if (!canTurnFromEdge(state, new RoutingState(-1, split.edge + 1, state), profileRequest.reverseSearch)) {
                     continue;
                 }
-                State ret = new State(-1, split.edge + 1, state);
+                RoutingState ret = new RoutingState(-1, split.edge + 1, state);
                 ret.streetMode = state.streetMode;
                 int turnCost = this.timeCalculator.turnTimeSeconds(state.backEdge, split.edge + 1, state.streetMode);
                 int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, state.streetMode));
@@ -830,7 +832,7 @@ public class StreetRouter {
      * If state to none of the vertices exists returns null
      * @return
      */
-    public State getState(double lat, double lon) {
+    public RoutingState getState(double lat, double lon) {
         Split split = streetLayer.findSplit(lat, lon, StreetLayer.LINK_RADIUS_METERS, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
@@ -839,357 +841,6 @@ public class StreetRouter {
         // FIXME this method being called is intended for destinations not origins!
         //  Fortunately this is only being called in PointToPointQuery which we are not using.
         return getState(split);
-    }
-
-    public static class State implements Cloneable,Serializable {
-        public int vertex;
-        public int backEdge;
-
-        //In simple search both those variables have same values
-        //But in complex search (P+R, Bike share) first variable have duration of all the legs
-        //and second, duration only in this leg
-        //this is used for limiting search time in VertexFlagVisitor
-        protected int durationSeconds;
-        protected int durationFromOriginSeconds;
-        //Distance in mm
-        public int distance;
-        public int idx;
-        public StreetMode streetMode;
-        public State backState; // previous state in the path chain
-        public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
-        public int heuristic = 0; // Lower bound on remaining weight to the destination.
-
-        /**
-         * All turn restrictions this state is currently passing through.
-         * The values are how many edges of a turn restriction have been traversed so far,
-         * keyed on the turn restriction index.
-         * If the value is 1 we have traversed only the from edge, etc.
-         */
-        public TIntIntMap turnRestrictions;
-
-        public State(int atVertex, int viaEdge, State backState) {
-            this.vertex = atVertex;
-            this.backEdge = viaEdge;
-            //Note here it can happen that back state has edge with negative index
-            //This means that this state was created from vertex and can be skipped in display
-            //but it is necessary in bike sharing and P+R to combine WALK and BIKE/CAR parts+
-            this.backState = backState;
-            this.distance = backState.distance;
-            this.durationSeconds = backState.durationSeconds;
-            this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
-            this.idx = backState.idx+1;
-        }
-
-        public State(int atVertex, int viaEdge, StreetMode streetMode) {
-            this.vertex = atVertex;
-            this.backEdge = viaEdge;
-            this.backState = null;
-            this.distance = 0;
-            this.streetMode = streetMode;
-            this.durationSeconds = 0;
-            this.durationFromOriginSeconds = 0;
-            this.idx = 0;
-        }
-
-        protected State clone() {
-            State ret;
-            try {
-                ret = (State) super.clone();
-            } catch (CloneNotSupportedException e) {
-                throw new IllegalStateException("This is not happening");
-            }
-            return ret;
-        }
-
-        /**
-         * Reverses order of states in arriveBy=true searches. Because start and target are reversed there
-         * @param transportNetwork this is used for getting from/to vertex in backEdge
-         * @return last edge in reversed order
-         */
-        public State reverse(TransportNetwork transportNetwork) {
-            State orig = this;
-            State ret = orig.reversedClone();
-            int edge = -1;
-            while (orig.backState != null) {
-                //LOG.info("START ORIG:{} RET:{}", orig, ret);
-                edge = orig.backEdge;
-                State child = ret.clone();
-                child.backState = ret;
-                child.backEdge = edge;
-                boolean traversingBackward = false;
-                EdgeStore.Edge origBackEdge = transportNetwork.streetLayer.edgeStore.getCursor(orig.backEdge);
-                if (origBackEdge.getFromVertex() == origBackEdge.getToVertex()
-                    && ret.vertex == origBackEdge.getFromVertex()) {
-                    traversingBackward = true;
-                    child.vertex = origBackEdge.getToVertex();
-                    //LOG.info("Case 1");
-                } else if (ret.vertex == origBackEdge.getFromVertex()) {
-                    child.vertex = origBackEdge.getToVertex();
-                    traversingBackward = false;
-                    //LOG.info("Case 2");
-                }else if (ret.vertex == origBackEdge.getToVertex()) {
-                    child.vertex = origBackEdge.getFromVertex();
-                    traversingBackward = true;
-                    //LOG.info("Case 3");
-                }
-                //LOG.info("State idx:{} tra:{}", orig.idx, traversingBackward);
-                /*
-                if (traversingBackward != ret.getOptions().arriveBy) {
-                    LOG.error("Actual traversal direction does not match traversal direction in TraverseOptions.");
-                    //defectiveTraversal = true;
-                }*/
-                child.durationSeconds += orig.durationSeconds - orig.backState.durationSeconds;
-                if (orig.backState != null) {
-                    child.distance += Math.abs(orig.distance-orig.backState.distance);
-                }
-                child.streetMode = orig.streetMode;
-                //LOG.info("CHILD:{}", child);
-                ret = child;
-                orig = orig.backState;
-            }
-            return ret;
-        }
-
-        public State reversedClone() {
-            State newState = new State(this.vertex, -1, this.streetMode);
-            newState.idx = idx;
-            return newState;
-        }
-
-        public void incrementTimeInSeconds(long seconds) {
-            if (seconds < 0) {
-                LOG.warn("A state's time is being incremented by a negative amount while traversing edge "
-                    );
-                //defectiveTraversal = true;
-                return;
-            }
-            //TODO: decrease time
-            if (false) {
-                durationSeconds-=seconds;
-                durationFromOriginSeconds -= seconds;
-            } else {
-                durationSeconds+=seconds;
-                durationFromOriginSeconds += seconds;
-            }
-
-        }
-
-        public int getDurationSeconds() {
-            return durationSeconds;
-        }
-
-        public String dump() {
-            State state = this;
-            StringBuilder out = new StringBuilder();
-            out.append("BEGIN PATH DUMP\n");
-            while (state != null) {
-                out.append(String.format("%s via %s\n", state.vertex, state.backEdge));
-                state = state.backState;
-            }
-            out.append("END PATH DUMP\n");
-
-            return out.toString();
-        }
-
-        public String compactDump(boolean reverse) {
-            State state = this;
-            StringBuilder out = new StringBuilder();
-            String middle;
-            if (reverse) {
-                middle = "->";
-            } else {
-                middle = "<-";
-            }
-            while (state != null) {
-                out.append(String.format("%s %d ",middle, state.backEdge));
-                state = state.backState;
-            }
-            return out.toString();
-        }
-
-
-        @Override
-        public String toString() {
-            final StringBuilder sb = new StringBuilder("State{");
-            sb.append("vertex=").append(vertex);
-            sb.append(", backEdge=").append(backEdge);
-            sb.append(", durationSeconds=").append(durationSeconds);
-            sb.append(", distance=").append(distance);
-            sb.append(", idx=").append(idx);
-            sb.append('}');
-            return sb.toString();
-        }
-
-        public int getRoutingVariable (RoutingVariable variable) {
-            if (variable == null) {
-                throw new NullPointerException("Routing variable is null.");
-            }
-            switch (variable) {
-                case DURATION_SECONDS:
-                    return this.durationSeconds;
-                case DISTANCE_MILLIMETERS:
-                    return this.distance;
-                default:
-                    throw new IllegalStateException("Unknown routing variable.");
-            }
-        }
-
-        public enum RoutingVariable {
-            /** Time, in seconds */
-            DURATION_SECONDS,
-            /** Distance, in millimeters */
-            DISTANCE_MILLIMETERS
-        }
-    }
-
-    /**
-     * Saves maxStops number of transitStops that are at least minTravelTimeSeconds from start of search
-     * If stop is found multiple times best states according to quantityToMinimize wins.
-     */
-    private static class StopVisitor implements RoutingVisitor {
-        private final int minTravelTimeSeconds;
-
-        private final StreetLayer streetLayer;
-
-        private final State.RoutingVariable dominanceVariable;
-
-        private final int maxStops;
-
-        private final int NO_STOP_FOUND;
-
-        TIntIntMap stops = new TIntIntHashMap();
-
-        /**
-         * @param streetLayer          needed because we need stopForStreetVertex
-         * @param dominanceVariable    according to which dominance variable should states be compared (same as in routing)
-         * @param maxStops             maximal number of stops that should be found
-         * @param minTravelTimeSeconds for stops that should be still added to list of stops
-         */
-        public StopVisitor(StreetLayer streetLayer, State.RoutingVariable dominanceVariable,
-            int maxStops, int minTravelTimeSeconds) {
-            this.minTravelTimeSeconds = minTravelTimeSeconds;
-            this.streetLayer = streetLayer;
-            this.dominanceVariable = dominanceVariable;
-            this.maxStops = maxStops;
-            this.NO_STOP_FOUND = streetLayer.parentNetwork.transitLayer.stopForStreetVertex
-                .getNoEntryKey();
-        }
-
-        /**
-         * If vertex at current state is transit stop. It adds it to best stops
-         * if it is more then minTravelTimeSeconds away and is better then existing path
-         * to the same stop according to dominance variable
-         */
-        @Override
-        public void visitVertex(State state) {
-            int stop = streetLayer.parentNetwork.transitLayer.stopForStreetVertex.get(state.vertex);
-            if (stop != NO_STOP_FOUND) {
-                if (state.durationSeconds < minTravelTimeSeconds) {
-                    return;
-                }
-                if (!stops.containsKey(stop) || stops.get(stop) > state
-                    .getRoutingVariable(dominanceVariable)) {
-                    stops.put(stop, state.getRoutingVariable(dominanceVariable));
-                }
-            }
-
-        }
-
-        /**
-         * @return true when maxStops transitStops are found
-         */
-        public boolean shouldBreakSearch() {
-            return stops.size() >= this.maxStops;
-        }
-
-        /**
-         * @return found stops. Same format of returned value as in
-         */
-        public TIntIntMap getStops() {
-            return stops;
-        }
-    }
-
-    /**
-     * Saves flagSearchQuantity number of vertices which have wantedFlag
-     * and are at least minTravelTimeSeconds away from the origin
-     * <p>
-     * If vertex is found multiple times vertex with lower quantityToMinimize is saved
-     */
-    private static class VertexFlagVisitor implements RoutingVisitor {
-        private final int minTravelTimeSeconds;
-
-        private final State.RoutingVariable dominanceVariable;
-
-        private final int maxVertices;
-
-        private final VertexStore.VertexFlag wantedFlag;
-
-        VertexStore.Vertex v;
-
-        TIntObjectMap<State> vertices = new TIntObjectHashMap<>();
-
-        //Save vertices which are too close so that if they appear again (with longer path to them)
-        // they are also skipped 
-        TIntSet skippedVertices = new TIntHashSet();
-
-        public VertexFlagVisitor(StreetLayer streetLayer, State.RoutingVariable dominanceVariable,
-            VertexStore.VertexFlag wantedFlag, int maxVertices, int minTravelTimeSeconds) {
-            this.minTravelTimeSeconds = minTravelTimeSeconds;
-            this.dominanceVariable = dominanceVariable;
-            this.wantedFlag = wantedFlag;
-            this.maxVertices = maxVertices;
-            v = streetLayer.vertexStore.getCursor();
-        }
-
-        /**
-         * If vertex at current state has wantedFlag it is added to vertices map
-         * if it is more then minTravelTimeSeconds away and has backState and non negative vertexIdx
-         * <p>
-         * If vertex is found multiple times vertex with lower quantityToMinimize is saved
-         *
-         * @param state
-         */
-        @Override
-        public void visitVertex(State state) {
-            if (state.vertex < 0 ||
-                //skips origin states for bikeShare (since in cycle search for bikeShare origin states
-                //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
-                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds ||
-                skippedVertices.contains(state.vertex)
-                ) {
-                // Make sure that vertex to which you can come sooner then minTravelTimeSeconds won't be used
-                // if a path which uses more then minTravelTimeSeconds is found
-                // since this means we need to walk/cycle/drive longer then required
-                if (state.vertex > 0 && state.durationFromOriginSeconds < minTravelTimeSeconds) {
-                    skippedVertices.add(state.vertex);
-                }
-                return;
-            }
-            v.seek(state.vertex);
-            if (v.getFlag(wantedFlag)) {
-                if (!vertices.containsKey(state.vertex)
-                    || vertices.get(state.vertex).getRoutingVariable(dominanceVariable) > state
-                    .getRoutingVariable(dominanceVariable)) {
-                    vertices.put(state.vertex, state);
-                }
-            }
-
-        }
-
-        /**
-         * @return true when flagSearchQuantity vertices are found
-         */
-        public boolean shouldBreakSearch() {
-            return vertices.size() >= this.maxVertices;
-        }
-
-        /**
-         * @return found vertices with wantedFlag. Same format of returned value as in {@link StreetRouter#getReachedVertices(VertexStore.VertexFlag)}
-         */
-        public TIntObjectMap<State> getVertices() {
-            return vertices;
-        }
     }
 
     /**
@@ -1207,4 +858,162 @@ public class StreetRouter {
         route();
     }
 
+    private RoutingState traverseEdge (Edge edge, RoutingState s0) {
+        // The vertex we'll be at after the traversal
+        // TODO check/assert that s0 is at the other vertex, at the other end of the edge.
+
+        if (streetLayer.edgeStore.temporarilyDeletedEdges != null && streetLayer.edgeStore.temporarilyDeletedEdges.contains(edge.edgeIndex)) {
+            return null;
+        }
+
+        int vertex;
+        if (profileRequest.reverseSearch) {
+            vertex = edge.getFromVertex();
+        } else {
+            vertex = edge.getToVertex();
+        }
+
+        // A new instance representing the state after traversing this edge. Fields will be filled in later.
+        RoutingState s1 = new RoutingState(vertex, edge.edgeIndex, s0);
+
+        if (!canTurnFromEdge(s0, s1, profileRequest.reverseSearch)) {
+            return null;
+        }
+
+        // Null out turn restrictions if they're empty
+        if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) {
+            s1.turnRestrictions = null;
+        }
+        streetLayer.edgeStore.startTurnRestriction(s0.streetMode, profileRequest.reverseSearch, s1);
+
+        //We allow two links in a row if this is a first state (negative back edge or no backState
+        //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
+        //Since backEdges are set from first part of multipart P+R search
+        if ((s0.backEdge >= 0) && (s0.backState != null) && edge.getFlag(EdgeFlag.LINK) && streetLayer.getEdgeCursor(s0.backEdge).getFlag(EdgeFlag.LINK)) {
+            // two link edges in a row, in other words a shortcut. Disallow this.
+            return null;
+        }
+
+        // Check whether this edge allows the selected mode, considering the request settings.
+        if (streetMode == StreetMode.WALK) {
+            if (!edge.getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                return null;
+            }
+            if (profileRequest.wheelchair && !edge.getFlag(EdgeFlag.ALLOWS_WHEELCHAIR)) {
+                return null;
+            }
+        } else if (streetMode == StreetMode.BICYCLE) {
+            // If biking is not allowed on this edge, or if the traffic stress is too high, walk the bike.
+            boolean tryWalking = !edge.getFlag(EdgeFlag.ALLOWS_BIKE);
+            if (profileRequest.bikeTrafficStress > 0 && profileRequest.bikeTrafficStress < 4) {
+                if (edge.getFlag(EdgeFlag.BIKE_LTS_4)) tryWalking = true;
+                if (profileRequest.bikeTrafficStress < 3 && edge.getFlag(EdgeFlag.BIKE_LTS_3)) tryWalking = true;
+                if (profileRequest.bikeTrafficStress < 2 && edge.getFlag(EdgeFlag.BIKE_LTS_2)) tryWalking = true;
+            }
+            if (tryWalking) {
+                if (!edge.getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                    return null;
+                }
+                streetMode = StreetMode.WALK;
+            }
+        } else if (streetMode == StreetMode.CAR) {
+            if (!edge.getFlag(EdgeFlag.ALLOWS_CAR)) {
+                return null;
+            }
+        }
+
+        s1.streetMode = streetMode;
+        int traverseTimeSeconds = timeCalculator.traversalTimeSeconds(edge, streetMode, profileRequest);
+
+        // This was rounding up, now truncating ... maybe change back for consistency?
+        // int roundedTime = (int) Math.ceil(time);
+
+        int turnTimeSeconds = 0;
+        // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
+        if (s0.backEdge >= 0) {
+            if (profileRequest.reverseSearch) {
+                turnTimeSeconds = timeCalculator.turnTimeSeconds(edge.getEdgeIndex(), s0.backEdge, streetMode);
+            } else {
+                turnTimeSeconds = timeCalculator.turnTimeSeconds(s0.backEdge, edge.getEdgeIndex(), streetMode);
+            }
+        }
+        // TODO add checks for negative increment values to these functions.
+        s1.incrementTimeInSeconds(traverseTimeSeconds + turnTimeSeconds);
+        s1.distance += edge.getLengthMm();
+
+        // Make sure we don't have states that don't increment weight/time, otherwise we could create loops.
+        // This should not happen since we always round upward (ceil function), perhaps replace with assertions.
+        if (s1.durationSeconds == s0.durationSeconds) {
+            s1.incrementTimeInSeconds(1);
+        }
+        if (s1.distance == s0.distance) {
+            s1.distance += 1;
+        }
+        return s1;
+    }
+
+    /**
+     * Can we turn onto this edge from this state? Also copies still-applicable restrictions forward.
+     */
+    private boolean canTurnFromEdge(RoutingState s0, RoutingState s1, boolean reverseSearch) {
+        // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
+        // if/when it gets changed.
+        if (s0.turnRestrictions != null && s0.streetMode == StreetMode.CAR) {
+            // clone turn restrictions
+            s1.turnRestrictions = new TIntIntHashMap(s0.turnRestrictions);
+
+            RESTRICTIONS:
+            for (TIntIntIterator it = s1.turnRestrictions.iterator(); it.hasNext(); ) {
+                it.advance();
+                int ridx = it.key();
+                TurnRestriction restriction = streetLayer.turnRestrictions.get(ridx);
+
+                // check via ways if applicable
+                // subtract 1 because the first (fromEdge) is not a via edge
+                int posInRestriction = it.value() - 1;
+                int toEdge = restriction.toEdge;
+                int[] viaEdges = restriction.viaEdges;
+
+                if (reverseSearch) {
+                    //In reverse search order of from/to and viaEdges is changed since we search from toEdge to fromEdge
+                    toEdge = restriction.fromEdge;
+                    if (viaEdges.length > 1) {
+                        TurnRestriction.reverse(viaEdges);
+                    }
+                }
+
+                if (posInRestriction < viaEdges.length) {
+                    if (s1.backEdge != restriction.viaEdges[posInRestriction]) {
+                        // we have exited the restriction
+                        if (restriction.only) return false;
+                        else {
+                            it.remove(); // no need to worry about this one anymore
+                            continue RESTRICTIONS;
+                        }
+                    } else {
+                        // increment position
+                        it.setValue(it.value() + 1);
+                    }
+                } else {
+                    if (toEdge != s1.backEdge) {
+                        // we have exited the restriction
+                        if (restriction.only)
+                            return false;
+                        else {
+                            it.remove();
+                            continue RESTRICTIONS;
+                        }
+                    } else {
+                        if (!restriction.only)
+                            return false;
+                        else {
+                            it.remove(); // done with this restriction
+                            continue RESTRICTIONS;
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
 }

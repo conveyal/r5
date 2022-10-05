@@ -1,7 +1,5 @@
 package com.conveyal.r5.rastercost;
 
-import gnu.trove.list.array.TIntArrayList;
-
 import java.util.BitSet;
 
 /**

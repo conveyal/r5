@@ -1,8 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,12 +52,12 @@ public class ReverseRoutingTest {
         //Bidirectional edges
         AB = streetLayer.edgeStore.addStreetPair(A, B, 10000, -1).getEdgeIndex(); //0,1
         ED = streetLayer.edgeStore.addStreetPair(E, D, 13000, -1).getEdgeIndex(); //2,3
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
+        Edge e = streetLayer.getEdgeCursor(0);
 
         do {
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            e.setFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
+            e.setFlag(EdgeFlag.ALLOWS_BIKE);
+            e.setFlag(EdgeFlag.ALLOWS_CAR);
         } while (e.advance());
 
         //Single directional edges
@@ -68,13 +67,13 @@ public class ReverseRoutingTest {
         DC2 = streetLayer.edgeStore.addStreetPair(D, C2, 12000, -1).getEdgeIndex();//8,9
         C2B = streetLayer.edgeStore.addStreetPair(C2, B, 11000, -1).getEdgeIndex();//10,11
 
-        e = streetLayer.edgeStore.getCursor(BC1);
+        e = streetLayer.getEdgeCursor(BC1);
         do {
             if (e.isForward()){
-                e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-                e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+                e.setFlag(EdgeFlag.ALLOWS_BIKE);
+                e.setFlag(EdgeFlag.ALLOWS_CAR);
             }
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            e.setFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
 
         } while (e.advance());
 
@@ -88,7 +87,7 @@ public class ReverseRoutingTest {
     @Test
     public void testReverseRouting() throws Exception {
         LOG.info("Edges:");
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
+        Edge e = streetLayer.getEdgeCursor(0);
         do {
             VertexStore.Vertex fromVertex = streetLayer.vertexStore.getCursor(e.getFromVertex());
             VertexStore.Vertex toVertex = streetLayer.vertexStore.getCursor(e.getToVertex());
@@ -109,9 +108,9 @@ public class ReverseRoutingTest {
         streetRouter.setOrigin(E); // EVertex.getLat(), EVertex.getLon());
         streetRouter.route();
 
-        StreetRouter.State lastState = streetRouter.getStateAtVertex(A); //streetRouter.getDestinationSplit());
+        RoutingState lastState = streetRouter.getStateAtVertex(A); //streetRouter.getDestinationSplit());
         assertNotNull(lastState);
-        StreetPath streetPath = new StreetPath(lastState, transportNetwork, profileRequest.reverseSearch);
+        StreetPath streetPath = new StreetPath(lastState, streetLayer, profileRequest.reverseSearch);
 
         List<Integer> correctEdgeIdx = Arrays.asList( 0, 4, 6, 3 );
         List<Integer> correctDuration = Arrays.asList(3,6,9,13);
@@ -122,10 +121,10 @@ public class ReverseRoutingTest {
         List<Integer> currentEdgeIdx = new ArrayList<>(correctEdgeIdx.size());
         List<Integer> currentDuration = new ArrayList<>(correctDuration.size());
         List<Integer> currentDistance = new ArrayList<>(correctDistance.size());
-        for (StreetRouter.State state : streetPath.getStates()) {
+        for (RoutingState state : streetPath.getStates()) {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
-                EdgeStore.Edge edge = streetLayer.edgeStore.getCursor(edgeIdx);
+                Edge edge = streetLayer.getEdgeCursor(edgeIdx);
                 LOG.info("Edge IDX:{} {} -> {} {}m IDX:{} {}mm {}sec", edgeIdx, vertexNames.get(edge.getFromVertex()),
                     vertexNames.get(edge.getToVertex()), edge.getLengthM(), state.idx, state.distance, state.durationSeconds);
                 currentEdgeIdx.add(edgeIdx);

@@ -45,12 +45,12 @@ public abstract class TurnTest {
         enw = streetLayer.edgeStore.addStreetPair(vw, vnw, 15000, 6).getEdgeIndex();
         esw = streetLayer.edgeStore.addStreetPair(vw, vsw, 15000, 7).getEdgeIndex();
 
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
+        Edge e = streetLayer.getEdgeCursor(0);
 
         do {
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            e.setFlag(EdgeStore.EdgeFlag.LINKABLE);
+            e.setFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
+            e.setFlag(EdgeFlag.ALLOWS_CAR);
+            e.setFlag(EdgeFlag.LINKABLE);
         } while (e.advance());
 
         streetLayer.indexStreets();

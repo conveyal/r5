@@ -1,6 +1,11 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.model.Service;
+import com.conveyal.r5.scenario.AddTrips;
+import com.conveyal.r5.scenario.AdjustFrequency;
+import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -25,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AdjustFrequencyTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -63,7 +69,7 @@ public class AdjustFrequencyTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(af);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // Trip patterns not referred to by entries should be wiped
         assertEquals(1, mod.transitLayer.tripPatterns.size());
@@ -152,7 +158,7 @@ public class AdjustFrequencyTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(af);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // both trip patterns should be still present
         assertEquals(2, mod.transitLayer.tripPatterns.size());
@@ -245,7 +251,7 @@ public class AdjustFrequencyTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(af);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // there should be frequencies and schedules
         assertTrue(mod.transitLayer.hasFrequencies);
@@ -365,7 +371,7 @@ public class AdjustFrequencyTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Collections.singletonList(af);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         TripPattern originalTwoStopPattern = network.transitLayer.tripPatterns.stream()
                 .filter(p -> p.stops.length == 2)
@@ -461,7 +467,7 @@ public class AdjustFrequencyTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(af);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         TripSchedule ts1 = mod.transitLayer.tripPatterns.stream()
                 .flatMap(tp -> tp.tripSchedules.stream())

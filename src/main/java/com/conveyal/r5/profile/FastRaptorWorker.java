@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.AnalysisWorkerTask;
 import com.conveyal.r5.transit.FilteredPattern;
 import com.conveyal.r5.transit.FilteredPatterns;
 import com.conveyal.r5.transit.PickDropType;
@@ -158,6 +158,12 @@ public class FastRaptorWorker {
         // Hidden feature: activate half-headway boarding times by specifying zero Monte Carlo draws.
         // The UI requires one or more draws, so this can only be activated by editing request JSON directly.
         boardingMode = (request.monteCarloDraws == 0) ? HALF_HEADWAY : MONTE_CARLO;
+
+        if (request.includePathResults || request.makeTauiSite) {
+            // By default, this is false and intermediate results (e.g. paths) are discarded.
+            // TODO do we really need to save all states just to get the travel time breakdown?
+            retainPaths = true;
+        }
     }
 
     /**

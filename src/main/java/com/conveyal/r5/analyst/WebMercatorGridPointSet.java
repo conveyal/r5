@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
@@ -10,8 +9,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.util.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.util.GeometryUtils.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -64,14 +63,6 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         this.width = width;
         this.height = height;
         this.basePointSet = basePointSet;
-    }
-
-    /**
-     * Constructs a grid point set that covers the entire extent of the supplied transport network's street network.
-     * This usually serves as the base supergrid pointset for other smaller grids in the same region.
-     */
-    public WebMercatorGridPointSet (TransportNetwork transportNetwork) {
-        this(transportNetwork.streetLayer.envelope);
     }
 
     /**

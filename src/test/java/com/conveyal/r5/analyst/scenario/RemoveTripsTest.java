@@ -1,5 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.scenario.RemoveTrips;
+import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class RemoveTripsTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -45,7 +50,7 @@ public class RemoveTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rt);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // there should still be trips on the retained route, but none on the removed route
         assertEquals(0, mod.transitLayer.tripPatterns.stream()
@@ -92,7 +97,7 @@ public class RemoveTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rt);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(78, mod.transitLayer.tripPatterns.stream()
                 .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))

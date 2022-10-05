@@ -1,16 +1,17 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.datasource.derivation.AggregationAreaDerivation;
 import com.conveyal.analysis.datasource.derivation.DataDerivation;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.components.HttpController;
+import com.conveyal.components.TaskScheduler;
 import com.conveyal.file.FileStorage;
-import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -23,8 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.conveyal.util.HttpUtils.toJson;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -69,7 +69,7 @@ public class AggregationAreaController implements HttpController {
         // The constructor will extract query parameters and range check them (not ideal separation, but it works).
         DataDerivation derivation = AggregationAreaDerivation.fromRequest(req, fileStorage, analysisDb);
         Task backgroundTask = Task.create("Aggregation area creation: " + derivation.dataSource().name)
-                .forUser(UserPermissions.from(req))
+                .forUser(HttpUtils.userFromRequest(req))
                 .setHeavy(true)
                 .withAction(derivation);
 
@@ -94,14 +94,14 @@ public class AggregationAreaController implements HttpController {
         if (filters.isEmpty()) {
             throw new IllegalArgumentException("You must supply either a regionId or a dataGroupId or both.");
         }
-        return aggregationAreaCollection.findPermitted(and(filters), UserPermissions.from(req));
+        return aggregationAreaCollection.findPermitted(and(filters), HttpUtils.userFromRequest(req));
     }
 
     /** Returns a JSON-wrapped URL for the mask grid of the aggregation area whose id matches the path parameter. */
     private ObjectNode getAggregationAreaGridUrl (Request req, Response res) {
         AggregationArea aggregationArea = aggregationAreaCollection.findPermittedByRequestParamId(req);
         String url = fileStorage.getURL(aggregationArea.getStorageKey());
-        return JsonUtil.objectNode().put("url", url);
+        return JsonUtils.objectNode().put("url", url);
     }
 
     @Override

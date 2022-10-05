@@ -18,8 +18,8 @@ public class RemoveStops extends Modification {
 
     public int secondsSavedAtEachStop = 0;
 
-    public com.conveyal.r5.analyst.scenario.RemoveStops toR5 () {
-        com.conveyal.r5.analyst.scenario.RemoveStops rs = new com.conveyal.r5.analyst.scenario.RemoveStops();
+    public com.conveyal.r5.scenario.RemoveStops toR5 () {
+        com.conveyal.r5.scenario.RemoveStops rs = new com.conveyal.r5.scenario.RemoveStops();
         rs.comment = name;
         rs.stops = feedScopedIdSet(feed, stops);
 

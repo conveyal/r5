@@ -1,12 +1,10 @@
 package com.conveyal.analysis.models;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.conveyal.util.JsonUtils;
 import org.bson.types.ObjectId;
 
 import javax.persistence.Id;
 import java.util.Date;
-
-import static com.conveyal.analysis.util.JsonUtil.objectMapper;
 
 /**
  * Shared superclass for data model classes that are serialized to communicate between the UI and the backend,
@@ -43,8 +41,8 @@ public abstract class Model implements Cloneable {
     @Override
     public String toString () {
         try {
-            return objectMapper.writeValueAsString(this);
-        } catch (JsonProcessingException e) {
+            return JsonUtils.objectToJsonString(this);
+        } catch (RuntimeException e) {
             e.printStackTrace();
             return super.toString();
         }

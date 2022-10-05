@@ -1,14 +1,14 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
-import com.conveyal.r5.util.ExceptionUtils;
+import com.conveyal.r5.analyst.RegionalWorkResult;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.worker.Job;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.conveyal.util.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -99,7 +99,7 @@ public class MultiOriginAssembler {
                     if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
                         destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
                     ) {
-                        throw new AnalysisServerException(String.format(
+                        throw new HttpServerRuntimeException(String.format(
                             "Freeform requests limited to %d destinations and %d origin-destination pairs.",
                             MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
                         ));

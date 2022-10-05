@@ -1,5 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.scenario.AdjustDwellTime;
+import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AdjustDwellTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -46,7 +51,7 @@ public class AdjustDwellTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // should not have modified original network
         assertTrue(network.transitLayer.tripPatterns.stream()
@@ -97,7 +102,7 @@ public class AdjustDwellTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // should not have modified original network
         assertTrue(network.transitLayer.tripPatterns.stream()
@@ -157,7 +162,7 @@ public class AdjustDwellTest {
 
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // should not have modified original network
         assertTrue(network.transitLayer.tripPatterns.stream()

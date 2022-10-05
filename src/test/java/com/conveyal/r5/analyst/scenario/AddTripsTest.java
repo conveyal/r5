@@ -1,7 +1,13 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
+import com.conveyal.r5.scenario.AddTrips;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.r5.scenario.StopSpec;
+import com.conveyal.r5.streets.RoutingVariable;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -32,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AddTripsTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -67,7 +74,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
@@ -144,7 +151,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(3, mod.transitLayer.tripPatterns.size());
 
@@ -266,7 +273,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 
@@ -296,7 +303,7 @@ public class AddTripsTest {
         r.setOrigin(createdVertex);
         r.distanceLimitMeters = 500;
         // avoid a lot of spewing warnings about resource limiting
-        r.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        r.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
         r.route();
 
         assertTrue(r.getReachedVertices().size() > 5);
@@ -385,7 +392,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Collections.singletonList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         // original pattern plus added pattern
         assertEquals(2, mod.transitLayer.tripPatterns.size());
@@ -498,7 +505,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at, at2);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(3, mod.transitLayer.tripPatterns.size());
 
@@ -558,7 +565,7 @@ public class AddTripsTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(2, mod.transitLayer.tripPatterns.size());
 

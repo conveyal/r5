@@ -1,5 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.FileStorage;
+import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.scenario.AdjustSpeed;
+import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class AdjustSpeedTest {
     public TransportNetwork network;
     public long checksum;
+    public FileStorage fileStorage = new LocalFileStorage();
 
     @BeforeEach
     public void setUp () {
@@ -44,7 +49,7 @@ public class AdjustSpeedTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -80,7 +85,7 @@ public class AdjustSpeedTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -129,7 +134,7 @@ public class AdjustSpeedTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
@@ -175,7 +180,7 @@ public class AdjustSpeedTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, fileStorage);
 
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 

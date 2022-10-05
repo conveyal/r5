@@ -139,8 +139,7 @@ public class SingleModeTraversalTimes implements Serializable {
             return 0;
         }
         // This seems inefficient, we could fetch the angles without cursors (e.g. edgeStore.angleBetweenEdges()).
-        EdgeStore.Edge e = edgeStore.getCursor();
-        e.seek(toEdge);
+        Edge e = new Edge(edgeStore, toEdge);
         int inAngle = e.getInAngle();
         e.seek(fromEdge);
         int outAngle = e.getOutAngle();
@@ -159,12 +158,12 @@ public class SingleModeTraversalTimes implements Serializable {
         }
     }
 
-    public int traversalTimeSeconds (EdgeStore.Edge currentEdge, double speedMetersPerSecond) {
+    public int traversalTimeSeconds (Edge currentEdge, double speedMetersPerSecond) {
         // Should we round instead of tuncating to avoid zero travel times?
         return (int) FastMath.ceil(perceivedTraversalMeters(currentEdge) / speedMetersPerSecond);
     }
 
-    private double perceivedTraversalMeters (EdgeStore.Edge edge) {
+    private double perceivedTraversalMeters (Edge edge) {
         double distance = edge.getLengthM();
         if (edge.edgeIndex < this.size()) {
             // This is performing a lot of extra multiplication. The perceived distances could be premultiplied, but

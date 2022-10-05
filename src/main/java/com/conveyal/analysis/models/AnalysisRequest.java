@@ -1,17 +1,17 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.modes.LegMode;
+import com.conveyal.modes.TransitModes;
+import com.conveyal.r5.analyst.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.ChaosParameters;
 import com.conveyal.r5.analyst.WebMercatorExtents;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.ChaosParameters;
-import com.conveyal.r5.analyst.decay.DecayFunction;
-import com.conveyal.r5.analyst.decay.StepDecayFunction;
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.decay.DecayFunction;
+import com.conveyal.r5.decay.StepDecayFunction;
+import com.conveyal.r5.fare.InRoutingFareCalculator;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.UserPermissions;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
 
@@ -195,7 +195,7 @@ public class AnalysisRequest {
      *      to the same method on the superclass.
      */
     public void populateTask (AnalysisWorkerTask task, UserPermissions userPermissions) {
-        if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
+        if (bounds == null) throw HttpServerRuntimeException.badRequest("Analysis bounds must be set.");
 
         task.scenario = createScenario(userPermissions);
         task.scenarioId = task.scenario.id;
@@ -273,12 +273,12 @@ public class AnalysisRequest {
 
     private static void checkGridSize (WebMercatorExtents extents) {
         if (extents.zoom < MIN_ZOOM || extents.zoom > MAX_ZOOM) {
-            throw AnalysisServerException.badRequest(String.format(
+            throw HttpServerRuntimeException.badRequest(String.format(
                     "Requested zoom (%s) is outside valid range (%s - %s)", extents.zoom, MIN_ZOOM, MAX_ZOOM
             ));
         }
         if (extents.height * extents.width > MAX_GRID_CELLS) {
-            throw AnalysisServerException.badRequest(String.format(
+            throw HttpServerRuntimeException.badRequest(String.format(
                     "Requested number of destinations (%s) exceeds limit (%s). " +
                             "Set smaller custom geographic bounds or a lower zoom level.",
                             extents.height * extents.width, MAX_GRID_CELLS

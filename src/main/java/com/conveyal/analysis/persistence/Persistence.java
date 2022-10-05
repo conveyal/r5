@@ -1,20 +1,22 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.models.JsonViews;
 import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.Modification;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.JsonViews;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
 import org.mongojack.JacksonDBCollection;
+import org.mongojack.internal.MongoJackModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +31,13 @@ import org.slf4j.LoggerFactory;
 public class Persistence {
 
     private static final Logger LOG = LoggerFactory.getLogger(Persistence.class);
+    private static final ObjectMapper objectMapper = JsonUtils.createBaseObjectMapper();
+
+    static {
+        MongoJackModule.configure(objectMapper);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.setConfig(objectMapper.getSerializationConfig().withView(JsonViews.Db.class));
+    }
 
     public static MongoClient mongo;
 
@@ -63,8 +72,7 @@ public class Persistence {
     /** Connect to a Mongo table using MongoJack, which persists Java objects into Mongo. */
     private static <V extends Model> MongoMap<V> getTable (String name, Class clazz) {
         DBCollection collection = db.getCollection(name);
-        ObjectMapper om = JsonUtil.getObjectMapper(JsonViews.Db.class, true);
-        JacksonDBCollection<V, String> coll = JacksonDBCollection.wrap(collection, clazz, String.class, om);
+        JacksonDBCollection<V, String> coll = JacksonDBCollection.wrap(collection, clazz, String.class, objectMapper);
         return new MongoMap<>(coll, clazz);
     }
 

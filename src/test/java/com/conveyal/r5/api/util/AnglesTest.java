@@ -1,7 +1,6 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.common.DirectionUtils;
-import org.junit.jupiter.api.BeforeAll;
+import com.conveyal.util.DirectionUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -9,8 +8,6 @@ import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

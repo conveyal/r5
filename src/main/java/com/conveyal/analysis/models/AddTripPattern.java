@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.r5.analyst.scenario.AddTrips;
+import com.conveyal.r5.scenario.AddTrips;
+import com.conveyal.util.HttpServerRuntimeException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -83,8 +83,8 @@ public class AddTripPattern extends Modification {
             // TODO handle errors converting modifications toR5 more generally.
             try {
                 stops = ModificationStop.getStopsFromSegments(segments, tt.dwellTimes, tt.dwellTime, tt.segmentSpeeds);
-            } catch (AnalysisServerException ase) {
-                throw AnalysisServerException.badRequest("Error in " + name + ": " + ase.message);
+            } catch (HttpServerRuntimeException ase) {
+                throw HttpServerRuntimeException.badRequest("Error in " + name + ": " + ase.message);
             }
 
             AddTrips.PatternTimetable pt = tt.toR5(stops);

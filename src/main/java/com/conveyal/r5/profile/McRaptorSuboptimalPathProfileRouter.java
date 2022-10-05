@@ -1,9 +1,11 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.fare.FareBounds;
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.modes.LegMode;
+import com.conveyal.modes.StreetMode;
+import com.conveyal.modes.TransitModes;
+import com.conveyal.r5.fare.FareBounds;
+import com.conveyal.r5.fare.InRoutingFareCalculator;
+import com.conveyal.r5.streets.RoutingVariable;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -46,8 +48,6 @@ public class McRaptorSuboptimalPathProfileRouter {
     public static final int BOARD_SLACK = 60;
 
     public static final int[] EMPTY_INT_ARRAY = new int[0];
-
-    private final boolean DUMP_STOPS = false;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
     public List<int[]> timesAtStopsEachIteration = new ArrayList<>();
@@ -245,52 +245,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         streetRouter.distanceLimitMeters = TransitLayer.WALK_DISTANCE_LIMIT_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
-        streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+        streetRouter.quantityToMinimize = RoutingVariable.DURATION_SECONDS;
         accessTimes = new HashMap<>();
         accessTimes.put(mode, streetRouter.getReachedStops());
-    }
-
-    /** dump out all stop names, for debugging */
-    public String dumpStops (TIntIntMap stops) {
-        if (DUMP_STOPS) {
-            StringBuilder sb = new StringBuilder();
-
-            stops.forEachEntry((stop, time) -> {
-                String stopName = network.transitLayer.stopNames.get(stop);
-                sb.append(String.format("%s (%d) at %sm %ss\n", stopName, stop, time / 60, time % 60));
-                return true;
-            });
-
-            return sb.toString();
-        } else {
-            return "";
-        }
-    }
-
-    /** Perform a McRAPTOR search and extract paths */
-    public Collection<PathWithTimes> getPaths () {
-        Collection<McRaptorState> states = route();
-
-        // A map to keep track of the best path among each group of paths using the same sequence of patterns.
-        // We will often find multiple paths that board or transfer to the same patterns at different locations.
-        // We only want to retain the best set of boarding, transfer, and alighting stops for a particular pattern sequence.
-        // FIXME we are using a map here with unorthodox definitions of hashcode and equals to make them serve as map keys.
-        // We should instead wrap PathWithTimes or copy the relevant fields into a PatternSequenceKey class.
-        Map<PathWithTimes, PathWithTimes> paths = new HashMap<>();
-
-        states.forEach(s -> {
-            PathWithTimes pwt = new PathWithTimes(s, network, request, accessTimes.get(s.accessMode), egressTimes.get(s.egressMode));
-
-            if (!paths.containsKey(pwt) || paths.get(pwt).stats.avg > pwt.stats.avg)
-                paths.put(pwt, pwt);
-        });
-        //states.forEach(s -> LOG.info("{}", s.dump(network)));
-
-        LOG.info("{} states led to {} paths", states.size(), paths.size());
-
-        paths.values().forEach(p -> LOG.info("{}", p.dump(network)));
-
-        return new ArrayList<>(paths.values());
     }
 
     /** perform one round of the McRAPTOR search. Returns true if anything changed */

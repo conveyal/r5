@@ -1,6 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.UserPermissions;
+import com.conveyal.util.UserPermissions;
 import org.bson.types.ObjectId;
 
 /** The base type for objects stored in our newer AnalysisDB using the Mongo Java driver's POJO functionality. */

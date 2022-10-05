@@ -1,12 +1,12 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
-import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.r5.scenario.PickupWaitTimes;
 import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.util.GeometryUtils;
+import com.conveyal.util.LambdaCounter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -26,7 +26,6 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * The final stage of a one-to-many transit trip is what we call "propagation": extending travel times out from all
@@ -75,7 +74,7 @@ public class EgressCostTable implements Serializable {
      * by link, it doesn't make sense to store distances, so we store times. This is left uninitialized until the
      * linkage mode is known, so we fail fast on any programming errors that don't set or copy the linkage cost unit.
      */
-    public final StreetRouter.State.RoutingVariable linkageCostUnit;
+    public final RoutingVariable linkageCostUnit;
 
     /**
      * For each transit stop, the distances or times (i.e. "costs") to all nearby PointSet points as a flattened
@@ -150,9 +149,9 @@ public class EgressCostTable implements Serializable {
         }
 
         if (streetMode == StreetMode.CAR) {
-            this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            this.linkageCostUnit = RoutingVariable.DURATION_SECONDS;
         } else {
-            this.linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            this.linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
         }
 
 

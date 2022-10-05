@@ -1,23 +1,24 @@
 package com.conveyal.analysis.datasource.derivation;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.datasource.DataSourceException;
-import com.conveyal.analysis.datasource.SpatialAttribute;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.file.DataSourceException;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.file.SpatialAttribute;
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.progress.WorkProduct;
-import com.conveyal.r5.util.ShapefileReader;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.r5.progress.WorkProduct;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.ShapefileReader;
+import com.conveyal.util.UserPermissions;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
@@ -37,8 +38,8 @@ import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.conveyal.r5.analyst.progress.WorkProductType.AGGREGATION_AREA;
-import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
+import static com.conveyal.r5.progress.WorkProductType.AGGREGATION_AREA;
+import static com.conveyal.util.ShapefileReader.GeometryType.POLYGON;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -77,7 +78,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
     private AggregationAreaDerivation (FileStorage fileStorage, AnalysisDB database, Request req) {
 
         // Before kicking off asynchronous processing, range check inputs to fail fast on obvious problems.
-        userPermissions = UserPermissions.from(req);
+        userPermissions = HttpUtils.userFromRequest(req);
         dataSourceId = req.queryParams("dataSourceId");
         nameProperty = req.queryParams("nameProperty"); //"dist_name"; //
         zoom = parseZoom(req.queryParams("zoom"));
@@ -195,7 +196,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
 
         // Convert to raster grids, then store them.
         areaGeometries.forEach((String name, Geometry geometry) -> {
-            if (geometry == null) throw new AnalysisServerException("Invalid geometry uploaded.");
+            if (geometry == null) throw new HttpServerRuntimeException("Invalid geometry uploaded.");
             Envelope env = geometry.getEnvelopeInternal();
             Grid maskGrid = new Grid(zoom, env);
             progressListener.beginTask("Creating grid for " + name, 0);
@@ -217,13 +218,13 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
                 aggregationAreas.add(aggregationArea);
                 fileStorage.moveIntoStorage(aggregationArea.getStorageKey(), gridFile);
             } catch (IOException e) {
-                throw new AnalysisServerException("Error processing/uploading aggregation area");
+                throw new HttpServerRuntimeException("Error processing/uploading aggregation area");
             }
             progressListener.increment();
         });
         aggregationAreaCollection.insertMany(aggregationAreas);
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId));
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup._id.toString(), spatialDataSource.regionId));
         progressListener.increment();
 
     }
@@ -234,7 +235,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         } catch (NullPointerException e) {
             String message = String.format("The specified property '%s' was not present on the uploaded features. " +
                     "Please verify that '%s' corresponds to a shapefile column.", propertyName, propertyName);
-            throw new AnalysisServerException(message);
+            throw new HttpServerRuntimeException(message);
         }
     }
 

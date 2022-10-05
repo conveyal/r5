@@ -2,7 +2,7 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.RegionalTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +12,7 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import static com.conveyal.r5.common.Util.human;
+import static com.conveyal.util.Util.human;
 
 /**
  * Write regional analysis results arriving from workers into a binary grid format. This how we

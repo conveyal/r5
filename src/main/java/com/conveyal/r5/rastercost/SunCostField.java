@@ -1,6 +1,6 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Edge;
 import gnu.trove.list.TFloatList;
 import gnu.trove.list.array.TFloatArrayList;
 
@@ -60,7 +60,7 @@ public class SunCostField implements CostField, Serializable {
     }
 
     @Override
-    public int additionalTraversalTimeSeconds (EdgeStore.Edge currentEdge, int traversalTimeSeconds) {
+    public int additionalTraversalTimeSeconds (Edge currentEdge, int traversalTimeSeconds) {
         double sunFactor = getSunFactor(currentEdge.getEdgeIndex());
         return (int) Math.round(sunFactor * traversalTimeSeconds);
     }

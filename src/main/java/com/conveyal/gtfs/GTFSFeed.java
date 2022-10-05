@@ -20,7 +20,8 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.util.GeometryUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -68,8 +69,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import static com.conveyal.gtfs.util.GeometryUtil.geometryFactory;
-import static com.conveyal.gtfs.util.Util.human;
+import static com.conveyal.util.Util.human;
 
 /**
  * This is a MapDB-backed representation of the data from a single GTFS feed.
@@ -588,7 +588,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 Double lon = stop.stop_lon;
                 coordinates.add(new Coordinate(lon, lat));
             }
-            ls = geometryFactory.createLineString(coordinates.toCoordinateArray());
+            ls = GeometryUtils.geometryFactory.createLineString(coordinates.toCoordinateArray());
         }
         // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
         else{
@@ -685,11 +685,11 @@ public class GTFSFeed implements Cloneable, Closeable {
                     if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
                         continue;
                     }
-                    Point stopPoint = geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
+                    Point stopPoint = GeometryUtils.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
                     Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
                     polygons.add(stopBuffer);
                 }
-                Geometry multiGeometry = geometryFactory.buildGeometry(polygons);
+                Geometry multiGeometry = GeometryUtils.geometryFactory.buildGeometry(polygons);
                 this.mergedBuffers = multiGeometry.union();
                 if (polygons.size() > 100) {
                     this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);

@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
 
 import java.io.Serializable;
 
@@ -26,7 +26,7 @@ public interface TraversalTimeCalculator extends Serializable {
      * @param currentEdge the edge currently being traversed.
      * @return the time it takes to travel down the entire edge using the streetMode, considering the request settings.
      */
-    public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req);
+    public int traversalTimeSeconds (Edge currentEdge, StreetMode streetMode, ProfileRequest req);
 
     /**
      * Calculate the time to turn from fromEdge onto toEdge by the given streetMode, considering settings in the given

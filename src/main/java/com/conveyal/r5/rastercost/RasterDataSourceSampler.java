@@ -1,8 +1,6 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.analysis.components.WorkerComponents;
-import com.conveyal.analysis.datasource.DataSourceException;
-import com.conveyal.file.FileStorageKey;
+import com.conveyal.r5.streets.Edge;
 import com.conveyal.r5.streets.EdgeStore;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.array.TDoubleArrayList;
@@ -28,11 +26,9 @@ import javax.media.jai.InterpolationBilinear;
 import java.awt.geom.Point2D;
 import java.io.File;
 
-import static com.conveyal.file.FileCategory.DATASOURCES;
-import static com.conveyal.file.FileStorageFormat.GEOTIFF;
-import static com.conveyal.gtfs.util.Util.METERS_PER_DEGREE_LATITUDE;
-import static com.conveyal.r5.common.GeometryUtils.checkLat;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.util.GeometryUtils.METERS_PER_DEGREE_LATITUDE;
+import static com.conveyal.util.GeometryUtils.checkLat;
+import static com.conveyal.util.GeometryUtils.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
@@ -50,8 +46,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 public class RasterDataSourceSampler {
 
     private static final Logger LOG = LoggerFactory.getLogger(RasterDataSourceSampler.class);
-
-    private final String dataSourceId;
     private final double sampleSpacingMeters;
     private final boolean interpolate;
 
@@ -76,33 +70,26 @@ public class RasterDataSourceSampler {
      */
     private final Envelope2D coverageWorldEnvelope;
 
-    public RasterDataSourceSampler (String dataSourceId, double sampleSpacingMeters, boolean interpolate) {
-        this.dataSourceId = dataSourceId;
+    public RasterDataSourceSampler (File rasterFile, double sampleSpacingMeters, boolean interpolate) throws Exception {
         this.sampleSpacingMeters = sampleSpacingMeters;
         this.interpolate = interpolate;
-        try {
-            FileStorageKey fileStorageKey = new FileStorageKey(DATASOURCES, dataSourceId, GEOTIFF.extension);
-            File localRasterFile = WorkerComponents.fileStorage.getFile(fileStorageKey);
-            AbstractGridFormat format = GridFormatFinder.findFormat(localRasterFile);
-            // Only relevant for certain files with WGS CRS?
-            Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-            GridCoverage2DReader coverageReader = format.getReader(localRasterFile, hints);
-            GridCoverage2D uninterpolatedCoverage = coverageReader.read(null);
-            if (interpolate) {
-                // it.geosolutions.jaiext.interpolators.InterpolationBilinear seems to be able to handle nodata values.
-                // javax.media.jai.InterpolationBilinear apparently cannot handle nodata.
-                // Can interpolation instead be achieved with Hints.VALUE_INTERPOLATION_BICUBIC on the original raster?
-                coverage = Interpolator2D.create(uninterpolatedCoverage, new InterpolationBilinear());
-            } else {
-                coverage = uninterpolatedCoverage;
-            }
-            this.coverageWorldEnvelope = coverage.getEnvelope2D();
-            // Set CRS transform from WGS84 to coverage, if any.
-            CoordinateReferenceSystem coverageCrs = coverage.getCoordinateReferenceSystem2D();
-            wgsToCoverage = CRS.findMathTransform(DefaultGeographicCRS.WGS84, coverageCrs);
-        } catch (Exception ex) {
-            throw new DataSourceException("Failed to open raster data source with id: " + dataSourceId, ex);
+        AbstractGridFormat format = GridFormatFinder.findFormat(rasterFile);
+        // Only relevant for certain files with WGS CRS?
+        Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
+        GridCoverage2DReader coverageReader = format.getReader(rasterFile, hints);
+        GridCoverage2D uninterpolatedCoverage = coverageReader.read(null);
+        if (interpolate) {
+            // it.geosolutions.jaiext.interpolators.InterpolationBilinear seems to be able to handle nodata values.
+            // javax.media.jai.InterpolationBilinear apparently cannot handle nodata.
+            // Can interpolation instead be achieved with Hints.VALUE_INTERPOLATION_BICUBIC on the original raster?
+            coverage = Interpolator2D.create(uninterpolatedCoverage, new InterpolationBilinear());
+        } else {
+            coverage = uninterpolatedCoverage;
         }
+        this.coverageWorldEnvelope = coverage.getEnvelope2D();
+        // Set CRS transform from WGS84 to coverage, if any.
+        CoordinateReferenceSystem coverageCrs = coverage.getCoordinateReferenceSystem2D();
+        wgsToCoverage = CRS.findMathTransform(DefaultGeographicCRS.WGS84, coverageCrs);
     }
 
     /**
@@ -177,20 +164,13 @@ public class RasterDataSourceSampler {
      * Note that this utility method does not reuse the elevation sampler. This causes more garbage collection but
      * is stateless, making it more suitable for use in parallel streams. The speedup from parallel sampling is large.
      */
-    public double[] sampleEdge (EdgeStore.Edge edge) {
+    public double[] sampleEdge (Edge edge) {
         if (edge.getLengthMm() < sampleSpacingMeters * 1000) {
             return EMPTY_DOUBLE_ARRAY;
         }
         EdgeSampler sampler = new EdgeSampler();
         edge.forEachPoint(sampler);
         return sampler.samples.toArray();
-    }
-
-    // Only progress reporting prevents us from calling this.
-    // It is imaginable to supply the edgeStore to the RasterDataSourceSampler (or to a composed object)
-    // and move all the iteration logic in here.
-    public double[] sampleEdgePair (int edgePairIndex, EdgeStore edgeStore) {
-        return sampleEdge(edgeStore.getCursor(edgePairIndex * 2));
     }
 
     /**

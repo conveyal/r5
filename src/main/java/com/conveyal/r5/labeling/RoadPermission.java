@@ -1,6 +1,6 @@
 package com.conveyal.r5.labeling;
 
-import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeFlag;
 
 import java.util.EnumSet;
 
@@ -9,11 +9,11 @@ import java.util.EnumSet;
  * permissions in both the forward and backward direction on a single road segment.
  */
 public class RoadPermission {
-    public final EnumSet<EdgeStore.EdgeFlag> forward;
-    public final EnumSet<EdgeStore.EdgeFlag> backward;
+    public final EnumSet<EdgeFlag> forward;
+    public final EnumSet<EdgeFlag> backward;
 
-    public RoadPermission(EnumSet<EdgeStore.EdgeFlag> forward,
-        EnumSet<EdgeStore.EdgeFlag> backward) {
+    public RoadPermission(EnumSet<EdgeFlag> forward,
+        EnumSet<EdgeFlag> backward) {
         this.forward = forward;
         this.backward = backward;
 

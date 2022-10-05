@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.fare.InRoutingFareCalculator;
 
 import java.util.Collection;
 import java.util.Iterator;

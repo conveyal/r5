@@ -1,5 +1,6 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.components.HttpController;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -11,7 +12,6 @@ import spark.Response;
 import spark.Service;
 
 import java.io.File;
-import java.io.InputStream;
 import java.util.Locale;
 
 /**

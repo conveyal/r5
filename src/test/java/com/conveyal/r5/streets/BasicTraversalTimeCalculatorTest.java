@@ -1,6 +1,6 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.algorithm.Angle;
 import org.locationtech.jts.geom.Coordinate;

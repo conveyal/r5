@@ -6,9 +6,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.BitSet;
 
-import static com.conveyal.r5.common.Util.newIntArray;
 import static com.conveyal.r5.profile.FastRaptorWorker.ENABLE_OPTIMIZATION_CLEAR_LONG_PATHS;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+import static com.conveyal.util.Util.newIntArray;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -280,19 +280,6 @@ public class RaptorState {
             stopsUpdated.set(stop);
         }
         return optimal;
-    }
-
-    /** Debug function: dump the path to a particular stop as a String. */
-    public String dump (int stop) {
-        Path p = new Path(this, stop);
-
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < p.length; i++) {
-            sb.append(String.format("Stop %5d at %5d, reached by pattern %5d from stop %5d\n", p.alightStops[i], p.alightTimes[i], p.patterns[i], p.boardStops[i]));
-        }
-
-        return sb.toString();
     }
 
     /**

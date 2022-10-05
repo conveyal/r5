@@ -3,10 +3,10 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
+import com.conveyal.file.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.util.ShapefileReader;
-import org.geotools.referencing.CRS;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.util.ShapefileReader;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
@@ -15,7 +15,7 @@ import org.opengis.referencing.operation.TransformException;
 import java.io.File;
 import java.io.IOException;
 
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.util.GeometryUtils.checkWgsEnvelopeSize;
 import static com.google.common.base.Preconditions.checkState;
 
 /**

@@ -1,16 +1,12 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.conveyal.util.GeometryUtils;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateFilter;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
 import java.io.Serializable;
@@ -26,10 +22,6 @@ import java.io.Serializable;
  * more space-efficient than a struct array when a field may be missing/null in every element.
  */
 public class VertexStore implements Serializable {
-
-    public static final double FIXED_FACTOR = 1e7; // we could just reuse the constant from osm-lib Node.
-    // TODO direct mm_per_fixed_degree conversion, work entirely in mm and fixed degrees.
-
     public TIntList fixedLats;
     public TIntList fixedLons;
     public TByteList vertexFlags;
@@ -47,7 +39,7 @@ public class VertexStore implements Serializable {
      * @return the index of the new vertex.
      */
     public int addVertex (double lat, double lon) {
-        return addVertexFixed(floatingDegreesToFixed(lat), floatingDegreesToFixed(lon));
+        return addVertexFixed(GeometryUtils.floatingDegreesToFixed(lat), GeometryUtils.floatingDegreesToFixed(lon));
     }
 
     /**
@@ -86,11 +78,11 @@ public class VertexStore implements Serializable {
         }
 
         public void setLat(double lat) {
-            fixedLats.set(index, (int)(lat * FIXED_FACTOR));
+            fixedLats.set(index, (int)(lat * GeometryUtils.FIXED_DEGREES_FACTOR));
         }
 
         public void setLon(double lon) {
-            fixedLons.set(index, (int) (lon * FIXED_FACTOR));
+            fixedLons.set(index, (int) (lon * GeometryUtils.FIXED_DEGREES_FACTOR));
         }
 
         public boolean getFlag(VertexFlag flag) {
@@ -102,11 +94,11 @@ public class VertexStore implements Serializable {
         }
 
         public double getLat() {
-            return fixedLats.get(index) / FIXED_FACTOR;
+            return fixedLats.get(index) / GeometryUtils.FIXED_DEGREES_FACTOR;
         }
 
         public double getLon() {
-            return fixedLons.get(index) / FIXED_FACTOR;
+            return fixedLons.get(index) / GeometryUtils.FIXED_DEGREES_FACTOR;
         }
 
         public int getFixedLat() {
@@ -135,47 +127,9 @@ public class VertexStore implements Serializable {
         return new Vertex(index);
     }
 
-    public static int floatingDegreesToFixed(double degrees) {
-        return (int)(degrees * FIXED_FACTOR);
-    }
-
-    public static double fixedDegreesToFloating(int fixed) {
-        return fixed / FIXED_FACTOR;
-    }
-
     /** Return the number of vertices currently stored in this VertexStore. */
     public int getVertexCount() {
         return vertexFlags.size();
-    }
-
-    /**
-     * Used when converting fixed-point latitude and longitude to floating-point from Split.
-     * The parameter datatype is double even though it is a fixed-point representation.
-     */
-    public static double fixedDegreesToFloating(double fixed) {
-        return fixed / FIXED_FACTOR;
-    }
-
-    /**
-     * Given a Geometry in fixed-point latitude and longitude, return a copy converted to floating point latitude and
-     * longitude.
-     */
-    public static Geometry fixedDegreeGeometryToFloating(Geometry fixedGeometry) {
-        Geometry wgsResult = (Geometry)fixedGeometry.clone();
-        wgsResult.apply((CoordinateFilter) c -> {
-            c.x = fixedDegreesToFloating(c.x); c.y = fixedDegreesToFloating(c.y);
-        });
-        return wgsResult;
-    }
-
-    /** Convert a JTS envelope to fixed-point degrees. */
-    public static Envelope envelopeToFixed(Envelope env) {
-        return new Envelope(
-                floatingDegreesToFixed(env.getMinX()),
-                floatingDegreesToFixed(env.getMaxX()),
-                floatingDegreesToFixed(env.getMinY()),
-                floatingDegreesToFixed(env.getMaxY())
-        );
     }
 
     public enum VertexFlag {

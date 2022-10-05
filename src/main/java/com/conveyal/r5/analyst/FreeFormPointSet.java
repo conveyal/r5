@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.util.InputStreamProvider;
+import com.conveyal.file.FileItemInputStreamProvider;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -18,8 +18,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.conveyal.util.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.util.GeometryUtils.fixedDegreesToFloating;
 
 /**
  * These are points serving as origins or destinations in an accessibility analysis which are not constrained to
@@ -49,7 +49,7 @@ public class FreeFormPointSet extends PointSet {
      * for the points; if not, row numbers will be used as the ids.
      */
     public static FreeFormPointSet fromCsv (
-            InputStreamProvider csvInputStreamProvider,
+            FileItemInputStreamProvider csvInputStreamProvider,
             String latField,
             String lonField,
             String idField,

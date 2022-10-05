@@ -1,6 +1,6 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.modes.StreetMode;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.set.TIntSet;
@@ -135,7 +135,7 @@ public class TarjanIslandPruner {
     private List<TIntSet> strongComponents = new ArrayList<>();
 
     /** Reüse the edge cursor to save memory */
-    private final EdgeStore.Edge edgeCursor;
+    private final Edge edgeCursor;
 
     public TarjanIslandPruner(StreetLayer streetLayer, int minComponentSize, StreetMode mode) {
         this.streets = streetLayer;
@@ -149,7 +149,7 @@ public class TarjanIslandPruner {
         Arrays.fill(lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor, -1);
         discoveryIndex = new int[streets.getVertexCount()];
         Arrays.fill(discoveryIndex, -1);
-        edgeCursor = streetLayer.edgeStore.getCursor();
+        edgeCursor = streetLayer.getEdgeCursor();
     }
 
     public void run () {
@@ -274,22 +274,22 @@ public class TarjanIslandPruner {
     }
 
     /** Loop over every outgoing edge for a particular mode */
-    public void forEachOutgoingEdge (int vertex, Consumer<EdgeStore.Edge> consumer) {
+    public void forEachOutgoingEdge (int vertex, Consumer<Edge> consumer) {
         streets.outgoingEdges.get(vertex).forEach(eidx -> {
             edgeCursor.seek(eidx);
 
             // filter by mode
             switch (mode) {
                 case WALK:
-                    if (!edgeCursor.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
+                    if (!edgeCursor.getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
                     else break;
                 case CAR:
-                    if (!edgeCursor.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
+                    if (!edgeCursor.getFlag(EdgeFlag.ALLOWS_CAR)) return true;
                     else break;
                 case BICYCLE:
                     // include ped mode here, because walking bikes is a thing you can do.
-                    boolean allowsBike = edgeCursor.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE) ||
-                                    edgeCursor.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+                    boolean allowsBike = edgeCursor.getFlag(EdgeFlag.ALLOWS_BIKE) ||
+                                    edgeCursor.getFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
                     if (!allowsBike) return true;
                     else break;
                 default:
@@ -308,13 +308,13 @@ public class TarjanIslandPruner {
                 edgeCursor.seek(eidx);
                 switch (mode) {
                     case CAR:
-                        edgeCursor.clearFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+                        edgeCursor.clearFlag(EdgeFlag.ALLOWS_CAR);
                         break;
                     case BICYCLE:
-                        edgeCursor.clearFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                        edgeCursor.clearFlag(EdgeFlag.ALLOWS_BIKE);
                         break;
                     case WALK:
-                        edgeCursor.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+                        edgeCursor.clearFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
                         break;
                     default:
                         throw new IllegalArgumentException(String.format("Unsupported mode %s for island removal", mode));

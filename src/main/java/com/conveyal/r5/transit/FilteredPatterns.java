@@ -1,7 +1,6 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.util.Tuple2;
+import com.conveyal.modes.TransitModes;
 
 import java.util.ArrayList;
 import java.util.BitSet;

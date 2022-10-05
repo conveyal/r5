@@ -1,14 +1,14 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.modes.StreetMode;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.error.TaskError;
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.fare.InRoutingFareCalculator;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.r5.scenario.TaskError;
 import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
@@ -79,8 +79,6 @@ public class TransportNetwork implements Serializable {
      * is in the network independent of object identity, and after a round trip through serialization.
      */
     public String scenarioId = null;
-
-    public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
     public InRoutingFareCalculator fareCalculator;
 
@@ -274,7 +272,7 @@ public class TransportNetwork implements Serializable {
         if (fullExtentGridPointSet != null) {
             throw new RuntimeException("Linked grid pointset was built more than once.");
         }
-        fullExtentGridPointSet = new WebMercatorGridPointSet(this);
+        fullExtentGridPointSet = new WebMercatorGridPointSet(this.streetLayer.envelope);
         for (StreetMode mode : modes) {
             linkageCache.buildUnevictableLinkage(fullExtentGridPointSet, streetLayer, mode);
         }
@@ -304,17 +302,6 @@ public class TransportNetwork implements Serializable {
         } else {
             return transitLayer.timeZone;
         }
-    }
-
-    /**
-     * Apply the given scenario to this TransportNetwork, copying any elements that are modified to leave the original
-     * unscathed. The scenario may be null or empty, in which case this method is a no-op.
-     */
-    public TransportNetwork applyScenario (Scenario scenario) {
-        if (scenario == null || scenario.modifications.isEmpty()) {
-            return this;
-        }
-        return scenario.applyToTransportNetwork(this);
     }
 
     /**

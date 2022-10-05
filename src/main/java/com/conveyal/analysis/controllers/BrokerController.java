@@ -1,26 +1,28 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.components.broker.JobStatus;
-import com.conveyal.analysis.components.broker.WorkerObservation;
-import com.conveyal.analysis.components.broker.WorkerTags;
-import com.conveyal.analysis.components.eventbus.EventBus;
-import com.conveyal.analysis.components.eventbus.SinglePointEvent;
+import com.conveyal.analysis.broker.Broker;
+import com.conveyal.analysis.broker.JobStatus;
+import com.conveyal.analysis.broker.WorkerObservation;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.HttpStatus;
-import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.cluster.WorkerStatus;
-import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.components.HttpController;
+import com.conveyal.eventbus.EventBus;
+import com.conveyal.eventbus.SinglePointEvent;
+import com.conveyal.r5.analyst.RegionalTask;
+import com.conveyal.r5.analyst.RegionalWorkResult;
+import com.conveyal.r5.analyst.TravelTimeSurfaceResultsFormat;
+import com.conveyal.r5.analyst.TravelTimeSurfaceTask;
+import com.conveyal.util.HttpServerRuntimeException;
+import com.conveyal.util.HttpStatus;
+import com.conveyal.util.HttpUtils;
+import com.conveyal.util.JsonUtils;
+import com.conveyal.util.UserPermissions;
+import com.conveyal.worker.AnalysisWorker;
+import com.conveyal.worker.WorkerCategory;
+import com.conveyal.worker.WorkerStatus;
+import com.conveyal.worker.WorkerTags;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -51,7 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.conveyal.util.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -74,7 +76,7 @@ public class BrokerController implements HttpController {
     private static final Logger LOG = LoggerFactory.getLogger(BrokerController.class);
 
     /** For convenience, a local reference to the shared JSON object codec. */
-    private static ObjectMapper jsonMapper = JsonUtilities.objectMapper;
+    private static ObjectMapper jsonMapper = JsonUtils.objectMapper;
 
     // Component Dependencies
 
@@ -129,10 +131,10 @@ public class BrokerController implements HttpController {
         // AnalysisRequest (backend) vs. AnalysisTask (R5)
         // We already know the user is authenticated, and we need not check if they have access to the graphs etc,
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
-        UserPermissions userPermissions = UserPermissions.from(request);
+        UserPermissions userPermissions = HttpUtils.userFromRequest(request);
         final long startTimeMsec = System.currentTimeMillis();
 
-        AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
+        AnalysisRequest analysisRequest = HttpUtils.objectFromRequestBody(request, AnalysisRequest.class);
         // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
         checkUuidParameter(analysisRequest.regionId, "region ID");
         checkUuidParameter(analysisRequest.projectId, "project ID");
@@ -169,12 +171,12 @@ public class BrokerController implements HttpController {
         if (request.headers("Accept").equals("image/tiff")) {
             // If the client requested a Geotiff using HTTP headers (for exporting results to GIS),
             // signal this using a field on the request sent to the worker.
-            task.setFormat(TravelTimeSurfaceTask.Format.GEOTIFF);
+            task.setFormat(TravelTimeSurfaceResultsFormat.GEOTIFF);
         } else {
             // The default response format is our own compact grid representation.
-            task.setFormat(TravelTimeSurfaceTask.Format.GRID);
+            task.setFormat(TravelTimeSurfaceResultsFormat.GRID);
         }
-        WorkerCategory workerCategory = task.getWorkerCategory();
+        WorkerCategory workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
@@ -198,7 +200,7 @@ public class BrokerController implements HttpController {
         HttpEntity entity = null;
         try {
             // Serialize and send the R5-specific task (not the original one the broker received from the UI)
-            httpPost.setEntity(new ByteArrayEntity(JsonUtil.objectMapper.writeValueAsBytes(task)));
+            httpPost.setEntity(new ByteArrayEntity(JsonUtils.objectToJsonBytes(task)));
             HttpResponse workerResponse = httpClient.execute(httpPost);
             // Mimic the status code sent by the worker.
             response.status(workerResponse.getStatusLine().getStatusCode());
@@ -252,7 +254,7 @@ public class BrokerController implements HttpController {
             broker.unregisterSinglePointWorker(workerCategory);
             return jsonResponse(response, HttpStatus.ACCEPTED_202, "Switching routing server");
         } catch (Exception e) {
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         } finally {
             // If the HTTP response entity is non-null close the associated input stream, which causes the HttpClient
             // to release the TCP connection back to its pool. This is critical to avoid exhausting the pool.
@@ -290,7 +292,7 @@ public class BrokerController implements HttpController {
         try {
             return jsonMapper.writeValueAsString(object);
         } catch (JsonProcessingException e) {
-            throw AnalysisServerException.unknown(e);
+            throw HttpServerRuntimeException.unknown(e);
         }
     }
 
@@ -347,7 +349,7 @@ public class BrokerController implements HttpController {
      */
     private Object workerPoll (Request request, Response response) {
 
-        WorkerStatus workerStatus = objectFromRequestBody(request, WorkerStatus.class);
+        WorkerStatus workerStatus = HttpUtils.objectFromRequestBody(request, WorkerStatus.class);
         List<RegionalWorkResult> perOriginResults = workerStatus.results;
 
         // Record any regional analysis results that were supplied by the worker and mark them completed.
@@ -371,20 +373,9 @@ public class BrokerController implements HttpController {
         }
     }
 
-    /**
-     * Deserializes an object of the given type from JSON in the body of the supplied Spark request.
-     */
-    private static <T> T objectFromRequestBody (Request request, Class<T> classe) {
-        try {
-            return JsonUtil.objectMapper.readValue(request.body(), classe);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private static void enforceAdmin (Request request) {
-        if (!UserPermissions.from(request).admin) {
-            throw AnalysisServerException.forbidden("You do not have access.");
+        if (!HttpUtils.userFromRequest(request).admin) {
+            throw HttpServerRuntimeException.forbidden("You do not have access.");
         }
     }
 

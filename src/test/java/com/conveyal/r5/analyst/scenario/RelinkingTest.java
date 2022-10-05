@@ -1,6 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.r5.scenario.AddTrips;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.r5.scenario.StopSpec;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
@@ -67,7 +71,7 @@ public class RelinkingTest {
         Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
-        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network, new LocalFileStorage());
         assertEquals(3, mod.transitLayer.tripPatterns.size());
         assertEquals(5, network.transitLayer.getStopCount());
         assertEquals(8, mod.transitLayer.getStopCount());

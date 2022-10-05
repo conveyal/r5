@@ -1,8 +1,8 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.util.GeometryUtils;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TObjectIntMap;
 import org.locationtech.jts.geom.Coordinate;

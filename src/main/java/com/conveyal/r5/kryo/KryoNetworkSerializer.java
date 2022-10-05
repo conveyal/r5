@@ -1,9 +1,9 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.kryo.InstanceCountingClassResolver;
 import com.conveyal.kryo.TIntArrayListSerializer;
 import com.conveyal.kryo.TIntIntHashMapSerializer;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;

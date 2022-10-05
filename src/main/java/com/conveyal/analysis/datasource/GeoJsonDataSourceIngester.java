@@ -3,9 +3,11 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
+import com.conveyal.file.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.util.ShapefileReader.GeometryType;
+import com.conveyal.file.SpatialAttribute;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.util.ShapefileReader.GeometryType;
 import org.geotools.data.Query;
 import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
@@ -31,7 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.conveyal.analysis.models.DataSourceValidationIssue.Level.ERROR;
-import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.util.GeometryUtils.checkWgsEnvelopeSize;
 
 /**
  * Logic to create SpatialDataSource metadata from an uploaded GeoJSON file and perform validation.

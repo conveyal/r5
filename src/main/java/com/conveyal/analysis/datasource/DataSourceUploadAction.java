@@ -1,13 +1,13 @@
 package com.conveyal.analysis.datasource;
 
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.progress.TaskAction;
+import com.conveyal.r5.progress.ProgressListener;
+import com.conveyal.r5.progress.TaskAction;
+import com.conveyal.util.UserPermissions;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
@@ -20,10 +20,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.analysis.util.HttpUtils.getFormField;
-import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
+import static com.conveyal.util.HttpUtils.getFormField;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
@@ -129,7 +128,7 @@ public class DataSourceUploadAction implements TaskAction {
         final String regionId = getFormField(formFields, "regionId", true);
         final List<FileItem> fileItems = formFields.get("sourceFiles");
 
-        FileStorageFormat format = detectUploadFormatAndValidate(fileItems);
+        FileStorageFormat format = DataSourceUtil.detectUploadFormatAndValidate(fileItems);
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);
 
         String originalFileNames = fileItems.stream().map(FileItem::getName).collect(Collectors.joining(", "));

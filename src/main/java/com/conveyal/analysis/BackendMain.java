@@ -5,10 +5,10 @@ import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.TaskAction;
-import com.conveyal.r5.util.ExceptionUtils;
+import com.conveyal.r5.progress.Task;
+import com.conveyal.r5.progress.TaskAction;
+import com.conveyal.util.ExceptionUtils;
+import com.conveyal.worker.WorkerCategory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

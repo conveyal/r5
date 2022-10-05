@@ -1,28 +1,21 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.PathResult;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.TravelTimeResult;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.decay.DecayFunction;
+import com.conveyal.modes.StreetTimeAndMode;
+import com.conveyal.r5.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.transit.IterationTemporalDetails;
+import com.conveyal.r5.transit.PatternSequence;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.Path;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+import static com.conveyal.util.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a bunch of travel times from an origin to a single destination point, this collapses that long list into a
@@ -30,9 +23,6 @@ import static com.google.common.base.Preconditions.checkState;
  * appropriate cumulative opportunities accessibility indicators at that origin.
  */
 public class TravelTimeReducer {
-
-    private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
-
     private boolean calculateAccessibility;
 
     private boolean calculateTravelTimes;
@@ -138,7 +128,17 @@ public class TravelTimeReducer {
             travelTimeResult = new TravelTimeResult(task);
         }
         if (task.includePathResults) {
-            pathResult = new PathResult(task, network.transitLayer);
+            // In interactive single-point tasks, paths are only returned for one destination
+            int nDestinations = 1;
+            if (task instanceof RegionalTask) {
+                // In regional analyses, return paths to all destinations
+                nDestinations = task.nTargetsPerOrigin();
+                // This limitation reflects the initial design, for use with freeform pointset destinations
+                if (nDestinations > PathResult.maxDestinations) {
+                    throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + PathResult.maxDestinations);
+                }
+            }
+            pathResult = new PathResult(network.transitLayer, nDestinations);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -281,18 +281,18 @@ public class TravelTimeReducer {
      * @param perIterationPaths paths for each iteration
      */
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
-                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
-        Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
+                                      StreetTimeAndMode[] perIterationEgress) {
+        Multimap<PatternSequence, IterationTemporalDetails> paths = HashMultimap.create();
         for (int i = 0; i < perIterationTimes.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
                 PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
-                PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                IterationTemporalDetails iteration = new IterationTemporalDetails(path.departureTime, path.waitTimes, totalTime);
                 paths.put(patternSequence, iteration);
             } else if (totalTime < UNREACHED){
                 PatternSequence patternSequence = new PatternSequence(null, null, null, null);
-                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
+                IterationTemporalDetails iteration = new IterationTemporalDetails(totalTime);
                 paths.put(patternSequence, iteration);
             }
         }
@@ -330,18 +330,5 @@ public class TravelTimeReducer {
      */
     public OneOriginResult finish () {
         return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
-    }
-
-    /**
-     * Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
-     * calculate travel times. They will only be used if we're calculating accessibility.
-     */
-    public void checkOpportunityExtents (PointSet travelTimePointSet) {
-        if (calculateAccessibility) {
-            for (PointSet opportunityPointSet : destinationPointSets) {
-                checkState(opportunityPointSet.getWebMercatorExtents().equals(travelTimePointSet.getWebMercatorExtents()),
-                        "Travel time would be calculated to a PointSet that does not match the opportunity PointSet.");
-            }
-        }
     }
 }

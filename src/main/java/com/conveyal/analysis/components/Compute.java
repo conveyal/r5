@@ -1,5 +1,7 @@
 package com.conveyal.analysis.components;
 
+import com.conveyal.components.Component;
+
 /**
  * This is a stub abstraction for a component performing accessibility analysis computations.
  * Computation could be on remote or local hardware, using code in this repo or a dependency.

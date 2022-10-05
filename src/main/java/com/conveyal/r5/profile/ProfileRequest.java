@@ -1,16 +1,16 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.api.util.SearchType;
-import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.model.json_serialization.LegModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.LegModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.TransitModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.TransitModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
+import com.conveyal.modes.LegMode;
+import com.conveyal.modes.StreetMode;
+import com.conveyal.modes.TransitModes;
+import com.conveyal.r5.fare.InRoutingFareCalculator;
+import com.conveyal.r5.scenario.Scenario;
+import com.conveyal.util.json.LegModeSetDeserializer;
+import com.conveyal.util.json.LegModeSetSerializer;
+import com.conveyal.util.json.TransitModeSetDeserializer;
+import com.conveyal.util.json.TransitModeSetSerializer;
+import com.conveyal.util.json.ZoneIdDeserializer;
+import com.conveyal.util.json.ZoneIdSerializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;

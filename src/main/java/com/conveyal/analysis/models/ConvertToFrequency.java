@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.r5.analyst.scenario.AddTrips;
-import com.conveyal.r5.analyst.scenario.AdjustFrequency;
+import com.conveyal.r5.scenario.AddTrips;
+import com.conveyal.r5.scenario.AdjustFrequency;
 
 import java.util.List;
 import java.util.stream.Collectors;

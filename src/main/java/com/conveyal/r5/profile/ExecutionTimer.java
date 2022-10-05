@@ -59,12 +59,6 @@ public class ExecutionTimer {
         startTimeNanos = 0;
     }
 
-    public void timeExecution (Runnable runnable) {
-        this.start();
-        runnable.run();
-        this.stop();
-    }
-
     public String getMessage () {
         String description = running ? "[RUNNING]" : accumulatedDurationNanos / 1e9D + "s";
         return String.format("%s: %s", name, description);

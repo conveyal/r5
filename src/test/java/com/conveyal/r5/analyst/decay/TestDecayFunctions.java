@@ -1,14 +1,20 @@
 package com.conveyal.r5.analyst.decay;
 
+import com.conveyal.r5.decay.DecayFunction;
+import com.conveyal.r5.decay.ExponentialDecayFunction;
+import com.conveyal.r5.decay.FixedExponentialDecayFunction;
+import com.conveyal.r5.decay.LinearDecayFunction;
+import com.conveyal.r5.decay.LogisticDecayFunction;
+import com.conveyal.r5.decay.StepDecayFunction;
 import com.google.common.primitives.Doubles;
 import gnu.trove.list.TDoubleList;
 import gnu.trove.list.array.TDoubleArrayList;
 import org.apache.commons.math3.util.FastMath;
 import org.junit.jupiter.api.Test;
 
-import static com.conveyal.r5.analyst.decay.DecayFunction.FOUR_HOURS_IN_SECONDS;
-import static com.conveyal.r5.analyst.decay.DecayFunction.TWO_HOURS_IN_SECONDS;
-import static com.conveyal.r5.analyst.decay.DecayFunction.ZERO_EPSILON;
+import static com.conveyal.r5.decay.DecayFunction.FOUR_HOURS_IN_SECONDS;
+import static com.conveyal.r5.decay.DecayFunction.TWO_HOURS_IN_SECONDS;
+import static com.conveyal.r5.decay.DecayFunction.ZERO_EPSILON;
 import static com.google.common.base.Preconditions.checkState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

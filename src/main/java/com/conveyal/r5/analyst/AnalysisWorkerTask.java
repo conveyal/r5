@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.decay.DecayFunction;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.util.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;

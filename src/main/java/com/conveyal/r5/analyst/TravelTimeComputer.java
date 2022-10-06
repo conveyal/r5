@@ -21,6 +21,7 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.path.Path;
+import com.conveyal.util.WebMercatorExtents;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import org.slf4j.Logger;
@@ -35,6 +36,8 @@ import java.util.stream.Collectors;
 import static com.conveyal.r5.analyst.PerTargetPropagater.MM_PER_METER;
 import static com.conveyal.r5.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
+import static com.conveyal.util.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -48,7 +51,7 @@ import static com.conveyal.r5.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
  */
 public class TravelTimeComputer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
-    private final AnalysisWorkerTask request;
+    private final AnalysisWorkerTask task;
     private final TransportNetwork network;
 
     private final TravelTimeReducer travelTimeReducer;
@@ -63,44 +66,87 @@ public class TravelTimeComputer {
 
     private FastRaptorWorker worker = null;
 
-    private OneOriginResult oneOriginResult = null;
+    private PointSet destinations = null;
 
     /** Constructor. */
-    public TravelTimeComputer (AnalysisWorkerTask request, TransportNetwork network) {
-        this.request = request;
+    public TravelTimeComputer (AnalysisWorkerTask task, TransportNetwork network, WebMercatorGridPointSetCache gridPointSetCache) {
+        this.task = task;
         this.network = network;
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
-        this.travelTimeReducer = new TravelTimeReducer(request, network);
+        this.travelTimeReducer = new TravelTimeReducer(task, network);
 
         // 0. Preliminary range checking and setup =====================================================================
-        if (!request.directModes.equals(request.accessModes)) {
+        if (!task.directModes.equals(task.accessModes)) {
             throw new IllegalArgumentException("Direct mode may not be different than access mode in Analysis.");
         }
 
         // If this request includes a fare calculator, inject the transport network's transit layer into it.
         // This is threadsafe because deserializing each incoming request creates a new fare calculator instance.
-        if (request.inRoutingFareCalculator != null) {
-            request.inRoutingFareCalculator.transitLayer = network.transitLayer;
+        if (task.inRoutingFareCalculator != null) {
+            task.inRoutingFareCalculator.transitLayer = network.transitLayer;
+        }
+
+        this.destinations = findDestinations(task, network, gridPointSetCache);
+    }
+
+    // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
+    // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
+    // destination pointset is used for all steps below.
+    // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
+    // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
+    private PointSet findDestinations (AnalysisWorkerTask task, TransportNetwork network, WebMercatorGridPointSetCache gridPointSetCache) {
+        if (task instanceof RegionalTask
+                && !task.makeTauiSite
+                && task.destinationPointSets[0] instanceof FreeFormPointSet
+        ) {
+            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
+            return task.destinationPointSets[0];
+        } else {
+            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
+            WebMercatorExtents destinationGridExtents = task.getWebMercatorExtents();
+            // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
+            PointSet destinations = gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
+
+            boolean calculateAccessibility;
+            if (task instanceof TravelTimeSurfaceTask) {
+                calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
+            } else {
+                // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
+                RegionalTask regionalTask = (RegionalTask) task;
+                calculateAccessibility = regionalTask.recordAccessibility;
+            }
+
+            // Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
+            // calculate travel times. They will only be used if we're calculating accessibility.
+            if (calculateAccessibility) {
+                WebMercatorExtents destinationWebMercatorExtents = destinations.getWebMercatorExtents();
+                for (PointSet opportunityPointSet : task.destinationPointSets) {
+                    checkState(opportunityPointSet.getWebMercatorExtents().equals(destinationWebMercatorExtents),
+                            "Travel time would be calculated to a PointSet that does not match the opportunity PointSet.");
+                }
+            }
+
+            return destinations;
         }
     }
 
-    public OneOriginResult computeTravelTimes (PointSet destinations) {
-        OneOriginResult result = hasNonTransitOneOriginResult(destinations);
+    public OneOriginResult computeTravelTimes () {
+        OneOriginResult result = hasNonTransitOneOriginResult();
         if (result != null) return result;
-        return propogateToDestinations(destinations).propagate();
+        return propogateToDestinations().propagate();
     }
 
     // I. Access to transit (or direct non-transit travel to destination) ==========================================
     // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel
     // times to the destination points using those access modes.
-    public OneOriginResult hasNonTransitOneOriginResult (PointSet destinations) {
+    public OneOriginResult hasNonTransitOneOriginResult () {
         // We will try to find a starting point in the street network and perform an access search with each street mode.
         // This tracks whether any of those searches (for any mode) were successfully connected to the street network.
         boolean foundAnyOriginPoint = false;
 
         // Convert from profile routing qualified modes to internal modes. This also ensures we don't route on
         // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
-        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
+        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(task.accessModes);
 
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
         for (StreetMode accessMode : accessModes) {
@@ -108,7 +154,7 @@ public class TravelTimeComputer {
 
             // Look up pick-up service for an access leg.
             PickupWaitTimes.AccessService accessService =
-                    network.streetLayer.getAccessService(request.fromLat, request.fromLon, accessMode);
+                    network.streetLayer.getAccessService(task.fromLat, task.fromLon, accessMode);
 
             // When an on-demand mobility service is defined, it may not be available at this particular location.
             if (accessService == NO_SERVICE_HERE) {
@@ -122,9 +168,9 @@ public class TravelTimeComputer {
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
             // The request must be provided to the StreetRouter before setting the origin point.
             StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.profileRequest = request;
+            sr.profileRequest = task;
             sr.streetMode = accessMode;
-            if (!sr.setOrigin(request.fromLat, request.fromLon)) {
+            if (!sr.setOrigin(task.fromLat, task.fromLon)) {
                 // Short circuit around routing and propagation if the origin point was not attached to the street network.
                 LOG.info("Origin point could not be linked to the street network for mode {}.", accessMode);
                 continue;
@@ -141,9 +187,9 @@ public class TravelTimeComputer {
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
             {
-                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit()) {
-                    limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
+                int limitSeconds = task.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+                if (task.hasTransit()) {
+                    limitSeconds = Math.min(limitSeconds, task.getMaxTimeSeconds(accessMode));
                 }
                 sr.timeLimitSeconds = limitSeconds;
             }
@@ -159,7 +205,7 @@ public class TravelTimeComputer {
                 sr.keepRoutingOnFoot();
             }
 
-            if (request.hasTransit()) {
+            if (task.hasTransit()) {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 // TODO add logic here if linkedStops are specified in pickupDelay?
@@ -190,13 +236,13 @@ public class TravelTimeComputer {
                         accessMode
                 );
 
-                int streetSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
+                int streetSpeedMillimetersPerSecond = (int) (task.getSpeedForMode(accessMode) * 1000);
                 if (streetSpeedMillimetersPerSecond <= 0) {
                     throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
 
                 // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+                int walkSpeedMillimetersPerSecond = (int) (task.walkSpeed * MM_PER_METER);
 
                 Split origin = sr.getOriginSplit();
 
@@ -226,7 +272,7 @@ public class TravelTimeComputer {
         // FIXME this special case for CAR_PARK currently overwrites any results from other access modes.
         //       That means computation is completely wasted and maybe duplicated.
         // This is pretty ugly, and should be integrated into the mode loop above.
-        if (request.accessModes.contains(LegMode.CAR_PARK)) {
+        if (task.accessModes.contains(LegMode.CAR_PARK)) {
             // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
             // Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
             // If multiple P+Rs reach the same stop, only one with shortest time is returned. Stops were searched for during graph building phase.
@@ -234,8 +280,8 @@ public class TravelTimeComputer {
             // by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
             // FIXME we should not limit the number of car parks found.
             StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.profileRequest = request;
-            sr = findParkRidePath(request, sr, network.transitLayer);
+            sr.profileRequest = task;
+            sr = findParkRidePath(task, sr, network.transitLayer);
             if (sr == null) {
                 // Origin not found. Signal this using the same flag as the other modes do.
                 foundAnyOriginPoint = false;
@@ -257,10 +303,10 @@ public class TravelTimeComputer {
 
         // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
         // were reached, return the non-transit grid as the final result.
-        if (request.transitModes.isEmpty() || bestAccessOptions.streetTimesAndModes.isEmpty()) {
+        if (task.transitModes.isEmpty() || bestAccessOptions.streetTimesAndModes.isEmpty()) {
             LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
             int nTargets =  nonTransitTravelTimesToDestinations.size();
-            if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
+            if (task instanceof RegionalTask && ((RegionalTask) task).oneToOne) nTargets = 1;
             for (int target = 0; target < nTargets; target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
@@ -278,9 +324,15 @@ public class TravelTimeComputer {
      * is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
      */
     private int[][] calculateTravelTimesToStops () {
-        if (request.inRoutingFareCalculator != null) return calculateWithSuboptimalPathProfileRouter();
+        if (task.inRoutingFareCalculator != null) return calculateWithSuboptimalPathProfileRouter();
         // Create the FastRaptorWorker
-        worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
+        worker = new FastRaptorWorker(network.transitLayer, task, bestAccessOptions.getTimes());
+
+        if (task.includePathResults || task.makeTauiSite) {
+            // By default, this is false and intermediate results (e.g. paths) are discarded.
+            // TODO do we really need to save all states just to get the travel time breakdown?
+            worker.retainPaths = true;
+        }
 
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
         // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
@@ -292,25 +344,25 @@ public class TravelTimeComputer {
         // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
         IntFunction<DominatingList> listSupplier =
                 (departureTime) -> new FareDominatingList(
-                        request.inRoutingFareCalculator,
-                        request.maxFare,
-                        departureTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
+                        task.inRoutingFareCalculator,
+                        task.maxFare,
+                        departureTime + task.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
         McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
-                request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
+                task, null, null, listSupplier, InRoutingFareCalculator.getCollator(task));
         mcRaptorWorker.route();
         return mcRaptorWorker.getBestTimes();
     }
 
     // III. Egress Propagation ======================================================================================
     // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
-    public PerTargetPropagater propogateToDestinations (PointSet destinations) {
+    public PerTargetPropagater propogateToDestinations () {
         int[][] transitTravelTimesToStops = calculateTravelTimesToStops();
 
         // This propagator will link the destinations to the street layer for all modes as needed.
         return new PerTargetPropagater(
                 destinations,
                 network,
-                request,
+                task,
                 // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
                 // because in the non-transit case we call the reducer directly (see above).
                 travelTimeReducer,
@@ -326,7 +378,7 @@ public class TravelTimeComputer {
      * propagater. Not supported for fare requests, which use the McRaptor router and path style.
      */
     private List<Path[]> getPathsIfNeeded () {
-        if ((request.includePathResults || request.makeTauiSite) && worker != null) {
+        if ((task.includePathResults || task.makeTauiSite) && worker != null) {
             return worker.pathsPerIteration.stream().peek(paths -> {
                 for (Path path : paths) {
                     if (path != null) {

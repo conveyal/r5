@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.util.WebMercatorExtents;
 import gnu.trove.list.TIntList;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
@@ -29,9 +30,7 @@ public abstract class PointSet {
      * @param envelope the envelope in FIXED POINT DEGREES within which we want to find all points.
      * @return a list of indexes for all points in the PointSet at least partially inside the envelope.
      */
-    public TIntList getPointsInEnvelope(Envelope envelope) {
-        throw new UnsupportedOperationException();
-    }
+    public abstract TIntList getPointsInEnvelope(Envelope envelope);
 
     /**
      * @return the WGS84 latitude of point i in the PointSet. In the general case, all PointSets (even those on grids)

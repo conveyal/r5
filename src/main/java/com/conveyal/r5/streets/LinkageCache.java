@@ -1,8 +1,8 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.r5.streets;
 
 import com.conveyal.modes.StreetMode;
-import com.conveyal.r5.streets.LinkedPointSet;
-import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;

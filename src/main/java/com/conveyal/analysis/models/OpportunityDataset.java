@@ -2,7 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.util.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import static com.conveyal.file.FileCategory.GRIDS;

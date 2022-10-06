@@ -1,4 +1,4 @@
-package com.conveyal.r5.analyst;
+package com.conveyal.util;
 
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -9,9 +9,6 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.util.Arrays;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkElementIndex;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -53,29 +50,6 @@ public class WebMercatorExtents {
         this.width = width;
         this.height = height;
         this.zoom = zoom;
-    }
-
-    /**
-     * If pointSets are all gridded, return the minimum bounding WebMercatorExtents containing them all.
-     * Otherwise return null (this null is a hack explained below and should eventually be made more consistent).
-     */
-    public static WebMercatorExtents forPointsets (PointSet[] pointSets) {
-        checkNotNull(pointSets);
-        checkElementIndex(0, pointSets.length, "You must supply at least one destination PointSet.");
-        if (pointSets[0] instanceof Grid || pointSets[0] instanceof GridTransformWrapper) {
-            WebMercatorExtents extents = pointSets[0].getWebMercatorExtents();
-            for (PointSet pointSet : pointSets) {
-                extents = extents.expandToInclude(pointSet.getWebMercatorExtents());
-            }
-            return extents;
-        } else {
-            // Temporary way to bypass network preloading while freeform pointset functionality is being
-            // developed. For now, the null return value is used in TravelTimeComputer to signal that the worker
-            // should use a provided freeform pointset, rather than creating a WebMercatorGridPointSet based on the
-            // parameters of the request.
-            checkArgument(pointSets.length == 1, "You may only specify one non-gridded PointSet.");
-            return null;
-        }
     }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */

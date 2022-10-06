@@ -5,13 +5,13 @@ import com.conveyal.modes.LegMode;
 import com.conveyal.modes.TransitModes;
 import com.conveyal.r5.analyst.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.ChaosParameters;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.decay.DecayFunction;
 import com.conveyal.r5.decay.StepDecayFunction;
 import com.conveyal.r5.fare.InRoutingFareCalculator;
 import com.conveyal.r5.scenario.Scenario;
 import com.conveyal.util.HttpServerRuntimeException;
 import com.conveyal.util.UserPermissions;
+import com.conveyal.util.WebMercatorExtents;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
 

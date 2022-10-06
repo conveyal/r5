@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.util.WebMercatorExtents;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 

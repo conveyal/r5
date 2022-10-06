@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 
@@ -54,8 +55,8 @@ public class RandomFrequencyPhasingTests {
                 .monteCarloDraws(1000)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes(task.destinationPointSets[0]);
+        TravelTimeComputer computer = new TravelTimeComputer(task, network, new WebMercatorGridPointSetCache());
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
     }
 

@@ -5,9 +5,11 @@ import com.conveyal.file.FileItemInputStreamProvider;
 import com.conveyal.util.GeometryUtils;
 import com.conveyal.util.ProgressListener;
 import com.conveyal.util.ShapefileReader;
+import com.conveyal.util.WebMercatorExtents;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
+import gnu.trove.list.TIntList;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -368,6 +370,11 @@ public class Grid extends PointSet {
 
     public boolean hasEqualExtents(Grid comparisonGrid){
         return this.extents.equals(comparisonGrid.extents);
+    }
+
+    @Override
+    public TIntList getPointsInEnvelope(Envelope envelope) {
+        throw new UnsupportedOperationException();
     }
 
     /**

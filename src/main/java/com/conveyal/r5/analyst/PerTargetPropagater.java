@@ -76,7 +76,7 @@ public class PerTargetPropagater {
      * For each iteration of the raptor algorithm, an array of the path that yielded the best travel time to each
      * transit stop. May be null, only needs to be set if we're recording paths.
      */
-    public List<Path[]> pathsToStopsForIteration = null;
+    public List<Path[]> pathsToStopsForIteration;
 
     /**
      * Different options for retaining and reporting paths. In default analyses, paths are not retained.
@@ -404,7 +404,7 @@ public class PerTargetPropagater {
                             // Because that's the case, update the best known travel time and, if requested, the
                             // corresponding path.
                             perIterationTravelTimes[iteration] = timeToReachTarget;
-                            if (pathsToStopsForIteration != null) {
+                            if (pathsToStopsForIteration != null && pathsToStopsForIteration.size() > 0) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {
                                     perIterationPaths[iteration] = path;

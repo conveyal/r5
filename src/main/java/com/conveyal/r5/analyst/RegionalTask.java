@@ -1,5 +1,11 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.util.WebMercatorExtents;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkElementIndex;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Represents a task to be performed as part of a regional analysis.
  * Instances are serialized and sent from the backend to workers when processing regional analyses.
@@ -73,7 +79,30 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
         if (makeTauiSite) {
             return super.getWebMercatorExtents();
         } else {
-            return WebMercatorExtents.forPointsets(this.destinationPointSets);
+            return forPointsets(this.destinationPointSets);
+        }
+    }
+
+    /**
+     * If pointSets are all gridded, return the minimum bounding WebMercatorExtents containing them all.
+     * Otherwise return null (this null is a hack explained below and should eventually be made more consistent).
+     */
+    public WebMercatorExtents forPointsets (PointSet[] pointSets) {
+        checkNotNull(pointSets);
+        checkElementIndex(0, pointSets.length, "You must supply at least one destination PointSet.");
+        if (pointSets[0] instanceof Grid || pointSets[0] instanceof GridTransformWrapper) {
+            WebMercatorExtents extents = pointSets[0].getWebMercatorExtents();
+            for (PointSet pointSet : pointSets) {
+                extents = extents.expandToInclude(pointSet.getWebMercatorExtents());
+            }
+            return extents;
+        } else {
+            // Temporary way to bypass network preloading while freeform pointset functionality is being
+            // developed. For now, the null return value is used in TravelTimeComputer to signal that the worker
+            // should use a provided freeform pointset, rather than creating a WebMercatorGridPointSet based on the
+            // parameters of the request.
+            checkArgument(pointSets.length == 1, "You may only specify one non-gridded PointSet.");
+            return null;
         }
     }
 

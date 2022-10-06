@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.util.WebMercatorExtents;
+import gnu.trove.list.TIntList;
 import org.locationtech.jts.geom.Envelope;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -44,6 +46,11 @@ public class GridTransformWrapper extends PointSet {
             return -1;
         }
         return y * sourceGrid.extents.width + x;
+    }
+
+    @Override
+    public TIntList getPointsInEnvelope(Envelope envelope) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

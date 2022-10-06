@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.ParameterException;
 import com.conveyal.file.FileItemInputStreamProvider;
+import com.conveyal.util.WebMercatorExtents;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;

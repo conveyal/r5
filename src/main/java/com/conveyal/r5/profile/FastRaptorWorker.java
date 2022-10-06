@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.AnalysisWorkerTask;
 import com.conveyal.r5.transit.FilteredPattern;
 import com.conveyal.r5.transit.FilteredPatterns;
 import com.conveyal.r5.transit.PickDropType;
@@ -105,7 +104,7 @@ public class FastRaptorWorker {
     private final TIntIntMap accessStops;
 
     /** The routing parameters. */
-    private final AnalysisWorkerTask request;
+    private final ProfileRequest request;
 
     /** Generates and stores departure time offsets for every frequency-based set of trips. */
     private final FrequencyRandomOffsets offsets;
@@ -139,7 +138,7 @@ public class FastRaptorWorker {
      * Only fast initialization steps are performed in the constructor.
      * All slower work is done in route() so timing information can be collected.
      */
-    public FastRaptorWorker (TransitLayer transitLayer, AnalysisWorkerTask request, TIntIntMap accessStops) {
+    public FastRaptorWorker (TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
         this.transit = transitLayer;
         this.request = request;
         this.accessStops = accessStops;
@@ -158,12 +157,6 @@ public class FastRaptorWorker {
         // Hidden feature: activate half-headway boarding times by specifying zero Monte Carlo draws.
         // The UI requires one or more draws, so this can only be activated by editing request JSON directly.
         boardingMode = (request.monteCarloDraws == 0) ? HALF_HEADWAY : MONTE_CARLO;
-
-        if (request.includePathResults || request.makeTauiSite) {
-            // By default, this is false and intermediate results (e.g. paths) are discarded.
-            // TODO do we really need to save all states just to get the travel time breakdown?
-            retainPaths = true;
-        }
     }
 
     /**

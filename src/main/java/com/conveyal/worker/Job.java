@@ -1,7 +1,7 @@
 package com.conveyal.worker;
 
 import com.conveyal.r5.analyst.RegionalTask;
-import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.util.WebMercatorExtents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

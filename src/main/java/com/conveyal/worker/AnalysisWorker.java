@@ -10,18 +10,15 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.PersistenceBuffer;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.OneOriginResult;
 import com.conveyal.r5.analyst.PathResult;
 import com.conveyal.r5.analyst.PerTargetPropagater;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.RegionalTask;
 import com.conveyal.r5.analyst.RegionalWorkResult;
 import com.conveyal.r5.analyst.TimeGridWriter;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.scenario.TaskError;
 import com.conveyal.r5.transit.SerializablePathIterations;
@@ -66,7 +63,6 @@ import static com.conveyal.r5.analyst.TravelTimeSurfaceResultsFormat.GEOTIFF;
 import static com.conveyal.util.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This contains the main polling loop used by the worker to pull and asynchronously process regional analysis tasks.
@@ -118,9 +114,6 @@ public class AnalysisWorker implements Component {
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
     // INSTANCE FIELDS
-
-    /** Hold a reference to the config object to avoid copying the many config values. */
-    private final Config config;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final NetworkPreloader networkPreloader;
@@ -200,7 +193,6 @@ public class AnalysisWorker implements Component {
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        this.config = config;
         this.brokerBaseUrl = String.format("http://%s:%s/internal", config.brokerAddress(), config.brokerPort());
 
         // Set the initial graph affinity of this worker (which will be null in local operation).
@@ -311,46 +303,6 @@ public class AnalysisWorker implements Component {
         return singlePointResultToBinary(oneOriginResult, task, transportNetwork);
     }
 
-    // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
-    // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
-    // destination pointset is used for all steps below.
-    // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
-    // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
-    private PointSet findDestinations (AnalysisWorkerTask task, TransportNetwork network) {
-        if (task instanceof RegionalTask
-                && !task.makeTauiSite
-                && task.destinationPointSets[0] instanceof FreeFormPointSet
-        ) {
-            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
-            return task.destinationPointSets[0];
-        } else {
-            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
-            WebMercatorExtents destinationGridExtents = task.getWebMercatorExtents();
-            // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
-            PointSet destinations = gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
-
-            boolean calculateAccessibility = false;
-            if (task instanceof TravelTimeSurfaceTask) {
-                calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
-            } else {
-                // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
-                RegionalTask regionalTask = (RegionalTask) task;
-                calculateAccessibility = regionalTask.recordAccessibility;
-            }
-
-            // Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
-            // calculate travel times. They will only be used if we're calculating accessibility.
-            if (calculateAccessibility) {
-                for (PointSet opportunityPointSet : task.destinationPointSets) {
-                    checkState(opportunityPointSet.getWebMercatorExtents().equals(destinations.getWebMercatorExtents()),
-                            "Travel time would be calculated to a PointSet that does not match the opportunity PointSet.");
-                }
-            }
-
-            return destinations;
-        }
-    }
-
     /**
      * Synchronously handle one single-point task.
      * @return the travel time grid (binary data) which will be passed back to the client UI, with a JSON block at the
@@ -373,9 +325,8 @@ public class AnalysisWorker implements Component {
         eventBus.send(new HandleSinglePointEvent());
 
         // Perform the core travel time computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        PointSet destinations = findDestinations(task, transportNetwork);
-        return computer.computeTravelTimes(destinations);
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridPointSetCache);
+        return computer.computeTravelTimes();
     }
 
     private byte[] singlePointResultToBinary (
@@ -494,12 +445,10 @@ public class AnalysisWorker implements Component {
         eventBus.send(new HandleRegionalEvent());
 
         // Perform the core travel time and accessibility computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        PointSet destinations = findDestinations(task, transportNetwork);
-
-        OneOriginResult oneOriginResult = computer.hasNonTransitOneOriginResult(destinations);
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridPointSetCache);
+        OneOriginResult oneOriginResult = computer.hasNonTransitOneOriginResult();
         if (oneOriginResult == null) {
-            PerTargetPropagater propagater = computer.propogateToDestinations(destinations);
+            PerTargetPropagater propagater = computer.propogateToDestinations();
             oneOriginResult = propagater.propagate();
             if (propagater.pathWriter != null) {
                 saveTauiData(task, task.taskId + "_paths.dat", propagater.pathWriter.storePathsInBuffer());

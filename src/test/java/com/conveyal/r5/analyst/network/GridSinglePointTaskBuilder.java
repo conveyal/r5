@@ -1,13 +1,12 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.r5.analyst.FreeFormPointSet;
-import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.TravelTimeSurfaceTask;
-import com.conveyal.r5.decay.StepDecayFunction;
 import com.conveyal.modes.LegMode;
 import com.conveyal.modes.TransitModes;
+import com.conveyal.r5.analyst.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.TravelTimeSurfaceTask;
+import com.conveyal.r5.decay.StepDecayFunction;
 import org.locationtech.jts.geom.Coordinate;
 
 import java.time.LocalTime;
@@ -71,7 +70,7 @@ public class GridSinglePointTaskBuilder {
 
     public GridSinglePointTaskBuilder setDestination (int gridX, int gridY) {
         Coordinate destination = gridLayout.getIntersectionLatLon(gridX, gridY);
-        task.destinationPointSets = new PointSet[] { new FreeFormPointSet(destination) };
+        task.destinationPointSets = new FreeFormPointSet[] { new FreeFormPointSet(destination) };
         task.destinationPointSetKeys = new String[] { "ID" };
         task.toLat = destination.y;
         task.toLon = destination.x;
@@ -110,7 +109,7 @@ public class GridSinglePointTaskBuilder {
 
     public GridSinglePointTaskBuilder uniformOpportunityDensity (double density) {
         Grid grid = gridLayout.makeUniformOpportunityDataset(density);
-        task.destinationPointSets = new PointSet[] { grid };
+        task.destinationPointSets = new Grid[] { grid };
         task.destinationPointSetKeys = new String[] { "GRID" };
 
         // In a single point task, the grid of destinations is given with these fields, not from the pointset object.

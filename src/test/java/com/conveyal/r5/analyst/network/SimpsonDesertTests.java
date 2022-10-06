@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.transit.SerializablePathIterations;
 import com.conveyal.r5.analyst.TimeGridWriter;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class SimpsonDesertTests {
 
     public static final Coordinate SIMPSON_DESERT_CORNER = new CoordinateXY(136.5, -25.5);
+    public final WebMercatorGridPointSetCache cache = new WebMercatorGridPointSetCache();
 
     @Test
     public void testGridScheduled () throws Exception {
@@ -51,8 +53,8 @@ public class SimpsonDesertTests {
                 .uniformOpportunityDensity(10)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes(task.destinationPointSets[0]);
+        TravelTimeComputer computer = new TravelTimeComputer(task, network, cache);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
         // Write travel times to Geotiff for debugging visualization in desktop GIS:
         // toGeotiff(oneOriginResult, task);
@@ -90,8 +92,8 @@ public class SimpsonDesertTests {
                 .uniformOpportunityDensity(10)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes(task.destinationPointSets[0]);
+        TravelTimeComputer computer = new TravelTimeComputer(task, network, cache);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
         int destination = gridLayout.pointIndex(task, 40, 40);
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(destination);
 
@@ -126,8 +128,8 @@ public class SimpsonDesertTests {
                 .monteCarloDraws(20000)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes(task.destinationPointSets[0]);
+        TravelTimeComputer computer = new TravelTimeComputer(task, network, cache);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
         int destination = gridLayout.pointIndex(task, 40, 40);
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(destination);
 
@@ -185,7 +187,7 @@ public class SimpsonDesertTests {
                 .uniformOpportunityDensity(10)
                 .build();
 
-        OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes(standardRider.destinationPointSets[0]);
+        OneOriginResult standardResult = new TravelTimeComputer(standardRider, network, cache).computeTravelTimes();
         List<SerializablePathIterations> standardPaths = standardResult.paths.getPathIterationsForDestination();
         int[] standardTimes = standardPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus ~5 minute ride and ~5 minute egress leg
@@ -196,7 +198,7 @@ public class SimpsonDesertTests {
                 .setOrigin(10, 50)
                 .build();
 
-        OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes(naiveRider.destinationPointSets[0]);
+        OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network, cache).computeTravelTimes();
         List<SerializablePathIterations> naivePaths = naiveResult.paths.getPathIterationsForDestination();
         int[] naiveTimes = naivePaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus ~35 minute ride and ~5 minute egress leg
@@ -208,7 +210,7 @@ public class SimpsonDesertTests {
                 .departureTimeWindow(7, 13, 5)
                 .build();
 
-        OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes(savvyRider.destinationPointSets[0]);
+        OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network, cache).computeTravelTimes();
         List<SerializablePathIterations> savvyPaths = savvyResult.paths.getPathIterationsForDestination();
         int[] savvyTimes = savvyPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
         // Trip B departs stop 10 at 7:25. So 8-12 minute wait, plus ~16 minute ride and ~5 minute egress leg
@@ -235,7 +237,7 @@ public class SimpsonDesertTests {
                 .monteCarloDraws(4000)
                 .build();
 
-        OneOriginResult oneOriginResult = new TravelTimeComputer(task, network).computeTravelTimes(task.destinationPointSets[0]);
+        OneOriginResult oneOriginResult = new TravelTimeComputer(task, network, cache).computeTravelTimes();
         int pointIndex = gridLayout.pointIndex(task, 80, 80);
         int[] travelTimePercentiles = oneOriginResult.travelTimes.getTarget(pointIndex);
 

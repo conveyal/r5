@@ -5,12 +5,12 @@ import com.conveyal.modes.StreetMode;
 import com.conveyal.r5.analyst.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.progress.ProgressListener;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.util.AsyncLoader;
+import com.conveyal.util.WebMercatorExtents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

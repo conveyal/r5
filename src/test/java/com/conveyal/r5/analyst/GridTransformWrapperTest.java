@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.util.WebMercatorExtents;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

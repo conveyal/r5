@@ -4,6 +4,7 @@ import com.beust.jcommander.ParameterException;
 import com.conveyal.file.PersistenceBuffer;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.util.JsonUtils;
+import com.conveyal.util.WebMercatorExtents;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;

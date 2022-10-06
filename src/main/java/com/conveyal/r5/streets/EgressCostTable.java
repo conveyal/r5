@@ -1,12 +1,12 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.modes.StreetMode;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.progress.ProgressListener;
 import com.conveyal.r5.scenario.PickupWaitTimes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.util.GeometryUtils;
 import com.conveyal.util.LambdaCounter;
+import com.conveyal.util.WebMercatorExtents;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -358,8 +358,8 @@ public class EgressCostTable implements Serializable {
         LinkedPointSet superLinkage = subLinkage.baseLinkage;
         EgressCostTable superCostTable = superLinkage.getEgressCostTable(progressListener);
 
-        final WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) superLinkage.pointSet;
-        final WebMercatorGridPointSet subGrid = (WebMercatorGridPointSet) subLinkage.pointSet;
+        final WebMercatorExtents superGrid = superLinkage.pointSet.getWebMercatorExtents();
+        final WebMercatorExtents subGrid = subLinkage.pointSet.getWebMercatorExtents();
 
         // For each transit stop, we have a table of costs to reach pointset points (or null if none can be reached).
         // If such tables have already been built for the source linkage, copy them and crop to a smaller rectangle as

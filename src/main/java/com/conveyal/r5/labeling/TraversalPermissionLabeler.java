@@ -263,6 +263,8 @@ public abstract class TraversalPermissionLabeler {
             if (label != Label.NO) {
                 applyLabel(Node.BICYCLE, label, tree);
             }
+        } else {
+            applyLabel(Node.BICYCLE, Label.NO, tree);
         }
         if (way.hasTag("cycleway:both")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway:both")), tree);
         if (way.hasTag("motor_vehicle")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motor_vehicle")), tree);

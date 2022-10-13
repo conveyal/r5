@@ -58,8 +58,8 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testCyclewayPermissions() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=cycleway");
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
-        roadFlagComparision(osmWay, "access", "destination",
+        roadFlagComparison(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparison(osmWay, "access", "destination",
             EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
                 EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR),
             EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
@@ -73,7 +73,7 @@ public class TraversalPermissionLabelerTest {
         osmWay.addTag("highway", "residential");
         osmWay.addTag("oneway", "true");
         osmWay.addTag("oneway:bicycle", "no");
-        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparison(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
     }
 
     @Test
@@ -83,16 +83,16 @@ public class TraversalPermissionLabelerTest {
                 EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
                 EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
-        roadFlagComparision(osmWay, expectedPermissions, expectedPermissions);
+        roadFlagComparison(osmWay, expectedPermissions, expectedPermissions);
     }
 
     @Test
     public void testPlatform() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=platform;public_transport=platform");
 
-        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparison(osmWay, PEDESTRIAN, PEDESTRIAN);
 
-        roadFlagComparision(osmWay, "wheelchair", "no", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
+        roadFlagComparison(osmWay, "wheelchair", "no", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
     }
 
     @Disabled("specific tagging isn't supported yet in specific permissions")
@@ -100,12 +100,12 @@ public class TraversalPermissionLabelerTest {
     public void testSidewalk() throws Exception {
         Way osmWay = new Way();
         osmWay.addTag("highway", "footway");
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparison(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
 
         //TODO: this had special permissions in OTP
         osmWay = makeOSMWayFromTags("footway=sidewalk;highway=footway");
 
-        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparison(osmWay, PEDESTRIAN, PEDESTRIAN);
     }
 
     //Sidewalks are assumed to be bidirectional so it shouldn't matter on which side of the street they are
@@ -114,19 +114,19 @@ public class TraversalPermissionLabelerTest {
 
         Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
 
-        roadFlagComparision(osmWay, CAR, CAR);
+        roadFlagComparison(osmWay, CAR, CAR);
 
-        roadFlagComparision(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
-        roadFlagComparision(osmWay, "sidewalk", "left", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
-        roadFlagComparision(osmWay, "sidewalk", "both", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
-        roadFlagComparision(osmWay, "sidewalk", "none", CAR, CAR);
-        roadFlagComparision(osmWay, "sidewalk", "no", CAR, CAR);
+        roadFlagComparison(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparison(osmWay, "sidewalk", "left", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparison(osmWay, "sidewalk", "both", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparison(osmWay, "sidewalk", "none", CAR, CAR);
+        roadFlagComparison(osmWay, "sidewalk", "no", CAR, CAR);
         osmWay = makeOSMWayFromTags("highway=residential");
-        roadFlagComparision(osmWay, ALL, ALL);
+        roadFlagComparison(osmWay, ALL, ALL);
 
         //This shouldn't remove WALK permissions
-        roadFlagComparision(osmWay, "sidewalk", "no", ALL, ALL);
-        roadFlagComparision(osmWay, "sidewalk", "none", ALL, ALL);
+        roadFlagComparison(osmWay, "sidewalk", "no", ALL, ALL);
+        roadFlagComparison(osmWay, "sidewalk", "none", ALL, ALL);
     }
 
 
@@ -135,19 +135,19 @@ public class TraversalPermissionLabelerTest {
 
         Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
 
-        roadFlagComparision(osmWay, CAR, CAR);
+        roadFlagComparison(osmWay, CAR, CAR);
 
-        roadFlagComparision(osmWay, "cycleway", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway:both", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway:both", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway:both", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway:both", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway", "share_busway", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway", "share_busway", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway", "shared_lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway", "shared_lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
     }
 
     @Test
@@ -159,7 +159,7 @@ public class TraversalPermissionLabelerTest {
         NO_THRU_CAR_PEDESTRIAN_BICYCLE.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
 
 
-        RoadPermission roadPermission = roadFlagComparision(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
+        RoadPermission roadPermission = roadFlagComparison(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
         assertFalse(
@@ -170,7 +170,7 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testSkippingRoadsWithNoPermissions() throws Exception {
         Way osmWay = makeOSMWayFromTags("bicycle=no;foot=no;highway=primary;lanes=2;maxspeed=70;oneway=yes;ref=1");
-        RoadPermission roadPermission = roadFlagComparision(osmWay, CAR, NONE);
+        RoadPermission roadPermission = roadFlagComparison(osmWay, CAR, NONE);
 
         //Doesn't insert edges which don't have any permissions forward and backward
         assertFalse(
@@ -187,54 +187,54 @@ public class TraversalPermissionLabelerTest {
     public void testRoadWithMonodirectionalCycleway() {
         Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
 
-        roadFlagComparision(osmWay, "cycleway:right", "lane", BICYCLE_AND_CAR, CAR);
+        roadFlagComparison(osmWay, "cycleway:right", "lane", BICYCLE_AND_CAR, CAR);
 
-        roadFlagComparision(osmWay, "cycleway:right", "track", BICYCLE_AND_CAR, CAR);
+        roadFlagComparison(osmWay, "cycleway:right", "track", BICYCLE_AND_CAR, CAR);
 
-        roadFlagComparision(osmWay, "cycleway:left", "lane", CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway:left", "lane", CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "cycleway:left", "track", CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "cycleway:left", "track", CAR, BICYCLE_AND_CAR);
 
         osmWay = makeOSMWayFromTags("highway=residential;foot=no");
 
-        roadFlagComparision(osmWay, "bicycle:forward", "use_sidepath", CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "bicycle:forward", "use_sidepath", CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "bicycle:forward", "no", CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "bicycle:forward", "no", CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "bicycle:forward", "dismount", CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, "bicycle:forward", "dismount", CAR, BICYCLE_AND_CAR);
 
-        roadFlagComparision(osmWay, "bicycle:backward", "use_sidepath", BICYCLE_AND_CAR, CAR);
+        roadFlagComparison(osmWay, "bicycle:backward", "use_sidepath", BICYCLE_AND_CAR, CAR);
 
-        roadFlagComparision(osmWay, "bicycle:backward", "no", BICYCLE_AND_CAR, CAR);
+        roadFlagComparison(osmWay, "bicycle:backward", "no", BICYCLE_AND_CAR, CAR);
 
-        roadFlagComparision(osmWay, "bicycle:backward", "dismount", BICYCLE_AND_CAR, CAR);
+        roadFlagComparison(osmWay, "bicycle:backward", "dismount", BICYCLE_AND_CAR, CAR);
 
         osmWay = makeOSMWayFromTags("cycleway:right=lane;highway=residential;cycleway:left=opposite_lane;oneway=yes");
 
-        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparison(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
 
-        roadFlagComparision(osmWay, "oneway:bicycle", "no", ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparison(osmWay, "oneway:bicycle", "no", ALL, PEDESTRIAN_AND_BICYCLE);
 
         osmWay = makeOSMWayFromTags("highway=tertiary;cycleway:left=lane;bicycle:forward=use_sidepath");
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, ALL);
+        roadFlagComparison(osmWay, PEDESTRIAN_AND_CAR, ALL);
 
         osmWay = makeOSMWayFromTags("highway=nobikenoped;cycleway:left=lane;bicycle:forward=use_sidepath");
-        roadFlagComparision(osmWay, CAR, BICYCLE_AND_CAR);
+        roadFlagComparison(osmWay, CAR, BICYCLE_AND_CAR);
 
         osmWay = makeOSMWayFromTags("highway=nobikenoped;foot=yes;oneway=-1;cycleway:left=opposite_lane");
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_CAR);
+        roadFlagComparison(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_CAR);
     }
 
     @Test
     public void testCyclewayNo() throws Exception {
         Way osmWay = makeOSMWayFromTags("oneway=no;highway=residential;cycleway=no");
-        roadFlagComparision(osmWay, ALL, ALL);
+        roadFlagComparison(osmWay, ALL, ALL);
 
     }
 
-    private RoadPermission roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
-        EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
-        return roadFlagComparision(osmWay, null, null, forwardExpected, backwardExpected);
+    private RoadPermission roadFlagComparison (Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
+                                               EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+        return roadFlagComparison(osmWay, null, null, forwardExpected, backwardExpected);
     }
 
     /**
@@ -247,7 +247,7 @@ public class TraversalPermissionLabelerTest {
      * @param forwardExpected
      * @param backwardExpected
      */
-    private static RoadPermission roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+    private static RoadPermission roadFlagComparison (Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
         Way osmWay = new Way();
 
         StringJoiner stringJoiner = new StringJoiner(";");
@@ -279,27 +279,27 @@ public class TraversalPermissionLabelerTest {
     public void testSteps() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=steps");
 
-        roadFlagComparision(osmWay, PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
+        roadFlagComparison(osmWay, PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
 
-        roadFlagComparision(osmWay, "wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparison(osmWay, "wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
 
-        roadFlagComparision(osmWay, "wheelchair", "limited", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
+        roadFlagComparison(osmWay, "wheelchair", "limited", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
 
-        roadFlagComparision(osmWay, "ramp:wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparison(osmWay, "ramp:wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
     }
 
     @Test
     public void testSidepath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=tertiary;bicycle=use_sidepath");
 
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparison(osmWay, PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
     }
 
     @Test
     public void testSpecificPermission() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=primary;bicycle=use_sidepath;foot=no;junction=roundabout");
 
-        roadFlagComparision(osmWay, CAR, NONE);
+        roadFlagComparison(osmWay, CAR, NONE);
     }
 
     /**

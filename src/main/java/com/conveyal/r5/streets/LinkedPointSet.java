@@ -43,7 +43,14 @@ public class LinkedPointSet implements Serializable {
 
     // CONSTANTS
 
-    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
+    // Reduce the default walking speed when walking on links between streets and true origins/destinations. Linkages
+    // are based on straight-line connections, but people need to avoid walls/barriers. The amount of this
+    // reduction is somewhat arbitrary; for now, try sqrt(2) as a conversion from diagonal to Manhattan
+    // distance. Reducing the speed also helps avoid unintuitive results when permissions change -- for example,
+    // removing walk permission from the street next to a destination may actually reduce walking time to that
+    // destination, because the route than assumes a straight-line path from the closest street that still has walk
+    // permissions.
+    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) ((1.3f * 1000) / Math.sqrt(2));
 
     // FIELDS IDENTIFYING THIS OBJECT
     // A LinkedPointSet is uniquely derived from: a PointSet, linked to a particular StreetLayer, for a given StreetMode.

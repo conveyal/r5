@@ -263,7 +263,12 @@ public abstract class TraversalPermissionLabeler {
             if (label != Label.NO) {
                 applyLabel(Node.BICYCLE, label, tree);
             }
-        } else {
+        } else if (!(way.hasTag("highway", "residential") ||
+                way.hasTag("highway", "living_street") ||
+                way.hasTag("access", "private") ||
+                way.hasTag("highway", "cycleway") ||
+                way.hasTag("bicycle", "designated")
+        )){
             applyLabel(Node.BICYCLE, Label.NO, tree);
         }
         if (way.hasTag("cycleway:both")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway:both")), tree);

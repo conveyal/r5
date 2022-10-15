@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +38,7 @@ public class TravelTimeResult {
      * just store every travel time, but binning makes it easy to compare with probability distributions.
      */
     int[][] histograms;
+    static final int nHistogramMinutes = 120;
 
     public TravelTimeResult(AnalysisWorkerTask task) {
         nPoints = task.nTargetsPerOrigin();
@@ -54,9 +54,9 @@ public class TravelTimeResult {
         }
         if (task.recordTravelTimeHistograms) {
             // Initializing the array to a non-null value will enable histogram recording.
-            LOG.warn("Recording travel time histograms at every desitination. " +
+            LOG.warn("Recording travel time histograms at every destination. " +
                     "This increases memory consumption and should only be enabled in tests.");
-            histograms = new int[nPoints][120];
+            histograms = new int[nPoints][nHistogramMinutes];
         }
     }
 

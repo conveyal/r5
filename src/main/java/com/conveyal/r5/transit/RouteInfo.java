@@ -34,4 +34,14 @@ public class RouteInfo implements Serializable {
     }
 
     public RouteInfo () { /* do nothing */ }
+
+    public String getName () {
+        if (route_short_name != null) {
+            return route_short_name;
+        } else if (route_long_name != null){
+            return route_long_name;
+        } else {
+            return route_id;
+        }
+    }
 }

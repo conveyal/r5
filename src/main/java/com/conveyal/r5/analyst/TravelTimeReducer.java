@@ -2,24 +2,16 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.PathResultsRecorder;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.path.PatternSequence;
-import com.conveyal.r5.transit.path.Path;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -30,24 +22,14 @@ import static com.google.common.base.Preconditions.checkState;
  * appropriate cumulative opportunities accessibility indicators at that origin.
  */
 public class TravelTimeReducer {
-
-    private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
-
-    private boolean calculateAccessibility;
-
-    private boolean calculateTravelTimes;
-
     /** Cumulative opportunities accessibility at one particular origin. null if we're only recording travel times. */
     private AccessibilityResult accessibilityResult = null;
 
     /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
 
-    /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
-    private PathResult pathResult = null;
-
     /** If we are calculating accessibility, the PointSets containing opportunities. */
-    private PointSet[] destinationPointSets;
+    private final PointSet[] destinationPointSets;
 
     /** The array indexes at which we'll find each percentile in a sorted list of length timesPerDestination. */
     private final int[] percentileIndexes;
@@ -77,6 +59,8 @@ public class TravelTimeReducer {
     /** Provides a weighting factor for opportunities at a given travel time. */
     private final DecayFunction decayFunction;
 
+    private final boolean oneToOne;
+
     /**
      * Reduce travel time values to requested summary outputs for each origin. The type of output (a single
      * cumulative opportunity accessibility value per origin, or selected percentiles of travel times to all
@@ -96,10 +80,11 @@ public class TravelTimeReducer {
      *
      * @param task task to be performed.
      */
-    public TravelTimeReducer (AnalysisWorkerTask task, TransportNetwork network) {
-
-        // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
-        this.timesPerDestination = task.getTotalIterations(network.transitLayer.hasFrequencies);
+    public TravelTimeReducer (
+            AnalysisWorkerTask task,
+            int timesPerDestination
+    ) {
+        this.timesPerDestination = timesPerDestination;
 
         // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
@@ -119,14 +104,17 @@ public class TravelTimeReducer {
         // Decide which elements we'll be calculating, retaining, and returning.
         // Always copy this field, the array in the task may be null or empty but we detect that case.
         this.destinationPointSets = task.destinationPointSets;
+        boolean calculateAccessibility;
+        boolean calculateTravelTimes = true;
         if (task instanceof TravelTimeSurfaceTask) {
-            calculateTravelTimes = true;
             calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
+            oneToOne = false;
         } else {
             // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
             RegionalTask regionalTask = (RegionalTask) task;
             calculateAccessibility = regionalTask.recordAccessibility;
             calculateTravelTimes = regionalTask.recordTimes || regionalTask.makeTauiSite;
+            oneToOne = regionalTask.oneToOne;
         }
 
         // Instantiate and initialize objects to accumulate the kinds of results we expect to produce.
@@ -136,9 +124,6 @@ public class TravelTimeReducer {
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
-        }
-        if (task.includePathResults) {
-            pathResult = new PathResult(task, network.transitLayer);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -157,9 +142,22 @@ public class TravelTimeReducer {
                 this.zeroPointsForCutoffs[c] = decayFunction.reachesZeroAt(cutoffSeconds);
             }
         }
-
     }
 
+    /**
+     * Initialize new travel times array with its non-transit times per target. Additionally, call start on the paths
+     * recorder.
+     * @param nonTransitTravelTimeToTarget time to initialize the array with
+     */
+    public int[] initializeTravelTimes (
+            int nonTransitTravelTimeToTarget
+    ) {
+        int[] travelTimes = new int[timesPerDestination];
+        // Initialize the travel times to that achieved without transit (if any).
+        // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
+        Arrays.fill(travelTimes, nonTransitTravelTimeToTarget);
+        return travelTimes;
+    }
 
     /**
      * Compute the index into a sorted list of N elements at which a particular percentile will be found. Our
@@ -190,32 +188,31 @@ public class TravelTimeReducer {
         recordTravelTimePercentilesForTarget(target, travelTimePercentilesSeconds);
     }
 
+    public void recordHistogramForTarget (int targetIdx, int[] travelTimes) {
+        if (travelTimeResult == null) return;
+        if (oneToOne) targetIdx = 0;
+        travelTimeResult.recordHistogramIfEnabled(targetIdx, travelTimes);
+    }
+
     /**
      * Given a list of travel times of the expected length, extract the requested percentiles, then record those values
-     * at the specified target. WARNING: this method destructively sorts the supplied times travel in place.
-     * Their positions in the array will no longer correspond to the raptor iterations that produced them.
-     *
-     * @param timesSeconds which will be destructively sorted in place to extract percentiles.
+     * at the specified target. Warning: this sorts the passed in travel times array.
+     * @param targetIdx
+     * @param travelTimes unsorted travel times
      */
-    public void extractTravelTimePercentilesAndRecord (int target, int[] timesSeconds) {
-        checkArgument(timesSeconds.length == timesPerDestination,
-            "Number of times supplied must match the number of iterations in this search.");
-        for (int i : timesSeconds) {
-            checkArgument(i >= 0, "Travel times must be positive.");
-        }
-        if (travelTimeResult != null) {
-            travelTimeResult.recordHistogramIfEnabled(target, timesSeconds);
-        }
-        // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
+    public void extractTravelTimePercentilesAndRecord (int targetIdx, int[] travelTimes) {
+        if (oneToOne) targetIdx = 0;
+        Arrays.sort(travelTimes);
+
+        // Extract percentiles at the pre-calculated percentile indexes.
         // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
         // We even had a prototype counting sort that would take advantage of this detail. However, applying distance
         // decay functions with one-second resolution decreases sensitivity to randomization error in travel times.
-        Arrays.sort(timesSeconds);
         int[] percentileTravelTimesSeconds = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
-            percentileTravelTimesSeconds[p] = timesSeconds[percentileIndexes[p]];
+            percentileTravelTimesSeconds[p] = travelTimes[percentileIndexes[p]];
         }
-        recordTravelTimePercentilesForTarget(target, percentileTravelTimesSeconds);
+        recordTravelTimePercentilesForTarget(targetIdx, percentileTravelTimesSeconds);
     }
 
     /**
@@ -229,14 +226,14 @@ public class TravelTimeReducer {
         for (int i : travelTimePercentilesSeconds) {
             checkArgument(i >= 0, "Travel times must be positive.");
         }
-        if (calculateTravelTimes) {
+        if (travelTimeResult != null) {
             int[] percentileTravelTimesMinutes = new int[nPercentiles];
             for (int p = 0; p < nPercentiles; p++) {
                 percentileTravelTimesMinutes[p] = convertToMinutes(travelTimePercentilesSeconds[p]);
             }
             travelTimeResult.setTarget(target, percentileTravelTimesMinutes);
         }
-        if (calculateAccessibility) {
+        if (accessibilityResult != null) {
             // This can handle multiple opportunity grids as long as they have exactly the same extents.
             // Grids of different extents are handled by using GridTransformWrapper to give them all the same extents.
             for (int d = 0; d < destinationPointSets.length; d++) {
@@ -274,32 +271,6 @@ public class TravelTimeReducer {
     }
 
     /**
-     * For the specified target index, record the path and travel time details for each iteration.
-     *
-     * @param target index for destination target
-     * @param perIterationTimes total travel time for each iteration
-     * @param perIterationPaths paths for each iteration
-     */
-    public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
-                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
-        Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
-        for (int i = 0; i < perIterationTimes.length; i++) {
-            Path path = perIterationPaths[i];
-            int totalTime = perIterationTimes[i];
-            if (path != null) {
-                PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
-                PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
-                paths.put(patternSequence, iteration);
-            } else if (totalTime < UNREACHED){
-                PatternSequence patternSequence = new PatternSequence(null, null, null, null);
-                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
-                paths.put(patternSequence, iteration);
-            }
-        }
-        pathResult.setTarget(target, paths);
-    }
-
-    /**
      * Convert the given timeSeconds to minutes, being careful to preserve UNREACHED values.
      * The seconds to minutes conversion uses integer division, which truncates toward zero. This approach is correct
      * for use in accessibility analysis, where we are always testing whether a travel time is less than a certain
@@ -313,8 +284,8 @@ public class TravelTimeReducer {
      */
     private int convertToMinutes (int timeSeconds) {
         // This check is a bit redundant, UNREACHED is always >= any integer pruning threshold.
-        if (timeSeconds == UNREACHED) {
-            return UNREACHED;
+        if (timeSeconds == FastRaptorWorker.UNREACHED) {
+            return FastRaptorWorker.UNREACHED;
         } else {
             int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
             return timeMinutes;
@@ -328,8 +299,12 @@ public class TravelTimeReducer {
      * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around routing and propagation when the
      * origin point is not connected to the street network.
      */
-    public OneOriginResult finish () {
-        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
+    public OneOriginResult finish(PathResultsRecorder pathsRecorder) {
+        return new OneOriginResult(
+                travelTimeResult,
+                accessibilityResult,
+                pathsRecorder
+        );
     }
 
     /**
@@ -337,7 +312,7 @@ public class TravelTimeReducer {
      * calculate travel times. They will only be used if we're calculating accessibility.
      */
     public void checkOpportunityExtents (PointSet travelTimePointSet) {
-        if (calculateAccessibility) {
+        if (accessibilityResult != null) {
             for (PointSet opportunityPointSet : destinationPointSets) {
                 checkState(opportunityPointSet.getWebMercatorExtents().equals(travelTimePointSet.getWebMercatorExtents()),
                         "Travel time would be calculated to a PointSet that does not match the opportunity PointSet.");

@@ -639,29 +639,6 @@ public class TransitLayer implements Serializable, Cloneable {
         return c == null ? null : GeometryUtils.geometryFactory.createPoint(c);
     }
 
-    /**
-     * Log some summary information about the contents of the layer that might help with spotting errors or bad data.
-     */
-    public void summarizeRoutesAndPatterns() {
-        System.out.println("Total stops " + stopForIndex.size());
-        System.out.println("Total patterns " + tripPatterns.size());
-        System.out.println("routeId,patterns,trips,stops");
-        Multimap<String, TripPattern> patternsForRoute = HashMultimap.create();
-        for (TripPattern pattern : tripPatterns) {
-            patternsForRoute.put(pattern.routeId, pattern);
-        }
-        for (String routeId : patternsForRoute.keySet()) {
-            Collection<TripPattern> patterns = patternsForRoute.get(routeId);
-            int nTrips = patterns.stream().mapToInt(p -> p.tripSchedules.size()).sum();
-            TIntSet stopsUsed = new TIntHashSet();
-            for (TripPattern pattern : patterns) stopsUsed.addAll(pattern.stops);
-            int nStops = stopsUsed.size();
-            int nPatterns = patternsForRoute.get(routeId).size();
-            System.out.println(String.join(",", routeId,
-                    Integer.toString(nPatterns), Integer.toString(nTrips), Integer.toString(nStops)));
-        }
-    }
-
     /** How much information should we load/save? */
     public enum LoadLevel {
         /** Load only information required for analytics, leaving out route names, etc. */
@@ -814,31 +791,13 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
-     * also include a route_short_name or route_long_name (if they are not null).
+     * Get the stop ID. If it does not exist, it is a new stop and return "new".
+     * @param stopIndex
+     * @return stopId
      */
-    public String routeString(int routeIndex, boolean includeName) {
-        RouteInfo routeInfo = routes.get(routeIndex);
-        String route = routeInfo.route_id;
-        if (includeName) {
-            if (routeInfo.route_short_name != null) {
-                return routeInfo.route_short_name;
-            } else if (routeInfo.route_long_name != null){
-                return routeInfo.route_long_name;
-            }
-        }
-        return route;
+    public String getStopId (int stopIndex) {
+        String stopId = stopIdForIndex.get(stopIndex);
+        if (stopId == null) return "[new]";
+        return stopId;
     }
-
-    /**
-     * For the given stop index, returns the GTFS stopId (stripped of R5's feedId prefix) and, if includeName is true,
-     * stopName.
-     */
-    public String stopString(int stopIndex, boolean includeName) {
-        // TODO use a compact feed index, instead of splitting to remove feedIds
-        if (stopIdForIndex.get(stopIndex) == null) return "[new]";
-        if (includeName) return stopNames.get(stopIndex);
-        return stopIdForIndex.get(stopIndex).split(":")[1];
-    }
-
 }

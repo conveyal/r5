@@ -282,19 +282,6 @@ public class RaptorState {
         return optimal;
     }
 
-    /** Debug function: dump the path to a particular stop as a String. */
-    public String dump (int stop) {
-        Path p = new Path(this, stop);
-
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < p.length; i++) {
-            sb.append(String.format("Stop %5d at %5d, reached by pattern %5d from stop %5d\n", p.alightStops[i], p.alightTimes[i], p.patterns[i], p.boardStops[i]));
-        }
-
-        return sb.toString();
-    }
-
     /**
      * This is the core of the range-raptor optimization. We move the departure time back one or more minutes,
      * reusing the existing results from the later minute. They are all still valid trips, you just have to wait a

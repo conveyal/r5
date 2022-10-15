@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -54,9 +53,6 @@ public class RandomFrequencyPhasingTests {
                 .monteCarloDraws(1000)
                 .build();
 
-        TravelTimeComputer computer = new TravelTimeComputer(task, network);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
+        TravelTimeComputer.computeTravelTimes(task, network);
     }
-
 }

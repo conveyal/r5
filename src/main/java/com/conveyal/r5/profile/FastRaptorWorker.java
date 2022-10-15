@@ -7,7 +7,6 @@ import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.conveyal.r5.transit.path.Path;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
@@ -17,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
@@ -129,21 +127,26 @@ public class FastRaptorWorker {
      */
     private final FrequencyBoardingMode boardingMode;
 
-    /** Set to true to save path details for all optimal paths. */
-    public boolean retainPaths = false;
-
-    /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
-    public List<Path[]> pathsPerIteration;
+    /**
+     * Record paths. Is enabled or disabled on creation.
+     */
+    private final TransitPathsPerIteration transitPathsPerIteration;
 
     /**
      * Only fast initialization steps are performed in the constructor.
      * All slower work is done in route() so timing information can be collected.
      */
-    public FastRaptorWorker (TransitLayer transitLayer, AnalysisWorkerTask request, TIntIntMap accessStops) {
+    public FastRaptorWorker (
+            TransitLayer transitLayer,
+            AnalysisWorkerTask request,
+            TIntIntMap accessStops,
+            TransitPathsPerIteration transitPathsPerIteration
+    ) {
         this.transit = transitLayer;
         this.request = request;
         this.accessStops = accessStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
+        this.transitPathsPerIteration = transitPathsPerIteration;
 
         offsets = new FrequencyRandomOffsets(transitLayer);
 
@@ -177,7 +180,6 @@ public class FastRaptorWorker {
         LOG.info("Performing {} total iterations ({} per minute); boarding {}; frequencies {}",
                 nIterations, iterationsPerMinute, boardingMode, transit.hasFrequencies);
         int[][] travelTimesToStopsPerIteration = new int[nIterations][];
-        if (retainPaths) pathsPerIteration = new ArrayList<>();
 
         // This main outer loop iterates backward over all minutes in the departure times window.
         // TODO revise this loop so seconds are derived from minute numbers
@@ -392,9 +394,7 @@ public class FastRaptorWorker {
                 // No need to make an additional protective copy, this state is already a copy of the scheduled state.
                 RaptorState finalRoundState = frequencyState[request.maxRides];
                 result[iteration] = finalRoundState.bestNonTransferTimes;
-                if (retainPaths) {
-                    pathsPerIteration.add(pathToEachStop(finalRoundState));
-                }
+                transitPathsPerIteration.recordPathsForIterationState(finalRoundState);
             }
             raptorTimer.frequencySearch.stop();
             return result;
@@ -410,10 +410,7 @@ public class FastRaptorWorker {
             // We have to be careful here that creating these paths does not modify the state, and makes
             // protective copies of any information we want to retain.
             result[0] = finalRoundState.bestNonTransferTimes;
-            if (retainPaths) {
-                Path[] paths = pathToEachStop(finalRoundState);
-                pathsPerIteration.add(paths);
-            }
+            transitPathsPerIteration.recordPathsForIterationState(finalRoundState);
             return result;
         }
     }
@@ -432,23 +429,6 @@ public class FastRaptorWorker {
         }
         return copy;
     }
-
-    /**
-     * Create the optimal path to each stop in the transit network, based on the given RaptorState.
-     */
-    private static Path[] pathToEachStop(RaptorState state) {
-        int nStops = state.bestNonTransferTimes.length;
-        Path[] paths = new Path[nStops];
-        for (int s = 0; s < nStops; s++) {
-            if (state.bestNonTransferTimes[s] == UNREACHED) {
-                paths[s] = null;
-            } else {
-                paths[s] = new Path(state, s);
-            }
-        }
-        return paths;
-    }
-
 
     /**
      * Starting from a trip we're already riding, step backward through the trips in the supplied filteredPattern to see
@@ -563,7 +543,7 @@ public class FastRaptorWorker {
                     // the upstream one would allow a shorter access/transfer leg. Doing so will not affect total travel
                     // time (as long as this is in a conditional ensuring we won't miss the trip we're on), but it will
                     // affect the breakdown of walk vs. wait time.
-                    final boolean reboardForPaths = retainPaths
+                    final boolean reboardForPaths = transitPathsPerIteration.isEnabled
                         && (onTrip != NONE)
                         && inputState.shorterAccessOrTransferLeg(stop, boardStop);
 

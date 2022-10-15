@@ -2,8 +2,9 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.PathResultsRecorder;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.LegMode;
@@ -13,24 +14,28 @@ import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.PerTargetPropagater;
+import com.conveyal.r5.profile.PropagationTimer;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.profile.TransitPathsPerIteration;
+import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.IntFunction;
-import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
-import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -43,22 +48,14 @@ import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
  * TODO: try to decouple the internal representation of the results from how they're serialized to the API.
  */
 public class TravelTimeComputer {
-
+    public static final int MM_PER_METER = 1000;
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
-    private final AnalysisWorkerTask request;
-    private final TransportNetwork network;
-
-    /** Constructor. */
-    public TravelTimeComputer (AnalysisWorkerTask request, TransportNetwork network) {
-        this.request = request;
-        this.network = network;
-    }
 
     /**
      * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both depending
      * on what's in the task it's given. TODO factor out each major step of this process into private methods.
      */
-    public OneOriginResult computeTravelTimes() {
+    public static OneOriginResult computeTravelTimes(AnalysisWorkerTask request, TransportNetwork network) {
 
         // 0. Preliminary range checking and setup =====================================================================
         if (!request.directModes.equals(request.accessModes)) {
@@ -71,9 +68,15 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
-        // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
-        // TODO Create and encapsulate this object within the propagator.
-        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request, network);
+        // Is this a `oneToOne` task?
+        boolean oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+
+        // Set the destination index for storing single paths
+        int destinationIndexForPaths = -1;
+
+        // We will not record or report travel times for paths this long or longer. To limit calculation time and avoid
+        // overflow, places at least this many seconds from the origin are simply considered unreachable.
+        int maxTripDurationSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
 
         // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
         // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
@@ -81,18 +84,40 @@ public class TravelTimeComputer {
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         PointSet destinations;
-
-        if (request instanceof  RegionalTask
-            && !request.makeTauiSite
-            && request.destinationPointSets[0] instanceof FreeFormPointSet
+        if (request instanceof RegionalTask
+                && !request.makeTauiSite
+                && request.destinationPointSets[0] instanceof FreeFormPointSet
         ) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = request.destinationPointSets[0];
+            if (oneToOne) destinationIndexForPaths = request.taskId;
+
         } else {
             // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
-            destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
+            WebMercatorGridPointSet gridPointSet = AnalysisWorkerTask.gridPointSetCache.get(
+                    destinationGridExtents,
+                    network.fullExtentGridPointSet
+            );
+            if (request.includePathResults && (request instanceof TravelTimeSurfaceTask || oneToOne)) {
+                destinationIndexForPaths = gridPointSet.getPointIndexContaining(request.toLon, request.toLat);
+            }
+            destinations = gridPointSet;
+        }
+
+        // Store `nIterations` expected. Used to size arrays.
+        int nIterations = request.getTotalIterations(network.transitLayer.hasFrequencies);
+
+        // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
+        // Set timesPerDestination depending on how waiting time/travel time variability will be sampled
+        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(
+                request,
+                nIterations
+        );
+
+        // Ensure opportunity extents match the task.
+        if (destinations instanceof WebMercatorGridPointSet) {
             travelTimeReducer.checkOpportunityExtents(destinations);
         }
 
@@ -115,6 +140,21 @@ public class TravelTimeComputer {
         // Convert from profile routing qualified modes to internal modes. This also ensures we don't route on
         // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
         EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
+
+        // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
+        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
+
+        // Pre-compute and retain a pre-multiplied integer speed to avoid float math in the loops below. These
+        // two values used to be computed once when the propagator was constructed, but now they must be
+        // computed separately for each egress StreetMode. At one point we believed float math was slowing down
+        // this code, however it's debatable whether that was due to casts, the mathematical operations
+        // themselves, or the fact that the operations were being completed with doubles rather than floats.
+        Map<StreetMode, Integer> modeSpeeds = new HashMap<>();
+        Map<StreetMode, Integer> modeTimeLimits = new HashMap<>();
+        for (StreetMode mode : EnumSet.allOf(StreetMode.class)) {
+            modeSpeeds.put(mode, (int) (request.getSpeedForMode(mode) * MM_PER_METER));
+            modeTimeLimits.put(mode, request.getMaxTimeSeconds(mode));
+        }
 
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
         for (StreetMode accessMode : accessModes) {
@@ -155,7 +195,7 @@ public class TravelTimeComputer {
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
             {
-                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+                int limitSeconds = maxTripDurationSeconds;
                 if (request.hasTransit()) {
                     limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
                 }
@@ -204,20 +244,17 @@ public class TravelTimeComputer {
                         accessMode
                 );
 
-                int streetSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
+                int streetSpeedMillimetersPerSecond = modeSpeeds.get(accessMode);
                 if (streetSpeedMillimetersPerSecond <= 0) {
                     throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
-
-                // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
 
                 Split origin = sr.getOriginSplit();
 
                 PointSetTimes pointSetTimes = linkedDestinations.eval(
                         sr::getTravelTimeToVertex,
                         streetSpeedMillimetersPerSecond,
-                        walkSpeedMillimetersPerSecond,
+                        modeSpeeds.get(StreetMode.WALK),
                         origin
                 );
 
@@ -266,92 +303,149 @@ public class TravelTimeComputer {
             // The origin point was not even linked to the street network.
             // Calling finish() before streaming in any travel times to destinations is designed to produce the right result.
             LOG.info("Origin point was outside the street network. Skipping routing and propagation, and returning default result.");
-            return travelTimeReducer.finish();
+            return travelTimeReducer.finish(null);
+        }
+
+        if (nonTransitTravelTimesToDestinations.travelTimes.length != destinations.featureCount()) {
+            throw new IllegalArgumentException("Non-transit travel times must have the same number of entries as there are points.");
         }
 
         // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
         // were reached, return the non-transit grid as the final result.
         if (request.transitModes.isEmpty() || bestAccessOptions.streetTimesAndModes.isEmpty()) {
             LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
-            int nTargets =  nonTransitTravelTimesToDestinations.size();
-            if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
+            int nTargets = nonTransitTravelTimesToDestinations.size();
+            if (oneToOne) nTargets = 1;
             for (int target = 0; target < nTargets; target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
                 travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);
             }
-            return travelTimeReducer.finish();
+            return travelTimeReducer.finish(null);
         }
 
         // II. Transit Routing ========================================================================================
+
+        // Record paths per iteration for use during propagation.
+        TransitPathsPerIteration pathsPerIteration = new TransitPathsPerIteration(
+                request.makeTauiSite || request.includePathResults,
+                bestAccessOptions
+        );
+
         // Transit stops were reached. Perform transit routing from those stops to all other reachable stops. The result
         // is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
-        int[][] transitTravelTimesToStops;
-        FastRaptorWorker worker = null;
-        if (request.inRoutingFareCalculator == null) {
-            worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
-            if (request.includePathResults || request.makeTauiSite) {
-                // By default, this is false and intermediate results (e.g. paths) are discarded.
-                // TODO do we really need to save all states just to get the travel time breakdown?
-                worker.retainPaths = true;
-            }
-            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
-            // Additional detailed path information is retained in the FastRaptorWorker after routing.
-            transitTravelTimesToStops = worker.route();
-        } else {
-            // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
-            IntFunction<DominatingList> listSupplier =
-                    (departureTime) -> new FareDominatingList(
-                            request.inRoutingFareCalculator,
-                            request.maxFare,
-                            departureTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
-            McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
-                    request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
-            mcRaptorWorker.route();
-            transitTravelTimesToStops = mcRaptorWorker.getBestTimes();
-        }
+        int[][] transitTravelTimesToStops = request.inRoutingFareCalculator == null
+                ? routeToStops(network.transitLayer, request, bestAccessOptions.getTimes(), pathsPerIteration)
+                : routeToStopsWithFares(request, network);
 
         // III. Egress Propagation ======================================================================================
         // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
+        PropagationTimer timer = new PropagationTimer();
+        timer.fullPropagation.start();
 
-        // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
-        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
+        // Invert and transpose data to speed up inner loops.
+        timer.transposition.start();
+        int[][] invertedTravelTimesToStops = PerTargetPropagater.getInvertedTravelTimesToStops(transitTravelTimesToStops);
 
-        // This propagator will link the destinations to the street layer for all modes as needed.
-        PerTargetPropagater perTargetPropagater = new PerTargetPropagater(
+        // This will link the destinations to the street layer for all modes as needed.
+        List<EgressCostTable> costTables = PerTargetPropagater.getTransposedEgressCostTables(
                 destinations,
-                network.streetLayer,
                 egressStreetModes,
+                network.streetLayer,
+                network.linkageCache
+        );
+        timer.transposition.stop();
+
+        // Create the paths recorder
+        PathResultsRecorder pathsRecorder = new PathResultsRecorder(
+                network.transitLayer,
                 request,
-                transitTravelTimesToStops,
-                nonTransitTravelTimesToDestinations.travelTimes
+                oneToOne,
+                pathsPerIteration,
+                destinationIndexForPaths,
+                nIterations
         );
 
-        // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
-        // because in the non-transit case we call the reducer directly (see above).
-        perTargetPropagater.travelTimeReducer = travelTimeReducer;
-
-        // When path results are needed (directly requested, or for a Taui site), read them from the worker,
-        // annotating with the access mode, then use the annotated paths to initialize the appropriate field in the
-        // propagater. Not supported for fare requests, which use the McRaptor router and path style.
-        if ((request.includePathResults || request.makeTauiSite) && worker != null) {
-            perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
-                for (Path path : paths) {
-                    if (path != null) {
-                        path.patternSequence.stopSequence.setAccess(bestAccessOptions);
-                    }
-                }
-            }).collect(Collectors.toList());
-            // Initialize the propagater's pathWriter to write Taui results directly to storage (instead of returning
-            // them to the backend).
-            if (request.makeTauiSite) {
-                perTargetPropagater.pathWriter = new PathWriter(request);
-            }
+        // In most tasks, we want to propagate travel times for each origin out to all the destinations.
+        int startTarget = 0;
+        int endTarget = nonTransitTravelTimesToDestinations.size();
+        if (oneToOne) {
+            startTarget = request.taskId;
+            endTarget = startTarget + 1;
         }
 
-        return perTargetPropagater.propagate();
+        // For each target, record the total travel times with propagation to the destinations.
+        for (int targetIdx = startTarget; targetIdx < endTarget; targetIdx++) {
+            timer.reducer.start();
+            // Generate base travel times array starting with non-transit times.
+            int nonTransitTravelTimeToTarget = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(targetIdx);
+            int[] travelTimesToTarget = travelTimeReducer.initializeTravelTimes(nonTransitTravelTimeToTarget);
+            timer.reducer.stop();
 
+            // Initiate path recording for this target
+            pathsRecorder.startRecordingTarget(targetIdx);
+
+            timer.propagation.start();
+            PerTargetPropagater.propagateToTarget(
+                    targetIdx,
+                    travelTimesToTarget,
+                    pathsRecorder,
+                    costTables,
+                    modeSpeeds,
+                    modeTimeLimits,
+                    invertedTravelTimesToStops,
+                    maxTripDurationSeconds
+            );
+            timer.propagation.stop();
+
+            // Record paths accumulated from propagation.
+            pathsRecorder.recordPathsForTarget(
+                    targetIdx,
+                    travelTimesToTarget
+            );
+
+            // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
+            timer.reducer.start();
+            travelTimeReducer.recordHistogramForTarget(targetIdx, travelTimesToTarget);
+
+            // NB: this next method sorts the travel times and should be the last one to use the array.
+            travelTimeReducer.extractTravelTimePercentilesAndRecord(targetIdx, travelTimesToTarget);
+            timer.reducer.stop();
+        }
+        timer.fullPropagation.stop();
+        timer.log();
+
+        return travelTimeReducer.finish(pathsRecorder);
     }
 
+    static int[][] routeToStops(
+            TransitLayer transitLayer,
+            AnalysisWorkerTask task,
+            TIntIntMap bestAccessOptionsTimes,
+            TransitPathsPerIteration transitPathsPerIteration
+    ) {
+        FastRaptorWorker worker = new FastRaptorWorker(
+                transitLayer,
+                task,
+                bestAccessOptionsTimes,
+                transitPathsPerIteration
+        );
+        // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+        // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+        // Additional detailed path information is retained in the FastRaptorWorker after routing.
+        return worker.route();
+    }
+
+    static int[][] routeToStopsWithFares(AnalysisWorkerTask task, TransportNetwork network) {
+        // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
+        IntFunction<DominatingList> listSupplier =
+                (departureTime) -> new FareDominatingList(
+                        task.inRoutingFareCalculator,
+                        task.maxFare,
+                        departureTime + task.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
+        McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
+                task, null, null, listSupplier, InRoutingFareCalculator.getCollator(task));
+        mcRaptorWorker.route();
+        return mcRaptorWorker.getBestTimes();
+    }
 }

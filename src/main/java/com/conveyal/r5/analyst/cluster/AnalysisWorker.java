@@ -4,7 +4,9 @@ import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
 import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
@@ -19,6 +21,7 @@ import com.conveyal.r5.transitive.TransitiveNetwork;
 import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.base.Preconditions;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -38,7 +41,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -51,7 +53,6 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -317,9 +318,7 @@ public class AnalysisWorker implements Component {
         eventBus.send(new HandleSinglePointEvent());
 
         // Perform the core travel time computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
-        return oneOriginResult;
+        return TravelTimeComputer.computeTravelTimes(task, transportNetwork);
     }
 
     private byte[] singlePointResultToBinary (
@@ -343,12 +342,25 @@ public class AnalysisWorker implements Component {
             // TODO eventually reuse same code path as static site time grid saving
             // TODO move the JSON writing code into the grid writer, it's essentially part of the grid format
             timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            PathResultSummary pathResultSummary = null;
+            if (oneOriginResult.hasPathResults()) {
+                PathResult[] pathResults = oneOriginResult.paths.getPathResults();
+                Preconditions.checkState(pathResults.length == 1, "Paths were stored for multiple " +
+                        "destinations, but only one is being requested");
+                PathResult pathResult = pathResults[0];
+                if (pathResult != null) {
+                    pathResultSummary = new PathResultSummary(
+                            pathResults[0],
+                            transportNetwork.transitLayer
+                    );
+                }
+            }
             addJsonToGrid(
                     byteArrayOutputStream,
                     oneOriginResult.accessibility,
                     transportNetwork.scenarioApplicationWarnings,
                     transportNetwork.scenarioApplicationInfo,
-                    oneOriginResult.paths
+                    pathResultSummary
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -389,8 +401,8 @@ public class AnalysisWorker implements Component {
         {
             task.decayFunction.prepare();
             int maxCutoffMinutes = Arrays.stream(task.cutoffsMinutes).max().getAsInt();
-            int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * SECONDS_PER_MINUTE);
-            int maxTripDurationMinutes = (int)(Math.ceil(maxTripDurationSeconds / 60D));
+            int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * 60);
+            int maxTripDurationMinutes = (int) (Math.ceil(maxTripDurationSeconds / 60D));
             if (maxTripDurationMinutes > 120) {
                 LOG.warn("Distance decay function reached zero above 120 minutes. Capping travel time at 120 minutes.");
                 maxTripDurationMinutes = 120;
@@ -438,8 +450,7 @@ public class AnalysisWorker implements Component {
         eventBus.send(new HandleRegionalEvent());
 
         // Perform the core travel time and accessibility computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+        OneOriginResult oneOriginResult = TravelTimeComputer.computeTravelTimes(task, transportNetwork);
 
         if (task.makeTauiSite) {
             // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
@@ -450,10 +461,30 @@ public class AnalysisWorker implements Component {
                 TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
                 PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
                 String timesFileName = task.taskId + "_times.dat";
-                fileStorage.saveTauiData(task, timesFileName, persistenceBuffer);
+                saveTauiData(task, timesFileName, persistenceBuffer);
             } else {
                 LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
+
+            if (oneOriginResult.hasPathResults()) {
+                PathResult[] pathResults = oneOriginResult.paths.getPathResults();
+                TauiPathResultsWriter tauiPathResultsWriter = new TauiPathResultsWriter(
+                        pathResults.length,
+                        task.nPathsPerTarget
+                );
+                boolean hasResults = tauiPathResultsWriter.indexPathResults(pathResults);
+                if (hasResults) {
+                    PersistenceBuffer pathsBuffer = new PersistenceBuffer();
+                    tauiPathResultsWriter.writeHeader(pathsBuffer.getDataOutput());
+                    tauiPathResultsWriter.writePathsAndInde(pathsBuffer.getDataOutput());
+                    pathsBuffer.doneWriting();
+                    saveTauiData(task, task.taskId + "_paths.dat", pathsBuffer);
+                } else {
+                    // No cells were reached with any transit paths. Do not write anything out to save storage space.
+                    LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
+                }
+            }
+
             // Overwrite with an empty set of results to send back to the backend, allowing it to track job
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
             // that have already been written to S3, and throwing exceptions on old backends that can't deal with
@@ -461,12 +492,16 @@ public class AnalysisWorker implements Component {
             oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
         }
 
+        String[][][] summarizedPathResults = oneOriginResult.hasPathResults()
+                ? RegionalPathResultsSummary.summarize(oneOriginResult.paths.getPathResults(), transportNetwork.transitLayer)
+                : null;
+
         // Accumulate accessibility results, which will be returned to the backend in batches.
         // For most regional analyses, this is an accessibility indicator value for one of many origins,
         // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
         // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
         synchronized (workResults) {
-            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+            workResults.add(new RegionalWorkResult(oneOriginResult, task, summarizedPathResults));
         }
         throughputTracker.recordTaskCompletion(task.jobId);
     }
@@ -488,7 +523,7 @@ public class AnalysisWorker implements Component {
 
         public List<TaskError> scenarioApplicationInfo;
 
-        public List<PathResult.PathIterations> pathSummaries;
+        public PathResultSummary pathSummaries = null;
 
         @Override
         public String toString () {
@@ -515,7 +550,7 @@ public class AnalysisWorker implements Component {
             AccessibilityResult accessibilityResult,
             List<TaskError> scenarioApplicationWarnings,
             List<TaskError> scenarioApplicationInfo,
-            PathResult pathResult
+            PathResultSummary pathResult
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
@@ -526,7 +561,7 @@ public class AnalysisWorker implements Component {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
-        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
+        jsonBlock.pathSummaries = pathResult;
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.
@@ -602,20 +637,25 @@ public class AnalysisWorker implements Component {
             // Save the regional analysis request, giving the UI some context to display the results.
             // This is the request object sent to the workers to generate these static site regional results.
             PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisWorkerTask);
-            fileStorage.saveTauiData(analysisWorkerTask, "request.json", buffer);
+            saveTauiData(analysisWorkerTask, "request.json", buffer);
 
             // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
             buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
-            fileStorage.saveTauiData(analysisWorkerTask, "warnings.json", buffer);
+            saveTauiData(analysisWorkerTask, "warnings.json", buffer);
 
             // Save transit route data that allows rendering paths with the Transitive library in a separate file.
             TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
-            fileStorage.saveTauiData(analysisWorkerTask, "transitive.json", buffer);
+            saveTauiData(analysisWorkerTask, "transitive.json", buffer);
         } catch (Exception e) {
             LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);
         }
+    }
+
+    void saveTauiData(AnalysisWorkerTask task, String fileName, PersistenceBuffer buffer) {
+        FileStorageKey key = new FileStorageKey(FileCategory.TAUI, String.join("/", task.jobId, fileName));
+        fileStorage.moveIntoStorage(key, buffer);
     }
 
 }

@@ -22,6 +22,9 @@ public class PathResultSummary {
             PathResult pathResult,
             TransitLayer transitLayer
     ) {
+        if (pathResult == null || pathResult.iterationsForPathTemplates.length != 1 || pathResult.iterationsForPathTemplates[0] == null)
+            return;
+
         // Iterate through each path result creating a list of iteration details and itineraries that reference each
         // other through an index.
         int itineraryIndex = 0;

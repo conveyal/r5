@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Convert a PathResult to an API friendly version. Uses the transit layer to get route information from the patterns.
+ * Convert a PathResult to an API friendly version. Uses the transit layer to get route and stop details.
  */
 public class PathResultSummary {
     public List<IterationDetails> iterations = new ArrayList<>();
@@ -65,7 +65,8 @@ public class PathResultSummary {
     }
 
     /**
-     * Wraps path and iteration details for JSON serialization
+     * An itinerary taken from a path result, including access and egress mode, transit legs, duration range, and how
+     * many iterations this itinerary was used.
      */
     static class Itinerary {
         public StreetTimesAndModes.StreetTimeAndMode access;

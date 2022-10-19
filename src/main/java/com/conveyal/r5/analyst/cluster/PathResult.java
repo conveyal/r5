@@ -153,16 +153,16 @@ public class PathResult {
      * Wraps path and iteration details for JSON serialization
      */
     public static class PathIterations {
-        public StreetTimesAndModes.StreetTimeAndMode access; // StreetTimesAndModes.StreetTimeAndMode would be more machine-readable.
+        public StreetTimesAndModes.StreetTimeAndMode access;
         public StreetTimesAndModes.StreetTimeAndMode egress;
         public Collection<RouteSequence.TransitLeg> transitLegs;
-        public Collection<HumanReadableIteration> iterations;
+        public Collection<Iteration> iterations;
 
         PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
             this.access = pathTemplate.stopSequence.access;
             this.egress = pathTemplate.stopSequence.egress;
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
-            this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
+            this.iterations = iterations;
         }
     }
 
@@ -208,21 +208,4 @@ public class PathResult {
             this.totalTime = totalTime;
         }
     }
-
-    /**
-     * Timestamp style clock times, and rounded wait/total time, for inspection as JSON.
-     */
-    public static class HumanReadableIteration {
-        public int departureTime;
-        public int[] waitTimes;
-        public int totalTime;
-
-        HumanReadableIteration(Iteration iteration) {
-            // TODO track departure time for non-transit paths (so direct trips don't show departure time 00:00).
-            this.departureTime = iteration.departureTime;
-            this.waitTimes =  iteration.waitTimes.toArray();
-            this.totalTime =  iteration.totalTime;
-        }
-    }
-
 }

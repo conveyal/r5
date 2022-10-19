@@ -46,7 +46,7 @@ public class PathResult {
      * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
-    private final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+    public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
 
     public static String[] DATA_COLUMNS = new String[]{

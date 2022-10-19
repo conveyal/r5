@@ -38,7 +38,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -348,7 +347,7 @@ public class AnalysisWorker implements Component {
                     oneOriginResult.accessibility,
                     transportNetwork.scenarioApplicationWarnings,
                     transportNetwork.scenarioApplicationInfo,
-                    oneOriginResult.paths
+                    oneOriginResult.paths != null ? new PathResultSummary(oneOriginResult.paths, transportNetwork.transitLayer) : null
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -488,7 +487,7 @@ public class AnalysisWorker implements Component {
 
         public List<TaskError> scenarioApplicationInfo;
 
-        public List<PathResult.PathIterations> pathSummaries;
+        public PathResultSummary pathSummaries;
 
         @Override
         public String toString () {
@@ -515,7 +514,7 @@ public class AnalysisWorker implements Component {
             AccessibilityResult accessibilityResult,
             List<TaskError> scenarioApplicationWarnings,
             List<TaskError> scenarioApplicationInfo,
-            PathResult pathResult
+            PathResultSummary pathResult
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
@@ -526,7 +525,7 @@ public class AnalysisWorker implements Component {
             // study area). But we'd need to control the number of decimal places serialized into the JSON.
             jsonBlock.accessibility = accessibilityResult.getIntValues();
         }
-        jsonBlock.pathSummaries = pathResult == null ? Collections.EMPTY_LIST : pathResult.getPathIterationsForDestination();
+        jsonBlock.pathSummaries = pathResult;
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

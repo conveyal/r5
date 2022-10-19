@@ -12,8 +12,10 @@ import java.util.StringJoiner;
 /** A door-to-door path that includes the routes ridden between stops */
 public class RouteSequence {
 
-    /** Route indexes (those used in R5 transit layer) for each transit leg */
-    private final TIntList routes;
+    /**
+     * Route indexes (those used in R5 transit layer) for each transit leg
+     */
+    public final TIntList routes;
     public final StopSequence stopSequence;
 
     /** Convert a pattern-based path into a more general route-based path. */

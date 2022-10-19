@@ -841,4 +841,15 @@ public class TransitLayer implements Serializable, Cloneable {
         return stopIdForIndex.get(stopIndex).split(":")[1];
     }
 
+    /**
+     * Get the stop ID. If it does not exist, it is a new stop and return "new".
+     *
+     * @param stopIndex
+     * @return stopId
+     */
+    public String getStopId(int stopIndex) {
+        String stopId = stopIdForIndex.get(stopIndex);
+        if (stopId == null) return "[new]";
+        return stopId;
+    }
 }

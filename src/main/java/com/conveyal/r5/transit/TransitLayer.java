@@ -822,9 +822,9 @@ public class TransitLayer implements Serializable, Cloneable {
         String route = routeInfo.route_id;
         if (includeName) {
             if (routeInfo.route_short_name != null) {
-                return routeInfo.route_short_name;
+                route += " (" + routeInfo.route_short_name + ")";
             } else if (routeInfo.route_long_name != null){
-                return routeInfo.route_long_name;
+                route += " (" + routeInfo.route_long_name + ")";
             }
         }
         return route;
@@ -836,20 +836,8 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String stopString(int stopIndex, boolean includeName) {
         // TODO use a compact feed index, instead of splitting to remove feedIds
-        if (stopIdForIndex.get(stopIndex) == null) return "[new]";
-        if (includeName) return stopNames.get(stopIndex);
-        return stopIdForIndex.get(stopIndex).split(":")[1];
-    }
-
-    /**
-     * Get the stop ID. If it does not exist, it is a new stop and return "new".
-     *
-     * @param stopIndex
-     * @return stopId
-     */
-    public String getStopId(int stopIndex) {
-        String stopId = stopIdForIndex.get(stopIndex);
-        if (stopId == null) return "[new]";
-        return stopId;
+        String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
+        if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
+        return stop;
     }
 }

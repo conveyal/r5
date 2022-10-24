@@ -11,17 +11,20 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Convert a PathResult to an API friendly version. Uses the transit layer to get route information from the patterns.
+ * Convert a PathResult to an API friendly version. Uses the transit layer to get route and stop details.
  */
 public class PathResultSummary {
     public List<IterationDetails> iterations = new ArrayList<>();
     public List<Itinerary> itineraries = new ArrayList<>();
-    public int fastestPathTime = Integer.MAX_VALUE;
+    public int fastestPathSeconds = Integer.MAX_VALUE;
 
     public PathResultSummary(
             PathResult pathResult,
             TransitLayer transitLayer
     ) {
+        if (pathResult == null || pathResult.iterationsForPathTemplates.length != 1 || pathResult.iterationsForPathTemplates[0] == null)
+            return;
+
         // Iterate through each path result creating a list of iteration details and itineraries that reference each
         // other through an index.
         int itineraryIndex = 0;
@@ -32,7 +35,7 @@ public class PathResultSummary {
             for (var iteration : allIterations) {
                 if (iteration.totalTime < fastestIteration) {
                     fastestIteration = iteration.totalTime;
-                    if (fastestIteration < fastestPathTime) fastestPathTime = fastestIteration;
+                    if (fastestIteration < fastestPathSeconds) fastestPathSeconds = fastestIteration;
                 }
                 // Add to the set of durations
                 durations.add(iteration.totalTime);
@@ -65,15 +68,16 @@ public class PathResultSummary {
     }
 
     /**
-     * Wraps path and iteration details for JSON serialization
+     * An itinerary taken from a path result, including access and egress mode, transit legs, duration range (seconds),
+     * and how many iterations this itinerary was used.
      */
     static class Itinerary {
         public StreetTimeAndMode access;
         public StreetTimeAndMode egress;
         public List<TransitLeg> transitLegs;
         public int iterationsOptimal;
-        public int minDuration;
-        public int maxDuration;
+        public int minSeconds;
+        public int maxSeconds;
 
         public int index;
 
@@ -82,27 +86,27 @@ public class PathResultSummary {
                 StreetTimeAndMode egress,
                 List<TransitLeg> transitLegs,
                 int iterationsOptimal,
-                int minDuration,
-                int maxDuration,
+                int minSeconds,
+                int maxSeconds,
                 int index
         ) {
             this.access = access;
             this.egress = egress;
             this.transitLegs = transitLegs;
             this.iterationsOptimal = iterationsOptimal;
-            this.maxDuration = maxDuration;
-            this.minDuration = minDuration;
+            this.maxSeconds = maxSeconds;
+            this.minSeconds = minSeconds;
             this.index = index;
         }
     }
 
     /**
-     * String representations of the boarding stop, alighting stop, and route, with in-vehicle time.
+     * String representations of the boarding stop, alighting stop, and route, with ride time (in seconds).
      */
     static class TransitLeg {
         public String routeId;
         public String routeName;
-        public int inVehicleTime;
+        public int rideTimeSeconds;
         public String boardStopId;
         public String boardStopName;
 
@@ -118,14 +122,14 @@ public class PathResultSummary {
             routeId = routeInfo.route_id;
             routeName = routeInfo.getName();
 
-            inVehicleTime = stopSequence.rideTimesSeconds.get(routeIndex);
+            rideTimeSeconds = stopSequence.rideTimesSeconds.get(routeIndex);
 
             int boardStopIndex = stopSequence.boardStops.get(routeIndex);
-            boardStopId = transitLayer.getStopId(boardStopIndex);
+            boardStopId = getStopId(transitLayer, boardStopIndex);
             boardStopName = transitLayer.stopNames.get(boardStopIndex);
 
             int alightStopIndex = stopSequence.alightStops.get(routeIndex);
-            alightStopId = transitLayer.getStopId(alightStopIndex);
+            alightStopId = getStopId(transitLayer, alightStopIndex);
             alightStopName = transitLayer.stopNames.get(alightStopIndex);
         }
     }
@@ -133,6 +137,8 @@ public class PathResultSummary {
     /**
      * Temporal details of a specific iteration of our RAPTOR implementation (per-leg wait times and total time
      * implied by a specific departure time and randomized schedule offsets).
+     * <p>
+     * All times are in seconds. Departure time is seconds from midnight.
      */
     public static class IterationDetails implements Comparable<IterationDetails> {
         public final int departureTime;
@@ -155,5 +161,17 @@ public class PathResultSummary {
             if (diff != 0) return diff;
             return this.itineraryIndex - o.itineraryIndex;
         }
+    }
+
+    /**
+     * Get the stop ID. If it does not exist, it is a new stop and return "new".
+     *
+     * @param stopIndex
+     * @return stopId
+     */
+    private static String getStopId(TransitLayer transitLayer, int stopIndex) {
+        String stopId = transitLayer.stopIdForIndex.get(stopIndex);
+        if (stopId == null) return "[new]";
+        return stopId;
     }
 }

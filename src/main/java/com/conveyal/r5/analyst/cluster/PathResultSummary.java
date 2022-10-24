@@ -22,9 +22,6 @@ public class PathResultSummary {
             PathResult pathResult,
             TransitLayer transitLayer
     ) {
-        if (pathResult == null || pathResult.iterationsForPathTemplates.length != 1 || pathResult.iterationsForPathTemplates[0] == null)
-            return;
-
         // Iterate through each path result creating a list of iteration details and itineraries that reference each
         // other through an index.
         int itineraryIndex = 0;
@@ -125,11 +122,11 @@ public class PathResultSummary {
             rideTimeSeconds = stopSequence.rideTimesSeconds.get(routeIndex);
 
             int boardStopIndex = stopSequence.boardStops.get(routeIndex);
-            boardStopId = getStopId(transitLayer, boardStopIndex);
+            boardStopId = transitLayer.getStopId(boardStopIndex);
             boardStopName = transitLayer.stopNames.get(boardStopIndex);
 
             int alightStopIndex = stopSequence.alightStops.get(routeIndex);
-            alightStopId = getStopId(transitLayer, alightStopIndex);
+            alightStopId = transitLayer.getStopId(alightStopIndex);
             alightStopName = transitLayer.stopNames.get(alightStopIndex);
         }
     }
@@ -161,17 +158,5 @@ public class PathResultSummary {
             if (diff != 0) return diff;
             return this.itineraryIndex - o.itineraryIndex;
         }
-    }
-
-    /**
-     * Get the stop ID. If it does not exist, it is a new stop and return "new".
-     *
-     * @param stopIndex
-     * @return stopId
-     */
-    private static String getStopId(TransitLayer transitLayer, int stopIndex) {
-        String stopId = transitLayer.stopIdForIndex.get(stopIndex);
-        if (stopId == null) return "[new]";
-        return stopId;
     }
 }

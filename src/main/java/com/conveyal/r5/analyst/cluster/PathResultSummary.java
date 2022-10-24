@@ -16,7 +16,7 @@ import java.util.List;
 public class PathResultSummary {
     public List<IterationDetails> iterations = new ArrayList<>();
     public List<Itinerary> itineraries = new ArrayList<>();
-    public int fastestPathTime = Integer.MAX_VALUE;
+    public int fastestPathSeconds = Integer.MAX_VALUE;
 
     public PathResultSummary(
             PathResult pathResult,
@@ -35,7 +35,7 @@ public class PathResultSummary {
             for (var iteration : allIterations) {
                 if (iteration.totalTime < fastestIteration) {
                     fastestIteration = iteration.totalTime;
-                    if (fastestIteration < fastestPathTime) fastestPathTime = fastestIteration;
+                    if (fastestIteration < fastestPathSeconds) fastestPathSeconds = fastestIteration;
                 }
                 // Add to the set of durations
                 durations.add(iteration.totalTime);
@@ -68,16 +68,16 @@ public class PathResultSummary {
     }
 
     /**
-     * An itinerary taken from a path result, including access and egress mode, transit legs, duration range, and how
-     * many iterations this itinerary was used.
+     * An itinerary taken from a path result, including access and egress mode, transit legs, duration range (seconds),
+     * and how many iterations this itinerary was used.
      */
     static class Itinerary {
         public StreetTimesAndModes.StreetTimeAndMode access;
         public StreetTimesAndModes.StreetTimeAndMode egress;
         public List<TransitLeg> transitLegs;
         public int iterationsOptimal;
-        public int minDuration;
-        public int maxDuration;
+        public int minSeconds;
+        public int maxSeconds;
 
         public int index;
 
@@ -86,27 +86,27 @@ public class PathResultSummary {
                 StreetTimesAndModes.StreetTimeAndMode egress,
                 List<TransitLeg> transitLegs,
                 int iterationsOptimal,
-                int minDuration,
-                int maxDuration,
+                int minSeconds,
+                int maxSeconds,
                 int index
         ) {
             this.access = access;
             this.egress = egress;
             this.transitLegs = transitLegs;
             this.iterationsOptimal = iterationsOptimal;
-            this.maxDuration = maxDuration;
-            this.minDuration = minDuration;
+            this.maxSeconds = maxSeconds;
+            this.minSeconds = minSeconds;
             this.index = index;
         }
     }
 
     /**
-     * String representations of the boarding stop, alighting stop, and route, with in-vehicle time.
+     * String representations of the boarding stop, alighting stop, and route, with ride time (in seconds).
      */
     static class TransitLeg {
         public String routeId;
         public String routeName;
-        public int inVehicleTime;
+        public int rideTimeSeconds;
         public String boardStopId;
         public String boardStopName;
 
@@ -122,7 +122,7 @@ public class PathResultSummary {
             routeId = routeInfo.route_id;
             routeName = routeInfo.getName();
 
-            inVehicleTime = stopSequence.rideTimesSeconds.get(routeIndex);
+            rideTimeSeconds = stopSequence.rideTimesSeconds.get(routeIndex);
 
             int boardStopIndex = stopSequence.boardStops.get(routeIndex);
             boardStopId = getStopId(transitLayer, boardStopIndex);
@@ -137,6 +137,8 @@ public class PathResultSummary {
     /**
      * Temporal details of a specific iteration of our RAPTOR implementation (per-leg wait times and total time
      * implied by a specific departure time and randomized schedule offsets).
+     * <p>
+     * All times are in seconds. Departure time is seconds from midnight.
      */
     public static class IterationDetails implements Comparable<IterationDetails> {
         public final int departureTime;

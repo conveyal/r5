@@ -343,12 +343,11 @@ public class AnalysisWorker implements Component {
             // TODO move the JSON writing code into the grid writer, it's essentially part of the grid format
             timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             PathResultSummary pathResultSummary = null;
-            if (oneOriginResult.hasPathResults()) {
-                PathResult[] pathResults = oneOriginResult.paths.getPathResults();
+            PathResult[] pathResults = oneOriginResult.getPathResults();
+            if (pathResults.length > 0) {
                 Preconditions.checkState(pathResults.length == 1, "Paths were stored for multiple " +
                         "destinations, but only one is being requested");
-                PathResult pathResult = pathResults[0];
-                if (pathResult != null) {
+                if (pathResults[0] != null) {
                     pathResultSummary = new PathResultSummary(
                             pathResults[0],
                             transportNetwork.transitLayer
@@ -451,7 +450,7 @@ public class AnalysisWorker implements Component {
 
         // Perform the core travel time and accessibility computations.
         OneOriginResult oneOriginResult = TravelTimeComputer.computeTravelTimes(task, transportNetwork);
-
+        PathResult[] pathResults = oneOriginResult.getPathResults();
         if (task.makeTauiSite) {
             // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
             // value because we're generating a set of time grids for a static site. We only save a file if it has
@@ -466,18 +465,9 @@ public class AnalysisWorker implements Component {
                 LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
 
-            if (oneOriginResult.hasPathResults()) {
-                PathResult[] pathResults = oneOriginResult.paths.getPathResults();
-                TauiPathResultsWriter tauiPathResultsWriter = new TauiPathResultsWriter(
-                        pathResults.length,
-                        task.nPathsPerTarget
-                );
-                boolean hasResults = tauiPathResultsWriter.indexPathResults(pathResults);
-                if (hasResults) {
-                    PersistenceBuffer pathsBuffer = new PersistenceBuffer();
-                    tauiPathResultsWriter.writeHeader(pathsBuffer.getDataOutput());
-                    tauiPathResultsWriter.writePathsAndInde(pathsBuffer.getDataOutput());
-                    pathsBuffer.doneWriting();
+            if (pathResults.length > 0) {
+                PersistenceBuffer pathsBuffer = TauiPathResultsWriter.getPathsBuffer(pathResults, task.nPathsPerTarget);
+                if (pathsBuffer != null) {
                     saveTauiData(task, task.taskId + "_paths.dat", pathsBuffer);
                 } else {
                     // No cells were reached with any transit paths. Do not write anything out to save storage space.
@@ -492,8 +482,8 @@ public class AnalysisWorker implements Component {
             oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
         }
 
-        String[][][] summarizedPathResults = oneOriginResult.hasPathResults()
-                ? RegionalPathResultsSummary.summarize(oneOriginResult.paths.getPathResults(), transportNetwork.transitLayer)
+        String[][][] summarizedPathResults = pathResults.length > 0
+                ? RegionalPathResultsSummary.summarize(pathResults, transportNetwork.transitLayer)
                 : null;
 
         // Accumulate accessibility results, which will be returned to the backend in batches.

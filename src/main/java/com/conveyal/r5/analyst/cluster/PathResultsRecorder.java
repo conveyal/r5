@@ -24,7 +24,7 @@ public class PathResultsRecorder {
     // Number of iterations per target
     private final int nIterations;
 
-    // The following three fields are initialized depending on if different path recording modes are enabled.
+    // The following two fields are initialized depending on if different path recording modes are enabled.
     private final PathResult[] pathResults;
     private final TransitPathsPerIteration pathsPerIteration;
 
@@ -33,7 +33,7 @@ public class PathResultsRecorder {
     private Path[] paths = null;
 
     // Transit layer required to convert patterns to route indexes
-    private TransitLayer transitLayer;
+    private final TransitLayer transitLayer;
 
     public PathResultsRecorder(
             TransitLayer transitLayer,
@@ -69,8 +69,6 @@ public class PathResultsRecorder {
     }
 
     /**
-     * If the path writer is enabled, store paths.
-     *
      * @return pathResults All accumulated path results for targets.
      */
     public PathResult[] getPathResults() {
@@ -80,17 +78,15 @@ public class PathResultsRecorder {
     /**
      * @return true if the paths recorder has a writer or a results array.
      */
-    public boolean isEnabled() {
+    private boolean isEnabled() {
         return pathResults != null;
     }
 
     /**
      * @return true if we should record paths for a given target index.
      */
-    public boolean shouldRecordPathsForTarget(int targetIdx) {
+    private boolean shouldRecordPathsForTarget(int targetIdx) {
         if (!isEnabled()) return false;
-        // If pathResults isn't initiated, we have nothing to record.
-        if (pathResults == null) return false;
         // If we are recording more than one result, no need to check the target ID.
         if (pathResults.length > 1) return true;
         // For oneToOne or single point tasks, ensure this is the requested target ID.
@@ -98,7 +94,7 @@ public class PathResultsRecorder {
     }
 
     public boolean isRecordingTarget() {
-        return egressModes != null && paths != null;
+        return isEnabled() && egressModes != null && paths != null;
     }
 
     /**
@@ -118,7 +114,7 @@ public class PathResultsRecorder {
      * Set the stop index and mode for this iteration.
      */
     public void setTargetIterationValues(int iteration, int stopIndex, StreetTimeAndMode mode) {
-        if (!isEnabled() || !isRecordingTarget()) return;
+        if (!isRecordingTarget()) return;
         Path path = pathsPerIteration.getIterationPaths(iteration)[stopIndex];
         if (path != null) {
             paths[iteration] = path;

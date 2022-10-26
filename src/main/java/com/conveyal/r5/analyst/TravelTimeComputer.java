@@ -303,7 +303,11 @@ public class TravelTimeComputer {
             // The origin point was not even linked to the street network.
             // Calling finish() before streaming in any travel times to destinations is designed to produce the right result.
             LOG.info("Origin point was outside the street network. Skipping routing and propagation, and returning default result.");
-            return travelTimeReducer.finish(null);
+            return new OneOriginResult(
+                    travelTimeReducer.getTravelTimeResult(),
+                    travelTimeReducer.getAccessibilityResult(),
+                    null
+            );
         }
 
         if (nonTransitTravelTimesToDestinations.travelTimes.length != destinations.featureCount()) {
@@ -321,7 +325,11 @@ public class TravelTimeComputer {
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
                 travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);
             }
-            return travelTimeReducer.finish(null);
+            return new OneOriginResult(
+                    travelTimeReducer.getTravelTimeResult(),
+                    travelTimeReducer.getAccessibilityResult(),
+                    null
+            );
         }
 
         // II. Transit Routing ========================================================================================
@@ -415,7 +423,12 @@ public class TravelTimeComputer {
         timer.fullPropagation.stop();
         timer.log();
 
-        return travelTimeReducer.finish(pathsRecorder);
+        // Combine the travel times, accessibility results, and paths into a `OneOriginResult`.
+        return new OneOriginResult(
+                travelTimeReducer.getTravelTimeResult(),
+                travelTimeReducer.getAccessibilityResult(),
+                pathsRecorder
+        );
     }
 
     static int[][] routeToStops(

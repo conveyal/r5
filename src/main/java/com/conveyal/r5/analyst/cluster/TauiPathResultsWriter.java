@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -21,7 +22,7 @@ import java.util.List;
  * filtered down to only a few for display, but that leads to huge files and a lot of post-processing.
  * <p>
  * Users may be surprised to see an uncommon path that happens to be associated with the median travel time, so we now
- * save several different ones.
+ * save several ones.
  */
 public class TauiPathResultsWriter {
     /**
@@ -63,6 +64,24 @@ public class TauiPathResultsWriter {
      */
     private final TIntList pathIndexes = new TIntArrayList();
 
+    /**
+     * Create a TauiPathResultsWriter and run on the path results. Return the persistence buffer ready to be written.
+     */
+    public static PersistenceBuffer getPathsBuffer(PathResult[] pathResults, int nPathsPerTarget) throws IOException {
+        TauiPathResultsWriter tauiPathResultsWriter = new TauiPathResultsWriter(
+                pathResults.length,
+                nPathsPerTarget
+        );
+        tauiPathResultsWriter.indexPathResults(pathResults);
+        if (!tauiPathResultsWriter.hasPathResults()) return null;
+
+        PersistenceBuffer pathsBuffer = new PersistenceBuffer();
+        tauiPathResultsWriter.writeHeader(pathsBuffer.getDataOutput());
+        tauiPathResultsWriter.writePathsAndIndex(pathsBuffer.getDataOutput());
+        pathsBuffer.doneWriting();
+        return pathsBuffer;
+    }
+
     public TauiPathResultsWriter(
             int nTargets,
             int nPathsPerTarget
@@ -73,10 +92,9 @@ public class TauiPathResultsWriter {
     }
 
     /**
-     * @param pathResults
-     * @return true if results are indexed and ready to be written.
+     * Run recordPathsForTarget on each path result.
      */
-    public boolean indexPathResults(PathResult[] pathResults) {
+    public void indexPathResults(PathResult[] pathResults) {
         for (PathResult pathResult : pathResults) {
             recordPathsForTarget(pathResult);
         }
@@ -85,8 +103,10 @@ public class TauiPathResultsWriter {
             throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
                     nExpectedPaths, pathIndexes.size()));
         }
-        if (pathForIndex.isEmpty()) return false;
-        return true;
+    }
+
+    public boolean hasPathResults() {
+        return !pathForIndex.isEmpty();
     }
 
     /**
@@ -153,7 +173,7 @@ public class TauiPathResultsWriter {
      * Once recordPathsForTarget has been called once for each target in order, this method is called to write out the
      * full set of paths.
      */
-    public void writePathsAndInde(DataOutput dataOutput) throws IOException {
+    public void writePathsAndIndex(DataOutput dataOutput) throws IOException {
         // Write the number of different distinct paths used to reach all destination cells,
         // followed by the details for each of those distinct paths.
         dataOutput.writeInt(pathForIndex.size());

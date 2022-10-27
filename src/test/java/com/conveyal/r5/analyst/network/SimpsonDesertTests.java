@@ -147,6 +147,13 @@ public class SimpsonDesertTests {
     }
 
     /**
+     * For evaluating results from the tests below.
+     */
+    private int[] roundPathTimesToMinutes (PathResult.PathIterations paths) {
+        return paths.iterations.stream().mapToInt(i -> (int) (Math.round(i.totalTime / 60f * 10) / 10.0)).toArray();
+    }
+
+    /**
      * Test that the router correctly handles overtaking trips on the same route. Consider Trip A and Trip B, on a
      * horizontal route where each hop time is 30 seconds, except when Trip A slows to 10 minutes/hop for hops 20 and
      * 21. If Trip A leaves the first stop at 7:10 and Trip B leaves the first stop at 7:20, Trip A runs 10 minutes
@@ -187,7 +194,7 @@ public class SimpsonDesertTests {
 
         OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes();
         List<PathResult.PathIterations> standardPaths = standardResult.paths.getPathIterationsForDestination();
-        int[] standardTimes = standardPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        int[] standardTimes = roundPathTimesToMinutes(standardPaths.get(0));
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus ~5 minute ride and ~5 minute egress leg
         assertTrue(Arrays.equals(new int[]{45, 44, 43, 42, 41}, standardTimes));
 
@@ -198,7 +205,7 @@ public class SimpsonDesertTests {
 
         OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes();
         List<PathResult.PathIterations> naivePaths = naiveResult.paths.getPathIterationsForDestination();
-        int[] naiveTimes = naivePaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        int[] naiveTimes = roundPathTimesToMinutes(naivePaths.get(0));
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus ~35 minute ride and ~5 minute egress leg
         assertTrue(Arrays.equals(new int[]{54, 53, 52, 51, 50}, naiveTimes));
 
@@ -210,7 +217,7 @@ public class SimpsonDesertTests {
 
         OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
         List<PathResult.PathIterations> savvyPaths = savvyResult.paths.getPathIterationsForDestination();
-        int[] savvyTimes = savvyPaths.get(0).iterations.stream().mapToInt(i -> (int) i.totalTime).toArray();
+        int[] savvyTimes = roundPathTimesToMinutes(savvyPaths.get(0));
         // Trip B departs stop 10 at 7:25. So 8-12 minute wait, plus ~16 minute ride and ~5 minute egress leg
         assertTrue(Arrays.equals(new int[]{32, 31, 30, 29, 28}, savvyTimes));
     }

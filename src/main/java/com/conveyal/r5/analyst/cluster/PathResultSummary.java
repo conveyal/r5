@@ -164,7 +164,7 @@ public class PathResultSummary {
     }
 
     /**
-     * Get the stop ID. If it does not exist, it is a new stop and return "new".
+     * Get the stop ID. If the ID does not exist, the stop is a new one added by a modification, so return "new".
      *
      * @param stopIndex
      * @return stopId

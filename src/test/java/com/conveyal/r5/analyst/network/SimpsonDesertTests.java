@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -149,8 +150,8 @@ public class SimpsonDesertTests {
     /**
      * For evaluating results from the tests below.
      */
-    private int[] roundPathTimesToMinutes (PathResult.PathIterations paths) {
-        return paths.iterations.stream().mapToInt(i -> (int) (Math.round(i.totalTime / 60f * 10) / 10.0)).toArray();
+    private static double[] pathTimesAsMinutes (PathResult.PathIterations paths) {
+        return paths.iterations.stream().mapToDouble(i -> i.totalTime / 60d).toArray();
     }
 
     /**
@@ -194,9 +195,8 @@ public class SimpsonDesertTests {
 
         OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes();
         List<PathResult.PathIterations> standardPaths = standardResult.paths.getPathIterationsForDestination();
-        int[] standardTimes = roundPathTimesToMinutes(standardPaths.get(0));
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus ~5 minute ride and ~5 minute egress leg
-        assertTrue(Arrays.equals(new int[]{45, 44, 43, 42, 41}, standardTimes));
+        assertArrayEquals(new double[]{45.0, 44.0, 43.0, 42.0, 41.0}, pathTimesAsMinutes(standardPaths.get(0)), 0.3);
 
         // 2. Naive rider: downstream overtaking means Trip A departs origin first but is not fastest to destination.
         AnalysisWorkerTask naiveRider = gridLayout.copyTask(standardRider)
@@ -205,9 +205,8 @@ public class SimpsonDesertTests {
 
         OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes();
         List<PathResult.PathIterations> naivePaths = naiveResult.paths.getPathIterationsForDestination();
-        int[] naiveTimes = roundPathTimesToMinutes(naivePaths.get(0));
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus ~35 minute ride and ~5 minute egress leg
-        assertTrue(Arrays.equals(new int[]{54, 53, 52, 51, 50}, naiveTimes));
+        assertArrayEquals(new double[]{54.0, 53.0, 52.0, 51.0, 50.0}, pathTimesAsMinutes(naivePaths.get(0)), 0.3);
 
         // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
         // when boarding Trip A is possible
@@ -217,9 +216,8 @@ public class SimpsonDesertTests {
 
         OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
         List<PathResult.PathIterations> savvyPaths = savvyResult.paths.getPathIterationsForDestination();
-        int[] savvyTimes = roundPathTimesToMinutes(savvyPaths.get(0));
         // Trip B departs stop 10 at 7:25. So 8-12 minute wait, plus ~16 minute ride and ~5 minute egress leg
-        assertTrue(Arrays.equals(new int[]{32, 31, 30, 29, 28}, savvyTimes));
+        assertArrayEquals(new double[]{32.0, 31.0, 30.0, 29.0, 28.0}, pathTimesAsMinutes(savvyPaths.get(0)), 0.3);
     }
 
     /**

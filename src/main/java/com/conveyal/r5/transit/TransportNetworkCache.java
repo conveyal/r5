@@ -6,8 +6,8 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -15,7 +15,6 @@ import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -207,6 +206,10 @@ public class TransportNetworkCache implements Component {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 File entryDestination = new File(dataDirectory, entry.getName());
+                if (!entryDestination.toPath().normalize().startsWith(dataDirectory.toPath())) {
+                    throw new Exception("Bad zip entry");
+                }
+
                 // Are both these mkdirs calls necessary?
                 entryDestination.getParentFile().mkdirs();
                 if (entry.isDirectory())

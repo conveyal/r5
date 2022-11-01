@@ -190,8 +190,8 @@ public class SimpsonDesertTests {
                 .build();
 
         OneOriginResult standardResult = TravelTimeComputer.computeTravelTimes(standardRider, network);
-        PathResultSummary standardPaths = new PathResultSummary(
-                standardResult.paths.getPathResults()[0],
+        PathResultSummary standardPaths = PathResultSummary.createSummary(
+                standardResult.paths.getPathResults(),
                 network.transitLayer
         );
         int[] standardTimes = roundPathTimesToMinutes(standardPaths.iterations);
@@ -204,8 +204,8 @@ public class SimpsonDesertTests {
                 .build();
 
         OneOriginResult naiveResult = TravelTimeComputer.computeTravelTimes(naiveRider, network);
-        PathResultSummary naivePaths = new PathResultSummary(
-                naiveResult.paths.getPathResults()[0],
+        PathResultSummary naivePaths = PathResultSummary.createSummary(
+                naiveResult.getPathResults(),
                 network.transitLayer
         );
         int[] naiveTimes = roundPathTimesToMinutes(naivePaths.iterations);
@@ -219,8 +219,8 @@ public class SimpsonDesertTests {
                 .build();
 
         OneOriginResult savvyResult = TravelTimeComputer.computeTravelTimes(savvyRider, network);
-        PathResultSummary savvyPaths = new PathResultSummary(
-                savvyResult.paths.getPathResults()[0],
+        PathResultSummary savvyPaths = PathResultSummary.createSummary(
+                savvyResult.paths.getPathResults(),
                 network.transitLayer
         );
         int[] savvyTimes = roundPathTimesToMinutes(savvyPaths.iterations);

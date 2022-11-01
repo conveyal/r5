@@ -57,6 +57,7 @@ public class RegionalPathResultsSummary {
     }
 
     public static String[][][] summarize(PathResult[] pathResults, TransitLayer transitLayer) {
+        if (pathResults == null) return null;
         return summarize(pathResults, transitLayer, Stat.MINIMUM);
     }
 

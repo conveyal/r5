@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.r5.analyst.StreetTimeAndMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.StopSequence;
+import com.google.common.base.Preconditions;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -17,6 +18,24 @@ public class PathResultSummary {
     public List<IterationDetails> iterations = new ArrayList<>();
     public List<Itinerary> itineraries = new ArrayList<>();
     public int fastestPathSeconds = Integer.MAX_VALUE;
+
+    public static PathResultSummary createSummary(
+            PathResult[] pathResults,
+            TransitLayer transitLayer
+    ) {
+        PathResultSummary pathResultSummary = null;
+        if (pathResults != null && pathResults.length > 0) {
+            Preconditions.checkState(pathResults.length == 1, "Paths were stored for multiple " +
+                    "destinations, but only one is being requested");
+            if (pathResults[0] != null) {
+                pathResultSummary = new PathResultSummary(
+                        pathResults[0],
+                        transitLayer
+                );
+            }
+        }
+        return pathResultSummary;
+    }
 
     public PathResultSummary(
             PathResult pathResult,

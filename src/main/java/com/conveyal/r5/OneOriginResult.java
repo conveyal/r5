@@ -28,8 +28,8 @@ public class OneOriginResult {
     }
 
     public PathResult[] getPathResults() {
-        if (this.paths == null) return new PathResult[]{};
-        return this.paths.getPathResults();
+        if (paths == null) return null;
+        return paths.getPathResults();
     }
 
 }

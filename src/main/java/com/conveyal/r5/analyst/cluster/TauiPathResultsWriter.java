@@ -68,6 +68,7 @@ public class TauiPathResultsWriter {
      * Create a TauiPathResultsWriter and run on the path results. Return the persistence buffer ready to be written.
      */
     public static PersistenceBuffer getPathsBuffer(PathResult[] pathResults, int nPathsPerTarget) throws IOException {
+        if (pathResults == null) return null;
         TauiPathResultsWriter tauiPathResultsWriter = new TauiPathResultsWriter(
                 pathResults.length,
                 nPathsPerTarget

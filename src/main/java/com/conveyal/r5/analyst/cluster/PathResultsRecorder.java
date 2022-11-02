@@ -37,35 +37,21 @@ public class PathResultsRecorder {
 
     public PathResultsRecorder(
             TransitLayer transitLayer,
-            AnalysisWorkerTask task,
-            boolean oneToOne,
             TransitPathsPerIteration pathsPerIteration,
+            int nDestinationResults,
             int targetIdxToRecord,
             int nIterations
     ) {
+        // This limitation reflects the initial design, for use with freeform pointset destinations
+        if (nDestinationResults > MAX_DESTINATIONS) {
+            throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + MAX_DESTINATIONS);
+        }
+
         this.transitLayer = transitLayer;
-        this.pathResults = initializePathResultsFromTask(task, oneToOne);
+        this.pathResults = pathsPerIteration.isEnabled ? new PathResult[nDestinationResults] : null;
         this.targetIdxToRecord = targetIdxToRecord;
         this.nIterations = nIterations;
         this.pathsPerIteration = pathsPerIteration;
-    }
-
-    /**
-     * Helper to initialize a path results array depending on the configuration given.
-     */
-    static PathResult[] initializePathResultsFromTask(AnalysisWorkerTask task, boolean oneToOne) {
-        int nDestinationResults = 0;
-        if (task.includePathResults || task.makeTauiSite) {
-            // In interactive single-point tasks, paths are only returned for one destination
-            // In regional analyses, return paths to all destinations
-            nDestinationResults = task instanceof TravelTimeSurfaceTask || oneToOne ? 1 : task.nTargetsPerOrigin();
-
-            // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinationResults > MAX_DESTINATIONS) {
-                throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + MAX_DESTINATIONS);
-            }
-        }
-        return nDestinationResults > 0 ? new PathResult[nDestinationResults] : null;
     }
 
     /**

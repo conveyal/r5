@@ -5,6 +5,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.list.TIntList;
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.StringJoiner;
 import java.util.stream.IntStream;
@@ -25,6 +26,8 @@ public class RegionalPathResultsSummary {
             "nIterations"
     };
 
+    public static String DELIMITER = "|";
+
     enum Stat {
         MEAN,
         MINIMUM
@@ -36,26 +39,27 @@ public class RegionalPathResultsSummary {
      *
      * @param pathResults  Path results to all destinations to generate summary from.
      * @param transitLayer Transit layer to retrieve data from.
-     * @param stat         whether the reported per-leg wait times should correspond to the iteration with the minimum or mean
-     *                     total waiting time.
+     * @param stat         whether the reported per-leg wait times should correspond to the iteration with the minimum
+     *                     or mean total waiting time.
      * @return For each destination, a list of String[]s summarizing path templates. For each path template, details
      * of the itinerary with waiting time closest to the requested stat are included.
      */
     public static String[][][] summarize(PathResult[] pathResults, TransitLayer transitLayer, Stat stat) {
         if (pathResults == null) return null;
-        int nDestinations = pathResults.length;
-        String[][][] summary = new String[nDestinations][][];
-        for (int d = 0; d < nDestinations; d++) {
-            var pathResult = pathResults[d];
+        var summary = new ArrayList<String[][]>();
+        for (PathResult pathResult : pathResults) {
             if (pathResult != null) {
-                summary[d] = summarizePathResult(pathResult, transitLayer, stat);
+                summary.add(summarizePathResult(pathResult, transitLayer, stat));
             } else {
-                summary[d] = new String[0][];
+                summary.add(new String[][]{});
             }
         }
-        return summary;
+        return summary.toArray(new String[0][][]);
     }
 
+    /**
+     * Default usage of summarize is with the minimum
+     */
     public static String[][][] summarize(PathResult[] pathResults, TransitLayer transitLayer) {
         if (pathResults == null) return null;
         return summarize(pathResults, transitLayer, Stat.MINIMUM);
@@ -66,12 +70,17 @@ public class RegionalPathResultsSummary {
             TransitLayer transitLayer,
             Stat stat
     ) {
-        return pathResult.getAllPathTemplates().stream().map(pathTemplate -> summarizePathTemplate(
-                pathTemplate,
-                pathResult.getIterationsForPathTemplate(pathTemplate),
-                transitLayer,
-                stat
-        )).toArray(String[][]::new);
+        var pathTemplates = pathResult.getAllPathTemplates();
+        var summarizedPathResults = new ArrayList<String[]>();
+        for (var pathTemplate : pathTemplates) {
+            summarizedPathResults.add(summarizePathTemplate(
+                    pathTemplate,
+                    pathResult.getIterationsForPathTemplate(pathTemplate),
+                    transitLayer,
+                    stat
+            ));
+        }
+        return summarizedPathResults.toArray(String[][]::new);
     }
 
     /**
@@ -86,7 +95,7 @@ public class RegionalPathResultsSummary {
         int nIterations = iterations.size();
         checkState(nIterations > 0, "A path was stored without any iterations");
         String transfer = null, totalTime = null, waits = null;
-        String[] pathDetails = pathTemplate.detailsWithGtfsIds(transitLayer);
+        String[] pathDetails = detailsWithGtfsIds(pathTemplate, transitLayer);
 
         IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
         double targetValue = Stat.MEAN.equals(stat)
@@ -94,7 +103,6 @@ public class RegionalPathResultsSummary {
                 : totalWaits.min().orElse(-1);
         double score = Double.MAX_VALUE;
         for (PathResult.Iteration iteration : iterations) {
-            // TODO clean up, maybe re-using approaches from PathScore?
             int totalWaitTime = iteration.waitTimes.sum();
             double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
             if (thisScore < score) {
@@ -136,5 +144,34 @@ public class RegionalPathResultsSummary {
             checkState(transferTimeSeconds >= 0);
             return transferTimeSeconds;
         }
+    }
+
+    /**
+     * Returns details summarizing this path template, using GTFS ids stored in the supplied transitLayer.
+     */
+    public static String[] detailsWithGtfsIds(
+            PathResult.PathTemplate path,
+            TransitLayer transitLayer
+    ) {
+        var routeIds = new StringJoiner(DELIMITER);
+        var boardStopIds = new StringJoiner(DELIMITER);
+        var alightStopIds = new StringJoiner(DELIMITER);
+        var rideTimes = new StringJoiner(DELIMITER);
+        for (int i = 0; i < path.routeIndexes.size(); i++) {
+            routeIds.add(transitLayer.routes.get(path.routeIndexes.get(i)).route_id);
+            boardStopIds.add(transitLayer.getStopId(path.stopSequence.boardStops.get(i)));
+            alightStopIds.add(transitLayer.getStopId(path.stopSequence.alightStops.get(i)));
+            rideTimes.add(String.format("%.1f", path.stopSequence.rideTimesSeconds.get(i) / 60f));
+        }
+        var accessTime = path.access == null ? null : String.format("%.1f", path.access.time / 60f);
+        var egressTime = path.egress == null ? null : String.format("%.1f", path.egress.time / 60f);
+        return new String[]{
+                routeIds.toString(),
+                boardStopIds.toString(),
+                alightStopIds.toString(),
+                rideTimes.toString(),
+                accessTime,
+                egressTime
+        };
     }
 }

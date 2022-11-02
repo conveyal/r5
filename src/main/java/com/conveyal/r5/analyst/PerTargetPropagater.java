@@ -1,9 +1,7 @@
-package com.conveyal.r5.profile;
+package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.LinkageCache;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.StreetTimeAndMode;
 import com.conveyal.r5.analyst.cluster.PathResultsRecorder;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -87,7 +85,7 @@ public class PerTargetPropagater {
     }
 
     /**
-     * Repeatedly performs propagation to each target, for each different mode of egress. Repeated propagation to the
+     * Performs propagation to a single target, for each different mode of egress. Repeated propagation to the
      * same target point works, because each propagation call checks whether it reduces the travel time at each separate
      * iteration. This does mean that different iterations can use different modes, which matches situations where the
      * rider decides dynamically whether to call a cab or walk depending on the egress station's proximity to the

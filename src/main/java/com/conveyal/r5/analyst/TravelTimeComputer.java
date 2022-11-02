@@ -13,7 +13,6 @@ import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
-import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.PropagationTimer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.TransitPathsPerIteration;
@@ -68,8 +67,16 @@ public class TravelTimeComputer {
             request.inRoutingFareCalculator.transitLayer = network.transitLayer;
         }
 
+        // Task types
+        boolean isRegionalTask = request instanceof RegionalTask;
+        boolean isTravelTimeSurfaceTask = request instanceof TravelTimeSurfaceTask;
+
         // Is this a `oneToOne` task?
-        boolean oneToOne = request instanceof RegionalTask && ((RegionalTask) request).oneToOne;
+        RegionalTask regionalTask = isRegionalTask ? ((RegionalTask) request) : null;
+        boolean oneToOne = isRegionalTask && regionalTask.oneToOne;
+
+        // Are we storing paths?
+        boolean storePaths = request.makeTauiSite || request.includePathResults;
 
         // Set the destination index for storing single paths
         int destinationIndexForPaths = -1;
@@ -84,13 +91,13 @@ public class TravelTimeComputer {
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         PointSet destinations;
-        if (request instanceof RegionalTask
+        if (isRegionalTask
                 && !request.makeTauiSite
                 && request.destinationPointSets[0] instanceof FreeFormPointSet
         ) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = request.destinationPointSets[0];
-            if (oneToOne) destinationIndexForPaths = request.taskId;
+            if (regionalTask.oneToOne) destinationIndexForPaths = request.taskId;
 
         } else {
             // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
@@ -100,8 +107,10 @@ public class TravelTimeComputer {
                     destinationGridExtents,
                     network.fullExtentGridPointSet
             );
-            if (request.includePathResults && (request instanceof TravelTimeSurfaceTask || oneToOne)) {
-                destinationIndexForPaths = gridPointSet.getPointIndexContaining(request.toLon, request.toLat);
+            if (request.includePathResults) {
+                if (isTravelTimeSurfaceTask || regionalTask.oneToOne) {
+                    destinationIndexForPaths = gridPointSet.getPointIndexContaining(request.toLon, request.toLat);
+                }
             }
             destinations = gridPointSet;
         }
@@ -336,7 +345,7 @@ public class TravelTimeComputer {
 
         // Record paths per iteration for use during propagation.
         TransitPathsPerIteration pathsPerIteration = new TransitPathsPerIteration(
-                request.makeTauiSite || request.includePathResults,
+                storePaths,
                 bestAccessOptions
         );
 
@@ -364,12 +373,15 @@ public class TravelTimeComputer {
         );
         timer.transposition.stop();
 
+        int nPathResults = isTravelTimeSurfaceTask || regionalTask.oneToOne
+                ? 1
+                : request.nTargetsPerOrigin();
+
         // Create the paths recorder
         PathResultsRecorder pathsRecorder = new PathResultsRecorder(
                 network.transitLayer,
-                request,
-                oneToOne,
                 pathsPerIteration,
+                nPathResults,
                 destinationIndexForPaths,
                 nIterations
         );
@@ -377,7 +389,7 @@ public class TravelTimeComputer {
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
         int startTarget = 0;
         int endTarget = nonTransitTravelTimesToDestinations.size();
-        if (oneToOne) {
+        if (isRegionalTask && regionalTask.oneToOne) {
             startTarget = request.taskId;
             endTarget = startTarget + 1;
         }

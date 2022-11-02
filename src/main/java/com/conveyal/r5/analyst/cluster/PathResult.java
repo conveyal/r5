@@ -17,7 +17,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Set;
-import java.util.StringJoiner;
 
 /**
  * Holds paths and associated details from an origin to a destination target at every Raptor iteration. For
@@ -120,34 +119,6 @@ public class PathResult {
             this.stopSequence = null;
             this.access = null;
             this.egress = null;
-        }
-
-        /**
-         * Returns details summarizing this path template, using GTFS ids stored in the supplied transitLayer.
-         */
-        public String[] detailsWithGtfsIds(
-                TransitLayer transitLayer
-        ) {
-            StringJoiner routeIds = new StringJoiner("|");
-            StringJoiner boardStopIds = new StringJoiner("|");
-            StringJoiner alightStopIds = new StringJoiner("|");
-            StringJoiner rideTimes = new StringJoiner("|");
-            for (int i = 0; i < routeIndexes.size(); i++) {
-                routeIds.add(transitLayer.routes.get(routeIndexes.get(i)).route_id);
-                boardStopIds.add(transitLayer.getStopId(stopSequence.boardStops.get(i)));
-                alightStopIds.add(transitLayer.getStopId(stopSequence.alightStops.get(i)));
-                rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
-            }
-            String accessTime = access == null ? null : String.format("%.1f", access.time / 60f);
-            String egressTime = egress == null ? null : String.format("%.1f", egress.time / 60f);
-            return new String[]{
-                    routeIds.toString(),
-                    boardStopIds.toString(),
-                    alightStopIds.toString(),
-                    rideTimes.toString(),
-                    accessTime,
-                    egressTime
-            };
         }
 
         @Override

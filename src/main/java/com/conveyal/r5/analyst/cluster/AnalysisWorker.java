@@ -458,7 +458,7 @@ public class AnalysisWorker implements Component {
                 LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
 
-            if (pathResults != null && pathResults.length > 0) {
+            if (pathResults != null) {
                 var pathsBuffer = TauiPathResultsWriter.getPathsBuffer(pathResults, task.nPathsPerTarget);
                 if (pathsBuffer != null) {
                     saveTauiData(task, task.taskId + "_paths.dat", pathsBuffer);
@@ -472,7 +472,11 @@ public class AnalysisWorker implements Component {
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
             // that have already been written to S3, and throwing exceptions on old backends that can't deal with
             // null AccessibilityResults.
-            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+            oneOriginResult = new OneOriginResult(
+                    null,
+                    new AccessibilityResult(),
+                    null
+            );
         } else {
             // Summarize path results, if they exist.
             summarizedPathResults = RegionalPathResultsSummary.summarize(

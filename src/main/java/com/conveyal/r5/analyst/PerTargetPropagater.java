@@ -96,7 +96,7 @@ public class PerTargetPropagater {
      */
     public static void propagateToTarget(
             int targetIdx,
-            int[] travelTimes,
+            int[] travelTimesToTarget,
             PathResultsRecorder pathsRecorder,
             List<EgressCostTable> egressCostTables,
             Map<StreetMode, Integer> modeSpeeds,
@@ -130,7 +130,7 @@ public class PerTargetPropagater {
                 if (egressTimeAndMode != null) {
                     propagateTransit(
                             stopIndex,
-                            travelTimes,
+                            travelTimesToTarget,
                             travelTimesToStop[stopIndex],
                             egressTimeAndMode,
                             maxTripDurationSeconds,
@@ -142,7 +142,7 @@ public class PerTargetPropagater {
         }
 
         // Ensure travel times are valid.
-        checkTravelTimes(travelTimes);
+        checkTravelTimes(travelTimesToTarget);
     }
 
     /**

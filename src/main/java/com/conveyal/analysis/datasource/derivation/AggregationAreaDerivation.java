@@ -8,7 +8,6 @@ import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
-import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
@@ -65,8 +64,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
 
     // TODO derivations could return their model objects and DataGroups so they don't need direct database and fileStorage access.
     // A DerivationProduct could be a collection of File, a Collection<M extends BaseModel> and a DataGroup.
-    private final AnalysisCollection<AggregationArea> aggregationAreaCollection;
-    private final AnalysisCollection<DataGroup> dataGroupCollection;
+    private final AnalysisDB db;
 
     /**
      * Extraction, validation and range checking of parameters.
@@ -74,9 +72,10 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
      * Derivation and stored by some more general purpose wrapper so we can avoid direct file and database access here.
      * It's also not great to pass in the full request - we only need to extract and validate query parameters.
      */
-    private AggregationAreaDerivation (FileStorage fileStorage, AnalysisDB database, Request req) {
+    private AggregationAreaDerivation(FileStorage fileStorage, AnalysisDB db, Request req) {
 
         // Before kicking off asynchronous processing, range check inputs to fail fast on obvious problems.
+        this.db = db;
         userPermissions = UserPermissions.from(req);
         dataSourceId = req.queryParams("dataSourceId");
         nameProperty = req.queryParams("nameProperty"); //"dist_name"; //
@@ -84,9 +83,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         mergePolygons = Boolean.parseBoolean(req.queryParams("mergePolygons"));
         checkNotNull(dataSourceId);
 
-        AnalysisCollection<DataSource> dataSourceCollection =
-                database.getAnalysisCollection("dataSources", DataSource.class);
-        DataSource dataSource = dataSourceCollection.findById(dataSourceId);
+        DataSource dataSource = db.dataSources.findById(dataSourceId);
         checkArgument(dataSource instanceof SpatialDataSource,
                 "Only spatial data sets can be converted to aggregation areas.");
         spatialDataSource = (SpatialDataSource) dataSource;
@@ -107,10 +104,6 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         }
 
         this.fileStorage = fileStorage;
-        // Do not retain AnalysisDB reference, but grab the collections we need.
-        // TODO cache AnalysisCollection instances and reuse? Are they threadsafe?
-        aggregationAreaCollection = database.getAnalysisCollection("aggregationAreas", AggregationArea.class);
-        dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
 
         /*
           Implementation notes:
@@ -130,7 +123,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         if (SHP.equals(spatialDataSource.fileFormat)) {
             // On a newly started backend, we can't be sure any sidecar files are on the local filesystem.
             // We may want to factor this out when we use shapefile DataSources in other derivations.
-            String baseName = spatialDataSource._id.toString();
+            String baseName = spatialDataSource._id;
             prefetchShpSidecarFiles(baseName, fileStorage);
             sourceFile = fileStorage.getFile(spatialDataSource.storageKey());
             // Reading the shapefile into a list may actually take a moment, should this be done in the async part?
@@ -173,7 +166,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
 
         ArrayList<AggregationArea> aggregationAreas = new ArrayList<>();
         String groupDescription = "z" + this.zoom + ": aggregation areas";
-        DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id.toString(), groupDescription);
+        DataGroup dataGroup = new DataGroup(userPermissions, spatialDataSource._id, groupDescription);
 
         progressListener.beginTask("Reading data source", finalFeatures.size() + 1);
         Map<String, Geometry> areaGeometries = new HashMap<>();
@@ -213,7 +206,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
                 OutputStream os = new GZIPOutputStream(FileUtils.getOutputStream(gridFile));
                 maskGrid.write(os);
                 os.close();
-                aggregationArea.dataGroupId = dataGroup._id.toString();
+                aggregationArea.dataGroupId = dataGroup._id;
                 aggregationAreas.add(aggregationArea);
                 fileStorage.moveIntoStorage(aggregationArea.getStorageKey(), gridFile);
             } catch (IOException e) {
@@ -221,9 +214,9 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
             }
             progressListener.increment();
         });
-        aggregationAreaCollection.insertMany(aggregationAreas);
-        dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId));
+        db.aggregationAreas.collection.insertMany(aggregationAreas);
+        db.dataGroups.collection.insertOne(dataGroup);
+        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId.toString()));
         progressListener.increment();
 
     }

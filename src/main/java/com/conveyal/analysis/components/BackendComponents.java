@@ -83,20 +83,20 @@ public abstract class BackendComponents {
         return Lists.newArrayList(
                 // These handlers are at paths beginning with /api
                 // and therefore subject to authentication and authorization.
-                new GtfsController(gtfsCache),
+                new GtfsController(database, gtfsCache),
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
-                new RegionalAnalysisController(broker, fileStorage),
+                new RegionalAnalysisController(broker, database, fileStorage),
                 new AggregationAreaController(fileStorage, database, taskScheduler),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
                 // is exempted from authentication and authorization, but should be hidden from the world
                 // outside the cluster by the reverse proxy. Perhaps we should serve /internal on a separate
                 // port so they can't be accidentally exposed by the reverse proxy. It could even be a separate
                 // InternalHttpApi component with its own spark service, renaming this ExternalHttpApi.
-                new BrokerController(broker, eventBus),
+                new BrokerController(broker, database, eventBus),
                 new UserActivityController(taskScheduler),
                 new DataSourceController(fileStorage, database, taskScheduler, censusExtractor),
-                new WorkerProxyController(broker)
+                new WorkerProxyController(broker, database)
         );
     }
 

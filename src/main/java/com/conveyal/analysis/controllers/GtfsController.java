@@ -2,7 +2,7 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
@@ -10,10 +10,9 @@ import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
 import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
-import org.mongojack.DBCursor;
 import spark.Request;
 import spark.Response;
 
@@ -46,9 +45,11 @@ public class GtfsController implements HttpController {
     private static final String PATTERN_LAYER_NAME = "conveyal:gtfs:patternShapes";
     private static final String STOP_LAYER_NAME = "conveyal:gtfs:stops";
 
+    private final AnalysisDB db;
     private final GTFSCache gtfsCache;
 
-    public GtfsController(GTFSCache gtfsCache) {
+    public GtfsController(AnalysisDB db, GTFSCache gtfsCache) {
+        this.db = db;
         this.gtfsCache = gtfsCache;
     }
 
@@ -178,13 +179,12 @@ public class GtfsController implements HttpController {
 
     private List<FeedGroupStopsApiResponse> getAllStopsForFeedGroup(Request req, Response res) {
         String feedGroupId = req.params("feedGroupId");
-        DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
-        if (!cursor.hasNext()) {
+        var bundle = db.bundles.find(Filters.eq("feedGroupId", feedGroupId)).first();
+        if (bundle == null) {
             throw AnalysisServerException.notFound("Bundle could not be found for the given feed group ID.");
         }
 
         List<FeedGroupStopsApiResponse> allStopsByFeed = new ArrayList<>();
-        Bundle bundle = cursor.next();
         for (Bundle.FeedSummary feedSummary : bundle.feeds) {
             String bundleScopedFeedId = Bundle.bundleScopeFeedId(feedSummary.feedId, feedGroupId);
             GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);

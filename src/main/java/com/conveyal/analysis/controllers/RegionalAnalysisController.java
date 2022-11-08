@@ -8,7 +8,7 @@ import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -22,9 +22,10 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 import gnu.trove.list.array.TIntArrayList;
-import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -55,43 +56,32 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class RegionalAnalysisController implements HttpController {
 
-    /** Until regional analysis config supplies percentiles in the request, hard-wire to our standard five. */
-    private static final int[] DEFAULT_REGIONAL_PERCENTILES = new int[] {5, 25, 50, 75, 95};
+    /**
+     * Until regional analysis config supplies percentiles in the request, hard-wire to our standard five.
+     */
+    private static final int[] DEFAULT_REGIONAL_PERCENTILES = new int[]{5, 25, 50, 75, 95};
 
     /**
      * Until the UI supplies cutoffs in the AnalysisRequest, hard-wire cutoffs.
      * The highest one is half our absolute upper limit of 120 minutes, which should by default save compute time.
      */
-    public static final int[] DEFAULT_CUTOFFS = new int[] {5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60};
+    public static final int[] DEFAULT_CUTOFFS = new int[]{5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60};
 
     private static final Logger LOG = LoggerFactory.getLogger(RegionalAnalysisController.class);
 
+    private final AnalysisDB db;
     private final Broker broker;
     private final FileStorage fileStorage;
 
-    public RegionalAnalysisController (Broker broker, FileStorage fileStorage) {
+    public RegionalAnalysisController(Broker broker, AnalysisDB db, FileStorage fileStorage) {
         this.broker = broker;
+        this.db = db;
         this.fileStorage = fileStorage;
-    }
-
-    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, UserPermissions userPermissions) {
-        return Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start().and(
-                        QueryBuilder.start("regionId").is(regionId).get(),
-                        QueryBuilder.start("deleted").is(false).get()
-                ).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                userPermissions
-        );
-    }
-
-    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(Request req, Response res) {
-        return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
     }
 
     // Note: this includes the modifications object which can be very large
     private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
+        return db.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     /**
@@ -100,10 +90,15 @@ public class RegionalAnalysisController implements HttpController {
      * @return JobStatues with associated regional analysis embedded
      */
     private Collection<JobStatus> getRunningAnalyses(Request req, Response res) {
-        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
+        final var regionId = req.params("regionId");
+        final var user = UserPermissions.from(req);
+        var iterator = db.regionalAnalyses.findPermitted(
+                Filters.and(Filters.eq("regionId", regionId), Filters.eq("deleted", false)),
+                user
+        ).projection(Projections.exclude("request.scenario.modifications"));
         List<JobStatus> runningStatusesForRegion = new ArrayList<>();
         Collection<JobStatus> allJobStatuses = broker.getAllJobStatuses();
-        for (RegionalAnalysis ra : allAnalysesInRegion) {
+        for (var ra : iterator) {
             JobStatus jobStatus = allJobStatuses.stream().filter(j -> j.jobId.equals(ra._id)).findFirst().orElse(null);
             if (jobStatus != null) {
                 jobStatus.regionalAnalysis = ra;
@@ -115,17 +110,11 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private RegionalAnalysis deleteRegionalAnalysis (Request req, Response res) {
-        UserPermissions userPermissions = UserPermissions.from(req);
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start().and(
-                        QueryBuilder.start("_id").is(req.params("_id")).get(),
-                        QueryBuilder.start("deleted").is(false).get()
-                ).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                userPermissions
-        ).iterator().next();
-        analysis.deleted = true;
-        Persistence.regionalAnalyses.updateByUserIfPermitted(analysis, userPermissions);
+        var analysis = db.regionalAnalyses.findPermittedByRequestParamId(req);
+        db.regionalAnalyses.collection.updateOne(
+                Filters.eq("_id", analysis._id),
+                Updates.set("deleted", true)
+        );
 
         // clear it from the broker
         if (!analysis.complete) {
@@ -169,12 +158,7 @@ public class RegionalAnalysisController implements HttpController {
         // The response file format: PNG, TIFF, or GRID
         final String fileFormatExtension = req.params("format");
 
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(req.params("_id")).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
-        ).iterator().next();
-
+        RegionalAnalysis analysis = getRegionalAnalysis(req, res);
         if (analysis == null || analysis.deleted) {
             throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
         }
@@ -315,12 +299,7 @@ public class RegionalAnalysisController implements HttpController {
         final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
         // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
 
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(regionalAnalysisId).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
-        ).iterator().next();
-
+        RegionalAnalysis analysis = getRegionalAnalysis(req, res);
         if (analysis == null || analysis.deleted) {
             throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
         }
@@ -364,20 +343,19 @@ public class RegionalAnalysisController implements HttpController {
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = new RegionalTask();
-        analysisRequest.populateTask(task, userPermissions);
+        RegionalTask task = analysisRequest.toRegionalTask(db, userPermissions);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
         if (!analysisRequest.makeTauiSite) {
             checkNotNull(analysisRequest.destinationPointSetIds);
             checkState(analysisRequest.destinationPointSetIds.length > 0,
-                "At least one destination pointset ID must be supplied.");
+                    "At least one destination pointset ID must be supplied.");
             int nPointSets = analysisRequest.destinationPointSetIds.length;
             task.destinationPointSetKeys = new String[nPointSets];
             List<OpportunityDataset> opportunityDatasets = new ArrayList<>();
             for (int i = 0; i < nPointSets; i++) {
                 String destinationPointSetId = analysisRequest.destinationPointSetIds[i];
-                OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
+                OpportunityDataset opportunityDataset = db.opportunities.findByIdIfPermitted(
                         destinationPointSetId,
                         userPermissions
                 );
@@ -413,7 +391,7 @@ public class RegionalAnalysisController implements HttpController {
         // Set the origin pointset key if an ID is specified. Currently this will always be a freeform pointset.
         // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
         if (analysisRequest.originPointSetId != null) {
-            task.originPointSetKey = Persistence.opportunityDatasets
+            task.originPointSetKey = db.opportunities
                     .findByIdIfPermitted(analysisRequest.originPointSetId, userPermissions).storageLocation();
             task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
@@ -504,7 +482,7 @@ public class RegionalAnalysisController implements HttpController {
 
         // Persist this newly created RegionalAnalysis to Mongo.
         // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
-        regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
+        regionalAnalysis = db.regionalAnalyses.create(regionalAnalysis, userPermissions);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);
@@ -512,14 +490,9 @@ public class RegionalAnalysisController implements HttpController {
         // Flush to the database any information added to the RegionalAnalysis object when it was enqueued.
         // This includes the paths of any CSV files that will be produced by this analysis.
         // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock() or put().
-        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
+        db.regionalAnalyses.modifyWithoutUpdatingLock(regionalAnalysis);
 
         return regionalAnalysis;
-    }
-
-    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
-        RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
     }
 
     /**
@@ -527,12 +500,11 @@ public class RegionalAnalysisController implements HttpController {
      * the given regional analysis.
      */
     private JsonNode getScenarioJsonUrl (Request request, Response response) {
-        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
-                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+        var user = UserPermissions.from(request);
+        var regionalAnalysis = db.regionalAnalyses.findByIdIfPermitted(request.params("_id"), user);
         // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
-        final String networkId = regionalAnalysis.bundleId;
         final String scenarioId = regionalAnalysis.request.scenarioId;
-        checkNotNull(networkId, "RegionalAnalysis did not contain a network ID.");
+        checkNotNull(regionalAnalysis.bundleId, "RegionalAnalysis did not contain a bundle ID.");
         checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
         String scenarioUrl = fileStorage.getURL(
                 new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
@@ -542,18 +514,15 @@ public class RegionalAnalysisController implements HttpController {
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/region", () -> {
-            sparkService.get("/:regionId/regional", this::getRegionalAnalysesForRegion, toJson);
             sparkService.get("/:regionId/regional/running", this::getRunningAnalyses, toJson);
         });
         sparkService.path("/api/regional", () -> {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
-            sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
             sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
             sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
-            sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);
         });
     }
 

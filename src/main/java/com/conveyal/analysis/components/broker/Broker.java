@@ -8,6 +8,7 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -94,6 +95,7 @@ public class Broker implements Component {
     private Config config;
 
     // Component Dependencies
+    private final AnalysisDB db;
     private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
@@ -144,8 +146,9 @@ public class Broker implements Component {
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
+    public Broker(Config config, AnalysisDB db, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
         this.config = config;
+        this.db = db;
         this.fileStorage = fileStorage;
         this.eventBus = eventBus;
         this.workerLauncher = workerLauncher;
@@ -173,7 +176,7 @@ public class Broker implements Component {
         // TODO encapsulate MultiOriginAssemblers in a new Component
         // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
         // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
-        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
+        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, db, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {

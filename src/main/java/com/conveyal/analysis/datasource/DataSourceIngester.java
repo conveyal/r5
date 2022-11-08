@@ -10,8 +10,8 @@ import java.io.File;
 
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
 import static com.conveyal.file.FileStorageFormat.GEOPACKAGE;
-import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.file.FileStorageFormat.GEOTIFF;
+import static com.conveyal.file.FileStorageFormat.SHP;
 
 /**
  * Logic for loading and validating a specific kind of input file, yielding a specific subclass of DataSource.
@@ -43,12 +43,12 @@ public abstract class DataSourceIngester {
      * DataSourceIngester taking care of the rest.
      * Our no-arg BaseModel constructors are used for deserialization so they don't create an _id or nonce ObjectId();
      */
-    public void initializeDataSource (
+    public void initializeDataSource(
             String name, String originalFileNames, String regionId, UserPermissions userPermissions
     ) {
         DataSource dataSource = dataSource();
-        dataSource._id = new ObjectId();
-        dataSource.nonce = new ObjectId();
+        dataSource._id = new ObjectId().toString();
+        dataSource.nonce = new ObjectId().toString();
         dataSource.name = name;
         dataSource.regionId = regionId;
         dataSource.createdBy = userPermissions.email;

@@ -5,7 +5,7 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -13,18 +13,17 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.bson.types.ObjectId;
@@ -41,7 +40,6 @@ import java.io.IOException;
 import java.io.Writer;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -71,7 +69,10 @@ public class BundleController implements HttpController {
     private final OSMCache osmCache;
     private final TaskScheduler taskScheduler;
 
-    public BundleController (BackendComponents components) {
+    private final AnalysisDB db;
+
+    public BundleController(BackendComponents components) {
+        this.db = components.database;
         this.fileStorage = components.fileStorage;
         this.gtfsCache = components.gtfsCache;
         this.osmCache = components.osmCache;
@@ -81,12 +82,9 @@ public class BundleController implements HttpController {
     // INTERFACE METHOD
 
     @Override
-    public void registerEndpoints (Service sparkService) {
+    public void registerEndpoints(Service sparkService) {
         sparkService.path("/api/bundle", () -> {
-            sparkService.get("", this::getBundles, toJson);
-            sparkService.get("/:_id", this::getBundle, toJson);
             sparkService.post("", this::create, toJson);
-            sparkService.put("/:_id", this::update, toJson);
             sparkService.delete("/:_id", this::deleteBundle, toJson);
         });
     }
@@ -110,13 +108,14 @@ public class BundleController implements HttpController {
         // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final Bundle bundle = new Bundle();
+        final UserPermissions userPermissions = UserPermissions.from(req);
         try {
             bundle.name = files.get("bundleName").get(0).getString("UTF-8");
             bundle.regionId = files.get("regionId").get(0).getString("UTF-8");
 
             if (files.get("osmId") != null) {
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
-                Bundle bundleWithOsm = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get()).next();
+                Bundle bundleWithOsm = db.bundles.find(Filters.eq("osmId", bundle.osmId)).first();
                 if (bundleWithOsm == null) {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }
@@ -124,7 +123,7 @@ public class BundleController implements HttpController {
 
             if (files.get("feedGroupId") != null) {
                 bundle.feedGroupId = files.get("feedGroupId").get(0).getString("UTF-8");
-                Bundle bundleWithFeed = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get()).next();
+                Bundle bundleWithFeed = db.bundles.find(Filters.eq("feedGroupId", bundle.feedGroupId)).first();
                 if (bundleWithFeed == null) {
                     throw AnalysisServerException.badRequest("Selected GTFS does not exist.");
                 }
@@ -138,20 +137,16 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
-            UserPermissions userPermissions = UserPermissions.from(req);
-            bundle.accessGroup = userPermissions.accessGroup;
-            bundle.createdBy = userPermissions.email;
         } catch (Exception e) {
             throw AnalysisServerException.badRequest(ExceptionUtils.stackTraceString(e));
         }
         // ID and create/update times are assigned here when we push into Mongo.
         // FIXME Ideally we'd only set and retain the ID without inserting in Mongo,
         //  but existing create() method with side effects would overwrite the ID.
-        Persistence.bundles.create(bundle);
+        db.bundles.create(bundle, userPermissions);
 
         // Submit all slower work for asynchronous processing on the backend, then immediately return the partially
         // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
-        final UserPermissions userPermissions = UserPermissions.from(req);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
             .forUser(userPermissions)
             .setHeavy(true)
@@ -269,7 +264,7 @@ public class BundleController implements HttpController {
                 throw t;
               } finally {
                 // ID and create/update times are assigned here when we push into Mongo.
-                Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+                  db.bundles.modifyWithoutUpdatingLock(bundle);
               }
         }));
         // TODO do we really want to return the bundle here? It should not be needed until the background work is done.
@@ -290,68 +285,13 @@ public class BundleController implements HttpController {
         fileStorage.moveIntoStorage(key, configFile);
     }
 
-    private Bundle deleteBundle (Request req, Response res) throws IOException {
-        Bundle bundle = Persistence.bundles.removeIfPermitted(req.params("_id"), UserPermissions.from(req));
-        FileStorageKey key = new FileStorageKey(BUNDLES, bundle._id + ".zip");
+    private boolean deleteBundle(Request req, Response res) {
+        var result = db.bundles.deleteByIdParamIfPermitted(req);
+        var bundleId = req.params("_id");
+        FileStorageKey key = new FileStorageKey(BUNDLES, bundleId + ".zip");
         fileStorage.delete(key);
 
-        return bundle;
-    }
-
-    private Bundle update (Request req, Response res) throws IOException {
-        return Persistence.bundles.updateFromJSONRequest(req);
-    }
-
-    private Bundle getBundle (Request req, Response res) {
-        Bundle bundle = Persistence.bundles.findByIdFromRequestIfPermitted(req);
-
-        // Progressively update older bundles with service start and end dates on retrieval
-        try {
-            setBundleServiceDates(bundle, gtfsCache);
-        } catch (Exception e) {
-            throw AnalysisServerException.unknown(e);
-        }
-
-        return bundle;
-    }
-
-    private Collection<Bundle> getBundles (Request req, Response res) {
-        return Persistence.bundles.findPermittedForQuery(req);
-    }
-
-    // UTILITY METHODS
-
-    /**
-     * Bundles created before 2018-10-04 do not have service start and end dates. This method sets the service start
-     * and end dates for pre-existing bundles that do not have them set already. A database migration wasn't done
-     * due to the need to load feeds which is a heavy operation. Duplicate functionality exists in the
-     * Bundle.FeedSummary constructor, so these dates will be automatically set for all new Bundles.
-     * TODO move this somewhere closer to the root of the package hierarchy to avoid cyclic dependencies
-     */
-    public static Bundle setBundleServiceDates (Bundle bundle, GTFSCache gtfsCache) {
-        if (bundle.status != Bundle.Status.DONE || (bundle.serviceStart != null && bundle.serviceEnd != null)) {
-            return bundle;
-        }
-
-        bundle.serviceStart = LocalDate.MAX;
-        bundle.serviceEnd = LocalDate.MIN;
-
-        for (Bundle.FeedSummary summary : bundle.feeds) {
-            // Compute the feed start and end dates
-            if (summary.serviceStart == null || summary.serviceEnd == null) {
-                GTFSFeed feed = gtfsCache.get(Bundle.bundleScopeFeedId(summary.feedId, bundle.feedGroupId));
-                summary.setServiceDates(feed);
-            }
-            if (summary.serviceStart.isBefore(bundle.serviceStart)) {
-                bundle.serviceStart = summary.serviceStart;
-            }
-            if (summary.serviceEnd.isAfter(bundle.serviceEnd)) {
-                bundle.serviceEnd = summary.serviceEnd;
-            }
-        }
-
-        // Automated change that could occur on a `get`, so don't update the nonce
-        return Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
+        return result.wasAcknowledged();
     }
 
 }

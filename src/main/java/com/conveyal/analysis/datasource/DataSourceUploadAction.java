@@ -1,8 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.models.DataSource;
-import com.conveyal.analysis.persistence.AnalysisCollection;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -20,8 +19,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -39,7 +38,7 @@ public class DataSourceUploadAction implements TaskAction {
     // The Components used by this background task, which were formerly captured by an anonymous closure.
     // Using named and well-defined classes for these background actions makes data flow and depdendencies clearer.
     private final FileStorage fileStorage;
-    private final AnalysisCollection<DataSource> dataSourceCollection;
+    private final AnalysisDB db;
 
     /** The files provided in the HTTP post form. These will be moved into storage. */
     private final List<FileItem> fileItems;
@@ -61,14 +60,14 @@ public class DataSourceUploadAction implements TaskAction {
         return ingester.dataSource().name;
     }
 
-    public DataSourceUploadAction (
+    public DataSourceUploadAction(
             FileStorage fileStorage,
-            AnalysisCollection<DataSource> dataSourceCollection,
+            AnalysisDB db,
             List<FileItem> fileItems,
             DataSourceIngester ingester
     ) {
         this.fileStorage = fileStorage;
-        this.dataSourceCollection = dataSourceCollection;
+        this.db = db;
         this.fileItems = fileItems;
         this.ingester = ingester;
     }
@@ -78,7 +77,7 @@ public class DataSourceUploadAction implements TaskAction {
         progressListener.setWorkProduct(ingester.dataSource().toWorkProduct());
         moveFilesIntoStorage(progressListener);
         ingester.ingest(file, progressListener);
-        dataSourceCollection.insert(ingester.dataSource());
+        db.dataSources.insert(ingester.dataSource());
     }
 
     /**
@@ -118,9 +117,9 @@ public class DataSourceUploadAction implements TaskAction {
      * instance set up to process the uploaded data in the background. This will fail fast on data files that we can't
      * recognize or have obvious problems. Care should be taken that this method contains no slow actions.
      */
-    public static DataSourceUploadAction forFormFields (
+    public static DataSourceUploadAction forFormFields(
             FileStorage fileStorage,
-            AnalysisCollection<DataSource> dataSourceCollection,
+            AnalysisDB db,
             Map<String, List<FileItem>> formFields,
             UserPermissions userPermissions
     ) {
@@ -135,7 +134,7 @@ public class DataSourceUploadAction implements TaskAction {
         String originalFileNames = fileItems.stream().map(FileItem::getName).collect(Collectors.joining(", "));
         ingester.initializeDataSource(sourceName, originalFileNames, regionId, userPermissions);
         DataSourceUploadAction dataSourceUploadAction =
-                new DataSourceUploadAction(fileStorage, dataSourceCollection, fileItems, ingester);
+                new DataSourceUploadAction(fileStorage, db, fileItems, ingester);
 
         return dataSourceUploadAction;
     }

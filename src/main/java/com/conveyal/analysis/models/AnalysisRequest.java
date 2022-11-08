@@ -2,18 +2,21 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.ChaosParameters;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.bson.conversions.Bson;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -164,21 +167,51 @@ public class AnalysisRequest {
      */
     public ChaosParameters injectFault;
 
+    public TravelTimeSurfaceTask toTravelTimeSurfaceTask(AnalysisDB db, UserPermissions user) {
+        var task = new TravelTimeSurfaceTask();
+        var scenario = createScenario(db, user);
+        populateTask(task, scenario);
+        populateInjectFault(task, user);
+        return task;
+    }
+
+    public RegionalTask toRegionalTask(AnalysisDB db, UserPermissions user) {
+        var task = new RegionalTask();
+        var scenario = createScenario(db, user);
+        populateTask(task, scenario);
+        populateInjectFault(task, user);
+        return task;
+    }
+
+    private void populateInjectFault(AnalysisWorkerTask task, UserPermissions user) {
+        // Intentionally introduce errors for testing purposes, but only for admin users.
+        if (injectFault != null) {
+            if (user.admin) {
+                task.injectFault = injectFault;
+            } else {
+                throw new IllegalArgumentException("Must be admin user to inject faults.");
+            }
+        }
+    }
+
     /**
      * Create the R5 `Scenario` from this request.
      */
-    public Scenario createScenario (UserPermissions userPermissions) {
-        QueryBuilder query = "all".equals(scenarioId)
-                ? QueryBuilder.start("projectId").is(projectId)
-                : QueryBuilder.start("_id").in(modificationIds);
-        Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), userPermissions);
-        // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
-        String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
-        String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
-        Scenario scenario = new Scenario();
-        scenario.id = scenarioId;
-        scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
-        return scenario;
+    public Scenario createScenario(AnalysisDB db, UserPermissions userPermissions) {
+        Bson query = "all".equals(scenarioId)
+                ? Filters.eq("projectId", projectId)
+                : Filters.in("_id", modificationIds);
+        var iterator = db.modifications.findPermitted(query, userPermissions);
+        try (var cursor = iterator.cursor()) {
+            Collection<Modification> modifications = db.modifications.toArray(cursor);
+            // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
+            String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
+            String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
+            Scenario scenario = new Scenario();
+            scenario.id = scenarioId;
+            scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
+            return scenario;
+        }
     }
 
     /**
@@ -194,10 +227,9 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public void populateTask (AnalysisWorkerTask task, UserPermissions userPermissions) {
+    public void populateTask(AnalysisWorkerTask task, Scenario scenario) {
         if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
-
-        task.scenario = createScenario(userPermissions);
+        task.scenario = scenario;
         task.scenarioId = task.scenario.id;
         task.graphId = bundleId;
         task.workerVersion = workerVersion;
@@ -260,14 +292,6 @@ public class AnalysisRequest {
         task.decayFunction = decayFunction;
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
-        }
-        // Intentionally introduce errors for testing purposes, but only for admin users.
-        if (injectFault != null) {
-            if (userPermissions.admin) {
-                task.injectFault = injectFault;
-            } else {
-                throw new IllegalArgumentException("Must be admin user to inject faults.");
-            }
         }
     }
 

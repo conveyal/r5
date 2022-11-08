@@ -3,18 +3,15 @@ package com.conveyal.analysis.persistence;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.BaseModel;
-import com.conveyal.analysis.util.JsonUtil;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.DeleteResult;
-import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 import spark.Request;
-import spark.Response;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.and;
@@ -25,49 +22,50 @@ public class AnalysisCollection<T extends BaseModel> {
     public static final String MONGO_PROP_ACCESS_GROUP = "accessGroup";
 
     public final MongoCollection<T> collection;
-    private final Class<T> type;
 
     private AnalysisServerException invalidAccessGroup() {
         return AnalysisServerException.forbidden("Permission denied. Invalid access group.");
     }
 
-    public AnalysisCollection(MongoCollection<T> collection, Class<T> clazz) {
+    public AnalysisCollection(MongoCollection<T> collection) {
         this.collection = collection;
-        this.type = clazz;
     }
 
-    public DeleteResult delete (T value) {
+    public List<T> toArray(MongoCursor<T> cursor) {
+        var list = new ArrayList<T>();
+        while (cursor.hasNext()) {
+            list.add(cursor.next());
+        }
+        return list;
+    }
+
+    public DeleteResult delete(T value) {
         return collection.deleteOne(eq("_id", value._id));
     }
 
-    public DeleteResult deleteByIdParamIfPermitted (Request request) {
+    public DeleteResult deleteByIdParamIfPermitted(Request request) {
         String _id = request.params("_id");
         UserPermissions user = UserPermissions.from(request);
-        return collection.deleteOne(and(eq("_id", new ObjectId(_id)), eq("accessGroup", user.accessGroup)));
+        return deleteByIdIfPermitted(_id, user);
     }
 
-    public List<T> findPermitted(Bson query, UserPermissions userPermissions) {
+    public DeleteResult deleteByIdIfPermitted(String _id, UserPermissions user) {
+        return collection.deleteOne(and(eq("_id", _id), eq(MONGO_PROP_ACCESS_GROUP, user.accessGroup)));
+    }
+
+    public FindIterable<T> findPermitted(Bson query, UserPermissions userPermissions) {
         return find(and(eq(MONGO_PROP_ACCESS_GROUP, userPermissions.accessGroup), query));
     }
 
-    public List<T> find(Bson query) {
-        MongoCursor<T> cursor = collection.find(query).cursor();
-        List<T> found = new ArrayList<>();
-        while (cursor.hasNext()) {
-            found.add(cursor.next());
-        }
-        return found;
+    public FindIterable<T> find(Bson query) {
+        return collection.find(query);
     }
 
     public T findById(String _id) {
-        return findById(new ObjectId(_id));
-    }
-
-    public T findById(ObjectId _id) {
         return collection.find(eq("_id", _id)).first();
     }
 
-    public T findByIdIfPermitted (String _id, UserPermissions userPermissions) {
+    public T findByIdIfPermitted(String _id, UserPermissions userPermissions) {
         T item = findById(_id);
         if (item.accessGroup.equals(userPermissions.accessGroup)) {
             return item;
@@ -82,6 +80,8 @@ public class AnalysisCollection<T extends BaseModel> {
         newModel.accessGroup = userPermissions.accessGroup;
         newModel.createdBy = userPermissions.email;
         newModel.updatedBy = userPermissions.email;
+        newModel.createdAt = new Date();
+        newModel.updatedAt = new Date();
 
         // This creates the `_id` automatically if it is missing
         collection.insertOne(newModel);
@@ -95,44 +95,12 @@ public class AnalysisCollection<T extends BaseModel> {
      * It looks like we could remove the OBJECT_ID_GENERATORS convention to force explicit ID creation.
      * https://mongodb.github.io/mongo-java-driver/3.11/bson/pojos/#conventions
      */
-    public void insert (T model) {
+    public void insert(T model) {
         collection.insertOne(model);
     }
 
-    public void insertMany (List<? extends T> models) {
-        collection.insertMany(models);
-    }
-
-    public T update(T value) {
-        return update(value, value.accessGroup);
-    }
-
-    public T update(T value, String accessGroup) {
-        // Store the current nonce for querying and to check later if needed.
-        ObjectId oldNonce = value.nonce;
-
-        value.nonce = new ObjectId();
-
-        UpdateResult result = collection.replaceOne(and(
-                eq("_id", value._id),
-                eq("nonce", oldNonce),
-                eq(MONGO_PROP_ACCESS_GROUP, accessGroup)
-        ), value);
-
-        // If no documents were modified try to find the document to find out why
-        if (result.getModifiedCount() != 1) {
-            T model = findById(value._id);
-            if (model == null) {
-                throw AnalysisServerException.notFound(type.getName() + " was not found.");
-            } else if (model.nonce != oldNonce) {
-                throw AnalysisServerException.nonce();
-            } else if (!model.accessGroup.equals(accessGroup)) {
-                throw invalidAccessGroup();
-            } else {
-                throw AnalysisServerException.unknown("Unable to update model.");
-            }
-        }
-
+    public T modifyWithoutUpdatingLock(T value) {
+        this.collection.replaceOne(eq("_id", value._id), value);
         return value;
     }
 
@@ -140,37 +108,9 @@ public class AnalysisCollection<T extends BaseModel> {
     //  On the other hand, making them instance methods reduces the number of parameters and gives access to Class<T>.
 
     /**
-     * Controller creation helper.
-     */
-    public T create(Request req, Response res) throws IOException {
-        T value = JsonUtil.objectMapper.readValue(req.body(), type);
-        return create(value, UserPermissions.from(req));
-    }
-
-    /**
      * Helper for HttpControllers - find a document by the _id path parameter in the request, checking permissions.
      */
-    public T findPermittedByRequestParamId (Request req) {
-        UserPermissions user = UserPermissions.from(req);
-        T value = findById(req.params("_id"));
-        // Throw if or does not have permission
-        if (!value.accessGroup.equals(user.accessGroup)) {
-            throw invalidAccessGroup();
-        }
-        return value;
+    public T findPermittedByRequestParamId(Request req) {
+        return findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
-
-    /**
-     * Controller update helper.
-     */
-    public T update(Request req, Response res) throws IOException {
-        T value = JsonUtil.objectMapper.readValue(req.body(), type);
-        final UserPermissions user = UserPermissions.from(req);
-        value.updatedBy = user.email;
-        if (!value.accessGroup.equals(user.accessGroup)) {
-            throw invalidAccessGroup();
-        }
-        return update(value, user.accessGroup);
-    }
-
 }

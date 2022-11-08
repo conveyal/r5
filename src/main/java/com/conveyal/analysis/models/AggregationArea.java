@@ -24,13 +24,16 @@ public class AggregationArea extends BaseModel {
 
     public int zoom;
 
-    /** Zero-argument constructor required for Mongo automatic POJO deserialization. */
-    public AggregationArea () { }
+    /**
+     * Zero-argument constructor required for Mongo automatic POJO deserialization.
+     */
+    public AggregationArea() {
+    }
 
     public AggregationArea(UserPermissions user, String name, SpatialDataSource dataSource, int zoom) {
         super(user, name);
         this.regionId = dataSource.regionId;
-        this.dataSourceId = dataSource._id.toString();
+        this.dataSourceId = dataSource._id;
         this.zoom = zoom;
     }
 

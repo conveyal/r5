@@ -1,14 +1,23 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.components.Component;
+import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.BaseModel;
+import com.conveyal.analysis.models.Bundle;
+import com.conveyal.analysis.models.DataGroup;
+import com.conveyal.analysis.models.DataSource;
+import com.conveyal.analysis.models.GtfsDataSource;
+import com.conveyal.analysis.models.Modification;
+import com.conveyal.analysis.models.OpportunityDataset;
+import com.conveyal.analysis.models.OsmDataSource;
+import com.conveyal.analysis.models.Region;
+import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.models.SpatialDataSource;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.codecs.pojo.Conventions;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,14 +26,25 @@ import static com.mongodb.MongoClientSettings.getDefaultCodecRegistry;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
-/** TODO should we pre-create all the AnalysisCollections and fetch them by Class? */
+/**
+ * TODO should we pre-create all the AnalysisCollections and fetch them by Class?
+ */
 public class AnalysisDB implements Component {
 
     private final Logger LOG = LoggerFactory.getLogger(AnalysisDB.class);
     private final MongoClient mongo;
     private final MongoDatabase database;
 
-    public AnalysisDB (Config config) {
+    public final AnalysisCollection<AggregationArea> aggregationAreas;
+    public final AnalysisCollection<Bundle> bundles;
+    public final AnalysisCollection<DataGroup> dataGroups;
+    public final AnalysisCollection<DataSource> dataSources;
+    public final AnalysisCollection<Modification> modifications;
+    public final AnalysisCollection<OpportunityDataset> opportunities;
+    public final AnalysisCollection<Region> regions;
+    public final AnalysisCollection<RegionalAnalysis> regionalAnalyses;
+
+    public AnalysisDB(Config config) {
         if (config.databaseUri() != null) {
             LOG.info("Connecting to remote MongoDB instance...");
             mongo = MongoClients.create(config.databaseUri());
@@ -36,10 +56,16 @@ public class AnalysisDB implements Component {
 
         // Request that the JVM clean up database connections in all cases - exiting cleanly or by being terminated.
         // We should probably register such hooks for other components to shut down more cleanly.
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            Persistence.mongo.close();
-            this.mongo.close();
-        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(this.mongo::close));
+
+        aggregationAreas = getAnalysisCollection("aggregationAreas", AggregationArea.class);
+        bundles = getAnalysisCollection("bundles", Bundle.class);
+        dataGroups = getAnalysisCollection("dataGroups", DataGroup.class);
+        dataSources = getAnalysisCollectionWithSubclasses("dataSources", DataSource.class, SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class);
+        modifications = getAnalysisCollection("modifications", Modification.class);
+        opportunities = getAnalysisCollection("opportunityDatasets", OpportunityDataset.class);
+        regions = getAnalysisCollection("regions", Region.class);
+        regionalAnalyses = getAnalysisCollection("regional-analyses", RegionalAnalysis.class);
     }
 
     /**
@@ -71,27 +97,32 @@ public class AnalysisDB implements Component {
      * verbose default discriminator of a fully qualified class name, because the Mongo driver does not auto-scan for
      * classes it has not encountered in a write operation or in a request for a collection.
      */
-    public <T extends BaseModel> AnalysisCollection getAnalysisCollection (
-        String name, Class<T> clazz, Class<? extends T>... subclasses
-    ){
+    public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollectionWithSubclasses(
+            String name, Class<T> clazz, Class<? extends T>... subclasses
+    ) {
         for (Class subclass : subclasses) {
             database.getCodecRegistry().get(subclass);
         }
-        return new AnalysisCollection<T>(database.getCollection(name, clazz), clazz);
+        return new AnalysisCollection<T>(database.getCollection(name, clazz));
+    }
+
+    public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollection(
+            String name, Class<T> clazz
+    ) {
+        return new AnalysisCollection<T>(database.getCollection(name, clazz));
     }
 
     /**
-     * Lower-level access to Mongo collections without the user-oriented functionality of BaseModel (accessGroup etc.)
-     * This is useful when storing server monitoring data (time series or event data) in a cloud environment.
+     * Interface to supply configuration to this component.
      */
-    public MongoCollection getMongoCollection (String name, Class clazz) {
-        return database.getCollection(name, clazz);
-    }
-
-    /** Interface to supply configuration to this component. */
     public interface Config {
-        default String databaseUri() { return "mongodb://127.0.0.1:27017"; }
-        default String databaseName() { return "analysis"; }
+        default String databaseUri() {
+            return "mongodb://127.0.0.1:27017";
+        }
+
+        default String databaseName() {
+            return "analysis";
+        }
     }
 
 }

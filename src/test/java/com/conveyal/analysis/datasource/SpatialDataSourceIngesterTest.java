@@ -14,7 +14,6 @@ import java.util.Optional;
 import static com.conveyal.analysis.datasource.SpatialAttribute.Type.NUMBER;
 import static com.conveyal.analysis.datasource.SpatialAttribute.Type.TEXT;
 import static com.conveyal.file.FileStorageFormat.GEOJSON;
-import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;

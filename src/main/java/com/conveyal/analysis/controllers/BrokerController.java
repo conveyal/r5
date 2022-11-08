@@ -11,7 +11,7 @@ import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -25,7 +25,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -35,8 +36,6 @@ import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
 import org.bson.types.ObjectId;
-import org.mongojack.DBCursor;
-import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import spark.Request;
@@ -73,7 +72,9 @@ public class BrokerController implements HttpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(BrokerController.class);
 
-    /** For convenience, a local reference to the shared JSON object codec. */
+    /**
+     * For convenience, a local reference to the shared JSON object codec.
+     */
     private static ObjectMapper jsonMapper = JsonUtilities.objectMapper;
 
     // Component Dependencies
@@ -82,9 +83,12 @@ public class BrokerController implements HttpController {
 
     private final EventBus eventBus;
 
-    public BrokerController (Broker broker, EventBus eventBus) {
+    private final AnalysisDB db;
+
+    public BrokerController(Broker broker, AnalysisDB db, EventBus eventBus) {
         this.broker = broker;
         this.eventBus = eventBus;
+        this.db = db;
     }
 
     /**
@@ -141,8 +145,7 @@ public class BrokerController implements HttpController {
         checkNotNull(analysisRequest.workerVersion, "Worker version must be provided in request.");
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
-        analysisRequest.populateTask(task, userPermissions);
+        TravelTimeSurfaceTask task = analysisRequest.toTravelTimeSurfaceTask(db, userPermissions);
 
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
@@ -152,7 +155,7 @@ public class BrokerController implements HttpController {
             // We should refactor the populateTask method (and move it off the request) to take care of all this.
             List<OpportunityDataset> opportunityDatasets = new ArrayList<>();
             for (String destinationPointSetId : analysisRequest.destinationPointSetIds) {
-                OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
+                OpportunityDataset opportunityDataset = db.opportunities.findByIdIfPermitted(
                         destinationPointSetId,
                         userPermissions
                 );
@@ -301,10 +304,9 @@ public class BrokerController implements HttpController {
         enforceAdmin(request);
         Collection<JobStatus> jobStatuses = broker.getAllJobStatuses();
         for (JobStatus jobStatus : jobStatuses) {
-            jobStatus.regionalAnalysis = Persistence.regionalAnalyses.find(
-                    QueryBuilder.start("_id").is(jobStatus.jobId).get(),
-                    DBProjection.exclude("request.scenario.modifications")
-            ).next();
+            jobStatus.regionalAnalysis = db.regionalAnalyses.collection.find(
+                    Filters.eq("_id", jobStatus.jobId)
+            ).projection(Projections.exclude("request.scenario.modifications")).first();
         }
         return jsonResponse(response, HttpStatus.OK_200, jobStatuses);
     }
@@ -321,10 +323,9 @@ public class BrokerController implements HttpController {
             for (String networkId : observation.status.networks) {
                 Bundle bundle = bundleForNetworkId.get(networkId);
                 if (bundle == null) {
-                    DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("_id").is(networkId).get());
+                    bundle = db.bundles.findById(networkId);
                     // Bundle for a network may have been deleted
-                    if (cursor.hasNext()) {
-                        bundle = cursor.next();
+                    if (bundle != null) {
                         bundleForNetworkId.put(networkId, bundle);
                     }
                 }

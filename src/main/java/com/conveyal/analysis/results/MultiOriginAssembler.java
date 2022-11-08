@@ -3,12 +3,14 @@ package com.conveyal.analysis.results;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.util.ExceptionUtils;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,8 @@ public class MultiOriginAssembler {
      */
     public final int nOriginsTotal;
 
+    private final AnalysisDB db;
+
     /**
      * Constructor. This sets up one or more ResultWriters depending on whether we're writing gridded or non-gridded
      * cumulative opportunities accessibility, or origin-destination travel times.
@@ -83,7 +87,9 @@ public class MultiOriginAssembler {
      *      file up to an umbrella location where a single reference to the file storage can be used to
      *      store all of them.
      */
-    public MultiOriginAssembler (RegionalAnalysis regionalAnalysis, Job job, FileStorage fileStorage) {
+    public MultiOriginAssembler(RegionalAnalysis regionalAnalysis, Job job, AnalysisDB db, FileStorage fileStorage) {
+        this.db = db;
+
         try {
             this.regionalAnalysis = regionalAnalysis;
             this.job = job;
@@ -91,7 +97,7 @@ public class MultiOriginAssembler {
             this.originsReceived = new BitSet(job.nTasksTotal);
             // Check that origin and destination sets are not too big for generating CSV files.
             if (!job.templateTask.makeTauiSite &&
-                 job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
+                    job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
             ) {
                // This requires us to have already loaded this destination pointset instance into the transient field.
                 PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
@@ -150,11 +156,13 @@ public class MultiOriginAssembler {
             for (RegionalResultWriter writer : resultWriters) {
                 writer.finish();
             }
-            regionalAnalysis.complete = true;
             // Write updated regionalAnalysis object back out to database, to mark it complete and record locations
             // of any CSV files generated. Use method that updates lock/timestamp, otherwise updates are not seen in UI.
             // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock().
-            Persistence.regionalAnalyses.put(regionalAnalysis);
+            db.regionalAnalyses.collection.updateOne(
+                    Filters.eq("_id", regionalAnalysis._id),
+                    Updates.set("complete", true)
+            );
         } catch (Exception e) {
             LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
         }

@@ -12,7 +12,7 @@ import java.util.Map;
  * Represents a single regional (multi-origin) accessibility analysis,
  * which may have more than one percentile and cutoff.
  */
-public class RegionalAnalysis extends Model implements Cloneable {
+public class RegionalAnalysis extends BaseModel implements Cloneable {
     public String regionId;
     public String bundleId;
     public String projectId;

@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.Sets;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -31,15 +28,19 @@ import static com.google.common.base.Preconditions.checkNotNull;
         @JsonSubTypes.Type(name = "add-streets", value = AddStreets.class),
         @JsonSubTypes.Type(name = "modify-streets", value = ModifyStreets.class)
 })
-public abstract class Modification extends Model implements Cloneable {
-    /** the type of this modification, see JsonSubTypes annotation above */
-    public abstract String getType ();
+public abstract class Modification extends BaseModel implements Cloneable {
+    /**
+     * the type of this modification, see JsonSubTypes annotation above
+     */
+    public abstract String getType();
 
-    public Modification clone () throws CloneNotSupportedException {
+    public Modification clone() throws CloneNotSupportedException {
         return (Modification) super.clone();
     }
 
-    /** What project is this modification a part of? */
+    /**
+     * What project is this modification a part of?
+     */
     public String projectId;
 
     /** what variants is this modification a part of? */

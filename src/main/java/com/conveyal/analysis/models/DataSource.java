@@ -65,7 +65,7 @@ public abstract class DataSource extends BaseModel {
     public DataSource () { }
 
     public WorkProduct toWorkProduct () {
-        return new WorkProduct(DATA_SOURCE, _id.toString(), regionId);
+        return new WorkProduct(DATA_SOURCE, _id, regionId);
     };
 
     public void addIssue (DataSourceValidationIssue.Level level, String message) {
@@ -73,7 +73,7 @@ public abstract class DataSource extends BaseModel {
     }
 
     public FileStorageKey fileStorageKey () {
-        return new FileStorageKey(FileCategory.DATASOURCES, _id.toString(), fileFormat.extension);
+        return new FileStorageKey(FileCategory.DATASOURCES, _id, fileFormat.extension);
     }
 
 }

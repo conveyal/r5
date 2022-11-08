@@ -17,12 +17,12 @@ import java.util.stream.Collectors;
 
 /**
  * Represents a transport Bundle (GTFS and OSM).
- *
+ * <p>
  * Previously the OSM was specified at the Region level, so every Bundle in the same Region used the same OSM data.
- *
+ * <p>
  * All of the data is stored in S3, however some information is duplicated here for convenience.
  */
-public class Bundle extends Model implements Cloneable {
+public class Bundle extends BaseModel implements Cloneable {
     public String regionId;
 
     // Unique key that allows for linking new bundles to previously uploaded OSM.

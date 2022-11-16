@@ -231,4 +231,17 @@ public class SingleModeTraversalTimes implements Serializable {
         }
     }
 
+    /**
+     * As a neutral starting point for building up generalized costs in modifications, as opposed to starting from
+     * tags is OSM data as it's read in, set all scaling factors to 1 and constant costs to 0.
+     */
+    public void setAllUnity () {
+        if (nEdges != 0) {
+            throw new IllegalArgumentException("Can only set an empty SingleModeTraversalTimes to unity.");
+        }
+        while (nEdges < edgeStore.nEdges()) {
+            setOneEdge();
+        }
+    }
+
 }

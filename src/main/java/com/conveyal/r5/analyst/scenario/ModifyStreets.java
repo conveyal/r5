@@ -4,6 +4,7 @@ import com.conveyal.gtfs.Geometries;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeTraversalTimes;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import gnu.trove.iterator.TIntIterator;
@@ -139,7 +140,9 @@ public class ModifyStreets extends Modification {
         }
         if (walkTimeFactor != null) {
             if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                errors.add("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
+                info.add("Modification requires a table of per-edge factors but network doesn't have one. Added one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(network.streetLayer.edgeStore);
+                network.streetLayer.edgeStore.edgeTraversalTimes.setAllUnity();
             }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
                 errors.add("walkGenCostFactor must be in the range (0...10].");
@@ -147,7 +150,9 @@ public class ModifyStreets extends Modification {
         }
         if (bikeTimeFactor != null) {
             if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                errors.add("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
+                info.add("Modification requires a table of per-edge factors but network doesn't have one. Added one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(network.streetLayer.edgeStore);
+                network.streetLayer.edgeStore.edgeTraversalTimes.setAllUnity();
             }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
                 errors.add("bikeGenCostFactor must be in the range (0...10].");

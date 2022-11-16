@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
+import gnu.trove.list.array.TDoubleArrayList;
 
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.BACKWARD;
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.FORWARD;
@@ -105,5 +106,14 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
     /** see getWalkTimeFactor() */
     public double getBikeTimeFactor (int edgeIndex) {
         return bikeTraversalTimes.perceivedLengthMultipliers.get(edgeIndex);
+    }
+
+    /**
+     * As a neutral starting point for building up generalized costs in modifications, as opposed to starting from
+     * tags is OSM data as it's read in, set all scaling factors to 1 and constant costs to 0.
+     */
+    public void setAllUnity () {
+        walkTraversalTimes.setAllUnity();
+        bikeTraversalTimes.setAllUnity();
     }
 }

@@ -24,7 +24,27 @@ import java.util.List;
 import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
 
 /**
+ * <p>
  * This modification selects all edges inside a given set of polygons and changes their characteristics.
+ * </p><p>
+ * Some of its options, specifically walkTimeFactor and bikeTimeFactor, adjust generalized costs for walking and biking
+ * which are stored in an optional generalized costs data table that is not present on networks by default.
+ * These data tables are currently only created in networks built from very particular OSM data where every way has all
+ * of the special tags contributing to the LADOT generalized costs (com.conveyal.r5.streets.LaDotCostTags).
+ * </p><p>
+ * The apply() method creates this data table in the scenario copy of the network as needed if one does not exist on the
+ * base network (so there is no extend-only wrapper in the scenario network). This means each scenario may have its own
+ * (potentially large) generalized cost data table instead of just extending a shared one in the baseline network.
+ * This less-than-optimal implementation is acceptable at least as a stopgap on this rarely used specialty modification.
+ * The other alternatives would be:
+ * </p><ul>
+ * <li> Add the table to the baseline network whenever it's any scenario needs to extend it.
+ *      This breaks a lot of conventions we have about treating loaded networks as read-only, and incurs a lot of extra
+ *      memory access and pointless multiplication by 1 on every scenario including the baseline.</li>
+ * <li> Require the table to be enabled on the base network when it's first built, using a parameter in
+ *      TransportNetworkConfig. This incurs the same overhead, but respects the immutable character of loaded networks
+ *      and is an intentional choice by the user.</li>
+ * </ul>
  */
 public class ModifyStreets extends Modification {
 

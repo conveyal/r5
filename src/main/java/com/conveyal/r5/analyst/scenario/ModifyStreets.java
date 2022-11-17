@@ -139,21 +139,11 @@ public class ModifyStreets extends Modification {
             }
         }
         if (walkTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                info.add("Modification requires a table of per-edge factors but network doesn't have one. Added one.");
-                network.streetLayer.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(network.streetLayer.edgeStore);
-                network.streetLayer.edgeStore.edgeTraversalTimes.setAllUnity();
-            }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
                 errors.add("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                info.add("Modification requires a table of per-edge factors but network doesn't have one. Added one.");
-                network.streetLayer.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(network.streetLayer.edgeStore);
-                network.streetLayer.edgeStore.edgeTraversalTimes.setAllUnity();
-            }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
                 errors.add("bikeGenCostFactor must be in the range (0...10].");
             }
@@ -172,6 +162,12 @@ public class ModifyStreets extends Modification {
     @Override
     public boolean apply (TransportNetwork network) {
         EdgeStore edgeStore = network.streetLayer.edgeStore;
+        if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
+            if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
+                info.add("Added table of per-edge factors because base network doesn't have one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.unity(network.streetLayer.edgeStore);
+            }
+        }
         EdgeStore.Edge oldEdge = edgeStore.getCursor();
         // By convention we only index the forward edge in each pair, so we're iterating over forward edges here.
         for (TIntIterator edgeIterator = edgesInPolygon.iterator(); edgeIterator.hasNext(); ) {

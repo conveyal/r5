@@ -109,11 +109,15 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
     }
 
     /**
-     * As a neutral starting point for building up generalized costs in modifications, as opposed to starting from
-     * tags is OSM data as it's read in, set all scaling factors to 1 and constant costs to 0.
+     * Factory method returning a newly constructed EdgeTraversalTimes where all scaling factors are 1 and constant
+     * costs are 0. This serves as a neutral starting point for building up generalized costs in modifications,
+     * as opposed to starting from pre-existing generalized costs derived from special purpose OSM tags.
      */
-    public void setAllUnity () {
-        walkTraversalTimes.setAllUnity();
-        bikeTraversalTimes.setAllUnity();
+    public static EdgeTraversalTimes unity (EdgeStore edgeStore) {
+        var times = new EdgeTraversalTimes(edgeStore);
+        times.bikeTraversalTimes.setAllUnity();
+        times.walkTraversalTimes.setAllUnity();
+        return times;
     }
+
 }

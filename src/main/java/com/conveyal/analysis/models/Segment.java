@@ -1,10 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.geojson.GeometryDeserializer;
-import com.conveyal.geojson.GeometrySerializer;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.locationtech.jts.geom.Geometry;
+import com.mongodb.client.model.geojson.LineString;
 
 /**
  * Represents a single segment of an added trip pattern (between two user-specified points)
@@ -28,11 +24,9 @@ public class Segment {
     /**
      * Geometry of this segment
      * Generally speaking, this will be a LineString, but the first segment may be a Point
-     * iff there are no more segments. This is used when someone first starts drawing a line and
+     * if there are no more segments. This is used when someone first starts drawing a line and
      * they have only drawn one stop so far. Of course a transit line with only one stop would
      * not be particularly useful.
      */
-    @JsonDeserialize(using= GeometryDeserializer.class)
-    @JsonSerialize(using= GeometrySerializer.class)
-    public Geometry geometry;
+    public LineString geometry;
 }

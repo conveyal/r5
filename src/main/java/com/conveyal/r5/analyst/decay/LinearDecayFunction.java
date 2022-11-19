@@ -1,11 +1,14 @@
 package com.conveyal.r5.analyst.decay;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * It's debatable whether the precomputation of a lookup table will speed up calculations. The tables get pretty big and
  * calculation may be faster than memory churn. We should try to measure with and without that optimization.
  */
+@BsonDiscriminator(value = "linear", key = "type")
 public class LinearDecayFunction extends DecayFunction {
 
     /** The public parameter. */

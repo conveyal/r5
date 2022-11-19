@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.decay;
 
 import org.apache.commons.math3.util.FastMath;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 /**
  * This an exponential decay function where the cutoff parameter c is treated as the half-life.
@@ -11,6 +12,7 @@ import org.apache.commons.math3.util.FastMath;
  * JIT may be smart enough to factor the (log(0.5)/cutoff) out of the series of method calls, without us needing to
  * create specific function instances with precomputed constants for each separate cutoff.
  */
+@BsonDiscriminator(value = "exponential", key = "type")
 public class ExponentialDecayFunction extends DecayFunction {
 
     private static final double logOneHalf = FastMath.log(0.5);

@@ -104,7 +104,7 @@ public class OpportunityDatasetController implements HttpController {
     private Object getOpportunityDataset(Request req, Response res) {
         OpportunityDataset dataset = db.opportunities.findPermittedByRequestParamId(req);
         if (dataset.format == FileStorageFormat.GRID) {
-            return getJsonUrl(dataset.getStorageKey());
+            return getJsonUrl(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
         } else {
             // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
             // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
@@ -142,7 +142,7 @@ public class OpportunityDatasetController implements HttpController {
         // TODO we should be reusing the same source from Mongo, not making new ephemeral ones on each extract operation
         SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
         source.regionId = regionId;
-        // Make a new group that will containin the N OpportunityDatasets we're saving.
+        // Make a new group that will contain the N OpportunityDatasets we're saving.
         String description = String.format("Import %s to %s", extractor.sourceName, region.name);
         DataGroup dataGroup = new DataGroup(userPermissions, source._id, description);
 
@@ -197,12 +197,17 @@ public class OpportunityDatasetController implements HttpController {
             if (dataset.format == FileStorageFormat.FREEFORM) {
                 dataset.name = String.join(" ", pointSet.name, "(freeform)");
             }
-            dataset.setWebMercatorExtents(pointSet.getWebMercatorExtents());
+            var extents = pointSet.getWebMercatorExtents();
+            dataset.north = extents.north;
+            dataset.west = extents.west;
+            dataset.height = extents.height;
+            dataset.width = extents.width;
+            dataset.zoom = extents.zoom;
             // TODO make origin and destination pointsets reference each other and indicate they are suitable
             //      for one-to-one analyses
 
             // Store the PointSet metadata in Mongo and accumulate these objects into the method return list.
-            db.opportunities.collection.insertOne(dataset);
+            db.opportunities.insert(dataset);
             datasets.add(dataset);
 
             // Persist a serialized representation of each PointSet (not the metadata) to S3 or other object storage.
@@ -215,7 +220,7 @@ public class OpportunityDatasetController implements HttpController {
                     OutputStream fos = new GZIPOutputStream(new FileOutputStream(gridFile));
                     ((Grid)pointSet).write(fos);
 
-                    fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
+                    fileStorage.moveIntoStorage(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
                     FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, source.regionId + "/" + dataset._id +
@@ -449,14 +454,15 @@ public class OpportunityDatasetController implements HttpController {
      */
     private OpportunityDataset deleteDataset(String id, UserPermissions userPermissions) {
         var dataset = db.opportunities.findByIdIfPermitted(id, userPermissions);
+
+        // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.PNG));
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GEOTIFF));
+
         var result = db.opportunities.deleteByIdIfPermitted(id, userPermissions);
-        if (result.wasAcknowledged()) {
+        if (!result.wasAcknowledged()) {
             throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
-        } else {
-            // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GRID));
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.PNG));
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GEOTIFF));
         }
         return dataset;
     }
@@ -577,8 +583,8 @@ public class OpportunityDatasetController implements HttpController {
 
         final OpportunityDataset opportunityDataset = db.opportunities.findPermittedByRequestParamId(req);
 
-        FileStorageKey gridKey = opportunityDataset.getStorageKey(FileStorageFormat.GRID);
-        FileStorageKey formatKey = opportunityDataset.getStorageKey(downloadFormat);
+        FileStorageKey gridKey = OpportunityDataset.getStorageKey(opportunityDataset, FileStorageFormat.GRID);
+        FileStorageKey formatKey = OpportunityDataset.getStorageKey(opportunityDataset, downloadFormat);
 
         // if this grid is not on S3 in the requested format, try to get the .grid format
         if (!fileStorage.exists(gridKey)) {

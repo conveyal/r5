@@ -179,7 +179,7 @@ public class GtfsController implements HttpController {
 
     private List<FeedGroupStopsApiResponse> getAllStopsForFeedGroup(Request req, Response res) {
         String feedGroupId = req.params("feedGroupId");
-        var bundle = db.bundles.find(Filters.eq("feedGroupId", feedGroupId)).first();
+        var bundle = db.bundles.collection.find(Filters.eq("feedGroupId", feedGroupId)).first();
         if (bundle == null) {
             throw AnalysisServerException.notFound("Bundle could not be found for the given feed group ID.");
         }

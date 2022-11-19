@@ -83,7 +83,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         mergePolygons = Boolean.parseBoolean(req.queryParams("mergePolygons"));
         checkNotNull(dataSourceId);
 
-        DataSource dataSource = db.dataSources.findById(dataSourceId);
+        DataSource dataSource = db.dataSources.findById(dataSourceId).first();
         checkArgument(dataSource instanceof SpatialDataSource,
                 "Only spatial data sets can be converted to aggregation areas.");
         spatialDataSource = (SpatialDataSource) dataSource;

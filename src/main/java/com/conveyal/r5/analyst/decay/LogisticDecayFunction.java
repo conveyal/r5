@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.decay;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.commons.math3.util.FastMath.PI;
 import static org.apache.commons.math3.util.FastMath.exp;
@@ -12,6 +14,7 @@ import static org.apache.commons.math3.util.FastMath.sqrt;
  * Number crunching is typically much faster than memory access on modern machines, we should only implement a
  * table-lookup optimization if we can show significant slowdown due to these on the fly calculations.
  */
+@BsonDiscriminator(value = "logistic", key = "type")
 public class LogisticDecayFunction extends DecayFunction {
 
     private static final double SQRT3 = sqrt(3);

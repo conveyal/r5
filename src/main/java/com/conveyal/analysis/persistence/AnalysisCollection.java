@@ -8,10 +8,10 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.DeleteResult;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import spark.Request;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.and;
@@ -43,30 +43,21 @@ public class AnalysisCollection<T extends BaseModel> {
         return collection.deleteOne(eq("_id", value._id));
     }
 
-    public DeleteResult deleteByIdParamIfPermitted(Request request) {
-        String _id = request.params("_id");
-        UserPermissions user = UserPermissions.from(request);
-        return deleteByIdIfPermitted(_id, user);
-    }
-
     public DeleteResult deleteByIdIfPermitted(String _id, UserPermissions user) {
         return collection.deleteOne(and(eq("_id", _id), eq(MONGO_PROP_ACCESS_GROUP, user.accessGroup)));
     }
 
     public FindIterable<T> findPermitted(Bson query, UserPermissions userPermissions) {
-        return find(and(eq(MONGO_PROP_ACCESS_GROUP, userPermissions.accessGroup), query));
+        return collection.find(and(eq(MONGO_PROP_ACCESS_GROUP, userPermissions.accessGroup), query));
     }
 
-    public FindIterable<T> find(Bson query) {
-        return collection.find(query);
-    }
-
-    public T findById(String _id) {
-        return collection.find(eq("_id", _id)).first();
+    public FindIterable<T> findById(String _id) {
+        return collection.find(eq("_id", _id));
     }
 
     public T findByIdIfPermitted(String _id, UserPermissions userPermissions) {
-        T item = findById(_id);
+        T item = findById(_id).first();
+        if (item == null) throw AnalysisServerException.notFound(_id + " not found");
         if (item.accessGroup.equals(userPermissions.accessGroup)) {
             return item;
         } else {
@@ -76,41 +67,40 @@ public class AnalysisCollection<T extends BaseModel> {
         }
     }
 
-    public T create(T newModel, UserPermissions userPermissions) {
-        newModel.accessGroup = userPermissions.accessGroup;
-        newModel.createdBy = userPermissions.email;
-        newModel.updatedBy = userPermissions.email;
-        newModel.createdAt = new Date();
-        newModel.updatedAt = new Date();
-
-        // This creates the `_id` automatically if it is missing
-        collection.insertOne(newModel);
-
-        return newModel;
-    }
-
     /**
      * Note that if the supplied model has _id = null, the Mongo insertOne method will overwrite it with a new
      * ObjectId(). We consider it good practice to set the _id for any model object ourselves, avoiding this behavior.
-     * It looks like we could remove the OBJECT_ID_GENERATORS convention to force explicit ID creation.
-     * https://mongodb.github.io/mongo-java-driver/3.11/bson/pojos/#conventions
      */
     public void insert(T model) {
+        if (model._id == null) model._id = new ObjectId().toString();
         collection.insertOne(model);
     }
 
-    public T modifyWithoutUpdatingLock(T value) {
+    public void replaceOne(T value) {
         this.collection.replaceOne(eq("_id", value._id), value);
-        return value;
     }
 
-    // TODO should all below be static helpers on HttpController? Passing the whole request in seems to defy encapsulation.
-    //  On the other hand, making them instance methods reduces the number of parameters and gives access to Class<T>.
+    /*
+      Helpers for HttpControllers
+     */
 
     /**
-     * Helper for HttpControllers - find a document by the _id path parameter in the request, checking permissions.
+     * Delete a document by the _id path parameter in the request, checking permissions.
+     *
+     * @param request
+     * @return
+     */
+    public DeleteResult deleteByIdParamIfPermitted(Request request) {
+        var _id = request.params("_id");
+        var user = UserPermissions.from(request);
+        return deleteByIdIfPermitted(_id, user);
+    }
+
+    /**
+     * Find a document by the _id path parameter in the request, checking permissions.
      */
     public T findPermittedByRequestParamId(Request req) {
         return findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
+
 }

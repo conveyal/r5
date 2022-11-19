@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.decay;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.math3.util.FastMath;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 /**
  * This is equivalent to using the ExponentialDecayFunction with a cutoff (half-life) of log(0.5)/decayConstant.
@@ -10,6 +11,7 @@ import org.apache.commons.math3.util.FastMath;
  * ignore the travel time cutoff, and results will not change from one cutoff to another. For this reason we do not
  * expose this function as an easily selectable choice in the client UI.
  */
+@BsonDiscriminator(value = "fixed-exponential", key = "type")
 public class FixedExponentialDecayFunction extends DecayFunction {
 
     /**

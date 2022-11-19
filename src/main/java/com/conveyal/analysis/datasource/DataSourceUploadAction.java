@@ -92,7 +92,7 @@ public class DataSourceUploadAction implements TaskAction {
         // Loop through uploaded files, registering the extensions and writing to storage
         // (with filenames that correspond to the source id)
         progressListener.beginTask("Moving files into storage...", 1);
-        final String dataSourceId = ingester.dataSource()._id.toString();
+        final String dataSourceId = ingester.dataSource()._id;
         for (FileItem fileItem : fileItems) {
             DiskFileItem dfi = (DiskFileItem) fileItem;
             // Use canonical extension from file type - files may be uploaded with e.g. tif instead of tiff or geotiff.

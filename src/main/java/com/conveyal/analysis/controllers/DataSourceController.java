@@ -71,9 +71,9 @@ public class DataSourceController implements HttpController {
         fileStorage.delete(dataSource.fileStorageKey());
         // This is so ad-hoc but it's not necessarily worth generalizing since SHP is the only format with sidecars.
         if (dataSource.fileFormat == SHP) {
-            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "shx"));
-            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "dbf"));
-            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id.toString(), "prj"));
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id, "shx"));
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id, "dbf"));
+            fileStorage.delete(new FileStorageKey(DATASOURCES, dataSource._id, "prj"));
         }
         return "Deleted " + nDeleted;
     }

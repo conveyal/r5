@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
@@ -95,8 +94,8 @@ public class RegionalAnalysisController implements HttpController {
                 Filters.and(Filters.eq("regionId", regionId), Filters.eq("deleted", false)),
                 user
         ).projection(Projections.exclude("request"));
-        List<JobStatus> runningStatusesForRegion = new ArrayList<>();
-        Collection<JobStatus> allJobStatuses = broker.getAllJobStatuses();
+        var runningStatusesForRegion = new ArrayList<JobStatus>();
+        var allJobStatuses = broker.getAllJobStatuses();
         iterator.forEach(ra -> {
             JobStatus jobStatus = allJobStatuses.stream().filter(j -> j.jobId.equals(ra._id)).findFirst().orElse(null);
             if (jobStatus != null) {

@@ -17,7 +17,7 @@ public class ConvertToFrequency extends Modification {
     }
 
     public String feed;
-    public String[] routes;
+    public List<String> routes;
 
     /** Should trips on this route that start outside the days/times specified by frequency entries be retained? */
     public boolean retainTripsOutsideFrequencyEntries = false;
@@ -25,17 +25,23 @@ public class ConvertToFrequency extends Modification {
     public List<FrequencyEntry> entries;
 
     public static class FrequencyEntry extends AbstractTimetable {
-        /** start times of this trip (seconds since midnight), when non-null scheduled trips will be created */
+        /**
+         * start times of this trip (seconds since midnight), when non-null scheduled trips will be created
+         */
         @Deprecated
         public int[] startTimes;
 
-        /** trip from which to copy travel times */
+        /**
+         * trip from which to copy travel times
+         */
         public String sourceTrip;
 
-        /** trips on the selected patterns which could be used as source trips */
-        public String[] patternTrips;
+        /**
+         * trips on the selected patterns which could be used as source trips
+         */
+        public List<String> patternTrips;
 
-        public AddTrips.PatternTimetable toR5 (String feed) {
+        public AddTrips.PatternTimetable toR5(String feed) {
             AddTrips.PatternTimetable pt = toBaseR5Timetable();
 
             pt.sourceTrip = feed + ":" + sourceTrip;
@@ -47,7 +53,7 @@ public class ConvertToFrequency extends Modification {
     public AdjustFrequency toR5 () {
         AdjustFrequency af = new AdjustFrequency();
         af.comment = name;
-        af.route = feedScopeId(feed, routes[0]);
+        af.route = feedScopeId(feed, routes.get(0));
         af.retainTripsOutsideFrequencyEntries = retainTripsOutsideFrequencyEntries;
         af.entries = entries.stream().map(e -> e.toR5(feed)).collect(Collectors.toList());
 

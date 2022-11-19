@@ -1,16 +1,17 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.r5.profile.StreetMode;
+import com.google.common.primitives.Doubles;
 
-import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Fields replicated from the R5 AddStreets modification.
  */
 public class AddStreets extends Modification {
-
-    public double[][][] lineStrings;
-    public EnumSet<StreetMode> allowedModes;
+    public List<List<List<Double>>> lineStrings;
+    public Set<StreetMode> allowedModes;
     public Double carSpeedKph;
     public Double walkTimeFactor;
     public Double bikeTimeFactor;
@@ -27,7 +28,7 @@ public class AddStreets extends Modification {
         com.conveyal.r5.analyst.scenario.AddStreets mod = new com.conveyal.r5.analyst.scenario.AddStreets();
         mod.comment = name;
 
-        mod.lineStrings = lineStrings;
+        mod.lineStrings = (double[][][]) lineStrings.stream().map(ls -> ls.stream().map(Doubles::toArray).toArray()).toArray();
         mod.allowedModes = allowedModes;
         mod.carSpeedKph = carSpeedKph;
         mod.walkTimeFactor = walkTimeFactor;

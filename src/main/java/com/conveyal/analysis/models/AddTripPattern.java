@@ -39,17 +39,22 @@ public class AddTripPattern extends Modification {
     public List<Timetable> timetables;
 
     public static class Timetable extends AbstractTimetable {
-        /** Default dwell time, seconds */
+        /**
+         * Default dwell time, seconds
+         */
         public int dwellTime;
 
-        /** Speed, kilometers per hour, for each segment */
-        public int[] segmentSpeeds;
+        /**
+         * Speed, kilometers per hour, for each segment
+         */
+        public List<Integer> segmentSpeeds;
 
-        /** Dwell times at adjusted stops, seconds */
-        // using Integer not int because dwell times can be null
-        public Integer[] dwellTimes;
+        /**
+         * Dwell times at adjusted stops, seconds
+         */
+        public List<Integer> dwellTimes;
 
-        public AddTrips.PatternTimetable toR5 (List<ModificationStop> stops) {
+        public AddTrips.PatternTimetable toR5(List<ModificationStop> stops) {
             AddTrips.PatternTimetable pt = this.toBaseR5Timetable();
 
             // Get hop times
@@ -92,7 +97,7 @@ public class AddTripPattern extends Modification {
         }
 
         // Values for stop spec are not affected by time table segment speeds or dwell times
-        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new int[0]));
+        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new ArrayList<>()));
 
         return at;
     }

@@ -8,7 +8,7 @@ import java.util.Date;
 /**
  * The base type for objects stored in our newer AnalysisDB using the Mongo Java driver's POJO functionality.
  */
-public class BaseModel {
+public abstract class BaseModel {
     public String _id;
 
     // For version management.
@@ -26,18 +26,24 @@ public class BaseModel {
     // Everything has a name
     public String name = null;
 
-    // package private to encourage use of static factory methods
-    BaseModel(UserPermissions user, String name) {
-        this._id = new ObjectId().toString();
-        this.nonce = new ObjectId().toString();
-        this.createdBy = user.email;
-        this.updatedBy = user.email;
-        this.createdAt = new Date();
-        this.updatedAt = new Date();
-        this.accessGroup = user.accessGroup;
+    public BaseModel(UserPermissions user, String name) {
+        this(user);
         this.name = name;
     }
 
-    /** Zero argument constructor required for MongoDB driver automatic POJO deserialization. */
-    public BaseModel () { }
+    public BaseModel(UserPermissions user) {
+        this._id = new ObjectId().toString();
+        this.nonce = new ObjectId().toString();
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+        this.createdBy = user.email;
+        this.updatedBy = user.email;
+        this.accessGroup = user.accessGroup;
+    }
+
+    /**
+     * Zero argument constructor required for MongoDB driver automatic POJO deserialization.
+     */
+    public BaseModel() {
+    }
 }

@@ -54,7 +54,7 @@ class ModificationStop {
      * Convert a list of Segments from a modification (the front-end representation) to this internal
      * backend representation.
      */
-    static List<ModificationStop> getStopsFromSegments (List<Segment> segments, Integer[] dwellTimes, int defaultDwellTime, int[] segmentSpeedsKph) {
+    static List<ModificationStop> getStopsFromSegments(List<Segment> segments, List<Integer> dwellTimes, int defaultDwellTime, List<Integer> segmentSpeedsKph) {
         if (segments == null || segments.size() == 0) {
             return new ArrayList<>();
         }
@@ -82,7 +82,7 @@ class ModificationStop {
         double metersToLastStop = 0; // distance to previously created stop, from start of pattern
         double metersFromPatternStart = 0; // from start of pattern
         int hopTimeSeconds = 0;
-        int previousSegmentSpeedKph = segmentSpeedsKph.length > 0 ? segmentSpeedsKph[0] : DEFAULT_SEGMENT_SPEED_KPH;
+        int previousSegmentSpeedKph = segmentSpeedsKph.size() > 0 ? segmentSpeedsKph.get(0) : DEFAULT_SEGMENT_SPEED_KPH;
         Coordinate previousSegmentFinalCoordinate = null;
 
         // Iterate over segments, which are defined by control points and real (i.e. not auto-generated at a requested
@@ -91,7 +91,7 @@ class ModificationStop {
             Segment segment = segments.get(i);
 
             // A timetable's segment speeds array may get out of sync with the
-            int segmentSpeedKph = i < segmentSpeedsKph.length ? segmentSpeedsKph[i] : previousSegmentSpeedKph;
+            int segmentSpeedKph = i < segmentSpeedsKph.size() ? segmentSpeedsKph.get(i) : previousSegmentSpeedKph;
             double segmentSpeedMps = segmentSpeedKph * METERS_PER_KM / SECONDS_PER_HOUR;
 
             // Set the previous segment speed to the current one since we just use the `mps` later
@@ -228,10 +228,10 @@ class ModificationStop {
         return dwellTimes;
     }
 
-    static int dwellAtStop (int realStopIndex, int defaultDwellTime, Integer[] dwellTimes){
+    static int dwellAtStop(int realStopIndex, int defaultDwellTime, List<Integer> dwellTimes) {
         // If a dwell time for this stop has been specified explicitly, use it
-        if (dwellTimes != null && dwellTimes.length > realStopIndex && dwellTimes[realStopIndex] != null) {
-            return dwellTimes[realStopIndex];
+        if (dwellTimes != null && dwellTimes.size() > realStopIndex && dwellTimes.get(realStopIndex) != null) {
+            return dwellTimes.get(realStopIndex);
         } else {
             return defaultDwellTime;
         }

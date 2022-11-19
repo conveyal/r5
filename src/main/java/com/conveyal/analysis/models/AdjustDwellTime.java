@@ -1,5 +1,7 @@
 package com.conveyal.analysis.models;
 
+import java.util.List;
+
 /**
  * Created by matthewc on 3/3/16.
  */
@@ -11,11 +13,11 @@ public class AdjustDwellTime extends Modification {
 
     public String feed;
 
-    public String[] routes;
+    public List<String> routes;
 
-    public String[] trips;
+    public List<String> trips;
 
-    public String[] stops;
+    public List<String> stops;
 
     /** are we scaling existing times (true) or replacing them with a brand new time (false) */
     public boolean scale;

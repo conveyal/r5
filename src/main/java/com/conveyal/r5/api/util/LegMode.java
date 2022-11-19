@@ -39,9 +39,9 @@ public enum LegMode {
         throw new AssertionError("This enum value is not covered by a conditional branch: " + legMode);
     }
 
-    public static EnumSet<StreetMode> toStreetModeSet (EnumSet<LegMode>... legModeSets) {
-        EnumSet<StreetMode> streetModes = EnumSet.noneOf(StreetMode.class);
-        for (EnumSet<LegMode> legModeSet : legModeSets) {
+    public static Set<StreetMode> toStreetModeSet(Set<LegMode>... legModeSets) {
+        Set<StreetMode> streetModes = EnumSet.noneOf(StreetMode.class);
+        for (Set<LegMode> legModeSet : legModeSets) {
             for (LegMode legMode : legModeSet) {
                 streetModes.add(LegMode.toStreetMode(legMode));
             }

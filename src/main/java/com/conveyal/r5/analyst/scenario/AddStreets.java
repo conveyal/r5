@@ -9,7 +9,7 @@ import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
 
-import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Created by abyrd on 2020-05-12
@@ -25,7 +25,7 @@ public class AddStreets extends Modification {
      */
     public double[][][] lineStrings;
 
-    public EnumSet<StreetMode> allowedModes;
+    public Set<StreetMode> allowedModes;
 
     /**
      * Nonzero positive float km/h. TODO decide if this is post- or pre-congestion, adjust sortOrder.
@@ -211,8 +211,6 @@ public class AddStreets extends Modification {
         // This modification directly changes and extends the StreetLayer.
         return true;
     }
-
-    @Override
     public boolean affectsTransitLayer () {
         // No changes are made directly to the TransitLayer,
         // but new streets may require relinking and affect distance tables.

@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
@@ -43,7 +42,7 @@ public class TimeCsvResultWriter extends CsvResultWriter {
         // In one-to-one mode, we expect only one value per origin, the destination point at the same pointset index as
         // the origin point. Otherwise, for each origin, we expect one value per destination.
         final int nDestinations = task.oneToOne ? 1 : task.destinationPointSets[0].featureCount();
-        checkDimension(workResult, "percentiles", workResult.travelTimeValues.length, task.percentiles.length);
+        checkDimension(workResult, "percentiles", workResult.travelTimeValues.length, task.percentiles.size());
         for (int[] percentileResult : workResult.travelTimeValues) {
             checkDimension(workResult, "destinations", percentileResult.length, nDestinations);
         }
@@ -55,7 +54,7 @@ public class TimeCsvResultWriter extends CsvResultWriter {
         String originId = task.originPointSet.getId(workResult.taskId);
         List<String[]> rows = new ArrayList<>();
         // Only one destination pointset for now.
-        for (int p = 0; p < task.percentiles.length; p++) {
+        for (int p = 0; p < task.percentiles.size(); p++) {
             int[] percentileResult = workResult.travelTimeValues[p];
             for (int d = 0; d < percentileResult.length; d++) {
                 int travelTime = percentileResult[d];
@@ -63,8 +62,8 @@ public class TimeCsvResultWriter extends CsvResultWriter {
                     travelTime = -1; // Replace 2^31 with less arcane value for end user export.
                 }
                 String destinationId = destinationId(workResult.taskId, d);
-                rows.add(new String[] {
-                    originId, destinationId, Integer.toString(task.percentiles[p]), Integer.toString(travelTime)
+                rows.add(new String[]{
+                        originId, destinationId, Integer.toString(task.percentiles.get(p)), Integer.toString(travelTime)
                 });
             }
         }

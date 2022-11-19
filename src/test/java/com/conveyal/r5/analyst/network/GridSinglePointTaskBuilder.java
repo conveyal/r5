@@ -12,6 +12,8 @@ import org.locationtech.jts.geom.Coordinate;
 
 import java.time.LocalTime;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
@@ -48,7 +50,7 @@ public class GridSinglePointTaskBuilder {
         // But in a list of more than 100 items, percentile 1 and 99 will return the first and last elements.
         task.percentiles = DistributionTester.PERCENTILES;
         // In single point tasks all 121 cutoffs are required (there is a check).
-        task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
+        task.cutoffsMinutes = IntStream.rangeClosed(0, 120).boxed().collect(Collectors.toList());
         task.decayFunction = new StepDecayFunction();
         task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
         // By default, traverse one block in a round predictable number of seconds.
@@ -71,8 +73,8 @@ public class GridSinglePointTaskBuilder {
 
     public GridSinglePointTaskBuilder setDestination (int gridX, int gridY) {
         Coordinate destination = gridLayout.getIntersectionLatLon(gridX, gridY);
-        task.destinationPointSets = new PointSet[] { new FreeFormPointSet(destination) };
-        task.destinationPointSetKeys = new String[] { "ID" };
+        task.destinationPointSets = new PointSet[]{new FreeFormPointSet(destination)};
+        task.destinationPointSetKeys = List.of("ID");
         task.toLat = destination.y;
         task.toLon = destination.x;
         task.includePathResults = true;
@@ -110,8 +112,8 @@ public class GridSinglePointTaskBuilder {
 
     public GridSinglePointTaskBuilder uniformOpportunityDensity (double density) {
         Grid grid = gridLayout.makeUniformOpportunityDataset(density);
-        task.destinationPointSets = new PointSet[] { grid };
-        task.destinationPointSetKeys = new String[] { "GRID" };
+        task.destinationPointSets = new PointSet[]{grid};
+        task.destinationPointSetKeys = List.of("GRID");
 
         // In a single point task, the grid of destinations is given with these fields, not from the pointset object.
         // The destination point set (containing the opportunity densities) must then match these same dimensions.

@@ -17,8 +17,8 @@ import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Polygon;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
 
@@ -40,7 +40,7 @@ public class ModifyStreets extends Modification {
      * Overwrites the allowed modes for these streets with the given modes.
      * The empty set of allowed modes should be equivalent to removing the streets.
      */
-    public EnumSet<StreetMode> allowedModes;
+    public Set<StreetMode> allowedModes;
 
     /** Absolute car speed. Only one of carSpeedKph and carSpeedFactor may be provided, not both. */
     public Double carSpeedKph;

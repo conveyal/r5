@@ -1,6 +1,8 @@
 package com.conveyal.analysis.results;
 
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.csvreader.CsvWriter;
@@ -22,8 +24,6 @@ import static com.google.common.base.Preconditions.checkState;
 public abstract class CsvResultWriter extends BaseResultWriter implements RegionalResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
-
-    public final String fileName;
     private final CsvWriter csvWriter;
     private int nDataColumns;
 
@@ -51,25 +51,29 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
     /**
      * Construct a writer to record incoming results in a CSV file, with header row consisting of
      * "origin", "destination", and the supplied indicator.
-     * FIXME it's strange we're manually passing injectable components into objects not wired up at application construction.
      */
-    CsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+    public CsvResultWriter(RegionalTask task, FileStorage fileStorage) {
         super(fileStorage);
-        super.prepare(task.jobId);
-        this.fileName = task.jobId + "_" + resultType() +".csv";
-        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
-        csvWriter = new CsvWriter(bufferedWriter, ',');
-        setDataColumns(columnHeaders());
+        var columns = columnHeaders();
+        csvWriter = getBufferedCsvWriter(columns);
+        this.nDataColumns = columns.length;
         this.task = task;
         LOG.info("Created CSV file to hold {} results for regional job {}", resultType(), task.jobId);
     }
 
-    /**
-     * Writes a header row containing the supplied data columns.
-     */
-    protected void setDataColumns(String... columns) throws IOException {
-        this.nDataColumns = columns.length;
-        csvWriter.writeRecord(columns);
+    public String getFileName() {
+        return task.jobId + "_" + resultType() + ".csv";
+    }
+
+    private CsvWriter getBufferedCsvWriter(String[] columnHeaders) {
+        try {
+            BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
+            var writer = new CsvWriter(bufferedWriter, ',');
+            writer.writeRecord(columnHeaders);
+            return writer;
+        } catch (IOException ioException) {
+            throw new RuntimeException(ioException);
+        }
     }
 
     /**
@@ -79,9 +83,10 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
      * Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
      */
     @Override
-    public synchronized void finish () throws IOException {
+    public synchronized void finish() throws IOException {
         csvWriter.close();
-        super.finish(this.fileName);
+        var file = gzipBufferedResults();
+        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, getFileName()), file);
     }
 
     /**

@@ -11,10 +11,10 @@ import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -24,13 +24,6 @@ import static com.google.common.base.Preconditions.checkState;
  * Describes an analysis task to be performed for a single origin, on its own or as part of a multi-origin analysis.
  * Instances are serialized and sent from the backend to workers.
  */
-@JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
-@JsonSubTypes({
-    // these match the enum values in AnalysisWorkerTask.Type
-    // FIXME it does not seem necessary to automatically detect subtypes. Each endpoint accepts only one type.
-    @JsonSubTypes.Type(name = "TRAVEL_TIME_SURFACE", value = TravelTimeSurfaceTask.class),
-    @JsonSubTypes.Type(name = "REGIONAL_ANALYSIS", value = RegionalTask.class)
-})
 public abstract class AnalysisWorkerTask extends ProfileRequest {
 
     /**
@@ -106,7 +99,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * Which percentiles of travel time to calculate.
      * These should probably just be integers, but there are already a lot of them in Mongo as floats.
      */
-    public int[] percentiles;
+    public List<Integer> percentiles;
 
     /**
      * The travel time cutoffs in minutes for regional accessibility analysis.
@@ -115,7 +108,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * Note this will only be set for accessibility calculation tasks, not for travel time surfaces.
      * TODO move it to the regional task subclass?
      */
-    public int[] cutoffsMinutes;
+    public List<Integer> cutoffsMinutes;
 
     /**
      * When recording paths as in a static site, how many distinct paths should be saved to each destination?
@@ -145,7 +138,7 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * On the other hand, in a single point request this may be null, in which case the worker will report only
      * travel times to destinations and not accessibility figures.
      */
-    public String[] destinationPointSetKeys;
+    public List<String> destinationPointSetKeys;
 
     /**
      * The pointsets we are calculating accessibility to, including opportunity density data (not bare sets of points).
@@ -164,40 +157,18 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     public ChaosParameters injectFault;
 
     /**
-     * Is this a single point or regional request? Needed to encode types in JSON serialization. Can that type field be
-     * added automatically with a serializer annotation instead of by defining a getter method and two dummy methods?
-     */
-    public abstract Type getType();
-
-    /** Ensure that type is perceived as a field by serialization libs, no-op */
-    public void setType (Type type) {};
-    public void setTypes (String type) {};
-
-    /**
      * @return extents for the appropriate destination grid, derived from task's bounds and zoom (for Taui site tasks
      * and single-point travel time surface tasks) or destination pointset (for standard regional accessibility
      * analysis tasks)
      */
+    @BsonIgnore
     @JsonIgnore
     public abstract WebMercatorExtents getWebMercatorExtents();
 
+    @BsonIgnore
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {
         return new WorkerCategory(graphId, workerVersion);
-    }
-
-    public enum Type {
-        /*
-           TODO we should not need this enum - this should be handled automatically by JSON serializer annotations.
-           These could also be changed to SINGLE_POINT and MULTI_POINT. The type of results requested (i.e. a grid of
-           travel times per origin vs. an accessibility value per origin) can be inferred based on whether grids are
-           specified in the profile request.  If travel time results are requested, flags can specify whether components
-           of travel time (e.g. waiting) and paths should also be returned.
-         */
-        /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
-        TRAVEL_TIME_SURFACE,
-        /** Cumulative opportunity accessibility values for all cells in a grid, returned to broker for assembly*/
-        REGIONAL_ANALYSIS
     }
 
     public AnalysisWorkerTask clone () {
@@ -225,14 +196,14 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         // First, validate and load the pointsets.
         // They need to be loaded so we can see their types and dimensions for the next step.
         checkNotNull(destinationPointSetKeys);
-        int nPointSets = destinationPointSetKeys.length;
+        int nPointSets = destinationPointSetKeys.size();
         checkState(
             nPointSets > 0 && nPointSets <= 12,
             "You must specify at least 1 destination PointSet, but no more than 12."
         );
         destinationPointSets = new PointSet[nPointSets];
         for (int i = 0; i < nPointSets; i++) {
-            PointSet pointSet = pointSetCache.get(destinationPointSetKeys[i]);
+            PointSet pointSet = pointSetCache.get(destinationPointSetKeys.get(i));
             checkNotNull(pointSet, "Could not load PointSet specified in regional task.");
             destinationPointSets[i] = pointSet;
         }
@@ -260,19 +231,20 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
 
     public void validatePercentiles () {
         checkNotNull(percentiles);
-        int nPercentiles = percentiles.length;
+        int nPercentiles = percentiles.size();
         checkArgument(nPercentiles <= MAX_PERCENTILES, "Maximum number of percentiles allowed is " + MAX_PERCENTILES);
         for (int p = 0; p < nPercentiles; p++) {
-            checkArgument(percentiles[p] > 0 && percentiles[p] < 100, "Percentiles must be in range [1, 99].");
+            var percentile = percentiles.get(p);
+            checkArgument(percentile > 0 && percentile < 100, "Percentiles must be in range [1, 99].");
             if (p > 0) {
-                checkState(percentiles[p] >= percentiles[p - 1], "Percentiles must be in ascending order.");
+                checkState(percentile >= percentiles.get(p - 1), "Percentiles must be in ascending order.");
             }
         }
     }
 
     public void validateCutoffsMinutes () {
         checkNotNull(cutoffsMinutes);
-        final int nCutoffs = cutoffsMinutes.length;
+        final int nCutoffs = cutoffsMinutes.size();
         checkArgument(nCutoffs >= 1, "At least one cutoff must be supplied.");
         // This should probably be handled with method overrides, but we are already using instanceOf everywhere.
         // In the longer term we should just merge both subtypes into this AnalysisWorkerTask superclass.
@@ -284,10 +256,11 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
                 "Single point accessibility has the wrong number of cutoffs.");
         }
         for (int c = 0; c < nCutoffs; c++) {
-            checkArgument(cutoffsMinutes[c] >= 0, "Cutoffs must be non-negative integers.");
-            checkArgument(cutoffsMinutes[c] <= 120, "Cutoffs must be at most 120 minutes.");
+            var cutoff = cutoffsMinutes.get(c);
+            checkArgument(cutoff >= 0, "Cutoffs must be non-negative integers.");
+            checkArgument(cutoff <= 120, "Cutoffs must be at most 120 minutes.");
             if (c > 0) {
-                checkArgument(cutoffsMinutes[c] >= cutoffsMinutes[c - 1], "Cutoffs must be in ascending order.");
+                checkArgument(cutoff >= cutoffsMinutes.get(c - 1), "Cutoffs must be in ascending order.");
             }
         }
     }

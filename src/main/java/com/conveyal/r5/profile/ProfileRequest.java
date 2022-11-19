@@ -15,6 +15,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +25,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -113,36 +114,50 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int    maxCarTime = 30;
     
     /** Minimum time to ride a bike (to prevent extremely short bike legs), in minutes */
-    public int    minBikeTime = 5;
-    
-    /** Minimum time to drive (to prevent extremely short driving legs), in minutes */
-    public int    minCarTime = 5;
+    public int minBikeTime = 5;
 
-    /** The date of the search */
+    /**
+     * Minimum time to drive (to prevent extremely short driving legs), in minutes
+     */
+    public int minCarTime = 5;
+
+    /**
+     * The date of the search
+     */
     public LocalDate date;
-    
-    /** the maximum number of options presented PER ACCESS MODE */
+
+    /**
+     * the maximum number of options presented PER ACCESS MODE
+     */
     public int limit;
-    
-    /** The modes used to access transit */
+
+    /**
+     * The modes used to access transit
+     */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> accessModes;
-    
-    /** The modes used to reach the destination after leaving transit */
+    public Set<LegMode> accessModes;
+
+    /**
+     * The modes used to reach the destination after leaving transit
+     */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> egressModes;
-    
-    /** The modes used to reach the destination without transit */
+    public Set<LegMode> egressModes;
+
+    /**
+     * The modes used to reach the destination without transit
+     */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> directModes;
-    
-    /** The transit modes used */
+    public Set<LegMode> directModes;
+
+    /**
+     * The transit modes used
+     */
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
-    public EnumSet<TransitModes> transitModes;
+    public Set<TransitModes> transitModes;
 
     /**
      * This parameter compensates for the fact that GTFS does not contain information about schedule deviation (lateness).
@@ -187,8 +202,9 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public String scenarioId;
 
-    @JsonSerialize(using=ZoneIdSerializer.class)
-    @JsonDeserialize(using=ZoneIdDeserializer.class)
+    @JsonSerialize(using = ZoneIdSerializer.class)
+    @JsonDeserialize(using = ZoneIdDeserializer.class)
+    @BsonIgnore
     public ZoneId zoneId = ZoneOffset.UTC;
 
     /**
@@ -256,6 +272,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      * uses {@link #getFromTimeDateZD()}
      */
+    @BsonIgnore
     @JsonIgnore
     public long getFromTimeDate() {
         return getFromTimeDateZD().toInstant().toEpochMilli();
@@ -267,6 +284,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * It needs to be decided how to do this correctly: #37
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      */
+    @BsonIgnore
     @JsonIgnore
     public ZonedDateTime getFromTimeDateZD() {
         ZonedDateTime currentDateTime;
@@ -288,6 +306,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * vary by edge) callers should implement logic that uses appropriate per-edge speeds instead of the returned
      * carSpeed. TODO throw exception if streetMode == CAR
      */
+    @BsonIgnore
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
@@ -305,6 +324,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * @return the maximum travel time on a single leg for the given mode in integer seconds.
      */
+    @BsonIgnore
     @JsonIgnore
     public int getMaxTimeSeconds(StreetMode mode) {
         switch (mode) {
@@ -360,6 +380,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * @return maximum time in integer seconds that may be spent on a leg using the given mode
      */
+    @BsonIgnore
     @JsonIgnore
     public int getMaxTimeSeconds(LegMode mode) {
         switch (mode) {
@@ -379,6 +400,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * @return min number of seconds that the specified mode should be used to get to stop/Park ride/bike share etc.
      *         defaults to zero for modes other than CAR or BICYCLE.
      */
+    @BsonIgnore
     @JsonIgnore
     public int getMinTimeSeconds(StreetMode mode) {
         switch (mode) {
@@ -392,6 +414,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /** Return the length of the time window in truncated integer minutes */
+    @BsonIgnore
     @JsonIgnore
     public int getTimeWindowLengthMinutes() {
         return (toTime - fromTime) / 60;
@@ -406,6 +429,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * @return if networkHasFrequencies and a sensible number of total draws is requested, the number of iterations
      *              needed per minute such that the total number of draws is at least the total requested. Otherwise, 1.
      */
+    @BsonIgnore
     @JsonIgnore
     public int getIterationsPerMinute(boolean networkHasFrequencies) {
         if (networkHasFrequencies) {
@@ -430,6 +454,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      *                   calculated). The total will be at least the total monteCarloDraws requested if monteCarlo is
      *                   true.
      */
+    @BsonIgnore
     @JsonIgnore
     public int getTotalIterations(boolean monteCarlo) {
         if (inRoutingFareCalculator != null) {

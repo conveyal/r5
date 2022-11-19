@@ -37,7 +37,7 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -46,6 +46,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
@@ -306,7 +307,7 @@ public class AnalysisWorker implements Component {
         // In this case our highest cutoff is always 120, so we need to search all the way out to 120 minutes.
         if (notNullOrEmpty(task.destinationPointSetKeys)) {
             task.decayFunction.prepare();
-            task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
+            task.cutoffsMinutes = IntStream.rangeClosed(0, 120).boxed().collect(Collectors.toList());
             task.maxTripDurationMinutes = 120;
             task.loadAndValidateDestinationPointSets(pointSetCache);
         }
@@ -387,7 +388,7 @@ public class AnalysisWorker implements Component {
         // TODO this needs to happen for both regional and single point tasks when calculating accessibility on the worker
         {
             task.decayFunction.prepare();
-            int maxCutoffMinutes = Arrays.stream(task.cutoffsMinutes).max().getAsInt();
+            int maxCutoffMinutes = Collections.max(task.cutoffsMinutes);
             int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * SECONDS_PER_MINUTE);
             int maxTripDurationMinutes = (int)(Math.ceil(maxTripDurationSeconds / 60D));
             if (maxTripDurationMinutes > 120) {
@@ -404,8 +405,8 @@ public class AnalysisWorker implements Component {
         // Using a newer backend, the task should have been normalized to use arrays not single values.
         checkNotNull(task.cutoffsMinutes, "This worker requires an array of cutoffs (rather than a single value).");
         checkNotNull(task.percentiles, "This worker requires an array of percentiles (rather than a single one).");
-        checkElementIndex(0, task.cutoffsMinutes.length, "Regional task must specify at least one cutoff.");
-        checkElementIndex(0, task.percentiles.length, "Regional task must specify at least one percentile.");
+        checkElementIndex(0, task.cutoffsMinutes.size(), "Regional task must specify at least one cutoff.");
+        checkElementIndex(0, task.percentiles.size(), "Regional task must specify at least one percentile.");
 
         // Get the graph object for the ID given in the task, fetching inputs and building as needed.
         // All requests handled together are for the same graph, and this call is synchronized so the graph will

@@ -1,14 +1,15 @@
 package com.conveyal.r5.analyst.network;
-import org.apache.commons.math3.stat.descriptive.SummaryStatistics;
-import java.util.Arrays;
+
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * Utility methods to check that distributions are similar to expected ones.
  */
 public abstract class DistributionTester {
 
-    public static final int[] PERCENTILES = new int[] {5, 25, 50, 75, 95};
+    public static final List<Integer> PERCENTILES = List.of(5, 25, 50, 75, 95);
 
     /**
      * Assert that the five percentiles given in the array (5, 25, 50, 75, and 95) appear to be drawn from values
@@ -16,8 +17,8 @@ public abstract class DistributionTester {
      */
     public static void assertUniformlyDistributed (int[] sortedPercentiles, int min, int max) {
         double range = max - min;
-        for (int p = 0; p < PERCENTILES.length; p++) {
-            double percentile = PERCENTILES[p];
+        for (int p = 0; p < PERCENTILES.size(); p++) {
+            double percentile = PERCENTILES.get(p);
             double expected = min + (percentile * range / 100d);
             double actual = sortedPercentiles[p];
             assertEquals(expected, actual, 1, "Travel time off by more than one at percentile " + percentile);
@@ -25,10 +26,10 @@ public abstract class DistributionTester {
     }
 
     public static void assertExpectedDistribution (Distribution expectedDistribution, int[] values) {
-        for (int p = 0; p < PERCENTILES.length; p++) {
-            int expected = expectedDistribution.findPercentile(PERCENTILES[p]);
+        for (int p = 0; p < PERCENTILES.size(); p++) {
+            int expected = expectedDistribution.findPercentile(PERCENTILES.get(p));
             int actual = values[p];
-            assertEquals(expected, actual, 1, "Travel time off by more than one at percentile " + PERCENTILES[p]);
+            assertEquals(expected, actual, 1, "Travel time off by more than one at percentile " + PERCENTILES.get(p));
         }
     }
 

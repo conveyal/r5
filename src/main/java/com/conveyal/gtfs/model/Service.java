@@ -5,8 +5,8 @@ import com.google.common.collect.Maps;
 import java.io.Serializable;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 
 import static java.time.DayOfWeek.FRIDAY;
 import static java.time.DayOfWeek.MONDAY;
@@ -33,21 +33,21 @@ public class Service implements Serializable {
     }
 
     /**
-     * @param service_id the service_id to assign to the newly created copy.
+     * @param service_id   the service_id to assign to the newly created copy.
      * @param daysToRemove the days of the week on which to deactivate service in the copy.
      * @return a copy of this Service with any service on the specified days of the week deactivated.
      */
-    public Service removeDays(String service_id, EnumSet<DayOfWeek> daysToRemove) {
+    public Service removeDays(String service_id, Set<DayOfWeek> daysToRemove) {
         Service service = new Service(service_id);
         // First, duplicate any Calendar in this Service, minus the specified days of the week.
         if (this.calendar != null) {
             Calendar calendar = new Calendar();
             //  TODO calendar.getDaysOfWeek/setDaysOfWeek which allow simplifying this section and activeOn below.
-            calendar.monday    = daysToRemove.contains(MONDAY)    ? 0 : this.calendar.monday;
-            calendar.tuesday   = daysToRemove.contains(TUESDAY)   ? 0 : this.calendar.tuesday;
+            calendar.monday = daysToRemove.contains(MONDAY) ? 0 : this.calendar.monday;
+            calendar.tuesday = daysToRemove.contains(TUESDAY) ? 0 : this.calendar.tuesday;
             calendar.wednesday = daysToRemove.contains(WEDNESDAY) ? 0 : this.calendar.wednesday;
-            calendar.thursday  = daysToRemove.contains(THURSDAY)  ? 0 : this.calendar.thursday;
-            calendar.friday    = daysToRemove.contains(FRIDAY)    ? 0 : this.calendar.friday;
+            calendar.thursday = daysToRemove.contains(THURSDAY) ? 0 : this.calendar.thursday;
+            calendar.friday = daysToRemove.contains(FRIDAY) ? 0 : this.calendar.friday;
             calendar.saturday  = daysToRemove.contains(SATURDAY)  ? 0 : this.calendar.saturday;
             calendar.sunday    = daysToRemove.contains(SUNDAY)    ? 0 : this.calendar.sunday;
             // The new calendar should cover exactly the same time range as the existing one.

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
@@ -55,11 +56,6 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      */
     public boolean recordAccessibility;
 
-    @Override
-    public Type getType() {
-        return Type.REGIONAL_ANALYSIS;
-    }
-
     /**
      * For Taui (static) sites, there is no fixed opportunity grid as accessibility is computed in the web UI.
      * The grid of destinations is the extents given in the task, which for Taui sites is also the grid of origins.
@@ -71,6 +67,7 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      * road network is smaller than the opportunity data, but that should be rare. We could intersect with the extents
      * of the street network, but that probably requires access to the loaded TransportNetwork.
      */
+    @BsonIgnore
     @Override
     public WebMercatorExtents getWebMercatorExtents() {
         if (makeTauiSite) {

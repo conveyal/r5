@@ -10,18 +10,19 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
  * Deserialize modesets in the form MODE,MODE,MODE
  */
-public class LegModeSetDeserializer extends JsonDeserializer<EnumSet<LegMode>> {
+public class LegModeSetDeserializer extends JsonDeserializer<Set<LegMode>> {
     private static final Logger LOG = LoggerFactory.getLogger(LegModeSetDeserializer.class);
 
     @Override
-    public EnumSet<LegMode> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
+    public Set<LegMode> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
         String str = jsonParser.getValueAsString();
-        EnumSet<LegMode> modes = EnumSet.noneOf(LegMode.class);
+        Set<LegMode> modes = EnumSet.noneOf(LegMode.class);
         Stream.of(str.split(",")).forEach(m -> {
             LegMode mode;
             try {

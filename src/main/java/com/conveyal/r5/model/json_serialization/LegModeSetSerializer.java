@@ -7,15 +7,15 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
 import java.io.IOException;
-import java.util.EnumSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Serialize a mode set as MODE,MODE,MODE
  */
-public class LegModeSetSerializer extends JsonSerializer<EnumSet<LegMode>> {
+public class LegModeSetSerializer extends JsonSerializer<Set<LegMode>> {
     @Override
-    public void serialize(EnumSet<LegMode> modes, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+    public void serialize(Set<LegMode> modes, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
         String str = modes.stream().map(LegMode::toString).collect(Collectors.joining(","));
         jsonGenerator.writeString(str);
     }

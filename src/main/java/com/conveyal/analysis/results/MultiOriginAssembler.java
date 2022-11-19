@@ -2,24 +2,14 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
-import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
-import com.conveyal.r5.util.ExceptionUtils;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
-
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * This assembles regional results arriving from workers into one or more files per regional analysis on
@@ -35,13 +25,6 @@ public class MultiOriginAssembler {
     private static final int MAX_FREEFORM_DESTINATIONS = 4_000_000;
 
     /**
-     * The regional analysis for which this object is assembling results.
-     * We retain the whole object rather than just its ID so we'll have the full details, e.g. destination point set
-     * IDs and scenario, things that are stripped out of the template task sent to the workers.
-     */
-    private final RegionalAnalysis regionalAnalysis;
-
-    /**
      * The object representing the progress of the regional analysis as tracked by the broker.
      * It may appear job.templateTask has all the information needed, making the regionalAnalysis field
      * unnecessary. But the templateTask is for worker consumption, while the regionalAnalysis has fields that are more
@@ -50,7 +33,7 @@ public class MultiOriginAssembler {
     public final Job job;
 
     // One writer per CSV/Grids we're outputting
-    private List<RegionalResultWriter> resultWriters = new ArrayList<>();
+    private final List<RegionalResultWriter> resultWriters;
 
     /**
      * The number of distinct origin points for which we've received at least one result. If for
@@ -71,100 +54,30 @@ public class MultiOriginAssembler {
     private final BitSet originsReceived;
 
     /**
-     * Total number of origin points for which we're expecting results. Note that the total
-     * number of results received could be higher in the event of an overzealous task redelivery.
-     */
-    public final int nOriginsTotal;
-
-    private final AnalysisDB db;
-
-    /**
      * Constructor. This sets up one or more ResultWriters depending on whether we're writing gridded or non-gridded
      * cumulative opportunities accessibility, or origin-destination travel times.
-     * TODO do not pass the FileStorage component down into this non-component and the ResultWriter non-component,
-     *      clarify design concepts on this point (e.g. only components should know other components exist).
-     *      Rather than pushing the component all the way down to the leaf function call, we return the finished
-     *      file up to an umbrella location where a single reference to the file storage can be used to
-     *      store all of them.
      */
-    public MultiOriginAssembler(RegionalAnalysis regionalAnalysis, Job job, AnalysisDB db, FileStorage fileStorage) {
-        this.db = db;
-
-        try {
-            this.regionalAnalysis = regionalAnalysis;
-            this.job = job;
-            this.nOriginsTotal = job.nTasksTotal;
-            this.originsReceived = new BitSet(job.nTasksTotal);
-            // Check that origin and destination sets are not too big for generating CSV files.
-            if (!job.templateTask.makeTauiSite &&
-                    job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
-            ) {
-               // This requires us to have already loaded this destination pointset instance into the transient field.
-                PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
-                if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
-                    if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
-                        destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
-                    ) {
-                        throw new AnalysisServerException(String.format(
-                            "Freeform requests limited to %d destinations and %d origin-destination pairs.",
-                            MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
-                        ));
-                    }
-                }
-            }
-
-            if (job.templateTask.recordAccessibility) {
-                if (job.templateTask.originPointSet != null) {
-                    resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
-                } else {
-                    resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
-                }
-            }
-
-            if (job.templateTask.recordTimes) {
-                resultWriters.add(new TimeCsvResultWriter(job.templateTask, fileStorage));
-            }
-
-            if (job.templateTask.includePathResults) {
-                resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
-            }
-
-            checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),
-                "A non-Taui regional analysis should always create at least one grid or CSV file.");
-
-            // Record the paths of any CSV files that will be produced by this analysis.
-            // The caller must flush the RegionalAnalysis back out to the database to retain this information.
-            // We avoid database access here in constructors, especially when called in synchronized methods.
-            for (RegionalResultWriter writer : resultWriters) {
-                // FIXME instanceof+cast is ugly, do this some other way or even record the Grids
-                if (writer instanceof CsvResultWriter) {
-                    CsvResultWriter csvWriter = (CsvResultWriter) writer;
-                    regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.stackTraceString(e));
-        }
+    public MultiOriginAssembler(Job job, List<RegionalResultWriter> resultWriters) {
+        this.resultWriters = resultWriters;
+        this.job = job;
+        this.originsReceived = new BitSet(job.nTasksTotal);
     }
 
     /**
-     * Gzip the output files and persist them to cloud storage.
+     * Check that origin and destination sets are not too big for generating CSV files.
      */
-    private synchronized void finish() {
-        LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
-        try {
-            for (RegionalResultWriter writer : resultWriters) {
-                writer.finish();
+    public static void ensureOdPairsUnderLimit(RegionalTask task, PointSet destinationPointSet) {
+        // This requires us to have already loaded this destination pointset instance into the transient field.
+        int nTasksTotal = Job.getTasksTotal(task);
+        if ((task.recordTimes || task.includePathResults) && !task.oneToOne) {
+            if (nTasksTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
+                    destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
+            ) {
+                throw new AnalysisServerException(String.format(
+                        "Freeform requests limited to %d destinations and %d origin-destination pairs.",
+                        MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                ));
             }
-            // Write updated regionalAnalysis object back out to database, to mark it complete and record locations
-            // of any CSV files generated. Use method that updates lock/timestamp, otherwise updates are not seen in UI.
-            // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock().
-            db.regionalAnalyses.collection.updateOne(
-                    Filters.eq("_id", regionalAnalysis._id),
-                    Updates.set("complete", true)
-            );
-        } catch (Exception e) {
-            LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
         }
     }
 
@@ -176,7 +89,7 @@ public class MultiOriginAssembler {
      * this class are also synchronized for good measure. There should be no additional cost to retaining the lock when
      * entering those methods.
      */
-    public synchronized void handleMessage (RegionalWorkResult workResult) throws Exception {
+    public synchronized void handleMessage(RegionalWorkResult workResult) throws Exception {
         for (RegionalResultWriter writer : resultWriters) {
             writer.writeOneWorkResult(workResult);
         }
@@ -186,8 +99,17 @@ public class MultiOriginAssembler {
             originsReceived.set(workResult.taskId);
             nComplete += 1;
         }
-        if (nComplete == nOriginsTotal) {
-            finish();
+
+        // If finished, run finish on all the result writers.
+        if (nComplete == job.nTasksTotal) {
+            LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
+            try {
+                for (RegionalResultWriter writer : resultWriters) {
+                    writer.finish();
+                }
+            } catch (Exception e) {
+                LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
+            }
         }
     }
 

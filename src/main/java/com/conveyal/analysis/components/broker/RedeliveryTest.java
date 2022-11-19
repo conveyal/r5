@@ -1,13 +1,16 @@
 package com.conveyal.analysis.components.broker;
 
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -64,9 +67,11 @@ public class RedeliveryTest {
         templateTask.height = 1;
         templateTask.width = N_TASKS_PER_JOB;
         templateTask.scenarioId = "FAKE";
-        RegionalAnalysis regionalAnalysis = new RegionalAnalysis();
+        RegionalAnalysis regionalAnalysis = new RegionalAnalysis(new UserPermissions("testing@conveyal.com", false, "testing"), "test");
         regionalAnalysis.request = templateTask;
-        broker.enqueueTasksForRegionalJob(regionalAnalysis);
+        var job = new Job(templateTask, WorkerTags.fromRegionalAnalysis(regionalAnalysis));
+        var assembler = new MultiOriginAssembler(job, new ArrayList<>());
+        broker.enqueueTasksForRegionalJob(job, assembler);
     }
 
     public static String compactUUID() {

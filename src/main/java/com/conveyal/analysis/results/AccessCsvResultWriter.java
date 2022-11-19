@@ -31,11 +31,11 @@ public class AccessCsvResultWriter extends CsvResultWriter {
      */
     @Override
     protected void checkDimension (RegionalWorkResult workResult) {
-        checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, task.destinationPointSetKeys.length);
+        checkDimension(workResult, "destination pointsets", workResult.accessibilityValues.length, task.destinationPointSetKeys.size());
         for (int[][] percentilesForGrid : workResult.accessibilityValues) {
-            checkDimension(workResult, "percentiles", percentilesForGrid.length, task.percentiles.length);
+            checkDimension(workResult, "percentiles", percentilesForGrid.length, task.percentiles.size());
             for (int[] cutoffsForPercentile : percentilesForGrid) {
-                checkDimension(workResult, "cutoffs", cutoffsForPercentile.length, task.cutoffsMinutes.length);
+                checkDimension(workResult, "cutoffs", cutoffsForPercentile.length, task.cutoffsMinutes.size());
             }
         }
     }
@@ -44,18 +44,19 @@ public class AccessCsvResultWriter extends CsvResultWriter {
     public Iterable<String[]> rowValues (RegionalWorkResult workResult) {
         String originId = task.originPointSet.getId(workResult.taskId);
         List<String[]> rows = new ArrayList<>();
-        for (int d = 0; d < task.destinationPointSetKeys.length; d++) {
+        for (int d = 0; d < task.destinationPointSetKeys.size(); d++) {
             int[][] percentilesForDestPointset = workResult.accessibilityValues[d];
-            for (int p = 0; p < task.percentiles.length; p++) {
+            for (int p = 0; p < task.percentiles.size(); p++) {
                 int[] cutoffsForPercentile = percentilesForDestPointset[p];
-                for (int c = 0; c < task.cutoffsMinutes.length; c++) {
+                for (int c = 0; c < task.cutoffsMinutes.size(); c++) {
+                    int accessibilityValue = cutoffsForPercentile[c];
                     // Ideally we'd output the pointset IDs (rather than keys) which we have in the RegionalAnalysis
-                    rows.add(new String[] {
+                    rows.add(new String[]{
                             originId,
-                            task.destinationPointSetKeys[d],
-                            Integer.toString(task.percentiles[p]),
-                            Integer.toString(task.cutoffsMinutes[c]),
-                            Integer.toString(workResult.accessibilityValues[d][p][c])
+                            task.destinationPointSetKeys.get(d),
+                            Integer.toString(task.percentiles.get(p)),
+                            Integer.toString(task.cutoffsMinutes.get(c)),
+                            Integer.toString(accessibilityValue)
                     });
                 }
             }

@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +41,7 @@ public class TravelTimeResult {
 
     public TravelTimeResult(AnalysisWorkerTask task) {
         nPoints = task.nTargetsPerOrigin();
-        nSamplesPerPoint = task.percentiles.length;
+        nSamplesPerPoint = task.percentiles.size();
         // Initialization: Fill the values array the default unreachable value.
         // This way the grid is valid even if we don't write anything into it
         // (rather than saying everything is reachable in zero minutes).

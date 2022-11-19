@@ -225,7 +225,7 @@ public class AnalysisRequest {
                     );
                 } else {
                     checkArgument(
-                            dataset.zoom == zoom,
+                            dataset.zoom == opportunityDatasets.get(0).zoom,
                             "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
                     );
                 }
@@ -329,7 +329,7 @@ public class AnalysisRequest {
                 Filters.eq("accessGroup", userPermissions.accessGroup),
                 query
         );
-        
+
         List<Modification> modifications = new ArrayList<>();
         addModificationsOfType(modifications, db, queryWithPermissions, "add-streets", AddStreets.class);
         addModificationsOfType(modifications, db, queryWithPermissions, "add-trip-pattern", AddTripPattern.class);

@@ -45,7 +45,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -430,37 +429,34 @@ public class OpportunityDatasetController implements HttpController {
         return parameters;
     }
 
-    private Collection<OpportunityDataset> deleteSourceSet(Request request, Response response) {
+    private Object deleteSourceSet(Request request, Response response) {
         String sourceId = request.params("sourceId");
         UserPermissions userPermissions = UserPermissions.from(request);
         var iterable = db.opportunities.findPermitted(
                 Filters.eq("sourceId", sourceId),
                 userPermissions
         );
-        try (var cursor = iterable.cursor()) {
-            Collection<OpportunityDataset> datasets = db.opportunities.toArray(cursor);
-            datasets.forEach(dataset -> deleteDataset(dataset._id, userPermissions));
-            return datasets;
+        for (var dataset : iterable) {
+            deleteDataset(dataset, userPermissions);
         }
+        return JsonUtil.objectNode().put("message", "Deleted source set.");
     }
 
     private OpportunityDataset deleteOpportunityDataset(Request request, Response response) {
-        String opportunityDatasetId = request.params("_id");
-        return deleteDataset(opportunityDatasetId, UserPermissions.from(request));
+        var dataset = db.opportunities.findPermittedByRequestParamId(request);
+        return deleteDataset(dataset, UserPermissions.from(request));
     }
 
     /**
      * Delete an Opportunity Dataset from the database and all formats from the file store.
      */
-    private OpportunityDataset deleteDataset(String id, UserPermissions userPermissions) {
-        var dataset = db.opportunities.findByIdIfPermitted(id, userPermissions);
-
+    private OpportunityDataset deleteDataset(OpportunityDataset dataset, UserPermissions userPermissions) {
         // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
         fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
         fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.PNG));
         fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GEOTIFF));
 
-        var result = db.opportunities.deleteByIdIfPermitted(id, userPermissions);
+        var result = db.opportunities.deleteByIdIfPermitted(dataset._id, userPermissions);
         if (!result.wasAcknowledged()) {
             throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
         }

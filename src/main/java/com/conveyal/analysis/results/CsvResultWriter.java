@@ -3,6 +3,7 @@ package com.conveyal.analysis.results;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.csvreader.CsvWriter;
@@ -11,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
@@ -21,10 +23,12 @@ import static com.google.common.base.Preconditions.checkState;
  * Subclasses are used to record origin/destination "skim" matrices, accessibility indicators for non-gridded
  * ("freeform") origin point sets, and cataloging paths between pairs of origins and destinations.
  */
-public abstract class CsvResultWriter extends BaseResultWriter implements RegionalResultWriter {
+public abstract class CsvResultWriter implements RegionalResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
+    private final File bufferFile = FileUtils.createScratchFile("csv");
     private final CsvWriter csvWriter;
+    private final FileStorage fileStorage;
     private int nDataColumns;
 
     /**
@@ -53,7 +57,7 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
      * "origin", "destination", and the supplied indicator.
      */
     public CsvResultWriter(RegionalTask task, FileStorage fileStorage) {
-        super(fileStorage);
+        this.fileStorage = fileStorage;
         var columns = columnHeaders();
         csvWriter = getBufferedCsvWriter(columns);
         this.nDataColumns = columns.length;
@@ -78,15 +82,16 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
 
     /**
      * Gzip the csv file and move it into permanent file storage such as AWS S3.
-     * Note: stored file will undergo gzip compression in super.finish(), but be stored with a .csv extension.
+     * Note: stored file will undergo gzip compression but be stored with a .csv extension.
      * When this file is downloaded from the UI, the browser will decompress, yielding a logically named .csv file.
      * Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
      */
     @Override
     public synchronized void finish() throws IOException {
         csvWriter.close();
-        var file = gzipBufferedResults();
-        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, getFileName()), file);
+        var gzippedFile = FileUtils.gzipFile(bufferFile);
+        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, getFileName()), gzippedFile);
+        bufferFile.delete();
     }
 
     /**
@@ -109,7 +114,7 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
     }
 
     @Override
-    public synchronized void terminate () throws Exception {
+    public synchronized void terminate() {
         csvWriter.close();
         bufferFile.delete();
     }

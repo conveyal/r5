@@ -4,12 +4,14 @@ import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -43,10 +45,12 @@ import static com.conveyal.r5.common.Util.human;
  * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).</li>
  * </ol>
  */
-public class GridResultWriter extends BaseResultWriter implements RegionalResultWriter {
+public class GridResultWriter implements RegionalResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
+    private final File bufferFile = FileUtils.createScratchFile("grid");
+    private final FileStorage fileStorage;
     private final RandomAccessFile randomAccessFile;
 
     /**
@@ -107,7 +111,7 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
      * from the workers will be accumulated.
      */
     GridResultWriter(RegionalTask task, FileStorage fileStorage, int percentileIndex, int destinationIndex, String destinationPointSetId) {
-        super(fileStorage);
+        this.fileStorage = fileStorage;
         this.gridFileName = String.format("%s_%s_P%d.access", task.jobId, destinationPointSetId, task.percentiles.get(percentileIndex));
         this.percentileIndex = percentileIndex;
         this.destinationIndex = destinationIndex;
@@ -160,9 +164,10 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
      */
     @Override
     public synchronized void finish() throws IOException {
-        var file = gzipBufferedResults();
-        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, gridFileName), file);
         randomAccessFile.close();
+        var gzippedFile = FileUtils.gzipFile(bufferFile);
+        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
+        bufferFile.delete();
     }
 
     /**

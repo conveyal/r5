@@ -4,13 +4,12 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
 
-    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+    public AccessCsvResultWriter(RegionalTask task, FileStorage fileStorage) {
         super(task, fileStorage);
     }
 

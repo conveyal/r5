@@ -20,12 +20,12 @@ public class DbResultWriter implements RegionalResultWriter {
     }
 
     @Override
-    public void writeOneWorkResult(RegionalWorkResult workResult) throws Exception {
+    public void writeOneWorkResult(RegionalWorkResult workResult) {
         // TODO increment?
     }
 
     @Override
-    public void terminate() throws Exception {
+    public void terminate() {
         // TODO mark as failed in the database?
     }
 

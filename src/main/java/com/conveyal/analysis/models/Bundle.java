@@ -55,6 +55,13 @@ public class Bundle extends BaseModel implements Cloneable {
         super(user);
     }
 
+    /**
+     * Zero argument constructor required for MongoDB driver automatic POJO deserialization.
+     */
+    public Bundle() {
+
+    }
+
     public Bundle clone() {
         try {
             return (Bundle) super.clone();

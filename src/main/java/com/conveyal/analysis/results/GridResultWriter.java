@@ -47,7 +47,7 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
 
     private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
-    private RandomAccessFile randomAccessFile;
+    private final RandomAccessFile randomAccessFile;
 
     /**
      * The version of the access grids we produce
@@ -102,7 +102,7 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
     }
 
     /**
-     * Construct an writer for a single regional analysis result grid, using the proprietary
+     * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
@@ -180,7 +180,6 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
     @Override
     public void writeOneWorkResult(RegionalWorkResult workResult) throws Exception {
         // Drop work results for this particular origin into a little-endian output file.
-        int taskNumber = workResult.taskId;
         int[][] percentilesForGrid = workResult.accessibilityValues[destinationIndex];
         int[] cutoffsForPercentile = percentilesForGrid[percentileIndex];
         writeOneOrigin(workResult.taskId, cutoffsForPercentile);
@@ -190,14 +189,13 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
      * Write all channels at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
      * coordinates. Flatten them to compute file offsets and for the origin checklist.
      */
-    synchronized void writeOneOrigin(int taskNumber, int[] values) throws IOException {
+    private void writeOneOrigin(int taskNumber, int[] values) throws IOException {
         if (values.length != channels) {
             throw new IllegalArgumentException("Number of channels to be written does not match this writer.");
         }
         long offset = HEADER_LENGTH_BYTES + (taskNumber * channels * Integer.BYTES);
         // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
-        // TODO why is the method also synchronized then?
-        synchronized (this) {
+        synchronized (randomAccessFile) {
             randomAccessFile.seek(offset);
             // FIXME should this be delta-coded? The Selecting grid reducer seems to expect it to be.
             int lastValue = 0;
@@ -210,7 +208,7 @@ public class GridResultWriter extends BaseResultWriter implements RegionalResult
     }
 
     @Override
-    public synchronized void terminate() throws IOException {
+    public void terminate() throws IOException {
         randomAccessFile.close();
         bufferFile.delete();
     }

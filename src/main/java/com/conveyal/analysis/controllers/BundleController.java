@@ -2,7 +2,6 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.AnalysisDB;
@@ -67,11 +66,11 @@ public class BundleController implements HttpController {
     private final TaskScheduler taskScheduler;
     private final AnalysisDB db;
 
-    public BundleController(BackendComponents components) {
-        this.db = components.database;
-        this.fileStorage = components.fileStorage;
-        this.gtfsCache = components.gtfsCache;
-        this.taskScheduler = components.taskScheduler;
+    public BundleController(AnalysisDB db, FileStorage fileStorage, GTFSCache gtfsCache, TaskScheduler taskScheduler) {
+        this.db = db;
+        this.fileStorage = fileStorage;
+        this.gtfsCache = gtfsCache;
+        this.taskScheduler = taskScheduler;
     }
 
     // INTERFACE METHOD

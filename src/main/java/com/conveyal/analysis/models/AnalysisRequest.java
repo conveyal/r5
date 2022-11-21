@@ -178,6 +178,9 @@ public class AnalysisRequest {
      */
     public ChaosParameters injectFault;
 
+    /**
+     * Create a Travel Time Surface task from this request.
+     */
     public TravelTimeSurfaceTask toTravelTimeSurfaceTask(AnalysisDB db, UserPermissions user) {
         var task = new TravelTimeSurfaceTask();
         var scenario = createScenario(db, user);
@@ -303,21 +306,6 @@ public class AnalysisRequest {
         }
     }
 
-    private void addModificationsOfType(List<Modification> list, AnalysisDB db, Bson query, String type, Class<? extends Modification> clazz) {
-        var modifications = db.getAnalysisCollection("modifications", clazz);
-        var iterator = modifications.collection.find(
-                Filters.and(
-                        Filters.eq("type", type),
-                        query
-                )
-        );
-        try (var cursor = iterator.cursor()) {
-            while (cursor.hasNext()) {
-                list.add(cursor.next());
-            }
-        }
-    }
-
     /**
      * Create the R5 `Scenario` from this request.
      */
@@ -330,25 +318,17 @@ public class AnalysisRequest {
                 query
         );
 
-        List<Modification> modifications = new ArrayList<>();
-        addModificationsOfType(modifications, db, queryWithPermissions, "add-streets", AddStreets.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "add-trip-pattern", AddTripPattern.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "adjust-dwell-time", AdjustDwellTime.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "adjust-speed", AdjustSpeed.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "convert-to-frequency", ConvertToFrequency.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "custom", CustomModificationHolder.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "modify-streets", ModifyStreets.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "remove-stops", RemoveStops.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "remove-trips", RemoveTrips.class);
-        addModificationsOfType(modifications, db, queryWithPermissions, "reroute", Reroute.class);
+        try (var cursor = db.modifications.findPermitted(query, userPermissions).cursor()) {
+            var modifications = db.modifications.toArray(cursor);
 
-        // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
-        String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
-        String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
-        Scenario scenario = new Scenario();
-        scenario.id = scenarioId;
-        scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
-        return scenario;
+            // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
+            String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
+            String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
+            Scenario scenario = new Scenario();
+            scenario.id = scenarioId;
+            scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
+            return scenario;
+        }
     }
 
     /**

@@ -1,10 +1,13 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.List;
 
 /**
  * Created by matthewc on 3/3/16.
  */
+@BsonDiscriminator(key = "type", value = "adjust-dwell-time")
 public class AdjustDwellTime extends Modification {
     @Override
     public String getType() {

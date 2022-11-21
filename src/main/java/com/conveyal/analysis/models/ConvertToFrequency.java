@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.r5.analyst.scenario.AddTrips;
 import com.conveyal.r5.analyst.scenario.AdjustFrequency;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -9,6 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Convert a line to frequency.
  */
+@BsonDiscriminator(key = "type", value = "convert-to-frequency")
 public class ConvertToFrequency extends Modification {
     public static final String type = "convert-to-frequency";
     @Override

@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.primitives.Doubles;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.List;
 import java.util.Set;
@@ -9,6 +10,7 @@ import java.util.Set;
 /**
  * Fields replicated from the R5 ModifyStreets modification.
  */
+@BsonDiscriminator(key = "type", value = "modify-streets")
 public class ModifyStreets extends Modification {
 
     public List<List<List<Double>>> polygons;

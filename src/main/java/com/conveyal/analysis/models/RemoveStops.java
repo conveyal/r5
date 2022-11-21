@@ -1,10 +1,13 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.List;
 
 /**
  * Created by matthewc on 3/2/16.
  */
+@BsonDiscriminator(key = "type", value = "remove-stops")
 public class RemoveStops extends Modification {
     public String getType() {
         return "remove-stops";

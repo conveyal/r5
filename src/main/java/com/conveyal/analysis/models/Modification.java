@@ -3,6 +3,7 @@ package com.conveyal.analysis.models;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.Sets;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.List;
 import java.util.Set;
@@ -30,6 +31,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
         @JsonSubTypes.Type(name = "add-streets", value = AddStreets.class),
         @JsonSubTypes.Type(name = "modify-streets", value = ModifyStreets.class)
 })
+@BsonDiscriminator(key = "type")
 public abstract class Modification extends BaseModel implements Cloneable {
     /**
      * the type of this modification, see JsonSubTypes annotation above

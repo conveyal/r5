@@ -1,16 +1,26 @@
 package com.conveyal.analysis.persistence;
 
 import com.conveyal.analysis.components.Component;
+import com.conveyal.analysis.models.AddStreets;
+import com.conveyal.analysis.models.AddTripPattern;
+import com.conveyal.analysis.models.AdjustDwellTime;
+import com.conveyal.analysis.models.AdjustSpeed;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.analysis.models.Bundle;
+import com.conveyal.analysis.models.ConvertToFrequency;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.GtfsDataSource;
+import com.conveyal.analysis.models.Modification;
+import com.conveyal.analysis.models.ModifyStreets;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.OsmDataSource;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.models.RemoveStops;
+import com.conveyal.analysis.models.RemoveTrips;
+import com.conveyal.analysis.models.Reroute;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
@@ -22,9 +32,7 @@ import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import org.bson.Document;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
@@ -46,6 +54,7 @@ public class AnalysisDB implements Component {
     public final AnalysisCollection<Bundle> bundles;
     public final AnalysisCollection<DataGroup> dataGroups;
     public final AnalysisCollection<DataSource> dataSources;
+    public final AnalysisCollection<Modification> modifications;
     public final AnalysisCollection<OpportunityDataset> opportunities;
     public final AnalysisCollection<Region> regions;
     public final AnalysisCollection<RegionalAnalysis> regionalAnalyses;
@@ -69,16 +78,10 @@ public class AnalysisDB implements Component {
         bundles = getAnalysisCollection("bundles", Bundle.class);
         dataGroups = getAnalysisCollection("dataGroups", DataGroup.class);
         dataSources = getAnalysisCollectionWithSubclasses("dataSources", DataSource.class, SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class);
+        modifications = getAnalysisCollectionWithSubclasses("modifications", Modification.class, AddStreets.class, AddTripPattern.class, AdjustDwellTime.class, AdjustSpeed.class, ConvertToFrequency.class, ModifyStreets.class, RemoveStops.class, RemoveTrips.class, Reroute.class);
         opportunities = getAnalysisCollection("opportunityDatasets", OpportunityDataset.class);
         regions = getAnalysisCollection("regions", Region.class);
         regionalAnalyses = getAnalysisCollection("regional-analyses", RegionalAnalysis.class);
-    }
-
-    /**
-     * For generic MongoDB collections.
-     */
-    public MongoCollection<Document> getCollection(String collectionName) {
-        return database.getCollection(collectionName);
     }
 
     /**
@@ -123,16 +126,16 @@ public class AnalysisDB implements Component {
     public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollectionWithSubclasses(
             String name, Class<T> clazz, Class<? extends T>... subclasses
     ) {
-        for (Class subclass : subclasses) {
+        for (Class<? extends T> subclass : subclasses) {
             database.getCodecRegistry().get(subclass);
         }
-        return new AnalysisCollection<T>(database.getCollection(name, clazz));
+        return new AnalysisCollection<>(database.getCollection(name, clazz));
     }
 
     public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollection(
             String name, Class<T> clazz
     ) {
-        return new AnalysisCollection<T>(database.getCollection(name, clazz));
+        return new AnalysisCollection<>(database.getCollection(name, clazz));
     }
 
     /**

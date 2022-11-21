@@ -1,11 +1,14 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Adjust the speed of a route.
  */
+@BsonDiscriminator(key = "type", value = "adjust-speed")
 public class AdjustSpeed extends Modification {
     public String getType() {
         return "adjust-speed";

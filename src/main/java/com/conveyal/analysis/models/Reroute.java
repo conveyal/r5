@@ -1,10 +1,13 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.List;
 
 /**
  * Created by matthewc on 3/28/16.
  */
+@BsonDiscriminator(key = "type", value = "reroute")
 public class Reroute extends Modification {
     public String getType() {
         return "reroute";

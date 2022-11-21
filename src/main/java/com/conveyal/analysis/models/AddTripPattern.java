@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.scenario.AddTrips;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * do reference and reuse existing stops, in which case each referenced stop has its own feed ID already prepended.
  * This is because when editing the trip pattern and optionally reusing stops, the user can see stops from all feeds.
  */
+@BsonDiscriminator(key = "type", value = "add-trip-pattern")
 public class AddTripPattern extends Modification {
 
     public static final String type = "add-trip-pattern";

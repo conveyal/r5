@@ -1,10 +1,13 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.List;
 
 /**
  * Remove trips from a graph.
  */
+@BsonDiscriminator(key = "type", value = "remove-trips")
 public class RemoveTrips extends Modification {
     public String getType() {
         return "remove-trips";

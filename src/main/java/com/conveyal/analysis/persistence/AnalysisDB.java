@@ -22,7 +22,6 @@ import com.conveyal.analysis.models.RemoveStops;
 import com.conveyal.analysis.models.RemoveTrips;
 import com.conveyal.analysis.models.Reroute;
 import com.conveyal.analysis.models.SpatialDataSource;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.ExponentialDecayFunction;
 import com.conveyal.r5.analyst.decay.FixedExponentialDecayFunction;
@@ -99,21 +98,19 @@ public class AnalysisDB implements Component {
      * methods do not auto-scan, they just provide the same behavior as automatic() but limited to specific packages.
      */
     private CodecRegistry makeCodecRegistry () {
-        ClassModel<RegionalAnalysis> regionalAnalysis = ClassModel.builder(RegionalAnalysis.class).enableDiscriminator(true).build();
-        ClassModel<RegionalTask> regionalTask = ClassModel.builder(RegionalTask.class).enableDiscriminator(true).build();
         ClassModel<DecayFunction> decayFunction = ClassModel.builder(DecayFunction.class).enableDiscriminator(true).build();
         ClassModel<StepDecayFunction> stepDecay = ClassModel.builder(StepDecayFunction.class).enableDiscriminator(true).build();
         ClassModel<LinearDecayFunction> linearDecay = ClassModel.builder(LinearDecayFunction.class).enableDiscriminator(true).build();
         ClassModel<LogisticDecayFunction> logisticDecay = ClassModel.builder(LogisticDecayFunction.class).enableDiscriminator(true).build();
         ClassModel<ExponentialDecayFunction> exponentialDecay = ClassModel.builder(ExponentialDecayFunction.class).enableDiscriminator(true).build();
         ClassModel<FixedExponentialDecayFunction> fixedExponentialDecay = ClassModel.builder(FixedExponentialDecayFunction.class).enableDiscriminator(true).build();
-        CodecProvider regionalTaskProvider = PojoCodecProvider.builder().register(regionalAnalysis, regionalTask, decayFunction, stepDecay, linearDecay, logisticDecay, exponentialDecay, fixedExponentialDecay).build();
+        CodecProvider decayFunctionProvider = PojoCodecProvider.builder().register(decayFunction, stepDecay, linearDecay, logisticDecay, exponentialDecay, fixedExponentialDecay).build();
 
         CodecProvider automaticPojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
         return CodecRegistries.fromRegistries(
                 CodecRegistries.fromCodecs(new LocalDateCodec()),
                 MongoClientSettings.getDefaultCodecRegistry(),
-                CodecRegistries.fromProviders(regionalTaskProvider, automaticPojoCodecProvider)
+                CodecRegistries.fromProviders(decayFunctionProvider, automaticPojoCodecProvider)
         );
     }
 

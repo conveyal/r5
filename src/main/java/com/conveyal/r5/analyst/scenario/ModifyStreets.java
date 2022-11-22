@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 
 /**
  * This modification selects all edges inside a given set of polygons and changes their characteristics.
@@ -213,8 +213,7 @@ public class ModifyStreets extends Modification {
         newEdge.disallowAllModes();
         newEdge.allowStreetModes(allowedModes);
         if (bikeLts != null) {
-            // Overwrite the LTS copied in the flags
-            newEdge.setFlag(intToLts(bikeLts));
+            newEdge.setLts(bikeLts);
         }
         if (carSpeedKph != null) {
             newEdge.setSpeedKph(carSpeedKph);

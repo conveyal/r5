@@ -14,6 +14,7 @@ import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.P2;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
+import com.google.common.base.Preconditions;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
@@ -42,6 +43,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
+
+import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.*;
 
 /**
  * This stores all the characteristics of the edges in the street graph layer of the transport network.
@@ -1093,12 +1096,33 @@ public class EdgeStore implements Serializable {
 
         /**
          * Set the flags for all on-street modes of transportation to "false", so no modes can traverse this edge.
+         * This can be used in preparation for setting only a single mode or specific subset of modes.
          */
         public void disallowAllModes() {
             clearFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
             clearFlag(EdgeFlag.ALLOWS_BIKE);
             clearFlag(EdgeFlag.ALLOWS_CAR);
             clearFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
+        /**
+         * Remove all LTS flags so the edge has no LTS information. This can be done in preparation for setting one
+         * specific LTS on the edge. This is particularly important because LTS categories should be mutually exclusive
+         * but flags are not. In practice higher LTS levels override lower ones when present on the same edge, but this
+         * can be confusing so ideally we'll set only one flag on any given edge.
+         */
+        public void removeAllLtsFlags() {
+            clearFlag(EdgeFlag.BIKE_LTS_1);
+            clearFlag(EdgeFlag.BIKE_LTS_2);
+            clearFlag(EdgeFlag.BIKE_LTS_3);
+            clearFlag(EdgeFlag.BIKE_LTS_4);
+        }
+
+        /** Clear all LTS flags, then set the single LTS flag for the supplied level from 1 to 4. */
+        public void setLts(int lts) {
+            Preconditions.checkArgument((lts >= 1 || lts <= 4), "LTS must be an integer in the range [1...4].");
+            removeAllLtsFlags();
+            setFlag(intToLts(lts));
         }
 
         public boolean allowsStreetMode(StreetMode mode) {
@@ -1173,6 +1197,14 @@ public class EdgeStore implements Serializable {
             return map;
         }
 
+    }
+
+    /** Clamp the integer value to the range [1...4] and return the equivalent LTS bit flag enum value. */
+    public static EdgeFlag intToLts (int lts) {
+        if (lts < 2) return BIKE_LTS_1;
+        else if (lts == 2) return BIKE_LTS_2;
+        else if (lts == 3) return BIKE_LTS_3;
+        else return BIKE_LTS_4;
     }
 
     /**

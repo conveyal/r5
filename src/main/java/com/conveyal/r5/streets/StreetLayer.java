@@ -1049,6 +1049,21 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
+     * Return whether this node can be traversed. This is particularly important for nodes that connect one part of the
+     * network to another. For example, an emergency exit connecting station platforms to an outside path.
+     * In the event of poor connectivity in the input OSM data, we want such platforms to be identified
+     * as disconnected so they will be removed, rather than staying connected via a locked door.
+     */
+    private static boolean isBarrierNode(Node node) {
+        // Check for presence of tags, exit early and memoize tag values - this code is hit millions of times.
+        if (node.hasNoTags()) {
+            return false;
+        }
+        String access = node.getTag("access");
+        return node.hasTag("entrance", "emergency") || "no".equals(access) || "private".equals(access);
+    }
+
+    /**
      * Make an edge for a sub-section of an OSM way, typically between two intersections or leading up to a dead end.
      */
     private void makeEdgePair (Way way, int beginIdx, int endIdx, Long osmID) {
@@ -1068,6 +1083,11 @@ public class StreetLayer implements Serializable, Cloneable {
             Node node = osm.nodes.get(nodeId);
             if (node == null) {
                 LOG.warn("Not creating street segment that references an undefined node.");
+                return;
+            }
+            // Skip creating segments that would lead through an impassable node.
+            // This could also be done during routing by storing mode-specific barrier status in VertexStore.
+            if (isBarrierNode(node)) {
                 return;
             }
             envelope.expandToInclude(node.getLon(), node.getLat());

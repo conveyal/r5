@@ -183,6 +183,7 @@ public class Task implements Runnable, ProgressListener {
             markComplete();
         } catch (Throwable t) {
             // TODO Store error in work product and write product to Mongo uniformly
+            System.out.println(ExceptionUtils.stackTraceString(t));
             markError(t);
         }
     }

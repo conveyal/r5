@@ -185,7 +185,7 @@ public class ModifyStreets extends Modification {
         if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
             if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
                 info.add("Added table of per-edge factors because base network doesn't have one.");
-                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.unity(network.streetLayer.edgeStore);
+                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.createNeutral(network.streetLayer.edgeStore);
             }
         }
         EdgeStore.Edge oldEdge = edgeStore.getCursor();

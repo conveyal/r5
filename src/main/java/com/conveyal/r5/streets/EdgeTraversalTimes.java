@@ -3,7 +3,6 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
-import gnu.trove.list.array.TDoubleArrayList;
 
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.BACKWARD;
 import static com.conveyal.r5.streets.LaDotCostTags.Direction.FORWARD;
@@ -81,10 +80,10 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
         bikeTraversalTimes.copyTimes(oldEdge, newEdge, bikeFactor);
     }
 
-    // Stopgap to pad out the traversal times when adding new edges
-    public void addOneEdge () {
-        walkTraversalTimes.setOneEdge();
-        bikeTraversalTimes.setOneEdge();
+    /** Pad out the traversal multipliers/costs with neutral values. */
+    public void addOneNeutralEdge () {
+        walkTraversalTimes.addOneNeutralEdge();
+        bikeTraversalTimes.addOneNeutralEdge();
     }
 
     public void setWalkTimeFactor (int edgeIndex, double walkTimeFactor) {
@@ -113,10 +112,11 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
      * costs are 0. This serves as a neutral starting point for building up generalized costs in modifications,
      * as opposed to starting from pre-existing generalized costs derived from special purpose OSM tags.
      */
-    public static EdgeTraversalTimes unity (EdgeStore edgeStore) {
+    public static EdgeTraversalTimes createNeutral (EdgeStore edgeStore) {
         var times = new EdgeTraversalTimes(edgeStore);
-        times.bikeTraversalTimes.setAllUnity();
-        times.walkTraversalTimes.setAllUnity();
+        for (int i = 0; i < edgeStore.nEdges(); i++) {
+            times.addOneNeutralEdge();
+        }
         return times;
     }
 

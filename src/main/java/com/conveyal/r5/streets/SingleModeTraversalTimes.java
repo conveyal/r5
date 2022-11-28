@@ -80,7 +80,12 @@ public class SingleModeTraversalTimes implements Serializable {
         int turnTimeSeconds (TurnDirection turnDirection);
     }
 
-    public void setOneEdge () {
+
+    /**
+     * Add data for a single edge, setting scaling factors to 1 and constant costs to 0.
+     * This serves as a neutral starting point for adding generalized costs later in modifications.
+     */
+    public void addOneNeutralEdge () {
         perceivedLengthMultipliers.add(1);
         this.leftTurnSeconds.add(0);
         this.rightTurnSeconds.add(0);
@@ -228,19 +233,6 @@ public class SingleModeTraversalTimes implements Serializable {
             straightThroughSeconds.set(newEdge, straightThroughSeconds.get(oldEdge));
         } else {
             throw new UnsupportedOperationException("Cannot extend non-scenario layer.");
-        }
-    }
-
-    /**
-     * As a neutral starting point for building up generalized costs in modifications, as opposed to starting from
-     * tags is OSM data as it's read in, set all scaling factors to 1 and constant costs to 0.
-     */
-    public void setAllUnity () {
-        if (nEdges != 0) {
-            throw new IllegalArgumentException("Can only set an empty SingleModeTraversalTimes to unity.");
-        }
-        while (nEdges < edgeStore.nEdges()) {
-            setOneEdge();
         }
     }
 

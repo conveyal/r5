@@ -373,8 +373,8 @@ public class EdgeStore implements Serializable {
         flags.add(0);
 
         if (edgeTraversalTimes != null) {
-            edgeTraversalTimes.addOneEdge();
-            edgeTraversalTimes.addOneEdge();
+            edgeTraversalTimes.addOneNeutralEdge();
+            edgeTraversalTimes.addOneNeutralEdge();
         }
 
         Edge edge = getCursor(forwardEdgeIndex);

@@ -13,9 +13,6 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
  * TODO rename to something like SinglePointTask because these can now return accessibility, travel time, paths, etc.
  */
 public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
-
-    // FIXME red flag - what is this enum enumerating Java types?
-
     @JsonIgnoreProperties(ignoreUnknown=true)
 
     /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */

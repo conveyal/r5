@@ -181,7 +181,7 @@ public class RegionalAnalysisController implements HttpController {
             cutoffIndex = analysis.cutoffsMinutes.indexOf(cutoffMinutes);
             checkState(cutoffIndex >= 0,
                     "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    analysis.cutoffsMinutes.stream().map(Object::toString).collect(Collectors.joining(","))
+                    analysis.cutoffsMinutes.stream().map(Object::toString).collect(Collectors.joining(", "))
             );
         }
 

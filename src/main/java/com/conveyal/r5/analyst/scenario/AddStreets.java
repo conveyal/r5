@@ -211,6 +211,8 @@ public class AddStreets extends Modification {
         // This modification directly changes and extends the StreetLayer.
         return true;
     }
+
+    @Override
     public boolean affectsTransitLayer () {
         // No changes are made directly to the TransitLayer,
         // but new streets may require relinking and affect distance tables.

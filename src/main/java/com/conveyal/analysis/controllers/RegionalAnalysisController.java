@@ -181,7 +181,7 @@ public class RegionalAnalysisController implements HttpController {
             cutoffIndex = analysis.cutoffsMinutes.indexOf(cutoffMinutes);
             checkState(cutoffIndex >= 0,
                     "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    analysis.cutoffsMinutes.stream().map(Object::toString).collect(Collectors.joining(","))
+                    analysis.cutoffsMinutes.stream().map(Object::toString).collect(Collectors.joining(", "))
             );
         }
 
@@ -194,7 +194,7 @@ public class RegionalAnalysisController implements HttpController {
             percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles.get(nPercentiles / 2));
             checkArgument(analysis.travelTimePercentiles.contains(percentile),
                     "Percentile for this regional analysis must be taken from this list: (%s)",
-                    analysis.travelTimePercentiles.stream().map(Object::toString).collect(Collectors.joining(",")));
+                    analysis.travelTimePercentiles.stream().map(Object::toString).collect(Collectors.joining(", ")));
         }
 
         // Handle even newer regional analyses with multiple destination pointsets per analysis.

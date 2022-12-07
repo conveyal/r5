@@ -83,7 +83,7 @@ public class GridResultWriter implements RegionalResultWriter {
 
     /**
      * We create one GridResultWriter for each destination pointset and percentile.
-     * Each of those output files contains data for all travel time cutoffs at each origin.
+     * Each of those output files contains data for all specified travel time cutoffs at each origin.
      */
     public static List<GridResultWriter> createWritersFromTask(RegionalAnalysis regionalAnalysis, RegionalTask task, FileStorage fileStorage) {
         int nPercentiles = task.percentiles.size();

@@ -23,6 +23,7 @@ import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.fileupload.FileItem;
@@ -98,7 +99,7 @@ public class BundleController implements HttpController {
      * TODO we may want to allow workers to connect to Mongo or the backend to avoid storing metadata in so many places.
      * Or simply not have "bundles" at all, and just supply a list of OSM and GTFS unique IDs to the workers.
      */
-    private Object create(Request req, Response res) {
+    private ObjectNode create(Request req, Response res) {
         // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final UserPermissions userPermissions = UserPermissions.from(req);

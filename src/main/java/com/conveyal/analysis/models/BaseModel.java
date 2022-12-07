@@ -6,7 +6,7 @@ import org.bson.types.ObjectId;
 import java.util.Date;
 
 /**
- * The base type for objects stored in our newer AnalysisDB using the Mongo Java driver's POJO functionality.
+ * The base type for objects stored in AnalysisDB using the Mongo Java driver's POJO functionality.
  */
 public abstract class BaseModel {
     public String _id;

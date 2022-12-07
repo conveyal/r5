@@ -401,6 +401,8 @@ public class RegionalAnalysisController implements HttpController {
             }
             checkArgument(notNullOrEmpty(resultWriters), "A regional analysis should always create at least one grid or CSV file.");
         }
+        // Add a resultWriter that will eventually mark this regionalAnalysis complete in the database.
+        // In the future, we could enhance this to track progress in the database.
         resultWriters.add(new DbResultWriter(db, regionalAnalysis._id));
 
 

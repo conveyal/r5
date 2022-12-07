@@ -194,7 +194,7 @@ public class RegionalAnalysisController implements HttpController {
             percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles.get(nPercentiles / 2));
             checkArgument(analysis.travelTimePercentiles.contains(percentile),
                     "Percentile for this regional analysis must be taken from this list: (%s)",
-                    analysis.travelTimePercentiles.stream().map(Object::toString).collect(Collectors.joining(",")));
+                    analysis.travelTimePercentiles.stream().map(Object::toString).collect(Collectors.joining(", ")));
         }
 
         // Handle even newer regional analyses with multiple destination pointsets per analysis.

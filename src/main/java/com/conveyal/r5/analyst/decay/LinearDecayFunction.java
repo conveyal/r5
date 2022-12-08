@@ -10,6 +10,10 @@ import static com.google.common.base.Preconditions.checkArgument;
  */
 @BsonDiscriminator(value = "linear", key = "type")
 public class LinearDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "linear";
+    }
 
     /** The public parameter. */
     public int widthMinutes;

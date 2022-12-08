@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.decay;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 /**
  * A family of monotonically decreasing functions from travel times to weight factors in the range [0...1].
@@ -19,7 +20,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(name="exponential", value=ExponentialDecayFunction.class),
     @JsonSubTypes.Type(name="fixed-exponential", value=FixedExponentialDecayFunction.class)
 })
+@BsonDiscriminator(key = "type")
 public abstract class DecayFunction {
+    public abstract String getType();
 
     public static final int TWO_HOURS_IN_SECONDS = 2 * 60 * 60;
 

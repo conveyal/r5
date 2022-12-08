@@ -16,6 +16,10 @@ import static org.apache.commons.math3.util.FastMath.sqrt;
  */
 @BsonDiscriminator(value = "logistic", key = "type")
 public class LogisticDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "logistic";
+    }
 
     private static final double SQRT3 = sqrt(3);
 

@@ -14,6 +14,10 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
  */
 @BsonDiscriminator(value = "exponential", key = "type")
 public class ExponentialDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "exponential";
+    }
 
     private static final double logOneHalf = FastMath.log(0.5);
 

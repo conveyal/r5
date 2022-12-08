@@ -13,6 +13,10 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
  */
 @BsonDiscriminator(value = "fixed-exponential", key = "type")
 public class FixedExponentialDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "fixed-exponential";
+    }
 
     /**
      * Note that this is a decay constant for travel times in seconds.

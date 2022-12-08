@@ -5,8 +5,12 @@ import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 /**
  * Simple cliff-edge weight function. No parameters to set or validate.
  */
-@BsonDiscriminator(value = "step", key = "type")
+@BsonDiscriminator(key = "type", value = "step")
 public class StepDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "step";
+    }
 
     @Override
     public void prepare() {

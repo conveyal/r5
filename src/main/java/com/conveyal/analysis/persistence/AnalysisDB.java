@@ -22,12 +22,6 @@ import com.conveyal.analysis.models.RemoveStops;
 import com.conveyal.analysis.models.RemoveTrips;
 import com.conveyal.analysis.models.Reroute;
 import com.conveyal.analysis.models.SpatialDataSource;
-import com.conveyal.r5.analyst.decay.DecayFunction;
-import com.conveyal.r5.analyst.decay.ExponentialDecayFunction;
-import com.conveyal.r5.analyst.decay.FixedExponentialDecayFunction;
-import com.conveyal.r5.analyst.decay.LinearDecayFunction;
-import com.conveyal.r5.analyst.decay.LogisticDecayFunction;
-import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -35,7 +29,6 @@ import com.mongodb.client.MongoDatabase;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.codecs.pojo.ClassModel;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,17 +60,21 @@ public class AnalysisDB implements Component {
             LOG.info("Connecting to local MongoDB instance...");
             mongoClient = MongoClients.create();
         }
-        database = mongoClient.getDatabase(config.databaseName()).withCodecRegistry(makeCodecRegistry());
-
         // Request that the JVM clean up database connections in all cases - exiting cleanly or by being terminated.
         // We should probably register such hooks for other components to shut down more cleanly.
         Runtime.getRuntime().addShutdownHook(new Thread(mongoClient::close));
 
+        database = mongoClient.getDatabase(config.databaseName()).withCodecRegistry(makeCodecRegistry());
+
         aggregationAreas = getAnalysisCollection("aggregationAreas", AggregationArea.class);
         bundles = getAnalysisCollection("bundles", Bundle.class);
         dataGroups = getAnalysisCollection("dataGroups", DataGroup.class);
-        dataSources = getAnalysisCollectionWithSubclasses("dataSources", DataSource.class, SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class);
-        modifications = getAnalysisCollectionWithSubclasses("modifications", Modification.class, AddStreets.class, AddTripPattern.class, AdjustDwellTime.class, AdjustSpeed.class, ConvertToFrequency.class, ModifyStreets.class, RemoveStops.class, RemoveTrips.class, Reroute.class);
+
+        addSubclassesToRegistry(SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class);
+        dataSources = getAnalysisCollection("dataSources", DataSource.class);
+
+        addSubclassesToRegistry(AddStreets.class, AddTripPattern.class, AdjustDwellTime.class, AdjustSpeed.class, ConvertToFrequency.class, ModifyStreets.class, RemoveStops.class, RemoveTrips.class, Reroute.class);
+        modifications = getAnalysisCollection("modifications", Modification.class);
         opportunities = getAnalysisCollection("opportunityDatasets", OpportunityDataset.class);
         regions = getAnalysisCollection("regions", Region.class);
         regionalAnalyses = getAnalysisCollection("regional-analyses", RegionalAnalysis.class);
@@ -98,38 +95,27 @@ public class AnalysisDB implements Component {
      * methods do not auto-scan, they just provide the same behavior as automatic() but limited to specific packages.
      */
     private CodecRegistry makeCodecRegistry () {
-        ClassModel<DecayFunction> decayFunction = ClassModel.builder(DecayFunction.class).enableDiscriminator(true).build();
-        ClassModel<StepDecayFunction> stepDecay = ClassModel.builder(StepDecayFunction.class).enableDiscriminator(true).build();
-        ClassModel<LinearDecayFunction> linearDecay = ClassModel.builder(LinearDecayFunction.class).enableDiscriminator(true).build();
-        ClassModel<LogisticDecayFunction> logisticDecay = ClassModel.builder(LogisticDecayFunction.class).enableDiscriminator(true).build();
-        ClassModel<ExponentialDecayFunction> exponentialDecay = ClassModel.builder(ExponentialDecayFunction.class).enableDiscriminator(true).build();
-        ClassModel<FixedExponentialDecayFunction> fixedExponentialDecay = ClassModel.builder(FixedExponentialDecayFunction.class).enableDiscriminator(true).build();
-        CodecProvider decayFunctionProvider = PojoCodecProvider.builder().register(decayFunction, stepDecay, linearDecay, logisticDecay, exponentialDecay, fixedExponentialDecay).build();
-
         CodecProvider automaticPojoCodecProvider = PojoCodecProvider.builder().automatic(true).build();
         return CodecRegistries.fromRegistries(
                 CodecRegistries.fromCodecs(new LocalDateCodec()),
                 MongoClientSettings.getDefaultCodecRegistry(),
-                CodecRegistries.fromProviders(decayFunctionProvider, automaticPojoCodecProvider)
+                CodecRegistries.fromProviders(automaticPojoCodecProvider)
         );
     }
 
     /**
-     * If the optional subclasses are supplied, the codec registry will be hit to cause it to build class models and
-     * codecs for them. This is necessary when these subclasses specify short discriminators, as opposed to the
-     * verbose default discriminator of a fully qualified class name, because the Mongo driver does not auto-scan for
-     * classes it has not encountered in a write operation or in a request for a collection.
+     * Hit the codec registry with subclasses to cause it to build class models and codecs for them. This is necessary
+     * when these subclasses specify short discriminators, as opposed to the verbose default discriminator of a fully
+     * qualified class name, because the MongoDB driver does not auto-scan for classes it has not encountered in a write
+     * operation or in a request for a collection.
      */
-    public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollectionWithSubclasses(
-            String name, Class<T> clazz, Class<? extends T>... subclasses
-    ) {
-        for (Class<? extends T> subclass : subclasses) {
+    private void addSubclassesToRegistry(Class<?> ...subclasses) {
+        for (var subclass : subclasses) {
             database.getCodecRegistry().get(subclass);
         }
-        return new AnalysisCollection<>(database.getCollection(name, clazz));
     }
 
-    public <T extends BaseModel> AnalysisCollection<T> getAnalysisCollection(
+    private <T extends BaseModel> AnalysisCollection<T> getAnalysisCollection(
             String name, Class<T> clazz
     ) {
         return new AnalysisCollection<>(database.getCollection(name, clazz));

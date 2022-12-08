@@ -213,7 +213,7 @@ public class GridResultWriter implements RegionalResultWriter {
     }
 
     @Override
-    public void terminate() throws IOException {
+    public synchronized void terminate() throws IOException {
         randomAccessFile.close();
         bufferFile.delete();
     }

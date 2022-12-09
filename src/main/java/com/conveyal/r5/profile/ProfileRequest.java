@@ -190,7 +190,6 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     @JsonSerialize(using = ZoneIdSerializer.class)
     @JsonDeserialize(using = ZoneIdDeserializer.class)
-    @BsonIgnore
     public ZoneId zoneId = ZoneOffset.UTC;
 
     /**

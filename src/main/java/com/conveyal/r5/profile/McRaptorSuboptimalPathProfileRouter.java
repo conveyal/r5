@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
@@ -225,7 +224,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private void computeAccessTimes() {
         StreetRouter streetRouter = new StreetRouter(network.streetLayer);
 
-        Set<LegMode> modes = request.accessModes;
+        var modes = request.accessModes;
         LegMode mode;
         if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;

@@ -2,7 +2,6 @@ package com.conveyal.r5.model.json_serialization;
 
 import com.conveyal.r5.api.util.TransitModes;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import org.slf4j.Logger;
@@ -20,9 +19,9 @@ public class TransitModeSetDeserializer extends JsonDeserializer<Set<TransitMode
     private static final Logger LOG = LoggerFactory.getLogger(TransitModeSetDeserializer.class);
 
     @Override
-    public Set<TransitModes> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
-        String str = jsonParser.getValueAsString();
-        Set<TransitModes> modes = EnumSet.noneOf(TransitModes.class);
+    public EnumSet<TransitModes> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
+        var str = jsonParser.getValueAsString();
+        var modes = EnumSet.noneOf(TransitModes.class);
         if (!str.isEmpty()) {
             Stream.of(str.split(",")).forEach(m -> {
                 TransitModes mode;

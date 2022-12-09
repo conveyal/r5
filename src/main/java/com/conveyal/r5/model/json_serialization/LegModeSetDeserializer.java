@@ -2,7 +2,6 @@ package com.conveyal.r5.model.json_serialization;
 
 import com.conveyal.r5.api.util.LegMode;
 import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import org.slf4j.Logger;
@@ -20,9 +19,9 @@ public class LegModeSetDeserializer extends JsonDeserializer<Set<LegMode>> {
     private static final Logger LOG = LoggerFactory.getLogger(LegModeSetDeserializer.class);
 
     @Override
-    public Set<LegMode> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
-        String str = jsonParser.getValueAsString();
-        Set<LegMode> modes = EnumSet.noneOf(LegMode.class);
+    public EnumSet<LegMode> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
+        var str = jsonParser.getValueAsString();
+        var modes = EnumSet.noneOf(LegMode.class);
         Stream.of(str.split(",")).forEach(m -> {
             LegMode mode;
             try {

@@ -2,7 +2,6 @@ package com.conveyal.r5.model.json_serialization;
 
 import com.conveyal.r5.api.util.TransitModes;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 
@@ -15,7 +14,7 @@ import java.util.stream.Collectors;
  */
 public class TransitModeSetSerializer extends JsonSerializer<Set<TransitModes>> {
     @Override
-    public void serialize(Set<TransitModes> modes, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException, JsonProcessingException {
+    public void serialize(Set<TransitModes> modes, JsonGenerator jsonGenerator, SerializerProvider serializerProvider) throws IOException {
         String str = modes.stream().map(TransitModes::toString).collect(Collectors.joining(","));
         jsonGenerator.writeString(str);
     }

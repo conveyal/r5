@@ -189,7 +189,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             );
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether
             // transit is used). See code in TravelTimeComputer for when each is used.
-            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
+            this.allModes = LegMode.toStreetModeSet(task.directModes);
+            this.allModes.addAll(LegMode.toStreetModeSet(task.accessModes));
             this.allModes.addAll(this.egressModes);
 
             this.destinationGridExtents = task.getWebMercatorExtents();

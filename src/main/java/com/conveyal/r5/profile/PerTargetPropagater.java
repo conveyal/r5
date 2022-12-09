@@ -56,9 +56,7 @@ public class PerTargetPropagater {
     /** The targets, not yet linked to the street network. */
     private PointSet targets;
 
-    /**
-     * All modes for which we want to perform egress propagation through the street network.
-     */
+    /** All modes for which we want to perform egress propagation through the street network. */
     public final Set<StreetMode> modes;
 
     /** One linkage for each street mode for which we want to extend travel times out from transit to destinations. */

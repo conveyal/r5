@@ -116,45 +116,31 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** Minimum time to ride a bike (to prevent extremely short bike legs), in minutes */
     public int minBikeTime = 5;
 
-    /**
-     * Minimum time to drive (to prevent extremely short driving legs), in minutes
-     */
+    /** Minimum time to drive (to prevent extremely short driving legs), in minutes */
     public int minCarTime = 5;
 
-    /**
-     * The date of the search
-     */
+    /** The date of the search */
     public LocalDate date;
 
-    /**
-     * the maximum number of options presented PER ACCESS MODE
-     */
+    /** the maximum number of options presented PER ACCESS MODE */
     public int limit;
 
-    /**
-     * The modes used to access transit
-     */
+    /** The modes used to access transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public Set<LegMode> accessModes;
 
-    /**
-     * The modes used to reach the destination after leaving transit
-     */
+    /** The modes used to reach the destination after leaving transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public Set<LegMode> egressModes;
 
-    /**
-     * The modes used to reach the destination without transit
-     */
+    /** The modes used to reach the destination without transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public Set<LegMode> directModes;
 
-    /**
-     * The transit modes used
-     */
+    /** The transit modes used */
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
     public Set<TransitModes> transitModes;

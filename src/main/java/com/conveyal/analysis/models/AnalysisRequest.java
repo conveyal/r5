@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -58,12 +57,12 @@ public class AnalysisRequest {
     public List<String> modificationIds = new ArrayList<>();
     public String workerVersion;
 
-    public Set<LegMode> accessModes;
+    public String accessModes;
     public float bikeSpeed;
     public Bounds bounds;
     public LocalDate date;
-    public Set<LegMode> directModes;
-    public Set<LegMode> egressModes;
+    public String directModes;
+    public String egressModes;
     public float fromLat;
     public float fromLon;
     public float toLat;
@@ -71,7 +70,7 @@ public class AnalysisRequest {
     public int fromTime;
     public int monteCarloDraws = 200;
     public int toTime;
-    public Set<TransitModes> transitModes;
+    public String transitModes;
     public float walkSpeed;
     public int maxTripDurationMinutes = 120;
     public int maxRides = 4;
@@ -398,12 +397,14 @@ public class AnalysisRequest {
 
         task.logRequest = logRequest;
 
-        task.accessModes = accessModes;
-        task.directModes = directModes;
-        task.egressModes = egressModes;
-        task.transitModes = transitModes != null
-                ? transitModes
-                : EnumSet.noneOf(TransitModes.class);
+        task.accessModes = getEnumSetFromString(accessModes);
+        task.directModes = getEnumSetFromString(directModes);
+        task.egressModes = getEnumSetFromString(egressModes);
+        if (transitModes != null && !"".equals(transitModes)) {
+            task.transitModes = EnumSet.copyOf(Arrays.stream(transitModes.split(",")).map(TransitModes::valueOf).collect(Collectors.toList()));
+        } else {
+            task.transitModes = EnumSet.noneOf(TransitModes.class);
+        }
 
         // Use the decay function supplied by the UI, defaulting to a zero-width step function if none is supplied.
         task.decayFunction = decayFunction;
@@ -424,6 +425,14 @@ public class AnalysisRequest {
                             "Set smaller custom geographic bounds or a lower zoom level.",
                             extents.height * extents.width, MAX_GRID_CELLS
             ));
+        }
+    }
+
+    private EnumSet<LegMode> getEnumSetFromString (String s) {
+        if (s != null && !"".equals(s)) {
+            return EnumSet.copyOf(Arrays.stream(s.split(",")).map(LegMode::valueOf).collect(Collectors.toList()));
+        } else {
+            return EnumSet.noneOf(LegMode.class);
         }
     }
 

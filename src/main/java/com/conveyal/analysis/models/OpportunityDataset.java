@@ -13,19 +13,13 @@ import static com.conveyal.file.FileCategory.GRIDS;
  */
 public class OpportunityDataset extends BaseModel {
 
-    /**
-     * The human-readable name of the data source from which this came, provided by the user who uploaded it.
-     */
+    /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
 
-    /**
-     * The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived.
-     */
+    /** The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived. */
     public String sourceId;
 
-    /**
-     * The ID of the DataGroup that this OpportunityDataset belongs to (all created at once from a single source).
-     */
+    /** The ID of the DataGroup that this OpportunityDataset belongs to (all created at once from a single source). */
     public String dataGroupId;
 
     /**
@@ -107,8 +101,6 @@ public class OpportunityDataset extends BaseModel {
         return new FileStorageKey(GRIDS, storageLocation(dataset, fileFormat.extension));
     }
 
-    /**
-     * Analysis region this dataset was uploaded in.
-     */
+    /** Analysis region this dataset was uploaded in. */
     public String regionId;
 }

@@ -425,7 +425,7 @@ public class RegionalAnalysisController implements HttpController {
      * Store the regional analysis scenario as JSON for retrieval by the workers.
      */
     private void storeScenarioJson(String graphId, Scenario scenario) throws IOException {
-        String fileName = String.format("%s_%s.json", graphId, scenario.id);
+        String fileName = getScenarioFilename(graphId, scenario.id);
         FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
         File localScenario = FileUtils.createScratchFile("json");
         JsonUtil.objectMapper.writeValue(localScenario, scenario);
@@ -437,17 +437,16 @@ public class RegionalAnalysisController implements HttpController {
      * the given regional analysis.
      */
     private JsonNode getScenarioJsonUrl(Request request, Response response) {
-        var user = UserPermissions.from(request);
-        var regionalAnalysis = db.regionalAnalyses
-                .findPermitted(Filters.eq("_id", request.params("_id")), user)
-                .projection(Projections.include("bundleId", "request.scenarioId"))
-                .first();
-        // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
-        final String scenarioId = regionalAnalysis.request.scenarioId;
-        checkNotNull(regionalAnalysis.bundleId, "RegionalAnalysis did not contain a bundle ID.");
+        // Fetch the regional analysis to verify permission and existence.
+        var regionalAnalysis = getRegionalAnalysis(request);
+        if (regionalAnalysis == null) throw AnalysisServerException.notFound("Regional analysis not found.");
+
+        var bundleId = request.params("bundleId");
+        var scenarioId = request.params("scenarioId");
+        checkNotNull(bundleId, "RegionalAnalysis did not contain a bundle ID.");
         checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
         String scenarioUrl = fileStorage.getURL(
-                new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
+                new FileStorageKey(BUNDLES, getScenarioFilename(bundleId, scenarioId)));
         return JsonUtil.objectNode().put("url", scenarioUrl);
     }
 
@@ -460,7 +459,7 @@ public class RegionalAnalysisController implements HttpController {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
             sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
-            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
+            sparkService.get("/:_id/scenarioJsonUrl/:bundleId/:scenarioId", this::getScenarioJsonUrl);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
         });

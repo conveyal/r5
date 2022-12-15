@@ -143,6 +143,7 @@ public class StreetLayer implements Serializable, Cloneable {
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
+    /** Map from OSM node ID to internal vertex ID. Impassable barrier nodes are excluded frmo this map. **/
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
 
     // Initialize these when we have an estimate of the number of expected edges.
@@ -1004,6 +1005,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
+     * If the OSM node is an impassable barrier (e.g. emergency exit), do not register the mapping and always return a
+     * fresh vertex ID
      * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
@@ -1019,7 +1022,8 @@ public class StreetLayer implements Serializable, Cloneable {
                 VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
                 if (node.hasTag("highway", "traffic_signals"))
                     v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-                vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+                if (!isBarrierNode(node))
+                    vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
             }
         }
         return vertexIndex;
@@ -1083,11 +1087,6 @@ public class StreetLayer implements Serializable, Cloneable {
             Node node = osm.nodes.get(nodeId);
             if (node == null) {
                 LOG.warn("Not creating street segment that references an undefined node.");
-                return;
-            }
-            // Skip creating segments that would lead through an impassable node.
-            // This could also be done during routing by storing mode-specific barrier status in VertexStore.
-            if (isBarrierNode(node)) {
                 return;
             }
             envelope.expandToInclude(node.getLon(), node.getLat());

@@ -54,11 +54,7 @@ public class StreetLayerTest {
         new TarjanIslandPruner(sl, 40, StreetMode.WALK).run();
 
         // note: disconnected subgraphs are not removed, they are de-pedestrianized
-        final EdgeStore.Edge edge = sl.edgeStore.getCursor();
-        assertTrue(Arrays.stream(sl.incomingEdges.get(v).toArray())
-                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
-        assertTrue(Arrays.stream(sl.outgoingEdges.get(v).toArray())
-                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
+        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
     }
 
     /**

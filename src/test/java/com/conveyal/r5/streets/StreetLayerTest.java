@@ -40,10 +40,7 @@ public class StreetLayerTest {
         assertEquals(3, sl.outgoingEdges.get(v).size());
 
         // make sure that it's a subgraph
-        StreetRouter r = new StreetRouter(sl);
-        r.setOrigin(v);
-        r.route();
-        assertTrue(r.getReachedVertices().size() < 40);
+        assertTrue(connectedVertices(sl, v) < 40);
 
         int e0 = sl.incomingEdges.get(v).get(0);
         int e1 = e0 % 2 == 0 ? e0 + 1 : e0 - 1;
@@ -347,4 +344,11 @@ public class StreetLayerTest {
         assertEquals(238215856L, edge.getOSMID());
         assertFalse(restriction.only);
     }
+    private int connectedVertices(StreetLayer sl, int vertexId) {
+        StreetRouter r = new StreetRouter(sl);
+        r.setOrigin(vertexId);
+        r.route();
+        return r.getReachedVertices().size();
+    }
+
 }

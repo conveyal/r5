@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -344,6 +343,55 @@ public class StreetLayerTest {
         assertEquals(238215856L, edge.getOSMID());
         assertFalse(restriction.only);
     }
+
+    /**
+     * Test pruning of platforms and edges that are isolated by impassable barrier nodes (e.g., emergency exits).
+     * The OSM is based on the Delft railway station, which has four underground platforms (numbered in increasing
+     * order east to west). The test fixture uses an area representation for platforms 1 and 3 and a (non-closed)
+     * path representation for platforms 2 and 4. The ways for platforms 1 and 2 are connected to the rest of the
+     * network by stairways and an elevator.
+     * <p>
+     * The only connection between platforms 3 and 4 and the rest of the network is an emergency exit at their
+     * southern end. So we expect island pruning to clear the ALLOWS_PEDESTRIAN flag for platforms 3 and 4.
+     */
+    @Test
+    public void testBarrierFiltering () {
+        OSM osm = new OSM(null);
+        osm.intersectionDetection = true;
+        osm.readFromUrl(StreetLayerTest.class.getResource("delft-station.pbf").toString());
+
+        StreetLayer sl = new StreetLayer();
+        sl.loadFromOsm(osm, true, true);
+        sl.buildEdgeLists();
+
+        // Initial assertions about OSM node 337954642 in the test fixture
+        // It is an emergency exit, and it is tracked as an intersection
+        assertTrue(sl.osm.nodes.get(3377954642L).hasTag("entrance", "emergency"));
+        assertTrue(osm.intersectionNodes.contains(3377954642L));
+        // It is a node on platforms 3 and 4
+        assertEquals(3377954642L, sl.osm.ways.get(899157819L).nodes[10]);
+        assertEquals(3377954642L, sl.osm.ways.get(1043558969L).nodes[7]);
+        // It is excluded from the vertexIndexForOsmNode map (because it corresponds to multiple vertices)
+        assertEquals(-1, sl.vertexIndexForOsmNode.get(3377954642L));
+
+        int v;
+        // Check that Platforms 1 and 2 allow pedestrians and are connected to the rest of the network
+        v = sl.vertexIndexForOsmNode.get(5303110250L);
+        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
+        assertEquals(68, connectedVertices(sl, v));
+
+        // Check that Platforms 3 and 4 have been pruned (ALLOWS_PEDESTRIAN cleared, so no connected vertices)
+        v = sl.vertexIndexForOsmNode.get(9604186664L);
+        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
+        assertEquals(0, connectedVertices(sl, v));
+
+        // Check that the stairway on the other side of the emergency exit allows pedestrians and is connected to the
+        // rest of the network
+        v = sl.vertexIndexForOsmNode.get(5744239458L);
+        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
+        assertEquals(68, connectedVertices(sl, v));
+    }
+    
     private int connectedVertices(StreetLayer sl, int vertexId) {
         StreetRouter r = new StreetRouter(sl);
         r.setOrigin(vertexId);

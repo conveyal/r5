@@ -139,7 +139,7 @@ public class AdjustSpeed extends Modification {
                 .collect(Collectors.toList());
 
         if (nTripsAffected > 0) {
-            info.add(String.format("Speed was changed on %d trips.", nTripsAffected));
+            info.add(String.format("Changed speed on %d trips.", nTripsAffected));
         } else {
             errors.add("This modification did not cause any changes to the transport network.");
         }

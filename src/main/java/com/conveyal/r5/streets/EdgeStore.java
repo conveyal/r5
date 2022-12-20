@@ -7,6 +7,7 @@ import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
+import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TByteAugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
@@ -633,6 +634,11 @@ public class EdgeStore implements Serializable {
                 vertex = getFromVertex();
             } else {
                 vertex = getToVertex();
+            }
+
+            // For turn restriction purposes, states are considered to be situated just before the starting vertex.
+            if (vertexStore.getFlag(vertex, VertexFlag.BARRIER)) {
+                return null;
             }
 
             // A new instance representing the state after traversing this edge. Fields will be filled in later.

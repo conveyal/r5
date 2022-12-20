@@ -143,7 +143,7 @@ public class StreetLayer implements Serializable, Cloneable {
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
-    /** Map from OSM node ID to internal vertex ID. Impassable barrier nodes are excluded frmo this map. **/
+    /** Map from OSM node ID to internal vertex ID. **/
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
 
     // Initialize these when we have an estimate of the number of expected edges.
@@ -162,7 +162,6 @@ public class StreetLayer implements Serializable, Cloneable {
      * references between the two layers.
      */
     public TransportNetwork parentNetwork = null;
-
 
     /**
      * A string uniquely identifying the contents of this StreetLayer among all StreetLayers.
@@ -298,7 +297,13 @@ public class StreetLayer implements Serializable, Cloneable {
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
             for (int n = 1; n < way.nodes.length; n++) {
-                if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
+                long nodeId = way.nodes[n];
+                Node node = osm.nodes.get(nodeId);
+                // TODO check for slowdown here
+                final boolean intersection = osm.intersectionNodes.contains(way.nodes[n]);
+                final boolean lastNode = (n == (way.nodes.length - 1));
+                final boolean barrier = isBarrierNode(node);
+                if (intersection || lastNode || barrier) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
                     beginIdx = n;
                 }
@@ -1005,25 +1010,26 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
-     * If the OSM node is an impassable barrier (e.g. emergency exit), do not register the mapping and always return a
-     * fresh vertex ID
      * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
         int vertexIndex = vertexIndexForOsmNode.get(osmNodeId);
         if (vertexIndex == -1) {
             // Register a new vertex, incrementing the index starting from zero.
-            // Store node coordinates for this new street vertex
+            // Store node coordinates for this new street vertex.
             Node node = osm.nodes.get(osmNodeId);
             if (node == null) {
                 LOG.warn("OSM data references an undefined node. This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
             } else {
                 vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
                 VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
-                if (node.hasTag("highway", "traffic_signals"))
+                if (node.hasTag("highway", "traffic_signals")) {
                     v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-                if (!isBarrierNode(node))
-                    vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+                }
+                if (isBarrierNode(node)) {
+                    v.setFlag(VertexStore.VertexFlag.BARRIER);
+                }
+                vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
             }
         }
         return vertexIndex;
@@ -1057,14 +1063,20 @@ public class StreetLayer implements Serializable, Cloneable {
      * network to another. For example, an emergency exit connecting station platforms to an outside path.
      * In the event of poor connectivity in the input OSM data, we want such platforms to be identified
      * as disconnected so they will be removed, rather than staying connected via a locked door.
+     *
+     * This code is hit millions of times so we want to bypass it as much as possible.
+     * If tags are present, memoize the values rather than repeatedly extracting them with hasTag().
      */
     private static boolean isBarrierNode(Node node) {
-        // Check for presence of tags, exit early and memoize tag values - this code is hit millions of times.
         if (node.hasNoTags()) {
             return false;
         }
         String access = node.getTag("access");
-        return node.hasTag("entrance", "emergency") || "no".equals(access) || "private".equals(access);
+        if (access == null) {
+            return node.hasTag("entrance", "emergency") || node.hasTag("barrier");
+        } else {
+            return access.equals("no") || access.equals("private");
+        }
     }
 
     /**
@@ -1658,13 +1670,13 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Whether a given flag is set to a given boolean value for all incoming and outgoing edges at a vertex
+     * @return whether a given flag is set to a given boolean value for all incoming and outgoing edges at a vertex.
      */
     public boolean flagsAroundVertex(int v, EdgeStore.EdgeFlag flag, boolean flagSet) {
         return Arrays.stream(incomingEdges.get(v).toArray())
-                .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet) &&
-                Arrays.stream(outgoingEdges.get(v).toArray())
-                        .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet);
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet) &&
+               Arrays.stream(outgoingEdges.get(v).toArray())
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet);
     }
 
     @Override

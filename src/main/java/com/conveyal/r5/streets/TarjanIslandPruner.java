@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.set.TIntSet;
@@ -152,7 +153,53 @@ public class TarjanIslandPruner {
         edgeCursor = streetLayer.edgeStore.getCursor();
     }
 
+    // DRAFT reusing our standard routing to do edge-based pruning which should support turn restrictions
+    // It may be better to accumulate all edges to remove and remove them all at the end after the searches.
+    // We need to think through whether the order of the searches and removals, or the fact that the edges are
+    // directed, make any difference.
+    // TODO parellelize this? You'd need to avoid searching simultaneously from two edges in the same component though.
     public void run () {
+        LOG.info("Removing islands for mode {}", mode);
+        final long startTime = System.currentTimeMillis();
+
+        int nComponentsRemoved = 0;
+        int nEdgesRemoved = 0;
+
+        final EdgeStore.Edge edge = streets.edgeStore.getCursor();
+        for (int sourceVertex = 0; sourceVertex < streets.getVertexCount(); sourceVertex++) {
+            StreetRouter r = new StreetRouter(streets);
+            r.setOrigin(sourceVertex);
+            r.streetMode = mode;
+            r.route();
+            int nEdgesFound = r.bestStatesAtEdge.size();
+            if (nEdgesFound < minComponentSize) {
+                r.bestStatesAtEdge.forEachEntry((eidx, states) -> {
+                    edge.seek(eidx);
+                    switch (mode) {
+                        case CAR:
+                            edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+                            break;
+                        case BICYCLE:
+                            edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                            break;
+                        case WALK:
+                            edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+                            break;
+                        default:
+                            throw new IllegalArgumentException(String.format("Unsupported mode %s for island removal", mode));
+                    }
+                    return true;
+                });
+                nComponentsRemoved += 1;
+                nEdgesRemoved += nEdgesFound;
+            }
+        }
+
+        LOG.info("Found and removed {} strong components (islands) with fewer than {} edges for mode {} in {} sec. {} edges removed.",
+                nComponentsRemoved, minComponentSize, mode, (System.currentTimeMillis() - startTime) / 1000d, nEdgesRemoved);
+    }
+
+    public void oldRun () {
         LOG.info("Removing islands for mode {}", mode);
         long startTime = System.currentTimeMillis();
 
@@ -164,7 +211,9 @@ public class TarjanIslandPruner {
                     int vertex = toExplore.pop();
 
                     if (discoveryIndex[vertex] != -1) {
-                        if (!onTarjanStack.get(vertex)) continue; // this strong component has already been found and removed from the tarjanStack
+                        if (!onTarjanStack.get(vertex)) {
+                            continue; // This strong component has already been found and removed from the tarjanStack.
+                        }
 
                         // we have previously visited this vertex and are looping back to it,
                         // update lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor based on successors
@@ -184,8 +233,14 @@ public class TarjanIslandPruner {
                         // Looping here has somewhat higher complexity than the original algorithm but uses less memory than
                         // keeping a tarjanStack of which successor was most recently explored, and still runs in <10 seconds on
                         // a relatively large (metropolitan Washington, DC) graph.
+
                         forEachOutgoingEdge(vertex, e -> {
                             int toVertex = e.getToVertex();
+                            // FIXME this imperfectly replicates code in edge.traverse.
+                            // For both barrier node and turn restriction purposes, we should be using the real traverse function.
+                            if (! streets.vertexStore.getFlag(toVertex, VertexFlag.BARRIER)) {
+                                return;
+                            }
                             if (discoveryIndex[toVertex] == -1) everySuccessorExplored[0] = false;
                             if (discoveryIndex[toVertex] > discoveryIndex[vertex] &&
                                     lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[vertex] > lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[toVertex])

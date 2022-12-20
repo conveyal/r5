@@ -4,7 +4,6 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
@@ -94,11 +93,11 @@ public class VertexStore implements Serializable {
         }
 
         public boolean getFlag(VertexFlag flag) {
-            return (vertexFlags.get(index) & flag.flag) != 0;
+            return VertexStore.this.getFlag(index, flag);
         }
 
         public void setFlag(VertexFlag flag) {
-            vertexFlags.set(index, (byte)(vertexFlags.get(index) | flag.flag));
+            VertexStore.this.setFlag(index, flag);
         }
 
         public double getLat() {
@@ -156,6 +155,14 @@ public class VertexStore implements Serializable {
         return fixed / FIXED_FACTOR;
     }
 
+    public boolean getFlag (int index, VertexFlag flag) {
+        return (vertexFlags.get(index) & flag.flag) != 0;
+    }
+
+    public void setFlag (int index, VertexFlag flag) {
+        vertexFlags.set(index, (byte)(vertexFlags.get(index) | flag.flag));
+    }
+
     /**
      * Given a Geometry in fixed-point latitude and longitude, return a copy converted to floating point latitude and
      * longitude.
@@ -182,7 +189,8 @@ public class VertexStore implements Serializable {
 
         TRAFFIC_SIGNAL(0), // This intersection has a traffic signal
         PARK_AND_RIDE(1),
-        BIKE_SHARING(2);
+        BIKE_SHARING(2),
+        BARRIER(3); // Barriers and gates that are locked, private, or for emergency use only.
 
         // TODO Add Stop and split vertex flags. This allows blocking U-turns at splits and eliminating the special stop finder visitor
 

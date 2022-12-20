@@ -2,6 +2,8 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.VertexStore.VertexFlag;
+import com.esotericsoftware.minlog.Log;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -364,6 +366,14 @@ public class StreetLayerTest {
         sl.loadFromOsm(osm, true, true);
         sl.buildEdgeLists();
 
+
+
+        for (int v = 0; v < sl.vertexStore.getVertexCount(); v++) {
+            if (sl.vertexStore.getFlag(v, VertexFlag.BARRIER)) {
+                System.out.println("Vertex is a BARRIER: " + v);
+            }
+
+        }
         // Initial assertions about OSM node 337954642 in the test fixture
         // It is an emergency exit, and it is tracked as an intersection
         assertTrue(sl.osm.nodes.get(3377954642L).hasTag("entrance", "emergency"));
@@ -371,25 +381,26 @@ public class StreetLayerTest {
         // It is a node on platforms 3 and 4
         assertEquals(3377954642L, sl.osm.ways.get(899157819L).nodes[10]);
         assertEquals(3377954642L, sl.osm.ways.get(1043558969L).nodes[7]);
-        // It is excluded from the vertexIndexForOsmNode map (because it corresponds to multiple vertices)
-        assertEquals(-1, sl.vertexIndexForOsmNode.get(3377954642L));
+        // The corresponding vertex has a BARRIER flag
+        int v = sl.vertexIndexForOsmNode.get(3377954642L);
+        assertTrue(sl.vertexStore.getFlag(v, VertexFlag.BARRIER));
 
-        int v;
         // Check that Platforms 1 and 2 allow pedestrians and are connected to the rest of the network
         v = sl.vertexIndexForOsmNode.get(5303110250L);
         assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
-        assertEquals(68, connectedVertices(sl, v));
+        assertEquals(65, connectedVertices(sl, v));
 
         // Check that Platforms 3 and 4 have been pruned (ALLOWS_PEDESTRIAN cleared, so no connected vertices)
         v = sl.vertexIndexForOsmNode.get(9604186664L);
         assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
         assertEquals(0, connectedVertices(sl, v));
 
-        // Check that the stairway on the other side of the emergency exit allows pedestrians and is connected to the
-        // rest of the network
+        // The path outside the emergency exit contains a gate node, which is part of this exit path but no other way.
+        // Ensure this non-intersection gate node cuts the emergency exit path off from the rest of the network, and
+        // that the island pruner removes pedestrian access to the island this creates.
         v = sl.vertexIndexForOsmNode.get(5744239458L);
-        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
-        assertEquals(68, connectedVertices(sl, v));
+        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
+        assertTrue(connectedVertices(sl, v) < 5);
     }
     
     private int connectedVertices(StreetLayer sl, int vertexId) {

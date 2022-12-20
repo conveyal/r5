@@ -427,10 +427,38 @@ public class LinkedPointSet implements Serializable {
 
     public PointSetTimes eval (
                 CostToVertexFunction timeToVertex,
-                Integer onStreetSpeed,
-                int offStreetSpeed,
                 Split origin
             ) {
+        int[] distances = new int[edges.length];
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        for (int i = 0; i < edges.length; i++) {
+            if (edges[i] < 0) {
+                // Target point is unlinked.
+                distances[i] = Integer.MAX_VALUE;
+                continue;
+            }
+
+            edge.seek(edges[i]);
+
+            if (origin != null && origin.edge == edges[i]) {
+                // The target point lies along the same edge as the origin
+                int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
+                distances[i] = // origin.distanceToEdge_mm / offStreetSpeed + TODO origin to origin split point
+                                onStreetDistance_mm + // along street
+                                distancesToEdge_mm[i]; // from destination split point to destination
+            } else {
+                distances[i] = distanceToPoint(timeToVertex, edge, i);
+            }
+        }
+        return new PointSetTimes(pointSet, distances);
+    }
+
+    public PointSetTimes eval (
+            CostToVertexFunction timeToVertex,
+            Integer onStreetSpeed,
+            int offStreetSpeed,
+            Split origin
+    ) {
         int[] travelTimes = new int[edges.length];
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         for (int i = 0; i < edges.length; i++) {

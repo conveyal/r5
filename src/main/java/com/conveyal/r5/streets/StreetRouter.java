@@ -737,6 +737,11 @@ public class StreetRouter {
         return state != null ? state.durationSeconds : Integer.MAX_VALUE;
     }
 
+    public int getDistanceToVertex (int vertexIndex) {
+        State state = getStateAtVertex(vertexIndex);
+        return state != null ? state.distance : Integer.MAX_VALUE;
+    }
+
     /**
      * Given a _destination_ split along an edge, return the best state that can be produced by traversing the edge
      * fragments from the vertices at either end of the edge up to the destination split point.

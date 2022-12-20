@@ -215,9 +215,7 @@ public class TravelTimeComputer {
                 Split origin = sr.getOriginSplit();
 
                 PointSetTimes pointSetTimes = linkedDestinations.eval(
-                        sr::getTravelTimeToVertex,
-                        streetSpeedMillimetersPerSecond,
-                        walkSpeedMillimetersPerSecond,
+                        sr::getDistanceToVertex,
                         origin
                 );
 
@@ -277,8 +275,9 @@ public class TravelTimeComputer {
             if (request instanceof RegionalTask && ((RegionalTask) request).oneToOne) nTargets = 1;
             for (int target = 0; target < nTargets; target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
-                final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);
-                travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, travelTimeSeconds);
+                final int distanceKmX60 =
+                        nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target) / 1_000_000 * 60;
+                travelTimeReducer.recordUnvaryingTravelTimeAtTarget(target, distanceKmX60);
             }
             return travelTimeReducer.finish();
         }

@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -371,25 +372,25 @@ public class StreetLayerTest {
         // It is a node on platforms 3 and 4
         assertEquals(3377954642L, sl.osm.ways.get(899157819L).nodes[10]);
         assertEquals(3377954642L, sl.osm.ways.get(1043558969L).nodes[7]);
-        // It is excluded from the vertexIndexForOsmNode map (because it corresponds to multiple vertices)
-        assertEquals(-1, sl.vertexIndexForOsmNode.get(3377954642L));
+        // The entry in vertexIndexForOsmNode map (one of multiple vertices) should be flagged as impassable.
+        assertTrue(sl.vertexStore.getFlag(sl.vertexIndexForOsmNode.get(3377954642L), VertexFlag.IMPASSABLE));
 
-        int v;
         // Check that Platforms 1 and 2 allow pedestrians and are connected to the rest of the network
-        v = sl.vertexIndexForOsmNode.get(5303110250L);
-        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
-        assertEquals(68, connectedVertices(sl, v));
+        int p12v = sl.vertexIndexForOsmNode.get(5303110250L);
+        assertTrue(sl.flagsAroundVertex(p12v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
+        assertEquals(68, connectedVertices(sl, p12v));
 
         // Check that Platforms 3 and 4 have been pruned (ALLOWS_PEDESTRIAN cleared, so no connected vertices)
-        v = sl.vertexIndexForOsmNode.get(9604186664L);
-        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
-        assertEquals(0, connectedVertices(sl, v));
+        int p34v = sl.vertexIndexForOsmNode.get(9604186664L);
+        assertTrue(sl.flagsAroundVertex(p34v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, false));
+        assertEquals(0, connectedVertices(sl, p34v));
 
         // Check that the stairway on the other side of the emergency exit allows pedestrians and is connected to the
-        // rest of the network
-        v = sl.vertexIndexForOsmNode.get(5744239458L);
-        assertTrue(sl.flagsAroundVertex(v, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
-        assertEquals(68, connectedVertices(sl, v));
+        // rest of the network. Actually it contains a barrier=gate node, but it's not tagged as being locked or private
+        // so remains traversible.
+        int stairsv = sl.vertexIndexForOsmNode.get(5744239458L);
+        assertTrue(sl.flagsAroundVertex(stairsv, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, true));
+        assertEquals(68, connectedVertices(sl, stairsv));
     }
     
     private int connectedVertices(StreetLayer sl, int vertexId) {

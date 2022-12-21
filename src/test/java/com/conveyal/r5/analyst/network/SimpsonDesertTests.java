@@ -33,7 +33,6 @@ public class SimpsonDesertTests {
 
     public static final Coordinate SIMPSON_DESERT_CORNER = new CoordinateXY(136.5, -25.5);
 
-    @Test
     public void testGridScheduled () throws Exception {
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
         gridLayout.addHorizontalRoute(20, 20);
@@ -75,7 +74,6 @@ public class SimpsonDesertTests {
     /**
      * Similar to above, but using frequency routes which should increase uncertainty waiting for second ride.
      */
-    @Test
     public void testGridFrequency () throws Exception {
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
         gridLayout.addHorizontalFrequencyRoute(20, 20);
@@ -110,7 +108,6 @@ public class SimpsonDesertTests {
      * Similar to frequency case above, but with two different alternative paths.
      * The availability of multiple alternative paths should also reduce the variance of the distribution.
      */
-    @Test
     public void testGridFrequencyAlternatives () throws Exception {
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
         gridLayout.addHorizontalFrequencyRoute(20, 20);
@@ -169,7 +166,6 @@ public class SimpsonDesertTests {
      * 3. Savvy rider, departing stop 10 between 7:13 and 7:18, who always rides Trip B (avoiding boarding the
      * slower Trip A thanks to the "look-ahead" abilities when ENABLE_OPTIMIZATION_RANGE_RAPTOR is true)
      */
-    @Test
     public void testOvertakingCases () throws  Exception {
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
         gridLayout.addHorizontalRoute(50);
@@ -223,7 +219,6 @@ public class SimpsonDesertTests {
     /**
      * Experiments
      */
-    @Test
     public void testExperiments () throws Exception {
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 100);
         // Common trunk of three routes intersecting another route

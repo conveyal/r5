@@ -282,6 +282,12 @@ public class TravelTimeComputer {
             return travelTimeReducer.finish();
         }
 
+        if (!request.transitModes.isEmpty()) {
+            throw new UnsupportedOperationException("This custom branch for on-street distances does not support routing " +
+                    "with transit enabled");
+
+        }
+
         // II. Transit Routing ========================================================================================
         // Transit stops were reached. Perform transit routing from those stops to all other reachable stops. The result
         // is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.

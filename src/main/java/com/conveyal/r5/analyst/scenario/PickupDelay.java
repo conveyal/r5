@@ -122,12 +122,12 @@ public class PickupDelay extends Modification {
                 final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon = new HashMap<>();
                 final Map<ModificationPolygon, PickupWaitTimes.EgressService> egressServices = new HashMap<>();
                 if (stopsForZone.isEmpty()) {
-                   addError("If stopsForZone is specified, it must be non-empty.");
+                    addError("If stopsForZone is specified, it must be non-empty.");
                 }
                 stopsForZone.forEach((zonePolygonId, stopPolygonIds) -> {
                     ModificationPolygon zonePolygon = polygons.getById(zonePolygonId);
                     if (zonePolygon == null) {
-                       addError("Could not find zone polygon with ID: " + zonePolygonId);
+                        addError("Could not find zone polygon with ID: " + zonePolygonId);
                     }
                     TIntSet stopNumbers = stopNumbersForZonePolygon.get(zonePolygon);
                     if (stopNumbers == null) {
@@ -137,11 +137,11 @@ public class PickupDelay extends Modification {
                     for (String stopPolygonId : stopPolygonIds) {
                         ModificationPolygon stopPolygon = polygons.getById(stopPolygonId);
                         if (stopPolygon == null) {
-                           addError("Could not find stop polygon with ID: " + stopPolygonId);
+                            addError("Could not find stop polygon with ID: " + stopPolygonId);
                         }
                         TIntSet stops = network.transitLayer.findStopsInGeometry(stopPolygon.polygonal);
                         if (stops.isEmpty()) {
-                           addError("Stop polygon did not contain any stops: " + stopPolygonId);
+                            addError("Stop polygon did not contain any stops: " + stopPolygonId);
                         }
                         stopNumbers.addAll(stops);
                         // Derive egress services from this pair of polygons
@@ -171,7 +171,7 @@ public class PickupDelay extends Modification {
             }
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.
-           addError(ExceptionUtils.stackTraceString(e));
+            addError(ExceptionUtils.stackTraceString(e));
         }
         return hasErrors();
     }
@@ -181,7 +181,7 @@ public class PickupDelay extends Modification {
         // network.streetLayer is already a protective copy made by method Scenario.applyToTransportNetwork.
         // The polygons have already been validated in the resolve method, we just need to record them in the network.
         if (network.streetLayer.pickupWaitTimes != null) {
-           addError("Multiple pickup delay modifications cannot be applied to a single network.");
+            addError("Multiple pickup delay modifications cannot be applied to a single network.");
         } else {
             network.streetLayer.pickupWaitTimes = this.pickupWaitTimes;
         }

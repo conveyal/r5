@@ -181,14 +181,14 @@ public abstract class Modification implements Serializable {
         }
         if (nDefined != 1) {
             if (allowTrips) {
-               addError("Exactly one of routes, patterns, or trips must be provided.");
+                addError("Exactly one of routes, patterns, or trips must be provided.");
             } else {
-               addError("Either routes or patterns must be provided, but not both.");
+                addError("Either routes or patterns must be provided, but not both.");
             }
         }
         if (!allowTrips && trips != null) {
             // This cannot happen yet, but it will if (TODO) we pull these fields up to the Modification class.
-           addError("This modification type does not allow specifying individual trips by ID.");
+            addError("This modification type does not allow specifying individual trips by ID.");
         }
 
         // TODO pull the network field up into the Modification class.
@@ -200,7 +200,7 @@ public abstract class Modification implements Serializable {
         }
         if (unmatchedRoutes.size() > 0) {
             if (unmatchedRoutes.size() == routes.size()) {
-               addError("None of the specified route IDs could be found.");
+                addError("None of the specified route IDs could be found.");
             } else {
                 // When a GTFS feed contains routes that have no stoptimes (which is unfortunately common) R5 will not
                 // represent that route. When someone bulk-adds all the routes in that feed to a modification,
@@ -211,7 +211,7 @@ public abstract class Modification implements Serializable {
             }
         }
         if (unmatchedTrips.size() > 0) {
-           addError("These trip IDs could not be found: " + unmatchedTrips.toString());
+            addError("These trip IDs could not be found: " + unmatchedTrips.toString());
         }
 
     }
@@ -231,7 +231,7 @@ public abstract class Modification implements Serializable {
                     coordinate.toString(),
                     envelope.toString()
             );
-           addError(message);
+            addError(message);
         }
     }
     
@@ -248,7 +248,7 @@ public abstract class Modification implements Serializable {
 
     protected void addErrors (Iterable<String> errorIterable) {
         for (String error : errorIterable) {
-            addError(error);
+             addError(error);
         }
     }
 

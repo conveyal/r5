@@ -77,10 +77,10 @@ public class AddTrips extends Modification {
     @Override
     public boolean resolve (TransportNetwork network) {
         if (stops == null || stops.size() < 2) {
-           addError("You must provide at least two stops.");
+            addError("You must provide at least two stops.");
         } else {
             if (frequencies.isEmpty()) {
-               addError("This modification should include at least one timetable/frequency entry.");
+                addError("This modification should include at least one timetable/frequency entry.");
             }
             for (PatternTimetable entry : frequencies) {
                 addErrors(entry.validate(stops.size()));

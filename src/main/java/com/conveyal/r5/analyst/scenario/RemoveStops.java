@@ -69,12 +69,12 @@ public class RemoveStops extends Modification {
         checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
         if (stops == null || stops.isEmpty()) {
-           addError("You must supply some stops to remove.");
+            addError("You must supply some stops to remove.");
         } else {
             for (String stringStopId : stops) {
                 int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
                 if (intStopId == -1) {
-                   addError("Could not find a stop with GTFS ID " + stringStopId);
+                    addError("Could not find a stop with GTFS ID " + stringStopId);
                 } else {
                     intStops.add(intStopId);
                 }
@@ -93,7 +93,7 @@ public class RemoveStops extends Modification {
         if (nPatternsAffected > 0) {
             LOG.info("Stops were removed from {} patterns.", nPatternsAffected);
         } else {
-           addError("No patterns had any stops removed by this modification.");
+            addError("No patterns had any stops removed by this modification.");
         }
         return hasErrors();
     }

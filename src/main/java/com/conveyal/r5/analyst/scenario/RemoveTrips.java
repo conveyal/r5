@@ -62,7 +62,7 @@ public class RemoveTrips extends Modification {
         int nPatternsRemoved = nPatternsBefore - transitLayer.tripPatterns.size();
         LOG.info("Removed {} entire patterns. Removed {} individual trips specified by ID.", nPatternsRemoved, nTripsRemoved);
         if (nTripsRemoved == 0 && nPatternsRemoved == 0) {
-           addError("No trips were removed.");
+            addError("No trips were removed.");
         }
         return false;
     }

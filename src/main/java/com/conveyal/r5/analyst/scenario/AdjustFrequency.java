@@ -74,7 +74,7 @@ public class AdjustFrequency extends Modification {
     @Override
     public boolean resolve (TransportNetwork network) {
         if (entries.isEmpty()) {
-           addError("This modification should include at least one timetable/frequency entry.");
+            addError("This modification should include at least one timetable/frequency entry.");
         }
         for (PatternTimetable entry : entries) {
             addErrors(entry.validate(-1));
@@ -112,7 +112,7 @@ public class AdjustFrequency extends Modification {
         Set<PatternTimetable> unmatchedEntries = new HashSet<>(entries);
         unmatchedEntries.removeAll(entriesMatched);
         for (PatternTimetable entry : unmatchedEntries) {
-           addError("Trip not found for ID " + entry.sourceTrip + ". Ensure a trip pattern has been selected in " +
+            addError("Trip not found for ID " + entry.sourceTrip + ". Ensure a trip pattern has been selected in " +
                     "this modification.");
         }
         LOG.info("Cleared {} patterns, creating {} new trip schedules.", nPatternsCleared, nTripSchedulesCreated);
@@ -268,7 +268,7 @@ public class AdjustFrequency extends Modification {
     private Service blackOutService(final TripSchedule schedule) {
 
         if (schedule.headwaySeconds != null) {
-           addError("We do not currently support retaining existing frequency entries when adjusting timetables.");
+            addError("We do not currently support retaining existing frequency entries when adjusting timetables.");
             return null;
         }
 

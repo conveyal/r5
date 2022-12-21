@@ -104,18 +104,18 @@ public class Reroute extends Modification {
     public boolean resolve (TransportNetwork network) {
         checkIds(routes, patterns, null, false, network);
         if (fromStop == null && toStop == null) {
-           addError("At least one of from and to stop must be supplied.");
+            addError("At least one of from and to stop must be supplied.");
         }
         if (fromStop != null) {
             intFromStop = network.transitLayer.indexForStopId.get(fromStop);
             if (intFromStop == -1) {
-               addError("Could not find fromStop with GTFS ID " + fromStop);
+                addError("Could not find fromStop with GTFS ID " + fromStop);
             }
         }
         if (toStop != null) {
             intToStop = network.transitLayer.indexForStopId.get(toStop);
             if (intToStop == -1) {
-               addError("Could not find toStop with GTFS ID " + toStop);
+                addError("Could not find toStop with GTFS ID " + toStop);
             }
         }
         // It is fine to add no new stops,
@@ -134,12 +134,12 @@ public class Reroute extends Modification {
             dwellTimes = new int[0];
         }
         if (dwellTimes.length != expectedDwells) {
-           addError("You must supply one dwell time per new stop, plus one for fromStop and one for toStop when they are specified.");
+            addError("You must supply one dwell time per new stop, plus one for fromStop and one for toStop when they are specified.");
         }
         if (hopTimes == null) {
-           addError("You must always supply some hop times.");
+            addError("You must always supply some hop times.");
         } else if (hopTimes.length != expectedDwells - 1) {
-           addError("The number of hops must always be one less than the number of dwells.");
+            addError("The number of hops must always be one less than the number of dwells.");
         }
         intNewStops = findOrCreateStops(stops, network);
         return hasErrors();
@@ -154,7 +154,7 @@ public class Reroute extends Modification {
         if (nPatternsAffected > 0) {
             LOG.info("Rerouted {} patterns.", nPatternsAffected);
         } else {
-           addError("No patterns were rerouted.");
+            addError("No patterns were rerouted.");
         }
         return hasErrors();
     }
@@ -207,12 +207,12 @@ public class Reroute extends Modification {
             } else {
                 // This Modification is being applied to specifically chosen patterns.
                 // If one does not contain the from or to stops, it's probably a badly formed modification so fail hard.
-               addError(warning);
+                addError(warning);
             }
             return originalTripPattern;
         }
         if (insertEndIndex < insertBeginIndex) {
-           addError("The end of the insertion region must be at or after its beginning.");
+            addError("The end of the insertion region must be at or after its beginning.");
             return originalTripPattern;
         }
 

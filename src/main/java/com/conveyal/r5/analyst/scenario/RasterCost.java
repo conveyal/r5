@@ -71,7 +71,7 @@ public class RasterCost extends Modification {
             loader = new SunLoader(dataSourceId);
         }
         if (loader == null) {
-           addError("Unrecognized cost function: " + costFunction);
+            addError("Unrecognized cost function: " + costFunction);
         } else {
             loader.setNorthShiftMeters(northShiftMeters);
             loader.setEastShiftMeters(eastShiftMeters);
@@ -85,7 +85,7 @@ public class RasterCost extends Modification {
 
     private void checkScaleRange (double scale) {
         if (scale <= 0 || scale >= 100) {
-           addError("Scale parameters must be positive nonzero real numbers less than 100.");
+            addError("Scale parameters must be positive nonzero real numbers less than 100.");
         }
     }
 

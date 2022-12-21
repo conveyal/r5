@@ -101,18 +101,18 @@ public class ModifyStreets extends Modification {
         final GeometryFactory geometryFactory = Geometries.geometryFactory;
         List<Polygon> jtsPolygons = new ArrayList<>();
         if (polygons == null || polygons.length == 0) {
-           addError("You must specify some polygons to select streets.");
+            addError("You must specify some polygons to select streets.");
             polygons = new double[][][]{};
         }
         for (double[][] polygon : polygons) {
             if (polygon.length < 3) {
-               addError("Polygons must have at least three coordinates to enclose any space.");
+                addError("Polygons must have at least three coordinates to enclose any space.");
                 continue;
             }
             List<Coordinate> jtsCoordinates = new ArrayList<>();
             for (double[] coordinate : polygon) {
                 if (coordinate.length != 2) {
-                   addError("Each coordinate must have two values, a latitude and a longitude.");
+                    addError("Each coordinate must have two values, a latitude and a longitude.");
                     continue;
                 }
                 Coordinate jtsCoordinate = new Coordinate(coordinate[0], coordinate[1]);
@@ -146,35 +146,35 @@ public class ModifyStreets extends Modification {
         // Range check and otherwise validate numeric parameters
 
         if (carSpeedKph != null && carSpeedFactor != null) {
-           addError("You must specify only one of carSpeedKph or carSpeedFactor.");
+            addError("You must specify only one of carSpeedKph or carSpeedFactor.");
         }
         if (carSpeedKph != null) {
             if (carSpeedKph <= 0 || carSpeedKph > 130) {
-               addError("Car speed must be in the range (0...130] kph.");
+                addError("Car speed must be in the range (0...130] kph.");
             }
         }
         if (carSpeedFactor != null) {
             if (carSpeedFactor <= 0 || carSpeedFactor > 10) {
-               addError("Car speed factor must be in the range (0...10].");
+                addError("Car speed factor must be in the range (0...10].");
             }
         }
         if (walkTimeFactor != null) {
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
-               addError("walkGenCostFactor must be in the range (0...10].");
+                addError("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
-               addError("bikeGenCostFactor must be in the range (0...10].");
+                addError("bikeGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeLts != null) {
             if (bikeLts < 0 || bikeLts > 4) {
-               addError("bikeLts must be in the range [0...4].");
+                addError("bikeLts must be in the range [0...4].");
             }
         }
         if (allowedModes == null) {
-           addError("You must specify a list of allowedModes, which may be empty.");
+            addError("You must specify a list of allowedModes, which may be empty.");
         }
         return hasErrors();
     }

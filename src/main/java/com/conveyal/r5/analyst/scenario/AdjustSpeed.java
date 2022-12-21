@@ -89,7 +89,7 @@ public class AdjustSpeed extends Modification {
     @Override
     public boolean resolve(TransportNetwork network) {
         if (scale <= 0) {
-           addError("Scaling factor must be a positive number.");
+            addError("Scaling factor must be a positive number.");
         }
         if (hops != null) {
             // De-duplicate hops. See explanation on the hops and uniqueHops fields.
@@ -97,7 +97,7 @@ public class AdjustSpeed extends Modification {
                 Set<P2<String>> uniqueHopSet = new HashSet<>();
                 for (String[] pair : hops) {
                     if (pair.length != 2) {
-                       addError("Hops must all have exactly two stops.");
+                        addError("Hops must all have exactly two stops.");
                         continue;
                     }
                     // Pair has equals and hashcode implementations which arrays lack
@@ -117,11 +117,11 @@ public class AdjustSpeed extends Modification {
                 int intFromId = network.transitLayer.indexForStopId.get(pair.a);
                 int intToId = network.transitLayer.indexForStopId.get(pair.b);
                 if (intFromId == -1) {
-                   addError("Could not find hop origin stop " + pair.a);
+                    addError("Could not find hop origin stop " + pair.a);
                     continue;
                 }
                 if (intToId == -1) {
-                   addError("Could not find hop destination stop " + pair.b);
+                    addError("Could not find hop destination stop " + pair.b);
                     continue;
                 }
                 hopFromStops.add(intFromId);
@@ -141,12 +141,12 @@ public class AdjustSpeed extends Modification {
         if (nTripsAffected > 0) {
             addInfo(String.format("Changed speed on %d trips.", nTripsAffected));
         } else {
-           addError("This modification did not cause any changes to the transport network.");
+            addError("This modification did not cause any changes to the transport network.");
         }
         if (uniqueHops != null) {
             for (int h = 0; h < uniqueHops.size(); h++) {
                 if (nPatternsAffectedByHop[h] == 0) {
-                   addError("No patterns were affected by hop: " + uniqueHops.get(h));
+                    addError("No patterns were affected by hop: " + uniqueHops.get(h));
                 }
             }
             addInfo("Number of patterns affected by each unique hop: " + Arrays.toString(nPatternsAffectedByHop));

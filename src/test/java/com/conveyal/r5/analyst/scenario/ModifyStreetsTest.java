@@ -152,6 +152,7 @@ public class ModifyStreetsTest {
         return n;
     }
 
+
     //// Static utility functions for constructing test modifications and scenarios
 
     private static TransportNetwork applySingleModification (TransportNetwork baseNetwork, Modification modification) {

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.Geometries;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeTraversalTimes;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import gnu.trove.iterator.TIntIterator;
@@ -20,10 +21,30 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 
 /**
+ * <p>
  * This modification selects all edges inside a given set of polygons and changes their characteristics.
+ * </p><p>
+ * Some of its options, specifically walkTimeFactor and bikeTimeFactor, adjust generalized costs for walking and biking
+ * which are stored in an optional generalized costs data table that is not present on networks by default.
+ * These data tables are currently only created in networks built from very particular OSM data where every way has all
+ * of the special tags contributing to the LADOT generalized costs (com.conveyal.r5.streets.LaDotCostTags).
+ * </p><p>
+ * The apply() method creates this data table in the scenario copy of the network as needed if one does not exist on the
+ * base network (so there is no extend-only wrapper in the scenario network). This means each scenario may have its own
+ * (potentially large) generalized cost data table instead of just extending a shared one in the baseline network.
+ * This less-than-optimal implementation is acceptable at least as a stopgap on this rarely used specialty modification.
+ * The other alternatives would be:
+ * </p><ul>
+ * <li> Add the table to the baseline network whenever it's any scenario needs to extend it.
+ *      This breaks a lot of conventions we have about treating loaded networks as read-only, and incurs a lot of extra
+ *      memory access and pointless multiplication by 1 on every scenario including the baseline.</li>
+ * <li> Require the table to be enabled on the base network when it's first built, using a parameter in
+ *      TransportNetworkConfig. This incurs the same overhead, but respects the immutable character of loaded networks
+ *      and is an intentional choice by the user.</li>
+ * </ul>
  */
 public class ModifyStreets extends Modification {
 
@@ -138,17 +159,11 @@ public class ModifyStreets extends Modification {
             }
         }
         if (walkTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                errors.add("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
                 errors.add("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                errors.add("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
                 errors.add("bikeGenCostFactor must be in the range (0...10].");
             }
@@ -167,6 +182,12 @@ public class ModifyStreets extends Modification {
     @Override
     public boolean apply (TransportNetwork network) {
         EdgeStore edgeStore = network.streetLayer.edgeStore;
+        if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
+            if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
+                info.add("Added table of per-edge factors because base network doesn't have one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.createNeutral(network.streetLayer.edgeStore);
+            }
+        }
         EdgeStore.Edge oldEdge = edgeStore.getCursor();
         // By convention we only index the forward edge in each pair, so we're iterating over forward edges here.
         for (TIntIterator edgeIterator = edgesInPolygon.iterator(); edgeIterator.hasNext(); ) {
@@ -213,8 +234,7 @@ public class ModifyStreets extends Modification {
         newEdge.disallowAllModes();
         newEdge.allowStreetModes(allowedModes);
         if (bikeLts != null) {
-            // Overwrite the LTS copied in the flags
-            newEdge.setFlag(intToLts(bikeLts));
+            newEdge.setLts(bikeLts);
         }
         if (carSpeedKph != null) {
             newEdge.setSpeedKph(carSpeedKph);

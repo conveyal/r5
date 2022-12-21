@@ -55,7 +55,9 @@ public class ShapefileLts extends Modification {
     @Override
     public boolean apply (TransportNetwork network) {
         // Replicate the entire flags array so we can write to it (following copy-on-write policy).
-        // Otherwise the TIntAugmentedList only allows extending the base graph.
+        // Otherwise the TIntAugmentedList only allows extending the base graph. An alternative approach can be seen in
+        // ModifyStreets, where all affected edges are marked deleted and then recreated in the augmented lists.
+        // The appraoch here assumes a high percentage of edges changed, while ModifyStreets assumes a small percentage.
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
         ShapefileMatcher shapefileMatcher = new ShapefileMatcher(network.streetLayer);
         try {

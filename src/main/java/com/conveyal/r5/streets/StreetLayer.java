@@ -1663,14 +1663,12 @@ public class StreetLayer implements Serializable, Cloneable {
         return this.isScenarioCopy() && p >= edgeStore.firstModifiableEdge;
     }
 
-    /**
-     * Whether a given flag is set to a given boolean value for all incoming and outgoing edges at a vertex
-     */
+    /** @return whether a given flag is set to a given boolean value for all incoming and outgoing edges at a vertex. */
     public boolean flagsAroundVertex(int v, EdgeStore.EdgeFlag flag, boolean flagSet) {
         return Arrays.stream(incomingEdges.get(v).toArray())
-                .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet) &&
-                Arrays.stream(outgoingEdges.get(v).toArray())
-                        .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet);
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet) &&
+               Arrays.stream(outgoingEdges.get(v).toArray())
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet);
     }
 
     @Override

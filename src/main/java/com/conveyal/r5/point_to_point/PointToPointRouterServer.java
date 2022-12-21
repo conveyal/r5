@@ -82,20 +82,13 @@ public class PointToPointRouterServer {
         final boolean inMemory = false;
 
         if ("--build".equals(commandArguments[0])) {
-            boolean saveShapes = false;
-            File dir;
-            if ("--save-shapes".equals(commandArguments[1])) {
-                saveShapes = true;
-                dir = new File(commandArguments[2]);
-            } else {
-                dir = new File(commandArguments[1]);
-            }
+            File dir = new File(commandArguments[1]);
 
             if (!dir.isDirectory() && dir.canRead()) {
                 LOG.error("'{}' is not a readable directory.", dir);
             }
 
-            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir, saveShapes);
+            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir);
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {

@@ -71,7 +71,7 @@ public class RasterCost extends Modification {
             loader = new SunLoader(dataSourceId);
         }
         if (loader == null) {
-            errors.add("Unrecognized cost function: " + costFunction);
+           addError("Unrecognized cost function: " + costFunction);
         } else {
             loader.setNorthShiftMeters(northShiftMeters);
             loader.setEastShiftMeters(eastShiftMeters);
@@ -80,12 +80,12 @@ public class RasterCost extends Modification {
             loader.setInputScale(inputScale);
             loader.setOutputScale(outputScale);
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     private void checkScaleRange (double scale) {
         if (scale <= 0 || scale >= 100) {
-            errors.add("Scale parameters must be positive nonzero real numbers less than 100.");
+           addError("Scale parameters must be positive nonzero real numbers less than 100.");
         }
     }
 
@@ -98,7 +98,7 @@ public class RasterCost extends Modification {
             edgeStore.costFields = new ArrayList<>();
         }
         edgeStore.costFields.add(costField);
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

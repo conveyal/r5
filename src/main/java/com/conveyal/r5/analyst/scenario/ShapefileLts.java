@@ -44,12 +44,12 @@ public class ShapefileLts extends Modification {
         try {
             TransportNetworkCache.prefetchShapefile(WorkerComponents.fileStorage, dataSourceId);
         } catch (DataSourceException dx) {
-            errors.add(ExceptionUtils.shortAndLongString(dx));
+           addError(ExceptionUtils.shortAndLongString(dx));
             return true;
         }
         fileStorageKey = new FileStorageKey(DATASOURCES, dataSourceId, FileStorageFormat.SHP.extension);
         localFile = WorkerComponents.fileStorage.getFile(fileStorageKey);
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
@@ -63,9 +63,9 @@ public class ShapefileLts extends Modification {
         try {
             shapefileMatcher.match(localFile.getAbsolutePath(), ltsAttribute);
         } catch (Exception e) {
-            errors.add(ExceptionUtils.shortAndLongString(e));
+           addError(ExceptionUtils.shortAndLongString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

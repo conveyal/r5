@@ -69,19 +69,19 @@ public class RemoveStops extends Modification {
         checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
         if (stops == null || stops.isEmpty()) {
-            errors.add("You must supply some stops to remove.");
+           addError("You must supply some stops to remove.");
         } else {
             for (String stringStopId : stops) {
                 int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
                 if (intStopId == -1) {
-                    errors.add("Could not find a stop with GTFS ID " + stringStopId);
+                   addError("Could not find a stop with GTFS ID " + stringStopId);
                 } else {
                     intStops.add(intStopId);
                 }
             }
             LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stops, intStops);
         }
-        return errors.size() > 0; // TODO make a function for this on the superclass
+        return hasErrors();
     }
 
     @Override
@@ -93,9 +93,9 @@ public class RemoveStops extends Modification {
         if (nPatternsAffected > 0) {
             LOG.info("Stops were removed from {} patterns.", nPatternsAffected);
         } else {
-            errors.add("No patterns had any stops removed by this modification.");
+           addError("No patterns had any stops removed by this modification.");
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     public TripPattern processTripPattern (TripPattern originalTripPattern, TransportNetwork network) {
@@ -221,7 +221,7 @@ public class RemoveStops extends Modification {
                 secondsWeWillActuallyRemovePerStop
         );
 
-        warnings.add(warning);
+        addWarning(warning);
         LOG.info(warning);
 
     }

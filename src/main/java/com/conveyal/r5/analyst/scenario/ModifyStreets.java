@@ -101,18 +101,18 @@ public class ModifyStreets extends Modification {
         final GeometryFactory geometryFactory = Geometries.geometryFactory;
         List<Polygon> jtsPolygons = new ArrayList<>();
         if (polygons == null || polygons.length == 0) {
-            errors.add("You must specify some polygons to select streets.");
+           addError("You must specify some polygons to select streets.");
             polygons = new double[][][]{};
         }
         for (double[][] polygon : polygons) {
             if (polygon.length < 3) {
-                errors.add("Polygons must have at least three coordinates to enclose any space.");
+               addError("Polygons must have at least three coordinates to enclose any space.");
                 continue;
             }
             List<Coordinate> jtsCoordinates = new ArrayList<>();
             for (double[] coordinate : polygon) {
                 if (coordinate.length != 2) {
-                    errors.add("Each coordinate must have two values, a latitude and a longitude.");
+                   addError("Each coordinate must have two values, a latitude and a longitude.");
                     continue;
                 }
                 Coordinate jtsCoordinate = new Coordinate(coordinate[0], coordinate[1]);
@@ -140,43 +140,43 @@ public class ModifyStreets extends Modification {
             }
             return true;
         });
-        info.add(String.format("Will affect %d edges out of %d candidates.", edgesInPolygon.size(),
+        addInfo(String.format("Will affect %d edges out of %d candidates.", edgesInPolygon.size(),
                 candidateEdges.size()));
 
         // Range check and otherwise validate numeric parameters
 
         if (carSpeedKph != null && carSpeedFactor != null) {
-            errors.add("You must specify only one of carSpeedKph or carSpeedFactor.");
+           addError("You must specify only one of carSpeedKph or carSpeedFactor.");
         }
         if (carSpeedKph != null) {
             if (carSpeedKph <= 0 || carSpeedKph > 130) {
-                errors.add("Car speed must be in the range (0...130] kph.");
+               addError("Car speed must be in the range (0...130] kph.");
             }
         }
         if (carSpeedFactor != null) {
             if (carSpeedFactor <= 0 || carSpeedFactor > 10) {
-                errors.add("Car speed factor must be in the range (0...10].");
+               addError("Car speed factor must be in the range (0...10].");
             }
         }
         if (walkTimeFactor != null) {
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
-                errors.add("walkGenCostFactor must be in the range (0...10].");
+               addError("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
-                errors.add("bikeGenCostFactor must be in the range (0...10].");
+               addError("bikeGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeLts != null) {
             if (bikeLts < 0 || bikeLts > 4) {
-                errors.add("bikeLts must be in the range [0...4].");
+               addError("bikeLts must be in the range [0...4].");
             }
         }
         if (allowedModes == null) {
-            errors.add("You must specify a list of allowedModes, which may be empty.");
+           addError("You must specify a list of allowedModes, which may be empty.");
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
@@ -184,7 +184,7 @@ public class ModifyStreets extends Modification {
         EdgeStore edgeStore = network.streetLayer.edgeStore;
         if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
             if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
-                info.add("Added table of per-edge factors because base network doesn't have one.");
+                addInfo("Added table of per-edge factors because base network doesn't have one.");
                 network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.createNeutral(network.streetLayer.edgeStore);
             }
         }
@@ -221,7 +221,7 @@ public class ModifyStreets extends Modification {
         }
         // Instead of repeating this error logic in every resolve and apply method,
         // we should really be doing this using a modification.hasErrors() method from one frame up.
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     /**

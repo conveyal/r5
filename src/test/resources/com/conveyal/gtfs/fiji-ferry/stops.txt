@@ -1,0 +1,3 @@
+﻿stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,location_type
+0,SUVA,Suva,Suva Ferry Terminal,-18.135791,178.4234745,
+1,MATEI,Matei,Naselesele Point,-16.6862018,-179.8820305,

@@ -80,10 +80,10 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
         bikeTraversalTimes.copyTimes(oldEdge, newEdge, bikeFactor);
     }
 
-    // Stopgap to pad out the traversal times when adding new edges
-    public void addOneEdge () {
-        walkTraversalTimes.setOneEdge();
-        bikeTraversalTimes.setOneEdge();
+    /** Pad out the traversal multipliers/costs with neutral values. */
+    public void addOneNeutralEdge () {
+        walkTraversalTimes.addOneNeutralEdge();
+        bikeTraversalTimes.addOneNeutralEdge();
     }
 
     public void setWalkTimeFactor (int edgeIndex, double walkTimeFactor) {
@@ -93,4 +93,31 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
     public void setBikeTimeFactor (int edgeIndex, double bikeTimeFactor) {
         bikeTraversalTimes.perceivedLengthMultipliers.set(edgeIndex, bikeTimeFactor);
     }
+
+    /**
+     * This breaks encapsulation a bit and reveals private fields, so it should only be used for display purposes,
+     * such as map displays for checking input data and settings.
+     */
+    public double getWalkTimeFactor (int edgeIndex) {
+        return walkTraversalTimes.perceivedLengthMultipliers.get(edgeIndex);
+    }
+
+    /** see getWalkTimeFactor() */
+    public double getBikeTimeFactor (int edgeIndex) {
+        return bikeTraversalTimes.perceivedLengthMultipliers.get(edgeIndex);
+    }
+
+    /**
+     * Factory method returning a newly constructed EdgeTraversalTimes where all scaling factors are 1 and constant
+     * costs are 0. This serves as a neutral starting point for building up generalized costs in modifications,
+     * as opposed to starting from pre-existing generalized costs derived from special purpose OSM tags.
+     */
+    public static EdgeTraversalTimes createNeutral (EdgeStore edgeStore) {
+        var times = new EdgeTraversalTimes(edgeStore);
+        for (int i = 0; i < edgeStore.nEdges(); i++) {
+            times.addOneNeutralEdge();
+        }
+        return times;
+    }
+
 }

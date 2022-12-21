@@ -128,7 +128,7 @@ public class ShapeDataStore {
 
     /** Write GeoBuf tiles to S3 */
     public void writeTilesToS3 (String bucketName) throws IOException {
-        // set up an upload thread
+        // For the duration of this multiple-tile upload operation, manage a single upload thread for the S3 uploads.
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // initialize an S3 client

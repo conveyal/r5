@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
@@ -12,7 +11,6 @@ import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
-import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.slf4j.Logger;
@@ -26,22 +24,24 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * This writes travel times from one origin to NxM gridded destinations out to a binary grid file.
- * For each destination, it saves one or more percentiles of the travel time distribution.
- *
- * This format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel values,
- * and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
+ * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations, this class will write
+ * them out to various file formats. Output is multi-channel: for each destination, it saves one or more percentiles of
+ * the travel time distribution. Supported formats are the Conveyal internal binary format and GeoTIFF for
+ * interoperability with desktop GIS.
+ * <p>
+ * The Conveyal binary format is similar to the Grid format used for opportunity grids, but it uses ints for the pixel
+ * values, and allows multiple values per pixel. It is now identical to the AccessGrid format, which is why its header
  * now says ACCESSGR instead of TIMEGRID.
- *
+ * <p>
  * TODO Unify this class with GridResultWriter in the backend, as they both write the same format now.
  *      We should be able to remove GridResultWriter from the backend and use this class imported from R5.
  *      We may eventually also be able to store opportunities in the same format.
  *      Prefiltering could aid compression (delta coding, skipping over or not delta coding UNREACHED values).
- *
- * Time grids look like this:
+ * <p>
+ * Time grids are composed of little-endian signed 4-byte ints, so the full grid can be mapped into a Javascript typed
+ * array of 4-byte integers if desired. They are laid out as follows:
  * <ol>
- * <li>Header (ASCII text "ACCESSGR", note that this header is eight bytes, so the full grid can be
-       mapped into a Javascript typed array of 4-byte integers if desired)</li>
+ * <li>(8 bytes) Magic numbers: ASCII text "ACCESSGR". This is a multiple of four bytes to maintain alignment.</li>
  * <li>(4 byte int) File format version</li>
  * <li>(4 byte int) Web mercator zoom level</li>
  * <li>(4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world</li>
@@ -52,7 +52,6 @@ import java.io.OutputStream;
  * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).
  *     Values are not delta-coded.</li>
  * </ol>
- * NOTE: All integers are little-endian and the same width, to facilitate reading grids as Javascript typed arrays.
  */
 public class TimeGridWriter {
 
@@ -74,7 +73,7 @@ public class TimeGridWriter {
 
     private final long nIntegersInOuput;
 
-    private final long nBytesInOutput;
+    private final long nBytesInOutput; // specifically for Conveyal internal format
 
     /**
      * Create a new in-memory time grid writer for the supplied TravelTimeResult, which is interpreted as a
@@ -167,11 +166,8 @@ public class TimeGridWriter {
                 }
             }
 
-            Grid grid = new Grid(extents);
-            ReferencedEnvelope env = grid.getMercatorEnvelopeMeters();
-
             GridCoverageFactory gcf = new GridCoverageFactory();
-            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, env);
+            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, extents.getMercatorEnvelopeMeters());
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
@@ -195,13 +191,12 @@ public class TimeGridWriter {
                         .writeValueAsString(clonedRequest));
                 writer.setMetadataValue("305", "Conveyal R5");
             }
-
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to write GeoTIFF file.", e);
         }
-    }
 
+    }
 
 }

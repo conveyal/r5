@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.BackendVersion;
+import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
@@ -57,7 +57,7 @@ public class WorkerStatus {
     public WorkerStatus (AnalysisWorker worker) {
 
         workerName = "R5";
-        workerVersion = BackendVersion.instance.version;
+        workerVersion = SoftwareVersion.instance.version;
         workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
 
         // Eventually we'll want to report all networks the worker has loaded, to give the backend hints about what kind
@@ -92,8 +92,8 @@ public class WorkerStatus {
         memoryTotal = runtime.totalMemory();
         memoryFree = runtime.freeMemory();
 
-        if (ec2.privateIp != null) {
-            // Give priority to the private IP address if running on EC2
+        if (ec2 != null && ec2.privateIp != null) {
+            // Give priority to the private IP address if running in cloud compute environment.
             ipAddress = ec2.privateIp;
         } else {
             // Get whatever is the default IP address

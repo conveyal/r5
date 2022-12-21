@@ -39,7 +39,6 @@ public class AddStreets extends Modification {
      * An increase in traversal time can be seen as more clock time or perceived time (generalized cost).
      * Values less than one imply it's faster (or more pleasant) to traverse, e.g. a slight downhill slope
      * with trees.
-     * TODO in implementation REPLACE existing factors instead of scaling the existing factor.
      */
     public Double walkTimeFactor;
 
@@ -71,24 +70,24 @@ public class AddStreets extends Modification {
     @Override
     public boolean resolve (TransportNetwork network) {
         if (allowedModes == null || allowedModes.isEmpty()) {
-            errors.add("You must supply at least one StreetMode.");
+            addError("You must supply at least one StreetMode.");
         }
         if (allowedModes != null && allowedModes.contains(StreetMode.CAR)) {
             if (carSpeedKph == null) {
-                errors.add("You must supply a car speed when specifying the CAR mode.");
+                addError("You must supply a car speed when specifying the CAR mode.");
             }
         }
         if (carSpeedKph != null) {
             // TODO factor out repetitive range checking code into a utility function
             if (carSpeedKph < 1 || carSpeedKph > 150) {
-                errors.add("Car speed should be in the range [1...150] kph. Specified speed is: " + carSpeedKph);
+                addError("Car speed should be in the range [1...150] kph. Specified speed is: " + carSpeedKph);
             }
         }
         if (lineStrings == null || lineStrings.length < 1) {
-            errors.add("Modification contained no LineStrings.");
+            addError("Modification contained no LineStrings.");
         } else for (double[][] lineString : lineStrings) {
             if (lineString.length < 2) {
-                errors.add("LineString had less than two coordinates.");
+                addError("LineString had less than two coordinates.");
             }
             for (double[] coord : lineString) {
                 // Incoming coordinates use the same (x, y) axis order as JTS.
@@ -98,21 +97,21 @@ public class AddStreets extends Modification {
         }
         if (walkTimeFactor != null) {
             if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                errors.add("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
+                addError("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
             }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
-                errors.add("walkGenCostFactor must be in the range (0...10].");
+                addError("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
             if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                errors.add("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
+                addError("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
             }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
-                errors.add("bikeGenCostFactor must be in the range (0...10].");
+                addError("bikeGenCostFactor must be in the range (0...10].");
             }
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
@@ -129,7 +128,7 @@ public class AddStreets extends Modification {
                     // Only first and last coordinates should be linked to the network.
                     int startLinkVertex = network.streetLayer.getOrCreateVertexNear(lat, lon, linkMode);
                     if (startLinkVertex < 0) {
-                        errors.add(String.format("Failed to connect first vertex to streets at (%f, %f)", lat, lon));
+                        addError(String.format("Failed to connect first vertex to streets at (%f, %f)", lat, lon));
                     }
                     prevVertex.seek(startLinkVertex);
                 }
@@ -143,7 +142,7 @@ public class AddStreets extends Modification {
                     // Only first and last coordinates should be linked to the network.
                     int endLinkVertex = network.streetLayer.getOrCreateVertexNear(lat, lon, linkMode);
                     if (endLinkVertex < 0) {
-                        errors.add(String.format("Failed to connect last vertex to streets at (%f, %f)", lat, lon));
+                        addError(String.format("Failed to connect last vertex to streets at (%f, %f)", lat, lon));
                     }
                     currVertex.seek(endLinkVertex);
                     createEdgePair(prevVertex, currVertex, network.streetLayer.edgeStore);
@@ -157,7 +156,7 @@ public class AddStreets extends Modification {
             forwardEdge.seek(forwardEdgeNumber);
             network.streetLayer.indexTemporaryEdgePair(forwardEdge);
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     private void createEdgePair (VertexStore.Vertex previousVertex, VertexStore.Vertex currentVertex, EdgeStore edgeStore) {
@@ -170,7 +169,7 @@ public class AddStreets extends Modification {
                 currentVertex.getLon()
         );
         if (edgeLengthMm > Integer.MAX_VALUE) {
-            errors.add("Edge length in millimeters would overflow an int (was longer than 2147km).");
+            addError("Edge length in millimeters would overflow an int (was longer than 2147km).");
             edgeLengthMm = Integer.MAX_VALUE;
         }
         // TODO mono- or bidirectional

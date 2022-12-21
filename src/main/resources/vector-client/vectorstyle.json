@@ -1,0 +1,65 @@
+{
+  "version": 8,
+  "name": "Local R5",
+  "sources": {
+    "r5": {
+      "type": "vector",
+      "tiles": [
+        "http://localhost:7070/networkVectorTiles/5f4ee64db8b6303fdd2fdec2/{z}/{x}/{y}"
+      ],
+      "maxzoom": 14
+    },
+    "dem-terrain": {
+      "type": "raster-dem",
+      "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+      "tileSize": 512,
+      "maxzoom": 14
+    },
+    "dem-hillshade": {
+      "type": "raster-dem",
+      "url": "mapbox://mapbox.mapbox-terrain-dem-v1",
+      "tileSize": 512,
+      "maxzoom": 14
+    },
+    "mapbox-streets": {
+      "type": "vector",
+      "url": "mapbox://mapbox.mapbox-streets-v8",
+      "tileSize": 512
+    }
+  },
+  "terrain": { "source": "dem-terrain", "exaggeration": 1.4 },
+  "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
+  "layers": [
+    {"id": "hillshading", "source": "dem-hillshade", "type": "hillshade"},
+    {
+      "id": "water",
+      "source": "mapbox-streets",
+      "source-layer": "water",
+      "type": "fill",
+      "paint": {
+        "fill-color": "#606090"
+      }
+    },
+    {
+      "id": "patterns",
+      "source": "r5",
+      "source-layer": "edges",
+      "type": "line",
+      "filter": ["get", "car"],
+      "paint": {
+        "line-color": [
+          "interpolate",
+          ["linear"],
+          ["get", "lts"],
+          1,
+          ["to-color","#0f0"],
+          2,
+          ["to-color","#099"],
+          4,
+          ["to-color","#f00"]
+        ]
+      }
+    }
+  ]
+}
+

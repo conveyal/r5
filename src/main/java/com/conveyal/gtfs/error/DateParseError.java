@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Represents a problem parsing a date field from a GTFS feed. */
@@ -14,4 +16,7 @@ public class DateParseError extends GTFSError implements Serializable {
         return "Could not parse date (format should be YYYYMMDD).";
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

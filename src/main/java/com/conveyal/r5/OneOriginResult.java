@@ -1,6 +1,7 @@
 package com.conveyal.r5;
 
 import com.conveyal.r5.analyst.AccessibilityResult;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**
@@ -9,7 +10,7 @@ import com.conveyal.r5.analyst.cluster.TravelTimeResult;
  * destination pointset, and accessibility indicator values for various travel time cutoffs and percentiles of travel
  * time.
  *
- * TODO add fields to record travel time breakdowns into wait and ride and walk time, and paths to destinations.
+ * TODO add fields to record travel time breakdowns into wait and ride and walk time.
  */
 public class OneOriginResult {
 
@@ -17,9 +18,12 @@ public class OneOriginResult {
 
     public final AccessibilityResult accessibility;
 
-    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility) {
+    public final PathResult paths;
+
+    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility, PathResult paths) {
         this.travelTimes = travelTimes;
         this.accessibility = accessibility;
+        this.paths = paths;
     }
 
 }

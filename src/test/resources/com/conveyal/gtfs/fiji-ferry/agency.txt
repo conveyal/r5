@@ -1,0 +1,2 @@
+﻿agency_id,agency_name,agency_url,agency_timezone,agency_lang
+FijiFerry,Fiji Antimeridian Ferry Authority,"https://tidesandcurrents.noaa.gov/stationhome.html?id=1910000",Pacific/Fiji,en

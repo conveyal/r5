@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.validator.model.DuplicateStops;
+import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
 
@@ -21,4 +22,7 @@ public class DuplicateStopError extends GTFSError implements Serializable {
         return message;
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

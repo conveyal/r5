@@ -1,7 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.analysis.components.Components;
-import com.conveyal.analysis.components.LocalComponents;
+import com.conveyal.analysis.components.BackendComponents;
+import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.slf4j.Logger;
@@ -30,7 +30,7 @@ public class RedeliveryTest {
     public static void main(String[] params) {
 
         // Start an analysis server with the default (offline) properties.
-        Components components = new LocalComponents();
+        BackendComponents components = new LocalBackendComponents();
         // FIXME this is a hackish way to test - the called method shouldn't be public.
         // BackendMain.startServer(components);
         // components.config.testTaskRedelivery = true;

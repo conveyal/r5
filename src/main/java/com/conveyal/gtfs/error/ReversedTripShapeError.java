@@ -11,7 +11,6 @@ import java.io.Serializable;
 public class ReversedTripShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final Priority priority = Priority.HIGH;
     public final String shapeId;
 
     public ReversedTripShapeError(Trip trip) {
@@ -21,5 +20,9 @@ public class ReversedTripShapeError extends GTFSError implements Serializable {
 
     @Override public String getMessage() {
         return "Trip " + affectedEntityId + " references reversed shape " + shapeId;
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.HIGH;
     }
 }

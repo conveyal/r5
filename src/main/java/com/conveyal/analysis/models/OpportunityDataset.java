@@ -5,6 +5,8 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import static com.conveyal.file.FileCategory.GRIDS;
+
 /**
  * A model object for storing metadata about opportunity datasets in Mongo, for sharing it with the frontend.
  * The actual contents of the opportunity datasets are persisted to files on S3 and/or in a directory of the local
@@ -13,27 +15,34 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  */
 public class OpportunityDataset extends Model {
 
-    /** For now all web Mercator grids are zoom level 9. Level 10 is probably ideal but will quadruple calculation.
-     * TODO make adjustable
-     * */
-    public static final int ZOOM = 9;
-
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
 
     /** The unique id for the data source (CSV file, Shapefile etc.) from which this dataset was derived. */
     public String sourceId;
 
-    /** Bucket name on S3 where the opportunity data itself is persisted. */
+    /** The ID of the DataGroup that this OpportunityDataset belongs to (all created at once from a single source). */
+    public String dataGroupId;
+
+    /**
+     * Bucket name on S3 where the opportunity data itself is persisted. Deprecated: as of April 2021, the FileStorage
+     * system encapsulates how local or remote storage coordinates are derived from the FileCategory.
+     */
+    @Deprecated
     public String bucketName;
 
     /**
-     * Bounds in web Mercator pixels.  Note that no zoom level is specified here, it's fixed to a constant 9.
+     * Bounds in web Mercator pixels.
      */
     public int north;
     public int west;
     public int width;
     public int height;
+
+    /**
+     * The zoom level this opportunity dataset was rasterized at.
+     */
+    public int zoom;
 
     /**
      * Total number of opportunities in the dataset, i.e. the sum of all opportunity counts at all points / grid cells.
@@ -88,17 +97,25 @@ public class OpportunityDataset extends Model {
     @JsonIgnore
     public FileStorageKey getStorageKey () {
         String path = storageLocation(this.format.extension);
-        return new FileStorageKey(this.bucketName, path);
+        return new FileStorageKey(GRIDS, path);
     }
 
     @JsonIgnore
     public FileStorageKey getStorageKey (FileStorageFormat fileFormat) {
-        return new FileStorageKey(this.bucketName, storageLocation(fileFormat.extension));
+        return new FileStorageKey(GRIDS, storageLocation(fileFormat.extension));
     }
 
     @JsonIgnore
-    public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(west, north, width, height, ZOOM);
+    public void setWebMercatorExtents (WebMercatorExtents extents) {
+        // These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
+        // for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets if
+        // the zoom level is fixed in OpportunityDataset.
+        // Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
+        this.west = extents.west;
+        this.north = extents.north;
+        this.width = extents.width;
+        this.height = extents.height;
+        this.zoom = extents.zoom;
     }
 
     /** Analysis region this dataset was uploaded in. */

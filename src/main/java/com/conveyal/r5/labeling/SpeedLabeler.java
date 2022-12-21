@@ -13,8 +13,9 @@ import java.util.regex.Pattern;
 
 import static systems.uom.common.USCustomary.KNOT;
 import static systems.uom.common.USCustomary.MILE_PER_HOUR;
-import static tec.uom.se.unit.Units.KILOMETRE_PER_HOUR;
-import static tec.uom.se.unit.Units.METRE_PER_SECOND;
+import static tech.units.indriya.unit.Units.KILOMETRE_PER_HOUR;
+import static tech.units.indriya.unit.Units.METRE_PER_SECOND;
+import static tech.units.indriya.unit.Units.KILOMETRE_PER_HOUR;
 
 /**
  * Gets information about max speeds based on highway tags from build-config

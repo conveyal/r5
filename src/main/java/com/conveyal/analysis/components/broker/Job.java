@@ -1,8 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.slf4j.Logger;
@@ -10,7 +8,12 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A Job is a collection of tasks that represent all the origins in a regional analysis. All the
@@ -70,15 +73,6 @@ public class Job {
     public final RegionalTask templateTask;
 
     /**
-     * If non-null, this specifies the non-gridded (freeform) origin points of this regional
-     * analysis. If null, the origin points are specified implicitly by web mercator dimensions of
-     * the template task. Ideally we'd always have a PointSet here and use polymorphism to get the
-     * lat and lon coordinates of each point, whether it's a grid or freeform.
-     * FIXME really we should not have the destinationPointSet in the RegionalTask, but originPointSet here.
-     */
-    public final FreeFormPointSet originPointSet;
-
-    /**
      * The only thing that changes from one task to the next is the origin coordinates. If this job
      * does not include an originPointSet, derive these coordinates from the web mercator grid
      * specified by the template task. If this job does include an originPointSet, look up the
@@ -92,7 +86,7 @@ public class Job {
     private RegionalTask makeOneTask (int taskNumber) {
         RegionalTask task = templateTask.clone();
         task.taskId = taskNumber;
-        if (originPointSet == null) {
+        if (task.originPointSet == null) {
             // Origins specified implicitly by web mercator dimensions of task
             int x = taskNumber % templateTask.width;
             int y = taskNumber / templateTask.width;
@@ -100,9 +94,10 @@ public class Job {
             task.fromLon = Grid.pixelToCenterLon(task.west + x, task.zoom);
         } else {
             // Look up coordinates and originId from job's originPointSet
-            task.originId = originPointSet.getId(taskNumber);
-            task.fromLat = originPointSet.getLat(taskNumber);
-            task.fromLon = originPointSet.getLon(taskNumber);
+            // saving them in non-transient fields for transmission to the worker.
+            task.originId = task.originPointSet.getId(taskNumber);
+            task.fromLat = task.originPointSet.getLat(taskNumber);
+            task.fromLon = task.originPointSet.getLon(taskNumber);
         }
         return task;
     }
@@ -127,6 +122,12 @@ public class Job {
      */
     public int deliveryPass = 0;
 
+    /**
+     * If any error compromises the usabilty or quality of results from any origin, it is recorded here.
+     * This is a Set because identical errors are likely to be reported from many workers or individual tasks.
+     */
+    public final Set<String> errors = new HashSet();
+
     public Job (RegionalTask templateTask, WorkerTags workerTags) {
         this.jobId = templateTask.jobId;
         this.templateTask = templateTask;
@@ -135,13 +136,9 @@ public class Job {
         this.nextTaskToDeliver = 0;
 
         if (templateTask.originPointSetKey != null) {
-            // If an originPointSetKey is specified, get it from S3 and set the number of origins
-            // FIXME we really shouldn't call network services in a constructor, especially when used in a synchronized
-            //       method on the Broker. However this is only triggered by experimental FreeFormPointSet code.
-            originPointSet = PointSetCache.readFreeFormFromFileStore(templateTask.originPointSetKey);
-            this.nTasksTotal = originPointSet.featureCount();
+            checkNotNull(templateTask.originPointSet);
+            this.nTasksTotal = templateTask.originPointSet.featureCount();
         } else {
-            originPointSet = null;
             this.nTasksTotal = templateTask.width * templateTask.height;
         }
 
@@ -165,8 +162,16 @@ public class Job {
         }
     }
 
+    public boolean isActive() {
+        return !(isComplete() || isErrored());
+    }
+
     public boolean isComplete() {
         return nTasksCompleted == nTasksTotal;
+    }
+
+    public boolean isErrored () {
+        return notNullOrEmpty(this.errors);
     }
 
     /**
@@ -191,7 +196,7 @@ public class Job {
     }
 
     public boolean hasTasksToDeliver() {
-        if (this.isComplete()) {
+        if (!(this.isActive())) {
             return false;
         }
         if (nextTaskToDeliver < nTasksTotal) {

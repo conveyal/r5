@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Indicates that a column marked as required is entirely missing from a GTFS feed. */
@@ -14,4 +16,7 @@ public class MissingColumnError extends GTFSError implements Serializable {
         return String.format("Missing required column.");
     }
 
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
+    }
 }

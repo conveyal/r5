@@ -7,6 +7,8 @@ public class RaptorTimer {
 
     public final ExecutionTimer fullSearch = new ExecutionTimer("Full range-Raptor search");
 
+    public final ExecutionTimer patternFiltering = new ExecutionTimer(fullSearch, "Pattern filtering");
+
     public final ExecutionTimer scheduledSearch = new ExecutionTimer(fullSearch, "Scheduled/bounds search");
 
     public final ExecutionTimer scheduledSearchTransit = new ExecutionTimer(scheduledSearch, "Scheduled search");

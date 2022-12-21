@@ -3,14 +3,18 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.rastercost.CostField;
 import com.conveyal.r5.trove.AugmentedList;
+import com.conveyal.r5.trove.TByteAugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.P2;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
+import com.google.common.base.Preconditions;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
@@ -33,10 +37,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
+
+import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.*;
 
 /**
  * This stores all the characteristics of the edges in the street graph layer of the transport network.
@@ -101,12 +109,19 @@ public class EdgeStore implements Serializable {
     /** Length of the edge along its geometry (millimeters). One entry for each edge pair. */
     public TIntList lengths_mm;
 
-    /** OSM ids of edges. One entry for each edge pair */
+    /** OSM ids of edges. One entry for each edge pair. Should we really be serializing this much data on every edge? */
     public TLongList osmids;
 
     /**
+     * For each edge _pair_, the OSM highway class it was derived from. Integer codes are defined in the StreetClass
+     * enum. Like OSM IDs and street names, these could be factored out into a table of OSM way data.
+     */
+    public TByteList streetClasses;
+
+    /**
      * Geometries. One entry for each edge pair. These are packed lists of lat, lon, lat, lon... as fixed-point
-     * integers, and don't include the endpoints (i.e. don't include the intersection vertices, only intermediate points).
+     * integers, and don't include the endpoints (i.e. don't include the intersection vertices, only intermediate
+     * points). The entry for edges with no intermediate points will be a canonical zero-length array, not null.
      */
     public List<int[]> geometries;
 
@@ -152,7 +167,7 @@ public class EdgeStore implements Serializable {
      * baseline graph shared between all threads.
      */
     public boolean isExtendOnlyCopy() {
-        // FIXME this definition will fail if we ever allow scenrios on top of completely empty street networks.
+        // FIXME this definition will fail if we ever allow scenarios on top of completely empty street networks.
         return firstModifiableEdge > 0;
     }
 
@@ -167,6 +182,13 @@ public class EdgeStore implements Serializable {
      * For now this may be null, indicating that no per-edge times are available and default values should be used.
      */
     public EdgeTraversalTimes edgeTraversalTimes;
+
+    /**
+     * Holds zero or more sets of data, typically derived from rasters, which represent scalar or boolean fields through
+     * which the streets pass. Traversal costs are evaluated over these fields, in the manner of a path integral.
+     * If this is null or empty no such costs will be applied.
+     */
+    public List<CostField> costFields;
 
     /** The street layer of a transport network that the edges in this edgestore make up. */
     public StreetLayer layer;
@@ -196,11 +218,13 @@ public class EdgeStore implements Serializable {
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
         osmids = new TLongArrayList(initialEdgePairs);
+        streetClasses = new TByteArrayList(initialEdgePairs);
         inAngles = new TByteArrayList(initialEdgePairs);
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
         turnRestrictionsReverse = new TIntIntHashMultimap();
         edgeTraversalTimes = null;
+        costFields = null;
     }
 
     /**
@@ -335,8 +359,9 @@ public class EdgeStore implements Serializable {
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
         osmids.add(osmID);
+        streetClasses.add(StreetClass.OTHER.code);
         inAngles.add((byte) 0);
-        outAngles.add((byte)0);
+        outAngles.add((byte) 0);
 
         // Speed and flags are stored separately for each edge in a pair (unlike length, geom, etc.)
 
@@ -351,8 +376,8 @@ public class EdgeStore implements Serializable {
         flags.add(0);
 
         if (edgeTraversalTimes != null) {
-            edgeTraversalTimes.addOneEdge();
-            edgeTraversalTimes.addOneEdge();
+            edgeTraversalTimes.addOneNeutralEdge();
+            edgeTraversalTimes.addOneNeutralEdge();
         }
 
         Edge edge = getCursor(forwardEdgeIndex);
@@ -533,14 +558,16 @@ public class EdgeStore implements Serializable {
          * This is a hack and should be done some other way.
          */
         public void copyPairFlagsAndSpeeds(Edge other) {
-            int foreEdge = pairIndex * 2;
-            int backEdge = foreEdge + 1;
-            int otherForeEdge = other.pairIndex * 2;
-            int otherBackEdge = otherForeEdge + 1;
-            flags.set(foreEdge, other.getEdgeStore().flags.get(otherForeEdge));
-            flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
-            speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
-            speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+            final int foreEdge = pairIndex * 2;
+            final int backEdge = foreEdge + 1;
+            final int otherForeEdge = other.pairIndex * 2;
+            final int otherBackEdge = otherForeEdge + 1;
+            final EdgeStore otherStore = other.getEdgeStore();
+            flags.set(foreEdge, otherStore.flags.get(otherForeEdge));
+            flags.set(backEdge, otherStore.flags.get(otherBackEdge));
+            speeds.set(foreEdge, otherStore.speeds.get(otherForeEdge));
+            speeds.set(backEdge, otherStore.speeds.get(otherBackEdge));
+            streetClasses.set(pairIndex, otherStore.streetClasses.get(other.pairIndex));
         }
 
         public void copyPairGeometry(Edge other) {
@@ -823,6 +850,14 @@ public class EdgeStore implements Serializable {
 
         }
 
+        public void setStreetClass (StreetClass streetClass) {
+            streetClasses.set(pairIndex, streetClass.code);
+        }
+
+        public byte getStreetClassCode () {
+            return streetClasses.get(pairIndex);
+        }
+
         /**
          * Reads edge geometry and calculates in and out angle
          *
@@ -873,7 +908,7 @@ public class EdgeStore implements Serializable {
 
 
         /**
-         * Returns LineString geometry of edge
+         * Returns LineString geometry of edge in floating point geographic coordinates.
          * Uses from/to vertices for first/last node and nodes from geometries for middle nodes
          *
          * TODO: it might be better idea to return just list of coordinates
@@ -1061,12 +1096,33 @@ public class EdgeStore implements Serializable {
 
         /**
          * Set the flags for all on-street modes of transportation to "false", so no modes can traverse this edge.
+         * This can be used in preparation for setting only a single mode or specific subset of modes.
          */
         public void disallowAllModes() {
             clearFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
             clearFlag(EdgeFlag.ALLOWS_BIKE);
             clearFlag(EdgeFlag.ALLOWS_CAR);
             clearFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
+        /**
+         * Remove all LTS flags so the edge has no LTS information. This can be done in preparation for setting one
+         * specific LTS on the edge. This is particularly important because LTS categories should be mutually exclusive
+         * but flags are not. In practice higher LTS levels override lower ones when present on the same edge, but this
+         * can be confusing so ideally we'll set only one flag on any given edge.
+         */
+        public void removeAllLtsFlags() {
+            clearFlag(EdgeFlag.BIKE_LTS_1);
+            clearFlag(EdgeFlag.BIKE_LTS_2);
+            clearFlag(EdgeFlag.BIKE_LTS_3);
+            clearFlag(EdgeFlag.BIKE_LTS_4);
+        }
+
+        /** Clear all LTS flags, then set the single LTS flag for the supplied level from 1 to 4. */
+        public void setLts(int lts) {
+            Preconditions.checkArgument((lts >= 1 || lts <= 4), "LTS must be an integer in the range [1...4].");
+            removeAllLtsFlags();
+            setFlag(intToLts(lts));
         }
 
         public boolean allowsStreetMode(StreetMode mode) {
@@ -1113,6 +1169,42 @@ public class EdgeStore implements Serializable {
         public void setBikeTimeFactor (double bikeTimeFactor) {
             edgeTraversalTimes.setBikeTimeFactor(edgeIndex, bikeTimeFactor);
         }
+
+        public Map<String, Object> attributesForDisplay () {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", edgeIndex); // Map UI component seems to group edges by this ID to span tile boundaries.
+            map.put("streetClass", (int) streetClasses.get(pairIndex)); // Serialization cannot handle Byte, cast it.
+            // map.put("osmId", getOSMID());
+            map.put("speedKph", getSpeedKph());
+            map.put("lengthM", getLengthM());
+            // FIXME we should employ a method like com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.ltsToInt for this
+            int lts =  getFlag(EdgeFlag.BIKE_LTS_1) ? 1 :
+                        getFlag(EdgeFlag.BIKE_LTS_2) ? 2 :
+                        getFlag(EdgeFlag.BIKE_LTS_3) ? 3 : 4;
+            map.put("lts", lts);
+            map.put("pedestrian", getFlag(EdgeFlag.ALLOWS_PEDESTRIAN));
+            map.put("bike", getFlag(EdgeFlag.ALLOWS_BIKE));
+            map.put("car", getFlag(EdgeFlag.ALLOWS_CAR));
+            if (edgeTraversalTimes != null) {
+                map.put("walkTimeFactor", edgeTraversalTimes.getWalkTimeFactor(edgeIndex));
+                map.put("bikeTimeFactor", edgeTraversalTimes.getBikeTimeFactor(edgeIndex));
+            }
+            if (costFields != null) {
+                for (CostField costField : costFields) {
+                    map.put(costField.getDisplayKey(), costField.getDisplayValue(edgeIndex));
+                }
+            }
+            return map;
+        }
+
+    }
+
+    /** Clamp the integer value to the range [1...4] and return the equivalent LTS bit flag enum value. */
+    public static EdgeFlag intToLts (int lts) {
+        if (lts < 2) return BIKE_LTS_1;
+        else if (lts == 2) return BIKE_LTS_2;
+        else if (lts == 3) return BIKE_LTS_3;
+        else return BIKE_LTS_4;
     }
 
     /**
@@ -1198,11 +1290,11 @@ public class EdgeStore implements Serializable {
         copy.geometries = new AugmentedList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
+        copy.streetClasses = new TByteAugmentedList(this.streetClasses);
         copy.temporarilyDeletedEdges = new TIntHashSet();
-        //Angles are deep copy for now
-        copy.inAngles = new TByteArrayList(inAngles);
-        copy.outAngles = new TByteArrayList(outAngles);
-        // We don't expect to add/change any turn restrictions.
+        copy.inAngles = new TByteAugmentedList(inAngles);
+        copy.outAngles = new TByteAugmentedList(outAngles);
+        // We don't expect to add/change any turn restrictions. TODO Consider split streets though.
         copy.turnRestrictions = turnRestrictions;
         copy.turnRestrictionsReverse = turnRestrictionsReverse;
         if (edgeTraversalTimes != null) {

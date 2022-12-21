@@ -2,24 +2,28 @@ package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
-import org.json.simple.JSONObject;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +32,6 @@ import spark.Response;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +42,9 @@ import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
+import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -62,37 +68,30 @@ public class RegionalAnalysisController implements HttpController {
 
     private final Broker broker;
     private final FileStorage fileStorage;
-    private final Config config;
 
-    public interface Config {
-        String resultsBucket ();
-        String bundleBucket ();
-    }
-
-    public RegionalAnalysisController (Broker broker, FileStorage fileStorage, Config config) {
+    public RegionalAnalysisController (Broker broker, FileStorage fileStorage) {
         this.broker = broker;
         this.fileStorage = fileStorage;
-        this.config = config;
     }
 
-    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, String accessGroup) {
+    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, UserPermissions userPermissions) {
         return Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start().and(
                         QueryBuilder.start("regionId").is(regionId).get(),
                         QueryBuilder.start("deleted").is(false).get()
                 ).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                accessGroup
+                userPermissions
         );
     }
 
     private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(Request req, Response res) {
-        return getRegionalAnalysesForRegion(req.params("regionId"), req.attribute("accessGroup"));
+        return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
     }
 
     // Note: this includes the modifications object which can be very large
     private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), req.attribute("accessGroup"));
+        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     /**
@@ -101,7 +100,7 @@ public class RegionalAnalysisController implements HttpController {
      * @return JobStatues with associated regional analysis embedded
      */
     private Collection<JobStatus> getRunningAnalyses(Request req, Response res) {
-        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), req.attribute("accessGroup"));
+        Collection<RegionalAnalysis> allAnalysesInRegion = getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
         List<JobStatus> runningStatusesForRegion = new ArrayList<>();
         Collection<JobStatus> allJobStatuses = broker.getAllJobStatuses();
         for (RegionalAnalysis ra : allAnalysesInRegion) {
@@ -116,25 +115,23 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private RegionalAnalysis deleteRegionalAnalysis (Request req, Response res) {
-        String accessGroup = req.attribute("accessGroup");
-        String email = req.attribute("email");
-
+        UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start().and(
                         QueryBuilder.start("_id").is(req.params("_id")).get(),
                         QueryBuilder.start("deleted").is(false).get()
                 ).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                accessGroup
+                userPermissions
         ).iterator().next();
         analysis.deleted = true;
-        Persistence.regionalAnalyses.updateByUserIfPermitted(analysis, email, accessGroup);
+        Persistence.regionalAnalyses.updateByUserIfPermitted(analysis, userPermissions);
 
         // clear it from the broker
         if (!analysis.complete) {
             String jobId = analysis._id;
             if (broker.deleteJob(jobId)) {
-                LOG.info("Deleted job {} from broker.", jobId);
+                LOG.debug("Deleted job {} from broker.", jobId);
             } else {
                 LOG.error("Deleting job {} from broker failed.", jobId);
             }
@@ -175,11 +172,11 @@ public class RegionalAnalysisController implements HttpController {
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(req.params("_id")).get(),
                 DBProjection.exclude("request.scenario.modifications"),
-                req.attribute("accessGroup")
+                UserPermissions.from(req)
         ).iterator().next();
 
         if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis in unknown or has been deleted.");
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
         }
 
         // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
@@ -232,99 +229,111 @@ public class RegionalAnalysisController implements HttpController {
                     String.join(",", analysis.destinationPointSetIds));
         }
 
-        // It seems like you would check regionalAnalysis.complete to choose between redirecting to s3 and fetching
-        // the partially completed local file. But this field is never set to true - it's on a UI model object that
-        // isn't readily accessible to the internal Job-tracking mechanism of the back end. Instead, just try to fetch
-        // the partially completed results file, which includes an O(1) check whether the job is still being processed.
-        File partialRegionalAnalysisResultFile = broker.getPartialRegionalAnalysisResults(regionalAnalysisId);
+        // We started implementing the ability to retrieve and display partially completed analyses.
+        // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
 
-        if (partialRegionalAnalysisResultFile != null) {
-            // FIXME we need to do the equivalent of the SelectingGridReducer here.
-            // The job is still being processed. There is a probably harmless race condition if the job happens to be
-            // completed at the very moment we're in this block, because the file will be deleted at that moment.
-            LOG.info("Analysis {} is not complete, attempting to return the partial results grid.", regionalAnalysisId);
-            if (!"GRID".equalsIgnoreCase(fileFormatExtension)) {
-                throw AnalysisServerException.badRequest(
-                        "For partially completed regional analyses, we can only return grid files, not images.");
-            }
-            if (partialRegionalAnalysisResultFile == null) {
-                throw AnalysisServerException.unknown(
-                        "Could not find partial result grid for incomplete regional analysis on server.");
-            }
-            try {
-                res.header("content-type", "application/octet-stream");
-                // This will cause Spark Framework to gzip the data automatically if requested by the client.
-                res.header("Content-Encoding", "gzip");
-                // Spark has default serializers for InputStream and Bytes, and calls toString() on everything else.
-                return new FileInputStream(partialRegionalAnalysisResultFile);
-            } catch (FileNotFoundException e) {
-                // The job must have finished and the file was deleted upon upload to S3. This should be very rare.
-                throw AnalysisServerException.unknown(
-                        "Could not find partial result grid for incomplete regional analysis on server.");
-            }
-        } else {
-            // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
-            LOG.info("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
-                    cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
-            FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-            if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.TIFF.equals(format)) {
-                throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
-            }
+        if (broker.findJob(regionalAnalysisId) != null) {
+            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
+        }
 
-            // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
-            // We do this even for results generated by older workers, so they will be re-extracted with the new name.
-            // These grids are reasonably small, we may be able to just send all cutoffs to the UI instead of selecting.
-            String singleCutoffKey =
-                    String.format("%s_%s_P%d_C%d.%s", regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, fileFormatExtension);
+        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        // aren't any (only CSV, because origins are freeform).
+        // How can we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
 
-            // A lot of overhead here - UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
-            FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(config.resultsBucket(), singleCutoffKey);
-            if (!fileStorage.exists(singleCutoffFileStorageKey)) {
-                // An accessibility grid for this particular cutoff has apparently never been extracted from the
-                // regional results file before. Extract one and save it for future reuse. Older regional analyses
-                // may not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
-                // filenames of such regional accessibility results will not have a percentile or pointset ID.
-                String multiCutoffKey;
-                if (analysis.travelTimePercentiles == null) {
-                    // Oldest form of results, single-percentile, single grid.
-                    multiCutoffKey = regionalAnalysisId + ".access";
+        // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
+        LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
+                cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
+        FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
+        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
+            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
+        }
+
+        // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
+        // We do this even for results generated by older workers, so they will be re-extracted with the new name.
+        // These grids are reasonably small, we may be able to just send all cutoffs to the UI instead of selecting.
+        String singleCutoffKey =
+                String.format("%s_%s_P%d_C%d.%s", regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, fileFormatExtension);
+
+        // A lot of overhead here - UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
+        if (!fileStorage.exists(singleCutoffFileStorageKey)) {
+            // An accessibility grid for this particular cutoff has apparently never been extracted from the
+            // regional results file before. Extract one and save it for future reuse. Older regional analyses
+            // did not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
+            // filenames of such regional accessibility results will not have a percentile or pointset ID.
+            // First try the newest form of regional results: multi-percentile, multi-destination-grid.
+            String multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+            FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+            if (!fileStorage.exists(multiCutoffFileStorageKey)) {
+                LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
+                // Fall back to second-oldest form: multi-percentile, single destination grid.
+                multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
+                multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                if (fileStorage.exists(multiCutoffFileStorageKey)) {
+                    checkArgument(analysis.destinationPointSetIds.length == 1);
                 } else {
-                    if (analysis.destinationPointSetIds == null) {
-                        // Newer form of regional results: multi-percentile, single grid.
-                        multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
+                    // Fall back on oldest form of results, single-percentile, single-destination-grid.
+                    multiCutoffKey = regionalAnalysisId + ".access";
+                    multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
+                    if (fileStorage.exists(multiCutoffFileStorageKey)) {
+                        checkArgument(analysis.travelTimePercentiles.length == 1);
+                        checkArgument(analysis.destinationPointSetIds.length == 1);
                     } else {
-                        // Newest form of regional results: multi-percentile, multi-grid.
-                        multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+                        throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
                     }
                 }
-                LOG.info("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
-                FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(config.resultsBucket(), multiCutoffKey);
+            }
+            LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
 
-                InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
-                Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
+            InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
+            Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
 
-                File localFile = FileUtils.createScratchFile(format.toString());
-                FileOutputStream fos = new FileOutputStream(localFile);
+            File localFile = FileUtils.createScratchFile(format.toString());
+            FileOutputStream fos = new FileOutputStream(localFile);
 
-                switch (format) {
-                    case GRID:
-                        grid.write(new GZIPOutputStream(fos));
-                        break;
-                    case PNG:
-                        grid.writePng(fos);
-                        break;
-                    case TIFF:
-                        grid.writeGeotiff(fos);
-                        break;
-                }
-
-                fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
+            switch (format) {
+                case GRID:
+                    grid.write(new GZIPOutputStream(fos));
+                    break;
+                case PNG:
+                    grid.writePng(fos);
+                    break;
+                case GEOTIFF:
+                    grid.writeGeotiff(fos);
+                    break;
             }
 
-            JSONObject json = new JSONObject();
-            json.put("url", fileStorage.getURL(singleCutoffFileStorageKey));
-            return json.toJSONString();
+            fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
         }
+        return JsonUtil.toJsonString(
+                JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
+        );
+    }
+
+    private String getCsvResults (Request req, Response res) {
+        final String regionalAnalysisId = req.params("_id");
+        final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
+        // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
+
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(regionalAnalysisId).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                UserPermissions.from(req)
+        ).iterator().next();
+
+        if (analysis == null || analysis.deleted) {
+            throw AnalysisServerException.notFound("The specified analysis is unknown, incomplete, or deleted.");
+        }
+
+        String storageKey = analysis.resultStorage.get(resultType);
+        if (storageKey == null) {
+            throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
+        }
+
+        FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, storageKey);
+
+        res.type("text/plain");
+        return fileStorage.getURL(fileStorageKey);
     }
 
     /**
@@ -333,8 +342,7 @@ public class RegionalAnalysisController implements HttpController {
      * in the body of the HTTP response.
      */
     private RegionalAnalysis createRegionalAnalysis (Request req, Response res) throws IOException {
-        final String accessGroup = req.attribute("accessGroup");
-        final String email = req.attribute("email");
+        final UserPermissions userPermissions = UserPermissions.from(req);
 
         AnalysisRequest analysisRequest = JsonUtil.objectMapper.readValue(req.body(), AnalysisRequest.class);
 
@@ -354,13 +362,13 @@ public class RegionalAnalysisController implements HttpController {
         }
 
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, accessGroup);
         // TODO now this is setting cutoffs and percentiles in the regional (template) task.
         //   why is some stuff set in this populate method, and other things set here in the caller?
-        RegionalTask task = (RegionalTask) analysisRequest.populateTask(new RegionalTask(), project);
+        RegionalTask task = new RegionalTask();
+        analysisRequest.populateTask(task, userPermissions);
 
         // Set the destination PointSets, which are required for all non-Taui regional requests.
-        if (! analysisRequest.makeTauiSite) {
+        if (!analysisRequest.makeTauiSite) {
             checkNotNull(analysisRequest.destinationPointSetIds);
             checkState(analysisRequest.destinationPointSetIds.length > 0,
                 "At least one destination pointset ID must be supplied.");
@@ -371,7 +379,7 @@ public class RegionalAnalysisController implements HttpController {
                 String destinationPointSetId = analysisRequest.destinationPointSetIds[i];
                 OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
                         destinationPointSetId,
-                        accessGroup
+                        userPermissions
                 );
                 checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
                 opportunityDatasets.add(opportunityDataset);
@@ -381,8 +389,9 @@ public class RegionalAnalysisController implements HttpController {
             if (nPointSets == 1) {
                 task.grid = task.destinationPointSetKeys[0];
             }
-            // Preflight check that all destination pointsets are exactly the same size. Equivalent to worker-side
-            // checks in AnalysisWorkerTask.loadAndValidateDestinationPointSets and WebMercatorExtents.forPointsets.
+            // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
+            // The worker will perform equivalent checks via the GridTransformWrapper constructor,
+            // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
             for (OpportunityDataset dataset : opportunityDatasets) {
                 if (dataset.format == FileStorageFormat.FREEFORM) {
                     checkArgument(
@@ -391,8 +400,8 @@ public class RegionalAnalysisController implements HttpController {
                     );
                 } else {
                     checkArgument(
-                        dataset.getWebMercatorExtents().equals(opportunityDatasets.get(0).getWebMercatorExtents()),
-                        "If multiple grids are specified as destinations, they must have identical extents."
+                        dataset.zoom == opportunityDatasets.get(0).zoom,
+                        "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
                     );
                 }
             }
@@ -401,22 +410,43 @@ public class RegionalAnalysisController implements HttpController {
             task.validatePercentiles();
         }
 
-        // Set the origin pointset if one is specified.
+        // Set the origin pointset key if an ID is specified. Currently this will always be a freeform pointset.
+        // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
-                    .findByIdIfPermitted(analysisRequest.originPointSetId, accessGroup).storageLocation();
+                    .findByIdIfPermitted(analysisRequest.originPointSetId, userPermissions).storageLocation();
+            task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
         }
 
         task.oneToOne = analysisRequest.oneToOne;
         task.recordTimes = analysisRequest.recordTimes;
+        // For now, we support calculating paths in regional analyses only for freeform origins.
+        task.includePathResults = analysisRequest.originPointSetId != null && analysisRequest.recordPaths;
         task.recordAccessibility = analysisRequest.recordAccessibility;
 
-        // Making a static site implies several different processes - turn them all on if requested.
+        // Making a Taui site implies writing static travel time and path files per origin, but not accessibility.
         if (analysisRequest.makeTauiSite) {
             task.makeTauiSite = true;
-            task.computeTravelTimeBreakdown = true;
-            task.computePaths = true;
             task.recordAccessibility = false;
+        }
+
+        // If our destinations are freeform, pre-load the destination pointset on the backend.
+        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
+        // Initialization order is important here: task fields makeTauiSite and destinationPointSetKeys must already be
+        // set above.
+        if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+            checkArgument(task.destinationPointSetKeys.length == 1);
+            task.destinationPointSets = new PointSet[] {
+                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
+            };
+        }
+        if (task.recordTimes) {
+            checkArgument(
+                task.destinationPointSets != null &&
+                task.destinationPointSets.length == 1 &&
+                task.destinationPointSets[0] instanceof FreeFormPointSet,
+                "recordTimes can only be used with a single destination pointset, which must be freeform (non-grid)."
+            );
         }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.
@@ -432,14 +462,14 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.west = task.west;
         regionalAnalysis.width = task.width;
 
-        regionalAnalysis.accessGroup = accessGroup;
-        regionalAnalysis.bundleId = project.bundleId;
-        regionalAnalysis.createdBy = email;
+        regionalAnalysis.accessGroup = userPermissions.accessGroup;
+        regionalAnalysis.bundleId = analysisRequest.bundleId;
+        regionalAnalysis.createdBy = userPermissions.email;
         regionalAnalysis.destinationPointSetIds = analysisRequest.destinationPointSetIds;
         regionalAnalysis.name = analysisRequest.name;
         regionalAnalysis.projectId = analysisRequest.projectId;
-        regionalAnalysis.regionId = project.regionId;
-        regionalAnalysis.variant = analysisRequest.variantIndex;
+        regionalAnalysis.regionId = analysisRequest.regionId;
+        regionalAnalysis.scenarioId = analysisRequest.scenarioId;
         regionalAnalysis.workerVersion = analysisRequest.workerVersion;
         regionalAnalysis.zoom = task.zoom;
 
@@ -473,20 +503,40 @@ public class RegionalAnalysisController implements HttpController {
         task.percentiles = regionalAnalysis.travelTimePercentiles;
 
         // Persist this newly created RegionalAnalysis to Mongo.
-        // Why are we overwriting the regionalAnalysis reference with the result of saving it? This looks like a no-op.
+        // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalAnalysis);
 
+        // Flush to the database any information added to the RegionalAnalysis object when it was enqueued.
+        // This includes the paths of any CSV files that will be produced by this analysis.
+        // TODO verify whether there is a reason to use regionalAnalyses.modifyWithoutUpdatingLock() or put().
+        Persistence.regionalAnalyses.modifiyWithoutUpdatingLock(regionalAnalysis);
+
         return regionalAnalysis;
     }
 
-    private RegionalAnalysis updateRegionalAnalysis(Request request, Response response) throws IOException {
-        final String accessGroup = request.attribute("accessGroup");
-        final String email = request.attribute("email");
+    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
         RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, email, accessGroup);
+        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
+    }
+
+    /**
+     * Return a JSON-wrapped URL for the file in FileStorage containing the JSON representation of the scenario for
+     * the given regional analysis.
+     */
+    private JsonNode getScenarioJsonUrl (Request request, Response response) {
+        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
+                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+        // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
+        final String networkId = regionalAnalysis.bundleId;
+        final String scenarioId = regionalAnalysis.request.scenarioId;
+        checkNotNull(networkId, "RegionalAnalysis did not contain a network ID.");
+        checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
+        String scenarioUrl = fileStorage.getURL(
+                new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
+        return JsonUtil.objectNode().put("url", scenarioUrl);
     }
 
     @Override
@@ -499,6 +549,8 @@ public class RegionalAnalysisController implements HttpController {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
+            sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
+            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
             sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);

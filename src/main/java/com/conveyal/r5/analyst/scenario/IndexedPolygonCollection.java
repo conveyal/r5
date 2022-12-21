@@ -1,10 +1,11 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.analyst.FileCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileStorageKey;
+import org.geotools.data.geojson.GeoJSONDataStore;
+import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
-import org.geotools.geojson.feature.FeatureJSON;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
@@ -17,12 +18,13 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.GZIPInputStream;
+
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * This is an abstraction for the polygons used to configure the road congestion modification type and the ride hailing
@@ -104,14 +106,11 @@ public class IndexedPolygonCollection {
     }
 
     public void loadFromS3GeoJson() throws Exception {
-        InputStream s3InputStream = AnalysisWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
-        // To test on local files:
-        //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
-        if (polygonLayer.endsWith(".gz")) {
-            s3InputStream = new GZIPInputStream(s3InputStream);
-        }
-        FeatureJSON featureJSON = new FeatureJSON();
-        FeatureCollection featureCollection = featureJSON.readFeatureCollection(s3InputStream);
+        // FIXME How will we handle .gz data?
+        File polygonInputFile = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, polygonLayer));
+        GeoJSONDataStore dataStore = new GeoJSONDataStore(polygonInputFile);
+        SimpleFeatureSource featureSource = dataStore.getFeatureSource();
+        FeatureCollection featureCollection = featureSource.getFeatures();
         LOG.info("Validating features and creating spatial index...");
         FeatureType featureType = featureCollection.getSchema();
         CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
@@ -133,7 +132,7 @@ public class IndexedPolygonCollection {
             boolean indexThisFeature = true;
             if (id == null) {
                 allPolygonsHaveIds = false;
-            } else if (!(name instanceof String)) {
+            } else if (!(id instanceof String)) {
                 errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
                         id, idAttribute, featureNumber));
                 indexThisFeature = false;

@@ -10,6 +10,7 @@ public class Reroute extends Modification {
         return "reroute";
     }
 
+    /** The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification. */
     public String feed;
     public String[] routes;
     public String[] trips;
@@ -39,9 +40,9 @@ public class Reroute extends Modification {
         rr.stops = ModificationStop.toStopSpecs(stops);
 
         if (this.trips == null) {
-            rr.routes = feedScopeIds(feed, routes);
+            rr.routes = feedScopedIdSet(feed, routes);
         } else {
-            rr.patterns = feedScopeIds(feed, trips);
+            rr.patterns = feedScopedIdSet(feed, trips);
         }
 
         if (fromStop != null) {

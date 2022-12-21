@@ -4,6 +4,7 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;

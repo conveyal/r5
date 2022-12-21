@@ -1,8 +1,9 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.RegionalAnalysisStatus;
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
+import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
@@ -17,6 +18,7 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import gnu.trove.TCollections;
@@ -41,6 +43,8 @@ import static com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent.St
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUESTED;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
+import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * This class distributes the tasks making up regional jobs to workers.
@@ -76,7 +80,7 @@ import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_
  *
  * TODO evaluate whether synchronizing all methods to make this threadsafe is a performance issue.
  */
-public class Broker {
+public class Broker implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
 
@@ -84,8 +88,6 @@ public class Broker {
         // TODO Really these first two should be WorkerLauncher / Compute config
         boolean offline ();
         int maxWorkers ();
-        String resultsBucket ();
-        String bundleBucket ();
         boolean testTaskRedelivery ();
     }
 
@@ -106,7 +108,8 @@ public class Broker {
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER = 800;
+    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
@@ -151,7 +154,6 @@ public class Broker {
     /**
      * Enqueue a set of tasks for a regional analysis.
      * Only a single task is passed in, which the broker will expand into all the individual tasks for a regional job.
-     * We pass in the group and user only to tag any newly created workers. This should probably be done in the caller.
      */
     public synchronized void enqueueTasksForRegionalJob (RegionalAnalysis regionalAnalysis) {
 
@@ -169,9 +171,9 @@ public class Broker {
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler =
-                new MultiOriginAssembler(regionalAnalysis, job, config.resultsBucket(), fileStorage);
-
+        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
+        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
+        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
         if (config.testTaskRedelivery()) {
@@ -207,10 +209,12 @@ public class Broker {
         // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
         templateTask.scenario = null;
         String fileName = String.format("%s_%s.json", regionalAnalysis.bundleId, scenario.id);
-        FileStorageKey fileStorageKey = new FileStorageKey(config.bundleBucket(), fileName);
+        FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);
+            // FIXME this is using a network service in a method called from a synchronized broker method.
+            //  Move file into storage before entering the synchronized block.
             fileStorage.moveIntoStorage(fileStorageKey, localScenario);
         } catch (IOException e) {
             LOG.error("Error storing scenario for retrieval by workers.", e);
@@ -240,7 +244,8 @@ public class Broker {
     /**
      * Create on-demand/spot workers for a given job, after certain checks
      * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot EC2 spot instances to request
+     * @param nSpot Target number of EC2 spot instances to request. The actual number requested may be lower if the
+     *              total number of workers running is approaching the maximum specified in the Broker config.
      */
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
@@ -252,6 +257,13 @@ public class Broker {
         if (nOnDemand < 0 || nSpot < 0){
             LOG.info("Negative number of workers requested, not starting any");
             return;
+        }
+
+        // Backoff: reduce the nSpot requested when the number of already running workers starts approaching the
+        // configured maximum
+        if (workerCatalog.totalWorkerCount() * 2 > config.maxWorkers()) {
+            nSpot = Math.min(nSpot, (config.maxWorkers() - workerCatalog.totalWorkerCount()) / 2);
+            LOG.info("Worker pool over half of maximum size. Number of new spot instances set to {}", nSpot);
         }
 
         if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {
@@ -267,7 +279,7 @@ public class Broker {
         // If workers have already been started up, don't repeat the operation.
         if (recentlyRequestedWorkers.containsKey(category)
                 && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
-            LOG.info("Workers still starting on {}, not starting more", category);
+            LOG.debug("Workers still starting on {}, not starting more", category);
             return;
         }
 
@@ -319,24 +331,31 @@ public class Broker {
      *
      * @return whether the task was found and removed.
      */
-    public synchronized void markTaskCompleted (String jobId, int taskId) {
-        Job job = findJob(jobId);
-        if (job == null) {
-            LOG.error("Could not find a job with ID {} and therefore could not mark the task as completed.", jobId);
-            return;
-        }
+    public synchronized void markTaskCompleted (Job job, int taskId) {
+        checkNotNull(job);
         if (!job.markTaskCompleted(taskId)) {
-            LOG.error("Failed to mark task {} completed on job {}.", taskId, jobId);
+            LOG.error("Failed to mark task {} completed on job {}.", taskId, job.jobId);
         }
         // Once the last task is marked as completed, the job is finished.
-        // Purge it from the list to free memory.
+        // Remove it and its associated result assembler from the maps.
+        // The caller should already have a reference to the result assembler so it can process the final results.
         if (job.isComplete()) {
             job.verifyComplete();
             jobs.remove(job.workerCategory, job);
-            // This method is called after the regional work results are handled, finishing and closing the local file.
-            // So we can harmlessly remove the MultiOriginAssembler now that the job is removed.
-            resultAssemblers.remove(jobId);
+            resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
+        }
+    }
+
+    /**
+     * When job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
+     * The Job will stop delivering tasks, allowing workers to shut down, but will continue to exist allowing the user
+     * to see the error message. User will then need to manually delete it, which will remove the result assembler.
+     * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
+     */
+    private synchronized void recordJobError (Job job, String error) {
+        if (job != null) {
+            job.errors.add(error);
         }
     }
 
@@ -390,7 +409,7 @@ public class Broker {
 
     /**
      * Given a worker commit ID and transport network, return the IP or DNS name of a worker that has that software
-     * and network already loaded. If none exist, return null and try to start one.
+     * and network already loaded. If none exist, return null. The caller can then try to start one.
      */
     public synchronized String getWorkerAddress(WorkerCategory workerCategory) {
         if (config.offline()) {
@@ -423,90 +442,92 @@ public class Broker {
     }
 
     /**
-     * Slots a single regional work result received from a worker into the appropriate position in
-     * the appropriate file. Also considers requesting extra spot instances after a few results have
-     * been received. The checks in place should prevent an unduly large number of workers from
-     * proliferating, assuming jobs for a given worker category (transport network + R5 version) are
-     * completed sequentially.
-     *
-     * @param workResult an object representing accessibility results for a single origin point,
-     *                   sent by a worker.
+     * Slots a single regional work result received from a worker into the appropriate position in the appropriate
+     * files. Also considers requesting extra spot instances after a few results have been received.
+     * @param workResult an object representing accessibility results for a single origin point, sent by a worker.
      */
     public void handleRegionalWorkResult(RegionalWorkResult workResult) {
-        // Retrieving the job and assembler from their maps is not threadsafe, so we do so in a
-        // synchronized block here. Once the job is retrieved, it can be used to
-        // requestExtraWorkers below without synchronization, because that method only uses final
-        // fields of the job.
-        Job job;
+        // Retrieving the job and assembler from their maps is not thread safe, so we use synchronized block here.
+        // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
+        // because that method only uses final fields of the job.
+        Job job = null;
         MultiOriginAssembler assembler;
-        synchronized (this) {
-            job = findJob(workResult.jobId);
-            assembler = resultAssemblers.get(workResult.jobId);
-        }
-
-        if (assembler == null) {
-            LOG.error("Received result for unrecognized job ID {}, discarding.", workResult.jobId);
-        } else {
-            // FIXME this is building up to 5 grids and uploading them to S3, this should not be done synchronously in
-            //       an HTTP handler.
-            assembler.handleMessage(workResult);
-            // When results for the task with the magic number are received, consider boosting the job by starting EC2
-            // spot instances
-            if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
-                requestExtraWorkersIfAppropriate(job);
+        try {
+            synchronized (this) {
+                job = findJob(workResult.jobId);
+                assembler = resultAssemblers.get(workResult.jobId);
+                if (job == null || assembler == null || !job.isActive()) {
+                    // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
+                    LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
+                    return;
+                }
+                if (workResult.error != null) {
+                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                    recordJobError(job, workResult.error);
+                    return;
+                }
+                // Mark tasks completed first before passing results to the assembler. On the final result received,
+                // this will minimize the risk of race conditions by quickly making the job invisible to incoming stray
+                // results from spurious redeliveries, before the assembler is busy finalizing and uploading results.
+                markTaskCompleted(job, workResult.taskId);
             }
+            // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
+            // It contains some slow nested operations to move completed results into storage. Really we should not do
+            // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
+            // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
+            assembler.handleMessage(workResult);
+        } catch (Throwable t) {
+            recordJobError(job, ExceptionUtils.stackTraceString(t));
+            eventBus.send(new ErrorEvent(t));
+            return;
         }
-
-        markTaskCompleted(workResult.jobId, workResult.taskId);
-
+        // When non-error results are received for several tasks we assume the regional analysis is running smoothly.
+        // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
+        if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
+            requestExtraWorkersIfAppropriate(job);
+        }
     }
 
     private void requestExtraWorkersIfAppropriate(Job job) {
-        if (job.originPointSet == null) {
-           // Don't autoscale for freeform pointset analyses until they are tested more thoroughly.
-            WorkerCategory workerCategory = job.workerCategory;
-            int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
-            if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-                // Start a number of workers that scales with the number of total tasks, up to a fixed number.
-                // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
-                int nSpot = Math.min(
-                                MAX_WORKERS_PER_CATEGORY,
-                                job.nTasksTotal / TARGET_TASKS_PER_WORKER
-                            ) - categoryWorkersAlreadyRunning;
-                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
+        WorkerCategory workerCategory = job.workerCategory;
+        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
+        if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
+            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+            int targetWorkerTotal;
+            if (job.templateTask.hasTransit()) {
+                // Total computation for a task with transit depends on the number of stops and whether the
+                // network has frequency-based routes. The total computation for the job depends on these
+                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+                //  this worth adding a field to Job or RegionalTask?
+                float transitScaleFactor = (9f / job.templateTask.zoom);
+                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+            } else {
+                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+                // the job increases roughly with linearly with the number of origins.
+                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
             }
+
+            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
+            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
+            // Guardrail until freeform pointsets are tested more thoroughly
+            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
+            int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
+            createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }
     }
 
-    /**
-     * Returns a simple status object intended to inform the UI of job progress.
-     */
-    public RegionalAnalysisStatus getJobStatus (String jobId) {
-        MultiOriginAssembler resultAssembler = resultAssemblers.get(jobId);
-        if (resultAssembler == null) {
-            return null;
-        } else {
-            return new RegionalAnalysisStatus(resultAssembler);
-        }
-    }
-
-    public File getPartialRegionalAnalysisResults (String jobId) {
-        MultiOriginAssembler resultAssembler = resultAssemblers.get(jobId);
-        if (resultAssembler == null) {
-            return null;
-        } else {
-            return resultAssembler.getGridBufferFile();
-        }
-    }
-
-    public boolean anyJobsActive () {
+    public synchronized boolean anyJobsActive () {
         for (Job job : jobs.values()) {
-            if (!job.isComplete()) return true;
+            if (job.isActive()) return true;
         }
         return false;
     }
 
-    public void logJobStatus() {
+    public synchronized void logJobStatus() {
         for (Job job : jobs.values()) {
             LOG.info(job.toString());
         }

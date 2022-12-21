@@ -445,7 +445,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                                     // we have to check all trips and frequency entries because, unlike
                                     // schedule-based trips, these are not sorted
                                     int departure = tripSchedule.startTimes[frequencyEntry] +
-                                            offsets.offsets.get(patIdx)[currentTrip][frequencyEntry] +
+                                            offsets.getOffsetSeconds(tripSchedule, frequencyEntry) +
                                             tripSchedule.departures[stopPositionInPattern];
 
                                     int latestDeparture = tripSchedule.endTimes[frequencyEntry] +

@@ -20,6 +20,7 @@ import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
+import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.P2;
@@ -54,6 +55,8 @@ import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.r5.streets.VertexStore.VertexFlag.IMPASSABLE;
+import static com.conveyal.r5.streets.VertexStore.VertexFlag.TRAFFIC_SIGNAL;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -143,7 +146,13 @@ public class StreetLayer implements Serializable, Cloneable {
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
-    /** Map from OSM node ID to internal vertex ID. Impassable barrier nodes are excluded frmo this map. **/
+    /**
+     * Map from OSM node ID to internal vertex ID, which is built up as vertices are created.
+     * For almost all nodes there is a one-to-one mapping from OSM nodes to vertices. In special cases such as
+     * impassable barrier nodes, a node may be split into multiple vertices, one for each time it is referenced.
+     * Only the most recently created vertex for such split nodes is included in this map, which means they may not
+     * behave properly for turn restriction purposes.
+     */
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
 
     // Initialize these when we have an estimate of the number of expected edges.
@@ -295,10 +304,16 @@ public class StreetLayer implements Serializable, Cloneable {
             if (!isWayRoutable(way)) {
                 continue;
             }
-            int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
+            // This is accessing every node and its tags as we process the ways. However we don't expect this
+            // to affect performance because the same sequence of nodes is accessed just afterward in makeEdgePair.
+            int beginIdx = 0;
             for (int n = 1; n < way.nodes.length; n++) {
-                if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
+                long nodeId = way.nodes[n];
+                Node node = osm.nodes.get(nodeId);
+                final boolean intersection = osm.intersectionNodes.contains(way.nodes[n]);
+                final boolean lastNode = (n == (way.nodes.length - 1));
+                if (intersection || lastNode || isImpassable(node)) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
                     beginIdx = n;
                 }
@@ -1005,25 +1020,28 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
-     * If the OSM node is an impassable barrier (e.g. emergency exit), do not register the mapping and always return a
-     * fresh vertex ID
+     * Generally we produce only one vertex per OSM node, but in special cases such as impassable barriers we may create
+     * more than one. In those cases, only the last one to be created will appear in vertexIndexForOsmNode.
      * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
         int vertexIndex = vertexIndexForOsmNode.get(osmNodeId);
-        if (vertexIndex == -1) {
-            // Register a new vertex, incrementing the index starting from zero.
-            // Store node coordinates for this new street vertex
+        if (vertexIndex == -1 || vertexStore.getFlag(vertexIndex, IMPASSABLE)) {
             Node node = osm.nodes.get(osmNodeId);
             if (node == null) {
-                LOG.warn("OSM data references an undefined node. This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+                LOG.warn("OSM data references an undefined node. " +
+                    "This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+                return -1;
             } else {
+                // Register a new vertex with the OSM node's coords, assigning sequential vertex IDs starting from zero.
                 vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
-                VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
-                if (node.hasTag("highway", "traffic_signals"))
-                    v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-                if (!isImpassable(node))
-                    vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+                if (node.hasTag("highway", "traffic_signals")) {
+                    vertexStore.setFlag(vertexIndex, TRAFFIC_SIGNAL);
+                }
+                if (isImpassable(node)) {
+                    vertexStore.setFlag(vertexIndex, IMPASSABLE);
+                }
+                vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
             }
         }
         return vertexIndex;
@@ -1081,7 +1099,7 @@ public class StreetLayer implements Serializable, Cloneable {
         long beginOsmNodeId = way.nodes[beginIdx];
         long endOsmNodeId = way.nodes[endIdx];
 
-        // Will create mapping if it doesn't exist yet.
+        // Will create a vertex for the OSM node if one doesn't exist yet.
         int beginVertexIndex = getVertexIndexForOsmNode(beginOsmNodeId);
         int endVertexIndex = getVertexIndexForOsmNode(endOsmNodeId);
 

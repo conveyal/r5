@@ -1022,7 +1022,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
                 if (node.hasTag("highway", "traffic_signals"))
                     v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-                if (!isBarrierNode(node))
+                if (!isImpassable(node))
                     vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
             }
         }
@@ -1057,9 +1057,15 @@ public class StreetLayer implements Serializable, Cloneable {
      * network to another. For example, an emergency exit connecting station platforms to an outside path.
      * In the event of poor connectivity in the input OSM data, we want such platforms to be identified
      * as disconnected so they will be removed, rather than staying connected via a locked door.
+     *
+     * At first it seems like we'd want to detect nodes with barrier=* and treat them as impassable. However, looking at
+     * https://wiki.openstreetmap.org/wiki/Key:barrier#Values we see that most of the values represent things that are
+     * easily passable, and even barrier=gate is implicitly openable unless tagged with access=no|private.
+     *
+     * This code is hit millions of times so we want to bypass it as much as possible.
+     * If tags are present, memoize the values rather than repeatedly extracting them with hasTag().
      */
-    private static boolean isBarrierNode(Node node) {
-        // Check for presence of tags, exit early and memoize tag values - this code is hit millions of times.
+    private static boolean isImpassable (Node node) {
         if (node.hasNoTags()) {
             return false;
         }

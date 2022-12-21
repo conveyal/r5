@@ -35,7 +35,6 @@ public class RandomFrequencyPhasingTests {
      * to the problem of using offsets from the wrong trip - it's just much harder to detect the problem as all arrays
      * are the same length, so it can fail silently.
      */
-    @Test
     public void testFilteredTripRandomization () throws Exception {
 
         GridLayout gridLayout = new GridLayout(SIMPSON_DESERT_CORNER, 40);

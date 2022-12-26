@@ -84,7 +84,7 @@ public abstract class BackendComponents {
                 // These handlers are at paths beginning with /api
                 // and therefore subject to authentication and authorization.
                 new GtfsController(database, gtfsCache),
-                new BundleController(database, fileStorage, gtfsCache, taskScheduler),
+                new BundleController(database, fileStorage, taskScheduler),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
                 new RegionalAnalysisController(broker, database, fileStorage),
                 new AggregationAreaController(fileStorage, database, taskScheduler),

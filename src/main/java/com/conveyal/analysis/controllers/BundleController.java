@@ -63,14 +63,12 @@ public class BundleController implements HttpController {
 
     // COMPONENT DEPENDENCIES
     private final FileStorage fileStorage;
-    private final GTFSCache gtfsCache;
     private final TaskScheduler taskScheduler;
     private final AnalysisDB db;
 
-    public BundleController(AnalysisDB db, FileStorage fileStorage, GTFSCache gtfsCache, TaskScheduler taskScheduler) {
+    public BundleController(AnalysisDB db, FileStorage fileStorage, TaskScheduler taskScheduler) {
         this.db = db;
         this.fileStorage = fileStorage;
-        this.gtfsCache = gtfsCache;
         this.taskScheduler = taskScheduler;
     }
 
@@ -101,9 +99,9 @@ public class BundleController implements HttpController {
      */
     private ObjectNode create(Request req, Response res) {
         // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
-        final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
-        final UserPermissions userPermissions = UserPermissions.from(req);
-        final Bundle bundle = parseBundleFromRequestFiles(userPermissions, files);
+        final var files = HttpUtils.getRequestFiles(req.raw());
+        final var userPermissions = UserPermissions.from(req);
+        final var bundle = parseBundleFromRequestFiles(userPermissions, files);
 
         // Form data parsed, insert to MongoDB and queue the heavy work.
         db.bundles.insert(bundle);
@@ -150,8 +148,9 @@ public class BundleController implements HttpController {
     private boolean deleteBundle(Request req, Response res) {
         var result = db.bundles.deleteByIdParamIfPermitted(req);
         var bundleId = req.params("_id");
-        FileStorageKey key = new FileStorageKey(BUNDLES, bundleId + ".zip");
-        fileStorage.delete(key);
+        // TODO: check if other bundles use this feed and bundle group
+        // FileStorageKey key = new FileStorageKey(BUNDLES, bundleId + ".zip");
+        // fileStorage.delete(key);
 
         return result.wasAcknowledged();
     }
@@ -275,10 +274,10 @@ public class BundleController implements HttpController {
             feed.close();
 
             // Ensure all files have been stored.
-            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
-            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
-            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
-            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
+            fileStorage.moveIntoStorage(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
+            fileStorage.moveIntoStorage(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
+            fileStorage.moveIntoStorage(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+            fileStorage.moveIntoStorage(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
         }
 
         // Set legacy progress field to indicate that all feeds have been loaded.

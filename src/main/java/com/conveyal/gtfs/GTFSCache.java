@@ -109,7 +109,7 @@ public class GTFSCache implements Component {
                 .build(this::retrieveAndProcessFeed);
     }
 
-    public FileStorageKey getFileKey (String id, String extension) {
+    public static FileStorageKey getFileKey (String id, String extension) {
         return new FileStorageKey(BUNDLES, String.join(".", cleanId(id), extension));
     }
 

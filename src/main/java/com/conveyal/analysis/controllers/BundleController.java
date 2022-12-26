@@ -145,14 +145,29 @@ public class BundleController implements HttpController {
         return JsonUtil.objectNode().put("bundleId", bundle._id);
     }
 
-    private boolean deleteBundle(Request req, Response res) {
+    /**
+     * Delete a bundle and it's stored files. Checks to see if OSM / GTFS are shared by other bundles before removing.
+     */
+    private ObjectNode deleteBundle(Request req, Response res) {
+        var bundle = db.bundles.findPermittedByRequestParamId(req);
         var result = db.bundles.deleteByIdParamIfPermitted(req);
-        var bundleId = req.params("_id");
-        // TODO: check if other bundles use this feed and bundle group
-        // FileStorageKey key = new FileStorageKey(BUNDLES, bundleId + ".zip");
-        // fileStorage.delete(key);
 
-        return result.wasAcknowledged();
+        var bundlesWithFeedGroupId = db.bundles.collection.countDocuments(Filters.eq("feedGroupId", bundle.feedGroupId));
+        var bundlesWithOsmId = db.bundles.collection.countDocuments(Filters.eq("osmId", bundle.osmId));
+        if (bundlesWithFeedGroupId == 0) {
+            for (var feedSummary : bundle.feeds) {
+                fileStorage.delete(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "db"));
+                fileStorage.delete(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"));
+                fileStorage.delete(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"));
+                fileStorage.delete(GTFSCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"));
+            }
+        }
+
+        if (bundlesWithOsmId == 0) {
+            fileStorage.delete(OSMCache.getKey(bundle.osmId));
+        }
+
+        return JsonUtil.objectNode().put("deleted", result.wasAcknowledged());
     }
 
     // HELPERS
@@ -165,7 +180,7 @@ public class BundleController implements HttpController {
 
             if (files.get("osmId") != null) {
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
-                Bundle bundleWithOsm = db.bundles.findPermitted(Filters.eq("osmId", bundle.osmId), userPermissions).first();
+                var bundleWithOsm = db.bundles.findPermitted(Filters.eq("osmId", bundle.osmId), userPermissions).first();
                 if (bundleWithOsm == null) {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }

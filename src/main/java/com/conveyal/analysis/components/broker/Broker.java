@@ -249,7 +249,7 @@ public class Broker implements Component {
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
         // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
-        // Throwing an exception there would not report any useful infomation to anyone.
+        // Throwing an exception there would not report any useful information to anyone.
 
         if (config.offline()) {
             LOG.info("Work offline enabled, not creating workers for {}.", category);

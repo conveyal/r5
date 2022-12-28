@@ -20,7 +20,6 @@ import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
-import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.P2;
@@ -1072,23 +1071,44 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Return whether this node can be traversed. This is particularly important for nodes that connect one part of the
-     * network to another. For example, an emergency exit connecting station platforms to an outside path.
-     * In the event of poor connectivity in the input OSM data, we want such platforms to be identified
-     * as disconnected so they will be removed, rather than staying connected via a locked door.
+     * network to another. For example, an emergency exit connecting station platforms to an outside path. In the event
+     * of poor connectivity in the input OSM data, we want such platforms to be identified as disconnected so they will
+     * be removed, rather than staying connected via a locked door.
      *
      * At first it seems like we'd want to detect nodes with barrier=* and treat them as impassable. However, looking at
      * https://wiki.openstreetmap.org/wiki/Key:barrier#Values we see that most of the values represent things that are
      * easily passable, and even barrier=gate is implicitly openable unless tagged with access=no|private.
      *
-     * This code is hit millions of times so we want to bypass it as much as possible.
-     * If tags are present, memoize the values rather than repeatedly extracting them with hasTag().
+     * Even when access=no|private, there are frequently exceptions for single modes. We don't yet handle single-mode
+     * barriers, so we want to default to the preexisting behavior of allowing passage (and relying only on edge
+     * traversal permissions) whenever we see exception tags that aren't clearly blocking access.
+     * See https://taginfo.openstreetmap.org/keys/foot#values.
      */
     private static boolean isImpassable (Node node) {
+        // This code is hit millions of times so we want to bypass it as much as possible.
         if (node.hasNoTags()) {
             return false;
         }
-        String access = node.getTag("access");
-        return node.hasTag("entrance", "emergency") || "no".equals(access) || "private".equals(access);
+        // Always disallow passing through emergency exits (the original source of our island pruning problem).
+        if (node.hasTag("entrance", "emergency")) {
+            return true;
+        }
+        if (isNoOrPrivate(node.getTag("access"))) {
+            // This node is explicitly decared inaccessible or private, but there might be exceptions.
+            // Err on the side of using the existing code path by returning false.
+            // Consider the node impassable only when all mode-specific exception tags are missing or clearly negative.
+            return isNullNoOrPrivate(node.getTag("foot")) && isNullNoOrPrivate(node.getTag("bicycle"));
+        }
+        // As a default, err on the side of returning false, which will maintain the preexisting code path.
+        return false;
+    }
+
+    private static boolean isNoOrPrivate (String value) {
+        return "no".equals(value) || "private".equals(value);
+    }
+
+    private static boolean isNullNoOrPrivate (String value) {
+        return value == null || isNoOrPrivate(value);
     }
 
     /**

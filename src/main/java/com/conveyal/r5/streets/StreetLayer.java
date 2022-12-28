@@ -1079,10 +1079,17 @@ public class StreetLayer implements Serializable, Cloneable {
      * https://wiki.openstreetmap.org/wiki/Key:barrier#Values we see that most of the values represent things that are
      * easily passable, and even barrier=gate is implicitly openable unless tagged with access=no|private.
      *
-     * Even when access=no|private, there are frequently exceptions for single modes. We don't yet handle single-mode
+     * Even when access=no, there are frequently exceptions for single modes. We don't yet handle single-mode
      * barriers, so we want to default to the preexisting behavior of allowing passage (and relying only on edge
      * traversal permissions) whenever we see exception tags that aren't clearly blocking access.
      * See https://taginfo.openstreetmap.org/keys/foot#values.
+     *
+     * We don't actually check for access|foot|bicycle=private because a private origin or destination area (gated
+     * housing or secure work facility) is still accessible to a person who lives or works there. We realized this
+     * because https://www.vtvzuidbuurt.nl/ near Vlaardingen in the Netherlands saw a huge drop in accessibility when
+     * we checked for no|private. This is a large housing complex with only two gates, both marked private.
+     *
+     * Ideally such areas would be treated as no-through-traffic but that would involve more tricky heuristics.
      */
     private static boolean isImpassable (Node node) {
         // This code is hit millions of times so we want to bypass it as much as possible.
@@ -1093,22 +1100,22 @@ public class StreetLayer implements Serializable, Cloneable {
         if (node.hasTag("entrance", "emergency")) {
             return true;
         }
-        if (isNoOrPrivate(node.getTag("access"))) {
-            // This node is explicitly decared inaccessible or private, but there might be exceptions.
+        if (isNo(node.getTag("access"))) {
+            // This node is explicitly decared inaccessible, but there might be exceptions.
             // Err on the side of using the existing code path by returning false.
             // Consider the node impassable only when all mode-specific exception tags are missing or clearly negative.
-            return isNullNoOrPrivate(node.getTag("foot")) && isNullNoOrPrivate(node.getTag("bicycle"));
+            return isNullOrNo(node.getTag("foot")) && isNullOrNo(node.getTag("bicycle"));
         }
         // As a default, err on the side of returning false, which will maintain the preexisting code path.
         return false;
     }
 
-    private static boolean isNoOrPrivate (String value) {
-        return "no".equals(value) || "private".equals(value);
+    private static boolean isNo(String value) {
+        return "no".equals(value);
     }
 
-    private static boolean isNullNoOrPrivate (String value) {
-        return value == null || isNoOrPrivate(value);
+    private static boolean isNullOrNo(String value) {
+        return value == null || isNo(value);
     }
 
     /**

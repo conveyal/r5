@@ -1,6 +1,5 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
@@ -108,7 +107,8 @@ public class Broker implements Component {
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER = 800;
+    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
@@ -243,28 +243,54 @@ public class Broker implements Component {
     /**
      * Create on-demand/spot workers for a given job, after certain checks
      * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot EC2 spot instances to request
+     * @param nSpot Target number of EC2 spot instances to request. The actual number requested may be lower if the
+     *              total number of workers running is approaching the maximum specified in the Broker config.
      */
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
+        // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
+        // Throwing an exception there would not report any useful information to anyone.
+
         if (config.offline()) {
-            LOG.info("Work offline enabled, not creating workers for {}", category);
+            LOG.info("Work offline enabled, not creating workers for {}.", category);
             return;
         }
 
-        if (nOnDemand < 0 || nSpot < 0){
-            LOG.info("Negative number of workers requested, not starting any");
+        if (nOnDemand < 0 || nSpot < 0) {
+            LOG.error("Negative number of workers requested, not starting any.");
             return;
         }
 
-        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {
-            String message = String.format(
-                    "Maximum of %d workers already started, not starting more;" +
-                    "jobs will not complete on %s",
-                    config.maxWorkers(),
-                    category
+        final int nRequested = nOnDemand + nSpot;
+        if (nRequested <= 0) {
+            LOG.error("No workers requested, not starting any.");
+            return;
+        }
+
+        // Zeno's worker pool management: never start more than half the remaining capacity.
+        final int remainingCapacity = config.maxWorkers() - workerCatalog.totalWorkerCount();
+        final int maxToStart = remainingCapacity / 2;
+        if (maxToStart <= 0) {
+            LOG.error("Due to capacity limiting, not starting any workers.");
+            return;
+        }
+
+        if (nRequested > maxToStart) {
+            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", nRequested);
+            nSpot = maxToStart;
+            nOnDemand = 0;
+            LOG.warn("Lowered to {} on-demand and {} spot workers.", nOnDemand, nSpot);
+        }
+
+        // Just an assertion for consistent state - this should never happen.
+        // Re-sum nOnDemand + nSpot here instead of using nTotal, as they may have been revised.
+        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot > config.maxWorkers()) {
+            LOG.error(
+                "Starting workers would exceed the maximum capacity of {}. Jobs may stall on {}.",
+                config.maxWorkers(),
+                category
             );
-            throw AnalysisServerException.forbidden(message);
+            return;
         }
 
         // If workers have already been started up, don't repeat the operation.
@@ -483,9 +509,27 @@ public class Broker implements Component {
         WorkerCategory workerCategory = job.workerCategory;
         int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-            // Start a number of workers that scales with the number of total tasks, up to a fixed number.
-            // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
-            int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
+            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+            int targetWorkerTotal;
+            if (job.templateTask.hasTransit()) {
+                // Total computation for a task with transit depends on the number of stops and whether the
+                // network has frequency-based routes. The total computation for the job depends on these
+                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+                //  this worth adding a field to Job or RegionalTask?
+                float transitScaleFactor = (9f / job.templateTask.zoom);
+                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+            } else {
+                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+                // the job increases roughly with linearly with the number of origins.
+                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+            }
+
+            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
+            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
             // Guardrail until freeform pointsets are tested more thoroughly
             if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;

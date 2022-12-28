@@ -35,6 +35,12 @@ public abstract class Modification implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Modification.class);
 
+    /** 
+     * The maximum number of error messages in each category (info/warning/error) to store in each modification.
+     * This prevents bandwidth/latency/memory problems from sending enormous lists of errors back to the client.
+     */
+    public static final int MAX_MESSAGES = 5;
+    
     /** Free-text comment describing this modification instance and what it's intended to do or represent. */
     public String comment;
 
@@ -47,14 +53,15 @@ public abstract class Modification implements Serializable {
     /**
      * The "resolve" method is called on each Modification before it is applied. If any problems are detected, the
      * Modification should not be applied, and this Set should contain Strings describing all the problems.
+     * To limit size, always add error/warning/info messages using the addX methods rather than direct field access.
      */
     public transient final Set<String> errors = new HashSet<>();
 
     /**
      * Any warnings that should be presented to the user but which do not prevent scenario application should appear here.
+     * TODO this should be transient like the other error/info fields but previously wasn't. R5 modifications are stored
+     *      in MongoDB in regional analyses, which means that marking it transient causes deserialization headaches.
      */
-    // TODO this should be transient as well but previously wasn't. R5 modifications are stored in MongoDB in regional
-    // analyses, which means that marking it transient causes deserialization headaches.
     public final Set<String> warnings = new HashSet<>();
 
     /**
@@ -69,7 +76,8 @@ public abstract class Modification implements Serializable {
      * or other deep objects from the original TransportNetwork. The Modification is responsible for ensuring that
      * no damage is done to the original TransportNetwork by making copies of referenced objects as necessary.
      *
-     * TODO arguably this and resolve() don't need to return booleans - all implementations just check whether the errors list is empty, so we could just supply a method that does that.
+     * TODO arguably this and resolve() don't need to return booleans - all implementations just check whether the 
+     *      errors list is empty, so we could just supply a method that does that.
      * TODO remove the network field, and use the network against which this Modification was resolved.
      * @return true if any errors happened while applying the modification.
      */
@@ -126,7 +134,7 @@ public abstract class Modification implements Serializable {
         // Create or find the stops referenced by the new trips.
         TIntList intStopIds = new TIntArrayList();
         for (StopSpec stopSpec : stops) {
-            int intStopId = stopSpec.resolve(network, errors);
+            int intStopId = stopSpec.resolve(network, this);
             intStopIds.add(intStopId);
         }
         // Adding the stops changes the street network but does not rebuild the edge lists.
@@ -173,14 +181,14 @@ public abstract class Modification implements Serializable {
         }
         if (nDefined != 1) {
             if (allowTrips) {
-                errors.add("Exactly one of routes, patterns, or trips must be provided.");
+                addError("Exactly one of routes, patterns, or trips must be provided.");
             } else {
-                errors.add("Either routes or patterns must be provided, but not both.");
+                addError("Either routes or patterns must be provided, but not both.");
             }
         }
         if (!allowTrips && trips != null) {
             // This cannot happen yet, but it will if (TODO) we pull these fields up to the Modification class.
-            errors.add("This modification type does not allow specifying individual trips by ID.");
+            addError("This modification type does not allow specifying individual trips by ID.");
         }
 
         // TODO pull the network field up into the Modification class.
@@ -192,18 +200,18 @@ public abstract class Modification implements Serializable {
         }
         if (unmatchedRoutes.size() > 0) {
             if (unmatchedRoutes.size() == routes.size()) {
-                errors.add("None of the specified route IDs could be found.");
+                addError("None of the specified route IDs could be found.");
             } else {
                 // When a GTFS feed contains routes that have no stoptimes (which is unfortunately common) R5 will not
                 // represent that route. When someone bulk-adds all the routes in that feed to a modification,
                 // some of them may be valid while others are not.
                 // Specifying some routes that don't exist seems like a severe problem that should be an error rather
                 // than a warning, but for now we have to tolerate it for the above reason.
-                warnings.add("Some of the specified route IDs could be found: " + unmatchedRoutes.toString());
+                addWarning("Some of the specified route IDs could be found: " + unmatchedRoutes.toString());
             }
         }
         if (unmatchedTrips.size() > 0) {
-            errors.add("These trip IDs could not be found: " + unmatchedTrips.toString());
+            addError("These trip IDs could not be found: " + unmatchedTrips.toString());
         }
 
     }
@@ -223,7 +231,41 @@ public abstract class Modification implements Serializable {
                     coordinate.toString(),
                     envelope.toString()
             );
-            errors.add(message);
+            addError(message);
         }
     }
+    
+    
+    // Always add messages using the methods below to limit the size of the sets and the responses to the client.
+    
+    protected void addWarning (String warning) {
+        addMessage(warnings, warning);
+    }
+
+    protected void addError (String error) {
+        addMessage(errors, error);
+    }
+
+    protected void addErrors (Iterable<String> errorIterable) {
+        for (String error : errorIterable) {
+             addError(error);
+        }
+    }
+
+    protected void addInfo (String info) {
+        addMessage(this.info, info);
+    }
+    
+    protected boolean hasErrors () {
+        return errors.size() > 0;
+    }
+    
+    private static void addMessage (Set<String> target, String message) {
+        if (target.size() < MAX_MESSAGES) {
+            target.add(message);
+        } else if (target.size() == MAX_MESSAGES) {
+            target.add("Additional messages omitted for brevity.");
+        }
+    }
+    
 }

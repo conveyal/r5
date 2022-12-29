@@ -1,6 +1,5 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
@@ -184,31 +183,49 @@ public class Broker implements Component {
      */
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
+        // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
+        // Throwing an exception there would not report any useful information to anyone.
+
         if (config.offline()) {
-            LOG.info("Work offline enabled, not creating workers for {}", category);
+            LOG.info("Work offline enabled, not creating workers for {}.", category);
             return;
         }
 
-        if (nOnDemand < 0 || nSpot < 0){
-            LOG.info("Negative number of workers requested, not starting any");
+        if (nOnDemand < 0 || nSpot < 0) {
+            LOG.error("Negative number of workers requested, not starting any.");
             return;
         }
 
-        // Backoff: reduce the nSpot requested when the number of already running workers starts approaching the
-        // configured maximum
-        if (workerCatalog.totalWorkerCount() * 2 > config.maxWorkers()) {
-            nSpot = Math.min(nSpot, (config.maxWorkers() - workerCatalog.totalWorkerCount()) / 2);
-            LOG.info("Worker pool over half of maximum size. Number of new spot instances set to {}", nSpot);
+        final int nRequested = nOnDemand + nSpot;
+        if (nRequested <= 0) {
+            LOG.error("No workers requested, not starting any.");
+            return;
         }
 
-        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {
-            String message = String.format(
-                    "Maximum of %d workers already started, not starting more;" +
-                    "jobs will not complete on %s",
-                    config.maxWorkers(),
-                    category
+        // Zeno's worker pool management: never start more than half the remaining capacity.
+        final int remainingCapacity = config.maxWorkers() - workerCatalog.totalWorkerCount();
+        final int maxToStart = remainingCapacity / 2;
+        if (maxToStart <= 0) {
+            LOG.error("Due to capacity limiting, not starting any workers.");
+            return;
+        }
+
+        if (nRequested > maxToStart) {
+            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", nRequested);
+            nSpot = maxToStart;
+            nOnDemand = 0;
+            LOG.warn("Lowered to {} on-demand and {} spot workers.", nOnDemand, nSpot);
+        }
+
+        // Just an assertion for consistent state - this should never happen.
+        // Re-sum nOnDemand + nSpot here instead of using nTotal, as they may have been revised.
+        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot > config.maxWorkers()) {
+            LOG.error(
+                "Starting workers would exceed the maximum capacity of {}. Jobs may stall on {}.",
+                config.maxWorkers(),
+                category
             );
-            throw AnalysisServerException.forbidden(message);
+            return;
         }
 
         // If workers have already been started up, don't repeat the operation.

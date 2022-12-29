@@ -80,7 +80,12 @@ public class SingleModeTraversalTimes implements Serializable {
         int turnTimeSeconds (TurnDirection turnDirection);
     }
 
-    public void setOneEdge () {
+
+    /**
+     * Add data for a single edge, setting scaling factors to 1 and constant costs to 0.
+     * This serves as a neutral starting point for adding generalized costs later in modifications.
+     */
+    public void addOneNeutralEdge () {
         perceivedLengthMultipliers.add(1);
         this.leftTurnSeconds.add(0);
         this.rightTurnSeconds.add(0);

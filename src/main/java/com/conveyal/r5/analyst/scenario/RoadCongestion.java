@@ -122,7 +122,7 @@ public class RoadCongestion extends Modification {
             // so it's better to just remove the CRS from all input files.
             CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
             if (crs != null && !DefaultGeographicCRS.WGS84.equals(crs) && !CRS.decode("CRS:84").equals(crs)) {
-                errors.add("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +
+                addError("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +
                         "coordinates. CRS is: " + crs.toString());
             }
             // PropertyDescriptor scalingPropertyDescriptor = featureType.getDescriptor(scalingAttribute);
@@ -142,24 +142,24 @@ public class RoadCongestion extends Modification {
                 if (name == null) {
                     logUpdatedEdgeCounts = false;
                 } else if (!(name instanceof String)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
                             name, nameAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (priority == null) {
                     priority = 0;
                 } else if (!(priority instanceof Number)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
                             priority, priorityAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (!(scale instanceof Number)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
                             scale, scalingAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (!(geometry instanceof Polygonal)) {
-                    errors.add(String.format("Geometry of feature %d should be a Polygon or Multipolygon.", featureNumber));
+                    addError(String.format("Geometry of feature %d should be a Polygon or Multipolygon.", featureNumber));
                     indexThisFeature = false;
                 }
                 if (indexThisFeature) {
@@ -176,9 +176,9 @@ public class RoadCongestion extends Modification {
                 logUpdatedEdgeCounts = false;
             }
         } catch (Exception e) {
-            errors.add(ExceptionUtils.stackTraceString(e));
+            addError(ExceptionUtils.stackTraceString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     /**
@@ -239,13 +239,13 @@ public class RoadCongestion extends Modification {
         }
         if (logUpdatedEdgeCounts) {
             edgeCounts.forEachEntry((polygon, quantity) -> {
-                info.add(String.format("polygon '%s' scaled %d edges by %.2f", polygon.name, quantity, polygon.scale));
+                addInfo(String.format("polygon '%s' scaled %d edges by %.2f", polygon.name, quantity, polygon.scale));
                 // LOG.info("{} edges were scaled by {} via polygon {} ", quantity, polygon.scale, polygon.name);
                 return true;
             });
         }
         edgeStore.speeds = adjustedSpeeds;
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

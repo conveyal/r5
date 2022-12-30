@@ -100,7 +100,7 @@ public class OpportunityDatasetController implements HttpController {
         );
     }
 
-    private Object getOpportunityDataset(Request req, Response res) {
+    private Object getOpportunityDatasetGridUrl(Request req, Response res) {
         OpportunityDataset dataset = db.opportunities.findPermittedByRequestParamId(req);
         if (dataset.format == FileStorageFormat.GRID) {
             return getJsonUrl(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
@@ -109,8 +109,7 @@ public class OpportunityDatasetController implements HttpController {
             // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
             // to that grid for display and preview, but the freeform and corresponding grid pointset have different
             // IDs and there are no references between them.
-            LOG.error("We cannot yet visualize freeform pointsets. Returning nothing to the UI.");
-            return null;
+            throw AnalysisServerException.notFound("Grid files do not exist for freeform pointsets.");
         }
     }
 
@@ -575,7 +574,7 @@ public class OpportunityDatasetController implements HttpController {
             return getJsonUrl(storageKey);
         }
 
-        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDataset(req, res);
+        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDatasetGridUrl(req, res);
 
         final OpportunityDataset opportunityDataset = db.opportunities.findPermittedByRequestParamId(req);
 
@@ -669,7 +668,7 @@ public class OpportunityDatasetController implements HttpController {
             sparkService.delete("/region/:regionId/status/:statusId", this::clearStatus, toJson);
             sparkService.delete("/source/:sourceId", this::deleteSourceSet, toJson);
             sparkService.delete("/:_id", this::deleteOpportunityDataset, toJson);
-            sparkService.get("/:_id", this::getOpportunityDataset, toJson);
+            sparkService.get("/:_id", this::getOpportunityDatasetGridUrl, toJson);
             sparkService.get("/:_id/:format", this::downloadOpportunityDataset, toJson);
         });
     }

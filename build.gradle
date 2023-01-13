@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'com.github.johnrengelman.shadow' version '6.0.0'
+    id 'application'
     id 'maven-publish'
     id 'com.palantir.git-version' version '0.12.3'
 }
@@ -13,8 +13,6 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(19))
     }
-    // sourceCompatibility = JavaVersion.VERSION_19
-    // targetCompatibility = JavaVersion.VERSION_19
 }
 
 jar {
@@ -31,10 +29,6 @@ jar {
             'Implementation-Vendor': 'Conveyal LLC',
             'Implementation-Version': project.version
     }
-}
-
-shadowJar {
-    mergeServiceFiles()
 }
 
 // Allow reflective access by Kryo to normally closed Java internals.
@@ -81,19 +75,24 @@ task copyDependencies(type: Copy) {
     into 'dependencies'
 }
 
-// Run R5 as a local analysis backend with all dependencies on the classpath, without building a shadowJar.
-task runBackend (type: JavaExec) {
-   dependsOn(build)
-   classpath(sourceSets.main.runtimeClasspath)
-   main("com.conveyal.analysis.BackendMain")
+application {
+    applicationDefaultJvmArgs = ['-Xmx4G']
+    mainClass = 'com.conveyal.analysis.BackendMain'
 }
 
-// Start up an analysis local backend from a shaded JAR and ask it to shut down immediately.
-// This is used to check in the automated build that the JAR is usable before we keep it.
+// Run R5 as a local analysis backend with all dependencies on the classpath, without building a shadowJar.
+task runBackend (type: JavaExec) {
+    dependsOn(build)
+    classpath(sourceSets.main.runtimeClasspath)
+    main("com.conveyal.analysis.BackendMain")
+}
+
+// Start up an analysis local backend and ask it to shut down immediately.
+// This is used to check in the automated build that the JAR is usable in end-to-end tests before we keep it.
 // Create a configuration properties file (by copying the template) before running this task.
-task testShadowJarRunnable(type: JavaExec) {
-    dependsOn(shadowJar)
-    classpath(shadowJar.archiveFile.get())
+task testRunnable(type: JavaExec) {
+    dependsOn(build)
+    classpath(sourceSets.main.runtimeClasspath)
     main("com.conveyal.analysis.BackendMain")
     jvmArgs("-Dconveyal.immediate.shutdown=true")
 }

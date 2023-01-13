@@ -42,10 +42,11 @@ jobs:
       run: gradle -q printVersion | head -n1
     - name: Build and test
       run: gradle build
-    - name: Ensure shadow JAR is runnable as local backend
+    # Check that build product is able to start up as a backend server before handing it to end-to-end testing
+    - name: Ensure backend runnable
       run: |
         cp analysis.properties.template analysis.properties
-        gradle testShadowJarRunnable
+        gradle testRunnable -x test
     - name: Publish to GH Packages
       # Supply access token to build.gradle (used in publishing.repositories.maven.credentials)
       env:

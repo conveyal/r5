@@ -83,6 +83,7 @@ application {
 // Run R5 as a local analysis backend with all dependencies on the classpath, without building a shadowJar.
 task runBackend (type: JavaExec) {
     dependsOn(build)
+    maxHeapSize('7G')
     classpath(sourceSets.main.runtimeClasspath)
     main("com.conveyal.analysis.BackendMain")
 }

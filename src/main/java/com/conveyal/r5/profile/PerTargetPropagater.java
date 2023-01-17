@@ -398,6 +398,11 @@ public class PerTargetPropagater {
                             linkedTargets.streetMode
                     );
 
+                    ////////// Test Java 19 Vector API
+                    if (VectorTest.ENABLE_VECTOR_TEST) {
+                        VectorTest.propagate(travelTimesToStop[stop], secondsFromStopToTarget, perIterationTravelTimes);
+                    } else
+                    ////////// Odd formatting just to prevent spurious git changes to following lines
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
                         // calculated in the Raptor route() method.

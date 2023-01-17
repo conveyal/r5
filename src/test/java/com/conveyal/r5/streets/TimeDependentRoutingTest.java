@@ -1,6 +1,5 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import org.junit.jupiter.api.Test;
@@ -13,7 +12,7 @@ public class TimeDependentRoutingTest {
     public void testProvideMyOwnTravelTime() {
 
         // Not time dependent yet
-        StreetLayer streetLayer = new StreetLayer(new TNBuilderConfig());
+        StreetLayer streetLayer = new StreetLayer();
         int one = streetLayer.vertexStore.addVertex(0, 1);
         int two = streetLayer.vertexStore.addVertex(0, 2);
         int three = streetLayer.vertexStore.addVertex(0, 3);

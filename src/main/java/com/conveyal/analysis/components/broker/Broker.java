@@ -1,6 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
@@ -79,7 +79,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * TODO evaluate whether synchronizing all methods to make this threadsafe is a performance issue.
  */
-public class Broker {
+public class Broker implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
 
@@ -107,7 +107,8 @@ public class Broker {
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER = 800;
+    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
@@ -242,28 +243,54 @@ public class Broker {
     /**
      * Create on-demand/spot workers for a given job, after certain checks
      * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot EC2 spot instances to request
+     * @param nSpot Target number of EC2 spot instances to request. The actual number requested may be lower if the
+     *              total number of workers running is approaching the maximum specified in the Broker config.
      */
     public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
 
+        // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
+        // Throwing an exception there would not report any useful information to anyone.
+
         if (config.offline()) {
-            LOG.info("Work offline enabled, not creating workers for {}", category);
+            LOG.info("Work offline enabled, not creating workers for {}.", category);
             return;
         }
 
-        if (nOnDemand < 0 || nSpot < 0){
-            LOG.info("Negative number of workers requested, not starting any");
+        if (nOnDemand < 0 || nSpot < 0) {
+            LOG.error("Negative number of workers requested, not starting any.");
             return;
         }
 
-        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot >= config.maxWorkers()) {
-            String message = String.format(
-                    "Maximum of %d workers already started, not starting more;" +
-                    "jobs will not complete on %s",
-                    config.maxWorkers(),
-                    category
+        final int nRequested = nOnDemand + nSpot;
+        if (nRequested <= 0) {
+            LOG.error("No workers requested, not starting any.");
+            return;
+        }
+
+        // Zeno's worker pool management: never start more than half the remaining capacity.
+        final int remainingCapacity = config.maxWorkers() - workerCatalog.totalWorkerCount();
+        final int maxToStart = remainingCapacity / 2;
+        if (maxToStart <= 0) {
+            LOG.error("Due to capacity limiting, not starting any workers.");
+            return;
+        }
+
+        if (nRequested > maxToStart) {
+            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", nRequested);
+            nSpot = maxToStart;
+            nOnDemand = 0;
+            LOG.warn("Lowered to {} on-demand and {} spot workers.", nOnDemand, nSpot);
+        }
+
+        // Just an assertion for consistent state - this should never happen.
+        // Re-sum nOnDemand + nSpot here instead of using nTotal, as they may have been revised.
+        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot > config.maxWorkers()) {
+            LOG.error(
+                "Starting workers would exceed the maximum capacity of {}. Jobs may stall on {}.",
+                config.maxWorkers(),
+                category
             );
-            throw AnalysisServerException.forbidden(message);
+            return;
         }
 
         // If workers have already been started up, don't repeat the operation.
@@ -327,12 +354,11 @@ public class Broker {
             LOG.error("Failed to mark task {} completed on job {}.", taskId, job.jobId);
         }
         // Once the last task is marked as completed, the job is finished.
-        // Purge it from the list to free memory.
+        // Remove it and its associated result assembler from the maps.
+        // The caller should already have a reference to the result assembler so it can process the final results.
         if (job.isComplete()) {
             job.verifyComplete();
             jobs.remove(job.workerCategory, job);
-            // This method is called after the regional work results are handled, finishing and closing the local file.
-            // So we can harmlessly remove the MultiOriginAssembler now that the job is removed.
             resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
@@ -345,7 +371,9 @@ public class Broker {
      * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
      */
     private synchronized void recordJobError (Job job, String error) {
-        job.errors.add(error);
+        if (job != null) {
+            job.errors.add(error);
+        }
     }
 
     /**
@@ -398,7 +426,7 @@ public class Broker {
 
     /**
      * Given a worker commit ID and transport network, return the IP or DNS name of a worker that has that software
-     * and network already loaded. If none exist, return null and try to start one.
+     * and network already loaded. If none exist, return null. The caller can then try to start one.
      */
     public synchronized String getWorkerAddress(WorkerCategory workerCategory) {
         if (config.offline()) {
@@ -431,41 +459,40 @@ public class Broker {
     }
 
     /**
-     * Slots a single regional work result received from a worker into the appropriate position in
-     * the appropriate file. Also considers requesting extra spot instances after a few results have
-     * been received. The checks in place should prevent an unduly large number of workers from
-     * proliferating, assuming jobs for a given worker category (transport network + R5 version) are
-     * completed sequentially.
-     *
-     * @param workResult an object representing accessibility results for a single origin point,
-     *                   sent by a worker.
+     * Slots a single regional work result received from a worker into the appropriate position in the appropriate
+     * files. Also considers requesting extra spot instances after a few results have been received.
+     * @param workResult an object representing accessibility results for a single origin point, sent by a worker.
      */
     public void handleRegionalWorkResult(RegionalWorkResult workResult) {
-        // Retrieving the job and assembler from their maps is not threadsafe, so we do so in a
-        // synchronized block here. Once the job is retrieved, it can be used to
-        // requestExtraWorkers below without synchronization, because that method only uses final
-        // fields of the job.
-        Job job;
+        // Retrieving the job and assembler from their maps is not thread safe, so we use synchronized block here.
+        // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
+        // because that method only uses final fields of the job.
+        Job job = null;
         MultiOriginAssembler assembler;
-        synchronized (this) {
-            job = findJob(workResult.jobId);
-            assembler = resultAssemblers.get(workResult.jobId);
-        }
-        if (job == null || assembler == null || !job.isActive()) {
-            // This will happen naturally for all delivered tasks when a job is deleted by the user or after it errors.
-            LOG.debug("Received result for unrecognized, deleted, or inactive job ID {}, discarding.", workResult.jobId);
-            return;
-        }
-        if (workResult.error != null) {
-            // Record any error reported by the worker and don't pass the (bad) result on to regional result assembly.
-            recordJobError(job, workResult.error);
-            return;
-        }
-        // When the last task is received, this will build up to 5 grids and upload them to S3. That should probably
-        // not be done synchronously in an HTTP handler called by the worker (likewise for starting workers below).
         try {
+            synchronized (this) {
+                job = findJob(workResult.jobId);
+                assembler = resultAssemblers.get(workResult.jobId);
+                if (job == null || assembler == null || !job.isActive()) {
+                    // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
+                    LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
+                    return;
+                }
+                if (workResult.error != null) {
+                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                    recordJobError(job, workResult.error);
+                    return;
+                }
+                // Mark tasks completed first before passing results to the assembler. On the final result received,
+                // this will minimize the risk of race conditions by quickly making the job invisible to incoming stray
+                // results from spurious redeliveries, before the assembler is busy finalizing and uploading results.
+                markTaskCompleted(job, workResult.taskId);
+            }
+            // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
+            // It contains some slow nested operations to move completed results into storage. Really we should not do
+            // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
+            // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
             assembler.handleMessage(workResult);
-            markTaskCompleted(job, workResult.taskId);
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));
@@ -482,9 +509,27 @@ public class Broker {
         WorkerCategory workerCategory = job.workerCategory;
         int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-            // Start a number of workers that scales with the number of total tasks, up to a fixed number.
-            // TODO more refined determination of number of workers to start (e.g. using tasks per minute)
-            int targetWorkerTotal = Math.min(MAX_WORKERS_PER_CATEGORY, job.nTasksTotal / TARGET_TASKS_PER_WORKER);
+            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+            int targetWorkerTotal;
+            if (job.templateTask.hasTransit()) {
+                // Total computation for a task with transit depends on the number of stops and whether the
+                // network has frequency-based routes. The total computation for the job depends on these
+                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+                //  this worth adding a field to Job or RegionalTask?
+                float transitScaleFactor = (9f / job.templateTask.zoom);
+                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+            } else {
+                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+                // the job increases roughly with linearly with the number of origins.
+                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+            }
+
+            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
+            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
             // Guardrail until freeform pointsets are tested more thoroughly
             if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;

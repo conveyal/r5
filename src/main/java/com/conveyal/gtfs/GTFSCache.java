@@ -1,16 +1,30 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.analysis.components.Component;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.r5.common.GeometryUtils;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalListener;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.File;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
@@ -23,21 +37,39 @@ import static com.google.common.base.Preconditions.checkState;
  * to hold a reference to the evicted GTFSFeed will then fail if it tries to access the closed MapDB. The exact eviction
  * policy is discussed in Javadoc on the class fields and methods.
  */
-public class GTFSCache {
+public class GTFSCache implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
-    private final LoadingCache<String, GTFSFeed> cache;
 
     public final FileStorage fileStorage;
 
-    public static String cleanId(String id) {
-        return id.replaceAll("[^A-Za-z0-9_]", "-");
-    }
+    private final LoadingCache<String, GTFSFeed> cache;
+
+    // The following two caches hold spatial indexes of GTFS geometries for generating Mapbox vector tiles, one spatial
+    // index per feed keyed on BundleScopedFeedId. They could potentially be combined such that cache values are a
+    // compound type holding two indexes, or cache values are a single index containing a mix of different geometry
+    // types that are filtered on iteration. They could also be integreated into the GTFSFeed values of the main
+    // GTFSCache#cache. However GTFSFeed is already a very long class, and we may want to tune eviction parameters
+    // separately for GTFSFeed and these indexes. While GTFSFeeds are expected to incur constant memory use, the
+    // spatial indexes are potentially unlimited in size and we may want to evict them faster or limit their quantity.
+    // We have decided to keep them as separate caches until we're certain of the chosen eviction tuning parameters.
+
+    /** A cache of spatial indexes of TripPattern shapes, keyed on the BundleScopedFeedId. */
+    public final GeometryCache<LineString> patternShapes;
+
+    /** A cache of spatial indexes of transit stop locations, keyed on the BundleScopedFeedId. */
+    public final GeometryCache<Point> stops;
 
     public GTFSCache (FileStorage fileStorage) {
         LOG.info("Initializing the GTFS cache...");
         this.fileStorage = fileStorage;
         this.cache = makeCaffeineCache();
+        this.patternShapes = new GeometryCache<>(this::buildShapesIndex);
+        this.stops = new GeometryCache<>(this::buildStopsIndex);
+    }
+
+    public static String cleanId(String id) {
+        return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
 
     /**
@@ -150,6 +182,64 @@ public class GTFSCache {
         } catch (Exception e) {
             throw new GtfsLibException("Error loading zip file for GTFS feed: " + zipKey, e);
         }
+    }
+
+    /** CacheLoader implementation making spatial indexes of stop pattern shapes for a single feed. */
+    private void buildShapesIndex (String bundleScopedFeedId, STRtree tree) {
+        final long startTimeMs = System.currentTimeMillis();
+        final GTFSFeed feed = this.get(bundleScopedFeedId);
+        // This is huge, we can instead map from envelopes to tripIds, but re-fetching those trips is slow
+        LOG.info("{}: indexing {} patterns", feed.feedId, feed.patterns.size());
+        for (Pattern pattern : feed.patterns.values()) {
+            Route route = feed.routes.get(pattern.route_id);
+            String exemplarTripId = pattern.associatedTrips.get(0);
+            LineString wgsGeometry = feed.getTripGeometry(exemplarTripId);
+            if (wgsGeometry == null) {
+                // Not sure why some of these are null.
+                continue;
+            }
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", pattern.pattern_id);
+            userData.put("name", pattern.name);
+            userData.put("routeId", route.route_id);
+            userData.put("routeName", route.route_long_name);
+            userData.put("routeColor", Objects.requireNonNullElse(route.route_color, "000000"));
+            userData.put("routeType", route.route_type);
+            wgsGeometry.setUserData(userData);
+            tree.insert(wgsGeometry.getEnvelopeInternal(), wgsGeometry);
+        }
+        LOG.info("Created vector tile spatial index for patterns in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
+    }
+
+    /**
+     * CacheLoader implementation making spatial indexes of transit stops for a single feed.
+     * This is inefficient, TODO specialized spatial index to bin points into mercator tiles (like hashgrid).
+     */
+    private void buildStopsIndex (String bundleScopedFeedId, STRtree tree) {
+        final long startTimeMs = System.currentTimeMillis();
+        final GTFSFeed feed = this.get(bundleScopedFeedId);
+        LOG.info("{}: indexing {} stops", feed.feedId, feed.stops.size());
+        for (Stop stop : feed.stops.values()) {
+            // To match existing GTFS API, include only stop objects that have location_type 0.
+            // All other location_types (station, entrance, generic node, boarding area) are skipped.
+            // Missing (NaN) coordinates will confuse the spatial index and cascade hundreds of errors.
+            if (stop.location_type != 0 || !Double.isFinite(stop.stop_lat) || !Double.isFinite(stop.stop_lon)) {
+                continue;
+            }
+            Envelope stopEnvelope = new Envelope(stop.stop_lon, stop.stop_lon, stop.stop_lat, stop.stop_lat);
+            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
+
+            Map<String, Object> properties = new HashMap<>();
+            properties.put("feedId", stop.feed_id);
+            properties.put("id", stop.stop_id);
+            properties.put("name", stop.stop_name);
+            properties.put("lat", stop.stop_lat);
+            properties.put("lon", stop.stop_lon);
+
+            point.setUserData(properties);
+            tree.insert(stopEnvelope, point);
+        }
+        LOG.info("Created spatial index for stops in feed {} ({})", bundleScopedFeedId, Duration.ofMillis(System.currentTimeMillis() - startTimeMs));
     }
 
 }

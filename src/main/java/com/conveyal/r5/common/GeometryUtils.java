@@ -23,8 +23,8 @@ public class GeometryUtils {
     /** Average of polar and equatorial radii, https://en.wikipedia.org/wiki/Earth */
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
 
-    /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
-    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
+    /** Maximum area allowed for the bounding box of uploaded files -- large enough for California.  */
+    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 975_000;
 
     /**
      * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this
@@ -107,16 +107,16 @@ public class GeometryUtils {
         checkLat(envelope.getMaxY());
     }
 
-    private static void checkLon (double longitude) {
+    public static void checkLon (double longitude) {
         if (!Double.isFinite(longitude) || Math.abs(longitude) > 180) {
             throw new DataSourceException("Longitude is not a finite number with absolute value below 180.");
         }
     }
 
-    private static void checkLat (double latitude) {
+    public static void checkLat (double latitude) {
         // Longyearbyen on the Svalbard archipelago is the world's northernmost permanent settlement (78 degrees N).
         if (!Double.isFinite(latitude) || Math.abs(latitude) > 80) {
-            throw new DataSourceException("Longitude is not a finite number with absolute value below 80.");
+            throw new DataSourceException("Latitude is not a finite number with absolute value below 80.");
         }
     }
 

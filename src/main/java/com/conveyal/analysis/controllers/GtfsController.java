@@ -3,6 +3,7 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
@@ -10,6 +11,7 @@ import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
 import com.mongodb.QueryBuilder;
+import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
 import org.mongojack.DBCursor;
 import spark.Request;
@@ -22,34 +24,32 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.conveyal.analysis.util.HttpStatus.OK_200;
+import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**
- * Controller for retrieving data from the GTFS cache.
+ * Controller for retrieving contents of GTFS feeds that have been converted to MapDB files via the GTFS cache.
  *
  * Each endpoint starts with it's `feedGroupId` and `feedId` for retrieving the feed from the cache. No database
  * interaction is done. This assumes that if the user is logged in and retrieving the feed by the appropriate ID then
  * they have access to it, without checking the access group. This setup will allow for putting this endpoint behind a
  * CDN in the future. Everything retrieved is immutable. Once it's retrieved and stored in the CDN, it doesn't need to
  * be pulled from the cache again.
+ *
+ * Also defines HTTP API endpoints to return Mapbox vector tiles of GTFS feeds known to the Analysis backend.
+ * A basic example client for browsing the tiles is at src/main/resources/vector-client
  */
 public class GtfsController implements HttpController {
+
+    // Vector tile layer names. These must match the layer names expected in the UI code.
+    private static final String PATTERN_LAYER_NAME = "conveyal:gtfs:patternShapes";
+    private static final String STOP_LAYER_NAME = "conveyal:gtfs:stops";
+
     private final GTFSCache gtfsCache;
+
     public GtfsController(GTFSCache gtfsCache) {
         this.gtfsCache = gtfsCache;
-    }
-
-    /**
-     * Use the same Cache-Control header for each endpoint here. 2,592,000 seconds is one month.
-     * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
-     */
-    private final String cacheControlImmutable = "public, max-age=2592000, immutable";
-
-    /**
-     * Extracted into a common method to allow turning off during development.
-     */
-    private void addImmutableResponseHeader (Response res) {
-        res.header("Cache-Control", cacheControlImmutable);
     }
 
     private static class BaseApiResponse {
@@ -67,9 +67,12 @@ public class GtfsController implements HttpController {
         public double[][] coordinates;
     }
 
+    private static String bundleScopedFeedIdFromRequest (Request req) {
+        return Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
+    }
+
     private GTFSFeed getFeedFromRequest (Request req) {
-        String bundleScopedFeedId = Bundle.bundleScopeFeedId(req.params("feedId"), req.params("feedGroupId"));
-        return gtfsCache.get(bundleScopedFeedId);
+        return gtfsCache.get(bundleScopedFeedIdFromRequest(req));
     }
 
     static class RouteApiResponse extends BaseApiResponse {
@@ -91,13 +94,11 @@ public class GtfsController implements HttpController {
     }
 
     private RouteApiResponse getRoute(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return new RouteApiResponse(feed.routes.get(req.params("routeId")));
     }
 
     private List<RouteApiResponse> getRoutes(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.routes
                 .values()
@@ -129,7 +130,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<PatternApiResponse> getPatternsForRoute (Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
         return feed.patterns
@@ -151,18 +151,18 @@ public class GtfsController implements HttpController {
         }
     }
     /**
-     * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed
+     * Return StopApiResponse values for GTFS stops (location_type = 0) in a single feed.
+     * All other location_types (station, entrance, generic node, boarding area) are skipped.
      */
     private List<StopApiResponse> getAllStopsForOneFeed(Request req, Response res) {
-        addImmutableResponseHeader(res);
         GTFSFeed feed = getFeedFromRequest(req);
         return feed.stops.values().stream().filter(s -> s.location_type == 0)
                 .map(StopApiResponse::new).collect(Collectors.toList());
     }
 
     /**
-     * Groups the feedId and stops (location_type = 0; not parent stations, entrances/exits, generic nodes, etc.) for a
-     * given GTFS feed
+     * Compound return type for the feedId and stops with location_type = 0 for a given GTFS feed.
+     * All other location_types (station, entrance, generic node, boarding area) are skipped.
      */
     static class FeedGroupStopsApiResponse {
         public final String feedId;
@@ -177,7 +177,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<FeedGroupStopsApiResponse> getAllStopsForFeedGroup(Request req, Response res) {
-        addImmutableResponseHeader(res);
         String feedGroupId = req.params("feedGroupId");
         DBCursor<Bundle> cursor = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(feedGroupId).get());
         if (!cursor.hasNext()) {
@@ -192,6 +191,32 @@ public class GtfsController implements HttpController {
             allStopsByFeed.add(new FeedGroupStopsApiResponse(feed));
         }
         return allStopsByFeed;
+    }
+
+    /**
+     * Generate a Mapbox Vector Tile of a GTFS feed's stops and pattern shapes for a given Z/X/Y tile.
+     */
+    private Object getTile (Request req, Response res) {
+        String bundleScopedFeedId = bundleScopedFeedIdFromRequest(req);
+        final int z = Integer.parseInt(req.params("z"));
+        final int x = Integer.parseInt(req.params("x"));
+        final int y = Integer.parseInt(req.params("y"));
+        VectorMapTile tile = new VectorMapTile(z, x, y);
+        List<Geometry> patternGeometries = tile.clipAndSimplifyLinesToTile(
+                gtfsCache.patternShapes.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        );
+        List<Geometry> stopGeometries = tile.projectPointsToTile(
+                gtfsCache.stops.queryEnvelope(bundleScopedFeedId, tile.envelope)
+        );
+
+        res.header("Content-Type", "application/vnd.mapbox-vector-tile");
+        res.header("Content-Encoding", "gzip");
+        res.status(OK_200);
+
+        return tile.encodeLayersToBytes(
+                tile.createLayer(PATTERN_LAYER_NAME, patternGeometries),
+                tile.createLayer(STOP_LAYER_NAME, stopGeometries)
+        );
     }
 
     static class TripApiResponse extends BaseApiResponse {
@@ -219,7 +244,6 @@ public class GtfsController implements HttpController {
     }
 
     private List<TripApiResponse> getTripsForRoute (Request req, Response res) {
-        addImmutableResponseHeader(res);
         final GTFSFeed feed = getFeedFromRequest(req);
         final String routeId = req.params("routeId");
         return feed.trips
@@ -231,12 +255,26 @@ public class GtfsController implements HttpController {
     }
 
     @Override
-    public void registerEndpoints (spark.Service sparkService) {
-        sparkService.get("/api/gtfs/:feedGroupId/stops", this::getAllStopsForFeedGroup, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes", this::getRoutes, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId", this::getRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/patterns", this::getPatternsForRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/routes/:routeId/trips", this::getTripsForRoute, toJson);
-        sparkService.get("/api/gtfs/:feedGroupId/:feedId/stops", this::getAllStopsForOneFeed, toJson);
+    public void registerEndpoints (spark.Service ss) {
+        ss.path("/api/gtfs/:feedGroupId", () -> {
+            ss.before("*", (req, res) ->{
+                res.header("Cache-Control", CACHE_CONTROL_IMMUTABLE);
+            });
+            ss.get("/stops", this::getAllStopsForFeedGroup, toJson);
+            ss.path("/:feedId", () -> {
+                ss.get("/tiles/:z/:x/:y", this::getTile);
+
+                ss.path("/routes", () -> {
+                    ss.get("", this::getRoutes, toJson);
+                    ss.path("/:routeId", () -> {
+                        ss.get("", this::getRoute, toJson);
+                        ss.get("/patterns", this::getPatternsForRoute, toJson);
+                        ss.get("/trips", this::getTripsForRoute, toJson);
+                    });
+                });
+
+                ss.get("/stops", this::getAllStopsForOneFeed, toJson);
+            });
+        });
     }
 }

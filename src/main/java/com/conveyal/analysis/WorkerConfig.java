@@ -1,6 +1,7 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.components.WorkerHttpApi;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,7 +9,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Properties;
 
 /** Loads config information for an analysis worker and exposes it to the worker's Components and HttpControllers. */
-public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.Config, AnalysisWorker.Config {
+public abstract class WorkerConfig extends ConfigBase
+        implements TaskScheduler.Config, AnalysisWorker.Config, WorkerHttpApi.Config {
 
     private static final Logger LOG = LoggerFactory.getLogger(ConfigBase.class);
 
@@ -18,7 +20,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
     private final String  brokerPort;
     private final int     lightThreads;
     private final int     heavyThreads;
-    private final boolean testTaskRedelivery;
     private final boolean listenForSinglePoint;
 
     // CONSTRUCTORS
@@ -34,7 +35,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
             lightThreads = availableProcessors;
             heavyThreads = availableProcessors;
         }
-        testTaskRedelivery = boolProp("test-task-redelivery");
         listenForSinglePoint = boolProp("listen-for-single-point");
         // No call to exitIfErrors() here, that should be done in concrete subclasses.
     }
@@ -47,7 +47,6 @@ public abstract class WorkerConfig extends ConfigBase implements TaskScheduler.C
     @Override public String  brokerPort()      { return brokerPort; }
     @Override public int     lightThreads ()   { return lightThreads; }
     @Override public int     heavyThreads ()   { return heavyThreads; }
-    @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public boolean listenForSinglePoint() { return listenForSinglePoint; }
 
 }

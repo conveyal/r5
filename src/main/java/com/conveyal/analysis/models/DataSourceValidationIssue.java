@@ -13,6 +13,11 @@ public class DataSourceValidationIssue {
         ERROR, WARN, INFO
     }
 
+    /** Zero argument constructor required for MongoDB driver automatic POJO deserialization. */
+    public DataSourceValidationIssue () {
+
+    }
+
     public DataSourceValidationIssue (Level level, String description) {
         this.level = level;
         this.description = description;

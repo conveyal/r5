@@ -34,6 +34,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
+import org.bson.types.ObjectId;
 import org.mongojack.DBCursor;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
@@ -48,6 +49,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -132,11 +134,11 @@ public class BrokerController implements HttpController {
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
         // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
-        checkNotNull(analysisRequest.regionId);
-        checkNotNull(analysisRequest.projectId);
-        checkNotNull(analysisRequest.bundleId);
-        checkNotNull(analysisRequest.modificationIds);
-        checkNotNull(analysisRequest.workerVersion);
+        checkUuidParameter(analysisRequest.regionId, "region ID");
+        checkUuidParameter(analysisRequest.projectId, "project ID");
+        checkUuidParameter(analysisRequest.bundleId, "bundle ID");
+        checkUuidParameters(analysisRequest.modificationIds, "modification IDs");
+        checkNotNull(analysisRequest.workerVersion, "Worker version must be provided in request.");
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
         TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
@@ -383,6 +385,33 @@ public class BrokerController implements HttpController {
     private static void enforceAdmin (Request request) {
         if (!UserPermissions.from(request).admin) {
             throw AnalysisServerException.forbidden("You do not have access.");
+        }
+    }
+
+    /**
+     * Validate a request parameter that is expected to be a non-null String containing a Mongo ObjectId or a
+     * UUID converted to a string in the standard way.
+     * @param name a human-readable name for the parameter being validated, for substitution into error messages.
+     * @throws IllegalArgumentException if the parameter fails any of these conditions.
+     */
+    public static void checkUuidParameter (String parameter, String name) {
+        if (parameter == null) {
+            throw new IllegalArgumentException(String.format("The %s is not set in the request.", name));
+        }
+        // Should be either 24 hex digits (Mongo ID) or 32 hex digits with dashes (UUID)
+        if (ObjectId.isValid(parameter)) {
+            return;
+        }
+        try {
+            UUID.fromString(parameter);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", name));
+        }
+    }
+
+    public static void checkUuidParameters (Iterable<String> parameters, String name) {
+        for (String parameter: parameters) {
+            checkUuidParameter(parameter, name);
         }
     }
 

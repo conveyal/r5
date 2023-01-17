@@ -123,7 +123,7 @@ public class FreeFormPointSet extends PointSet {
             return ret;
         } catch (NumberFormatException nfe) {
             throw new ParameterException(
-                String.format("Improperly formatted floating point value on line %d of CSV input", rec)
+                String.format("Improperly formatted floating point value near line %d of CSV input", rec + 1)
             );
         }
     }

@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
  * This is an API model object for reporting a single error or warning that occurred on a worker back to the UI via
  * the backend. The most common errors a user will see are problems applying scenario modifications, so this provides
@@ -35,6 +37,7 @@ public class TaskError {
     public TaskError(Modification modification, Collection<String> messages) {
         this.modificationId = modification.comment;
         this.title = "while applying the modification entitled '" + modification.comment + "'.";
+        checkArgument(messages.size() <= Modification.MAX_MESSAGES + 1);
         this.messages.addAll(messages);
     }
 

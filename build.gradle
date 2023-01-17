@@ -33,6 +33,7 @@ jar {
 
 // Allow reflective access by Kryo to normally closed Java internals.
 // This is used for testing equality, but also for building automatic Kryo (de)serializers.
+// Until we use the Java module system (add module-info.java) we also need to add these same flags to non-test runs.
 test {
     jvmArgs = ['--add-opens=java.base/java.io=ALL-UNNAMED',
                '--add-opens=java.base/java.time=ALL-UNNAMED',
@@ -126,10 +127,8 @@ repositories {
     // Put Open Source Geospatial before Maven Central to get JAI core, see https://stackoverflow.com/a/26993223
     maven { url 'https://repo.osgeo.org/repository/release/' }
     mavenCentral()
-    // TODO review whether we really need these repositories
+    // TODO review whether we really need the repositories below
     maven { url 'https://maven.conveyal.com' }
-    // Used for importing java projects from github (why do we need this?)
-    maven { url 'https://jitpack.io' }
     // For the polyline encoder
     maven { url 'https://nexus.axiomalaska.com/nexus/content/repositories/public-releases' }
 }

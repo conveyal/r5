@@ -155,8 +155,8 @@ public class GridResultWriter extends BaseResultWriter {
 
     @Override
     synchronized void terminate () throws IOException {
-        bufferFile.delete();
         randomAccessFile.close();
+        bufferFile.delete();
     }
 
 }

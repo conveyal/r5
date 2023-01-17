@@ -138,7 +138,6 @@ public class TypeOfEdgeLabeler {
             forwardFlags.add(EdgeStore.EdgeFlag.PLATFORM);
             backFlags.add(EdgeStore.EdgeFlag.PLATFORM);
         }
-
-
     }
+
 }

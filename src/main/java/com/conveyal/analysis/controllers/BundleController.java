@@ -13,11 +13,14 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -95,8 +98,8 @@ public class BundleController implements HttpController {
      * Given a request containing an HTML form-based file upload (a multipart/form-data POST request), interpret each
      * of the uploaded items as a GTFS feed, processing the uploaded feeds into MapDB form. This provides at least
      * some form of basic validation that the feed can be loaded at all, then creates the Bundle object in MongoDB to
-     * represent the set of feeds, as well as a JSON "manifest" which is stored on S3 alongside the feeds so that
-     * workers know which feeds are grouped together as a Bundle. The Bundle object is returned so it can be
+     * represent the set of feeds, as well as a JSON TransportNetworkConfig which is stored on S3 alongside the feeds so
+     * that workers know which feeds are grouped together as a Bundle. The Bundle object is returned so it can be
      * communicated back to the client over HTTP. The processing of the feeds is done asynchronously, so the status
      * field of the Bundle will at first indicate that it is not complete. By polling these API endpoints a client
      * can see when the GTFS processing has finished, or whether any errors occurred.
@@ -197,15 +200,29 @@ public class BundleController implements HttpController {
                         feed.progressListener = progressListener;
                         feed.loadFromFile(zipFile, new ObjectId().toString());
 
-                        // Populate the metadata while the feed is open
-                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
-                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
-                        bundle.feeds.add(feedSummary);
+                        // Perform any more complex validation that requires cross-table checks.
+                        new PostLoadValidator(feed).validate();
 
+                        // Find and validate the extents of the GTFS, defined by all stops in the feed.
                         for (Stop s : feed.stops.values()) {
                             bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
                         }
-                        checkWgsEnvelopeSize(bundleBounds, "GTFS data");
+                        try {
+                            checkWgsEnvelopeSize(bundleBounds, "GTFS data");
+                        } catch (IllegalArgumentException iae) {
+                            // Convert envelope size or antimeridian crossing exceptions to feed import errors.
+                            // Out of range lat/lon values will throw DataSourceException and bundle import will fail.
+                            // Envelope size or antimeridian crossing will throw IllegalArgumentException. We want to
+                            // soft-fail on these because some feeds contain small amounts of long-distance service
+                            // which may extend far beyond the analysis area without causing problems.
+                            feed.errors.add(new GeneralError("stops", -1, null, iae.getMessage()));
+                        }
+
+                        // Populate the metadata while the feed is still open.
+                        // This must be done after all errors have been added to the feed.
+                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
+                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
+                        bundle.feeds.add(feedSummary);
 
                         if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
                             bundle.serviceStart = feedSummary.serviceStart;
@@ -241,7 +258,7 @@ public class BundleController implements HttpController {
                     bundle.east = bundleBounds.getMaxX();
                     bundle.west = bundleBounds.getMinX();
                 }
-                writeManifestToCache(bundle);
+                writeNetworkConfigToCache(bundle);
                 bundle.status = Bundle.Status.DONE;
               } catch (Throwable t) {
                 LOG.error("Error creating bundle", t);
@@ -260,17 +277,17 @@ public class BundleController implements HttpController {
         return bundle;
     }
 
-    private void writeManifestToCache (Bundle bundle) throws IOException {
-        BundleManifest manifest = new BundleManifest();
-        manifest.osmId = bundle.osmId;
-        manifest.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
+    private void writeNetworkConfigToCache (Bundle bundle) throws IOException {
+        TransportNetworkConfig networkConfig = new TransportNetworkConfig();
+        networkConfig.osmId = bundle.osmId;
+        networkConfig.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
 
-        String manifestFileName = bundle._id + ".json";
-        File manifestFile = FileUtils.createScratchFile("json");
-        JsonUtil.objectMapper.writeValue(manifestFile, manifest);
+        String configFileName = bundle._id + ".json";
+        File configFile = FileUtils.createScratchFile("json");
+        JsonUtil.objectMapper.writeValue(configFile, networkConfig);
 
-        FileStorageKey key = new FileStorageKey(BUNDLES, manifestFileName);
-        fileStorage.moveIntoStorage(key, manifestFile);
+        FileStorageKey key = new FileStorageKey(BUNDLES, configFileName);
+        fileStorage.moveIntoStorage(key, configFile);
     }
 
     private Bundle deleteBundle (Request req, Response res) throws IOException {

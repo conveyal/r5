@@ -2,6 +2,7 @@
 package com.conveyal.r5.profile;
 
 import jdk.incubator.vector.IntVector;
+import jdk.incubator.vector.VectorMask;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
@@ -45,11 +46,14 @@ public class VectorTest {
             var tts = IntVector.fromArray(SPECIES, timesToStop, i);
             var ttd = IntVector.fromArray(SPECIES, timesToDestination, i);
             // .max(tts) should handle overflow, i.e. if adding something makes it less (negtive) keep the higher value
+            // Alternatively the following is about the same speed:
+            // VectorMask stopReached = tts.lt(maxTravelTimeSeconds).not();
+            // tts.add(stopToDestTime).blend(Integer.MAX_VALUE, stopReached).min(ttd);
             var ttd2 = tts.add(stopToDestTime).max(tts).min(ttd);
             ttd2.intoArray(timesToDestination, i);
         }
         for (; i < timesToStop.length; i++) {
-            timesToDestination[i] = Math.min(timesToDestination[i], timesToStop[i] + stopToDestTime);
+            timesToDestination[i] = Math.min(timesToDestination[i], Math.max(timesToStop[i] + stopToDestTime, timesToStop[i]));
         }
     }
 

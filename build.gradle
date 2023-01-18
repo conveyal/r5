@@ -22,7 +22,7 @@ jar {
     // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.
     // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
     manifest {
-        attributes 'Automatic-Module-Name': 'com.conveyal.analysis',
+        attributes 'Automatic-Module-Name': 'com.conveyal.r5',
             'Main-Class': 'com.conveyal.analysis.BackendMain',
             'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
             'Implementation-Title': 'Conveyal Analysis Backend',
@@ -31,15 +31,15 @@ jar {
     }
 }
 
-// Allow reflective access by Kryo to normally closed Java internals.
-// This is used for testing equality, but also for building automatic Kryo (de)serializers.
-// Until we use the Java module system (add module-info.java) we also need to add these same flags to non-test runs.
+// Allow reflective access by ObjectDiffer to normally closed Java internals. Used for round-trip testing serialization.
+// IntelliJ seems not to pass these JVM arguments when running tests from within the IDE, so the Kryo serialization
+// tests may only succeed under command line Gradle.
 test {
+    useJUnitPlatform()
     jvmArgs = ['--add-opens=java.base/java.io=ALL-UNNAMED',
                '--add-opens=java.base/java.time=ALL-UNNAMED',
                '--add-opens=java.base/java.time.zone=ALL-UNNAMED',
                '--add-opens=java.base/java.lang=ALL-UNNAMED']
-    useJUnitPlatform()
 }
 
 // `gradle publish` will upload both shadow and simple JAR to Github Packages
@@ -127,6 +127,7 @@ repositories {
     // Put Open Source Geospatial before Maven Central to get JAI core, see https://stackoverflow.com/a/26993223
     maven { url 'https://repo.osgeo.org/repository/release/' }
     mavenCentral()
+    mavenLocal()
     // TODO review whether we really need the repositories below
     maven { url 'https://maven.conveyal.com' }
     // For the polyline encoder
@@ -140,10 +141,10 @@ configurations.all {
 
 dependencies {
     // Provides our logging API
-    implementation 'org.slf4j:slf4j-api:1.7.30'
+    implementation 'org.slf4j:slf4j-api:2.0.6'
 
     // Implementation of the logging API
-    implementation 'ch.qos.logback:logback-classic:1.2.3'
+    implementation 'ch.qos.logback:logback-classic:1.4.5'
 
     // Spark is an HTTP framework built on Jetty. Its name is the same as several other projects.
     implementation (group: 'com.sparkjava', name: 'spark-core', version: '2.7.2') {
@@ -199,9 +200,6 @@ dependencies {
     // Commons IO gives us BOMInputStream for handling UTF-8 Byte Order Marks.
     implementation 'commons-io:commons-io:2.6'
 
-    // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
-    implementation 'com.google.guava:guava:28.2-jre'
-
     // Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use the async
     // capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
     implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'
@@ -218,14 +216,18 @@ dependencies {
     // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
     implementation 'org.apache.commons:commons-math3:3.0'
 
-    // Provides some shared serializers for Kryo. Introduces transitive dependencies on Guava, Trove, and Kryo.
+    // Provides some Kryo serializers for Guava and Trove collecitons.
     // Also provides classes for testing that a round trip through serialization reproduces the same network.
     // This is an external dependency (not merged into backend) because it's also used by OTP2.
-    // TODO arguably we should declare non-transitive dependencies on Guava, Trove, and Kryo since we use them directly
-    implementation 'com.conveyal:kryo-tools:1.3.0'
+    implementation 'com.conveyal:kryo-tools:1.5.0'
 
+    // Ensure the versions of the next three dependencies match the transitive dependencies of kryo-tools.
+    implementation 'com.esotericsoftware:kryo:5.4.0'
+    // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
+    implementation 'com.google.guava:guava:31.1-jre'
     // Trove supplies very efficient collections of primitive data types for Java.
     implementation 'net.sf.trove4j:trove4j:3.0.3'
+
 
     // TODO eliminate custom Conveyal geojson library, use Geotools?
     implementation 'com.conveyal:jackson2-geojson:0.9'
@@ -249,8 +251,7 @@ dependencies {
     ////// Test-only dependencies //////
 
     // Java unit testing framework.
-    testImplementation(platform('org.junit:junit-bom:5.7.0'))
-    testImplementation('org.junit.jupiter:junit-jupiter')
+    testImplementation('org.junit.jupiter:junit-jupiter:5.9.2')
 
     // Chart drawing library for examining travel time distributions when crafting tests.
     // Although rarely used it should be low-impact: it is a test-only dependency with no transitive dependenices.

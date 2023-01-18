@@ -55,7 +55,7 @@ public abstract class KryoNetworkSerializer {
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 
     /** Set this to true to count instances and print a report including which serializer is handling each class. */
-    private static final boolean COUNT_CLASS_INSTANCES = true;
+    private static final boolean COUNT_CLASS_INSTANCES = false;
 
     /**
      * Factory method ensuring that we configure Kryo exactly the same way when saving and loading networks, without

@@ -15,6 +15,12 @@ java {
     }
 }
 
+// Since we don't have a module-info.java (we just declare an automatic-module-name)
+// we can only add the incubator modules to compilation steps with command line arguments.
+tasks.withType(JavaCompile) {
+    options.compilerArgs += ['--add-modules', 'jdk.incubator.vector']
+}
+
 jar {
     // For Java 11 Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
@@ -34,9 +40,11 @@ jar {
 // Allow reflective access by ObjectDiffer to normally closed Java internals. Used for round-trip testing serialization.
 // IntelliJ seems not to pass these JVM arguments when running tests from within the IDE, so the Kryo serialization
 // tests may only succeed under command line Gradle.
+// Also add the vector incubator module when running tests.
 test {
     useJUnitPlatform()
-    jvmArgs = ['--add-opens=java.base/java.io=ALL-UNNAMED',
+    jvmArgs = ['--add-modules=jdk.incubator.vector',
+               '--add-opens=java.base/java.io=ALL-UNNAMED',
                '--add-opens=java.base/java.time=ALL-UNNAMED',
                '--add-opens=java.base/java.time.zone=ALL-UNNAMED',
                '--add-opens=java.base/java.lang=ALL-UNNAMED']
@@ -77,7 +85,7 @@ task copyDependencies(type: Copy) {
 }
 
 application {
-    applicationDefaultJvmArgs = ['-Xmx6G']
+    applicationDefaultJvmArgs = ['-Xmx6G', '--add-modules=jdk.incubator.vector']
     mainClass = 'com.conveyal.analysis.BackendMain'
 }
 

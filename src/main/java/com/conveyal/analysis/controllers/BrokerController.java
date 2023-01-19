@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
+import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -388,6 +389,11 @@ public class BrokerController implements HttpController {
         }
     }
 
+    /** Factor out exception creation for readability/repetition. */
+    private static IllegalArgumentException uuidException (String fieldName) {
+        return new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", fieldName));
+    }
+
     /**
      * Validate a request parameter that is expected to be a non-null String containing a Mongo ObjectId or a
      * UUID converted to a string, or a UUID converted to a string with the hyphens removed.
@@ -406,11 +412,16 @@ public class BrokerController implements HttpController {
             try {
                 UUID.fromString(parameter);
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", name));
+                throw uuidException(name);
             }
-        }
-        if (parameter.length() != 32) {
-            throw new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", name));
+        } else if (parameter.length() == 32) {
+            for (char c : parameter.toCharArray()) {
+                if (Character.digit(c, 16) == -1) {
+                    throw uuidException(name);
+                }
+            }
+        } else {
+            throw uuidException(name);
         }
     }
 

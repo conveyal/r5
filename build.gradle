@@ -77,7 +77,7 @@ task copyDependencies(type: Copy) {
 }
 
 application {
-    applicationDefaultJvmArgs = ['-Xmx4G']
+    applicationDefaultJvmArgs = ['-Xmx6G']
     mainClass = 'com.conveyal.analysis.BackendMain'
 }
 
@@ -127,7 +127,6 @@ repositories {
     // Put Open Source Geospatial before Maven Central to get JAI core, see https://stackoverflow.com/a/26993223
     maven { url 'https://repo.osgeo.org/repository/release/' }
     mavenCentral()
-    mavenLocal()
     // TODO review whether we really need the repositories below
     maven { url 'https://maven.conveyal.com' }
     // For the polyline encoder

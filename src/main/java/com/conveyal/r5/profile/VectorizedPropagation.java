@@ -31,14 +31,21 @@ import jdk.incubator.vector.VectorSpecies;
  * Such work on masked loops, though important, is beyond the scope of this JEP.
  *
  * Benchmarking:
- * Running in non-debug mode.
+ * Running outside debugger (debug mode seems to inhibit optimization and yields slower code).
  * Total propagation time Netherlands 7-11AM (240 minutes) after repeated runs to trigger JIT:
  * JVM 11 3.4s with scalar loops only
  * JVM 19 3.4s with scalar loops only
  * JVM 19 2.4s with Vector API (29% speedup)
+ * JVM 19 2.0s with Vector API operating on shorts (41% speedup)
  *
- * Auto-vectorization must already be getting us part of the way there. Memory bus limitations could also limit
- * improvements. Using narrower data types (e.g. when transposing travel times) could help.
+ * (Note that it helps to set ExecutionTimer log level to DEBUG in logback.xml to see the breakdown.)
+ * Speedups are only about 1/3 rather than 4-8X, so auto-vectorization must already be getting us part of the way there.
+ * Memory bus speed may also limit improvements. Using narrower data types (e.g. when transposing travel times) appears
+ * to help significantly and should reduce memory consumption on large sets of destinations.
+ * A 16 bit signed short is 2**16/2 = 9.1 hours at 1 sec resolution.
+ * We could even reserve half the positive range (everything > 4.5 hours) for unreached, essentially using the high bit
+ * as a flag for UNREACHED, which would eliminate the need to check for UNREACHED or overflow until final output.
+ *
  * Parallelization of propagation in geographic blocks could help with memory locality and cache.
  * This is complicated by the fact that the propagator class has state and is not threadsafe.
  *
@@ -66,15 +73,17 @@ public class VectorizedPropagation {
         return (a >= b) ? a : b;
     }
 
+    public static final short SHORT_UNREACHED_THRESHOLD = Short.MAX_VALUE / 2;
+
     /** Clamp 32 bit int to 16 bit range, preserving meaning of Integer.MAX_VALUE as FastRaptorWorker.UNREACHED */
-    static short timeToShort(int time) {
-        if (time >= Short.MAX_VALUE) return Short.MAX_VALUE;
+    public static short timeToShort(int time) {
+        if (time >= SHORT_UNREACHED_THRESHOLD) return SHORT_UNREACHED_THRESHOLD;
         return (short) time;
     }
 
-    /** Expand 16 bit int to 32 bits, preserving meaning of Short.MAX_VALUE as FastRaptorWorker.UNREACHED */
-    private static int timeToInt (short time) {
-        if (time == Short.MAX_VALUE) return Integer.MAX_VALUE;
+    /** Expand 16 bit int to 32 bits, interpreting values above SHORT_UNREACHED_THRESHOLD as FastRaptorWorker.UNREACHED */
+    public static int timeToInt (short time) {
+        if (time >= SHORT_UNREACHED_THRESHOLD) return Integer.MAX_VALUE;
         return (int) time;
     }
 
@@ -94,12 +103,11 @@ public class VectorizedPropagation {
             // Alternatively the following is about the same speed:
             // VectorMask stopReached = tts.lt(maxTravelTimeSeconds).not();
             // tts.add(stopToDestTime).blend(Integer.MAX_VALUE, stopReached).min(ttd);
-            var ttd2 = tts.add(stopToDestTime).max(tts).min(ttd);
-            ttd2.intoArray(timesToDestination, i);
+            tts.add(stopToDestTime).min(ttd).intoArray(timesToDestination, i);
         }
         for (; i < timesToStop.length; i++) {
             // In Java, the sum of two shorts is an int. Why? Because the language specification says so.
-            timesToDestination[i] = min(timesToDestination[i], max((short)(timesToStop[i] + stopToDestTime), timesToStop[i]));
+            timesToDestination[i] = min(timesToDestination[i], (short)(timesToStop[i] + stopToDestTime));
         }
     }
 }

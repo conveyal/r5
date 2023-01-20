@@ -8,6 +8,7 @@ import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.VectorizedPropagation;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.Path;
@@ -20,6 +21,7 @@ import java.util.Arrays;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
+import static com.conveyal.r5.profile.VectorizedPropagation.timeToInt;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -213,7 +215,7 @@ public class TravelTimeReducer {
         Arrays.sort(timesSeconds);
         int[] percentileTravelTimesSeconds = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
-            percentileTravelTimesSeconds[p] = timesSeconds[percentileIndexes[p]];
+            percentileTravelTimesSeconds[p] = timeToInt(timesSeconds[percentileIndexes[p]]);
         }
         recordTravelTimePercentilesForTarget(target, percentileTravelTimesSeconds);
     }

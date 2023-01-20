@@ -7,7 +7,13 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 /**
+ * Tests that check how parameters received over the HTTP API are validated.
+ * These validators should be fairly strict about what they accept, and should not tolerate the presence of things
+ * like semicolons or double dashes that indicate attempts to corrupt or gain access to database contents.
  *
+ * Arguably we should have another layer of input sanitization that not only refuses but logs anything that contains
+ * characters or substrings that could be associated with an attempted attack, and that same validator should be
+ * applied to every input (perhaps called from every other input validator).
  */
 public class ArgumentValidationTest {
 
@@ -17,7 +23,7 @@ public class ArgumentValidationTest {
             BrokerController.checkIdParameter("hello", "param");
         });
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            BrokerController.checkIdParameter("Robert'; DROP TABLE Students;--", "param");
+            BrokerController.checkIdParameter("Robert'); DROP TABLE Students;--", "param");
             // https://xkcd.com/327/
         });
         Assertions.assertThrows(IllegalArgumentException.class, () -> {

@@ -385,24 +385,24 @@ public class PerTargetPropagater {
                     if (egressCostTable.egressStopDelaysSeconds != null) {
                         int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
                         if (delayAtEgress < 0) {
-                            // Pickup for this mode not allowed at this stop, so trove iteration should
-                            // continue
+                            // Pickup for this mode not allowed at this stop, so trove iteration should continue
                             return true;
                         } else {
                             secondsFromStopToTarget += delayAtEgress;
                         }
                     }
 
-                    StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
-                            secondsFromStopToTarget,
-                            linkedTargets.streetMode
-                    );
-
-                    ////////// Test Java 19 Vector API
+                    ////////// Test Java 19 Vector API //////////
                     if (VectorizedPropagation.ENABLE_VECTOR_TEST) {
                         VectorizedPropagation.propagate(travelTimesToStop[stop], secondsFromStopToTarget, perIterationTravelTimes);
-                    } else
-                    ////////// Odd formatting just to prevent spurious git changes to following lines
+                        return true; // Trove iteration should continue to next point-to-stop linkage entry
+                    }
+
+                    ////////// Original scalar propagation follows //////////
+                    StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
+                        secondsFromStopToTarget,
+                        linkedTargets.streetMode
+                    );
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
                         // calculated in the Raptor route() method.

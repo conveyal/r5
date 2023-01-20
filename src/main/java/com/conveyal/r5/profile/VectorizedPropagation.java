@@ -67,7 +67,7 @@ public class VectorizedPropagation {
         for (; i < upperBound; i += SPECIES.length()) {
             var tts = IntVector.fromArray(SPECIES, timesToStop, i);
             var ttd = IntVector.fromArray(SPECIES, timesToDestination, i);
-            // .max(tts) should handle overflow, i.e. if adding something makes it less (negtive) keep the higher value
+            // .max(tts) should handle overflow, i.e. if adding something makes it less (negative) keep the higher value
             // Alternatively the following is about the same speed:
             // VectorMask stopReached = tts.lt(maxTravelTimeSeconds).not();
             // tts.add(stopToDestTime).blend(Integer.MAX_VALUE, stopReached).min(ttd);

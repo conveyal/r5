@@ -197,7 +197,7 @@ public class TravelTimeReducer {
      *
      * @param timesSeconds which will be destructively sorted in place to extract percentiles.
      */
-    public void extractTravelTimePercentilesAndRecord (int target, int[] timesSeconds) {
+    public void extractTravelTimePercentilesAndRecord (int target, short[] timesSeconds) {
         checkArgument(timesSeconds.length == timesPerDestination,
             "Number of times supplied must match the number of iterations in this search.");
         for (int i : timesSeconds) {

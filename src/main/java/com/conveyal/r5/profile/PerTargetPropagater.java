@@ -27,6 +27,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
+import static com.conveyal.r5.profile.VectorizedPropagation.timeToShort;
+
 /**
  * Given minimum travel times from a single origin point to all transit stops, this class finds minimum travel times to
  * a grid of destinations ("targets") by walking or biking or driving from the transit stops to the targets.
@@ -76,7 +78,10 @@ public class PerTargetPropagater {
     private final int[] nonTransitTravelTimesToTargets;
 
     /** Times at transit stops for each iteration. Plus a transposed version of that same matrix as an optimization. */
-    private int[][] travelTimesToStopsForIteration, travelTimesToStop;
+    private int[][] travelTimesToStopsForIteration;
+
+    /** EXPERIMENT use 16 instead of 32 bits to double the number of vector lanes. */
+    private short[][] travelTimesToStop;
 
     /**
      * The number of "iterations" (departure minutes & Monte Carlo schedules) and the number of stops and destination
@@ -126,7 +131,7 @@ public class PerTargetPropagater {
      * Retains the best known total travel time to the current destination for each iteration of the RAPTOR algorithm.
      * TODO instead of a long-lived field this could be returned from the propagate function.
      */
-    private int[] perIterationTravelTimes;
+    private short[] perIterationTravelTimes;
 
     /**
      * The transit path that yielded the best known travel time to the current destination for each iteration of the
@@ -188,7 +193,7 @@ public class PerTargetPropagater {
 
         timer.fullPropagation.start();
         timer.transposition.start();
-        invertTravelTimes();
+        transposeTravelTimes();
         if (nonTransitTravelTimesToTargets.length != nTargets) {
             throw new IllegalArgumentException("Non-transit travel times must have the same number of entries as there are points.");
         }
@@ -214,7 +219,7 @@ public class PerTargetPropagater {
         timer.fullPropagation.start();
 
         // perIterationTravelTimes and perIterationDetails are reused when processing each target.
-        perIterationTravelTimes = new int[nIterations];
+        perIterationTravelTimes = new short[nIterations];
 
         // Retain additional information about how the target was reached to report travel time breakdown and paths to targets.
         if (savePaths != SavePaths.NONE) {
@@ -237,7 +242,7 @@ public class PerTargetPropagater {
 
             // Initialize the travel times to that achieved without transit (if any).
             // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
-            Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
+            Arrays.fill(perIterationTravelTimes, timeToShort(nonTransitTravelTimesToTargets[targetIdx]));
 
             // Clear out the Path array if we're building one. These are transit solution details, so they remain
             // null until we find a good transit solution.
@@ -258,17 +263,15 @@ public class PerTargetPropagater {
             if (savePaths == SavePaths.WRITE_TAUI) {
                 // TODO optimization: skip this entirely if there is no transit access to the destination.
                 // We know transit access is impossible in the caller when there are no reached stops.
-                pathScorer = new PathScorer(perIterationTravelTimes, perIterationPaths, perIterationEgress);
+//                pathScorer = new PathScorer(perIterationTravelTimes, perIterationPaths, perIterationEgress);
             } else if (savePaths == SavePaths.ALL_DESTINATIONS) {
                 // For regional tasks, return paths to all targets.
                 // Typically used with freeform destinations fewer in number than gridded destinations.
-                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
-                        perIterationEgress);
+//                travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths, perIterationEgress);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
                 // Return paths to the single target destination specified (by toLat/toLon in a single-point
                 // analysis, or by the origin-destination pairing implied by a oneToOne regional analysis).
-                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths,
-                        perIterationEgress);
+//                travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths, perIterationEgress);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)
@@ -317,11 +320,11 @@ public class PerTargetPropagater {
      * worthwhile to change the routing algorithm to output already-transposed data, as that will create memory
      * locality problems elsewhere (since the pathfinding algorithm solves one iteration for all stops simultaneously).
      */
-    private void invertTravelTimes() {
-        travelTimesToStop = new int[nStops][nIterations];
+    private void transposeTravelTimes() {
+        travelTimesToStop = new short[nStops][nIterations];
         for (int iteration = 0; iteration < nIterations; iteration++) {
             for (int stop = 0; stop < nStops; stop++) {
-                travelTimesToStop[stop][iteration] = travelTimesToStopsForIteration[iteration][stop];
+                travelTimesToStop[stop][iteration] = timeToShort(travelTimesToStopsForIteration[iteration][stop]);
             }
         }
     }
@@ -394,7 +397,7 @@ public class PerTargetPropagater {
 
                     ////////// Test Java 19 Vector API //////////
                     if (VectorizedPropagation.ENABLE_VECTOR_TEST) {
-                        VectorizedPropagation.propagate(travelTimesToStop[stop], secondsFromStopToTarget, perIterationTravelTimes);
+                        VectorizedPropagation.propagate(travelTimesToStop[stop], timeToShort(secondsFromStopToTarget), perIterationTravelTimes);
                         return true; // Trove iteration should continue to next point-to-stop linkage entry
                     }
 
@@ -419,7 +422,7 @@ public class PerTargetPropagater {
                             // egress mode is faster than any previously checked stop/egress mode combination.
                             // Because that's the case, update the best known travel time and, if requested, the
                             // corresponding path.
-                            perIterationTravelTimes[iteration] = timeToReachTarget;
+                            perIterationTravelTimes[iteration] = timeToShort(timeToReachTarget);
                             if (pathsToStopsForIteration != null) {
                                 Path path = pathsToStopsForIteration.get(iteration)[stop];
                                 if (path != null) {

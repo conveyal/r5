@@ -2,6 +2,7 @@
 package com.conveyal.r5.profile;
 
 import jdk.incubator.vector.IntVector;
+import jdk.incubator.vector.ShortVector;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
@@ -53,20 +54,42 @@ public class VectorizedPropagation {
      * The preferred size of vector for the particular hardware we're running on.
      * Declared static final so the compiler will treat it as a constant and optimize more aggressively.
      */
-    static final VectorSpecies<Integer> SPECIES = IntVector.SPECIES_PREFERRED;
+    static final VectorSpecies<Short> SPECIES = ShortVector.SPECIES_PREFERRED;
+
+    /** Math.min does not have an overload for short parameters. */
+    static short min (short a, short b) {
+        return (a <= b) ? a : b;
+    }
+
+    /** Math.max does not have an overload for short parameters. */
+    static short max (short a, short b) {
+        return (a >= b) ? a : b;
+    }
+
+    /** Clamp 32 bit int to 16 bit range, preserving meaning of Integer.MAX_VALUE as FastRaptorWorker.UNREACHED */
+    static short timeToShort(int time) {
+        if (time >= Short.MAX_VALUE) return Short.MAX_VALUE;
+        return (short) time;
+    }
+
+    /** Expand 16 bit int to 32 bits, preserving meaning of Short.MAX_VALUE as FastRaptorWorker.UNREACHED */
+    private static int timeToInt (short time) {
+        if (time == Short.MAX_VALUE) return Integer.MAX_VALUE;
+        return (int) time;
+    }
 
     /**
      * @param timesToStop the travel times to one particular stop
      * @param stopToDestTime number of seconds to travel from that stop to the destination point
      * @param timesToDestination this is the output array and will be overwritten by a call to this method
      */
-    static void propagate (int[] timesToStop, int stopToDestTime, int[] timesToDestination) {
+    static void propagate (short[] timesToStop, short stopToDestTime, short[] timesToDestination) {
         if (timesToStop == null) return; // Stop was not linked to network
         int i = 0;
         int upperBound = SPECIES.loopBound(timesToStop.length);
         for (; i < upperBound; i += SPECIES.length()) {
-            var tts = IntVector.fromArray(SPECIES, timesToStop, i);
-            var ttd = IntVector.fromArray(SPECIES, timesToDestination, i);
+            var tts = ShortVector.fromArray(SPECIES, timesToStop, i);
+            var ttd = ShortVector.fromArray(SPECIES, timesToDestination, i);
             // .max(tts) should handle overflow, i.e. if adding something makes it less (negative) keep the higher value
             // Alternatively the following is about the same speed:
             // VectorMask stopReached = tts.lt(maxTravelTimeSeconds).not();
@@ -75,8 +98,8 @@ public class VectorizedPropagation {
             ttd2.intoArray(timesToDestination, i);
         }
         for (; i < timesToStop.length; i++) {
-            timesToDestination[i] = Math.min(timesToDestination[i], Math.max(timesToStop[i] + stopToDestTime, timesToStop[i]));
+            // In Java, the sum of two shorts is an int. Why? Because the language specification says so.
+            timesToDestination[i] = min(timesToDestination[i], max((short)(timesToStop[i] + stopToDestTime), timesToStop[i]));
         }
     }
-
 }

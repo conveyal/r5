@@ -82,7 +82,7 @@ public class TravelTimeResult {
 
     public int[][] getValues() { return values;}
 
-    public void recordHistogramIfEnabled (int target, int[] travelTimesSeconds) {
+    public void recordHistogramIfEnabled (int target, short[] travelTimesSeconds) {
         if (histograms != null) {
             int[] counts = histograms[target];
             for (int seconds : travelTimesSeconds) {

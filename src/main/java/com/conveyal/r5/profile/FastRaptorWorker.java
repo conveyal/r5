@@ -24,6 +24,7 @@ import java.util.List;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.HALF_HEADWAY;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.MONTE_CARLO;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.UPPER_BOUND;
+import static com.conveyal.r5.profile.VectorizedPropagation.timeToShort;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
@@ -166,7 +167,7 @@ public class FastRaptorWorker {
      * Return value dimension order is [searchIteration][transitStopIndex]
      * TODO Create proper types for return values?
      */
-    public int[][] route () {
+    public short[][] route () {
         raptorTimer.fullSearch.start();
         raptorTimer.patternFiltering.start();
         filteredPatterns = transit.filteredPatternCache.get(request.transitModes, servicesActive);
@@ -176,7 +177,7 @@ public class FastRaptorWorker {
         final int nIterations = iterationsPerMinute * nMinutes;
         LOG.info("Performing {} total iterations ({} per minute); boarding {}; frequencies {}",
                 nIterations, iterationsPerMinute, boardingMode, transit.hasFrequencies);
-        int[][] travelTimesToStopsPerIteration = new int[nIterations][];
+        short[][] travelTimesToStopsPerIteration = new short[nIterations][];
         if (retainPaths) pathsPerIteration = new ArrayList<>();
 
         // This main outer loop iterates backward over all minutes in the departure times window.
@@ -195,10 +196,11 @@ public class FastRaptorWorker {
             for (int[] arrivalTimesAtStops : resultsForDepartureMinute) {
                 // Make a protective copy of the arrival times, transforming them into travel times (durations).
                 checkState(arrivalTimesAtStops.length == nStops, "Result should contain one value per stop.");
-                int[] travelTimesToStops = new int[nStops];
+                short[] travelTimesToStops = new short[nStops];
                 for (int s = 0; s < nStops; s++) {
                     int arrivalTime = arrivalTimesAtStops[s];
-                    travelTimesToStops[s] = (arrivalTime == UNREACHED) ? UNREACHED : arrivalTime - departureTime;
+                    // Convert clock time to elapsed time, which fits in a narrower data type (short)
+                    travelTimesToStops[s] = timeToShort((arrivalTime == UNREACHED) ? UNREACHED : arrivalTime - departureTime);
                 }
                 // Accumulate the duration-transformed Monte Carlo iterations for the current minute
                 // into one big flattened array representing all iterations at all minutes.

@@ -78,7 +78,7 @@ public class PerTargetPropagater {
     private final int[] nonTransitTravelTimesToTargets;
 
     /** Times at transit stops for each iteration. Plus a transposed version of that same matrix as an optimization. */
-    private int[][] travelTimesToStopsForIteration;
+    private short[][] travelTimesToStopsForIteration;
 
     /** EXPERIMENT use 16 instead of 32 bits to double the number of vector lanes. */
     private short[][] travelTimesToStop;
@@ -151,7 +151,7 @@ public class PerTargetPropagater {
             StreetLayer streetLayer,
             EnumSet<StreetMode> modes,
             AnalysisWorkerTask task,
-            int[][] travelTimesToStopsForIteration,
+            short[][] travelTimesToStopsForIteration,
             int[] nonTransitTravelTimesToTargets
     ) {
         this.targets = targets;
@@ -324,7 +324,7 @@ public class PerTargetPropagater {
         travelTimesToStop = new short[nStops][nIterations];
         for (int iteration = 0; iteration < nIterations; iteration++) {
             for (int stop = 0; stop < nStops; stop++) {
-                travelTimesToStop[stop][iteration] = timeToShort(travelTimesToStopsForIteration[iteration][stop]);
+                travelTimesToStop[stop][iteration] = travelTimesToStopsForIteration[iteration][stop];
             }
         }
     }

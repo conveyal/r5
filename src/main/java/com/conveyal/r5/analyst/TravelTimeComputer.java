@@ -286,7 +286,7 @@ public class TravelTimeComputer {
         // II. Transit Routing ========================================================================================
         // Transit stops were reached. Perform transit routing from those stops to all other reachable stops. The result
         // is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
-        int[][] transitTravelTimesToStops;
+        short[][] transitTravelTimesToStops;
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
             worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
@@ -309,7 +309,9 @@ public class TravelTimeComputer {
             McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
                     request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
             mcRaptorWorker.route();
-            transitTravelTimesToStops = mcRaptorWorker.getBestTimes();
+            // FIXME shorts
+            // transitTravelTimesToStops = mcRaptorWorker.getBestTimes();
+            transitTravelTimesToStops = null;
         }
 
         // III. Egress Propagation ======================================================================================

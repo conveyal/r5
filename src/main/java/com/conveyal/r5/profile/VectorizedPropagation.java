@@ -45,6 +45,7 @@ import jdk.incubator.vector.VectorSpecies;
  * A 16 bit signed short is 2**16/2 = 9.1 hours at 1 sec resolution.
  * We could even reserve half the positive range (everything > 4.5 hours) for unreached, essentially using the high bit
  * as a flag for UNREACHED, which would eliminate the need to check for UNREACHED or overflow until final output.
+ * This short typing can be carried all the way to TravelTimeResult#values.
  *
  * Parallelization of propagation in geographic blocks could help with memory locality and cache.
  * This is complicated by the fact that the propagator class has state and is not threadsafe.
@@ -75,7 +76,10 @@ public class VectorizedPropagation {
 
     public static final short SHORT_UNREACHED_THRESHOLD = Short.MAX_VALUE / 2;
 
-    /** Clamp 32 bit int to 16 bit range, preserving meaning of Integer.MAX_VALUE as FastRaptorWorker.UNREACHED */
+    /**
+     * Clamp 32 bit int to half of 16 bit range (4.5 hours), mapping Integer.MAX_VALUE (FastRaptorWorker.UNREACHED)
+     * and any excessive travel times to SHORT_UNREACHED_THRESHOLD.
+     */
     public static short timeToShort(int time) {
         if (time >= SHORT_UNREACHED_THRESHOLD) return SHORT_UNREACHED_THRESHOLD;
         return (short) time;

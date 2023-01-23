@@ -1,7 +1,7 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
-import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.RegionalPathResultsSummary;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.apache.commons.lang3.ArrayUtils;
@@ -13,7 +13,6 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkState;
 
 public class PathCsvResultWriter extends CsvResultWriter {
-
     public PathCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
         super(task, fileStorage);
     }
@@ -25,14 +24,14 @@ public class PathCsvResultWriter extends CsvResultWriter {
 
     @Override
     public String[] columnHeaders () {
-        return ArrayUtils.addAll(new String[] {"origin", "destination"}, PathResult.DATA_COLUMNS);
+        return ArrayUtils.addAll(new String[]{"origin", "destination"}, RegionalPathResultsSummary.DATA_COLUMNS);
     }
 
     @Override
     public Iterable<String[]> rowValues (RegionalWorkResult workResult) {
         List<String[]> rows = new ArrayList<>();
         for (int d = 0; d < workResult.pathResult.length; d++) {
-            ArrayList<String[]> pathsIterations = workResult.pathResult[d];
+            String[][] pathsIterations = workResult.pathResult[d];
             for (String[] iterationDetails : pathsIterations) {
                 String originId = task.originPointSet.getId(workResult.taskId);
                 String destinationId = destinationId(workResult.taskId, d);
@@ -50,10 +49,10 @@ public class PathCsvResultWriter extends CsvResultWriter {
         // the origin point. Otherwise, for each origin, we expect one value per destination.
         final int nDestinations = task.oneToOne ? 1 : task.destinationPointSets[0].featureCount();
         checkDimension(workResult, "destinations", workResult.pathResult.length, nDestinations);
-        for (ArrayList<String[]> oneDestination : workResult.pathResult) {
+        for (String[][] oneDestination : workResult.pathResult) {
             // Number of distinct paths per destination is variable, don't validate it.
             for (String[] iterationDetails : oneDestination) {
-                checkDimension(workResult, "columns", iterationDetails.length, PathResult.DATA_COLUMNS.length);
+                checkDimension(workResult, "columns", iterationDetails.length, RegionalPathResultsSummary.DATA_COLUMNS.length);
             }
         }
     }

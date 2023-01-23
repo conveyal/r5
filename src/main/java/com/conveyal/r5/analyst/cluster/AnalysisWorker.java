@@ -4,7 +4,9 @@ import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
 import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
@@ -50,7 +52,6 @@ import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -316,9 +317,7 @@ public class AnalysisWorker implements Component {
         eventBus.send(new HandleSinglePointEvent());
 
         // Perform the core travel time computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
-        return oneOriginResult;
+        return TravelTimeComputer.computeTravelTimes(task, transportNetwork);
     }
 
     private byte[] singlePointResultToBinary (
@@ -342,12 +341,17 @@ public class AnalysisWorker implements Component {
             // TODO eventually reuse same code path as static site time grid saving
             // TODO move the JSON writing code into the grid writer, it's essentially part of the grid format
             timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            // Create the path results summary, if there are path results.
+            var pathResultSummary = PathResultSummary.createSummary(
+                    oneOriginResult.getPathResults(),
+                    transportNetwork.transitLayer
+            );
             addJsonToGrid(
                     byteArrayOutputStream,
                     oneOriginResult.accessibility,
                     transportNetwork.scenarioApplicationWarnings,
                     transportNetwork.scenarioApplicationInfo,
-                    oneOriginResult.paths != null ? new PathResultSummary(oneOriginResult.paths, transportNetwork.transitLayer) : null
+                    pathResultSummary
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -388,8 +392,8 @@ public class AnalysisWorker implements Component {
         {
             task.decayFunction.prepare();
             int maxCutoffMinutes = Arrays.stream(task.cutoffsMinutes).max().getAsInt();
-            int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * SECONDS_PER_MINUTE);
-            int maxTripDurationMinutes = (int)(Math.ceil(maxTripDurationSeconds / 60D));
+            int maxTripDurationSeconds = task.decayFunction.reachesZeroAt(maxCutoffMinutes * 60);
+            int maxTripDurationMinutes = (int) (Math.ceil(maxTripDurationSeconds / 60D));
             if (maxTripDurationMinutes > 120) {
                 LOG.warn("Distance decay function reached zero above 120 minutes. Capping travel time at 120 minutes.");
                 maxTripDurationMinutes = 120;
@@ -426,21 +430,21 @@ public class AnalysisWorker implements Component {
         // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
         TransportNetwork transportNetwork = networkPreloader.synchronousPreload(task);
 
-        // If we are generating a static site, there must be a single metadata file for an entire batch of results.
-        // Arbitrarily we create this metadata as part of the first task in the job.
-        if (task.makeTauiSite && task.taskId == 0) {
-            LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-            saveTauiMetadata(task, transportNetwork);
-        }
-
         // After the TransportNetwork has been loaded, signal that we will begin processing the task.
         eventBus.send(new HandleRegionalEvent());
 
         // Perform the core travel time and accessibility computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
-        OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
+        OneOriginResult oneOriginResult = TravelTimeComputer.computeTravelTimes(task, transportNetwork);
+        PathResult[] pathResults = oneOriginResult.getPathResults();
+        String[][][] summarizedPathResults = null;
         if (task.makeTauiSite) {
+            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+            // Arbitrarily we create this metadata as part of the first task in the job.
+            if (task.taskId == 0) {
+                LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+                saveTauiMetadata(task, transportNetwork);
+            }
+
             // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
             // value because we're generating a set of time grids for a static site. We only save a file if it has
             // non-default contents, as a way to save storage and bandwidth.
@@ -449,15 +453,36 @@ public class AnalysisWorker implements Component {
                 TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
                 PersistenceBuffer persistenceBuffer = timeGridWriter.writeToPersistenceBuffer();
                 String timesFileName = task.taskId + "_times.dat";
-                fileStorage.saveTauiData(task, timesFileName, persistenceBuffer);
+                saveTauiData(task, timesFileName, persistenceBuffer);
             } else {
                 LOG.debug("No destination cells reached. Not saving static site file to reduce storage space.");
             }
+
+            if (pathResults != null) {
+                var pathsBuffer = TauiPathResultsWriter.getPathsBuffer(pathResults, task.nPathsPerTarget);
+                if (pathsBuffer != null) {
+                    saveTauiData(task, task.taskId + "_paths.dat", pathsBuffer);
+                } else {
+                    // No cells were reached with any transit paths. Do not write anything out to save storage space.
+                    LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
+                }
+            }
+
             // Overwrite with an empty set of results to send back to the backend, allowing it to track job
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
             // that have already been written to S3, and throwing exceptions on old backends that can't deal with
             // null AccessibilityResults.
-            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+            oneOriginResult = new OneOriginResult(
+                    null,
+                    new AccessibilityResult(),
+                    null
+            );
+        } else {
+            // Summarize path results, if they exist.
+            summarizedPathResults = RegionalPathResultsSummary.summarize(
+                    pathResults,
+                    transportNetwork.transitLayer
+            );
         }
 
         // Accumulate accessibility results, which will be returned to the backend in batches.
@@ -465,7 +490,7 @@ public class AnalysisWorker implements Component {
         // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
         // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
         synchronized (workResults) {
-            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+            workResults.add(new RegionalWorkResult(oneOriginResult, task, summarizedPathResults));
         }
         throughputTracker.recordTaskCompletion(task.jobId);
     }
@@ -487,7 +512,7 @@ public class AnalysisWorker implements Component {
 
         public List<TaskError> scenarioApplicationInfo;
 
-        public PathResultSummary pathSummaries;
+        public PathResultSummary pathSummaries = null;
 
         @Override
         public String toString () {
@@ -601,20 +626,25 @@ public class AnalysisWorker implements Component {
             // Save the regional analysis request, giving the UI some context to display the results.
             // This is the request object sent to the workers to generate these static site regional results.
             PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisWorkerTask);
-            fileStorage.saveTauiData(analysisWorkerTask, "request.json", buffer);
+            saveTauiData(analysisWorkerTask, "request.json", buffer);
 
             // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
             buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
-            fileStorage.saveTauiData(analysisWorkerTask, "warnings.json", buffer);
+            saveTauiData(analysisWorkerTask, "warnings.json", buffer);
 
             // Save transit route data that allows rendering paths with the Transitive library in a separate file.
             TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
-            fileStorage.saveTauiData(analysisWorkerTask, "transitive.json", buffer);
+            saveTauiData(analysisWorkerTask, "transitive.json", buffer);
         } catch (Exception e) {
             LOG.error("Exception saving static metadata: {}", ExceptionUtils.stackTraceString(e));
             throw new RuntimeException(e);
         }
+    }
+
+    void saveTauiData(AnalysisWorkerTask task, String fileName, PersistenceBuffer buffer) {
+        FileStorageKey key = new FileStorageKey(FileCategory.TAUI, String.join("/", task.jobId, fileName));
+        fileStorage.moveIntoStorage(key, buffer);
     }
 
 }

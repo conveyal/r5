@@ -1,8 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.StreetTimesAndModes;
+import com.conveyal.r5.analyst.StreetTimeAndMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.StopSequence;
+import com.google.common.base.Preconditions;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -18,18 +19,33 @@ public class PathResultSummary {
     public List<Itinerary> itineraries = new ArrayList<>();
     public int fastestPathSeconds = Integer.MAX_VALUE;
 
+    public static PathResultSummary createSummary(
+            PathResult[] pathResults,
+            TransitLayer transitLayer
+    ) {
+        PathResultSummary pathResultSummary = null;
+        if (pathResults != null && pathResults.length > 0) {
+            Preconditions.checkState(pathResults.length == 1, "Paths were stored for multiple " +
+                    "destinations, but only one is being requested");
+            if (pathResults[0] != null) {
+                pathResultSummary = new PathResultSummary(
+                        pathResults[0],
+                        transitLayer
+                );
+            }
+        }
+        return pathResultSummary;
+    }
+
     public PathResultSummary(
             PathResult pathResult,
             TransitLayer transitLayer
     ) {
-        if (pathResult == null || pathResult.iterationsForPathTemplates.length != 1 || pathResult.iterationsForPathTemplates[0] == null)
-            return;
-
         // Iterate through each path result creating a list of iteration details and itineraries that reference each
         // other through an index.
         int itineraryIndex = 0;
-        for (var pathTemplate : pathResult.iterationsForPathTemplates[0].keySet()) {
-            var allIterations = pathResult.iterationsForPathTemplates[0].get(pathTemplate);
+        for (var pathTemplate : pathResult.getAllPathTemplates()) {
+            var allIterations = pathResult.getIterationsForPathTemplate(pathTemplate);
             TIntArrayList durations = new TIntArrayList();
             int fastestIteration = Integer.MAX_VALUE;
             for (var iteration : allIterations) {
@@ -49,12 +65,12 @@ public class PathResultSummary {
                 this.iterations.add(iterationDetails);
             }
             List<TransitLeg> transitLegs = new ArrayList<>();
-            for (int routeIndex = 0; routeIndex < pathTemplate.routes.size(); routeIndex++) {
+            for (int routeIndex = 0; routeIndex < pathTemplate.routeIndexes.size(); routeIndex++) {
                 transitLegs.add(new TransitLeg(transitLayer, pathTemplate.stopSequence, routeIndex));
             }
             itineraries.add(new Itinerary(
-                    pathTemplate.stopSequence.access,
-                    pathTemplate.stopSequence.egress,
+                    pathTemplate.access,
+                    pathTemplate.egress,
                     transitLegs,
                     allIterations.size(),
                     durations.min(),
@@ -72,8 +88,8 @@ public class PathResultSummary {
      * and how many iterations this itinerary was used.
      */
     static class Itinerary {
-        public StreetTimesAndModes.StreetTimeAndMode access;
-        public StreetTimesAndModes.StreetTimeAndMode egress;
+        public StreetTimeAndMode access;
+        public StreetTimeAndMode egress;
         public List<TransitLeg> transitLegs;
         public int iterationsOptimal;
         public int minSeconds;
@@ -82,8 +98,8 @@ public class PathResultSummary {
         public int index;
 
         Itinerary(
-                StreetTimesAndModes.StreetTimeAndMode access,
-                StreetTimesAndModes.StreetTimeAndMode egress,
+                StreetTimeAndMode access,
+                StreetTimeAndMode egress,
                 List<TransitLeg> transitLegs,
                 int iterationsOptimal,
                 int minSeconds,
@@ -125,11 +141,11 @@ public class PathResultSummary {
             rideTimeSeconds = stopSequence.rideTimesSeconds.get(routeIndex);
 
             int boardStopIndex = stopSequence.boardStops.get(routeIndex);
-            boardStopId = getStopId(transitLayer, boardStopIndex);
+            boardStopId = transitLayer.getStopId(boardStopIndex);
             boardStopName = transitLayer.stopNames.get(boardStopIndex);
 
             int alightStopIndex = stopSequence.alightStops.get(routeIndex);
-            alightStopId = getStopId(transitLayer, alightStopIndex);
+            alightStopId = transitLayer.getStopId(alightStopIndex);
             alightStopName = transitLayer.stopNames.get(alightStopIndex);
         }
     }
@@ -161,17 +177,5 @@ public class PathResultSummary {
             if (diff != 0) return diff;
             return this.itineraryIndex - o.itineraryIndex;
         }
-    }
-
-    /**
-     * Get the stop ID. If the ID does not exist, the stop is a new one added by a modification, so return "new".
-     *
-     * @param stopIndex
-     * @return stopId
-     */
-    private static String getStopId(TransitLayer transitLayer, int stopIndex) {
-        String stopId = transitLayer.stopIdForIndex.get(stopIndex);
-        if (stopId == null) return "[new]";
-        return stopId;
     }
 }

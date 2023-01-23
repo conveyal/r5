@@ -3,8 +3,6 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.util.ExceptionUtils;
 
-import java.util.ArrayList;
-
 /**
  * Model class used for serialized travel times and accessibility indicators for a multi-origin (regional) analysis,
  * sent over HTTP to the backend/broker. Similar to OneOriginResult, but with arrays for results (instead of more
@@ -26,7 +24,7 @@ public class RegionalWorkResult {
      * String array summarizing the details of a path at a specific iteration (e.g. wait time, in-vehicle time), keyed
      * on target index and iteration.
      */
-    public ArrayList<String[]>[] pathResult;
+    public String[][][] pathResult;
 
     /**
      * These are the truncated integer accessibility results for each [destinationGrid, percentile, cutoff].
@@ -53,12 +51,12 @@ public class RegionalWorkResult {
      * and transfer from the worker back to the backend. The job and task ID are copied from the supplied task
      * to show which task these results are for.
      */
-    public RegionalWorkResult(OneOriginResult result, RegionalTask task) {
+    public RegionalWorkResult(OneOriginResult result, RegionalTask task, String[][][] pathResult) {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
-        this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
+        this.pathResult = pathResult;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 
@@ -68,5 +66,4 @@ public class RegionalWorkResult {
         this.taskId = task.taskId;
         this.error = ExceptionUtils.shortAndLongString(t);
     }
-
 }

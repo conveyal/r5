@@ -33,12 +33,12 @@ public class RouteInfo implements Serializable {
         this.agency_url = route.route_url;
     }
 
-    public RouteInfo() { /* do nothing */ }
+    public RouteInfo () { /* do nothing */ }
 
-    public String getName() {
+    public String getName () {
         if (route_short_name != null) {
             return route_short_name;
-        } else if (route_long_name != null) {
+        } else if (route_long_name != null){
             return route_long_name;
         } else {
             return route_id;

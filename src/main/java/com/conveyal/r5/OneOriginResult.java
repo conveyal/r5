@@ -2,6 +2,7 @@ package com.conveyal.r5;
 
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.PathResultsRecorder;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**
@@ -18,12 +19,17 @@ public class OneOriginResult {
 
     public final AccessibilityResult accessibility;
 
-    public final PathResult paths;
+    public final PathResultsRecorder paths;
 
-    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility, PathResult paths) {
+    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility, PathResultsRecorder paths) {
         this.travelTimes = travelTimes;
         this.accessibility = accessibility;
         this.paths = paths;
+    }
+
+    public PathResult[] getPathResults() {
+        if (paths == null) return null;
+        return paths.getPathResults();
     }
 
 }

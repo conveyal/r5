@@ -19,7 +19,7 @@ public class PropagationTimer {
 
     public final ExecutionTimer reducer = new ExecutionTimer(fullPropagation, "Travel time reducer");
 
-    public void log () {
+    public void log() {
         fullPropagation.logWithChildren();
     }
 

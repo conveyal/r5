@@ -13,14 +13,13 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -41,7 +40,6 @@ import java.io.IOException;
 import java.io.Writer;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -83,10 +81,7 @@ public class BundleController implements HttpController {
     @Override
     public void registerEndpoints (Service sparkService) {
         sparkService.path("/api/bundle", () -> {
-            sparkService.get("", this::getBundles, toJson);
-            sparkService.get("/:_id", this::getBundle, toJson);
             sparkService.post("", this::create, toJson);
-            sparkService.put("/:_id", this::update, toJson);
             sparkService.delete("/:_id", this::deleteBundle, toJson);
         });
     }
@@ -296,27 +291,6 @@ public class BundleController implements HttpController {
         fileStorage.delete(key);
 
         return bundle;
-    }
-
-    private Bundle update (Request req, Response res) throws IOException {
-        return Persistence.bundles.updateFromJSONRequest(req);
-    }
-
-    private Bundle getBundle (Request req, Response res) {
-        Bundle bundle = Persistence.bundles.findByIdFromRequestIfPermitted(req);
-
-        // Progressively update older bundles with service start and end dates on retrieval
-        try {
-            setBundleServiceDates(bundle, gtfsCache);
-        } catch (Exception e) {
-            throw AnalysisServerException.unknown(e);
-        }
-
-        return bundle;
-    }
-
-    private Collection<Bundle> getBundles (Request req, Response res) {
-        return Persistence.bundles.findPermittedForQuery(req);
     }
 
     // UTILITY METHODS

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
@@ -109,6 +110,15 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
             return width * height;
         } else {
             return destinationPointSets[0].featureCount();
+        }
+    }
+
+    public int getTasksTotal() {
+        if (originPointSetKey != null) {
+            Preconditions.checkNotNull(originPointSet);
+            return originPointSet.featureCount();
+        } else {
+            return width * height;
         }
     }
 

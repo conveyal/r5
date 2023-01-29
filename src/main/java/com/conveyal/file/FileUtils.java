@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public abstract class FileUtils {
     /**
@@ -81,6 +82,20 @@ public abstract class FileUtils {
             is.transferTo(os);
             is.close();
             os.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * GZIP a File and return the new File descriptor.
+     */
+    public static File gzipFile(File file) {
+        try {
+            var gzippedFile = createScratchFile();
+            var gzippedOs = new GZIPOutputStream(getOutputStream(gzippedFile));
+            transferFromFileTo(file, gzippedOs);
+            return gzippedFile;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

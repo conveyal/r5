@@ -6,7 +6,6 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.apache.commons.lang3.ArrayUtils;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +13,7 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathCsvResultWriter extends CsvResultWriter {
 
-    public PathCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+    public PathCsvResultWriter (RegionalTask task, FileStorage fileStorage) {
         super(task, fileStorage);
     }
 

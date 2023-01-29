@@ -34,7 +34,7 @@ public class LocalBackendComponents extends BackendComponents {
         authentication = new LocalAuthentication();
         // TODO add nested LocalWorkerComponents here, to reuse some components, and pass it into the LocalWorkerLauncher?
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
-        broker = new Broker(config, fileStorage, eventBus, workerLauncher);
+        broker = new Broker(config, eventBus, workerLauncher);
         censusExtractor = new SeamlessCensusGridExtractor(config);
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
         List<HttpController> httpControllers = standardHttpControllers();

@@ -4,13 +4,12 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
 
-    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
+    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) {
         super(task, fileStorage);
     }
 
@@ -49,13 +48,14 @@ public class AccessCsvResultWriter extends CsvResultWriter {
             for (int p = 0; p < task.percentiles.length; p++) {
                 int[] cutoffsForPercentile = percentilesForDestPointset[p];
                 for (int c = 0; c < task.cutoffsMinutes.length; c++) {
+                    int accessibilityValue = cutoffsForPercentile[c];
                     // Ideally we'd output the pointset IDs (rather than keys) which we have in the RegionalAnalysis
                     rows.add(new String[] {
                             originId,
                             task.destinationPointSetKeys[d],
                             Integer.toString(task.percentiles[p]),
                             Integer.toString(task.cutoffsMinutes[c]),
-                            Integer.toString(workResult.accessibilityValues[d][p][c])
+                            Integer.toString(accessibilityValue)
                     });
                 }
             }

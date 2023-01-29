@@ -6,17 +6,11 @@ import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
-import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.results.MultiOriginAssembler;
-import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.file.FileStorage;
-import com.conveyal.file.FileStorageKey;
-import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
@@ -27,8 +21,6 @@ import gnu.trove.map.hash.TObjectLongHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,7 +34,6 @@ import static com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent.St
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUESTED;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
-import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -98,7 +89,6 @@ public class Broker implements Component {
     private final Config config;
 
     // Component Dependencies
-    private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
 
@@ -151,9 +141,8 @@ public class Broker implements Component {
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
+    public Broker (Config config, EventBus eventBus, WorkerLauncher workerLauncher) {
         this.config = config;
-        this.fileStorage = fileStorage;
         this.eventBus = eventBus;
         this.workerLauncher = workerLauncher;
     }
@@ -162,27 +151,14 @@ public class Broker implements Component {
      * Enqueue a set of tasks for a regional analysis.
      * Only a single task is passed in, which the broker will expand into all the individual tasks for a regional job.
      */
-    public synchronized void enqueueTasksForRegionalJob (RegionalAnalysis regionalAnalysis) {
-
-        // Make a copy of the regional task inside the RegionalAnalysis, replacing the scenario with a scenario ID.
-        RegionalTask templateTask = templateTaskFromRegionalAnalysis(regionalAnalysis);
-
-        LOG.info("Enqueuing tasks for job {} using template task.", templateTask.jobId);
-        if (findJob(templateTask.jobId) != null) {
-            LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
-            throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
+    public synchronized void enqueueTasksForRegionalJob (Job job, MultiOriginAssembler assembler) {
+        LOG.info("Enqueuing tasks for job {} using template task.", job.jobId);
+        if (findJob(job.jobId) != null) {
+            LOG.error("Someone tried to enqueue job {} but it already exists.", job.jobId);
+            throw new RuntimeException("Enqueued duplicate job " + job.jobId);
         }
-        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
-        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
-        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
-        WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
-        Job job = new Job(templateTask, workerTags);
-
         // Register the regional job so results received from multiple workers can be assembled into one file.
-        // If any parameters fail checks here, an exception may cause this method to exit early.
-        // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
-        resultAssemblers.put(templateTask.jobId, assembler);
+        resultAssemblers.put(job.jobId, assembler);
 
         // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
         jobs.put(job.workerCategory, job);
@@ -193,56 +169,12 @@ public class Broker implements Component {
         }
 
         if (workerCatalog.noWorkersAvailable(job.workerCategory, config.offline())) {
-            createOnDemandWorkerInCategory(job.workerCategory, workerTags);
+            createOnDemandWorkerInCategory(job.workerCategory, job.workerTags);
         } else {
             // Workers exist in this category, clear out any record that we're waiting for one to start up.
             recentlyRequestedWorkers.remove(job.workerCategory);
         }
-        eventBus.send(new RegionalAnalysisEvent(templateTask.jobId, STARTED).forUser(workerTags.user, workerTags.group));
-    }
-
-    /**
-     * The single RegionalTask object represents a lot of individual accessibility tasks at many different origin
-     * points, typically on a grid. Before passing that RegionalTask on to the Broker (which distributes tasks to
-     * workers and tracks progress), we remove the details of the scenario, substituting the scenario's unique ID
-     * to save time and bandwidth. This avoids repeatedly sending the scenario details to the worker in every task,
-     * as they are often quite voluminous. The workers will fetch the scenario once from S3 and cache it based on
-     * its ID only. We protectively clone this task because we're going to null out its scenario field, and don't
-     * want to affect the original object which contains all the scenario details.
-     * TODO Why is all this detail added after the Persistence call?
-     *      We don't want to store all the details added below in Mongo?
-     */
-    private RegionalTask templateTaskFromRegionalAnalysis (RegionalAnalysis regionalAnalysis) {
-        RegionalTask templateTask = regionalAnalysis.request.clone();
-        // First replace the inline scenario with a scenario ID, storing the scenario for retrieval by workers.
-        Scenario scenario = templateTask.scenario;
-        templateTask.scenarioId = scenario.id;
-        // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
-        templateTask.scenario = null;
-        String fileName = String.format("%s_%s.json", regionalAnalysis.bundleId, scenario.id);
-        FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
-        try {
-            File localScenario = FileUtils.createScratchFile("json");
-            JsonUtil.objectMapper.writeValue(localScenario, scenario);
-            // FIXME this is using a network service in a method called from a synchronized broker method.
-            //  Move file into storage before entering the synchronized block.
-            fileStorage.moveIntoStorage(fileStorageKey, localScenario);
-        } catch (IOException e) {
-            LOG.error("Error storing scenario for retrieval by workers.", e);
-        }
-        // Fill in all the fields in the template task that will remain the same across all tasks in a job.
-        // I am not sure why we are re-setting all these fields, it seems like they are already set when the task is
-        // initialized by AnalysisRequest.populateTask. But we'd want to thoroughly check that assumption before
-        // eliminating or moving these lines.
-        templateTask.jobId = regionalAnalysis._id;
-        templateTask.graphId = regionalAnalysis.bundleId;
-        templateTask.workerVersion = regionalAnalysis.workerVersion;
-        templateTask.height = regionalAnalysis.height;
-        templateTask.width = regionalAnalysis.width;
-        templateTask.north = regionalAnalysis.north;
-        templateTask.west = regionalAnalysis.west;
-        templateTask.zoom = regionalAnalysis.zoom;
-        return templateTask;
+        eventBus.send(new RegionalAnalysisEvent(job.jobId, STARTED).forUser(job.workerTags.user, job.workerTags.group));
     }
 
     /**

@@ -5,8 +5,8 @@ import com.google.common.collect.Maps;
 import java.io.Serializable;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 
 import static java.time.DayOfWeek.FRIDAY;
 import static java.time.DayOfWeek.MONDAY;
@@ -37,7 +37,7 @@ public class Service implements Serializable {
      * @param daysToRemove the days of the week on which to deactivate service in the copy.
      * @return a copy of this Service with any service on the specified days of the week deactivated.
      */
-    public Service removeDays(String service_id, EnumSet<DayOfWeek> daysToRemove) {
+    public Service removeDays(String service_id, Set<DayOfWeek> daysToRemove) {
         Service service = new Service(service_id);
         // First, duplicate any Calendar in this Service, minus the specified days of the week.
         if (this.calendar != null) {

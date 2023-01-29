@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -58,7 +57,7 @@ public class PerTargetPropagater {
     private PointSet targets;
 
     /** All modes for which we want to perform egress propagation through the street network. */
-    public final EnumSet<StreetMode> modes;
+    public final Set<StreetMode> modes;
 
     /** One linkage for each street mode for which we want to extend travel times out from transit to destinations. */
     private final List<LinkedPointSet> linkedTargets;
@@ -144,7 +143,7 @@ public class PerTargetPropagater {
     public PerTargetPropagater(
             PointSet targets,
             StreetLayer streetLayer,
-            EnumSet<StreetMode> modes,
+            Set<StreetMode> modes,
             AnalysisWorkerTask task,
             int[][] travelTimesToStopsForIteration,
             int[] nonTransitTravelTimesToTargets

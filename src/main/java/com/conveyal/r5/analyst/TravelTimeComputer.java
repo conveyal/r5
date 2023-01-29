@@ -24,7 +24,7 @@ import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumSet;
+import java.util.Set;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
@@ -114,7 +114,7 @@ public class TravelTimeComputer {
 
         // Convert from profile routing qualified modes to internal modes. This also ensures we don't route on
         // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
-        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
+        Set<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
 
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
         for (StreetMode accessMode : accessModes) {
@@ -316,7 +316,7 @@ public class TravelTimeComputer {
         // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
 
         // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
-        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
+        Set<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
 
         // This propagator will link the destinations to the street layer for all modes as needed.
         PerTargetPropagater perTargetPropagater = new PerTargetPropagater(

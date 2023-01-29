@@ -24,7 +24,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -127,22 +127,22 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** The modes used to access transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> accessModes;
+    public Set<LegMode> accessModes;
     
     /** The modes used to reach the destination after leaving transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> egressModes;
+    public Set<LegMode> egressModes;
     
     /** The modes used to reach the destination without transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
-    public EnumSet<LegMode> directModes;
+    public Set<LegMode> directModes;
     
     /** The transit modes used */
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
-    public EnumSet<TransitModes> transitModes;
+    public Set<TransitModes> transitModes;
 
     /**
      * This parameter compensates for the fact that GTFS does not contain information about schedule deviation (lateness).

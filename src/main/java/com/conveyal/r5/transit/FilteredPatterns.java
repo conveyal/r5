@@ -1,12 +1,11 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.util.Tuple2;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.r5.transit.TransitLayer.getTransitModes;
 
@@ -37,7 +36,7 @@ public class FilteredPatterns {
      * Construct FilteredPatterns from the given TransitLayer, filtering for the specified modes and active services.
      * It's tempting to use List.of() or Collectors.toUnmodifiableList() but these cause an additional array copy.
      */
-    public FilteredPatterns (TransitLayer transitLayer, EnumSet<TransitModes> modes, BitSet services) {
+    public FilteredPatterns (TransitLayer transitLayer, Set<TransitModes> modes, BitSet services) {
         List<TripPattern> sourcePatterns = transitLayer.tripPatterns;
         patterns = new ArrayList<>(sourcePatterns.size());
         for (int patternIndex = 0; patternIndex < sourcePatterns.size(); patternIndex++) {

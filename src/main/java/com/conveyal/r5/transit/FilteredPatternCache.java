@@ -6,7 +6,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 
 import java.util.BitSet;
-import java.util.EnumSet;
+import java.util.Set;
 
 /**
  * Stores the patterns and trips relevant for routing based on the transit modes and date in an analysis request.
@@ -37,13 +37,13 @@ public class FilteredPatternCache {
     }
 
     // TODO replace all keys and tuples with Java 16/17 Records
-    private static class Key extends Tuple2<EnumSet<TransitModes>, BitSet> {
-        public Key (EnumSet<TransitModes> transitModes, BitSet servicesActive) {
+    private static class Key extends Tuple2<Set<TransitModes>, BitSet> {
+        public Key (Set<TransitModes> transitModes, BitSet servicesActive) {
             super(transitModes, servicesActive);
         }
     }
 
-    public FilteredPatterns get (EnumSet<TransitModes> transitModes, BitSet servicesActive) {
+    public FilteredPatterns get (Set<TransitModes> transitModes, BitSet servicesActive) {
         return cache.get(new Key(transitModes, servicesActive));
     }
 

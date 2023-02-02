@@ -310,6 +310,10 @@ public class StreetLayer implements Serializable, Cloneable {
             for (int n = 1; n < way.nodes.length; n++) {
                 long nodeId = way.nodes[n];
                 Node node = osm.nodes.get(nodeId);
+                if (node == null) {
+                    LOG.warn("Bailing out of OSM way {} that references an undefined node.", entry.getKey());
+                    break;
+                }
                 final boolean intersection = osm.intersectionNodes.contains(way.nodes[n]);
                 final boolean lastNode = (n == (way.nodes.length - 1));
                 if (intersection || lastNode || isImpassable(node)) {

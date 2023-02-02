@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
+import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -134,10 +135,10 @@ public class BrokerController implements HttpController {
 
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
         // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
-        checkUuidParameter(analysisRequest.regionId, "region ID");
-        checkUuidParameter(analysisRequest.projectId, "project ID");
-        checkUuidParameter(analysisRequest.bundleId, "bundle ID");
-        checkUuidParameters(analysisRequest.modificationIds, "modification IDs");
+        checkIdParameter(analysisRequest.regionId, "region ID");
+        checkIdParameter(analysisRequest.projectId, "project ID");
+        checkIdParameter(analysisRequest.bundleId, "bundle ID");
+        checkIdParameters(analysisRequest.modificationIds, "modification IDs");
         checkNotNull(analysisRequest.workerVersion, "Worker version must be provided in request.");
 
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
@@ -388,30 +389,45 @@ public class BrokerController implements HttpController {
         }
     }
 
+    /** Factor out exception creation for readability/repetition. */
+    private static IllegalArgumentException uuidException (String fieldName) {
+        return new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", fieldName));
+    }
+
     /**
      * Validate a request parameter that is expected to be a non-null String containing a Mongo ObjectId or a
-     * UUID converted to a string in the standard way.
+     * UUID converted to a string, or a UUID converted to a string with the hyphens removed.
      * @param name a human-readable name for the parameter being validated, for substitution into error messages.
      * @throws IllegalArgumentException if the parameter fails any of these conditions.
      */
-    public static void checkUuidParameter (String parameter, String name) {
+    public static void checkIdParameter(String parameter, String name) {
         if (parameter == null) {
             throw new IllegalArgumentException(String.format("The %s is not set in the request.", name));
         }
-        // Should be either 24 hex digits (Mongo ID) or 32 hex digits with dashes (UUID)
+        // Should be either 24 hex digits (Mongo ID), 32 hex digits with dashes (UUID), or 32 hex digits without dashes
         if (ObjectId.isValid(parameter)) {
             return;
         }
-        try {
-            UUID.fromString(parameter);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", name));
+        if (parameter.length() == 36) {
+            try {
+                UUID.fromString(parameter);
+            } catch (IllegalArgumentException e) {
+                throw uuidException(name);
+            }
+        } else if (parameter.length() == 32) {
+            for (char c : parameter.toCharArray()) {
+                if (Character.digit(c, 16) == -1) {
+                    throw uuidException(name);
+                }
+            }
+        } else {
+            throw uuidException(name);
         }
     }
 
-    public static void checkUuidParameters (Iterable<String> parameters, String name) {
+    public static void checkIdParameters(Iterable<String> parameters, String name) {
         for (String parameter: parameters) {
-            checkUuidParameter(parameter, name);
+            checkIdParameter(parameter, name);
         }
     }
 

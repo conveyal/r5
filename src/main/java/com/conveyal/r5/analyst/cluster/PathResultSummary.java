@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.path.RouteSequence;
 import com.conveyal.r5.transit.path.StopSequence;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -49,8 +50,8 @@ public class PathResultSummary {
                 this.iterations.add(iterationDetails);
             }
             List<TransitLeg> transitLegs = new ArrayList<>();
-            for (int routeIndex = 0; routeIndex < pathTemplate.routes.size(); routeIndex++) {
-                transitLegs.add(new TransitLeg(transitLayer, pathTemplate.stopSequence, routeIndex));
+            for (int legIndex = 0; legIndex < pathTemplate.routes.size(); legIndex++) {
+                transitLegs.add(new TransitLeg(transitLayer, pathTemplate, legIndex));
             }
             itineraries.add(new Itinerary(
                     pathTemplate.stopSequence.access,
@@ -115,20 +116,21 @@ public class PathResultSummary {
 
         public TransitLeg(
                 TransitLayer transitLayer,
-                StopSequence stopSequence,
-                int routeIndex
+                RouteSequence routeSequence,
+                int legIndex
         ) {
-            var routeInfo = transitLayer.routes.get(routeIndex);
+            var routeInfo = transitLayer.routes.get(routeSequence.routes.get(legIndex));
             routeId = routeInfo.route_id;
             routeName = routeInfo.getName();
+            StopSequence stopSequence = routeSequence.stopSequence;
 
-            rideTimeSeconds = stopSequence.rideTimesSeconds.get(routeIndex);
+            rideTimeSeconds = stopSequence.rideTimesSeconds.get(legIndex);
 
-            int boardStopIndex = stopSequence.boardStops.get(routeIndex);
+            int boardStopIndex = stopSequence.boardStops.get(legIndex);
             boardStopId = getStopId(transitLayer, boardStopIndex);
             boardStopName = transitLayer.stopNames.get(boardStopIndex);
 
-            int alightStopIndex = stopSequence.alightStops.get(routeIndex);
+            int alightStopIndex = stopSequence.alightStops.get(legIndex);
             alightStopId = getStopId(transitLayer, alightStopIndex);
             alightStopName = transitLayer.stopNames.get(alightStopIndex);
         }

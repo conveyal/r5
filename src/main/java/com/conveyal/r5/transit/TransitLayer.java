@@ -546,7 +546,7 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public void buildDistanceTables(Geometry rebuildZone) {
 
-        LOG.info("Finding distances from transit stops to street vertices.");
+        LOG.info("Pre-computing distances from transit stops to street vertices (WALK mode only).");
         if (rebuildZone != null) {
             LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }

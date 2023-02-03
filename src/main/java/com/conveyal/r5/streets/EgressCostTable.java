@@ -209,7 +209,7 @@ public class EgressCostTable implements Serializable {
             rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
         }
 
-        LOG.info("Creating EgressCostTables from each transit stop to PointSet points.");
+        LOG.info("Creating EgressCostTables from each transit stop to PointSet points for mode {}.", streetMode);
         if (rebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
@@ -232,9 +232,9 @@ public class EgressCostTable implements Serializable {
         progressListener.beginTask(taskDescription, nStops);
 
         final LambdaCounter computeCounter = new LambdaCounter(LOG, nStops, computeLogFrequency,
-                "Computed new stop -> point tables for {} of {} transit stops.");
+                String.format("Computed new stop-to-point tables from {} of {} transit stops for mode %s.", streetMode));
         final LambdaCounter copyCounter = new LambdaCounter(LOG, nStops, copyLogFrequency,
-                "Copied unchanged stop -> point tables for {} of {} transit stops.");
+                String.format("Copied unchanged stop-to-point tables from {} of {} transit stops for mode %s.", streetMode));
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // Each table is a flattened 2D array. Two values for each point reachable from this stop: (pointIndex, cost)
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.

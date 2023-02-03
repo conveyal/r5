@@ -262,16 +262,16 @@ public class EgressCostTable implements Serializable {
             GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, linkingDistanceLimitMeters);
 
             if (streetMode == StreetMode.WALK) {
-                // Walking distances from stops to street vertices are saved in the TransitLayer.
-                // Get the pre-computed walking distance table from the stop to the street vertices,
-                // then extend that table out from the street vertices to the points in this PointSet.
-                // TODO reuse the code that computes the walk tables at TransitLayer.buildOneDistanceTable() rather than
-                //      duplicating it below for other modes.
+                // Distances from stops to street vertices are saved in the TransitLayer, but only for the walk mode.
+                // Get the pre-computed walking distance table from the stop to the street vertices, then extend that
+                // table out from the street vertices to the points in this PointSet. It may be possible to reuse the
+                // code that pre-computes walk tables at TransitLayer.buildOneDistanceTable() rather than duplicating
+                // it below for other (non-walk) modes.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
                 return distanceTableToVertices == null ? null :
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
-
+                // For non-walk modes perform a search from each stop, as stop-to-vertex tables are not precomputed.
                 Geometry egressArea = null;
 
                 // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
@@ -301,14 +301,14 @@ public class EgressCostTable implements Serializable {
                     LOG.warn("Stop unlinked, cannot build distance table: {}", stopIndex);
                     return null;
                 }
-                // TODO setting the origin point of the router to the stop vertex does not work.
-                // This is probably because link edges do not allow car traversal. We could traverse them.
-                // As a stopgap we perform car linking at the geographic coordinate of the stop.
+                // Setting the origin point of the router to the stop vertex (as follows) does not work.
                 // sr.setOrigin(vertexId);
+                // This is probably because link edges do not allow car traversal. We could traverse them.
+                // As a workaround we perform car linking at the geographic coordinate of the stop.
                 VertexStore.Vertex vertex = linkedPointSet.streetLayer.vertexStore.getCursor(vertexId);
                 sr.setOrigin(vertex.getLat(), vertex.getLon());
 
-                // WALK is handled above, this block is exhaustively handling all other modes.
+                // WALK is handled in the if clause above, this else block is exhaustively handling all other modes.
                 if (streetMode == StreetMode.BICYCLE) {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;
                 } else if (streetMode == StreetMode.CAR) {

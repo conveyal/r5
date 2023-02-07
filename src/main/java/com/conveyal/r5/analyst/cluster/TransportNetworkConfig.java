@@ -42,7 +42,7 @@ public class TransportNetworkConfig {
     public List<Modification> modifications;
 
     /**
-     * Additional modes other than walk for which to pre-build a full regional grid and distance tables.
+     * Additional modes other than walk for which to pre-build large data structures (grid linkage and cost tables).
      * When building a network, by default we build distance tables from transit stops to street vertices, to which we
      * connect a grid covering the entire street network at the default zoom level. By default we do this only for the
      * walk mode. Pre-building and serializing equivalent data structures for other modes allows workers to start up

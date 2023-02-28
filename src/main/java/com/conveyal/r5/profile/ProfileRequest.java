@@ -66,9 +66,11 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /** The speed of walking, in meters per second */
     public float  walkSpeed = 1.3f;
+    public double walkSpeedAsDouble = 1.3d;
     
     /** The speed of cycling, in meters per second */
     public float  bikeSpeed = 4f;
+    public double bikeSpeedAsDouble = 4d;
 
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
@@ -83,6 +85,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * appear to use this value, but various conditionals ensure edge-specific speeds take precedence.
      */
     public float carSpeed = 2.22f; // ~8 km/h
+    public double carSpeedAsDouble = 2.22d; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
     public int    streetTime = 60;
@@ -279,6 +282,27 @@ public class ProfileRequest implements Serializable, Cloneable {
 
         //fromTime is in seconds and there are 1000 ms in a second
         return  currentDateTime.plusSeconds(fromTime);
+    }
+
+    /**
+     * @return the speed at which the given mode will traverse street edges, in meters per second (natively as double to reduce boxing).
+     *
+     * For WALK and BICYCLE, it makes sense to allow users to adjust speeds in the request. For CAR (where speeds
+     * vary by edge) callers should implement logic that uses appropriate per-edge speeds instead of the returned
+     * carSpeed. TODO throw exception if streetMode == CAR
+     */
+    @JsonIgnore
+    public double getSpeedForModeAsDouble (StreetMode streetMode) {
+        switch (streetMode) {
+            case WALK:
+                return walkSpeedAsDouble;
+            case BICYCLE:
+                return bikeSpeedAsDouble;
+            case CAR:
+                return carSpeedAsDouble;
+            default:
+                throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
+        }
     }
 
     /**

@@ -17,7 +17,12 @@ public class TIntObjectHashMultimap<V> implements TIntObjectMultimap<V> {
 
     @Override
     public boolean put(int key, V value) {
-        if (!wrapped.containsKey(key)) wrapped.put(key, new ArrayList<>());
+        if (!wrapped.containsKey(key)) {
+            wrapped.put(key, new ArrayList<>(2));
+        } else {
+            ArrayList<V> wrappedList = (ArrayList<V>) wrapped.get(key);
+            wrappedList.ensureCapacity(wrappedList.size() * 2);
+        }
         return wrapped.get(key).add(value);
     }
 

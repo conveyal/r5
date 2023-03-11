@@ -658,6 +658,8 @@ public class EdgeStore implements Serializable {
                 // two link edges in a row, in other words a shortcut. Disallow this.
                 return null;
             }
+            // Used for experimental speed adjustments based on LTS
+            boolean LTS_ONE_LEVEL_HIGHER = false;
 
             // Check whether this edge allows the selected mode, considering the request settings.
             if (streetMode == StreetMode.WALK) {
@@ -668,12 +670,19 @@ public class EdgeStore implements Serializable {
                     return null;
                 }
             } else if (streetMode == StreetMode.BICYCLE) {
-                // If biking is not allowed on this edge, or if the traffic stress is too high, walk the bike.
+                // If biking is not allowed on this edge, try to walk the bike instead.
                 boolean tryWalking = !getFlag(EdgeFlag.ALLOWS_BIKE);
-                if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) tryWalking = true;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) tryWalking = true;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) tryWalking = true;
+                // Experimental: if the edge's LTS exceeds the requested limit by 1 level, double the traversal time.
+                // If the edge's LTS exceeds the requested limit by more than 1 level, try to walk the bike instead.
+                if (req.bikeTrafficStress == 3) {
+                    if(getFlag(EdgeFlag.BIKE_LTS_4)) LTS_ONE_LEVEL_HIGHER = true;
+                } else if (req.bikeTrafficStress == 2) {
+                    if (getFlag(EdgeFlag.BIKE_LTS_3)) LTS_ONE_LEVEL_HIGHER = true;
+                    else if (getFlag(BIKE_LTS_4)) tryWalking = true;
+                } else if (req.bikeTrafficStress == 1) {
+                    if (getFlag(EdgeFlag.BIKE_LTS_2)) LTS_ONE_LEVEL_HIGHER = true;
+                    else if (getFlag(BIKE_LTS_3)) tryWalking = true;
+                    else if (getFlag(BIKE_LTS_4)) tryWalking = true;
                 }
                 if (tryWalking) {
                     if (!getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
@@ -689,6 +698,7 @@ public class EdgeStore implements Serializable {
 
             s1.streetMode = streetMode;
             int traverseTimeSeconds = timeCalculator.traversalTimeSeconds(this, streetMode, req);
+            if (LTS_ONE_LEVEL_HIGHER) traverseTimeSeconds *= 2;
 
             // This was rounding up, now truncating ... maybe change back for consistency?
             // int roundedTime = (int) Math.ceil(time);

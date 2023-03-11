@@ -22,13 +22,10 @@ jobs:
         with:
           fetch-depth: 0
           path: r5
-      # Build .jar and copy to ./ui directory (along with config file)
-      # Cache Gradle dependencies to speed up the shadow jar build
-      - uses: actions/cache@v1
-        id: cache
+      - uses: gradle/gradle-build-action@v2.4.0
         with:
-          path: ~/.gradle/caches
-          key: gradle-caches
+          gradle-version: 7.6.1
+      # Build .jar and copy to ./ui directory (along with config file)
       - uses: actions/setup-java@v1
         with:
           java-version: 11

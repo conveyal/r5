@@ -52,7 +52,7 @@ public class Calendar extends Entity implements Serializable {
             String service_id = getStringField("service_id", true); // TODO service_id can reference either calendar or calendar_dates.
             Service service = services.computeIfAbsent(service_id, Service::new);
             if (service.calendar != null) {
-                feed.errors.add(new DuplicateKeyError(tableName, row, "service_id"));
+                feed.errors.add(new DuplicateKeyError(tableName, row, "service_id", service_id));
             } else {
                 Calendar c = new Calendar();
                 c.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index

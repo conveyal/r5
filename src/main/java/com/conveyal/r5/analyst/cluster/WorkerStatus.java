@@ -50,6 +50,9 @@ public class WorkerStatus {
     public String ipAddress;
     public List<RegionalWorkResult> results;
 
+    /** Then maximum number of tasks the broker should send to this worker. May be zero if its work queue is full. */
+    public int maxTasksRequested = 0;
+
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }
 

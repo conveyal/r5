@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -74,6 +75,13 @@ public class WorkerCatalog {
      */
     private synchronized void purgeDeadWorkers () {
         long now = System.currentTimeMillis();
+        // TODO purge newer workers much sooner since they poll regularly every 15 seconds.
+        // Unfortunately we need to keep the higher threshold around for older worker versions.
+        // Rather than decoding the worker version string, we can also just look at whether
+        // observation.status.maxTasksRequested > 0 which is only true on regularly-polling workers.
+        // Maybe the workers should even send their own poll interval in their status for this reason
+        // (to handle future tweaks across versions). This field could default to WORKER_RECORD_DURATION_MSEC.
+
         long oldestAcceptable = now - WORKER_RECORD_DURATION_MSEC;
         List<WorkerObservation> ancientObservations = new ArrayList<>();
         for (WorkerObservation observation : observationsByWorkerId.values()) {

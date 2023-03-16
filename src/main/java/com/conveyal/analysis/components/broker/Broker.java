@@ -100,8 +100,8 @@ public class Broker implements Component {
     private final ListMultimap<WorkerCategory, Job> jobs =
             MultimapBuilder.hashKeys().arrayListValues().build();
 
-    /** The most tasks to deliver to a worker at a time. */
-    public final int MAX_TASKS_PER_WORKER = 16;
+    /** The most tasks to deliver to a worker at a time. 50 tasks gives response bodies of about 65kB. */
+    public final int MAX_TASKS_PER_WORKER = 50;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
@@ -317,9 +317,13 @@ public class Broker implements Component {
 
     /**
      * Attempt to find some tasks that match what a worker is requesting.
-     * Always returns a list, which may be empty if there is nothing to deliver.
+     * Always returns a non-null List, which may be empty if there is nothing to deliver.
+     * Number of tasks in the list is strictly limited to maxTasksRequested.
      */
-    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory) {
+    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory, int maxTasksRequested) {
+        if (maxTasksRequested <= 0) {
+            return Collections.EMPTY_LIST;
+        }
         Job job;
         if (config.offline()) {
             // Working in offline mode; get tasks from the first job that has any tasks to deliver.
@@ -335,7 +339,11 @@ public class Broker implements Component {
             return Collections.EMPTY_LIST;
         }
         // Return up to N tasks that are waiting to be processed.
-        return job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
+        if (maxTasksRequested > MAX_TASKS_PER_WORKER) {
+            LOG.warn("Worker requested {} tasks, reducing to {}.", maxTasksRequested, MAX_TASKS_PER_WORKER);
+            maxTasksRequested = MAX_TASKS_PER_WORKER;
+        }
+        return job.generateSomeTasksToDeliver(maxTasksRequested);
     }
 
     /**

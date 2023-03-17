@@ -55,7 +55,7 @@ public class Calendar extends Entity implements Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "service_id"));
             } else {
                 Calendar c = new Calendar();
-                c.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+                c.sourceFileLine = row;
                 c.service_id = service.service_id;
                 c.monday = getIntField("monday", true, 0, 1);
                 c.tuesday = getIntField("tuesday", true, 0, 1);

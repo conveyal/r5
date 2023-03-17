@@ -46,7 +46,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         @Override
         public void loadOneRow() throws IOException {
             Route r = new Route();
-            r.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            r.sourceFileLine = row;
             r.route_id = getStringField("route_id", true);
             Agency agency = getRefField("agency_id", false, feed.agency);
 

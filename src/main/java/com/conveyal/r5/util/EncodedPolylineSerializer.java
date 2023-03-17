@@ -11,9 +11,15 @@ import org.locationtech.jts.geom.LineString;
 import java.io.IOException;
 
 /**
- * Serialize to Google encoded polyline.
- * Hopefully we can get rid of this - it's the only thing still using JTS objects under the vividsolutions package name
- * so is pulling in extra dependencies and requiring conversions (toLegacyLineString).
+ * Serialize JTS LineString to Google encoded polyline.
+ *
+ * This class is the only use of dependency com.axiomalaska:polyline-encoder, and it is only used in
+ * com.conveyal.r5.transitive.TransitivePattern, which is in turn only used in
+ * com.conveyal.r5.transitive.TransitiveNetwork, which is in turn only used in
+ * com.conveyal.r5.analyst.cluster.AnalysisWorker#saveTauiMetadata.
+ * That dependency has required maintainance on a few occasions and is hosted at a repo outside Maven Central which has
+ * become unavailable on a few occations. We should evaluate licence compatibility (LGPL) for copying it into this repo
+ * ("vendoring" it).
  */
 public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
 

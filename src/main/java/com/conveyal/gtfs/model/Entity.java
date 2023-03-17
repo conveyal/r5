@@ -314,13 +314,13 @@ public abstract class Entity implements Serializable {
         protected void insertCheckingDuplicateKey (Map<String, E> map, E value, String keyField) {
             String key = value.getId();
             if (key == null) {
-                feed.errors.add(new MissingKeyError(tableName, value.sourceFileLine, keyField));
+                feed.errors.add(new MissingKeyError(tableName, row, keyField));
                 return;
             }
             // Map returns previous value if one was already present
             E previousValue = map.put(key, value);
             if (previousValue != null) {
-                feed.errors.add(new DuplicateKeyError(tableName, value.sourceFileLine, keyField, key));
+                feed.errors.add(new DuplicateKeyError(tableName, row, keyField, key));
             }
         }
     }

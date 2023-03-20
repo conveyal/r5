@@ -24,7 +24,7 @@ import java.util.Set;
 public class WorkerStatus {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkerStatus.class);
-
+    private static final int MAX_TASKS_LEGACY_WORKERS = 16;
     public String architecture;
     public int processors;
     public double loadAverage;
@@ -50,8 +50,11 @@ public class WorkerStatus {
     public String ipAddress;
     public List<RegionalWorkResult> results;
 
-    /** Then maximum number of tasks the broker should send to this worker. May be zero if its work queue is full. */
-    public int maxTasksRequested = 0;
+    /**
+     * Then maximum number of tasks the broker should send to this worker. May be zero if its work queue is full.
+     * Default value determines the number of tasks to send to older workers that don't send this value when they poll.
+     */
+    public int maxTasksRequested = MAX_TASKS_LEGACY_WORKERS;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }

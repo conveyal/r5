@@ -203,10 +203,10 @@ public class AnalysisWorker implements Component {
         // The default task rejection policy is "Abort".
         // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        LOG.debug("Java reports the number of available processors is: {}", availableProcessors);
+        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
         final int maxThreads = availableProcessors;
         final int taskQueueLength = availableProcessors * QUEUE_SLOTS_PER_PROCESSOR;
-        LOG.debug("Maximum number of regional processing threads is {}, target length of task queue is {}.", maxThreads, taskQueueLength);
+        LOG.info("Maximum number of regional processing threads is {}, target length of task queue is {}.", maxThreads, taskQueueLength);
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
         regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
@@ -266,7 +266,7 @@ public class AnalysisWorker implements Component {
                 try {
                     regionalTaskExecutor.execute(new RegionalTaskRunnable(task));
                 } catch (RejectedExecutionException e) {
-                    LOG.error("Regional task could not be enqueued for processing - queue lengths are misconfigured!");
+                    LOG.error("Regional task could not be enqueued for processing (queue length exceeded). Task dropped.");
                 }
             }
         }

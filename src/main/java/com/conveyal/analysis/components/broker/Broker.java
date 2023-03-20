@@ -104,7 +104,7 @@ public class Broker implements Component {
      * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
      * never send more than the minimum of the two values. 50 tasks gives response bodies of about 65kB.
      */
-    public final int MAX_TASKS_PER_WORKER = 50;
+    public final int MAX_TASKS_PER_WORKER = 100;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of

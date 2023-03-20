@@ -78,7 +78,7 @@ public class AnalysisWorker implements Component {
     private static final int POLL_INTERVAL_MIN_SECONDS = 1;
     private static final int POLL_INTERVAL_MAX_SECONDS = 15;
     private static final int POLL_JITTER_SECONDS = 5;
-    private static final int QUEUE_SLOTS_PER_PROCESSOR = 6;
+    private static final int QUEUE_SLOTS_PER_PROCESSOR = 10;
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.
@@ -126,8 +126,11 @@ public class AnalysisWorker implements Component {
      */
     private final List<RegionalWorkResult> workResults = new ArrayList<>();
 
-    /** The last time (in milliseconds since the epoch) that we polled for work. */
-    private long lastPollingTime;
+    /**
+     * The last time (in milliseconds since the epoch) that we polled for work.
+     * The initial value of zero causes the worker to poll the backend immediately on startup avoiding a delay.
+     */
+    private long lastPollingTime = 0;
 
     /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
     private final ThroughputTracker throughputTracker = new ThroughputTracker();
@@ -199,28 +202,27 @@ public class AnalysisWorker implements Component {
     /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
     public void startPolling () {
 
-        // Create executors with up to one thread per processor.
-        // The default task rejection policy is "Abort".
-        // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
+        // Create an executor with one thread per processor. The default task rejection policy is "Abort".
+        // The number of threads will only increase from the core pool size toward the max pool size when the queue is
+        // full. We no longer exceed the queue length in normal operation, so the thread pool will remain at core size.
+        // "[The] core pool size is the threshold beyond which [an] executor service prefers to queue up the task than
+        // spawn a new thread."
+        // The executor's queue is rather long because some tasks complete very fast and we poll at most once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
         LOG.info("Java reports the number of available processors is: {}", availableProcessors);
         final int maxThreads = availableProcessors;
         final int taskQueueLength = availableProcessors * QUEUE_SLOTS_PER_PROCESSOR;
         LOG.info("Maximum number of regional processing threads is {}, target length of task queue is {}.", maxThreads, taskQueueLength);
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
-        regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
+        regionalTaskExecutor = new ThreadPoolExecutor(maxThreads, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
-        // Main polling loop to fill the regional work queue.
+        // This is the main polling loop that fills the regional work queue.
         // Go into an endless loop polling for regional tasks that can be computed asynchronously.
         // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
         // people all over the world have been jumping through hoops to try to achieve this simple behavior
         // with no real success, at least without writing bug and deadlock-prone custom executor services.
-        // Two alternative approaches are trying to keep the queue full and waiting for the queue to be almost empty.
-        // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
-        // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
-        // see https://stackoverflow.com/a/15185004/778449
-        // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
-        // then fetch more work only when the queue is getting empty.
+        // Our current (revised) approach is to slowly spin-wait, checking whether the queue is low and sleeping briefly,
+        // then fetching more work only when the queue is getting empty.
 
         // Allows slowing down polling when not actively receiving tasks.
         boolean receivedWorkLastTime = false;
@@ -232,14 +234,14 @@ public class AnalysisWorker implements Component {
             // If worker handles all tasks in its internal queue in less than this time, this is a speed bottleneck.
             // This can happen in areas unconnected to transit and when travel time cutoffs are very low.
             sleepSeconds(POLL_INTERVAL_MIN_SECONDS);
-
             // Determine whether to poll this cycle - is the queue running empty, or has the maximum interval passed?
             {
                 long currentTime = System.currentTimeMillis();
                 boolean maxIntervalExceeded = (currentTime - lastPollingTime) > (POLL_INTERVAL_MAX_SECONDS * 1000);
                 int tasksInQueue = taskQueue.size();
-                int minQueueLength = availableProcessors; // Poll whenever we have less tasks in the queue than processors.
-                boolean shouldPoll = maxIntervalExceeded || (receivedWorkLastTime && (tasksInQueue < minQueueLength)) ;
+                // Poll any time we have less tasks in the queue than processors.
+                boolean shouldPoll = maxIntervalExceeded || (receivedWorkLastTime && (tasksInQueue < availableProcessors));
+                LOG.debug("Last polled {} sec ago. Task queue length is {}.", (currentTime - lastPollingTime)/1000, taskQueue.size());
                 if (!shouldPoll) {
                     continue;
                 }
@@ -580,6 +582,7 @@ public class AnalysisWorker implements Component {
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus(this);
         workerStatus.maxTasksRequested = tasksToRequest;
+        workerStatus.pollIntervalSeconds = POLL_INTERVAL_MAX_SECONDS;
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {

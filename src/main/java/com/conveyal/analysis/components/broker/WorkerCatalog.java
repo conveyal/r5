@@ -22,7 +22,8 @@ import java.util.Objects;
  */
 public class WorkerCatalog {
 
-    public static final int WORKER_RECORD_DURATION_MSEC = 2 * 60 * 1000;
+    /** If a worker says it will poll every s seconds or less, wait s plus this number before considering it gone. */
+    private static final int POLLING_TOLERANCE_SECONDS = 5;
 
     /**
      * The information supplied by workers the last time they polled for more tasks.
@@ -75,16 +76,9 @@ public class WorkerCatalog {
      */
     private synchronized void purgeDeadWorkers () {
         long now = System.currentTimeMillis();
-        // TODO purge newer workers much sooner since they poll regularly every 15 seconds.
-        // Unfortunately we need to keep the higher threshold around for older worker versions.
-        // Rather than decoding the worker version string, we can also just look at whether
-        // observation.status.maxTasksRequested > 0 which is only true on regularly-polling workers.
-        // Maybe the workers should even send their own poll interval in their status for this reason
-        // (to handle future tweaks across versions). This field could default to WORKER_RECORD_DURATION_MSEC.
-
-        long oldestAcceptable = now - WORKER_RECORD_DURATION_MSEC;
         List<WorkerObservation> ancientObservations = new ArrayList<>();
         for (WorkerObservation observation : observationsByWorkerId.values()) {
+            long oldestAcceptable = now - ((observation.status.pollIntervalSeconds + POLLING_TOLERANCE_SECONDS) * 1000);
             if (observation.lastSeen < oldestAcceptable) {
                 ancientObservations.add(observation);
             }

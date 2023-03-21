@@ -44,24 +44,25 @@ public class ShapefileDataSourceIngester extends DataSourceIngester {
         try {
             ShapefileReader reader = new ShapefileReader(file);
             // Iterate over all features to ensure file is readable, geometries are valid, and can be reprojected.
-            Envelope envelope = reader.wgs84Bounds();
-            checkWgsEnvelopeSize(envelope, "Shapefile");
+            // Note that the method reader.wgs84Bounds() transforms the envelope in projected coordinates to WGS84,
+            // which does not necessarily include all the points transformed individually.
+            Envelope envelope = new Envelope();
             reader.wgs84Stream().forEach(f -> {
-                checkState(envelope.contains(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal()));
+                envelope.expandToInclude(((Geometry)f.getDefaultGeometry()).getEnvelopeInternal());
             });
+            checkWgsEnvelopeSize(envelope, "Shapefile");
             reader.close();
             progressListener.increment();
             dataSource.wgsBounds = Bounds.fromWgsEnvelope(envelope);
             dataSource.attributes = reader.attributes();
             dataSource.geometryType = reader.geometryType();
             dataSource.featureCount = reader.featureCount();
-            dataSource.coordinateSystem =
-                    reader.crs.getName().getCode();
-
+            dataSource.coordinateSystem = reader.crs.getName().getCode();
             progressListener.increment();
         } catch (FactoryException | TransformException e) {
-            throw new DataSourceException("Shapefile transform error. " +
-                    "Try uploading an unprojected WGS84 (EPSG:4326) file.", e);
+            throw new DataSourceException(
+                "Shapefile transform error. Try uploading an unprojected WGS84 (EPSG:4326) file.", e
+            );
         } catch (IOException e) {
             // ShapefileReader throws a checked IOException.
             throw new DataSourceException("Error parsing shapefile. Ensure the files you uploaded are valid.", e);

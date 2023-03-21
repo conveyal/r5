@@ -1,6 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -19,6 +20,7 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.google.common.collect.HashMultimap;
@@ -253,7 +255,15 @@ public class GTFSFeed implements Cloneable, Closeable {
         // There are conceivably cases where the extra step of identifying and naming patterns is not necessary.
         // In current usage we do always need them, and performing this step during load allows enforcing subsequent
         // read-only access.
-        findPatterns();
+        // Find patterns only if there are no referential integrity errors or other severe problems. Those problems
+        // can cause pattern finding to fail hard with null pointer exceptions, causing detailed error messages to be
+        // lost and hiding underlying problems from the user. If high-priority problems are present, the feed should be
+        // presented to the user as unuseable anyway.
+        if (errors.stream().anyMatch(e -> e.getPriority() == Priority.HIGH)) {
+            LOG.warn("Feed contains high priority errors, not finding patterns. It will be useless for routing.");
+        } else {
+            findPatterns();
+        }
 
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
@@ -576,11 +586,13 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     public LineString getStraightLineForStops(String trip_id) {
         CoordinateList coordinates = new CoordinateList();
-        LineString ls = null;
+        LineString lineString = null;
         Trip trip = trips.get(trip_id);
 
         Iterable<StopTime> stopTimes;
         stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
+        // lineString must remain null if there are less than two stopTimes to avoid
+        // an exception when creating linestring.
         if (Iterables.size(stopTimes) > 1) {
             for (StopTime stopTime : stopTimes) {
                 Stop stop = stops.get(stopTime.stop_id);
@@ -588,13 +600,9 @@ public class GTFSFeed implements Cloneable, Closeable {
                 Double lon = stop.stop_lon;
                 coordinates.add(new Coordinate(lon, lat));
             }
-            ls = geometryFactory.createLineString(coordinates.toCoordinateArray());
+            lineString = geometryFactory.createLineString(coordinates.toCoordinateArray());
         }
-        // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
-        else{
-            ls = null;
-        }
-        return ls;
+        return lineString;
     }
 
     /**

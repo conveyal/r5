@@ -65,10 +65,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int    toTime;
 
     /** The speed of walking, in meters per second */
-    public float  walkSpeed = 1.3f;
+    public double  walkSpeed = 1.3d;
     
     /** The speed of cycling, in meters per second */
-    public float  bikeSpeed = 4f;
+    public double  bikeSpeed = 4d;
 
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
@@ -82,7 +82,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * This value is used only in the goal direction heuristic of the PointToPoint router. Code used in analysis may
      * appear to use this value, but various conditionals ensure edge-specific speeds take precedence.
      */
-    public float carSpeed = 2.22f; // ~8 km/h
+    public double carSpeed = 2.22d; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
     public int    streetTime = 60;
@@ -289,7 +289,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * carSpeed. TODO throw exception if streetMode == CAR
      */
     @JsonIgnore
-    public float getSpeedForMode (StreetMode streetMode) {
+    public double getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
             case WALK:
                 return walkSpeed;

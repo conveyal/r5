@@ -34,7 +34,7 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
 
     @Override
     public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
-        float speedMetersPerSecond = currentEdge.calculateSpeed(req, streetMode);
+        double speedMetersPerSecond = currentEdge.calculateSpeed(req, streetMode);
         double traversalTimeSeconds = currentEdge.getLengthM() / speedMetersPerSecond;
         return (int) FastMath.ceil(traversalTimeSeconds);
     }

@@ -530,8 +530,8 @@ public class EdgeStore implements Serializable {
          * @return the car speed on this edge, taking live traffic updates into account if requested (though that's not
          * yet implemented)
          */
-        public float getCarSpeedMetersPerSecond() {
-            return (float) ((speeds.get(edgeIndex) / 100.));
+        public double getCarSpeedMetersPerSecond() {
+            return ((speeds.get(edgeIndex) / 100.));
         }
 
         public float getSpeedKph () {
@@ -606,10 +606,10 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        public float calculateSpeed(ProfileRequest options, StreetMode traverseStreetMode) {
+        public double calculateSpeed(ProfileRequest options, StreetMode traverseStreetMode) {
             if (traverseStreetMode == null) {
                 // Do we really want to do this? Why not just let the NPE happen if the parameter is missing?
-                return Float.NaN;
+                return Double.NaN;
             } else if (traverseStreetMode == StreetMode.CAR) {
                 // TODO: apply speed based on traffic information if switched on in the request
                 return getCarSpeedMetersPerSecond();

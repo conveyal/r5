@@ -17,9 +17,8 @@ import java.io.IOException;
  * com.conveyal.r5.transitive.TransitivePattern, which is in turn only used in
  * com.conveyal.r5.transitive.TransitiveNetwork, which is in turn only used in
  * com.conveyal.r5.analyst.cluster.AnalysisWorker#saveTauiMetadata.
- * That dependency has required maintainance on a few occasions and is hosted at a repo outside Maven Central which has
- * become unavailable on a few occations. We should evaluate licence compatibility (LGPL) for copying it into this repo
- * ("vendoring" it).
+ * That dependency has required maintainance on a few occasions and was hosted at a repo outside Maven Central which has
+ * become unavailable on a few occations. We have copied the artifact to our S3-backed Conveyal Maven repo.
  */
 public class EncodedPolylineSerializer extends JsonSerializer<LineString> {
 

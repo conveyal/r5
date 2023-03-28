@@ -31,7 +31,8 @@ public class PickupDelay extends Modification {
     // Public Parameters deserialized from JSON
 
     /**
-     * The identifier of the polygon layer containing the on-demand pick-up zones.
+     * The name of the geojson file (in data sources) containing polygons or multipolygons for on-demand pick-up zones.
+     * This may optionally contain features for selecting stops to associate with the pick-up zones (see stopsForZone).
      * This set of polygons represents areas where an on-demand mobility service will pick up passengers, with
      * associated wait times to be picked up. Overlapping zones are not yet supported, only one "winning" zone will
      * be chosen using the priority values.
@@ -65,8 +66,9 @@ public class PickupDelay extends Modification {
     public String idAttribute = "id";
 
     /**
-     * A JSON map from polygon IDs to lists of polygon IDs. If any stop_id is specified for a polygon, service is
-     * only allowed between the polygon and the stops (i.e. no direct trips). If no stop_ids are specified,
+     * A JSON map from polygon IDs (service zones) to lists of polygon IDs (stop areas served by those zones).
+     * If one or more stop area polygons are specified for a service zone polygon, service is only allowed between
+     * that polygon and the stops within the stop area polygons (i.e. no direct trips). If no stop_ids are specified,
      * passengers boarding an on-demand service in a pick-up zone should be able to alight anywhere.
      */
     public Map<String, Set<String>> stopsForZone;

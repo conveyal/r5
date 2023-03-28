@@ -36,12 +36,12 @@ public class ReverseRoutingTest {
         transportNetwork.streetLayer = streetLayer;
         vertexNames = new ArrayList<>(6);
 
-        A = streetLayer.vertexStore.addVertex(41,15);
-        B = streetLayer.vertexStore.addVertex(42,15);
-        C1 = streetLayer.vertexStore.addVertex(43,12);
-        C2 = streetLayer.vertexStore.addVertex(43,10);
-        D = streetLayer.vertexStore.addVertex(44,15);
-        E = streetLayer.vertexStore.addVertex(45, 15);
+        A = streetLayer.vertexStore.addVertex(1.041,1.015);
+        B = streetLayer.vertexStore.addVertex(1.042,1.015);
+        C1 = streetLayer.vertexStore.addVertex(1.043,1.012);
+        C2 = streetLayer.vertexStore.addVertex(1.043,1.010);
+        D = streetLayer.vertexStore.addVertex(1.044,1.015);
+        E = streetLayer.vertexStore.addVertex(1.045, 1.015);
 
         vertexNames.add("A");
         vertexNames.add("B");

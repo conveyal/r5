@@ -39,9 +39,6 @@ import static com.google.common.base.Preconditions.checkState;
  * sends/forwards to R5 workers (see {@link AnalysisWorkerTask}), though it has many of the same fields.
  */
 public class AnalysisRequest {
-    private static int MIN_ZOOM = 9;
-    private static int MAX_ZOOM = 12;
-    private static int MAX_GRID_CELLS = 5_000_000;
 
     /**
      * These three IDs are redundant, and just help reduce the number of database lookups necessary.
@@ -355,7 +352,6 @@ public class AnalysisRequest {
         // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
         //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
-        checkGridSize(extents);
         task.height = extents.height;
         task.north = extents.north;
         task.west = extents.west;
@@ -410,21 +406,6 @@ public class AnalysisRequest {
         task.decayFunction = decayFunction;
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
-        }
-    }
-
-    private static void checkGridSize (WebMercatorExtents extents) {
-        if (extents.zoom < MIN_ZOOM || extents.zoom > MAX_ZOOM) {
-            throw AnalysisServerException.badRequest(String.format(
-                    "Requested zoom (%s) is outside valid range (%s - %s)", extents.zoom, MIN_ZOOM, MAX_ZOOM
-            ));
-        }
-        if (extents.height * extents.width > MAX_GRID_CELLS) {
-            throw AnalysisServerException.badRequest(String.format(
-                    "Requested number of destinations (%s) exceeds limit (%s). " +
-                            "Set smaller custom geographic bounds or a lower zoom level.",
-                            extents.height * extents.width, MAX_GRID_CELLS
-            ));
         }
     }
 

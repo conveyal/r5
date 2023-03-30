@@ -135,7 +135,7 @@ public class LinkedPointSet implements Serializable {
      *                    the same pointSet and streetMode as the preceding arguments.
      */
     public LinkedPointSet (PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
-        LOG.info("Linking pointset to street network...");
+        LOG.info("Linking pointset to street network for mode {}...", streetMode);
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
         this.streetMode = streetMode;
@@ -301,7 +301,7 @@ public class LinkedPointSet implements Serializable {
      */
     private void linkPointsToStreets (boolean all) {
         LambdaCounter linkCounter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
-                "Linked {} of {} PointSet points to streets.");
+                String.format("Linked {} of {} PointSet points to streets for mode %s.", streetMode));
 
         // Construct a geometry around any edges added by the scenario, or null if there are no added edges.
         // As it is derived from edge geometries this is a fixed-point geometry and must be intersected with the same.

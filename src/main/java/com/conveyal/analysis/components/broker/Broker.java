@@ -465,8 +465,9 @@ public class Broker implements Component {
 
             // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
             targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
-            // Guardrail until freeform pointsets are tested more thoroughly
-            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 5);
+            // Guardrails until freeform pointsets are tested more thoroughly
+            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
+            if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
             createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }

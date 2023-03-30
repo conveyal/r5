@@ -37,7 +37,7 @@ public class OSMCache implements Component {
         return id.replaceAll("[^A-Za-z0-9]", "-");
     }
 
-    public static FileStorageKey getKey(String id) {
+    public static FileStorageKey getKey (String id) {
         // FIXME Transforming IDs each time they're used seems problematic. They should probably only be validated here.
         String cleanId = cleanId(id);
         return new FileStorageKey(FileCategory.BUNDLES, cleanId + ".pbf");

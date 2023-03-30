@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -398,6 +399,25 @@ public class StreetLayerTest {
         r.setOrigin(vertexId);
         r.route();
         return r.getReachedVertices().size();
+    }
+
+    /**
+     * We have decided to tolerate OSM data containing ways that reference missing nodes, because geographic extract
+     * processes often produce data like this. Load a file containing a way that ends with some missing nodes
+     * and make sure no exception occurs. The input must contain ways creating intersections such that at least one
+     * edge is produced, as later steps expect the edge store to be non-empty. The PBF fixture for this test is derived
+     * from the hand-tweaked XML file of the same name using osmconvert.
+     */
+    @Test
+    public void testMissingNodes () {
+        OSM osm = new OSM(null);
+        osm.intersectionDetection = true;
+        osm.readFromUrl(StreetLayerTest.class.getResource("missing-nodes.pbf").toString());
+        assertDoesNotThrow(() -> {
+            StreetLayer sl = new StreetLayer();
+            sl.loadFromOsm(osm, true, true);
+            sl.buildEdgeLists();
+        });
     }
 
 }

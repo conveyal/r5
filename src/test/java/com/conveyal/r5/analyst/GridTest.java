@@ -26,31 +26,33 @@ public class GridTest {
     @Test
     public void testGetMercatorEnvelopeMeters() throws Exception {
         // Southeastern Australia
-        // Correct meter coordinates from http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
-        int zoom = 4;
-        int xTile = 14;
-        int yTile = 9;
+        // Reference coordinates in meters from http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
+        int zoom = 9;
+        int xTile = 465;
+        int yTile = 312;
         Grid grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         ReferencedEnvelope envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
-        assertEquals(15028131.257091936, envelope.getMinX(), 0.1);
-        assertEquals(-5009377.085697312, envelope.getMinY(), 0.1);
-        assertEquals(17532819.79994059, envelope.getMaxX(), 0.1);
-        assertEquals(-2504688.542848654, envelope.getMaxY(), 0.1);
+        assertEquals(16358747.0, envelope.getMinX(), 1);
+        assertEquals(-4461476.0, envelope.getMinY(), 1);
+        assertEquals(16437019.0, envelope.getMaxX(), 1);
+        assertEquals(-4383205.0, envelope.getMaxY(), 1);
 
-        // Cutting through Paris
-        zoom = 5;
-        xTile = 16;
-        yTile = 11;
+        // The tile east of Greenwich
+        // Reference coordinates in meters from http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
+        // Expect the zero edge to be more exact, others to within one meter.
+        zoom = 12;
+        xTile = 2048;
+        yTile = 1362;
         grid = new Grid(256 * xTile, 256 * yTile, 256, 256, zoom);
         envelope = grid.getWebMercatorExtents().getMercatorEnvelopeMeters();
-        assertEquals(0, envelope.getMinX(), 0.1);
-        assertEquals(5009377.085697312, envelope.getMinY(), 0.1);
-        assertEquals(1252344.271424327, envelope.getMaxX(), 0.1);
-        assertEquals(6261721.357121639, envelope.getMaxY(), 0.1);
+        assertEquals(0.0, envelope.getMinX(), 0.01);
+        assertEquals(6701999.0, envelope.getMinY(), 1);
+        assertEquals(9784.0, envelope.getMaxX(), 1);
+        assertEquals(6711783.0, envelope.getMaxY(), 1);
 
 //        /**
-//         * Make sure the Mercator projection works properly. Open the resulting file in GIS and
-//         * compare with http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
+//         * Uncomment to manually verify that the Mercator projection works properly. Open the resulting file in GIS
+//         * and compare with http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/
 //         */
 //        OutputStream outputStream = new FileOutputStream("test.tiff");
 //        grid.writeGeotiff(outputStream);

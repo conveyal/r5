@@ -63,7 +63,7 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
 
-    public static final boolean SAVE_SHAPES = false;
+    public static final boolean SAVE_SHAPES = true;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as

@@ -20,6 +20,11 @@ public class Trip extends Entity {
     public int    wheelchair_accessible;
     public String feed_id;
 
+    @Override
+    public String getId() {
+        return trip_id;
+    }
+
     public static class Loader extends Entity.Loader<Trip> {
 
         public Loader(GTFSFeed feed) {
@@ -47,7 +52,7 @@ public class Trip extends Entity {
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed_id = feed.feedId;
-            feed.trips.put(t.trip_id, t);
+            insertCheckingDuplicateKey(feed.trips, t, "trip_id");
 
             /*
               Check referential integrity without storing references. Trip cannot directly reference Services or

@@ -107,6 +107,11 @@ public class Grid extends PointSet {
         this(new WebMercatorExtents(west, north, width, height, zoom));
     }
 
+    /**
+     * Other constructors and factory methods all call this one, and Grid has a WebMercatorExtents field, which means
+     * Grid construction always follows construction of a WebMercatorExtents, whose constructor always performs a
+     * check on the size of the grid.
+     */
     public Grid (WebMercatorExtents extents) {
         this.extents = extents;
         this.grid = new double[extents.width][extents.height];

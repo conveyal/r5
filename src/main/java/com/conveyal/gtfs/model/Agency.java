@@ -20,6 +20,11 @@ public class Agency extends Entity {
     public URL    agency_branding_url;
     public String feed_id;
 
+    @Override
+    public String getId() {
+        return agency_id;
+    }
+
     public static class Loader extends Entity.Loader<Agency> {
 
         public Loader(GTFSFeed feed) {
@@ -45,11 +50,11 @@ public class Agency extends Entity {
             a.agency_fare_url = getUrlField("agency_fare_url", false);
             a.agency_branding_url = getUrlField("agency_branding_url", false);
             a.feed_id = feed.feedId;
-
-            // TODO clooge due to not being able to have null keys in mapdb
-            if (a.agency_id == null) a.agency_id = "NONE";
-
-            feed.agency.put(a.agency_id, a);
+            // Kludge because mapdb does not support null keys
+            if (a.agency_id == null) {
+                a.agency_id = "NONE";
+            }
+            insertCheckingDuplicateKey(feed.agency, a, "agency_id");
         }
 
     }

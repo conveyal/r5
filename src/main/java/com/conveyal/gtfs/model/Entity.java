@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
+import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.error.MissingKeyError;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
@@ -57,8 +59,10 @@ public abstract class Entity implements Serializable {
      *          with a sequence number. For example stop_times and shapes have no single field that uniquely
      *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
      */
-    public String getId () {
-        return null;
+    public String getId() {
+        // Several entities have compound keys which are handled as tuple objects, not strings.
+        // Fail fast if anything tries to fetch a string ID for those Entity types.
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -301,6 +305,24 @@ public abstract class Entity implements Serializable {
             }
         }
 
+        /**
+         * Insert the given value into the map, checking whether a value already exists with its key.
+         * The entity type must override getId() for this to work. We have to pass in the name of the key field for
+         * error reporting purposes because although there is a method to get the ID of an Entity there is not a method
+         * to get the name of the field(s) it is taken from.
+         */
+        protected void insertCheckingDuplicateKey (Map<String, E> map, E value, String keyField) {
+            String key = value.getId();
+            if (key == null) {
+                feed.errors.add(new MissingKeyError(tableName, row, keyField));
+                return;
+            }
+            // Map returns previous value if one was already present
+            E previousValue = map.put(key, value);
+            if (previousValue != null) {
+                feed.errors.add(new DuplicateKeyError(tableName, row, keyField, key));
+            }
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
@@ -17,14 +18,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
- * Really we should be embedding one of these in the tasks, grids, etc. to factor out all the common fields.
- * Equals and hashcode are semantic, for use as or within hashtable keys.
+ * Really we should have a field pointing to an instance of this in tasks, grids, etc. to factor out all the common
+ * fields. Equals and hashcode are semantic, for use as or within hashtable keys.
  *
  * TODO may want to distinguish between WebMercatorExtents, WebMercatorGrid (adds lat/lon conversion functions),
  *      and OpportunityGrid (AKA Grid) which adds opportunity counts. These can compose, not necessarily subclass.
  *      Of course they could all be one class, with the opportunity grid nulled out when there is no density.
  */
 public class WebMercatorExtents {
+
+    private static final int MIN_ZOOM = 9;
+    private static final int MAX_ZOOM = 12;
+    private static final int MAX_GRID_CELLS = 5_000_000;
 
     /** The pixel number of the westernmost pixel (smallest x value). */
     public final int west;
@@ -44,12 +49,17 @@ public class WebMercatorExtents {
     /** Web mercator zoom level. */
     public final int zoom;
 
+    /**
+     * All factory methods or constructors for WebMercatorExtents should eventually call this constructor,
+     * as it will enforce size constraints that prevent straining or stalling the system.
+     */
     public WebMercatorExtents (int west, int north, int width, int height, int zoom) {
         this.west = west;
         this.north = north;
         this.width = width;
         this.height = height;
         this.zoom = zoom;
+        checkGridSize();
     }
 
     /**
@@ -84,7 +94,11 @@ public class WebMercatorExtents {
         }
     }
 
-    /** Create the minimum-size immutable WebMercatorExtents containing both this one and the other one. */
+    /**
+     * Create the minimum-size immutable WebMercatorExtents containing both this one and the other one.
+     * Note that WebMercatorExtents fields are immutable, and this method does not modify the instance in place.
+     * It creates a new instance. This behavior differs from GeoTools / JTS Envelopes.
+     */
     public WebMercatorExtents expandToInclude (WebMercatorExtents other) {
         checkState(this.zoom == other.zoom, "All grids supplied must be at the same zoom level.");
         final int thisEast = this.west + this.width;
@@ -205,6 +219,36 @@ public class WebMercatorExtents {
         double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
         double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
         return new Coordinate(xMeters, yMeters);
+    }
+
+    /**
+     * Users may create very large grids in various ways. For example, by setting large custom analysis bounds or by
+     * uploading spatial data sets with very large extents. This method checks some limits on the zoom level and total
+     * number of cells to avoid straining or stalling the system.
+     *
+     * The fields of WebMercatorExtents are immutable and are not typically deserialized from incoming HTTP API
+     * requests. As all instances are created through a constructor, so we can perform this check every time a grid is
+     * created. If we do eventually deserialize these from HTTP API requests, we'll have to call the check explicitly.
+     * The Grid class internally uses a WebMercatorExtents field, so dimensions are also certain to be checked while
+     * constructing a Grid.
+     *
+     * An analysis destination grid might become problematic at a smaller size than an opportunity data grid. But until
+     * we have a reason to distinguish different situations, MAX_GRID_CELLS is defined as a constant in this class.
+     * If needed, we can make the max size a method parameter and pass in different limits in different contexts.
+     */
+    public void checkGridSize () {
+        if (this.zoom < MIN_ZOOM || this.zoom > MAX_ZOOM) {
+            throw AnalysisServerException.badRequest(String.format(
+                    "Requested zoom (%s) is outside valid range (%s - %s)", this.zoom, MIN_ZOOM, MAX_ZOOM
+            ));
+        }
+        if (this.height * this.width > MAX_GRID_CELLS) {
+            throw AnalysisServerException.badRequest(String.format(
+                    "Requested number of destinations (%s) exceeds limit (%s). " +
+                            "Set smaller custom geographic bounds or a lower zoom level.",
+                    this.height * this.width, MAX_GRID_CELLS
+            ));
+        }
     }
 
 }

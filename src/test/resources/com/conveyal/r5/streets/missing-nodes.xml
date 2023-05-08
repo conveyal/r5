@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6">
+    <bounds minlat="54.0889580" minlon="12.2487570" maxlat="54.0913900" maxlon="12.2524800"/>
+    <node id="261728686" lat="54.0906309" lon="12.2441924" user="PikoWinter" uid="36744" visible="true" version="1" changeset="323878" timestamp="2008-05-03T13:39:23Z"/>
+    <node id="298884269" lat="54.0901746" lon="12.2482632" user="SvenHRO" uid="46882" visible="true" version="1" changeset="676636" timestamp="2008-09-21T21:37:45Z"/>
+    <node id="298884272" lat="54.0901447" lon="12.2516513" user="SvenHRO" uid="46882" visible="true" version="1" changeset="676636" timestamp="2008-09-21T21:37:45Z"/>
+    <node id="1831881213" version="1" changeset="12370172" lat="54.0900666" lon="12.2539381" user="lafkor" uid="75625" visible="true" timestamp="2012-07-20T09:43:19Z">
+        <tag k="name" v="Neu Broderstorf"/>
+        <tag k="traffic_sign" v="city_limit"/>
+    </node>
+    <way id="14">
+        <nd ref="298884269"/>
+        <nd ref="261728686"/>
+        <tag k="name" v="Fake Test Straße"/>
+    </way>
+    <way id="26659127" user="Masch" uid="55988" visible="true" version="5" changeset="4142606" timestamp="2010-03-16T11:47:08Z">
+        <nd ref="1831881213"/>
+        <nd ref="298884272"/>
+        <nd ref="298884269"/>
+        <nd ref="42"/>
+        <nd ref="261728686"/>
+        <tag k="highway" v="unclassified"/>
+        <tag k="name" v="Pastower Straße"/>
+    </way>
+</osm>

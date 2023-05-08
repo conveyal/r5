@@ -535,16 +535,18 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Run a distance-constrained street search from every transit stop in the graph.
+     * Run a distance-constrained street search from every transit stop in the graph using the walk mode.
      * Store the distance to every reachable street vertex for each of these origin stops.
      * If a scenario has been applied, we need to build tables for any newly created stops and any stops within
      * transfer distance or access/egress distance of those new stops. In that case a rebuildZone geometry should be
      * supplied. If rebuildZone is null, a complete rebuild of all tables will occur for all stops.
+     * Note, this rebuilds for the WALK MODE ONLY. The network only has a field for retaining walk distance tables.
+     * This is a candidate for optimization if car or bicycle scenarios are slow to apply.
      * @param rebuildZone the zone within which to rebuild tables in FIXED-POINT DEGREES, or null to build all tables.
      */
     public void buildDistanceTables(Geometry rebuildZone) {
 
-        LOG.info("Finding distances from transit stops to street vertices.");
+        LOG.info("Pre-computing distances from transit stops to street vertices (WALK mode only).");
         if (rebuildZone != null) {
             LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }

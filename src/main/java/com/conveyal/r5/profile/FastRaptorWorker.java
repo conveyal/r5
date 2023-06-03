@@ -145,7 +145,7 @@ public class FastRaptorWorker {
         this.accessStops = accessStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
 
-        offsets = new FrequencyRandomOffsets(transitLayer);
+        offsets = new FrequencyRandomOffsets(transitLayer, request);
 
         // compute number of minutes for scheduled search
         nMinutes = request.getTimeWindowLengthMinutes();

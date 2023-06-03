@@ -55,6 +55,7 @@ public class AnalysisRequest {
     public float toLon;
     public int fromTime;
     public int monteCarloDraws = 200;
+    public boolean lockSchedules = false;
     public int toTime;
     public String transitModes;
     public float walkSpeed;
@@ -244,6 +245,7 @@ public class AnalysisRequest {
         task.cutoffsMinutes = cutoffsMinutes;
         
         task.logRequest = logRequest;
+        task.lockSchedules = lockSchedules;
 
         task.accessModes = getEnumSetFromString(accessModes);
         task.directModes = getEnumSetFromString(directModes);

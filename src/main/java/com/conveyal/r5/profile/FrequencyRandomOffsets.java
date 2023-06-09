@@ -50,8 +50,12 @@ public class FrequencyRandomOffsets {
         if (!data.hasFrequencies) {
             return;
         }
-        // Use a fixed seed for each origin
-        this.mt = new MersenneTwister((int) (request.fromLat * 1e9));
+        if (request == null) {
+            this.mt = new MersenneTwister();
+        } else {
+            // Use a fixed seed for each origin
+            this.mt = new MersenneTwister((int) (request.fromLat * 1e9));
+        }
         // Create skeleton empty data structure with slots for all offsets that will be generated.
         for (int pattIdx = 0; pattIdx < data.tripPatterns.size(); pattIdx++) {
             TripPattern tp = data.tripPatterns.get(pattIdx);

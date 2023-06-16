@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 
 /**
@@ -31,6 +32,13 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
     public String originPointSetKey;
 
     /**
+     * The PointSet instance looked up from the originPointSetKey.
+     * Transient so it's not serialized when the task is sent over the wire, but still available wherever we need to
+     * look up lat/lon coordinates or the number of origin points etc.
+     */
+    public transient PointSet originPointSet;
+
+    /**
      * Whether to calculate travel time from each origin to one corresponding destination (the destination at the
      * same position in the destionationPointSet). If false, travel time calculations will be many-to-many (between
      * all origin points and all destination points).
@@ -60,7 +68,8 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      * the destinations, as this is necessary to compute accessibility. Travel times to any location outside those grids
      * cannot change accessibility results, and we are not displaying travel time isochrones, so we extract the
      * minimal bounds containing all destination opportunity grids. This is not optimal where the full extent of the
-     * road network is smaller than the opportunity data, but that should be rare.
+     * road network is smaller than the opportunity data, but that should be rare. We could intersect with the extents
+     * of the street network, but that probably requires access to the loaded TransportNetwork.
      */
     @Override
     public WebMercatorExtents getWebMercatorExtents() {

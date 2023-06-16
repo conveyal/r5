@@ -7,9 +7,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.hash.HashCode;
@@ -20,16 +18,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -104,109 +101,93 @@ public class TransportNetwork implements Serializable {
         transitLayer.rebuildTransientIndexes();
     }
 
-
-    /** Create a TransportNetwork from gtfs-lib feeds */
-    public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
-        return fromFiles(osmSourceFile, null, feeds, config);
-    }
-
-    /** Legacy method to load from a single GTFS file */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
-        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
-    }
-
     /**
-     * It would seem cleaner to just have two versions of this function, one which takes a list of strings and converts
-     * it to a list of feeds, and one that just takes a list of feeds directly. However, this would require loading all
-     * the feeds into memory simulataneously, which shouldn't be so bad with mapdb-based feeds, but it's still not great
-     * (due to caching etc.)
+     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
+     * more than one PBF file into a single OSM storage object. However they might be from different points in time, so
+     * we have decided to allow only one OSM input file, loaded into a single OSM object.
+     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
+     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
+     * doesn't really matter, particularly for analytics. Loading all he feeds into memory simulataneously shouldn't be
+     * so bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap allocations etc.)
+     * Therefore we create the feeds within a stream which loads them one by one on demand.
+     *
+     * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
+     * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
-    private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds,
-                                               TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
-
-        System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
-        System.out.println(tnBuilderConfig);
-
-        // Create a transport network to hold the street and transit layers
-        TransportNetwork transportNetwork = new TransportNetwork();
-
-        // Load OSM data into MapDB
+    public static TransportNetwork fromFiles (
+            String osmSourceFile,
+            List<String> gtfsSourceFiles
+    ) throws DuplicateFeedException {
+        // Load OSM data into MapDB to pass into network builder.
         OSM osm = new OSM(osmSourceFile + ".mapdb");
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
+        // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
+        Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
+        return fromInputs(osm, feeds);
+    }
+
+    /**
+     * This is the core method for building a street and transit network. It takes osm-lib and gtfs-lib objects as
+     * parameters. It is wrapped in various other methods that create those OSM and GTFS objects from filenames, input
+     * directories etc. The supplied OSM object must have intersections already detected.
+     * The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
+     */
+    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
+        // Create a transport network to hold the street and transit layers
+        TransportNetwork transportNetwork = new TransportNetwork();
 
         // Make street layer from OSM data in MapDB
-        StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
+        StreetLayer streetLayer = new StreetLayer();
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
         // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
-        // We should probably try to delete the file when exceptions occur.
+        // We should probably try to delete the file when exceptions occur, or at least close it properly.
         osm.close();
 
-        // The street index is needed for associating transit stops with the street network
-        // and for associating bike shares with the street network
+        // Build a street index to help associate transit stops and bike share stations with the street network.
         streetLayer.indexStreets();
 
-        if (tnBuilderConfig.bikeRentalFile != null) {
-            streetLayer.associateBikeSharing(tnBuilderConfig);
-        }
-
-        // Load transit data TODO remove need to supply street layer at this stage
+        // Load transit data
         TransitLayer transitLayer = new TransitLayer();
-
-        if (feeds != null) {
-            for (GTFSFeed feed : feeds) {
-                transitLayer.loadFromGtfs(feed);
-            }
-        } else {
-            for (String feedFile: gtfsSourceFiles) {
-                GTFSFeed feed = GTFSFeed.fromFile(feedFile);
-                transitLayer.loadFromGtfs(feed);
-                feed.close();
-            }
-        }
+        gtfsFeeds.forEach(gtfsFeed -> {
+            transitLayer.loadFromGtfs(gtfsFeed);
+            // Is there a reason we can't push this close call down into the loader method? Maybe exception handling?
+            gtfsFeed.close();
+        });
         transportNetwork.transitLayer = transitLayer;
         transitLayer.parentNetwork = transportNetwork;
         // transitLayer.summarizeRoutesAndPatterns();
 
         // The street index is needed for associating transit stops with the street network.
-        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here
+        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here.
         streetLayer.indexStreets();
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
+
+        // This would re-build the street index and edge list, so we only rebuild indexes on the transit layer.
+        // However TransportNetworkCache#buildNetworkFromConfig does seem to call rebuild on the whole network.
+        // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
         new TransferFinder(transportNetwork).findParkRideTransfer();
 
-        transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
-
-        if (transportNetwork.fareCalculator != null) transportNetwork.fareCalculator.transitLayer = transitLayer;
-
         return transportNetwork;
     }
 
     /**
-     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
-     * more than one PBF file into a single OSM storage object. However they might be from different points in time, so
-     * it may be cleaner to just map one PBF file to one OSM object.
-     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
-     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
-     * doesn't really matter, particularly for analytics.
+     * Scan a directory detecting all the files that are network inputs, then build a network from those files.
+     *
+     * NOTE the feedId of the gtfs feeds laoded here will be the ones declared by the feeds or based on their filenames.
+     * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
-    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
-        return fromFiles(osmFile, gtfsFiles, null, config);
-    }
-
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
-        TNBuilderConfig builderConfig = null;
-        //This can exit program if json file has errors.
-        builderConfig = loadJson(new File(directory, BUILDER_CONFIG_FILENAME));
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
                 case GTFS:
@@ -232,33 +213,14 @@ public class TransportNetwork implements Serializable {
             LOG.error("An OSM PBF file is required to build a network.");
             return null;
         } else {
-            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
         }
     }
 
-    /**
-     * Open and parse the JSON file at the given path into a Jackson JSON tree. Comments and unquoted keys are allowed.
-     * Returns default config if the file does not exist,
-     * Returns null if the file contains syntax errors or cannot be parsed for some other reason.
-     * <p>
-     * We do not require any JSON config files to be present because that would get in the way of the simplest
-     * rapid deployment workflow. Therefore we return default config if file does not exist.
-     */
-    static TNBuilderConfig loadJson(File file) {
-        try (FileInputStream jsonStream = new FileInputStream(file)) {
-            TNBuilderConfig config = JsonUtilities.objectMapper
-                .readValue(jsonStream, TNBuilderConfig.class);
-            config.fillPath(file.getParent());
-            LOG.info("Found and loaded JSON configuration file '{}'", file);
-            return config;
-        } catch (FileNotFoundException ex) {
-            LOG.info("File '{}' is not present. Using default configuration.", file);
-            return TNBuilderConfig.defaultConfig();
-        } catch (Exception ex) {
-            LOG.error("Error while parsing JSON config file '{}': {}", file, ex.getMessage());
-            System.exit(42); // probably "should" be done with an exception
-            return null;
-        }
+    /** Establish a bidirectional reference between this TransportNetwork and the supplied fare calculator. */
+    public void setFareCalculator (InRoutingFareCalculator fareCalculator) {
+        this.fareCalculator = fareCalculator;
+        fareCalculator.transitLayer = transitLayer;
     }
 
     /**
@@ -302,14 +264,14 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork. Then, for any modes
-     * supplied, we also build a linkage that is held permanently in the GridPointSet. This method is called when a
-     * network is first built.
-     * The resulting grid PointSet will cover the entire street network layer of this TransportNetwork, which should
-     * include every point we can route from or to. Any other destination grid (for the same mode, walking) can be made
-     * as a subset of this one since it includes every potentially accessible point.
+     * Build a grid PointSet covering the entire street network layer of this TransportNetwork, which should include
+     * every point we can route from or to. Then for all requested modes build a linkage that is held in the
+     * GridPointSet. This method is called when a network is first built so these linkages are serialized with it.
+     * Any other destination grid (at least for the same modes) can be made as a subset of this one since it includes
+     * every potentially accessible point. Destination grids for other modes will be made on demand, which is a slow
+     * operation that can occupy hundreds of workers for long periods of time when a regional analysis starts up.
      */
-    public void rebuildLinkedGridPointSet(StreetMode... modes) {
+    public void rebuildLinkedGridPointSet(Iterable<StreetMode> modes) {
         if (fullExtentGridPointSet != null) {
             throw new RuntimeException("Linked grid pointset was built more than once.");
         }
@@ -317,6 +279,10 @@ public class TransportNetwork implements Serializable {
         for (StreetMode mode : modes) {
             linkageCache.buildUnevictableLinkage(fullExtentGridPointSet, streetLayer, mode);
         }
+    }
+
+    public void rebuildLinkedGridPointSet(StreetMode... modes) {
+        rebuildLinkedGridPointSet(Set.of(modes));
     }
 
     //TODO: add transit stops to envelope

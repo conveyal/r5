@@ -5,6 +5,7 @@ import com.conveyal.r5.util.InputStreamProvider;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
@@ -117,11 +119,11 @@ public class FreeFormPointSet extends PointSet {
                 // If count column was specified and present, use it. Otherwise, one opportunity per point.
                 ret.counts[rec] = countCol < 0 ? 1D : Double.parseDouble(reader.get(countCol));
             }
-            Grid.checkWgsEnvelopeSize(ret.getWgsEnvelope());
+            checkWgsEnvelopeSize(ret.getWgsEnvelope(), "freeform pointset");
             return ret;
         } catch (NumberFormatException nfe) {
             throw new ParameterException(
-                String.format("Improperly formatted floating point value on line %d of CSV input", rec)
+                String.format("Improperly formatted floating point value near line %d of CSV input", rec + 1)
             );
         }
     }
@@ -144,8 +146,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double sumTotalOpportunities () {
-        // For now we always have one opportunity per point.
-        return featureCount();
+        return Arrays.stream(counts).sum();
     }
 
     @Override
@@ -224,9 +225,7 @@ public class FreeFormPointSet extends PointSet {
 
     @Override
     public double getOpportunityCount (int i) {
-        // For now, these points do not have attached opportunity counts.
-        // We consider them to all have a count of 1.
-        return 1D;
+        return counts[i];
     }
 
     @Override
@@ -256,4 +255,16 @@ public class FreeFormPointSet extends PointSet {
         return webMercatorExtents;
     }
 
+    /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */
+    public FreeFormPointSet (Coordinate... coordinates) {
+        this(coordinates.length);
+        int i = 0;
+        for (Coordinate coordinate : coordinates) {
+            ids[i] = Integer.toString(i);
+            lons[i] = coordinate.x;
+            lats[i] = coordinate.y;
+            counts[i] = 1;
+            i++;
+        }
+    }
 }

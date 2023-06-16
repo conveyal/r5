@@ -10,7 +10,7 @@ import com.conveyal.r5.util.AsyncLoader;
  *
  * Created by abyrd on 2018-10-30
  */
-public class WorkerNotReadyException extends Exception {
+public class WorkerNotReadyException extends RuntimeException {
 
     public final AsyncLoader.LoaderState<TransportNetwork> asyncLoaderState;
 

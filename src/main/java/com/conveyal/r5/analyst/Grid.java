@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
@@ -7,7 +8,6 @@ import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import com.google.common.primitives.Doubles;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -22,7 +22,6 @@ import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
@@ -39,7 +38,6 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +46,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -64,6 +63,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -86,51 +88,33 @@ public class Grid extends PointSet {
 
     public static final String COUNT_COLUMN_NAME = "[COUNT]";
 
-    /** The web mercator zoom level for this grid. */
-    public final int zoom;
-
-    /* The following fields establish the position of this sub-grid within the full worldwide web mercator grid. */
-
-    /**
-     * The pixel number of the northernmost pixel in this grid (smallest y value in web Mercator,
-     * because y increases from north to south in web Mercator).
-     */
-    public final int north;
-
-    /** The pixel number of the westernmost pixel in this grid (smallest x value). */
-    public final int west;
-
-    /** The width of the grid in web Mercator pixels. */
-    public final int width;
-
-    /** The height of the grid in web Mercator pixels. */
-    public final int height;
+    public final WebMercatorExtents extents;
 
     /**
      * The data values for each pixel within this grid. Dimension order is (x, y), with range [0, width) and [0, height).
      */
     public final double[][] grid;
 
-    /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
-    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
-
     /** Maximum area allowed for features in a shapefile upload */
     private static final double MAX_FEATURE_AREA_SQ_DEG = 2;
 
-    /**
-     * Used when reading a saved grid.
-     */
-    public Grid (int zoom, int width, int height, int north, int west) {
-        this.zoom = zoom;
-        this.width = width;
-        this.height = height;
-        this.north = north;
-        this.west = west;
-        this.grid = new double[width][height];
+    /** Limit on number of pixels, to prevent OOME when multiple large grids are being created (width * height *
+     * number of layers/attributes) */
+    private static final int MAX_PIXELS = 10_000 * 10_000 * 10;
+
+    /** Used when reading a saved grid. */
+    public Grid (int west, int north, int width, int height, int zoom) {
+        this(new WebMercatorExtents(west, north, width, height, zoom));
     }
 
+    /**
+     * Other constructors and factory methods all call this one, and Grid has a WebMercatorExtents field, which means
+     * Grid construction always follows construction of a WebMercatorExtents, whose constructor always performs a
+     * check on the size of the grid.
+     */
     public Grid (WebMercatorExtents extents) {
-        this(extents.zoom, extents.width, extents.height, extents.north, extents.west);
+        this.extents = extents;
+        this.grid = new double[extents.width][extents.height];
     }
 
     /**
@@ -138,14 +122,7 @@ public class Grid extends PointSet {
      * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
     public Grid (int zoom, Envelope wgsEnvelope) {
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
-        // TODO actually store a reference to an immutable WebMercatorExtents instead of inlining the fields in Grid.
-        this.zoom = webMercatorExtents.zoom;
-        this.west = webMercatorExtents.west;
-        this.north = webMercatorExtents.north;
-        this.width = webMercatorExtents.width;
-        this.height = webMercatorExtents.height;
-        this.grid = new double[width][height];
+        this(WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom));
     }
 
     public static class PixelWeight {
@@ -153,7 +130,7 @@ public class Grid extends PointSet {
         public final int y;
         public final double weight;
 
-        private PixelWeight (int x, int y, double weight){
+        public PixelWeight (int x, int y, double weight){
             this.x = x;
             this.y = y;
             this.weight = weight;
@@ -206,21 +183,21 @@ public class Grid extends PointSet {
 
         Envelope env = geometry.getEnvelopeInternal();
 
-        for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
+        for (int worldy = latToPixel(env.getMaxY(), extents.zoom); worldy <= latToPixel(env.getMinY(), extents.zoom); worldy++) {
             // NB web mercator Y is reversed relative to latitude.
             // Iterate over longitude (x) in the inner loop to avoid repeat calculations of pixel areas, which should be
             // equal at a given latitude (y)
 
             double pixelAreaAtLat = -1; //Set to -1 to recalculate pixelArea at each latitude.
 
-            for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
+            for (int worldx = lonToPixel(env.getMinX(), extents.zoom); worldx <= lonToPixel(env.getMaxX(), extents.zoom); worldx++) {
 
-                int x = worldx - west;
-                int y = worldy - north;
+                int x = worldx - extents.west;
+                int y = worldy - extents.north;
 
-                if (x < 0 || x >= width || y < 0 || y >= height) continue; // off the grid
+                if (x < 0 || x >= extents.width || y < 0 || y >= extents.height) continue; // off the grid
 
-                Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
+                Geometry pixel = getPixelGeometry(x , y , extents);
                 if (pixelAreaAtLat == -1) pixelAreaAtLat = pixel.getArea(); //Recalculate for a new latitude.
 
                 // Pixel completely within feature:
@@ -269,26 +246,35 @@ public class Grid extends PointSet {
      * Burn point data into the grid.
      */
     private void incrementPoint (double lat, double lon, double amount) {
-        int worldx = lonToPixel(lon, zoom);
-        int worldy = latToPixel(lat, zoom);
-        int x = worldx - west;
-        int y = worldy - north;
-        if (x >= 0 && x < width && y >= 0 && y < height) {
+        int worldx = lonToPixel(lon, extents.zoom);
+        int worldy = latToPixel(lat, extents.zoom);
+        int x = worldx - extents.west;
+        int y = worldy - extents.north;
+        if (x >= 0 && x < extents.width && y >= 0 && y < extents.height) {
             grid[x][y] += amount;
         } else {
             LOG.warn("{} opportunities are outside regional bounds, at {}, {}", amount, lon, lat);
         }
     }
 
+    public void write (String filename) {
+        try {
+            write(new FileOutputStream(filename));
+        } catch (Exception e) {
+            throw new RuntimeException("Error writing grid.", e);
+        }
+    }
+
     /**
      * Write this opportunity density grid out in R5 binary format.
-     * Note that writing a grid out and reading it back in rounds the data values, which start out as fractional
-     * doubles. This can lead to some strange effects. If you rasterize two polygons into the grid, one with 0.49
-     * opportunities in each cell and the other with 0.51, only one polygon will survive. If one has 1.2 per cell and
-     * the other 0.4 per cell, one polygon will survive as well as the overlap of the two (which will round to 2) but
-     * not the second polygon alone. Maybe we should be truncating instead of rounding to avoid this weirdness.
-     * TODO conversion to integers should happen as separate method, not during writing, and should be better, #566
-     *
+     * Note that while opportunity densities are internally represented as doubles and don't have to be integers, our
+     * file format uses integers so writing a grid rounds off the densities. This can lead to some strange effects
+     * described in issue #566. If you rasterize two polygons into the grid, one with 0.49 opportunities in each cell
+     * and the other with 0.51, the first polygon will disappear, while the number of opportunities within the second
+     * polygon will almost double. If one polygon has 1.2 per cell and the other 0.4 per cell, the first polygon will
+     * survive as well as the overlap of the two (which will round to 2) but not the non-overlapping portion of the
+     * second polygon.
+     * TODO this conversion to integers should happen as separate method, not during writing, and should be better, #566
      * Also note that this is a different format than "access grids" and "time grids". Maybe someday they should all be
      * the same format with a couple of options for compression or number of channels.
      */
@@ -298,71 +284,43 @@ public class Grid extends PointSet {
         // On almost all current hardware this is little-endian. Guava saves us again.
         LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(outputStream);
         // A header consisting of six 4-byte integers specifying the zoom level and bounds.
-        out.writeInt(zoom);
-        out.writeInt(west);
-        out.writeInt(north);
-        out.writeInt(width);
-        out.writeInt(height);
+        out.writeInt(extents.zoom);
+        out.writeInt(extents.west);
+        out.writeInt(extents.north);
+        out.writeInt(extents.width);
+        out.writeInt(extents.height);
         // The rest of the file is 32-bit integers in row-major order (x changes faster than y), delta-coded.
-        for (int y = 0, prev = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int val = (int) Math.round(grid[x][y]);
-                out.writeInt(val - prev);
-                prev = val;
+        // Delta coding and error diffusion are reset on each row to avoid wrapping.
+        int prev = 0;
+        for (int y = 0; y < extents.height; y++) {
+            // Reset error on each row to avoid diffusing to distant locations.
+            // An alternative is to use serpentine iteration or iterative diffusion.
+            double error = 0;
+            for (int x = 0; x < extents.width; x++) {
+                double val = grid[x][y];
+                checkState(val >= 0, "Opportunity density should never be negative.");
+                val += error;
+                int rounded = ((int) Math.round(val));
+                checkState(rounded >= 0, "Rounded opportunity density should never be negative.");
+                error = val - rounded;
+                int delta = rounded - prev;
+                out.writeInt(delta);
+                prev = rounded;
             }
         }
         out.close();
     }
 
-    /**
-     * How to get the width of the world in meters according to the EPSG CRS spec:
-     * $ gdaltransform -s_srs epsg:4326 -t_srs epsg:3857
-     * 180, 0
-     * 20037508.3427892 -7.08115455161362e-10 0
-     * You can't do 180, 90 because this projection is cut off above a certain level to make the world square.
-     * You can do the reverse projection to find this latitude:
-     * $ gdaltransform -s_srs epsg:3857 -t_srs epsg:4326
-     * 20037508.342789, 20037508.342789
-     * 179.999999999998 85.0511287798064 0
-     */
-    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
-        double worldWidthPixels = Math.pow(2, zoom) * 256D;
-        // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
-        // The origin is WGS84 (0,0).
-        final double worldWidthMeters = 20037508.342789244 * 2;
-        double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
-        double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
-        return new Coordinate(xMeters, yMeters);
-    }
-
-    /**
-     * At zoom level zero, our coordinates are pixels in a single planetary tile, with coordinates are in the range
-     * [0...256). We want to export with a conventional web Mercator envelope in meters.
-     */
-    public ReferencedEnvelope getMercatorEnvelopeMeters() {
-        Coordinate topLeft = mercatorPixelToMeters(west, north);
-        Coordinate bottomRight = mercatorPixelToMeters(west + width, north + height);
-        Envelope mercatorEnvelope = new Envelope(topLeft, bottomRight);
-        try {
-            // Get Spherical Mercator pseudo-projection CRS
-            CoordinateReferenceSystem webMercator = CRS.decode("EPSG:3857");
-            ReferencedEnvelope env = new ReferencedEnvelope(mercatorEnvelope, webMercator);
-            return env;
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
     /** Write this grid out in GeoTIFF format */
     public void writeGeotiff (OutputStream out) {
         try {
-            float[][] data = new float[height][width];
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
+            float[][] data = new float[extents.height][extents.width];
+            for (int x = 0; x < extents.width; x++) {
+                for (int y = 0; y < extents.height; y++) {
                     data[y][x] = (float) grid[x][y];
                 }
             }
-            ReferencedEnvelope env = getMercatorEnvelopeMeters();
+            ReferencedEnvelope env = this.getWebMercatorExtents().getMercatorEnvelopeMeters();
             GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
@@ -389,7 +347,7 @@ public class Grid extends PointSet {
         int width = data.readInt();
         int height = data.readInt();
 
-        Grid grid = new Grid(zoom, width, height, north, west);
+        Grid grid = new Grid(west, north, width, height, zoom);
 
         // loop in row-major order
         for (int y = 0, value = 0; y < height; y++) {
@@ -415,11 +373,11 @@ public class Grid extends PointSet {
             }
         }
 
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        BufferedImage img = new BufferedImage(extents.width, extents.height, BufferedImage.TYPE_BYTE_GRAY);
         byte[] imgPixels = ((DataBufferByte) img.getRaster().getDataBuffer()).getData();
         int p = 0;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        for (int y = 0; y < extents.height; y++) {
+            for (int x = 0; x < extents.width; x++) {
                 double density = grid[x][y];
                 imgPixels[p++] = (byte)(density * 255 / maxPixel);
             }
@@ -442,13 +400,13 @@ public class Grid extends PointSet {
             store.createSchema(gridCell);
             Transaction transaction = new DefaultTransaction("Save Grid");
             FeatureWriter writer = store.getFeatureWriterAppend(transaction);
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
+            for (int x = 0; x < extents.width; x++) {
+                for (int y = 0; y < extents.height; y++) {
                     try {
                         double value = grid[x][y];
                         if (value > 0) {
                             SimpleFeature feature = (SimpleFeature) writer.next();
-                            Polygon pixelPolygon = getPixelGeometry(x + west, y + north, zoom);
+                            Polygon pixelPolygon = getPixelGeometry(x, y, extents);
                             feature.setDefaultGeometry(pixelPolygon);
                             feature.setAttribute(fieldName, value);
                             writer.write();
@@ -467,74 +425,103 @@ public class Grid extends PointSet {
     }
 
     public boolean hasEqualExtents(Grid comparisonGrid){
-        return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
+        return this.extents.equals(comparisonGrid.extents);
     }
 
     /**
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 latitude of the center of the corresponding pixel in the grid
+     * Return the latitude of the center point of the grid cell for the specified one-dimensional index into this
+     * gridded pointset (flattened, with x varying faster than y).
+     * TODO WebMercatorGridPointSet should follow a consistent definition (edge or center) but it doesn't!
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 latitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLat(int i) {
-        int y = i / width;
-        return pixelToCenterLat(north + y, zoom);
+        // Integer division of linear index to find vertical integer intra-grid pixel coordinate
+        int y = i / extents.width;
+        return pixelToCenterLat(extents.north + y, extents.zoom);
     }
 
     /**
-     * @param i the one-dimensional index into the pointset (flattened, with x varying faster than y)
-     * @return the WGS84 longitude of the center of the corresponding pixel in the grid
+     * Like getLat, but returns the longitude of the center point of the specified cell.
+     *
+     * @param i the one-dimensional index into the points composing this pointset
+     * @return the WGS84 longitude of the center of the corresponding pixel in this grid, considering its zoom level
      */
     public double getLon(int i) {
-        int x = i % width;
-        return pixelToCenterLon(west + x, zoom);
+        // Remainder of division yields horizontal integer intra-grid pixel coordinate
+        int x = i % extents.width;
+        return pixelToCenterLon(extents.west + x, extents.zoom);
     }
 
-    public int featureCount() { return width * height; }
+    public int featureCount() {
+        return extents.width * extents.height;
+    }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
-    /** Return the pixel the given longitude falls within */
+    /**
+     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
+     * zoom level.
+     */
     public static int lonToPixel (double lon, int zoom) {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
-    /** return the west side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
-    public static double pixelToLon (double pixel, int zoom) {
-        return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+    /**
+     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
+     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     */
+    public static double pixelToLon (double xPixel, int zoom) {
+        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
-    /** Return the longitude of the center of the given pixel */
-    public static double pixelToCenterLon (int pixel, int zoom) {
-        return pixelToLon(pixel + 0.5, zoom);
+    /**
+     * Return the longitude of the center of all pixels at the given zoom and x pixel number, measured from the west
+     * edge of the world.
+     */
+    public static double pixelToCenterLon (int xPixel, int zoom) {
+        return pixelToLon(xPixel + 0.5, zoom);
     }
 
-    /** Return the pixel the given latitude falls within */
+    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
     public static int latToPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
-    /** Return the latitude of the center of the given pixel */
-    public static double pixelToCenterLat (int pixel, int zoom) {
-        return pixelToLat(pixel + 0.5, zoom);
-    }
-
-    // We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
-    /** return the north side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
-    public static double pixelToLat (double pixel, int zoom) {
-        return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+    /**
+     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
+     * measured southward from the north edge of the world.
+     */
+    public static double pixelToCenterLat (int yPixel, int zoom) {
+        return pixelToLat(yPixel + 0.5, zoom);
     }
 
     /**
-     * @param x absolute (world) x pixel number at the given zoom level.
-     * @param y absolute (world) y pixel number at the given zoom level.
-     * @return a JTS Polygon in WGS84 coordinates for the given absolute (world) pixel.
+     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
+     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
+     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
      */
-    public static Polygon getPixelGeometry (int x, int y, int zoom) {
-        double minLon = pixelToLon(x, zoom);
-        double maxLon = pixelToLon(x + 1, zoom);
+    public static double pixelToLat (double yPixel, int zoom) {
+        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+    }
+
+    /**
+     * Given a pixel's local grid coordinates within the supplied WebMercatorExtents, return a closed
+     * polygon of that pixel's outline in WGS84 global geographic coordinates.
+     * @param localX x pixel number within the given extents.
+     * @param localY y pixel number within the given extents.
+     * @return a JTS Polygon in WGS84 coordinates for the given pixel.
+     */
+    public static Polygon getPixelGeometry (int localX, int localY, WebMercatorExtents extents) {
+        int x = localX + extents.west;
+        int y = localY + extents.north;
+        double minLon = pixelToLon(x, extents.zoom);
+        double maxLon = pixelToLon(x + 1, extents.zoom);
         // The y axis increases from north to south in web Mercator.
-        double minLat = pixelToLat(y + 1, zoom);
-        double maxLat = pixelToLat(y, zoom);
+        double minLat = pixelToLat(y + 1, extents.zoom);
+        double maxLat = pixelToLat(y, extents.zoom);
         return GeometryUtils.geometryFactory.createPolygon(new Coordinate[] {
                 new Coordinate(minLon, minLat),
                 new Coordinate(minLon, maxLat),
@@ -601,11 +588,11 @@ public class Grid extends PointSet {
             for (Iterator<String> it = numericColumns.iterator(); it.hasNext();) {
                 String field = it.next();
                 String value = reader.get(field);
-                if (value == null || "".equals(value)) continue; // allow missing data
+                if (value == null || "".equals(value)) continue; // allow missing data TODO add "N/A" etc.?
                 try {
                     double dv = parseDouble(value);
                     if (!(Double.isFinite(dv) || dv < 0)) {
-                        it.remove();
+                        it.remove(); // TODO track removed columns and report to UI?
                     }
                 } catch (NumberFormatException e) {
                     it.remove();
@@ -616,10 +603,9 @@ public class Grid extends PointSet {
         // This will also close the InputStreams.
         reader.close();
 
-        if (numericColumns.isEmpty()) {
-            throw new IllegalArgumentException("CSV file contained no entirely finite, non-negative numeric columns.");
-        }
-        checkWgsEnvelopeSize(envelope);
+        checkWgsEnvelopeSize(envelope, "CSV points");
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        checkPixelCount(extents, numericColumns.size());
 
         if (progressListener != null) {
             progressListener.setTotalItems(total);
@@ -628,14 +614,14 @@ public class Grid extends PointSet {
         // We now have an envelope and know which columns are numeric. Make a grid for each numeric column.
         Map<String, Grid> grids = new HashMap<>();
         for (String columnName : numericColumns) {
-            Grid grid = new Grid(zoom, envelope);
+            Grid grid = new Grid(extents);
             grid.name = columnName;
             grids.put(grid.name, grid);
         }
 
         // Make one more Grid where every point will have a weight of 1, for counting points rather than opportunities.
         // This assumes there is no column called "[COUNT]" in the source file, which is validated above.
-        Grid countGrid = new Grid(zoom, envelope);
+        Grid countGrid = new Grid(extents);
         countGrid.name = COUNT_COLUMN_NAME;
         grids.put(countGrid.name, countGrid);
 
@@ -687,20 +673,24 @@ public class Grid extends PointSet {
     public static List<Grid> fromShapefile (File shapefile, int zoom, ProgressListener progressListener)
             throws IOException, FactoryException, TransformException {
 
-        Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
-
-
         Envelope envelope = reader.wgs84Bounds();
-        int total = reader.getFeatureCount();
+        checkWgsEnvelopeSize(envelope, "Shapefile");
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        List<String> numericAttributes = reader.numericAttributes();
+        Set<String> uniqueNumericAttributes = new HashSet<>(numericAttributes);
+        if (uniqueNumericAttributes.size() != numericAttributes.size()) {
+            throw new IllegalArgumentException("Shapefile has duplicate numeric attributes");
+        }
+        checkPixelCount(extents, numericAttributes.size());
 
-        checkWgsEnvelopeSize(envelope);
-
+        int total = reader.featureCount();
         if (progressListener != null) {
             progressListener.setTotalItems(total);
         }
 
         AtomicInteger count = new AtomicInteger(0);
+        Map<String, Grid> grids = new HashMap<>();
 
         reader.wgs84Stream().forEach(feat -> {
             Geometry geom = (Geometry) feat.getDefaultGeometry();
@@ -713,11 +703,10 @@ public class Grid extends PointSet {
                 if (numericVal == 0) continue;
 
                 String attributeName = p.getName().getLocalPart();
-
-                // TODO this is assuming that each attribute name can only exist once. Shapefiles can contain duplicate attribute names. Validate to catch this.
+                
                 Grid grid = grids.get(attributeName);
                 if (grid == null) {
-                    grid = new Grid(zoom, envelope);
+                    grid = new Grid(extents);
                     grid.name = attributeName;
                     grids.put(attributeName, grid);
                 }
@@ -729,7 +718,7 @@ public class Grid extends PointSet {
                 } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
                     grid.rasterize(geom, numericVal);
                 } else {
-                    throw new IllegalArgumentException("Unsupported geometry type");
+                    throw new IllegalArgumentException("Unsupported geometry type: " + geom);
                 }
             }
 
@@ -758,8 +747,8 @@ public class Grid extends PointSet {
 
     @Override
     public double getOpportunityCount (int i) {
-        int x = i % this.width;
-        int y = i / this.width;
+        int x = i % extents.width;
+        int y = i / extents.width;
         return grid[x][y];
     }
 
@@ -788,36 +777,18 @@ public class Grid extends PointSet {
 
     @Override
     public WebMercatorExtents getWebMercatorExtents () {
-        return new WebMercatorExtents(this.west, this.north, this.width, this.height, this.zoom);
+        return extents;
     }
 
-    /**
-     * @return the approximate area of an Envelope in WGS84 lat/lon coordinates, in square kilometers.
-     */
-    public static double roughWgsEnvelopeArea (Envelope wgsEnvelope) {
-        double lon0 = wgsEnvelope.getMinX();
-        double lon1 = wgsEnvelope.getMaxX();
-        double lat0 = wgsEnvelope.getMinY();
-        double lat1 = wgsEnvelope.getMaxY();
-        double height = lat1 - lat0;
-        double width = lon1 - lon0;
-        final double KM_PER_DEGREE_LAT = 111.133;
-        // Scale the x direction as if the Earth was a sphere.
-        // Error above the middle latitude should approximately cancel out error below that latitude.
-        double averageLat = (lat0 + lat1) / 2;
-        double xScale = FastMath.cos(FastMath.toRadians(averageLat));
-        double area = (height * KM_PER_DEGREE_LAT) * (width * KM_PER_DEGREE_LAT * xScale);
-        return area;
-    }
-
-    /**
-     * Throw an exception if the provided envelope is too big for a reasonable destination grid.
-     */
-    public static void checkWgsEnvelopeSize (Envelope envelope) {
-        if (roughWgsEnvelopeArea(envelope) > MAX_BOUNDING_BOX_AREA_SQ_KM) {
-            throw new IllegalArgumentException("Shapefile extent (" + roughWgsEnvelopeArea(envelope) + " sq. km.) " +
-                    "exceeds limit (" + MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+    public static void checkPixelCount (WebMercatorExtents extents, int layers) {
+        int pixels = extents.width * extents.height * layers;
+        if (pixels > MAX_PIXELS) {
+            throw new DataSourceException("Number of zoom level " + extents.zoom + " pixels (" + pixels + ")"  +
+                    "exceeds limit (" + MAX_PIXELS +"). Reduce the zoom level or the file's extents or number of " +
+                    "numeric attributes.");
         }
     }
+
+
 
 }

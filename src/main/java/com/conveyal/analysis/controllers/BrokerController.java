@@ -1,6 +1,5 @@
 package com.conveyal.analysis.controllers;
 
-import com.amazonaws.services.s3.Headers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
@@ -12,7 +11,6 @@ import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
-import com.conveyal.analysis.models.Project;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
@@ -28,13 +26,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
+import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.util.EntityUtils;
+import org.bson.types.ObjectId;
 import org.mongojack.DBCursor;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
@@ -49,6 +50,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -126,16 +128,23 @@ public class BrokerController implements HttpController {
         // Deserialize the task in the request body so we can see what kind of worker it wants.
         // Perhaps we should allow both travel time surface and accessibility calculation tasks to be done as single points.
         // AnalysisRequest (backend) vs. AnalysisTask (R5)
-        // The accessgroup stuff is copypasta from the old single point controller.
         // We already know the user is authenticated, and we need not check if they have access to the graphs etc,
         // as they're all coded with UUIDs which contain significantly more entropy than any human's account password.
-        final String accessGroup = request.attribute("accessGroup");
-        final String userEmail = request.attribute("email");
+        UserPermissions userPermissions = UserPermissions.from(request);
         final long startTimeMsec = System.currentTimeMillis();
+
         AnalysisRequest analysisRequest = objectFromRequestBody(request, AnalysisRequest.class);
-        Project project = Persistence.projects.findByIdIfPermitted(analysisRequest.projectId, accessGroup);
+        // Some parameters like regionId weren't sent by older frontends. Fail fast on missing parameters.
+        checkIdParameter(analysisRequest.regionId, "region ID");
+        checkIdParameter(analysisRequest.projectId, "project ID");
+        checkIdParameter(analysisRequest.bundleId, "bundle ID");
+        checkIdParameters(analysisRequest.modificationIds, "modification IDs");
+        checkNotNull(analysisRequest.workerVersion, "Worker version must be provided in request.");
+
         // Transform the analysis UI/backend task format into a slightly different type for R5 workers.
-        TravelTimeSurfaceTask task = (TravelTimeSurfaceTask) analysisRequest.populateTask(new TravelTimeSurfaceTask(), project);
+        TravelTimeSurfaceTask task = new TravelTimeSurfaceTask();
+        analysisRequest.populateTask(task, userPermissions);
+
         // If destination opportunities are supplied, prepare to calculate accessibility worker-side
         if (notNullOrEmpty(analysisRequest.destinationPointSetIds)){
             // Look up all destination opportunity data sets from the database and derive their storage keys.
@@ -146,7 +155,7 @@ public class BrokerController implements HttpController {
             for (String destinationPointSetId : analysisRequest.destinationPointSetIds) {
                 OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
                         destinationPointSetId,
-                        accessGroup
+                        userPermissions
                 );
                 checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
                 opportunityDatasets.add(opportunityDataset);
@@ -170,7 +179,7 @@ public class BrokerController implements HttpController {
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {
             // There are no workers that can handle this request. Request some.
-            WorkerTags workerTags = new WorkerTags(accessGroup, userEmail, project._id, project.regionId);
+            WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.regionId);
             broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
@@ -180,8 +189,9 @@ public class BrokerController implements HttpController {
             // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
             broker.recentlyRequestedWorkers.remove(workerCategory);
         }
-        String workerUrl = "http://" + address + ":7080/single"; // TODO remove hard-coded port number.
-        LOG.info("Re-issuing HTTP request from UI to worker at {}", workerUrl);
+        // Port number is hard-coded until we have a good reason to make it configurable.
+        String workerUrl = "http://" + address + ":7080/single";
+        LOG.debug("Re-issuing HTTP request from UI to worker at {}", workerUrl);
         HttpPost httpPost = new HttpPost(workerUrl);
         // httpPost.setHeader("Accept", "application/x-analysis-time-grid");
         // TODO Explore: is this unzipping and re-zipping the result from the worker?
@@ -195,9 +205,9 @@ public class BrokerController implements HttpController {
             response.status(workerResponse.getStatusLine().getStatusCode());
             // Mimic headers sent by the worker. We're mostly interested in Content-Type, maybe Content-Encoding.
             // We do not want to mimic all headers like Date, Server etc.
-            Header contentTypeHeader = workerResponse.getFirstHeader(Headers.CONTENT_TYPE);
+            Header contentTypeHeader = workerResponse.getFirstHeader("Content-Type");
             response.header(contentTypeHeader.getName(), contentTypeHeader.getValue());
-            LOG.info("Returning worker response to UI with status code {} and content type {}",
+            LOG.debug("Returning worker response to UI with status code {} and content type {}",
                     workerResponse.getStatusLine(), contentTypeHeader.getValue());
             // This header will cause the Spark Framework to gzip the data automatically if requested by the client.
             response.header("Content-Encoding", "gzip");
@@ -207,11 +217,11 @@ public class BrokerController implements HttpController {
             if (response.status() == 200) {
                 int durationMsec = (int) (System.currentTimeMillis() - startTimeMsec);
                 eventBus.send(new SinglePointEvent(
-                        task.scenarioId,
-                        analysisRequest.projectId,
-                        analysisRequest.variantIndex,
+                        analysisRequest.scenarioId,
+                        analysisRequest.bundleId,
+                        analysisRequest.regionId,
                         durationMsec
-                    ).forUser(userEmail, accessGroup)
+                    ).forUser(userPermissions)
                 );
             }
             // If you return a stream to the Spark Framework, its SerializerChain will copy that stream out to the
@@ -221,15 +231,23 @@ public class BrokerController implements HttpController {
             // probably degrades the perceived responsiveness of single-point requests.
             return ByteStreams.toByteArray(entity.getContent());
         } catch (SocketTimeoutException ste) {
-            LOG.info("Timeout waiting for response from worker.");
+            LOG.warn("Timeout waiting for response from worker.");
             // Aborting the request might help release resources - we had problems with exhausting connection pools here.
             httpPost.abort();
             return jsonResponse(response, HttpStatus.BAD_REQUEST_400, "Routing server timed out. For the " +
                     "complexity of this scenario, your request may have too many simulated schedules. If you are " +
                     "using Routing Engine version < 4.5.1, your scenario may still be in preparation and you should " +
                     "try again in a few minutes.");
-        } catch (NoRouteToHostException nrthe){
-            LOG.info("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
+        } catch (NoRouteToHostException | HttpHostConnectException e) {
+            // NoRouteToHostException occurs when a single-point worker shuts down (normally due to inactivity) but is
+            // not yet removed from the worker catalog.
+            // HttpHostConnectException has also been observed, presumably after a worker shuts down and a new one
+            // starts up but claims the same IP address as the defunct single point worker.
+            // Yet another even rarer case is possible, where a single point worker starts for a different network and
+            // is assigned the same IP as the defunct worker.
+            // All these cases could be avoided by more rapidly removing workers from the catalog via frequent regular
+            // polling with backpressure, potentially including an "I'm shutting down" flag.
+            LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
                     "user made a single-point request within WORKER_RECORD_DURATION_MSEC after shutdown.", workerCategory);
             httpPost.abort();
             broker.unregisterSinglePointWorker(workerCategory);
@@ -366,8 +384,50 @@ public class BrokerController implements HttpController {
     }
 
     private static void enforceAdmin (Request request) {
-        if (!request.<UserPermissions>attribute("permissions").admin) {
+        if (!UserPermissions.from(request).admin) {
             throw AnalysisServerException.forbidden("You do not have access.");
+        }
+    }
+
+    /** Factor out exception creation for readability/repetition. */
+    private static IllegalArgumentException uuidException (String fieldName) {
+        return new IllegalArgumentException(String.format("The %s does not appear to be an ObjectId or UUID.", fieldName));
+    }
+
+    /**
+     * Validate a request parameter that is expected to be a non-null String containing a Mongo ObjectId or a
+     * UUID converted to a string, or a UUID converted to a string with the hyphens removed.
+     * @param name a human-readable name for the parameter being validated, for substitution into error messages.
+     * @throws IllegalArgumentException if the parameter fails any of these conditions.
+     */
+    public static void checkIdParameter(String parameter, String name) {
+        if (parameter == null) {
+            throw new IllegalArgumentException(String.format("The %s is not set in the request.", name));
+        }
+        // Should be either 24 hex digits (Mongo ID), 32 hex digits with dashes (UUID), or 32 hex digits without dashes
+        if (ObjectId.isValid(parameter)) {
+            return;
+        }
+        if (parameter.length() == 36) {
+            try {
+                UUID.fromString(parameter);
+            } catch (IllegalArgumentException e) {
+                throw uuidException(name);
+            }
+        } else if (parameter.length() == 32) {
+            for (char c : parameter.toCharArray()) {
+                if (Character.digit(c, 16) == -1) {
+                    throw uuidException(name);
+                }
+            }
+        } else {
+            throw uuidException(name);
+        }
+    }
+
+    public static void checkIdParameters(Iterable<String> parameters, String name) {
+        for (String parameter: parameters) {
+            checkIdParameter(parameter, name);
         }
     }
 

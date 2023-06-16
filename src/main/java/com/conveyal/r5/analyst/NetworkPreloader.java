@@ -72,7 +72,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
     private static final Logger LOG = LoggerFactory.getLogger(NetworkPreloader.class);
 
-    /** Keeps one or more TransportNetworks around, lazy-loading or lazy-building them. */
+    /** Keeps one or more TransportNetworks around, lazy-loading or lazy-building them. Ideally should be private. */
     public final TransportNetworkCache transportNetworkCache;
 
     public NetworkPreloader(TransportNetworkCache transportNetworkCache) {
@@ -86,6 +86,20 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         return get(Key.forTask(task));
     }
 
+    /**
+     * A blocking way to ensure the network and all linkages and precomputed tables are prepared in advance of routing.
+     * Note that this does not perform any blocking or locking of its own - any synchronization will be that of the
+     * underlying caches (synchronized methods on TransportNetworkCache or LinkedPointSet). It also bypasses the
+     * AsyncLoader locking that would usually allow only one buildValue operation at a time. All threads that call with
+     * similar tasks will make interleaved calls to setProgress (with superficial map synchronization). Other than
+     * causing a value to briefly revert from PRESENT to BUILDING this doesn't seem deeply problematic.
+     * This is provided specifically for regional tasks, to ensure that they remain in preloading mode while all this
+     * data is prepared. 
+     */
+    public TransportNetwork synchronousPreload (AnalysisWorkerTask task) {
+        return buildValue(Key.forTask(task));
+    }
+
     @Override
     protected TransportNetwork buildValue(Key key) {
 
@@ -97,12 +111,19 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         // Get the set of points to which we are measuring travel time. Any smaller sub-grids created here will
         // reference the scenarioNetwork's built-in full-extent pointset, so can reuse its linkage.
         // TODO handle multiple destination grids.
+
+        if (key.destinationGridExtents == null) {
+            // Special (and ideally temporary) case for regional freeform destinations, where there is no grid to link.
+            // The null destinationGridExtents are created by the WebMercatorExtents#forPointsets else clause.
+            return scenarioNetwork;
+        }
+
         setProgress(key, 0, "Fetching gridded point set...");
         PointSet pointSet = AnalysisWorkerTask.gridPointSetCache.get(key.destinationGridExtents, scenarioNetwork.fullExtentGridPointSet);
 
         // Now rebuild grid linkages as needed. One linkage per mode, and one cost table per egress mode.
         // Cost tables are slow to compute and not needed for access or direct legs, only egress modes.
-        // Note that we're able to pass a progress listener down into the EgressCostTable contruction process,
+        // Note that we're able to pass a progress listener down into the EgressCostTable construction process,
         // but not into the linkage process, because the latter is encapsulated as a Google/Caffeine
         // LoadingCache. We'll need some way to get LoadingCache's per-key locking, while still allowing a
         // progress listener specific to the single request. Perhaps this will mean registering 0..N
@@ -154,18 +175,22 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
          * supplied in the request. The UI only sends these if the user has changed them to something other than
          * "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
          * the region.
-         *
-         * FIXME but should we really be injecting Grid objects into a class deserialized straight from JSON?
          */
         public Key (AnalysisWorkerTask task) {
             this.networkId = task.graphId;
             // A supplied scenario ID will always override any full scenario that is present.
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
+            // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
+            this.egressModes = LegMode.toStreetModeSet(
+                // Avoid unnecessarily building egress tables by
+                // ignoring spurious egress modes in requests that do not have transit enabled.
+                task.transitModes.isEmpty() ? EnumSet.noneOf(LegMode.class) : task.egressModes
+            );
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether
             // transit is used). See code in TravelTimeComputer for when each is used.
-            // Egress modes must be tracked independently since we need to build EgressDistanceTables for those.
-            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
-            this.egressModes = LegMode.toStreetModeSet(task.egressModes);
+            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
+            this.allModes.addAll(this.egressModes);
+
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 

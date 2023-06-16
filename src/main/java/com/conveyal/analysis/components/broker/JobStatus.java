@@ -2,6 +2,8 @@ package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.models.RegionalAnalysis;
 
+import java.util.Set;
+
 /**
  * Describes the status of a Job in a REST API response.
  */
@@ -34,6 +36,9 @@ public class JobStatus {
     /** Active instances working on this job. **/
     public int activeWorkers;
 
+    /** Error messages for any problems related to this job that occurred on workers or backend. */
+    public Set<String> errors;
+
     /** The regional analysis associated with this job */
     public RegionalAnalysis regionalAnalysis;
 
@@ -50,5 +55,6 @@ public class JobStatus {
         this.incomplete = total - complete;
         this.deliveries = job.nTasksDelivered;
         this.deliveryPass = job.deliveryPass;
+        this.errors = job.errors;
     }
 }

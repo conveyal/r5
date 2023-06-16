@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.analyst.FileCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -9,9 +9,10 @@ import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.geotools.data.geojson.GeoJSONDataStore;
+import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
-import org.geotools.geojson.feature.FeatureJSON;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
@@ -24,9 +25,10 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.InputStream;
+import java.io.File;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
+
+import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /**
  * To simulate traffic congestion, apply a slow-down (or speed-up) factor to roads, according to attributes of polygon
@@ -107,17 +109,11 @@ public class RoadCongestion extends Modification {
         // and errors can all be easily recorded and bubbled back up to the UI.
         // Polygon should only need to be fetched once when the scenario is applied, then the resulting network is cached.
         // this.features = polygonLayerCache.getPolygonFeatureCollection(this.polygonLayer);
-        // Note: Newer JTS now has GeoJsonReader
         try {
-            InputStream s3InputStream = AnalysisWorker.filePersistence.getData(FileCategory.POLYGON, polygonLayer);
-            // To test on local files:
-            //InputStream s3InputStream = new FileInputStream("/Users/abyrd/" + polygonLayer);
-            // TODO handle gzip decompression in FilePersistence base class.
-            if (polygonLayer.endsWith(".gz")) {
-                s3InputStream = new GZIPInputStream(s3InputStream);
-            }
-            FeatureJSON featureJSON = new FeatureJSON();
-            FeatureCollection featureCollection = featureJSON.readFeatureCollection(s3InputStream);
+            File polygonInputFile = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, polygonLayer));
+            GeoJSONDataStore dataStore = new GeoJSONDataStore(polygonInputFile);
+            SimpleFeatureSource featureSource = dataStore.getFeatureSource();
+            FeatureCollection featureCollection = featureSource.getFeatures();
             LOG.info("Validating features and creating spatial index...");
             polygonSpatialIndex = new STRtree();
             FeatureType featureType = featureCollection.getSchema();
@@ -126,7 +122,7 @@ public class RoadCongestion extends Modification {
             // so it's better to just remove the CRS from all input files.
             CoordinateReferenceSystem crs = featureType.getCoordinateReferenceSystem();
             if (crs != null && !DefaultGeographicCRS.WGS84.equals(crs) && !CRS.decode("CRS:84").equals(crs)) {
-                errors.add("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +
+                addError("GeoJSON should specify no coordinate reference system, and contain unprojected WGS84 " +
                         "coordinates. CRS is: " + crs.toString());
             }
             // PropertyDescriptor scalingPropertyDescriptor = featureType.getDescriptor(scalingAttribute);
@@ -146,24 +142,24 @@ public class RoadCongestion extends Modification {
                 if (name == null) {
                     logUpdatedEdgeCounts = false;
                 } else if (!(name instanceof String)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a string.",
                             name, nameAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (priority == null) {
                     priority = 0;
                 } else if (!(priority instanceof Number)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
                             priority, priorityAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (!(scale instanceof Number)) {
-                    errors.add(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
+                    addError(String.format("Value '%s' of attribute '%s' of feature %d should be a number.",
                             scale, scalingAttribute, featureNumber));
                     indexThisFeature = false;
                 }
                 if (!(geometry instanceof Polygonal)) {
-                    errors.add(String.format("Geometry of feature %d should be a Polygon or Multipolygon.", featureNumber));
+                    addError(String.format("Geometry of feature %d should be a Polygon or Multipolygon.", featureNumber));
                     indexThisFeature = false;
                 }
                 if (indexThisFeature) {
@@ -180,9 +176,9 @@ public class RoadCongestion extends Modification {
                 logUpdatedEdgeCounts = false;
             }
         } catch (Exception e) {
-            errors.add(ExceptionUtils.asString(e));
+            addError(ExceptionUtils.stackTraceString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     /**
@@ -243,13 +239,13 @@ public class RoadCongestion extends Modification {
         }
         if (logUpdatedEdgeCounts) {
             edgeCounts.forEachEntry((polygon, quantity) -> {
-                info.add(String.format("polygon '%s' scaled %d edges by %.2f", polygon.name, quantity, polygon.scale));
+                addInfo(String.format("polygon '%s' scaled %d edges by %.2f", polygon.name, quantity, polygon.scale));
                 // LOG.info("{} edges were scaled by {} via polygon {} ", quantity, polygon.scale, polygon.name);
                 return true;
             });
         }
         edgeStore.speeds = adjustedSpeeds;
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

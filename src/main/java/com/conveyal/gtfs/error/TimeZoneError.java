@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /**
@@ -26,5 +28,9 @@ public class TimeZoneError extends GTFSError implements Serializable {
 
     @Override public String getMessage() {
         return message + ". (" + field + ": " + affectedEntityId + ")";
+    }
+
+    @Override public Priority getPriority() {
+        return Priority.MEDIUM;
     }
 }

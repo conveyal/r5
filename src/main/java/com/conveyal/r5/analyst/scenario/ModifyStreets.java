@@ -4,6 +4,7 @@ import com.conveyal.gtfs.Geometries;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeTraversalTimes;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import gnu.trove.iterator.TIntIterator;
@@ -20,10 +21,30 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 
 /**
+ * <p>
  * This modification selects all edges inside a given set of polygons and changes their characteristics.
+ * </p><p>
+ * Some of its options, specifically walkTimeFactor and bikeTimeFactor, adjust generalized costs for walking and biking
+ * which are stored in an optional generalized costs data table that is not present on networks by default.
+ * These data tables are currently only created in networks built from very particular OSM data where every way has all
+ * of the special tags contributing to the LADOT generalized costs (com.conveyal.r5.streets.LaDotCostTags).
+ * </p><p>
+ * The apply() method creates this data table in the scenario copy of the network as needed if one does not exist on the
+ * base network (so there is no extend-only wrapper in the scenario network). This means each scenario may have its own
+ * (potentially large) generalized cost data table instead of just extending a shared one in the baseline network.
+ * This less-than-optimal implementation is acceptable at least as a stopgap on this rarely used specialty modification.
+ * The other alternatives would be:
+ * </p><ul>
+ * <li> Add the table to the baseline network whenever it's any scenario needs to extend it.
+ *      This breaks a lot of conventions we have about treating loaded networks as read-only, and incurs a lot of extra
+ *      memory access and pointless multiplication by 1 on every scenario including the baseline.</li>
+ * <li> Require the table to be enabled on the base network when it's first built, using a parameter in
+ *      TransportNetworkConfig. This incurs the same overhead, but respects the immutable character of loaded networks
+ *      and is an intentional choice by the user.</li>
+ * </ul>
  */
 public class ModifyStreets extends Modification {
 
@@ -80,18 +101,18 @@ public class ModifyStreets extends Modification {
         final GeometryFactory geometryFactory = Geometries.geometryFactory;
         List<Polygon> jtsPolygons = new ArrayList<>();
         if (polygons == null || polygons.length == 0) {
-            errors.add("You must specify some polygons to select streets.");
+            addError("You must specify some polygons to select streets.");
             polygons = new double[][][]{};
         }
         for (double[][] polygon : polygons) {
             if (polygon.length < 3) {
-                errors.add("Polygons must have at least three coordinates to enclose any space.");
+                addError("Polygons must have at least three coordinates to enclose any space.");
                 continue;
             }
             List<Coordinate> jtsCoordinates = new ArrayList<>();
             for (double[] coordinate : polygon) {
                 if (coordinate.length != 2) {
-                    errors.add("Each coordinate must have two values, a latitude and a longitude.");
+                    addError("Each coordinate must have two values, a latitude and a longitude.");
                     continue;
                 }
                 Coordinate jtsCoordinate = new Coordinate(coordinate[0], coordinate[1]);
@@ -119,54 +140,54 @@ public class ModifyStreets extends Modification {
             }
             return true;
         });
-        info.add(String.format("Will affect %d edges out of %d candidates.", edgesInPolygon.size(),
+        addInfo(String.format("Will affect %d edges out of %d candidates.", edgesInPolygon.size(),
                 candidateEdges.size()));
 
         // Range check and otherwise validate numeric parameters
 
         if (carSpeedKph != null && carSpeedFactor != null) {
-            errors.add("You must specify only one of carSpeedKph or carSpeedFactor.");
+            addError("You must specify only one of carSpeedKph or carSpeedFactor.");
         }
         if (carSpeedKph != null) {
             if (carSpeedKph <= 0 || carSpeedKph > 130) {
-                errors.add("Car speed must be in the range (0...130] kph.");
+                addError("Car speed must be in the range (0...130] kph.");
             }
         }
         if (carSpeedFactor != null) {
             if (carSpeedFactor <= 0 || carSpeedFactor > 10) {
-                errors.add("Car speed factor must be in the range (0...10].");
+                addError("Car speed factor must be in the range (0...10].");
             }
         }
         if (walkTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                errors.add("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
-                errors.add("walkGenCostFactor must be in the range (0...10].");
+                addError("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                errors.add("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
-                errors.add("bikeGenCostFactor must be in the range (0...10].");
+                addError("bikeGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeLts != null) {
             if (bikeLts < 0 || bikeLts > 4) {
-                errors.add("bikeLts must be in the range [0...4].");
+                addError("bikeLts must be in the range [0...4].");
             }
         }
         if (allowedModes == null) {
-            errors.add("You must specify a list of allowedModes, which may be empty.");
+            addError("You must specify a list of allowedModes, which may be empty.");
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
     public boolean apply (TransportNetwork network) {
         EdgeStore edgeStore = network.streetLayer.edgeStore;
+        if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
+            if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
+                addInfo("Added table of per-edge factors because base network doesn't have one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.createNeutral(network.streetLayer.edgeStore);
+            }
+        }
         EdgeStore.Edge oldEdge = edgeStore.getCursor();
         // By convention we only index the forward edge in each pair, so we're iterating over forward edges here.
         for (TIntIterator edgeIterator = edgesInPolygon.iterator(); edgeIterator.hasNext(); ) {
@@ -200,7 +221,7 @@ public class ModifyStreets extends Modification {
         }
         // Instead of repeating this error logic in every resolve and apply method,
         // we should really be doing this using a modification.hasErrors() method from one frame up.
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     /**
@@ -213,8 +234,7 @@ public class ModifyStreets extends Modification {
         newEdge.disallowAllModes();
         newEdge.allowStreetModes(allowedModes);
         if (bikeLts != null) {
-            // Overwrite the LTS copied in the flags
-            newEdge.setFlag(intToLts(bikeLts));
+            newEdge.setLts(bikeLts);
         }
         if (carSpeedKph != null) {
             newEdge.setSpeedKph(carSpeedKph);

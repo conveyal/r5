@@ -12,15 +12,19 @@ import java.util.StringJoiner;
 /** A door-to-door path that includes the routes ridden between stops */
 public class RouteSequence {
 
-    /** Route indexes (those used in R5 transit layer) for each transit leg */
-    private final TIntList routes;
+    /**
+     * Route indexes (those used in R5 transit layer) for each transit leg
+     */
+    public final TIntList routes;
     public final StopSequence stopSequence;
 
     /** Convert a pattern-based path into a more general route-based path. */
     public RouteSequence(PatternSequence patternSequence, TransitLayer transitLayer) {
         this.stopSequence = patternSequence.stopSequence;
         this.routes = new TIntArrayList();
-        patternSequence.patterns.forEach(p -> this.routes.add(transitLayer.tripPatterns.get(p).routeIndex));
+        if (patternSequence.patterns != null) {
+            patternSequence.patterns.forEach(p -> this.routes.add(transitLayer.tripPatterns.get(p).routeIndex));
+        }
     }
 
     /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
@@ -35,13 +39,15 @@ public class RouteSequence {
             alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), false));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
+        String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
+        String egressTime = stopSequence.egress == null ? null : String.format("%.1f", stopSequence.egress.time / 60f);
         return new String[]{
                 routeIds.toString(),
                 boardStopIds.toString(),
                 alightStopIds.toString(),
                 rideTimes.toString(),
-                String.format("%.1f", stopSequence.access.time / 60f),
-                String.format("%.1f", stopSequence.egress.time / 60f)
+                accessTime,
+                egressTime
         };
     }
 

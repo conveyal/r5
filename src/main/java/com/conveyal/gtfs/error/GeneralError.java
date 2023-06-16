@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Represents any GTFS loading problem that does not have its own class, with a free-text message. */
@@ -17,4 +19,7 @@ public class GeneralError extends GTFSError implements Serializable {
         return message;
     }
 
+    @Override public Priority getPriority() {
+        return Priority.UNKNOWN;
+    }
 }

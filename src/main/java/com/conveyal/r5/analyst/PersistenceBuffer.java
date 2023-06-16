@@ -15,6 +15,10 @@ import java.util.zip.GZIPOutputStream;
  * by AWS S3. It also works around a limitation of ByteArrayOutputStream that requires the backing byte array to be
  * copied to create an InputStream. It uses the little-endian representation of integers so they can be read
  * straight out of a typed array in Javascript on any little-endian architecture (nearly all processors these days).
+ * This is an encapsulated replacement for a previous pattern where we'd chain a bunch of output streams, connect
+ * them to an input stream, then launch a short-lived thread to upload data pulled from the input stream. This was
+ * ugly and prone to stalling or locking up. This whole construct largely exists to allow creating lots of files in
+ * memory and uploading them without creating and deleting local files, a major part of TAUI site creation.
  */
 public class PersistenceBuffer {
 
@@ -73,18 +77,18 @@ public class PersistenceBuffer {
      */
     public InputStream getInputStream () {
         if (!doneWriting) {
-            throw new RuntimeException("You must mark a PersistenceBuffer 'doneWriting' before reading its contents as an InputStream.");
+            throw new RuntimeException("You must call doneWriting()) before reading its contents as an InputStream.");
         }
         return buffer.getInputStream();
     }
 
     /**
-     * @return the size of the underlying byte buffer. Because of compression this is not well-defined until writing is
-     * completed. Therefore a call to this method will automatically end writing.
+     * @return the size of the underlying byte buffer. Because of compression this size is not well-defined until
+     * writing is completed. Therefore a call to this method will fail if doneWriting() has not been called.
      */
     public long getSize() {
         if (!doneWriting) {
-            throw new RuntimeException("You must mark a PersistenceBuffer 'doneWriting' before taking its size.");
+            throw new RuntimeException("You must  call doneWriting()) before taking the size of a buffer.");
         }
         return buffer.size();
     }
@@ -102,7 +106,8 @@ public class PersistenceBuffer {
     }
 
     /**
-     * Signal that writing to this buffer is complete. Certain operations will not be possible until writing is complete.
+     * Signal that writing to this buffer is complete.
+     * Certain operations will not be possible until writing is complete.
      */
     public void doneWriting() {
         if (doneWriting) {

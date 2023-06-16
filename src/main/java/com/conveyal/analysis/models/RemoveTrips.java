@@ -21,9 +21,9 @@ public class RemoveTrips extends Modification {
         rt.comment = name;
 
         if (trips == null) {
-            rt.routes = feedScopeIds(feed, routes);
+            rt.routes = feedScopedIdSet(feed, routes);
         } else {
-            rt.patterns = feedScopeIds(feed, trips);
+            rt.patterns = feedScopedIdSet(feed, trips);
         }
 
         return rt;

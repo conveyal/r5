@@ -13,10 +13,11 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SpeedLabeler;
+import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.point_to_point.builder.SpeedConfig;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
@@ -29,7 +30,6 @@ import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import org.geotools.geojson.geom.GeometryJSON;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -53,7 +53,9 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
+import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
+import static com.conveyal.r5.streets.VertexStore.VertexFlag.IMPASSABLE;
+import static com.conveyal.r5.streets.VertexStore.VertexFlag.TRAFFIC_SIGNAL;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -143,6 +145,13 @@ public class StreetLayer implements Serializable, Cloneable {
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
+    /**
+     * Map from OSM node ID to internal vertex ID, which is built up as vertices are created.
+     * For almost all nodes there is a one-to-one mapping from OSM nodes to vertices. In special cases such as
+     * impassable barrier nodes, a node may be split into multiple vertices, one for each time it is referenced.
+     * Only the most recently created vertex for such split nodes is included in this map, which means they may not
+     * behave properly for turn restriction purposes.
+     */
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
 
     // Initialize these when we have an estimate of the number of expected edges.
@@ -196,8 +205,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public boolean bikeSharing = false;
 
-    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
-        speedLabeler = new SpeedLabeler(tnBuilderConfig.speeds);
+    public StreetLayer() {
+        speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
     }
 
     /** Load street layer from an OSM-lib OSM DB */
@@ -282,7 +291,7 @@ public class StreetLayer implements Serializable, Cloneable {
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
-        // TEMPORARY HACK: create a GeneralizedCosts object to hold costs from preprocessed OSM data, and indicate that
+        // TEMPORARY HACK: create a EdgeTraversalTimes object to hold costs from preprocessed OSM data, and indicate that
         // we are loading them. Eventually this should be done based on configuration settings.
         this.edgeStore.edgeTraversalTimes = new EdgeTraversalTimes(edgeStore);
 
@@ -294,17 +303,26 @@ public class StreetLayer implements Serializable, Cloneable {
             if (!isWayRoutable(way)) {
                 continue;
             }
-            int nEdgesCreated = 0;
-            int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge pair per segment.
+            // This is accessing every node and its tags as we process the ways. However we don't expect this
+            // to affect performance because the same sequence of nodes is accessed just afterward in makeEdgePair.
+            int beginIdx = 0;
             for (int n = 1; n < way.nodes.length; n++) {
-                if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
+                long nodeId = way.nodes[n];
+                Node node = osm.nodes.get(nodeId);
+                if (node == null) {
+                    LOG.warn("Bailing out of OSM way {} that references an undefined node.", entry.getKey());
+                    break;
+                }
+                final boolean intersection = osm.intersectionNodes.contains(way.nodes[n]);
+                final boolean lastNode = (n == (way.nodes.length - 1));
+                if (intersection || lastNode || isImpassable(node)) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
-                    nEdgesCreated += 1;
                     beginIdx = n;
                 }
             }
         }
+        // Initial bike LTS values were added in makeEdgePair calls above via LevelOfTrafficStressLabeler.label
         stressLabeler.logErrors();
 
         if (edgeStore.edgeTraversalTimes != null) {
@@ -380,6 +398,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (!saveVertexIndex)
             vertexIndexForOsmNode = null;
 
+        checkWgsEnvelopeSize(envelope, "street layer");
         osm = null;
     }
 
@@ -871,7 +890,12 @@ public class StreetLayer implements Serializable, Cloneable {
             final long fromWayId = from.id; // more effectively final nonsense
             final boolean[] bad = new boolean[] { false };
 
-            int fromVertex = vertexIndexForOsmNode.get(pathNodes[0]);
+            final long fromNode = pathNodes[0];
+            final int fromVertex = vertexIndexForOsmNode.get(fromNode);
+            if (fromVertex == -1) {
+                LOG.warn("Vertex not found for from-node {} of restriction {}, skipping this restriction", fromNode, osmRelationId);
+                return;
+            }
 
             // find the edges
             incomingEdges.get(fromVertex).forEach(eidx -> {
@@ -889,7 +913,12 @@ public class StreetLayer implements Serializable, Cloneable {
                 return true; // iteration should continue
             });
 
-            int toVertex = vertexIndexForOsmNode.get(pathNodes[pathNodes.length - 1]);
+            final long toNode = pathNodes[pathNodes.length - 1];
+            final int toVertex = vertexIndexForOsmNode.get(toNode);
+            if (toVertex == -1) {
+                LOG.warn("Vertex not found for to-node {} of restriction {}, skipping this restriction", toNode, osmRelationId);
+                return;
+            }
 
             final int[] toEdge = new int[] { -1 };
             final long toWayId = to.id; // more effectively final nonsense
@@ -994,21 +1023,27 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
+     * Generally we produce only one vertex per OSM node, but in special cases such as impassable barriers we may create
+     * more than one. In those cases, only the last one to be created will appear in vertexIndexForOsmNode.
      * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
         int vertexIndex = vertexIndexForOsmNode.get(osmNodeId);
-        if (vertexIndex == -1) {
-            // Register a new vertex, incrementing the index starting from zero.
-            // Store node coordinates for this new street vertex
+        if (vertexIndex == -1 || vertexStore.getFlag(vertexIndex, IMPASSABLE)) {
             Node node = osm.nodes.get(osmNodeId);
             if (node == null) {
-                LOG.warn("OSM data references an undefined node. This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+                LOG.warn("OSM data references an undefined node. " +
+                    "This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+                return -1;
             } else {
+                // Register a new vertex with the OSM node's coords, assigning sequential vertex IDs starting from zero.
                 vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
-                VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
-                if (node.hasTag("highway", "traffic_signals"))
-                    v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
+                if (node.hasTag("highway", "traffic_signals")) {
+                    vertexStore.setFlag(vertexIndex, TRAFFIC_SIGNAL);
+                }
+                if (isImpassable(node)) {
+                    vertexStore.setFlag(vertexIndex, IMPASSABLE);
+                }
                 vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
             }
         }
@@ -1039,6 +1074,55 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
+     * Return whether this node can be traversed. This is particularly important for nodes that connect one part of the
+     * network to another. For example, an emergency exit connecting station platforms to an outside path. In the event
+     * of poor connectivity in the input OSM data, we want such platforms to be identified as disconnected so they will
+     * be removed, rather than staying connected via a locked door.
+     *
+     * At first it seems like we'd want to detect nodes with barrier=* and treat them as impassable. However, looking at
+     * https://wiki.openstreetmap.org/wiki/Key:barrier#Values we see that most of the values represent things that are
+     * easily passable, and even barrier=gate is implicitly openable unless tagged with access=no|private.
+     *
+     * Even when access=no, there are frequently exceptions for single modes. We don't yet handle single-mode
+     * barriers, so we want to default to the preexisting behavior of allowing passage (and relying only on edge
+     * traversal permissions) whenever we see exception tags that aren't clearly blocking access.
+     * See https://taginfo.openstreetmap.org/keys/foot#values.
+     *
+     * We don't actually check for access|foot|bicycle=private because a private origin or destination area (gated
+     * housing or secure work facility) is still accessible to a person who lives or works there. We realized this
+     * because https://www.vtvzuidbuurt.nl/ near Vlaardingen in the Netherlands saw a huge drop in accessibility when
+     * we checked for no|private. This is a large housing complex with only two gates, both marked private.
+     *
+     * Ideally such areas would be treated as no-through-traffic but that would involve more tricky heuristics.
+     */
+    private static boolean isImpassable (Node node) {
+        // This code is hit millions of times so we want to bypass it as much as possible.
+        if (node.hasNoTags()) {
+            return false;
+        }
+        // Always disallow passing through emergency exits (the original source of our island pruning problem).
+        if (node.hasTag("entrance", "emergency")) {
+            return true;
+        }
+        if (isNo(node.getTag("access"))) {
+            // This node is explicitly decared inaccessible, but there might be exceptions.
+            // Err on the side of using the existing code path by returning false.
+            // Consider the node impassable only when all mode-specific exception tags are missing or clearly negative.
+            return isNullOrNo(node.getTag("foot")) && isNullOrNo(node.getTag("bicycle"));
+        }
+        // As a default, err on the side of returning false, which will maintain the preexisting code path.
+        return false;
+    }
+
+    private static boolean isNo(String value) {
+        return "no".equals(value);
+    }
+
+    private static boolean isNullOrNo(String value) {
+        return value == null || isNo(value);
+    }
+
+    /**
      * Make an edge for a sub-section of an OSM way, typically between two intersections or leading up to a dead end.
      */
     private void makeEdgePair (Way way, int beginIdx, int endIdx, Long osmID) {
@@ -1046,7 +1130,7 @@ public class StreetLayer implements Serializable, Cloneable {
         long beginOsmNodeId = way.nodes[beginIdx];
         long endOsmNodeId = way.nodes[endIdx];
 
-        // Will create mapping if it doesn't exist yet.
+        // Will create a vertex for the OSM node if one doesn't exist yet.
         int beginVertexIndex = getVertexIndexForOsmNode(beginOsmNodeId);
         int endVertexIndex = getVertexIndexForOsmNode(endOsmNodeId);
 
@@ -1094,8 +1178,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
         Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, osmID);
         // newEdge is first pointing to the forward edge in the pair.
-        // Geometries apply to both edges in a pair.
+        // Geometries apply to both edges in a pair. Likewise for street classes.
         newEdge.setGeometry(nodes);
+        newEdge.setStreetClass(StreetClass.forWay(way));
+
         // If per-edge traversal time factors are being recorded for this StreetLayer, store these factors for the
         // pair of newly created edges based on the current OSM Way.
         // NOTE the unusual requirement here that each OSM way is exactly one routable network edge.
@@ -1108,6 +1194,7 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
+        // Now set characteristics that differ in the forward and backward directions.
         newEdge.setFlags(forwardFlags);
         newEdge.setSpeed(forwardSpeed);
         // Step ahead to the backward edge in the same pair.
@@ -1121,6 +1208,7 @@ public class StreetLayer implements Serializable, Cloneable {
         LOG.info("Indexing streets...");
         spatialIndex = new IntHashGrid();
         // Skip by twos, we only need to index forward (even) edges. Their odd companions have the same geometry.
+        // Ideally shouldn't we then be recording the edge pair numbers, i.e. the edgeIndex/2 ?
         Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges(); e += 2) {
             edge.seek(e);
@@ -1445,10 +1533,10 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Creates vertices to represent each bike rental station.
+     * CURRENTLY UNUSED. Should this be configuratble in the network build configuration?
      */
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) {
-        LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
-        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
+    public void associateBikeSharing(File bikeRentalFile) {
+        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(bikeRentalFile);
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
         bikeRentalStationMap = new TIntObjectHashMap<>(bikeRentalStations.size());
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());
@@ -1540,24 +1628,6 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Given a JTS Geometry in fixed-point latitude and longitude, log it as floating-point GeoJSON.
-     */
-    public static void logFixedPointGeometry (String label, Geometry fixedPointGeometry) {
-        if (fixedPointGeometry == null){
-            LOG.info("{} is null.", label);
-        } else if (fixedPointGeometry.isEmpty()) {
-            LOG.info("{} is empty.", label);
-        } else {
-            String geoJson = new GeometryJSON().toString(fixedDegreeGeometryToFloating(fixedPointGeometry));
-            if (geoJson == null) {
-                LOG.info("Could not convert non-null geometry to GeoJSON");
-            } else {
-                LOG.info("{} {}", label, geoJson);
-            }
-        }
-    }
-
-    /**
      * Finds all the P+R stations in given envelope. This might overselect (doesn't filter the objects from the
      * spatial index) but it's only used in visualizations.
      *
@@ -1640,6 +1710,14 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public boolean edgeIsAddedByScenario (int p) {
         return this.isScenarioCopy() && p >= edgeStore.firstModifiableEdge;
+    }
+
+    /** @return whether a given flag is set to a given boolean value for all incoming and outgoing edges at a vertex. */
+    public boolean flagsAroundVertex(int v, EdgeStore.EdgeFlag flag, boolean flagSet) {
+        return Arrays.stream(incomingEdges.get(v).toArray())
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet) &&
+               Arrays.stream(outgoingEdges.get(v).toArray())
+                     .allMatch(i -> edgeStore.getCursor(i).getFlag(flag) == flagSet);
     }
 
     @Override

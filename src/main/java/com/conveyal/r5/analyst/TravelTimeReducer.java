@@ -21,6 +21,7 @@ import java.util.Arrays;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -42,6 +43,7 @@ public class TravelTimeReducer {
     /** Travel time results reduced to a limited number of percentiles. null if we're only recording accessibility. */
     private TravelTimeResult travelTimeResult = null;
 
+    /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
     private PathResult pathResult = null;
 
     /** If we are calculating accessibility, the PointSets containing opportunities. */
@@ -144,6 +146,7 @@ public class TravelTimeReducer {
         // This is only relevant when calculating accessibility.
         this.decayFunction = task.decayFunction;
         if (calculateAccessibility) {
+            checkNotNull(decayFunction);
             task.validateCutoffsMinutes();
             this.nCutoffs = task.cutoffsMinutes.length;
             this.cutoffsSeconds = new int[nCutoffs];
@@ -200,7 +203,9 @@ public class TravelTimeReducer {
         for (int i : timesSeconds) {
             checkArgument(i >= 0, "Travel times must be positive.");
         }
-
+        if (travelTimeResult != null) {
+            travelTimeResult.recordHistogramIfEnabled(target, timesSeconds);
+        }
         // Sort the travel times to this target and extract percentiles at the pre-calculated percentile indexes.
         // We used to convert these to minutes before sorting, which may allow the sort to be more efficient.
         // We even had a prototype counting sort that would take advantage of this detail. However, applying distance
@@ -278,12 +283,16 @@ public class TravelTimeReducer {
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
                                       StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
         Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
-        for (int i = 0; i < perIterationPaths.length; i++) {
+        for (int i = 0; i < perIterationTimes.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
             if (path != null) {
                 PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
                 PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                paths.put(patternSequence, iteration);
+            } else if (totalTime < UNREACHED){
+                PatternSequence patternSequence = new PatternSequence(null, null, null, null);
+                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
                 paths.put(patternSequence, iteration);
             }
         }

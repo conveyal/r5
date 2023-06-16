@@ -28,7 +28,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
 
     @Override
     public String getId() {
-        return trip_id; // Needs sequence number to be unique
+        return trip_id; // Concatenate with sequence number to make unique
     }
 
     @Override

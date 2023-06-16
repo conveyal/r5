@@ -35,9 +35,9 @@ public class StopSequence {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         StopSequence that = (StopSequence) o;
-        return boardStops.equals(that.boardStops) &&
-                alightStops.equals(that.alightStops) &&
-                rideTimesSeconds.equals(that.rideTimesSeconds) &&
+        return Objects.equals(boardStops, that.boardStops) &&
+                Objects.equals(alightStops, that.alightStops) &&
+                Objects.equals(rideTimesSeconds, that.rideTimesSeconds) &&
                 Objects.equals(access, that.access) &&
                 Objects.equals(egress, that.egress);
     }
@@ -64,10 +64,15 @@ public class StopSequence {
      * calculated by  subtracting the other components of travel time from the total travel time
      */
     public int transferTime(PathResult.Iteration iteration) {
-        int transferTimeSeconds =
-                iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
-        checkState(transferTimeSeconds >= 0);
-        return transferTimeSeconds;
+        if (access == null && egress == null && iteration.waitTimes.size() == 0 && rideTimesSeconds == null) {
+            // No transit ridden, so transfer time is 0.
+            return 0;
+        } else {
+            int transferTimeSeconds =
+                    iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
+            checkState(transferTimeSeconds >= 0);
+            return transferTimeSeconds;
+        }
     }
 
 }

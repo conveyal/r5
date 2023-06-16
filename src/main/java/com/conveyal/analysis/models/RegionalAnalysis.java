@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.results.CsvResultWriter;
+import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
 
@@ -16,6 +16,7 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public String regionId;
     public String bundleId;
     public String projectId;
+    public String scenarioId;
 
     public int variant;
 
@@ -26,6 +27,14 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public int height;
     public int north;
     public int west;
+
+    /**
+     * TODO: Fix confusing naming. An `AnalysisRequest` is used to create a `AnalysisWorkerTask` (which `RegionalTask`
+     *       extends) but is not the same as a task. Naming this parameter `request` can create confusion that it refers
+     *       to that incoming `AnalysisRequest` object and not the `RegionalTask` itself. Either 1) rename this parameter
+     *       "task" (which would require a migration) or 2) rename `AnalysisRequest` something more unique to
+     *       differentiate or 3) ?.
+     */
     public RegionalTask request;
 
     /**
@@ -76,12 +85,22 @@ public class RegionalAnalysis extends Model implements Cloneable {
     /** Has this analysis been (soft) deleted? */
     public boolean deleted;
 
-    public Map<CsvResultWriter.Result, String> resultStorage = new HashMap<>();
-
-    public void addCsvStoragePath (CsvResultWriter.Result resultType, String outputBucket) {
-        // TODO less fragile path, consistent gzip behavior
-        resultStorage.put(resultType, outputBucket + "/" + this._id + "_" + resultType + ".csv.gz");
-    }
+    /**
+     * Storage locations of supplemental regional analysis results intended for export (rather than direct UI display).
+     * A map from result type (times, paths, or access) to the file name. This could conceivably be a more structured
+     * Java type rather than a String-keyed map, but for now we want to maintain flexibility for new result types.
+     *
+     * These CSV regional results are meant by design to be downloaded as files by end users. We store their filenames
+     * to facilitate download via the UI without having to replicate any backend logic that generates filenames from
+     * analysis characteristics.
+     *
+     * This stands in opposition to our original regional analysis results: grids of accessibility for different travel
+     * times and percentiles. These are fetched by the backend and returned to the UI on demand. Those file names are
+     * derived from the ID of the regional analysis and other details. The backend has all that naming logic in one
+     * place because these files are not meant for direct download by the end user, so the UI doesn't need to replicate
+     * any of that logic.
+     */
+    public Map<CsvResultType, String> resultStorage = new HashMap<>();
 
     public RegionalAnalysis clone () {
         try {

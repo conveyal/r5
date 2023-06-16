@@ -83,13 +83,15 @@ public class TravelTimeComputer {
         PointSet destinations;
 
         if (request instanceof  RegionalTask
-                && !request.makeTauiSite
-                && request.destinationPointSets[0] instanceof FreeFormPointSet) {
+            && !request.makeTauiSite
+            && request.destinationPointSets[0] instanceof FreeFormPointSet
+        ) {
             // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
             destinations = request.destinationPointSets[0];
         } else {
+            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
-            // Destination points can be inferred from a regular grid (WebMercatorGridPointSet)
+            // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
             destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
             travelTimeReducer.checkOpportunityExtents(destinations);
         }
@@ -149,12 +151,17 @@ public class TravelTimeComputer {
             // egress end of the trip. We could probably reuse a method for both (getTravelTimesFromPoint).
             // Note: Access searches (which minimize travel time) are asymmetric with the egress cost tables (which
             // often minimize distance to allow reuse at different speeds).
+
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
-            if (request.hasTransit()) {
-                sr.timeLimitSeconds = request.getMaxTimeSeconds(accessMode);
-            } else {
-                sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+            // The overall time limit specified in the request may further decrease that mode-specific limit.
+            {
+                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+                if (request.hasTransit()) {
+                    limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
+                }
+                sr.timeLimitSeconds = limitSeconds;
             }
+
             // Even if generalized cost tags were present on the input data, we always minimize travel time.
             // The generalized cost calculations currently increment time and weight by the same amount.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;

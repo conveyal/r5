@@ -41,6 +41,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
         @Override
         protected boolean isRequired() {
+            // One of calendar or calendar_dates must be present - check in more flexible modular validation later.
             return false;
         }
 
@@ -51,7 +52,8 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
             Service service = services.computeIfAbsent(service_id, Service::new);
             LocalDate date = getDateField("date", true);
             if (service.calendar_dates.containsKey(date)) {
-                feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
+                String keyString = String.format("(%s,%s)", service_id, date.toString());
+                feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)", keyString));
             } else {
                 CalendarDate cd = new CalendarDate();
                 cd.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index

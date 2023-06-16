@@ -60,10 +60,7 @@ import java.util.stream.StreamSupport;
  */
 public class TransitLayer implements Serializable, Cloneable {
 
-    /**
-     * Maximum distance to record in distance tables, in meters.
-     * Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS but TODO should probably be reduced after Kansas City project.
-     */
+    /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
 
     public static final boolean SAVE_SHAPES = false;
@@ -103,6 +100,9 @@ public class TransitLayer implements Serializable, Cloneable {
     public static final int TYPICAL_NUMBER_OF_STOPS_PER_TRIP = 30;
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
+
+    /** Stores the relevant patterns and trips based on the transit modes and date in an analysis request. */
+    public transient FilteredPatternCache filteredPatternCache = new FilteredPatternCache(this);
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -176,13 +176,18 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String scenarioId;
 
-    /** Load a GTFS feed with full load level */
+    /**
+     * Load a GTFS feed with full load level. The feed is not closed after being loaded.
+     * TODO eliminate "load levels"
+     */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         loadFromGtfs(gtfs, LoadLevel.FULL);
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
+     * The supplied feed is treated as read-only, and is not closed after being loaded.
+     * This method requires findPatterns() to have been called on the feed before it's passed in.
      */
     public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
@@ -222,11 +227,6 @@ public class TransitLayer implements Serializable, Cloneable {
             serviceCodeNumber.put(serviceId, serviceIndex);
             LOG.debug("Service {} has ID {}", serviceIndex, serviceId);
         });
-
-        // Group trips by stop pattern (including pickup/dropoff type) and fill stop times into patterns.
-        // Also group trips by the blockId they belong to, and chain them together if they allow riders to stay on board
-        // the vehicle from one trip to the next, even if it changes routes or directions. This is called "interlining".
-        gtfs.findPatterns();
 
         LOG.info("Creating trip patterns and schedules.");
 
@@ -535,16 +535,18 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Run a distance-constrained street search from every transit stop in the graph.
+     * Run a distance-constrained street search from every transit stop in the graph using the walk mode.
      * Store the distance to every reachable street vertex for each of these origin stops.
      * If a scenario has been applied, we need to build tables for any newly created stops and any stops within
      * transfer distance or access/egress distance of those new stops. In that case a rebuildZone geometry should be
      * supplied. If rebuildZone is null, a complete rebuild of all tables will occur for all stops.
+     * Note, this rebuilds for the WALK MODE ONLY. The network only has a field for retaining walk distance tables.
+     * This is a candidate for optimization if car or bicycle scenarios are slow to apply.
      * @param rebuildZone the zone within which to rebuild tables in FIXED-POINT DEGREES, or null to build all tables.
      */
     public void buildDistanceTables(Geometry rebuildZone) {
 
-        LOG.info("Finding distances from transit stops to street vertices.");
+        LOG.info("Pre-computing distances from transit stops to street vertices (WALK mode only).");
         if (rebuildZone != null) {
             LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }
@@ -672,35 +674,33 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public static TransitModes getTransitModes(int routeType) {
         /* TPEG Extension  https://groups.google.com/d/msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J */
-        if (routeType >= 100 && routeType < 200){ // Railway Service
+        if (routeType >= 100 && routeType < 200) { // Railway Service
             return TransitModes.RAIL;
-        }else if (routeType >= 200 && routeType < 300){ //Coach Service
+        } else if (routeType >= 200 && routeType < 300) { //Coach Service
             return TransitModes.BUS;
-        }else if (routeType >= 300 && routeType < 500){ //Suburban Railway Service and Urban Railway service
+        } else if (routeType >= 300 && routeType < 500) { //Suburban Railway Service and Urban Railway service
             return TransitModes.RAIL;
-        }else if (routeType >= 500 && routeType < 700){ //Metro Service and Underground Service
+        } else if (routeType >= 500 && routeType < 700) { //Metro Service and Underground Service
             return TransitModes.SUBWAY;
-        }else if (routeType >= 700 && routeType < 900){ //Bus Service and Trolleybus service
+        } else if (routeType >= 700 && routeType < 900) { //Bus Service and Trolleybus service
             return TransitModes.BUS;
-        }else if (routeType >= 900 && routeType < 1000){ //Tram service
+        } else if (routeType >= 900 && routeType < 1000) { //Tram service
             return TransitModes.TRAM;
-        }else if (routeType >= 1000 && routeType < 1100){ //Water Transport Service
+        } else if (routeType >= 1000 && routeType < 1100) { //Water Transport Service
             return TransitModes.FERRY;
-        }else if (routeType >= 1100 && routeType < 1200){ //Air Service
+        } else if (routeType >= 1100 && routeType < 1200) { //Air Service
             return TransitModes.AIR;
-        }else if (routeType >= 1200 && routeType < 1300){ //Ferry Service
+        } else if (routeType >= 1200 && routeType < 1300) { //Ferry Service
             return TransitModes.FERRY;
-        }else if (routeType >= 1300 && routeType < 1400){ //Telecabin Service
+        } else if (routeType >= 1300 && routeType < 1400) { //Telecabin Service
             return TransitModes.GONDOLA;
-        }else if (routeType >= 1400 && routeType < 1500){ //Funicalar Service
+        } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
             return TransitModes.FUNICULAR;
-        }else if (routeType >= 1500 && routeType < 1600){ //Taxi Service
-            throw new IllegalArgumentException("Taxi service not supported" + routeType);
+        } else if (routeType >= 1500 && routeType < 1600) { //Taxi Service
+            throw new IllegalArgumentException("Taxi route_type code not supported: " + routeType);
+        } else if (routeType >= 1600) {
+            throw new IllegalArgumentException("Car or other route_type code above 1600 not supported: " + routeType);
         }
-        //Is this really needed?
-        /**else if (routeType >= 1600 && routeType < 1700){ //Self drive
-            return TransitModes.CAR;
-        }*/
         /* Original GTFS route types. Should these be checked before TPEG types? */
         switch (routeType) {
         case 0:
@@ -719,8 +719,14 @@ public class TransitLayer implements Serializable, Cloneable {
             return TransitModes.GONDOLA;
         case 7:
             return TransitModes.FUNICULAR;
+        // Codes 8, 9, and 10 are unused.
+        // Codes 11 and 12 were officially added to the spec to bring it in line with internal Google usage.
+        case 11:
+            return TransitModes.BUS;  // Trolleybus
+        case 12:
+            return TransitModes.TRAM; // Monorail
         default:
-            throw new IllegalArgumentException("unknown gtfs route type " + routeType);
+            throw new IllegalArgumentException("Unknown GTFS route_type code: " + routeType);
         }
     }
 
@@ -744,6 +750,7 @@ public class TransitLayer implements Serializable, Cloneable {
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its
             // scenarioId remains unchanged as is done in StreetLayer.
             copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.filteredPatternCache = new FilteredPatternCache(copy);
         }
         return copy;
     }
@@ -831,9 +838,8 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String stopString(int stopIndex, boolean includeName) {
         // TODO use a compact feed index, instead of splitting to remove feedIds
-        String stop = stopIdForIndex.get(stopIndex).split(":")[1];
+        String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
         if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
         return stop;
     }
-
 }

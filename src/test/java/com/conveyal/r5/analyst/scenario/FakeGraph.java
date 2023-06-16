@@ -8,7 +8,6 @@ import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.ByteStreams;
 import org.mapdb.Fun;
@@ -64,7 +63,7 @@ public class FakeGraph {
                 gtfsFiles.add(gtfsFile.getAbsolutePath());
             }
 
-            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, new TNBuilderConfig());
+            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
             net.transitLayer.buildDistanceTables(null);
 
             // clean up
@@ -177,6 +176,7 @@ public class FakeGraph {
             feed.stop_times.put(new Fun.Tuple2(st4.trip_id, st4.stop_sequence), st4);
         }
 
+        feed.findPatterns();
         return feed;
     }
 
@@ -302,6 +302,7 @@ public class FakeGraph {
             feed.stop_times.put(new Fun.Tuple2(st2.trip_id, st2.stop_sequence), st2);
         }
 
+        feed.findPatterns();
         return feed;
     }
 
@@ -395,6 +396,7 @@ public class FakeGraph {
             feed.stop_times.put(new Fun.Tuple2(st3.trip_id, st3.stop_sequence), st3);
         }
 
+        feed.findPatterns();
         return feed;
     }
 
@@ -403,7 +405,7 @@ public class FakeGraph {
         // using conveyal GTFS lib to build GTFS so a lot of code does not have to be rewritten later
         // once we're using the conveyal GTFS lib for everything we ought to be able to do this
         // without even writing out the GTFS to a file.
-        GTFSFeed feed = new GTFSFeed();
+        GTFSFeed feed = GTFSFeed.newWritableInMemory();
         Agency a = new Agency();
         a.agency_id = "agency";
         a.agency_name = "Agency";
@@ -490,10 +492,11 @@ public class FakeGraph {
             feed.stop_times.put(new Fun.Tuple2(st2.trip_id, st2.stop_sequence), st2);
         }
 
+        feed.findPatterns();
         return feed;
     }
 
-    public static enum TransitNetwork {
+    public enum TransitNetwork {
         // Single line on High Street, Columbus, OH.
         SINGLE_LINE,
 
@@ -523,7 +526,7 @@ public class FakeGraph {
         }
 
         public GTFSFeed getBlankFeed() {
-            GTFSFeed feed = new GTFSFeed();
+            GTFSFeed feed = GTFSFeed.newWritableInMemory();
             feed.feedId = this.toString();
 
             FeedInfo info = new FeedInfo();

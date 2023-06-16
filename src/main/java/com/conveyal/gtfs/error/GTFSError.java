@@ -50,7 +50,10 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
         return this.getClass().getSimpleName();
     }
 
-    public Priority getPriority () {
+    /**
+     * @return The Error priority level associated with this class.
+     */
+    public Priority getPriority() {
         return Priority.UNKNOWN;
     }
 

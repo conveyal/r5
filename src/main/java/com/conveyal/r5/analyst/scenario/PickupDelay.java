@@ -111,7 +111,7 @@ public class PickupDelay extends Modification {
             );
             polygons.loadFromS3GeoJson();
             // Collect any errors from the IndexedPolygonCollection construction, so they can be seen in the UI.
-            errors.addAll(polygons.getErrors());
+            addErrors(polygons.getErrors());
             // Handle pickup service to stop mapping if supplied in the modification JSON.
             if (stopsForZone == null) {
                 this.pickupWaitTimes = new PickupWaitTimes(polygons, null, Collections.emptySet(), this.streetMode);
@@ -122,12 +122,12 @@ public class PickupDelay extends Modification {
                 final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon = new HashMap<>();
                 final Map<ModificationPolygon, PickupWaitTimes.EgressService> egressServices = new HashMap<>();
                 if (stopsForZone.isEmpty()) {
-                    errors.add("If stopsForZone is specified, it must be non-empty.");
+                    addError("If stopsForZone is specified, it must be non-empty.");
                 }
                 stopsForZone.forEach((zonePolygonId, stopPolygonIds) -> {
                     ModificationPolygon zonePolygon = polygons.getById(zonePolygonId);
                     if (zonePolygon == null) {
-                        errors.add("Could not find zone polygon with ID: " + zonePolygonId);
+                        addError("Could not find zone polygon with ID: " + zonePolygonId);
                     }
                     TIntSet stopNumbers = stopNumbersForZonePolygon.get(zonePolygon);
                     if (stopNumbers == null) {
@@ -137,11 +137,11 @@ public class PickupDelay extends Modification {
                     for (String stopPolygonId : stopPolygonIds) {
                         ModificationPolygon stopPolygon = polygons.getById(stopPolygonId);
                         if (stopPolygon == null) {
-                            errors.add("Could not find stop polygon with ID: " + stopPolygonId);
+                            addError("Could not find stop polygon with ID: " + stopPolygonId);
                         }
                         TIntSet stops = network.transitLayer.findStopsInGeometry(stopPolygon.polygonal);
                         if (stops.isEmpty()) {
-                            errors.add("Stop polygon did not contain any stops: " + stopPolygonId);
+                            addError("Stop polygon did not contain any stops: " + stopPolygonId);
                         }
                         stopNumbers.addAll(stops);
                         // Derive egress services from this pair of polygons
@@ -171,9 +171,9 @@ public class PickupDelay extends Modification {
             }
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.
-            errors.add(ExceptionUtils.asString(e));
+            addError(ExceptionUtils.stackTraceString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
@@ -181,11 +181,11 @@ public class PickupDelay extends Modification {
         // network.streetLayer is already a protective copy made by method Scenario.applyToTransportNetwork.
         // The polygons have already been validated in the resolve method, we just need to record them in the network.
         if (network.streetLayer.pickupWaitTimes != null) {
-            errors.add("Multiple pickup delay modifications cannot be applied to a single network.");
+            addError("Multiple pickup delay modifications cannot be applied to a single network.");
         } else {
             network.streetLayer.pickupWaitTimes = this.pickupWaitTimes;
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

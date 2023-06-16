@@ -17,7 +17,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
+import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.*;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 
 /**
  * Label streets with a best-guess at their Level of Traffic Stress, as defined in
@@ -43,11 +44,20 @@ public class LevelOfTrafficStressLabeler {
     /**
      * Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment).
      * This sets flags (passed in as the second and third parameters) from the tags on the OSM Way (first parameter).
+     *
+     * The general approach in this function is to look at a bunch of OSM tags (highway, cycleway, maxspeed, lanes) and
+     * edge characteristics (allowed modes) progressing from things implying low to high LTS, and returning early when
+     * lower LTS has already been established.
+     *
+     * One reason to work in order of increasing LTS is that LTS is implemented as non-mutually exclusive flags on the
+     * edge, and higher LTS flags override lower ones, i.e. if an LTS 4 flag is present the road is seen as LTS 4 even
+     * if an LTS 2 flag is present. This should really be changed, but it would be a backward-incompatible change to
+     * the network storage format.
      */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
-        // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
 
-        // First, if the input OSM data contains LTS tags, use those rather than estimating LTS from road characteristics.
+        // First, if the input OSM data contains LTS tags,
+        // use those rather than estimating LTS from road characteristics and return immediately.
         String ltsTagValue = way.getTag("lts");
         if (ltsTagValue != null) {
             try {
@@ -67,36 +77,38 @@ public class LevelOfTrafficStressLabeler {
             }
         }
 
+        // Ways that do not permit cars are deemed LTS 1.
         if (!forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) && !backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
-            // no cars permitted on this way, it is LTS 1
             // TODO on street bike lanes/cycletracks digitized as separate infrastructure?
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
+            forwardFlags.add(BIKE_LTS_1);
+            backFlags.add(BIKE_LTS_1);
             return;
         }
 
-        // leave some unlabeled because we don't really know. Also alleys and parking aisles shouldn't "bleed" high LTS
-        // into the streets that connect to them
-        if (way.hasTag("highway", "service"))
+        // Service roads are left unlabeled because we don't really know how stressful they are.
+        // Also, alleys and parking aisles shouldn't "bleed" high LTS into the streets that connect to them.
+        // (Though perhaps the problem there is that streets shouldn't bleed LTS at all, and certainly not from lower
+        // to higher streets in the hierarchy.)
+        if (way.hasTag("highway", "service")) {
             return;
+        }
 
-        // is this a small, low-stress road?
+        // Small, low-stress road types are definitively set to LTS 1.
         if (way.hasTag("highway", "residential") || way.hasTag("highway", "living_street")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
+            forwardFlags.add(BIKE_LTS_1);
+            backFlags.add(BIKE_LTS_1);
             return;
         }
 
-        // is there a bike lane?
-        // we don't have lane widths, so guess from the roadway classification
+        // If the way has a cycle lane tag, record this fact for later consideration.
         boolean hasForwardLane = false;
         boolean hasBackwardLane = false;
         if (way.hasTag("cycleway", "lane")) {
-            // there is a bike lane in all directions that cycles are allowed to traverse.
+            // There is a bike lane in all directions that cycles are allowed to traverse.
             hasForwardLane = hasBackwardLane = true;
         }
 
-        // TODO handle left-hand-drive countries
+        // TODO handle left-hand-drive countries.
         if (way.hasTag("cycleway:left", "lane") || way.hasTag("cycleway", "opposite") || way.hasTag("cycleway:right", "opposite")) {
             hasBackwardLane = true;
         }
@@ -107,7 +119,7 @@ public class LevelOfTrafficStressLabeler {
             hasForwardLane = true;
         }
 
-        // extract max speed and lane info
+        // Extract maximum speed and number of lanes, retaining them for later consideration.
         double maxSpeed = Double.NaN;
         if (way.hasTag("maxspeed")) {
             // parse the max speed tag
@@ -131,55 +143,52 @@ public class LevelOfTrafficStressLabeler {
             }
         }
 
-        EdgeStore.EdgeFlag defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_3;
+        // In the absence of other evidence, we will assign LTS 3. This may be revised downward based on tags.
+        EdgeStore.EdgeFlag defaultLts = BIKE_LTS_3;
 
-        // if it's small and slow, LTS 2
-        if (lanes <= 3 && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+        // If it's small and slow, lessen stress to LTS 2.
+        if (lanes <= 3 && maxSpeed <= 25 * 1.61) defaultLts = BIKE_LTS_2;
 
-        // assume that there aren't too many lanes if it's not specified
-        if (lanes == Integer.MAX_VALUE && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+        // Assume that streets with a slow maximum speed aren't too stressful if the number of lanes is not specified.
+        if (lanes == Integer.MAX_VALUE && maxSpeed <= 25 * 1.61) defaultLts = BIKE_LTS_2;
 
         // TODO arbitrary. Roads up to tertiary with bike lanes are considered LTS 2, roads above tertiary, LTS 3.
         // LTS 3 has defined space, but on fast roads
         if (way.hasTag("highway", "unclassified") || way.hasTag("highway", "tertiary") || way.hasTag("highway", "tertiary_link")) {
             // assume that it's not too fast if it's not specified, but only for these smaller roads
             // TODO questionable. Tertiary roads probably tend to be faster than 25 MPH.
-            if (lanes <= 3 && Double.isNaN(maxSpeed)) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+            if (lanes <= 3 && Double.isNaN(maxSpeed)) defaultLts = BIKE_LTS_2;
 
             if (hasForwardLane) {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
-            }
-            else {
+                forwardFlags.add(BIKE_LTS_2);
+            } else {
                 forwardFlags.add(defaultLts); // moderate speed single lane street
             }
-
             if (hasBackwardLane) {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
-            }
-            else {
+                backFlags.add(BIKE_LTS_2);
+            } else {
                 backFlags.add(defaultLts);
             }
-        }
-        else { // NB includes trunk
-            // NB this will be LTS 3 unless this street has a low number of lanes and speed limit, or a low speed limit
-            // and unknown number of lanes
+        } else {
+            // This clause includes trunk roads, and will default to LTS 3 unless this street has a low number of lanes
+            // and speed limit, or a low speed limit and unknown number of lanes.
             if (hasForwardLane) {
                 forwardFlags.add(defaultLts);
             }
-
             if (hasBackwardLane) {
                 backFlags.add(defaultLts);
             }
         }
 
-        // if we've assigned nothing, assign LTS 4
-        if (!forwardFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_1) && !forwardFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_2) &&
-                !forwardFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_3) && !forwardFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_4))
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_4);
-
-        if (!backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_1) && !backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_2) &&
-                !backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_3) && !backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_4))
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_4);
+        // If we've assigned nothing, assign LTS 4
+        if (!forwardFlags.contains(BIKE_LTS_1) && !forwardFlags.contains(BIKE_LTS_2) &&
+                !forwardFlags.contains(BIKE_LTS_3) && !forwardFlags.contains(BIKE_LTS_4)) {
+            forwardFlags.add(BIKE_LTS_4);
+        }
+        if (!backFlags.contains(BIKE_LTS_1) && !backFlags.contains(BIKE_LTS_2) &&
+                !backFlags.contains(BIKE_LTS_3) && !backFlags.contains(BIKE_LTS_4)) {
+            backFlags.add(BIKE_LTS_4);
+        }
      }
 
     /**
@@ -205,16 +214,16 @@ public class LevelOfTrafficStressLabeler {
 
             for (TIntIterator it = streetLayer.incomingEdges.get(v.index).iterator(); it.hasNext();) {
                 e.seek(it.next());
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
+                if (e.getFlag(BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
+                if (e.getFlag(BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
+                if (e.getFlag(BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
             }
 
             for (TIntIterator it = streetLayer.outgoingEdges.get(v.index).iterator(); it.hasNext();) {
                 e.seek(it.next());
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
+                if (e.getFlag(BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
+                if (e.getFlag(BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
+                if (e.getFlag(BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
             }
 
             vertexStresses.put(v.index, maxLts);
@@ -231,21 +240,13 @@ public class LevelOfTrafficStressLabeler {
                 if (e.getFlag(BIKE_LTS_EXPLICIT)) {
                     continue;
                 }
-
                 // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
                 // LTS if the other end of it is connected to a higher-stress intersection.
                 int lts = it.value();
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts = Math.max(2, lts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts = Math.max(3, lts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts = Math.max(4, lts);
-
-                // clear existing markings
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_1);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_2);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_3);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_4);
-
-                e.setFlag(intToLts(lts));
+                if (e.getFlag(BIKE_LTS_2)) lts = Math.max(2, lts);
+                if (e.getFlag(BIKE_LTS_3)) lts = Math.max(3, lts);
+                if (e.getFlag(BIKE_LTS_4)) lts = Math.max(4, lts);
+                e.setLts(lts);
             }
 
             // need to set on both incoming and outgoing b/c it is possible to start or end a search at a high-stress intersection
@@ -254,21 +255,13 @@ public class LevelOfTrafficStressLabeler {
                 if (e.getFlag(BIKE_LTS_EXPLICIT)) {
                     continue;
                 }
-
                 // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
                 // LTS if the other end of it is connected to a higher-stress intersection.
                 int lts = it.value();
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts = Math.max(2, lts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts = Math.max(3, lts);
-                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts = Math.max(4, lts);
-
-                // clear existing markings
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_1);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_2);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_3);
-                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_4);
-
-                e.setFlag(intToLts(lts));
+                if (e.getFlag(BIKE_LTS_2)) lts = Math.max(2, lts);
+                if (e.getFlag(BIKE_LTS_3)) lts = Math.max(3, lts);
+                if (e.getFlag(BIKE_LTS_4)) lts = Math.max(4, lts);
+                e.setLts(lts);
             }
         }
     }
@@ -281,13 +274,6 @@ public class LevelOfTrafficStressLabeler {
             case BIKE_LTS_4: return 4;
             default: return null;
         }
-    }
-
-    public static EdgeStore.EdgeFlag intToLts (int lts) {
-        if (lts < 2) return EdgeStore.EdgeFlag.BIKE_LTS_1;
-        else if (lts == 2) return EdgeStore.EdgeFlag.BIKE_LTS_2;
-        else if (lts == 3) return EdgeStore.EdgeFlag.BIKE_LTS_3;
-        else return EdgeStore.EdgeFlag.BIKE_LTS_4;
     }
 
     /** parse an OSM speed tag */

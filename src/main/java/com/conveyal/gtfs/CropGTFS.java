@@ -44,7 +44,7 @@ public class CropGTFS {
 
     public static void main (String[] args) {
 
-        GTFSFeed feed = GTFSFeed.fromFile(inputFile);
+        GTFSFeed feed = GTFSFeed.writableTempFileFromGtfs(inputFile);
 
         // We keep two sets of trip IDs because we only keep trips that are referenced by two or more stopTimes.
         // A TObjectIntMap would be good for this as well, but we don't currently depend on Trove.

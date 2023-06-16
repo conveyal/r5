@@ -21,12 +21,12 @@ public class RemoveStops extends Modification {
     public com.conveyal.r5.analyst.scenario.RemoveStops toR5 () {
         com.conveyal.r5.analyst.scenario.RemoveStops rs = new com.conveyal.r5.analyst.scenario.RemoveStops();
         rs.comment = name;
-        rs.stops = feedScopeIds(feed, stops);
+        rs.stops = feedScopedIdSet(feed, stops);
 
         if (trips == null) {
-            rs.routes = feedScopeIds(feed, routes);
+            rs.routes = feedScopedIdSet(feed, routes);
         } else {
-            rs.patterns = feedScopeIds(feed, trips);
+            rs.patterns = feedScopedIdSet(feed, trips);
         }
 
         rs.secondsSavedAtEachStop = secondsSavedAtEachStop;

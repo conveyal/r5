@@ -18,7 +18,10 @@ import static com.google.common.base.Preconditions.checkState;
 /**
  * Class used to represent transit paths for display to end users (and debugging).
  * It is a group of parallel arrays, with each position in the arrays representing a leg in the trip.
+ *
+ * NOTE this has been superseded for most purposes by com.conveyal.r5.transit.path.Path
  */
+@Deprecated
 public class Path implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);

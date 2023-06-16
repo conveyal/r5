@@ -164,7 +164,7 @@ public class RaptorState {
         this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
         this.nonTransferInVehicleTravelTime =
                 Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
-        this.previousWaitTime = Arrays.copyOf(state.previousInVehicleTravelTime, state.previousInVehicleTravelTime.length);
+        this.previousWaitTime = Arrays.copyOf(state.previousWaitTime, state.previousWaitTime.length);
         this.previousInVehicleTravelTime = Arrays.copyOf(state.previousInVehicleTravelTime,
                 state.previousInVehicleTravelTime.length);
         this.departureTime = state.departureTime;

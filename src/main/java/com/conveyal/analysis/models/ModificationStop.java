@@ -115,7 +115,7 @@ class ModificationStop {
                     // JTS orthodromic distance returns meters, considering the input coordinate system.
                     lineSegmentMeters = JTS.orthodromicDistance(c0, c1, crs);
                 } catch (TransformException e) {
-                    throw AnalysisServerException.unknown(ExceptionUtils.asString(e));
+                    throw AnalysisServerException.unknown(ExceptionUtils.stackTraceString(e));
                 }
                 double metersAtEndOfSegment = metersFromPatternStart + lineSegmentMeters;
 

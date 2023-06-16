@@ -65,8 +65,8 @@ public class BootstrappingTravelTimeReducer {
         // We use the size of the grid to determine the number of destinations used in the linked point set in
         // TravelTimeComputer, therefore the target indices are relative to the grid, not the task.
         // TODO verify that the above is still accurate
-        int gridx = target % grid.width;
-        int gridy = target / grid.width;
+        int gridx = target % grid.extents.width;
+        int gridy = target / grid.extents.width;
         double opportunityCountAtTarget = grid.grid[gridx][gridy];
 
         // As an optimization, don't even bother to check whether cells that contain no opportunities are reachable.

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.Path;
 import com.conveyal.r5.transit.path.PatternSequence;
@@ -7,10 +8,10 @@ import com.conveyal.r5.transit.path.RouteSequence;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -31,13 +32,21 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathResult {
 
+    /**
+     * The maximum number of destinations for which we'll generate detailed path information in a single request.
+     * Detailed path information was added on to the original design, which returned a simple grid of travel times.
+     * These results are returned to the backend over an HTTP API so we don't want to risk making them too huge.
+     * This could be set to a higher number in cases where you know the result return channel can handle the size.
+     */
+    public static int maxDestinations = 5000;
+
     private final int nDestinations;
     /**
      * Array with one entry per destination. Each entry is a map from a "path template" to the associated iteration
      * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
-    private final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+    public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
 
     public static String[] DATA_COLUMNS = new String[]{
@@ -61,8 +70,9 @@ public class PathResult {
             // In regional analyses, return paths to all destinations
             nDestinations = task.nTargetsPerOrigin();
             // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinations > 5000) throw new UnsupportedOperationException("Path results are limited to 5000 " +
-                    "destinations");
+            if (nDestinations > maxDestinations) {
+                throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + maxDestinations);
+            }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
@@ -143,23 +153,23 @@ public class PathResult {
      * Wraps path and iteration details for JSON serialization
      */
     public static class PathIterations {
-        public String access; // StreetTimesAndModes.StreetTimeAndMode would be more machine-readable.
-        public String egress;
+        public StreetTimesAndModes.StreetTimeAndMode access;
+        public StreetTimesAndModes.StreetTimeAndMode egress;
         public Collection<RouteSequence.TransitLeg> transitLegs;
-        public Collection<HumanReadableIteration> iterations;
+        public Collection<Iteration> iterations;
 
         PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
-            this.access = pathTemplate.stopSequence.access.toString();
-            this.egress = pathTemplate.stopSequence.egress.toString();
+            this.access = pathTemplate.stopSequence.access;
+            this.egress = pathTemplate.stopSequence.egress;
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
-            this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
+            this.iterations = iterations;
         }
     }
 
     /**
      * Returns human-readable details of path iterations, for JSON representation (e.g. in the UI console).
      */
-    List<PathIterations> getPathIterationsForDestination() {
+    public List<PathIterations> getPathIterationsForDestination() {
         checkState(iterationsForPathTemplates.length == 1, "Paths were stored for multiple " +
                 "destinations, but only one is being requested");
         List<PathIterations> detailsForDestination = new ArrayList<>();
@@ -189,25 +199,13 @@ public class PathResult {
             this.waitTimes = path.waitTimes;
             this.totalTime = totalTime;
         }
-    }
 
-    /**
-     * Timestamp style clock times, and rounded wait/total time, for inspection as JSON.
-     */
-    public static class HumanReadableIteration {
-        public String departureTime;
-        public double[] waitTimes;
-        public double totalTime;
-
-        HumanReadableIteration(Iteration iteration) {
-            this.departureTime =
-                    String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
-                            (int) (iteration.departureTime / 60.0 % 60));
-            this.waitTimes =  Arrays.stream(iteration.waitTimes.toArray()).mapToDouble(
-                    wait -> Math.round(wait / 60f * 10) / 10.0
-            ).toArray();
-            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
+        /**
+         * Constructor for paths with no transit boardings (and therefore no wait times).
+         */
+        public Iteration(int totalTime) {
+            this.waitTimes = new TIntArrayList();
+            this.totalTime = totalTime;
         }
     }
-
 }

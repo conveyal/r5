@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /** Indicates that a number is out of the acceptable range. */
@@ -19,4 +21,7 @@ public class RangeError extends GTFSError implements Serializable {
         return String.format("Number %s outside of acceptable range [%s,%s].", actual, min, max);
     }
 
+    @Override public Priority getPriority() {
+        return Priority.LOW;
+    }
 }

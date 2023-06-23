@@ -102,16 +102,13 @@ public class Split {
             // On a given edge pair both directions will have the same flag.
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
-            // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
-            // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block
-            // below). This system has odd effects in areas with lots of one-way streets or divided roads.
-            // TODO Really, we want to allow linking to two different edge-pairs in such cases but that is more complex.
             // Do not consider linking to edges that are not marked "linkable". This excludes e.g. tunnels and motorways.
-            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+            // Experimental change: ignore mode (which may lead to many dead-end trips)
+            if (!edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.advance();
-            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+            if (!edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.retreat();

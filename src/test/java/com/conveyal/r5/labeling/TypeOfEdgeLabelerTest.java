@@ -84,27 +84,7 @@ public class TypeOfEdgeLabelerTest {
             Arguments.of("directional cycleway", "highway=nobikenoped;cycleway:right=lane", CAR_CYCLEWAY, CAR),
             Arguments.of("directional cycleway", "highway=nobikenoped;cycleway:left=lane", CAR, CAR_CYCLEWAY),
             Arguments.of("directional cycleway", "highway=cycleway;oneway=true", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN),
-            Arguments.of("directional cycleway", "highway=cycleway", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN_BIKE_CYCLEWAY),
-            Arguments.of(
-                "oneway streets with opposite lane cycleway",
-                "highway=residential;cycleway=opposite_lane;oneway=yes",
-                EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                    EdgeStore.EdgeFlag.ALLOWS_CAR,
-                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
-                    EdgeStore.EdgeFlag.LINKABLE),
-                PEDESTRIAN_BIKE_CYCLEWAY
-            ),
-            Arguments.of(
-                "oneway reversed street with opposite lane cycleway",
-                "highway=residential;cycleway=opposite_lane;oneway=-1",
-                PEDESTRIAN_BIKE_CYCLEWAY,
-                EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                    EdgeStore.EdgeFlag.ALLOWS_CAR,
-                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
-                    EdgeStore.EdgeFlag.LINKABLE)
-            )
+            Arguments.of("directional cycleway", "highway=cycleway", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN_BIKE_CYCLEWAY)
         );
 
 

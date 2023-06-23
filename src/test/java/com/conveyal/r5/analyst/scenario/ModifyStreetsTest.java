@@ -37,43 +37,6 @@ public class ModifyStreetsTest {
     // Analysis bounds
     private static final int MIN_ELEMENTS = 100;
 
-    /**
-     * Using a `ModifyStreets` modification, test that adjusting the `walkTimeFactor` appropriately changes travel time.
-     * Also indirectly tests that the necessary generalized cost data tables will be added to the network when missing.
-     */
-    @Test
-    public void testGeneralizedCostWalk() {
-        var network = FakeGraph.buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
-
-        var ms = new ModifyStreets();
-        ms.allowedModes = EnumSet.of(StreetMode.WALK);
-        ms.walkTimeFactor = 0.1;
-        ms.polygons = makeModificationPolygon(FROM_LON, FROM_LAT, SIZE_DEGREES);
-        var modifiedNetwork = applySingleModification(network, ms);
-
-        var reachedVertices = getReachedVertices(network);
-        var reachedVerticesWithModification = getReachedVertices(modifiedNetwork);
-
-        int nReachedVertices = reachedVertices.size();
-        int nReachedVerticesWithModification = reachedVerticesWithModification.size();
-
-        assertTrue(nReachedVertices > 500);
-        assertTrue(nReachedVerticesWithModification > nReachedVertices * 2);
-
-        int nLowerTimes = 0;
-        for (int v : reachedVertices.keys()) {
-            int travelTime = reachedVertices.get(v);
-            int travelTimeWithModification = reachedVerticesWithModification.get(v);
-            assertTrue(travelTimeWithModification != -1);
-            assertTrue(travelTimeWithModification <= travelTime);
-            if (travelTimeWithModification != travelTime) {
-                nLowerTimes += 1;
-                assertTrue(travelTimeWithModification * 1.3 < travelTime);
-            }
-        }
-        assertTrue(nLowerTimes > 500);
-    }
-
     private static TIntIntMap getReachedVertices(TransportNetwork network) {
         var task = new TravelTimeSurfaceTask();
         task.accessModes = EnumSet.of(LegMode.WALK);

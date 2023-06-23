@@ -73,7 +73,7 @@ public class TraversalPermissionLabelerTest {
         osmWay.addTag("highway", "residential");
         osmWay.addTag("oneway", "true");
         osmWay.addTag("oneway:bicycle", "no");
-        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparision(osmWay, BICYCLE_AND_CAR, BICYCLE);
     }
 
     @Test
@@ -121,11 +121,10 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, "sidewalk", "none", CAR, CAR);
         roadFlagComparision(osmWay, "sidewalk", "no", CAR, CAR);
         osmWay = makeOSMWayFromTags("highway=residential");
-        roadFlagComparision(osmWay, ALL, ALL);
+        roadFlagComparision(osmWay, BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
-        //This shouldn't remove WALK permissions
-        roadFlagComparision(osmWay, "sidewalk", "no", ALL, ALL);
-        roadFlagComparision(osmWay, "sidewalk", "none", ALL, ALL);
+        roadFlagComparision(osmWay, "sidewalk", "no", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+        roadFlagComparision(osmWay, "sidewalk", "none", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
     }
 
 
@@ -210,12 +209,12 @@ public class TraversalPermissionLabelerTest {
 
         osmWay = makeOSMWayFromTags("cycleway:right=lane;highway=residential;cycleway:left=opposite_lane;oneway=yes");
 
-        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparision(osmWay, BICYCLE_AND_CAR, BICYCLE);
 
-        roadFlagComparision(osmWay, "oneway:bicycle", "no", ALL, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparision(osmWay, "oneway:bicycle", "no", BICYCLE_AND_CAR, BICYCLE);
 
         osmWay = makeOSMWayFromTags("highway=tertiary;cycleway:left=lane;bicycle:forward=use_sidepath");
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, ALL);
+        roadFlagComparision(osmWay, CAR, BICYCLE_AND_CAR);
 
         osmWay = makeOSMWayFromTags("highway=nobikenoped;cycleway:left=lane;bicycle:forward=use_sidepath");
         roadFlagComparision(osmWay, CAR, BICYCLE_AND_CAR);
@@ -227,7 +226,7 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testCyclewayNo() throws Exception {
         Way osmWay = makeOSMWayFromTags("oneway=no;highway=residential;cycleway=no");
-        roadFlagComparision(osmWay, ALL, ALL);
+        roadFlagComparision(osmWay, BICYCLE_AND_CAR, BICYCLE_AND_CAR);
 
     }
 
@@ -291,7 +290,7 @@ public class TraversalPermissionLabelerTest {
     public void testSidepath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=tertiary;bicycle=use_sidepath");
 
-        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparision(osmWay, CAR, CAR);
     }
 
     @Test

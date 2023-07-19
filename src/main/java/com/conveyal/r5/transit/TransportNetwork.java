@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -263,14 +264,14 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork. Then, for any modes
-     * supplied, we also build a linkage that is held permanently in the GridPointSet. This method is called when a
-     * network is first built.
-     * The resulting grid PointSet will cover the entire street network layer of this TransportNetwork, which should
-     * include every point we can route from or to. Any other destination grid (for the same mode, walking) can be made
-     * as a subset of this one since it includes every potentially accessible point.
+     * Build a grid PointSet covering the entire street network layer of this TransportNetwork, which should include
+     * every point we can route from or to. Then for all requested modes build a linkage that is held in the
+     * GridPointSet. This method is called when a network is first built so these linkages are serialized with it.
+     * Any other destination grid (at least for the same modes) can be made as a subset of this one since it includes
+     * every potentially accessible point. Destination grids for other modes will be made on demand, which is a slow
+     * operation that can occupy hundreds of workers for long periods of time when a regional analysis starts up.
      */
-    public void rebuildLinkedGridPointSet(StreetMode... modes) {
+    public void rebuildLinkedGridPointSet(Iterable<StreetMode> modes) {
         if (fullExtentGridPointSet != null) {
             throw new RuntimeException("Linked grid pointset was built more than once.");
         }
@@ -278,6 +279,10 @@ public class TransportNetwork implements Serializable {
         for (StreetMode mode : modes) {
             linkageCache.buildUnevictableLinkage(fullExtentGridPointSet, streetLayer, mode);
         }
+    }
+
+    public void rebuildLinkedGridPointSet(StreetMode... modes) {
+        rebuildLinkedGridPointSet(Set.of(modes));
     }
 
     //TODO: add transit stops to envelope

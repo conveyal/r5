@@ -1,6 +1,5 @@
 package com.conveyal.r5.shapefile;
 
-import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;
@@ -10,7 +9,6 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.index.strtree.STRtree;
-import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +18,7 @@ import java.io.FileWriter;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
 
 /**
@@ -67,8 +65,8 @@ public class ShapefileMatcher {
 
     /**
      * Match each pair of edges in the street layer to a feature in the shapefile. Copy LTS attribute from that feature
-     * to the pair of edges, setting the BIKE_LTS_EXPLICIT flag. This will prevent Conveyal OSM-inferred LTS from
-     * overwriting the shapefile-derived LTS.
+     * to the pair of edges, setting the BIKE_LTS_EXPLICIT flag. This can prevent Conveyal OSM-inferred LTS from
+     * overwriting the shapefile-derived LTS if this matching process is applied during network build.
      * In current usage this is applied after the OSM is already completely loaded and converted to network edges, so
      * it overwrites any data from OSM. Perhaps instead of BIKE_LTS_EXPLICIT we should have an LTS source flag:
      * OSM_INFERRED, OSM_EXPLICIT, SHAPEFILE_MATCH etc. This could also apply to things like speeds and slopes.
@@ -93,14 +91,13 @@ public class ShapefileMatcher {
                 // TODO reuse code from LevelOfTrafficStressLabeler.label()
                 int lts = ((Number) bestFeature.getAttribute(ltsAttributeIndex)).intValue();
                 if (lts < 1 || lts > 4) {
-                    LOG.error("Clamping LTS value to range [1...4]. Value in attribute is {}", lts);
+                    LOG.error("LTS should be in range [1...4]. Value in attribute is {}", lts);
                 }
-                EdgeStore.EdgeFlag ltsFlag = intToLts(lts);
                 edge.setFlag(BIKE_LTS_EXPLICIT);
-                edge.setFlag(ltsFlag);
+                edge.setLts(lts);
                 edge.advance();
                 edge.setFlag(BIKE_LTS_EXPLICIT);
-                edge.setFlag(ltsFlag);
+                edge.setLts(lts);
                 edgePairCounter.increment();
             }
         });

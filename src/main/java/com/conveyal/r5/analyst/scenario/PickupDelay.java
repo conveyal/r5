@@ -120,7 +120,7 @@ public class PickupDelay extends Modification {
             );
             polygons.loadFromS3GeoJson();
             // Collect any errors from the IndexedPolygonCollection construction, so they can be seen in the UI.
-            errors.addAll(polygons.getErrors());
+            addErrors(polygons.getErrors());
             // Handle pickup service to stop mapping if supplied in the modification JSON.
             if (stopsForZone == null && destinationsForZone == null) {
                 this.pickupWaitTimes = new PickupWaitTimes(
@@ -193,9 +193,9 @@ public class PickupDelay extends Modification {
             }
         } catch (Exception e) {
             // Record any unexpected errors to bubble up to the UI.
-            errors.add(ExceptionUtils.stackTraceString(e));
+            addError(ExceptionUtils.stackTraceString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     private ModificationPolygon tryToGetPolygon (IndexedPolygonCollection polygons, String id, String label) {
@@ -211,11 +211,11 @@ public class PickupDelay extends Modification {
         // network.streetLayer is already a protective copy made by method Scenario.applyToTransportNetwork.
         // The polygons have already been validated in the resolve method, we just need to record them in the network.
         if (network.streetLayer.pickupWaitTimes != null) {
-            errors.add("Multiple pickup delay modifications cannot be applied to a single network.");
+            addError("Multiple pickup delay modifications cannot be applied to a single network.");
         } else {
             network.streetLayer.pickupWaitTimes = this.pickupWaitTimes;
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

@@ -39,7 +39,7 @@ public class FareAttribute extends Entity {
             String fareId = getStringField("fare_id", true);
             Fare fare = fares.computeIfAbsent(fareId, Fare::new);
             if (fare.fare_attribute != null) {
-                feed.errors.add(new DuplicateKeyError(tableName, row, "fare_id"));
+                feed.errors.add(new DuplicateKeyError(tableName, row, "fare_id", fareId));
             } else {
                 FareAttribute fa = new FareAttribute();
                 fa.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index

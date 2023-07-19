@@ -23,7 +23,7 @@ public class SpeedConfig {
      */
     public int defaultSpeed;
 
-    private static double SCALE = 0.5;
+    private static double SCALE = 1.0;
 
     /**
      * Build a speed factory given a config node, or fallback to the default if none is specified.

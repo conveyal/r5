@@ -34,8 +34,7 @@ public class PickupDelay extends Modification {
     /**
      * The identifier of the polygon layer containing the on-demand pick-up zones.
      * This set of polygons represents areas where an on-demand mobility service will pick up passengers, with
-     * associated wait times to be picked up. Overlapping zones are not yet supported, only one "winning" zone will
-     * be chosen using the priority values.
+     * associated wait times to be picked up.
      */
     public String zonePolygons;
 

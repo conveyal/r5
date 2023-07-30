@@ -4,15 +4,17 @@ import com.conveyal.r5.analyst.scenario.ondemand.AccessService;
 import com.conveyal.r5.analyst.scenario.ondemand.EgressService;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.r5.analyst.scenario.ondemand.AccessService.NO_SERVICE_HERE;
@@ -31,10 +33,7 @@ public class PickupWaitTimes {
     /**
      * This Map associates each on-demand pick-up zone with specific internal stop indexes in the TransitLayer.
      * On the access leg, someone picked up in the key zone can be dropped off at any of the transit stops that are
-     * values for that key. On the egress end, this is reversed. Because this map is used on both the access and egress
-     * ends, it should contain even polygons whose wait time data is negative (indicating they can't be used on access)
-     * because they may still be used for egress. TODO Clarify -- this implies stop zones should have delay = -1? But
-     * that's not congruent with egressWaitMinutes >= 0 in PickupDelay.
+     * values for that key. On the egress end, this is reversed.
      * If this and destinationAreasForZonePolygon are both null, then all the zones allow access to any stop in the
      * network.
      */
@@ -83,35 +82,40 @@ public class PickupWaitTimes {
     }
 
     /**
-     * Given a particular departure location, get a description of the on-demand pickup service available there.
-     * Currently this chooses just one "best" zone polygon based on location and priority values in the polygons.
+     * Given a particular departure location, get a description of the on-demand pickup services available there.
      * @return an AccessService with the wait time to be picked up, and any restrictions on reachable stops and
      * service areas
      */
     public AccessService getAccessService (double lat, double lon) {
         Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-        ModificationPolygon polygon = polygons.getWinningPolygon(point);
-        double waitTimeMinutes = polygon == null ? polygons.defaultData : polygon.data;
-        if (waitTimeMinutes == -1) {
+        List<ModificationPolygon> intersectingPolygons = polygons.getIntersectingPolygons(point);
+
+        TIntIntMap waitTimesForStops = new TIntIntHashMap();
+
+        if (intersectingPolygons.size() == 0 && polygons.defaultData == -1) {
             return NO_SERVICE_HERE;
         }
-        // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
-        // By default all stops can be reached (null means no restrictions applied).
-        int waitTimeSeconds = (int) (waitTimeMinutes * 60);
-        TIntSet stopsReachable = null;
-        // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
-        if (stopNumbersForZonePolygon != null) {
-            stopsReachable = stopNumbersForZonePolygon.get(polygon);
-            if (stopsReachable == null) {
-                // No stops were associated with the winning polygon (e.g. it is itself a stop polygon).
-                // stopsReachable should be empty, since null signals "no filtering" (all stops reachable).
-                stopsReachable = new TIntHashSet();
+
+        for (ModificationPolygon polygon : intersectingPolygons) {
+            double waitTimeMinutes = polygon.data;
+            if (waitTimeMinutes == -1) {
+                return NO_SERVICE_HERE;
+            }
+            // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
+            // By default all stops can be reached (null means no restrictions applied).
+            int waitTimeSeconds = (int) (waitTimeMinutes * 60);
+            // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
+            if (stopNumbersForZonePolygon != null) {
+                TIntSet stopsReachable = stopNumbersForZonePolygon.get(polygon);
+                if (stopsReachable != null) {
+                    stopsReachable.forEach(stop -> {
+                        waitTimesForStops.put(stop, waitTimeSeconds);
+                        return true;
+                    });
+                }
             }
         }
-
-        Geometry directAreasReachable = destinationAreasForZonePolygon.get(polygon);
-
-        return new AccessService(waitTimeSeconds, stopsReachable, directAreasReachable);
+        return new AccessService(waitTimesForStops);
     }
 
     /**

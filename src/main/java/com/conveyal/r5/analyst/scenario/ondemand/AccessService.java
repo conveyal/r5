@@ -1,5 +1,7 @@
 package com.conveyal.r5.analyst.scenario.ondemand;
 
+import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import org.locationtech.jts.geom.Geometry;
 
@@ -14,10 +16,22 @@ import org.locationtech.jts.geom.Geometry;
  */
 public class AccessService extends OnDemandService {
 
+    /**
+     * Map from stop indexes to wait times. See comment in parent class (OnDemandService) about using TIntIntMap
+     * instead of TIntSet stops. TODO pick one approach, rather than using separate implementation here.
+     */
+    public final TIntIntMap waitTimesForStops;
+
     public AccessService (int waitTimeSeconds, TIntSet stopsReachable, Geometry directServiceArea) {
         this.waitTimeSeconds = waitTimeSeconds;
         this.stops = stopsReachable;
         this.serviceArea = directServiceArea;
+        this.waitTimesForStops = new TIntIntHashMap();
+    }
+
+    // TODO consolidate constructors
+    public AccessService (TIntIntMap waitTimesForStops) {
+        this.waitTimesForStops = waitTimesForStops;
     }
 
     /** Special instance representing situations where a service is defined, but not available at this location. */

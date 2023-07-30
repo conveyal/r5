@@ -21,6 +21,7 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,17 +177,22 @@ public class TravelTimeComputer {
             if (request.hasTransit()) {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
-                // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
+                TIntIntMap adjustedTravelTimesToSeconds = new TIntIntHashMap();
                 if (accessService != NO_WAIT_ALL_STOPS) {
-                    LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
-                            accessService.waitTimeSeconds, accessMode);
-                    if (accessService.stops != null) {
-                        travelTimesToStopsSeconds.retainEntries((k, v) -> accessService.stops.contains(k));
-                    }
-                    travelTimesToStopsSeconds.transformValues(i -> i + accessService.waitTimeSeconds);
+                    LOG.info("Delaying access times to {} transit stops (to wait for {} pick-up).",
+                            accessService.waitTimesForStops.size(),
+                            accessMode);
+                    accessService.waitTimesForStops.forEachEntry((stop, wait) -> {
+                        if (travelTimesToStopsSeconds.containsKey(stop)) {
+                            adjustedTravelTimesToSeconds.put(stop, wait + travelTimesToStopsSeconds.get(stop));
+                        }
+                        return true;
+                    });
+                    bestAccessOptions.update(adjustedTravelTimesToSeconds, accessMode);
+                } else {
+                    bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
                 }
-               bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
             }
 
             // Calculate times to reach destinations directly by this street mode, without using transit.
@@ -222,12 +228,12 @@ public class TravelTimeComputer {
                 );
 
                 if (accessService != NO_WAIT_ALL_STOPS) {
-                    LOG.info("Delaying on-demand service by {} seconds (to wait for {} pick-up).",
-                            accessService.waitTimeSeconds, accessMode);
                     if (accessService.serviceArea != null) {
+                        LOG.info("Delaying on-demand service by {} seconds (to wait for {} pick-up).",
+                                accessService.waitTimeSeconds, accessMode);
                         pointSetTimes.incrementWithinAndClip(accessService.serviceArea, accessService.waitTimeSeconds);
                     }
-                    else if (accessService.stops != null) {
+                    else if (accessService.stops != null || !accessService.waitTimesForStops.isEmpty()) {
                         // Disallow direct travel to destination if pickupDelay zones are associated with stops.
                         pointSetTimes = PointSetTimes.allUnreached(destinations);
                     } else {

@@ -1227,7 +1227,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * including knowledge of whether an edge passes inside the query envelope at all.
      * FIXME Document whether we're putting all edges, or just forward edges into this index.
      *
-     * @param envelope FIXME IN WHAT UNITS, FIXED OR FLOATING?
+     * @param envelope in FIXED POINT degrees.
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);

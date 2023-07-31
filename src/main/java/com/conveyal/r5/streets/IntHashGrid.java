@@ -79,7 +79,7 @@ public class IntHashGrid implements Serializable {
     }
 
 
-    // TODO check that the number of bins to is sane.
+    // TODO check that the number of bins to visit is sane.
     public final void insert(Envelope envelope, final int item) {
         visit(envelope, true, (bin, mapKey) -> {
             /*
@@ -150,6 +150,7 @@ public class IntHashGrid implements Serializable {
     /**
      * The spatial index can and will return false positives, but should not produce false negatives.
      * We return the unfiltered results including false positives. That is, this overselects and MUST BE FILTERED.
+     * @param envelope in FIXED POINT degrees within which indexed items will definitely be returned
      * @return all indexed objects within the envelope, and then some.
      */
     public final TIntSet query(Envelope envelope) {
@@ -186,7 +187,7 @@ public class IntHashGrid implements Serializable {
     }
 
     /**
-     * @param envelope The envelope within which all bins should be visited.
+     * @param envelope The envelope within which all bins should be visited, in FIXED POINT degrees.
      * @param createIfEmpty Create a new bin if it does not exist.
      * @param binVisitor The callback to call for each visited bin.
      */

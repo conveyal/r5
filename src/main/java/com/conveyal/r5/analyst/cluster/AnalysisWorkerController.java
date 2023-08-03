@@ -1,10 +1,10 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.analysis.controllers.HttpController;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.util.ExceptionUtils;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +21,8 @@ import java.util.Map;
 
 import static com.conveyal.r5.analyst.cluster.AnalysisWorker.addJsonToGrid;
 import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GRID;
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.PNG;
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
@@ -51,8 +53,13 @@ public class AnalysisWorkerController implements HttpController {
             response.status(HttpStatus.OK_200);
             if (task.getFormat().equals(GEOTIFF)) {
                 response.header("Content-Type", "application/x-geotiff");
+            } else if (task.getFormat().equals(PNG)) {
+                response.header("Content-Type", "image/png");
             } else {
                 response.header("Content-Type", "application/octet-stream");
+            }
+            if (task.getFormat() != GRID) {
+                response.header("X-Conveyal-Bounding-Box", WebMercatorExtents.forTask(task).toWgsBboxHeaderString());
             }
             return binaryResult;
         } catch (WorkerNotReadyException workerNotReadyException) {

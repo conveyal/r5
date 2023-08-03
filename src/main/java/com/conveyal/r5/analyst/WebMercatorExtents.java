@@ -12,6 +12,8 @@ import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.Grid.latToPixel;
 import static com.conveyal.r5.analyst.Grid.lonToPixel;
+import static com.conveyal.r5.analyst.Grid.pixelToLat;
+import static com.conveyal.r5.analyst.Grid.pixelToLon;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -131,6 +133,22 @@ public class WebMercatorExtents {
         int width = (lonToPixel(wgsEnvelope.getMaxX(), zoom) - west) + 1; // minimum width is 1
         WebMercatorExtents webMercatorExtents = new WebMercatorExtents(west, north, width, height, zoom);
         return webMercatorExtents;
+    }
+
+    public Envelope toWgsEnvelope () {
+        double maxLat = pixelToLat(north, zoom);
+        double minLat = pixelToLat(north + height, zoom);
+        double minLon = pixelToLon(west, zoom);
+        double maxLon = pixelToLon(west + width, zoom);
+        return new Envelope(minLon, maxLon, minLat, maxLat);
+    }
+
+    /**
+     * @return a String containing minLon,minLat,maxLon,maxLat in WGS84 coordinates for use as an HTTP header
+     */
+    public String toWgsBboxHeaderString() {
+        Envelope env = this.toWgsEnvelope();
+        return String.format("%3.6f,%3.6f,%3.6f,%3.6f", env.getMinX(), env.getMinY(), env.getMaxX(), env.getMaxY());
     }
 
     @Override

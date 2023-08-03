@@ -16,12 +16,19 @@ import org.opengis.parameter.ParameterValueGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageTypeSpecifier;
+import javax.imageio.ImageWriter;
+import javax.imageio.metadata.IIOMetadata;
 import javax.media.jai.RasterFactory;
+import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations, this class will write
@@ -197,6 +204,31 @@ public class TimeGridWriter {
             throw new RuntimeException("Failed to write GeoTIFF file.", e);
         }
 
+    }
+
+    /**
+     * Write this grid out in PNG format. The first three percentiles will be stored in the RGB channels as minutes.
+     * We could include geographic bounds in text tags on the PNG. The percentage of reachability could potentially
+     * be encoded in the alpha channel of the PNG.
+     */
+    public void writePng (OutputStream out) {
+        BufferedImage bufferedImage = new BufferedImage(extents.width, extents.height, BufferedImage.TYPE_INT_RGB);
+        WritableRaster raster = bufferedImage.getRaster();
+        int[] rgb = new int[3];
+        for (int y = 0; y < extents.height; y++) {
+            for (int x = 0; x < extents.width; x++) {
+                for (int n = 0; n < 3; n++) {
+                    rgb[n] = travelTimeResult.values[n][y * extents.width + x];
+                }
+                raster.setPixel(x, y, rgb);
+            }
+        }
+        try {
+            ImageIO.write(bufferedImage, "PNG", out);
+            // Add bounding box as PNG text metadata?
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

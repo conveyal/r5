@@ -49,6 +49,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.GEOTIFF;
+import static com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask.Format.PNG;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.SECONDS_PER_MINUTE;
 import static com.google.common.base.Preconditions.checkElementIndex;
@@ -332,12 +333,14 @@ public class AnalysisWorker implements Component {
         // Handle gzipping with HTTP headers (caller should already be doing this)
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
-        // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
+        // The single-origin travel time surface can be represented as a Conveyal binary grid or other image formats.
         TimeGridWriter timeGridWriter = new TimeGridWriter(oneOriginResult.travelTimes, task);
         if (task.getFormat() == GEOTIFF) {
             timeGridWriter.writeGeotiff(byteArrayOutputStream);
+        } else if (task.getFormat() == PNG) {
+            timeGridWriter.writePng(byteArrayOutputStream);
         } else {
-            // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
+            // Catch-all, if the client didn't specifically ask for a GeoTIFF or PNG give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.
             // TODO eventually reuse same code path as static site time grid saving
             // TODO move the JSON writing code into the grid writer, it's essentially part of the grid format

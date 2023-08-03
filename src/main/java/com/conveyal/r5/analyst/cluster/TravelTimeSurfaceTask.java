@@ -27,7 +27,9 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
         /** Flat binary grid format */
         GRID,
         /** GeoTIFF file for download and use in GIS */
-        GEOTIFF
+        GEOTIFF,
+        /** PNG file with three percentiles of travel time encoded in RGB channels */
+        PNG
     }
 
     /** Default format is a Conveyal flat binary file */

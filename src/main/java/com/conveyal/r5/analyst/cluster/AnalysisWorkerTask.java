@@ -99,6 +99,9 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      */
     public boolean includePathResults = false;
 
+    /** Whether to record the n closest destination points to the origin. */
+    public boolean includeNearestN = false;
+
     /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
     public boolean recordTravelTimeHistograms = false;
 

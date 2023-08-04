@@ -46,6 +46,9 @@ public class TravelTimeReducer {
     /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
     private PathResult pathResult = null;
 
+    /** Retains the nearest N destinations from this origin. */
+    private NearestNResult nearestNResult = null;
+
     /** If we are calculating accessibility, the PointSets containing opportunities. */
     private PointSet[] destinationPointSets;
 
@@ -139,6 +142,9 @@ public class TravelTimeReducer {
         }
         if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
+        }
+        if (task.includeNearestN) {
+            nearestNResult = new NearestNResult(task);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -271,6 +277,9 @@ public class TravelTimeReducer {
                 }
             }
         }
+        if (nearestNResult != null) {
+            nearestNResult.record(target, travelTimePercentilesSeconds);
+        }
     }
 
     /**
@@ -329,7 +338,7 @@ public class TravelTimeReducer {
      * origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
+        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult, nearestNResult);
     }
 
     /**

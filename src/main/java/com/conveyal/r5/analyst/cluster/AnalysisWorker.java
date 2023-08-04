@@ -457,7 +457,7 @@ public class AnalysisWorker implements Component {
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
             // that have already been written to S3, and throwing exceptions on old backends that can't deal with
             // null AccessibilityResults.
-            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null, null);
         }
 
         // Accumulate accessibility results, which will be returned to the backend in batches.

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.NearestNResult.NearbyOpportunity;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.util.ArrayList;
@@ -38,6 +39,12 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues;
 
     /**
+     * The nearest n destinations for each percentile of travel time.
+     * Each item contains a travel time, target index, and ID.
+     */
+    public NearbyOpportunity[][] nearestN;
+
+    /**
      * If this field is non-null, the worker is reporting an error that compromises the quality of the result at this
      * origin point, and potentially for then entire regional analysis. Put into a Set on backend since all workers
      * will probably report the same problem, but we may want to tolerate errors on a small number of origin points to
@@ -59,6 +66,7 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
+        this.nearestN = result.nearest == null ? null : result.nearest.opportunities;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

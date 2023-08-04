@@ -1,6 +1,7 @@
 package com.conveyal.r5;
 
 import com.conveyal.r5.analyst.AccessibilityResult;
+import com.conveyal.r5.analyst.NearestNResult;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
@@ -20,10 +21,18 @@ public class OneOriginResult {
 
     public final PathResult paths;
 
-    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility, PathResult paths) {
+    public final NearestNResult nearest;
+
+    public OneOriginResult(
+            TravelTimeResult travelTimes,
+            AccessibilityResult accessibility,
+            PathResult paths,
+            NearestNResult nearest
+    ) {
         this.travelTimes = travelTimes;
         this.accessibility = accessibility;
         this.paths = paths;
+        this.nearest = nearest;
     }
 
 }

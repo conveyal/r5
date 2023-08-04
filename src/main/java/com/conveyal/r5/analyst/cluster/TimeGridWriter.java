@@ -19,8 +19,11 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageTypeSpecifier;
+import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.metadata.IIOMetadata;
+import javax.imageio.metadata.IIOMetadataFormatImpl;
+import javax.imageio.metadata.IIOMetadataNode;
 import javax.media.jai.RasterFactory;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
@@ -28,7 +31,6 @@ import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
 
 /**
  * Given a TravelTimeResult containing travel times from one origin to NxM gridded destinations, this class will write
@@ -208,12 +210,20 @@ public class TimeGridWriter {
 
     /**
      * Write this grid out in PNG format. The first three percentiles will be stored in the RGB channels as minutes.
-     * We could include geographic bounds in text tags on the PNG. The percentage of reachability could potentially
-     * be encoded in the alpha channel of the PNG.
+     * The geographic bounds are included as a text tag on the PNG. Other information like the proportion of iterations
+     * in which each destination is reachable could be encoded in the alpha channel of the PNG.
+     *
+     * ImageIO PNG writing is said to be slow, and external libraries exist that are several times faster. However,
+     * this speedup seems to be achieved via multi-threaded compression. On a worker machine where all cores are often
+     * occupied with multiple requests in parallel, it may not be very advantageous to spread the work of each request
+     * across multiple threads.
+     *
+     * The metadata writing process with ImageIO is so complex that the right approach is probably to use the tiny
+     * https://github.com/leonbloy/pngj/ which allows setting metadata and writing the file in only a couple of lines.
      */
     public void writePng (OutputStream out) {
-        BufferedImage bufferedImage = new BufferedImage(extents.width, extents.height, BufferedImage.TYPE_INT_RGB);
-        WritableRaster raster = bufferedImage.getRaster();
+        BufferedImage image = new BufferedImage(extents.width, extents.height, BufferedImage.TYPE_INT_RGB);
+        WritableRaster raster = image.getRaster();
         int[] rgb = new int[3];
         for (int y = 0; y < extents.height; y++) {
             for (int x = 0; x < extents.width; x++) {
@@ -223,9 +233,28 @@ public class TimeGridWriter {
                 raster.setPixel(x, y, rgb);
             }
         }
+        // Add a single PNG text chunk containing the WGS84 bounding box. See: https://www.w3.org/TR/png/#11textinfo
+        // IIOImage is "a container class to aggregate an image, a set of thumbnail images, and... metadata associated
+        // with the image". The ImageIO methods for manipulating metadata seem quite convoluted and use the XML DOM API.
+        // Hopefully decoding and using this metadata will be less complex on the receiving end.
+        // Below is based on ImageIO.write(), https://coderanch.com/t/750185/java/Writing-PNG-images-output-file and
+        // https://stackoverflow.com/a/8735707/778449
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("PNG").next();
+        ImageWriteParam writeParam = writer.getDefaultWriteParam();
+        ImageTypeSpecifier typeSpecifier = ImageTypeSpecifier.createFromBufferedImageType(image.getType());
+        IIOMetadata metadata = writer.getDefaultImageMetadata(typeSpecifier, writeParam);
+        IIOMetadataNode textEntry = new IIOMetadataNode("TextEntry");
+        textEntry.setAttribute("keyword", "bbox");
+        textEntry.setAttribute("value", extents.toWgsBboxHeaderString());
+        IIOMetadataNode text = new IIOMetadataNode("Text");
+        text.appendChild(textEntry);
+        IIOMetadataNode root = new IIOMetadataNode(IIOMetadataFormatImpl.standardMetadataFormatName);
+        root.appendChild(text);
         try {
-            ImageIO.write(bufferedImage, "PNG", out);
-            // Add bounding box as PNG text metadata?
+            metadata.mergeTree(IIOMetadataFormatImpl.standardMetadataFormatName, root);
+            IIOImage iioImage = new IIOImage(image, null, metadata);
+            writer.setOutput(ImageIO.createImageOutputStream(out));
+            writer.write(iioImage);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

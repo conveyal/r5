@@ -7,12 +7,14 @@ import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
+import com.conveyal.r5.analyst.NearestNResult.NearbyOpportunity;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
@@ -344,10 +346,10 @@ public class AnalysisWorker implements Component {
             timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addJsonToGrid(
                     byteArrayOutputStream,
-                    oneOriginResult.accessibility,
+                    oneOriginResult,
                     transportNetwork.scenarioApplicationWarnings,
                     transportNetwork.scenarioApplicationInfo,
-                    oneOriginResult.paths != null ? new PathResultSummary(oneOriginResult.paths, transportNetwork.transitLayer) : null
+                    transportNetwork.transitLayer
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -489,6 +491,10 @@ public class AnalysisWorker implements Component {
 
         public PathResultSummary pathSummaries;
 
+        public NearbyOpportunity[][] nearby;
+
+        public double[][][] opportunitiesPerMinute;
+
         @Override
         public String toString () {
             return String.format(
@@ -508,24 +514,34 @@ public class AnalysisWorker implements Component {
      * and no serious errors, we use a success error code.
      * TODO distinguish between warnings and errors - we already distinguish between info and warnings.
      * This could be turned into a GridJsonBlock constructor, with the JSON writing code in an instance method.
+     * Note that this is very similar to the RegionalWorkResult constructor, and some duplication of logic could be
+     * achieved by somehow merging the two.
      */
     public static void addJsonToGrid (
             OutputStream outputStream,
-            AccessibilityResult accessibilityResult,
+            OneOriginResult oneOriginResult,
             List<TaskError> scenarioApplicationWarnings,
             List<TaskError> scenarioApplicationInfo,
-            PathResultSummary pathResult
+            TransitLayer transitLayer // Only used if oneOriginResult contains paths, can be null otherwise
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
         jsonBlock.scenarioApplicationWarnings = scenarioApplicationWarnings;
-        if (accessibilityResult != null) {
-            // Due to the application of distance decay functions, we may want to make the shift to non-integer
-            // accessibility values (especially for cases where there are relatively few opportunities across the whole
-            // study area). But we'd need to control the number of decimal places serialized into the JSON.
-            jsonBlock.accessibility = accessibilityResult.getIntValues();
+        if (oneOriginResult != null) {
+            if (oneOriginResult.accessibility != null) {
+                // Due to the application of distance decay functions, we may want to make the shift to non-integer
+                // accessibility values (especially for cases where there are relatively few opportunities across the whole
+                // study area). But we'd need to control the number of decimal places serialized into the JSON.
+                jsonBlock.accessibility = oneOriginResult.accessibility.getIntValues();
+            }
+            if (oneOriginResult.paths != null) {
+                jsonBlock.pathSummaries = new PathResultSummary(oneOriginResult.paths, transitLayer);
+            }
+            if (oneOriginResult.nearest != null) {
+                jsonBlock.nearby = oneOriginResult.nearest.nearby;
+                jsonBlock.opportunitiesPerMinute = oneOriginResult.nearest.opportunitiesPerMinute;
+            }
         }
-        jsonBlock.pathSummaries = pathResult;
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.

@@ -124,6 +124,8 @@ public class TravelTimeReducer {
         this.destinationPointSets = task.destinationPointSets;
         if (task instanceof TravelTimeSurfaceTask) {
             calculateTravelTimes = true;
+            // In single-point analyses, destination pointsets may be missing if the user has not selected one in the
+            // UI, or if the user has selected the step decay function instead of one of the other decay functions.
             calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
         } else {
             // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
@@ -136,15 +138,14 @@ public class TravelTimeReducer {
         // These are conditionally instantiated because they can consume a lot of memory.
         if (calculateAccessibility) {
             accessibilityResult = new AccessibilityResult(task);
+            // TODO create this more selectively, choose histograms and nearest n independently
+            nearestNResult = new NearestNResult(task);
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
         }
         if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
-        }
-        if (task.includeNearestN) {
-            nearestNResult = new NearestNResult(task);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication

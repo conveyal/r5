@@ -42,7 +42,13 @@ public class RegionalWorkResult {
      * The nearest n destinations for each percentile of travel time.
      * Each item contains a travel time, target index, and ID.
      */
-    public NearbyOpportunity[][] nearestN;
+    public NearbyOpportunity[][] nearby;
+
+    /**
+     * The nearest n destinations for each percentile of travel time.
+     * Each item contains a travel time, target index, and ID.
+     */
+    public double[][][] opportunitiesPerMinute;
 
     /**
      * If this field is non-null, the worker is reporting an error that compromises the quality of the result at this
@@ -66,7 +72,8 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
-        this.nearestN = result.nearest == null ? null : result.nearest.opportunities;
+        this.nearby = result.nearest == null ? null : result.nearest.nearby;
+        this.opportunitiesPerMinute = result.nearest == null ? null : result.nearest.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

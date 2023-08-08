@@ -45,8 +45,7 @@ public class RegionalWorkResult {
     public NearbyOpportunity[][] nearby;
 
     /**
-     * The nearest n destinations for each percentile of travel time.
-     * Each item contains a travel time, target index, and ID.
+     * The temporal density of opportunities - how many are reached during each minute of travel.
      */
     public double[][][] opportunitiesPerMinute;
 

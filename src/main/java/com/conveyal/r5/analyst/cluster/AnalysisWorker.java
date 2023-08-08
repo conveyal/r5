@@ -540,7 +540,6 @@ public class AnalysisWorker implements Component {
             if (oneOriginResult.nearest != null) {
                 jsonBlock.nearby = oneOriginResult.nearest.nearby;
                 jsonBlock.opportunitiesPerMinute = oneOriginResult.nearest.opportunitiesPerMinute;
-                LOG.info("Dual accessibility: {}", oneOriginResult.nearest.minutesToReachOpporunities(272_500));
                 LOG.info("Opportunities per minute: {}", oneOriginResult.nearest.opportunitiesPerMinute);
                 LOG.info("Opportunities nearby: {}", oneOriginResult.nearest.nearby);
             }

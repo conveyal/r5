@@ -138,14 +138,15 @@ public class TravelTimeReducer {
         // These are conditionally instantiated because they can consume a lot of memory.
         if (calculateAccessibility) {
             accessibilityResult = new AccessibilityResult(task);
-            // TODO create this more selectively, choose histograms and nearest n independently
-            nearestNResult = new NearestNResult(task);
         }
         if (calculateTravelTimes) {
             travelTimeResult = new TravelTimeResult(task);
         }
         if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
+        }
+        if (task.opportunityTemporalDensity) {
+            nearestNResult = new NearestNResult(task);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -279,7 +280,7 @@ public class TravelTimeReducer {
             }
         }
         if (nearestNResult != null) {
-            nearestNResult.record(target, travelTimePercentilesSeconds);
+            nearestNResult.recordOneTarget(target, travelTimePercentilesSeconds);
         }
     }
 

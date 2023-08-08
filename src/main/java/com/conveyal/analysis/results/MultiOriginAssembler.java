@@ -123,6 +123,10 @@ public class MultiOriginAssembler {
                 resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
             }
 
+            if (job.templateTask.opportunityTemporalDensity) {
+                resultWriters.add(new OpportunityCsvResultWriter(job.templateTask, fileStorage));
+            }
+
             checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),
                 "A non-Taui regional analysis should always create at least one grid or CSV file.");
 

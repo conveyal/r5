@@ -99,6 +99,15 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      */
     public boolean includePathResults = false;
 
+    /**
+     * Whether to include the number of opportunities reached during each minute of travel in results sent back
+     * to the broker. Requires both an origin and destination pointset to be specified, and in the case of regional
+     * analyses the origins must be non-gridded. (Should be possible to make a grid as well.)
+     */
+    public boolean opportunityTemporalDensity = false;
+
+    public int dualAccessibilityOpportunityThreshold = 0;
+
     /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
     public boolean recordTravelTimeHistograms = false;
 

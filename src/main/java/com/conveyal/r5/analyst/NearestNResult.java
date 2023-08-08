@@ -3,8 +3,8 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.google.common.base.Preconditions;
 
-import static com.conveyal.r5.common.Util.newObjectArray;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
  * An instance of this is included in a OneOriginResult for reporting the nearest N destinations. If we use more than
@@ -15,6 +15,9 @@ import static com.conveyal.r5.common.Util.notNullOrEmpty;
  * function, how many opportunities are encountered during each minute of travel, whose integral is the cumulative
  * accessibility curve); and the nearest one or more opportunities to a given origin.
  * (expand from comments on https://github.com/conveyal/r5/pull/884)
+ *
+ * Corresponds to OpportunityCsvResultWriter when collating regional results, and
+ * AnalysisWorkerTask#opportunityTemporalDensity to enable, so maybe the names should be made more coherent.
  */
 public class NearestNResult {
 
@@ -66,14 +69,17 @@ public class NearestNResult {
 
     private int listLength = 0; // increment as lists grow in length; use as initial insert position
 
-    public void record (int target, int[] travelTimePercentilesSeconds) {
+    public void recordOneTarget (int target, int[] travelTimePercentilesSeconds) {
         // Increment histogram bin for the number of minutes of travel by the number of opportunities at the target.
         for (int d = 0; d < destinationPointSets.length; d++) {
             PointSet dps = destinationPointSets[d];
             for (int p = 0; p < nPercentiles; p++) {
-                int i = travelTimePercentilesSeconds[p] / 60;
-                if (i <= 120) {
-                    opportunitiesPerMinute[d][p][i] += dps.getOpportunityCount(target);
+                if (travelTimePercentilesSeconds[p] == UNREACHED) {
+                    break; // If any percentile is unreached, all higher ones are also unreached.
+                }
+                int m = travelTimePercentilesSeconds[p] / 60;
+                if (m <= 120) {
+                    opportunitiesPerMinute[d][p][m] += dps.getOpportunityCount(target);
                 }
             }
         }
@@ -113,7 +119,7 @@ public class NearestNResult {
      * @param n the threshold quantity of opportunities
      * @return the number of minutes it takes to reach n opportunities, for each destination set and percentile of travel time.
      */
-    public int[][] minutesToReachOpporunities (int n) {
+    public int[][] minutesToReachOpportunities(int n) {
         int[][] result = new int[destinationPointSets.length][nPercentiles];
         for (int d = 0; d < destinationPointSets.length; d++) {
             for (int p = 0; p < nPercentiles; p++) {

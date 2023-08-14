@@ -115,7 +115,12 @@ public class PickupWaitTimes {
                 }
             }
         }
-        return new AccessService(waitTimesForStops);
+
+        if (waitTimesForStops.isEmpty()) {
+            return NO_SERVICE_HERE;
+        } else {
+            return new AccessService(waitTimesForStops);
+        }
     }
 
     /**

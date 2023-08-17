@@ -534,9 +534,9 @@ public class AnalysisWorker implements Component {
             if (oneOriginResult.paths != null) {
                 jsonBlock.pathSummaries = new PathResultSummary(oneOriginResult.paths, transitLayer);
             }
-            if (oneOriginResult.nearest != null) {
-                jsonBlock.opportunitiesPerMinute = oneOriginResult.nearest.opportunitiesPerMinute;
-                LOG.info("Opportunities per minute: {}", oneOriginResult.nearest.opportunitiesPerMinute);
+            if (oneOriginResult.density != null) {
+                jsonBlock.opportunitiesPerMinute = oneOriginResult.density.opportunitiesPerMinute;
+                LOG.info("Opportunities per minute: {}", oneOriginResult.density.opportunitiesPerMinute);
             }
         }
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);

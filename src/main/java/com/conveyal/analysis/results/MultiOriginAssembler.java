@@ -123,8 +123,8 @@ public class MultiOriginAssembler {
                 resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
             }
 
-            if (job.templateTask.opportunityTemporalDensity) {
-                resultWriters.add(new OpportunityCsvResultWriter(job.templateTask, fileStorage));
+            if (job.templateTask.includeTemporalDensity) {
+                resultWriters.add(new TemporalDensityCsvResultWriter(job.templateTask, fileStorage));
             }
 
             checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),

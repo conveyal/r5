@@ -65,7 +65,7 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
-        this.opportunitiesPerMinute = result.nearest == null ? null : result.nearest.opportunitiesPerMinute;
+        this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

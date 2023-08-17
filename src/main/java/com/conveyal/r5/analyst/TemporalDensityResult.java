@@ -20,11 +20,8 @@ import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
  * This is more efficient in cases where N is small, and allows retaining the one-second resolution. However currently
  * there does not seem to be much demand among users for this level of detail, so it has been removed in the interest
  * of simplicity and maintainability.
- *
- * Corresponds to OpportunityCsvResultWriter when collating regional results, and
- * AnalysisWorkerTask#opportunityTemporalDensity to enable, so maybe the names should be made more coherent.
  */
-public class NearestNResult {
+public class TemporalDensityResult {
 
     // Internal state fields
 
@@ -40,7 +37,7 @@ public class NearestNResult {
      */
     public final double[][][] opportunitiesPerMinute;
 
-    public NearestNResult (AnalysisWorkerTask task) {
+    public TemporalDensityResult(AnalysisWorkerTask task) {
         Preconditions.checkArgument(
             notNullOrEmpty(task.destinationPointSets),
             "Dual accessibility requires at least one destination pointset."

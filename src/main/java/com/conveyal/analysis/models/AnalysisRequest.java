@@ -276,8 +276,8 @@ public class AnalysisRequest {
             }
         }
 
-        task.opportunityTemporalDensity = opportunityTemporalDensity;
-        task.dualAccessibilityOpportunityThreshold = dualAccessibilityOpportunityThreshold;
+        task.includeTemporalDensity = opportunityTemporalDensity;
+        task.dualAccessibilityThreshold = dualAccessibilityOpportunityThreshold;
     }
 
     private EnumSet<LegMode> getEnumSetFromString (String s) {

@@ -6,22 +6,20 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
  * This handles collating regional results into CSV files containing temporal opportunity density
  * (number of opportunities reached in each one-minute interval, the derivative of step-function accessibility)
  * as well as "dual" accessibility (the amount of time needed to reach n opportunities).
- * And maybe the N closest opportunities to each origin?
  */
-public class OpportunityCsvResultWriter extends CsvResultWriter {
+public class TemporalDensityCsvResultWriter extends CsvResultWriter {
 
-    private final int dualOpportunityCount;
+    private final int dualThreshold;
 
-    public OpportunityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
+    public TemporalDensityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
         super(task, fileStorage);
-        dualOpportunityCount = task.dualAccessibilityOpportunityThreshold;
+        dualThreshold = task.dualAccessibilityThreshold;
     }
 
     @Override
@@ -41,13 +39,16 @@ public class OpportunityCsvResultWriter extends CsvResultWriter {
             headers.add(Integer.toString(m));
         }
         // The number of minutes needed to reach d destination opportunities
-        headers.add("D" + dualOpportunityCount);
+        headers.add("D" + dualThreshold);
         return headers.toArray(new String[0]);
     }
 
     @Override
     protected void checkDimension (RegionalWorkResult workResult) {
-        checkDimension(workResult, "destination pointsets", workResult.opportunitiesPerMinute.length, task.destinationPointSetKeys.length);
+        checkDimension(
+            workResult, "destination pointsets",
+            workResult.opportunitiesPerMinute.length, task.destinationPointSetKeys.length
+        );
         for (double[][] percentilesForPointset : workResult.opportunitiesPerMinute) {
             checkDimension(workResult, "percentiles", percentilesForPointset.length, task.percentiles.length);
             for (double[] minutesForPercentile : percentilesForPointset) {
@@ -74,7 +75,7 @@ public class OpportunityCsvResultWriter extends CsvResultWriter {
                 {
                     int m = 0;
                     double sum = 0;
-                    while (sum < dualOpportunityCount) {
+                    while (sum < dualThreshold) {
                         sum += densitiesPerMinute[m];
                         m += 1;
                     }

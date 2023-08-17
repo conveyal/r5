@@ -97,7 +97,7 @@ task runBackend (type: JavaExec) {
 task testRunnable(type: JavaExec) {
     dependsOn(build)
     classpath(sourceSets.main.runtimeClasspath)
-    mainClass = 'com.conveyal.analysis.BackendMain"'
+    mainClass = 'com.conveyal.analysis.BackendMain'
     jvmArgs("-Dconveyal.immediate.shutdown=true")
 }
 
@@ -118,6 +118,12 @@ task createVersionProperties(dependsOn: processResources) {
         // Also make a simple one-line version.txt for scripts to use
         new File(dir, "version.txt").text = "$version"
     }
+}
+
+// Fix inconsistent Gradle behavior (see https://github.com/gradle/gradle/issues/16791)
+// By default JavaExec tasks use the JVM Gradle was launched with, ignoring the project-level toolchain.
+tasks.withType(JavaExec).configureEach {
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
 }
 
 classes {

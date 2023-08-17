@@ -108,6 +108,10 @@ public class GridSinglePointTaskBuilder {
         return this;
     }
 
+    /**
+     * Even if you're not actually using the opportunity count, you should call this to set the grid extents on the
+     * resulting task. Otherwise it will fail checks on the grid dimensions and zoom level.
+     */
     public GridSinglePointTaskBuilder uniformOpportunityDensity (double density) {
         Grid grid = gridLayout.makeUniformOpportunityDataset(density);
         task.destinationPointSets = new PointSet[] { grid };

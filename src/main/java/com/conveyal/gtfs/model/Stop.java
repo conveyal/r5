@@ -1,10 +1,12 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.DuplicateKeyError;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.Iterator;
+import java.util.Map;
 
 public class Stop extends Entity {
 
@@ -61,11 +63,12 @@ public class Stop extends Entity {
             s.stop_timezone  = getStringField("stop_timezone", false);
             s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
             s.feed_id = feed.feedId;
-            /* TODO check ref integrity later, this table self-references via parent_station */
-            feed.stops.put(s.stop_id, s);
+            // Referential integrity is checked later after fully loaded. Stops self-reference via parent_station. 
+            insertCheckingDuplicateKey(feed.stops, s, "stop_id");
         }
 
     }
+
 
     public static class Writer extends Entity.Writer<Stop> {
         public Writer (GTFSFeed feed) {

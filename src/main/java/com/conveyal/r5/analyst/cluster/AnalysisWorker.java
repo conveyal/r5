@@ -7,7 +7,6 @@ import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
-import com.conveyal.r5.analyst.NearestNResult.NearbyOpportunity;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.PointSetCache;
@@ -491,8 +490,6 @@ public class AnalysisWorker implements Component {
 
         public PathResultSummary pathSummaries;
 
-        public NearbyOpportunity[][] nearby;
-
         public double[][][] opportunitiesPerMinute;
 
         @Override
@@ -538,10 +535,8 @@ public class AnalysisWorker implements Component {
                 jsonBlock.pathSummaries = new PathResultSummary(oneOriginResult.paths, transitLayer);
             }
             if (oneOriginResult.nearest != null) {
-                jsonBlock.nearby = oneOriginResult.nearest.nearby;
                 jsonBlock.opportunitiesPerMinute = oneOriginResult.nearest.opportunitiesPerMinute;
                 LOG.info("Opportunities per minute: {}", oneOriginResult.nearest.opportunitiesPerMinute);
-                LOG.info("Opportunities nearby: {}", oneOriginResult.nearest.nearby);
             }
         }
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);

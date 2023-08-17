@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.NearestNResult.NearbyOpportunity;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.util.ArrayList;
@@ -39,13 +38,8 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues;
 
     /**
-     * The nearest n destinations for each percentile of travel time.
-     * Each item contains a travel time, target index, and ID.
-     */
-    public NearbyOpportunity[][] nearby;
-
-    /**
      * The temporal density of opportunities - how many are reached during each minute of travel.
+     * Quantities of opportunities for each [destinationGrid, percentile, minute].
      */
     public double[][][] opportunitiesPerMinute;
 
@@ -71,7 +65,6 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
-        this.nearby = result.nearest == null ? null : result.nearest.nearby;
         this.opportunitiesPerMinute = result.nearest == null ? null : result.nearest.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }

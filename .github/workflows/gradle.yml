@@ -32,11 +32,11 @@ jobs:
       with:
         fetch-depth: 0
     # Java setup step completes very fast, no need to run in a preconfigured docker container.
-    - name: Set up JDK 19
+    - name: Set up JDK 20
       uses: actions/setup-java@v3
       with:
         distribution: temurin
-        java-version: 19
+        java-version: 20
         cache: gradle
     - name: Show version string
       run: gradle -q printVersion | head -n1

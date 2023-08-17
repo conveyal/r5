@@ -88,7 +88,7 @@ task runBackend (type: JavaExec) {
     dependsOn(build)
     maxHeapSize('7G')
     classpath(sourceSets.main.runtimeClasspath)
-    mainClass("com.conveyal.analysis.BackendMain")
+    mainClass = 'com.conveyal.analysis.BackendMain'
 }
 
 // Start up an analysis local backend and ask it to shut down immediately.
@@ -97,7 +97,7 @@ task runBackend (type: JavaExec) {
 task testRunnable(type: JavaExec) {
     dependsOn(build)
     classpath(sourceSets.main.runtimeClasspath)
-    mainClass("com.conveyal.analysis.BackendMain")
+    mainClass = 'com.conveyal.analysis.BackendMain"'
     jvmArgs("-Dconveyal.immediate.shutdown=true")
 }
 

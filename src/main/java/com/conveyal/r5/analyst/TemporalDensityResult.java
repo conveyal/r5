@@ -27,6 +27,7 @@ public class TemporalDensityResult {
 
     private final PointSet[] destinationPointSets;
     private final int nPercentiles;
+    private final int opportunityThreshold;
 
     // Externally visible fields for accumulating results
 
@@ -44,6 +45,7 @@ public class TemporalDensityResult {
         );
         this.destinationPointSets = task.destinationPointSets;
         this.nPercentiles = task.percentiles.length;
+        this.opportunityThreshold = task.dualAccessibilityThreshold;
         this.opportunitiesPerMinute = new double[destinationPointSets.length][nPercentiles][120];
     }
 
@@ -66,7 +68,8 @@ public class TemporalDensityResult {
     /**
      * Calculate "dual" accessibility from the accumulated temporal opportunity density array.
      * @param n the threshold quantity of opportunities
-     * @return the number of minutes it takes to reach n opportunities, for each destination set and percentile of travel time.
+     * @return the minimum whole number of minutes necessary to reach n opportunities,
+     *         for each destination set and percentile of travel time.
      */
     public int[][] minutesToReachOpportunities(int n) {
         int[][] result = new int[destinationPointSets.length][nPercentiles];
@@ -84,6 +87,10 @@ public class TemporalDensityResult {
             }
         }
         return result;
+    }
+
+    public int[][] minutesToReachOpportunities() {
+        return minutesToReachOpportunities(opportunityThreshold);
     }
 
 }

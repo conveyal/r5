@@ -536,7 +536,6 @@ public class AnalysisWorker implements Component {
             }
             if (oneOriginResult.density != null) {
                 jsonBlock.opportunitiesPerMinute = oneOriginResult.density.opportunitiesPerMinute;
-                LOG.info("Opportunities per minute: {}", oneOriginResult.density.opportunitiesPerMinute);
             }
         }
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);

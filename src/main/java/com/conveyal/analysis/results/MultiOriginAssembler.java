@@ -109,8 +109,10 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
+                    // Freeform origins - create CSV regional analysis results
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
+                    // Gridded origins - create gridded regional analysis results
                     resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
                 }
             }

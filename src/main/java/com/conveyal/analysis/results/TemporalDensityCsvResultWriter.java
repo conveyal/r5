@@ -24,7 +24,7 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
 
     @Override
     public CsvResultType resultType () {
-        return CsvResultType.OPPORTUNITIES;
+        return CsvResultType.TDENSITY;
     }
 
     @Override
@@ -59,33 +59,32 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
 
     @Override
     public Iterable<String[]> rowValues (RegionalWorkResult workResult) {
-        List<String> row = new ArrayList<>(125);
+        List<String[]> rows = new ArrayList<>();
         String originId = task.originPointSet.getId(workResult.taskId);
         for (int d = 0; d < task.destinationPointSetKeys.length; d++) {
-            int[][] percentilesForDestPointset = workResult.accessibilityValues[d];
+            double[][] percentilesForDestPointset = workResult.opportunitiesPerMinute[d];
             for (int p = 0; p < task.percentiles.length; p++) {
+                List<String> row = new ArrayList<>(125);
                 row.add(originId);
-                row.add(task.destinationPointSets[d].name);
+                row.add(task.destinationPointSetKeys[d]);
                 row.add(Integer.toString(p));
-                int[] densitiesPerMinute = percentilesForDestPointset[p];
+                // One density value for each of 120 minutes
+                double[] densitiesPerMinute = percentilesForDestPointset[p];
                 for (int m = 0; m < 120; m++) {
                     row.add(Double.toString(densitiesPerMinute[m]));
                 }
-                // Dual accessibility
-                {
-                    int m = 0;
-                    double sum = 0;
-                    while (sum < dualThreshold) {
-                        sum += densitiesPerMinute[m];
-                        m += 1;
-                    }
-                    row.add(Integer.toString(m >= 120 ? -1 : m));
+                // One dual accessibility value
+                int m = 0;
+                double sum = 0;
+                while (sum < dualThreshold && m < 120) {
+                    sum += densitiesPerMinute[m];
+                    m += 1;
                 }
+                row.add(Integer.toString(m >= 120 ? -1 : m));
+                rows.add(row.toArray(new String[row.size()]));
             }
         }
-        // List.of() or Arrays.asList() don't work without explicitly specifying the generic type because
-        // they interpret the String[] as varargs in the method signature.
-        return List.<String[]>of(row.toArray(new String[0]));
+        return rows;
     }
 
 }

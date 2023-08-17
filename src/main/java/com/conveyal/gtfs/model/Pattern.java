@@ -24,9 +24,15 @@ public class Pattern implements Serializable {
     // TODO: add set of shapes
 //    public Set<String> associatedShapes;
 
-    // This is the only place in the library we are still using the old JTS package name. These objects are
-    // serialized into MapDB files. We want to read and write MapDB files that old workers can understand.
+    // This is the only place we are still using the old JTS package name.
+    // Hopefully we can get rid of this - it's the only thing still using JTS objects under the obsolete vividsolutions
+    // package name so is pulling in extra dependencies and requiring conversions (toLegacyLineString).
+    // Unfortunately these objects are serialized into MapDB files, and we want to read and write MapDB files that
+    // old workers can understand. This cannot be migrated to newer JTS package names without deprecating all older
+    // workers, then deleting all MapDB representations of GTFS data from S3 and the local cache directory, forcing
+    // them to all be rebuilt the next time they're used.
     public com.vividsolutions.jts.geom.LineString geometry;
+
     public String name;
     public String route_id;
     public static Joiner joiner = Joiner.on("-").skipNulls();

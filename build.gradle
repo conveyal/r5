@@ -125,10 +125,8 @@ repositories {
     // Put Open Source Geospatial before Maven Central to get JAI core, see https://stackoverflow.com/a/26993223
     maven { url 'https://repo.osgeo.org/repository/release/' }
     mavenCentral()
-    // TODO review whether we really need the repositories below
+    // Polyline encoder 0.2 is now in Maven repo
     maven { url 'https://maven.conveyal.com' }
-    // For the polyline encoder
-    maven { url 'https://nexus.axiomalaska.com/nexus/content/repositories/public-releases' }
 }
 
 // Exclude all JUnit 4 transitive dependencies - IntelliJ bug causes it to think we're using Junit 4 instead of 5.

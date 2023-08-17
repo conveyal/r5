@@ -58,6 +58,10 @@ public class UserActivityController implements HttpController {
         UserPermissions userPermissions = UserPermissions.from(req);
         String id = req.params("id");
         Task task = taskScheduler.getTaskForUser(userPermissions.email, id);
+        // Check if task still exists before attempting to remove.
+        if (task == null) {
+            throw  AnalysisServerException.notFound("Task does not exist. It may have already been removed by another user.");
+        }
         // Disallow removing active tasks via the API.
         if (task.state.equals(Task.State.ACTIVE)) {
             throw AnalysisServerException.badRequest("Cannot clear an active task.");

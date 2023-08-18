@@ -146,10 +146,10 @@ configurations.all {
 
 dependencies {
     // Provides our logging API
-    implementation 'org.slf4j:slf4j-api:2.0.6'
+    implementation 'org.slf4j:slf4j-api:2.0.7'
 
     // Implementation of the logging API
-    implementation 'ch.qos.logback:logback-classic:1.4.5'
+    implementation 'ch.qos.logback:logback-classic:1.4.11'
 
     // Spark is an HTTP framework built on Jetty. Its name is the same as several other projects.
     implementation (group: 'com.sparkjava', name: 'spark-core', version: '2.7.2') {
@@ -224,12 +224,12 @@ dependencies {
     // Provides some Kryo serializers for Guava and Trove collecitons.
     // Also provides classes for testing that a round trip through serialization reproduces the same network.
     // This is an external dependency (not merged into backend) because it's also used by OTP2.
-    implementation 'com.conveyal:kryo-tools:1.5.0'
+    implementation 'com.conveyal:kryo-tools:1.6.0'
 
     // Ensure the versions of the next three dependencies match the transitive dependencies of kryo-tools.
-    implementation 'com.esotericsoftware:kryo:5.4.0'
+    implementation 'com.esotericsoftware:kryo:5.5.0'
     // Guava provides a lot of functionality, collections, and tools "missing" from the Java standard library.
-    implementation 'com.google.guava:guava:31.1-jre'
+    implementation 'com.google.guava:guava:32.1.2-jre'
     // Trove supplies very efficient collections of primitive data types for Java.
     implementation 'net.sf.trove4j:trove4j:3.0.3'
 

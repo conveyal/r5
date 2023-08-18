@@ -4,7 +4,6 @@ import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.rastercost.ElevationLoader;
 import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -24,8 +23,6 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
  */
 public class ShapefileLts extends Modification {
 
-    public String ltsDataSource;
-
     /**
      * ID of the linear shapefile DataSource containing bicycle LTS to be matched to streets.
      * We must assume its type because the workers don't have access to the DataStore metadata.
@@ -34,6 +31,8 @@ public class ShapefileLts extends Modification {
 
     /** The name of the numeric attribute within the ltsDataSource containing LTS values from 1-4. */
     public String ltsAttribute = "lts";
+
+    public double matchLimitMeters = 3.0;
 
     private FileStorageKey fileStorageKey;
 
@@ -61,7 +60,7 @@ public class ShapefileLts extends Modification {
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
         ShapefileMatcher shapefileMatcher = new ShapefileMatcher(network.streetLayer);
         try {
-            shapefileMatcher.match(localFile.getAbsolutePath(), ltsAttribute);
+            shapefileMatcher.match(localFile.getAbsolutePath(), ltsAttribute, matchLimitMeters);
         } catch (Exception e) {
             addError(ExceptionUtils.shortAndLongString(e));
         }

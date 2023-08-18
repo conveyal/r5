@@ -41,7 +41,7 @@ public class FeedInfo extends Entity implements Cloneable {
         @Override
         public void loadOneRow() throws IOException {
             FeedInfo fi = new FeedInfo();
-            fi.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            fi.sourceFileLine = row;
             fi.feed_id = getStringField("feed_id", false);
             fi.feed_publisher_name = getStringField("feed_publisher_name", true);
             fi.feed_publisher_url = getUrlField("feed_publisher_url", true);

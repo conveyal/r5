@@ -19,7 +19,8 @@ public class SuspectStopLocationError extends GTFSError implements Serializable 
 
     @Override public String getMessage() {
         return String.format(
-            "Stop with ID %s is located in a 1/4 degree cell with less than 5 inhabitants per square km.",
+            "Stop with ID %s is in a sparsely populated area (fewer than 5 inhabitants per square km in any " +
+                    "neighboring 1/4 degree cell)",
             affectedEntityId
         );
     }

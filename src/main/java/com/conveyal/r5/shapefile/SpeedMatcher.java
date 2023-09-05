@@ -6,6 +6,7 @@ import org.opengis.feature.simple.SimpleFeature;
 
 public class SpeedMatcher extends ShapefileMatcher {
 
+    static double KPH_PER_MPH = 1.609344;
     public SpeedMatcher (StreetLayer streets) {
         super(streets);
     }
@@ -16,7 +17,7 @@ public class SpeedMatcher extends ShapefileMatcher {
     @Override
     void setEdgePair (SimpleFeature feature, int attributeIndex, EdgeStore.Edge edge) {
         if (feature.getAttribute(attributeIndex) != null) {
-            double speedKph = ((Number) feature.getAttribute(attributeIndex)).doubleValue();
+            double speedKph = KPH_PER_MPH * ((Number) feature.getAttribute(attributeIndex)).doubleValue();
             edge.setSpeedKph(speedKph);
             edge.advance();
             edge.setSpeedKph(speedKph);

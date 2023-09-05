@@ -67,14 +67,11 @@ public class BundleController implements HttpController {
 
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
-    // FIXME The backend appears to use an osmcache purely to get a file key at which to store incoming OSM. Refactor.
-    private final OSMCache osmCache;
     private final TaskScheduler taskScheduler;
 
     public BundleController (BackendComponents components) {
         this.fileStorage = components.fileStorage;
         this.gtfsCache = components.gtfsCache;
-        this.osmCache = components.osmCache;
         this.taskScheduler = components.taskScheduler;
     }
 
@@ -176,7 +173,7 @@ public class BundleController implements HttpController {
                     osm.close();
                     checkWgsEnvelopeSize(osmBounds, "OSM data");
                     // Store the source OSM file. Note that we're not storing the derived MapDB file here.
-                    fileStorage.moveIntoStorage(osmCache.getKey(bundle.osmId), fi.getStoreLocation());
+                    fileStorage.moveIntoStorage(OSMCache.getKey(bundle.osmId), fi.getStoreLocation());
                 }
 
                 if (bundle.feedGroupId == null) {

@@ -28,7 +28,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
 
     @Override
     public String getId() {
-        return trip_id; // Needs sequence number to be unique
+        return trip_id; // Concatenate with sequence number to make unique
     }
 
     @Override
@@ -50,7 +50,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         @Override
         public void loadOneRow() throws IOException {
             StopTime st = new StopTime();
-            st.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            st.sourceFileLine = row;
             st.trip_id        = getStringField("trip_id", true);
             // TODO: arrival_time and departure time are not required, but if one is present the other should be
             // also, if this is the first or last stop, they are both required

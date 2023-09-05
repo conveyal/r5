@@ -4,11 +4,13 @@ import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.ShapefileLts;
+import com.conveyal.r5.profile.StreetMode;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * All inputs and options that describe how to build a particular transport network (except the serialization version).
@@ -38,5 +40,18 @@ public class TransportNetworkConfig {
 
     /** A list of _R5_ modifications to apply during network build. May be null. */
     public List<Modification> modifications;
+
+    /**
+     * Additional modes other than walk for which to pre-build large data structures (grid linkage and cost tables).
+     * When building a network, by default we build distance tables from transit stops to street vertices, to which we
+     * connect a grid covering the entire street network at the default zoom level. By default we do this only for the
+     * walk mode. Pre-building and serializing equivalent data structures for other modes allows workers to start up
+     * much faster in regional analyses. The work need only be done once when the first single-point worker to builds
+     * the network. Otherwise, hundreds of workers will each have to build these tables every time they start up.
+     * Some scenarios, such as those that affect the street layer, may still be slower to apply for modes listed here
+     * because some intermediate data (stop-to-vertex tables) are only retained for the walk mode. If this proves to be
+     * a problem it is a candidate for future optimization.
+     */
+    public Set<StreetMode> buildGridsForModes;
 
 }

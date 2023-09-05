@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
+import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.error.MissingKeyError;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
@@ -57,8 +59,10 @@ public abstract class Entity implements Serializable {
      *          with a sequence number. For example stop_times and shapes have no single field that uniquely
      *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
      */
-    public String getId () {
-        return null;
+    public String getId() {
+        // Several entities have compound keys which are handled as tuple objects, not strings.
+        // Fail fast if anything tries to fetch a string ID for those Entity types.
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -81,7 +85,11 @@ public abstract class Entity implements Serializable {
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
 
         protected CsvReader reader;
-        protected int       row;
+
+        // Use one-based rows which are easier to understand in error messages.
+        // Line numbers are conventionally one-based even in IDEs and programming editors.
+        protected int row = 1;
+
         // TODO "String column" that is set before any calls to avoid passing around the column name
 
         public Loader(GTFSFeed feed, String tableName) {
@@ -285,22 +293,44 @@ public abstract class Entity implements Serializable {
             }
             CsvReader reader = new CsvReader(inStream, ',', Charset.forName("UTF8"));
             this.reader = reader;
+            // row number is already positioned at 1
             boolean hasHeaders = reader.readHeaders();
             if (!hasHeaders) {
                 feed.errors.add(new EmptyTableError(tableName));
             }
             while (reader.readRecord()) {
-                // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
-                if (++row % 500000 == 0) {
+                // reader.getCurrentRecord() is zero-based and does not include the header line,
+                // so we keep our own one-based row count that does include the header line.
+                // Advance row number before calling loadOneRow so the current value is available inside that function.
+                row += 1;
+                if (row % 500000 == 0) {
                     LOG.info("Record number {}", human(row));
                 }
                 loadOneRow(); // Call subclass method to produce an entity from the current row.
             }
-            if (row == 0) {
+            if (row < 2) {
                 feed.errors.add(new EmptyTableError(tableName));
             }
         }
 
+        /**
+         * Insert the given value into the map, checking whether a value already exists with its key.
+         * The entity type must override getId() for this to work. We have to pass in the name of the key field for
+         * error reporting purposes because although there is a method to get the ID of an Entity there is not a method
+         * to get the name of the field(s) it is taken from.
+         */
+        protected void insertCheckingDuplicateKey (Map<String, E> map, E value, String keyField) {
+            String key = value.getId();
+            if (key == null) {
+                feed.errors.add(new MissingKeyError(tableName, row, keyField));
+                return;
+            }
+            // Map returns previous value if one was already present
+            E previousValue = map.put(key, value);
+            if (previousValue != null) {
+                feed.errors.add(new DuplicateKeyError(tableName, row, keyField, key));
+            }
+        }
     }
 
     /**

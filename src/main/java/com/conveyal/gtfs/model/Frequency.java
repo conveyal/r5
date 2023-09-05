@@ -57,7 +57,7 @@ public class Frequency extends Entity implements Comparable<Frequency> {
         public void loadOneRow() throws IOException {
             Frequency f = new Frequency();
             Trip trip = getRefField("trip_id", true, feed.trips);
-            f.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            f.sourceFileLine = row;
             f.trip_id = trip.trip_id;
             f.start_time = getTimeField("start_time", true);
             f.end_time = getTimeField("end_time", true);

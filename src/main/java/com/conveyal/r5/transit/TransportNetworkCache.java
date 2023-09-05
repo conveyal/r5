@@ -6,8 +6,8 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -15,11 +15,11 @@ import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,28 +159,52 @@ public class TransportNetworkCache implements Component {
         return new FileStorageKey(BUNDLES, getR5NetworkFilename(networkId));
     }
 
+    /** @return the network configuration (AKA manifest) for the given network ID, or null if no config file exists. */
+    private TransportNetworkConfig loadNetworkConfig (String networkId) {
+        FileStorageKey configFileKey = new FileStorageKey(BUNDLES, getNetworkConfigFilename(networkId));
+        if (!fileStorage.exists(configFileKey)) {
+            return null;
+        }
+        File configFile = fileStorage.getFile(configFileKey);
+        try {
+            // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            return JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
+        }
+    }
+
     /**
      * If we did not find a cached network, build one from the input files. Should throw an exception rather than
      * returning null if for any reason it can't finish building one.
      */
     private @Nonnull TransportNetwork buildNetwork (String networkId) {
         TransportNetwork network;
-        FileStorageKey networkConfigKey = new FileStorageKey(BUNDLES, GTFSCache.cleanId(networkId) + ".json");
-        if (fileStorage.exists(networkConfigKey)) {
-            network = buildNetworkFromConfig(networkId);
-        } else {
-            LOG.warn("Detected old-format bundle stored as single ZIP file");
+        TransportNetworkConfig networkConfig = loadNetworkConfig(networkId);
+        if (networkConfig == null) {
+            // The switch to use JSON manifests instead of zips occurred in 32a1aebe in July 2016.
+            // Over six years have passed, buildNetworkFromBundleZip is deprecated and could probably be removed.
+            LOG.warn("No network config (aka manifest) found. Assuming old-format network inputs bundle stored as a single ZIP file.");
             network = buildNetworkFromBundleZip(networkId);
+        } else {
+            network = buildNetworkFromConfig(networkConfig);
         }
         network.scenarioId = networkId;
 
-        // Networks created in TransportNetworkCache are going to be used for analysis work. Pre-compute distance tables
-        // from stops to street vertices, then pre-build a linked grid pointset for the whole region. These linkages
-        // should be serialized along with the network, which avoids building them when an analysis worker starts.
-        // The linkage we create here will never be used directly, but serves as a basis for scenario linkages, making
-        // analysis much faster to start up.
+        // Pre-compute distance tables from stops out to street vertices, then pre-build a linked grid pointset for the
+        // whole region covered by the street network. These tables and linkages will be serialized along with the
+        // network, which avoids building them when every analysis worker starts. The linkage we create here will never
+        // be used directly, but serves as a basis for scenario linkages, making analyses much faster to start up.
+        // Note, this retains stop-to-vertex distances for the WALK MODE ONLY, even when they are produced as
+        // intermediate results while building linkages for other modes.
+        // This is a candidate for optimization if car or bicycle scenarios are slow to apply.
         network.transitLayer.buildDistanceTables(null);
-        network.rebuildLinkedGridPointSet(StreetMode.WALK);
+
+        Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
+        if (networkConfig != null && networkConfig.buildGridsForModes != null) {
+            buildGridsForModes.addAll(networkConfig.buildGridsForModes);
+        }
+        network.rebuildLinkedGridPointSet(buildGridsForModes);
 
         // Cache the serialized network on the local filesystem and mirror it to any remote storage.
         try {
@@ -207,6 +231,10 @@ public class TransportNetworkCache implements Component {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 File entryDestination = new File(dataDirectory, entry.getName());
+                if (!entryDestination.toPath().normalize().startsWith(dataDirectory.toPath())) {
+                    throw new Exception("Bad zip entry");
+                }
+
                 // Are both these mkdirs calls necessary?
                 entryDestination.getParentFile().mkdirs();
                 if (entry.isDirectory())
@@ -244,17 +272,7 @@ public class TransportNetworkCache implements Component {
      * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
-    private TransportNetwork buildNetworkFromConfig (String networkId) {
-        FileStorageKey configFileKey = new FileStorageKey(BUNDLES, getNetworkConfigFilename(networkId));
-        File configFile = fileStorage.getFile(configFileKey);
-        TransportNetworkConfig config;
-
-        try {
-            // Use lenient mapper to mimic behavior in objectFromRequestBody.
-            config = JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
-        } catch (IOException e) {
-            throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
-        }
+    private TransportNetwork buildNetworkFromConfig (TransportNetworkConfig config) {
         // FIXME duplicate code. All internal building logic should be encapsulated in a method like
         //  TransportNetwork.build(osm, gtfs1, gtfs2...)
         // We currently have multiple copies of it, in buildNetworkFromConfig and buildNetworkFromBundleZip so you've
@@ -262,7 +280,7 @@ public class TransportNetworkCache implements Component {
         // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
 
         TransportNetwork network = new TransportNetwork();
-        network.scenarioId = networkId;
+
         network.streetLayer = new StreetLayer();
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
 

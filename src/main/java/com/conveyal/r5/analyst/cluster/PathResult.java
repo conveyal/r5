@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.Path;
 import com.conveyal.r5.transit.path.PatternSequence;
@@ -11,7 +12,6 @@ import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -46,7 +46,7 @@ public class PathResult {
      * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
-    private final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+    public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
 
     public static String[] DATA_COLUMNS = new String[]{
@@ -153,21 +153,16 @@ public class PathResult {
      * Wraps path and iteration details for JSON serialization
      */
     public static class PathIterations {
-        public String access; // StreetTimesAndModes.StreetTimeAndMode would be more machine-readable.
-        public String egress;
+        public StreetTimesAndModes.StreetTimeAndMode access;
+        public StreetTimesAndModes.StreetTimeAndMode egress;
         public Collection<RouteSequence.TransitLeg> transitLegs;
-        public Collection<HumanReadableIteration> iterations;
+        public Collection<Iteration> iterations;
 
         PathIterations(RouteSequence pathTemplate, TransitLayer transitLayer, Collection<Iteration> iterations) {
-            this.access = pathTemplate.stopSequence.access == null ? null : pathTemplate.stopSequence.access.toString();
-            this.egress = pathTemplate.stopSequence.egress == null ? null : pathTemplate.stopSequence.egress.toString();
+            this.access = pathTemplate.stopSequence.access;
+            this.egress = pathTemplate.stopSequence.egress;
             this.transitLegs = pathTemplate.transitLegs(transitLayer);
-            this.iterations = iterations.stream().map(HumanReadableIteration::new).collect(Collectors.toList());
-            iterations.forEach(pathTemplate.stopSequence::transferTime); // The transferTime method includes an
-            // assertion that the transfer time is non-negative, i.e. that the access + egress + wait + ride times of
-            // a specific iteration do not exceed the total travel time. Perform that sense check here, even though
-            // the transfer time is not reported to the front-end for the human-readable single-point responses.
-            // TODO add transferTime to HumanReadableIteration?
+            this.iterations = iterations;
         }
     }
 
@@ -213,25 +208,4 @@ public class PathResult {
             this.totalTime = totalTime;
         }
     }
-
-    /**
-     * Timestamp style clock times, and rounded wait/total time, for inspection as JSON.
-     */
-    public static class HumanReadableIteration {
-        public String departureTime;
-        public double[] waitTimes;
-        public double totalTime;
-
-        HumanReadableIteration(Iteration iteration) {
-            // TODO track departure time for non-transit paths (so direct trips don't show departure time 00:00).
-            this.departureTime =
-                    String.format("%02d:%02d", Math.floorDiv(iteration.departureTime, 3600),
-                            (int) (iteration.departureTime / 60.0 % 60));
-            this.waitTimes =  Arrays.stream(iteration.waitTimes.toArray()).mapToDouble(
-                    wait -> Math.round(wait / 60f * 10) / 10.0
-            ).toArray();
-            this.totalTime =  Math.round(iteration.totalTime / 60f * 10) / 10.0;
-        }
-    }
-
 }

@@ -43,26 +43,28 @@ public class ShapefileLts extends Modification {
         try {
             TransportNetworkCache.prefetchShapefile(WorkerComponents.fileStorage, dataSourceId);
         } catch (DataSourceException dx) {
-            errors.add(ExceptionUtils.shortAndLongString(dx));
+            addError(ExceptionUtils.shortAndLongString(dx));
             return true;
         }
         fileStorageKey = new FileStorageKey(DATASOURCES, dataSourceId, FileStorageFormat.SHP.extension);
         localFile = WorkerComponents.fileStorage.getFile(fileStorageKey);
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
     public boolean apply (TransportNetwork network) {
         // Replicate the entire flags array so we can write to it (following copy-on-write policy).
-        // Otherwise the TIntAugmentedList only allows extending the base graph.
+        // Otherwise the TIntAugmentedList only allows extending the base graph. An alternative approach can be seen in
+        // ModifyStreets, where all affected edges are marked deleted and then recreated in the augmented lists.
+        // The appraoch here assumes a high percentage of edges changed, while ModifyStreets assumes a small percentage.
         network.streetLayer.edgeStore.flags = new TIntArrayList(network.streetLayer.edgeStore.flags);
         SpeedMatcher shapefileMatcher = new SpeedMatcher(network.streetLayer);
         try {
             shapefileMatcher.match(localFile.getAbsolutePath(), ltsAttribute);
         } catch (Exception e) {
-            errors.add(ExceptionUtils.shortAndLongString(e));
+            addError(ExceptionUtils.shortAndLongString(e));
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override

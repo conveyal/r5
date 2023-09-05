@@ -23,8 +23,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
-import static com.conveyal.analysis.util.HttpStatus.OK_200;
-
 /**
  * This proxies requests coming from the UI over to any currently active worker for the specified network bundle.
  * This could be used for point-to-point routing or the existing R5 endpoints producing debug tiles of the graph.
@@ -104,7 +102,7 @@ public class WorkerProxyController implements HttpController {
             resp.headers().map().forEach((key, value) -> {
                 if (!value.isEmpty()) response.header(key, value.get(0));
             });
-            response.status(OK_200);
+            response.status(resp.statusCode());
             return resp.body();
         } catch (Exception exception) {
             response.status(HttpStatus.BAD_REQUEST_400);

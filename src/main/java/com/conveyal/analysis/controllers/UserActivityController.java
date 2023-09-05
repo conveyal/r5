@@ -1,15 +1,15 @@
 package com.conveyal.analysis.controllers;
 
+import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.r5.analyst.progress.ApiTask;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import com.conveyal.r5.analyst.progress.Task;
+import com.google.common.collect.ImmutableMap;
 import spark.Request;
 import spark.Response;
 import spark.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -40,6 +40,7 @@ public class UserActivityController implements HttpController {
     @Override
     public void registerEndpoints (Service sparkService) {
         sparkService.get("/api/activity", this::getActivity, toJson);
+        sparkService.delete("/api/activity/:id", this::removeActivity, toJson);
     }
 
     private ResponseModel getActivity (Request req, Response res) {
@@ -51,6 +52,25 @@ public class UserActivityController implements HttpController {
         String user = system ? "SYSTEM" : userPermissions.email;
         responseModel.taskProgress = taskScheduler.getTasksForUser(user);
         return responseModel;
+    }
+
+    private Object removeActivity (Request req, Response res) {
+        UserPermissions userPermissions = UserPermissions.from(req);
+        String id = req.params("id");
+        Task task = taskScheduler.getTaskForUser(userPermissions.email, id);
+        // Check if task still exists before attempting to remove.
+        if (task == null) {
+            throw  AnalysisServerException.notFound("Task does not exist. It may have already been removed by another user.");
+        }
+        // Disallow removing active tasks via the API.
+        if (task.state.equals(Task.State.ACTIVE)) {
+            throw AnalysisServerException.badRequest("Cannot clear an active task.");
+        }
+        if (taskScheduler.removeTaskForUser(userPermissions.email, id)) {
+            return ImmutableMap.of("message", "Successfully cleared task.");
+        } else {
+            throw AnalysisServerException.badRequest("Failed to clear task.");
+        }
     }
 
     /** API model used only to structure activity JSON messages sent back to UI. */

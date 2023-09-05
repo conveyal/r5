@@ -32,6 +32,11 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public URL route_branding_url;
     public String feed_id;
 
+    @Override
+    public String getId() {
+        return route_id;
+    }
+
     public static class Loader extends Entity.Loader<Route> {
 
         public Loader(GTFSFeed feed) {
@@ -46,7 +51,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         @Override
         public void loadOneRow() throws IOException {
             Route r = new Route();
-            r.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            r.sourceFileLine = row;
             r.route_id = getStringField("route_id", true);
             Agency agency = getRefField("agency_id", false, feed.agency);
 
@@ -72,7 +77,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_text_color = getStringField("route_text_color", false);
             r.route_branding_url = getUrlField("route_branding_url", false);
             r.feed_id = feed.feedId;
-            feed.routes.put(r.route_id, r);
+            insertCheckingDuplicateKey(feed.routes, r, "route_id");
         }
 
     }

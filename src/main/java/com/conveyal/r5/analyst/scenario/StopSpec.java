@@ -52,24 +52,25 @@ public class StopSpec implements Serializable {
      * TODO maybe make protective copies a subclass of Networks to enforce this typing.
      *
      * @param network the transit network in which to find or create the specified transit stops.
+     * @param modification the modification in which to store any validation errors.
      * @return the integer index of the new stop within the given network, or -1 if it could not be created.
      */
-    public int resolve (TransportNetwork network, Set<String> warnings) {
+    public int resolve (TransportNetwork network, Modification modification) {
         if (id == null) {
             // No stop ID supplied, this is a new stop rather than a reference to an existing one.
             if (lat == 0 || lon == 0) {
-                warnings.add("When no stop ID is supplied, nonzero coordinates must be supplied.");
+                modification.addError("When no stop ID is supplied, nonzero coordinates must be supplied.");
             }
             int newStopId = materializeOne(network);
             return newStopId;
         } else {
             // Stop ID supplied, this is a reference to an existing stop rather than a new stop.
             if (lat != 0 || lon != 0 || name != null) {
-                warnings.add("A reference to an existing id should not include coordinates or a name.");
+                modification.addError("A reference to an existing id should not include coordinates or a name.");
             }
             int intStopId = network.transitLayer.indexForStopId.get(id);
             if (intStopId == -1) {
-                warnings.add("Could not find existing stop with GTFS ID " + id);
+                modification.addError("Could not find existing stop with GTFS ID " + id);
             }
             return intStopId;
         }

@@ -4,8 +4,8 @@ import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import org.opengis.feature.simple.SimpleFeature;
 
-import static com.conveyal.r5.labeling.LevelOfTrafficStressLabeler.intToLts;
 import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
+import static com.conveyal.r5.streets.EdgeStore.intToLts;
 
 public class LtsMatcher extends ShapefileMatcher {
 

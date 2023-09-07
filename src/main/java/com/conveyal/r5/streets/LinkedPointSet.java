@@ -43,7 +43,7 @@ public class LinkedPointSet implements Serializable {
 
     // CONSTANTS
 
-    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
+    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3888888f * 1000);
 
     // FIELDS IDENTIFYING THIS OBJECT
     // A LinkedPointSet is uniquely derived from: a PointSet, linked to a particular StreetLayer, for a given StreetMode.

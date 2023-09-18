@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 /**
  * Instances are serialized and sent from the backend to workers processing single point,
@@ -12,14 +13,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * TODO rename to something like SinglePointTask because these can now return accessibility, travel time, paths, etc.
  */
 public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
-
-    // FIXME red flag - what is this enum enumerating Java types?
-
-    @Override
-    public Type getType() {
-        return Type.TRAVEL_TIME_SURFACE;
-    }
-
     @JsonIgnoreProperties(ignoreUnknown=true)
 
     /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */
@@ -41,6 +34,7 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
         return format;
     }
 
+    @BsonIgnore
     @Override
     public WebMercatorExtents getWebMercatorExtents() {
         return WebMercatorExtents.forTask(this);

@@ -21,9 +21,9 @@ public class AccessibilityResult {
 
     /** Construct an AccessibilityResult of the appropriate dimensions for the specified AnalysisTask. */
     public AccessibilityResult (AnalysisWorkerTask task) {
-        this.nPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
-        this.nPercentiles = task.percentiles.length;
-        this.nCutoffs = task.cutoffsMinutes.length;
+        this.nPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.size();
+        this.nPercentiles = task.percentiles.size();
+        this.nCutoffs = task.cutoffsMinutes.size();
         cumulativeOpportunities = new double[nPointSets][nPercentiles][nCutoffs];
     }
 

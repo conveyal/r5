@@ -8,9 +8,7 @@ import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDataSource;
-import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
-import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
@@ -29,7 +27,7 @@ import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.bson.types.ObjectId;
@@ -47,7 +45,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -74,21 +71,18 @@ public class OpportunityDatasetController implements HttpController {
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
     private final SeamlessCensusGridExtractor extractor;
+    private final AnalysisDB db;
 
-    // Database tables
-
-    private final AnalysisCollection<DataGroup> dataGroupCollection;
-
-    public OpportunityDatasetController (
+    public OpportunityDatasetController(
             FileStorage fileStorage,
             TaskScheduler taskScheduler,
             SeamlessCensusGridExtractor extractor,
             AnalysisDB database
     ) {
+        this.db = database;
         this.fileStorage = fileStorage;
         this.taskScheduler = taskScheduler;
         this.extractor = extractor;
-        this.dataGroupCollection = database.getAnalysisCollection("dataGroups", DataGroup.class);
     }
 
     /** Store upload status objects FIXME trivial Javadoc */
@@ -106,24 +100,16 @@ public class OpportunityDatasetController implements HttpController {
         );
     }
 
-    private Collection<OpportunityDataset> getRegionDatasets(Request req, Response res) {
-        return Persistence.opportunityDatasets.findPermitted(
-                QueryBuilder.start("regionId").is(req.params("regionId")).get(),
-                UserPermissions.from(req)
-        );
-    }
-
-    private Object getOpportunityDataset(Request req, Response res) {
-        OpportunityDataset dataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
+    private Object getOpportunityDatasetGridUrl(Request req, Response res) {
+        OpportunityDataset dataset = db.opportunities.findPermittedByRequestParamId(req);
         if (dataset.format == FileStorageFormat.GRID) {
-            return getJsonUrl(dataset.getStorageKey());
+            return getJsonUrl(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
         } else {
             // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
             // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
             // to that grid for display and preview, but the freeform and corresponding grid pointset have different
             // IDs and there are no references between them.
-            LOG.error("We cannot yet visualize freeform pointsets. Returning nothing to the UI.");
-            return null;
+            throw AnalysisServerException.notFound("Grid files do not exist for freeform pointsets.");
         }
     }
 
@@ -144,7 +130,7 @@ public class OpportunityDatasetController implements HttpController {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
         final UserPermissions userPermissions = UserPermissions.from(req);
-        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions);
+        final Region region = db.regions.findByIdIfPermitted(regionId, userPermissions);
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet) TODO use DataGroup and DataSource (creating only one DataSource per region).
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
@@ -154,9 +140,9 @@ public class OpportunityDatasetController implements HttpController {
         // TODO we should be reusing the same source from Mongo, not making new ephemeral ones on each extract operation
         SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
         source.regionId = regionId;
-        // Make a new group that will containin the N OpportunityDatasets we're saving.
+        // Make a new group that will contain the N OpportunityDatasets we're saving.
         String description = String.format("Import %s to %s", extractor.sourceName, region.name);
-        DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), description);
+        DataGroup dataGroup = new DataGroup(userPermissions, source._id, description);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
                 .forUser(userPermissions)
@@ -179,11 +165,11 @@ public class OpportunityDatasetController implements HttpController {
      * Given a list of new PointSets, serialize each PointSet and save it to S3, then create a metadata object about
      * that PointSet and store it in Mongo.
      */
-    private void updateAndStoreDatasets (SpatialDataSource source,
-                                         DataGroup dataGroup,
-                                         OpportunityDatasetUploadStatus status,
-                                         List<? extends PointSet> pointSets,
-                                         com.conveyal.r5.analyst.progress.ProgressListener progressListener) {
+    private void updateAndStoreDatasets(SpatialDataSource source,
+                                        DataGroup dataGroup,
+                                        OpportunityDatasetUploadStatus status,
+                                        List<? extends PointSet> pointSets,
+                                        com.conveyal.r5.analyst.progress.ProgressListener progressListener) {
         status.status = Status.UPLOADING;
         status.totalGrids = pointSets.size();
         progressListener.beginTask("Storing opportunity data", pointSets.size());
@@ -193,9 +179,13 @@ public class OpportunityDatasetController implements HttpController {
         for (PointSet pointSet : pointSets) {
             OpportunityDataset dataset = new OpportunityDataset();
             dataset.sourceName = source.name;
-            dataset.sourceId = source._id.toString();
-            dataset.dataGroupId = dataGroup._id.toString();
+            dataset.sourceId = source._id;
+            dataset.dataGroupId = dataGroup._id;
+            dataset.createdAt = source.createdAt;
             dataset.createdBy = source.createdBy;
+            dataset.updatedAt = source.updatedAt;
+            dataset.updatedBy = source.updatedBy;
+            dataset.nonce = new ObjectId().toString();
             dataset.accessGroup = source.accessGroup;
             dataset.regionId = source.regionId;
             dataset.name = pointSet.name;
@@ -205,12 +195,17 @@ public class OpportunityDatasetController implements HttpController {
             if (dataset.format == FileStorageFormat.FREEFORM) {
                 dataset.name = String.join(" ", pointSet.name, "(freeform)");
             }
-            dataset.setWebMercatorExtents(pointSet.getWebMercatorExtents());
+            var extents = pointSet.getWebMercatorExtents();
+            dataset.north = extents.north;
+            dataset.west = extents.west;
+            dataset.height = extents.height;
+            dataset.width = extents.width;
+            dataset.zoom = extents.zoom;
             // TODO make origin and destination pointsets reference each other and indicate they are suitable
             //      for one-to-one analyses
 
             // Store the PointSet metadata in Mongo and accumulate these objects into the method return list.
-            Persistence.opportunityDatasets.create(dataset);
+            db.opportunities.insert(dataset);
             datasets.add(dataset);
 
             // Persist a serialized representation of each PointSet (not the metadata) to S3 or other object storage.
@@ -223,7 +218,7 @@ public class OpportunityDatasetController implements HttpController {
                     OutputStream fos = new GZIPOutputStream(new FileOutputStream(gridFile));
                     ((Grid)pointSet).write(fos);
 
-                    fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
+                    fileStorage.moveIntoStorage(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
                     FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, source.regionId + "/" + dataset._id +
@@ -243,7 +238,7 @@ public class OpportunityDatasetController implements HttpController {
                 }
                 LOG.info("Moved {}/{} files into storage for {}", status.uploadedGrids, status.totalGrids, status.name);
             } catch (NumberFormatException e) {
-                throw new AnalysisServerException("Error attempting to parse number in uploaded file: " + e.toString());
+                throw new AnalysisServerException("Error attempting to parse number in uploaded file: " + e);
             } catch (Exception e) {
                 status.completeWithError(e);
                 throw AnalysisServerException.unknown(e);
@@ -251,7 +246,7 @@ public class OpportunityDatasetController implements HttpController {
             progressListener.increment();
         }
         // Set the workProduct - TODO update UI so it can handle a link to a group of OPPORTUNITY_DATASET
-        dataGroupCollection.insert(dataGroup);
+        db.dataGroups.collection.insertOne(dataGroup);
         progressListener.setWorkProduct(WorkProduct.forDataGroup(OPPORTUNITY_DATASET, dataGroup, source.regionId));
     }
 
@@ -396,7 +391,7 @@ public class OpportunityDatasetController implements HttpController {
                 // Some methods like createGridsFromShapefile above "consume" those files by moving them into a tempdir.
                 SpatialDataSource source = new SpatialDataSource(userPermissions, sourceName);
                 source.regionId = regionId;
-                DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), "Import opportunity data");
+                DataGroup dataGroup = new DataGroup(userPermissions, source._id, "Import opportunity data");
                 updateAndStoreDatasets(source, dataGroup, status, pointsets, new NoopProgressListener());
             } catch (Exception e) {
                 e.printStackTrace();
@@ -433,36 +428,36 @@ public class OpportunityDatasetController implements HttpController {
         return parameters;
     }
 
-    private OpportunityDataset editOpportunityDataset(Request request, Response response) throws IOException {
-        return Persistence.opportunityDatasets.updateFromJSONRequest(request);
-    }
-
-    private Collection<OpportunityDataset> deleteSourceSet(Request request, Response response) {
+    private Object deleteSourceSet(Request request, Response response) {
         String sourceId = request.params("sourceId");
         UserPermissions userPermissions = UserPermissions.from(request);
-        Collection<OpportunityDataset> datasets = Persistence.opportunityDatasets.findPermitted(
-                QueryBuilder.start("sourceId").is(sourceId).get(), userPermissions);
-        datasets.forEach(dataset -> deleteDataset(dataset._id, userPermissions));
-        return datasets;
+        var iterable = db.opportunities.findPermitted(
+                Filters.eq("sourceId", sourceId),
+                userPermissions
+        );
+        for (var dataset : iterable) {
+            deleteDataset(dataset, userPermissions);
+        }
+        return JsonUtil.objectNode().put("message", "Deleted source set.");
     }
 
     private OpportunityDataset deleteOpportunityDataset(Request request, Response response) {
-        String opportunityDatasetId = request.params("_id");
-        return deleteDataset(opportunityDatasetId, UserPermissions.from(request));
+        var dataset = db.opportunities.findPermittedByRequestParamId(request);
+        return deleteDataset(dataset, UserPermissions.from(request));
     }
 
     /**
      * Delete an Opportunity Dataset from the database and all formats from the file store.
      */
-    private OpportunityDataset deleteDataset(String id, UserPermissions userPermissions) {
-        OpportunityDataset dataset = Persistence.opportunityDatasets.removeIfPermitted(id, userPermissions);
-        if (dataset == null) {
+    private OpportunityDataset deleteDataset(OpportunityDataset dataset, UserPermissions userPermissions) {
+        // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GRID));
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.PNG));
+        fileStorage.delete(OpportunityDataset.getStorageKey(dataset, FileStorageFormat.GEOTIFF));
+
+        var result = db.opportunities.deleteByIdIfPermitted(dataset._id, userPermissions);
+        if (!result.wasAcknowledged()) {
             throw AnalysisServerException.notFound("Opportunity dataset could not be found.");
-        } else {
-            // Several of these files may not exist. FileStorage::delete contract states this will be handled cleanly.
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GRID));
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.PNG));
-            fileStorage.delete(dataset.getStorageKey(FileStorageFormat.GEOTIFF));
         }
         return dataset;
     }
@@ -579,12 +574,12 @@ public class OpportunityDatasetController implements HttpController {
             return getJsonUrl(storageKey);
         }
 
-        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDataset(req, res);
+        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDatasetGridUrl(req, res);
 
-        final OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
+        final OpportunityDataset opportunityDataset = db.opportunities.findPermittedByRequestParamId(req);
 
-        FileStorageKey gridKey = opportunityDataset.getStorageKey(FileStorageFormat.GRID);
-        FileStorageKey formatKey = opportunityDataset.getStorageKey(downloadFormat);
+        FileStorageKey gridKey = OpportunityDataset.getStorageKey(opportunityDataset, FileStorageFormat.GRID);
+        FileStorageKey formatKey = OpportunityDataset.getStorageKey(opportunityDataset, downloadFormat);
 
         // if this grid is not on S3 in the requested format, try to get the .grid format
         if (!fileStorage.exists(gridKey)) {
@@ -671,11 +666,9 @@ public class OpportunityDatasetController implements HttpController {
             sparkService.post("/region/:regionId/download", this::downloadLODES, toJson);
             sparkService.get("/region/:regionId/status", this::getRegionUploadStatuses, toJson);
             sparkService.delete("/region/:regionId/status/:statusId", this::clearStatus, toJson);
-            sparkService.get("/region/:regionId", this::getRegionDatasets, toJson);
             sparkService.delete("/source/:sourceId", this::deleteSourceSet, toJson);
             sparkService.delete("/:_id", this::deleteOpportunityDataset, toJson);
-            sparkService.get("/:_id", this::getOpportunityDataset, toJson);
-            sparkService.put("/:_id", this::editOpportunityDataset, toJson);
+            sparkService.get("/:_id", this::getOpportunityDatasetGridUrl, toJson);
             sparkService.get("/:_id/:format", this::downloadOpportunityDataset, toJson);
         });
     }

@@ -53,12 +53,12 @@ public class BootstrappingTravelTimeReducer {
         // FIXME this assumes frequency entries are present.
         int nIterations = request.getTotalIterations(true);
         // TODO handle multiple percentiles, request already has an array to hold more than one of them
-        if (request.percentiles.length != 1) {
+        if (request.percentiles.size() != 1) {
             throw new IllegalArgumentException("Bootstrapped travel times only support a single percentile of travel time!");
         }
         // The disatance between the first value (0th percentile) and last value (100th percentile) is nIterations-1.
         // minCount should range from 1 (for 0th percentile / minimum) to N (for 100th percentile / maximum)
-        minCount = (int) ((nIterations - 1) * (request.percentiles[0] / 100d)) + 1;
+        minCount = (int) ((nIterations - 1) * (request.percentiles.get(0) / 100d)) + 1;
     }
 
     public void recordTravelTimesForTarget(int target, int[] travelTimesForTarget) {

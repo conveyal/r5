@@ -12,6 +12,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public abstract class FileUtils {
     /**
@@ -87,10 +88,24 @@ public abstract class FileUtils {
     }
 
     /**
+     * GZIP a File and return the new File descriptor.
+     */
+    public static File gzipFile(File file) {
+        try {
+            var gzippedFile = createScratchFile();
+            var gzippedOs = new GZIPOutputStream(getOutputStream(gzippedFile));
+            transferFromFileTo(file, gzippedOs);
+            return gzippedFile;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
      * Get an BufferedInputStream for a file. Read bytes from the underlying file stream without causing a system call
      * for each byte read.
      */
-    public static BufferedInputStream getInputStream (File file) {
+    public static BufferedInputStream getInputStream(File file) {
         try {
             return new BufferedInputStream(new FileInputStream(file));
         } catch (IOException e) {

@@ -1,7 +1,6 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.UserPermissions;
-import org.bson.types.ObjectId;
 
 /**
  * When deriving data (layers, networks, etc.) from a DataSource, we sometimes produce many outputs at once from
@@ -12,10 +11,12 @@ import org.bson.types.ObjectId;
  */
 public class DataGroup extends BaseModel {
 
-    /** The data source this group of products was derived from. */
+    /**
+     * The data source this group of products was derived from.
+     */
     public String dataSourceId;
 
-    public DataGroup (UserPermissions user, String dataSourceId, String description) {
+    public DataGroup(UserPermissions user, String dataSourceId, String description) {
         super(user, description);
         this.dataSourceId = dataSourceId;
     }

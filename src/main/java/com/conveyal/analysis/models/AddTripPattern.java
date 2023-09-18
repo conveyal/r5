@@ -2,6 +2,7 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.scenario.AddTrips;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * do reference and reuse existing stops, in which case each referenced stop has its own feed ID already prepended.
  * This is because when editing the trip pattern and optionally reusing stops, the user can see stops from all feeds.
  */
+@BsonDiscriminator(key = "type", value = "add-trip-pattern")
 public class AddTripPattern extends Modification {
 
     public static final String type = "add-trip-pattern";
@@ -39,17 +41,22 @@ public class AddTripPattern extends Modification {
     public List<Timetable> timetables;
 
     public static class Timetable extends AbstractTimetable {
-        /** Default dwell time, seconds */
+        /**
+         * Default dwell time, seconds
+         */
         public int dwellTime;
 
-        /** Speed, kilometers per hour, for each segment */
-        public int[] segmentSpeeds;
+        /**
+         * Speed, kilometers per hour, for each segment
+         */
+        public List<Integer> segmentSpeeds;
 
-        /** Dwell times at adjusted stops, seconds */
-        // using Integer not int because dwell times can be null
-        public Integer[] dwellTimes;
+        /**
+         * Dwell times at adjusted stops, seconds
+         */
+        public List<Integer> dwellTimes;
 
-        public AddTrips.PatternTimetable toR5 (List<ModificationStop> stops) {
+        public AddTrips.PatternTimetable toR5(List<ModificationStop> stops) {
             AddTrips.PatternTimetable pt = this.toBaseR5Timetable();
 
             // Get hop times
@@ -92,7 +99,7 @@ public class AddTripPattern extends Modification {
         }
 
         // Values for stop spec are not affected by time table segment speeds or dwell times
-        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new int[0]));
+        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new ArrayList<>()));
 
         return at;
     }

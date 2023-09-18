@@ -2,8 +2,6 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.WebMercatorExtents;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import static com.conveyal.file.FileCategory.GRIDS;
 
@@ -13,7 +11,7 @@ import static com.conveyal.file.FileCategory.GRIDS;
  * filesystem. They are in subclasses of PointSet, specifically Grid and FreeformPointSet. Note that these are no
  * longer strictly opportunity datasets - they may be sets of points with no attached opportunity densities.
  */
-public class OpportunityDataset extends Model {
+public class OpportunityDataset extends BaseModel {
 
     /** The human-readable name of the data source from which this came, provided by the user who uploaded it. */
     public String sourceName;
@@ -33,6 +31,11 @@ public class OpportunityDataset extends Model {
 
     /**
      * Bounds in web Mercator pixels.
+     * <p>
+     * These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
+     * for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets if
+     * the zoom level is fixed in OpportunityDataset.
+     * Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
      */
     public int north;
     public int west;
@@ -79,10 +82,10 @@ public class OpportunityDataset extends Model {
      * This will use the deprecated key field (a descriptive string plus a UUID) if it's set when deserialized from
      * Mongo, otherwise we use the _id. See discussion in #53.
      */
-    private String storageLocation(String extension) {
+    private static String storageLocation(OpportunityDataset dataset, String extension) {
         return String.format("%s/%s.%s",
-                this.regionId,
-                this.key == null ? this._id : this.key,
+                dataset.regionId,
+                dataset.key == null ? dataset._id : dataset.key,
                 extension.toLowerCase()
         );
     }
@@ -90,32 +93,12 @@ public class OpportunityDataset extends Model {
     /**
      * The key on S3 (or other object storage) where the persisted grid or freeform pointset is located.
      */
-    public String storageLocation() {
-        return storageLocation(this.format.extension);
+    public static String storageLocation(OpportunityDataset dataset) {
+        return storageLocation(dataset, dataset.format.extension);
     }
 
-    @JsonIgnore
-    public FileStorageKey getStorageKey () {
-        String path = storageLocation(this.format.extension);
-        return new FileStorageKey(GRIDS, path);
-    }
-
-    @JsonIgnore
-    public FileStorageKey getStorageKey (FileStorageFormat fileFormat) {
-        return new FileStorageKey(GRIDS, storageLocation(fileFormat.extension));
-    }
-
-    @JsonIgnore
-    public void setWebMercatorExtents (WebMercatorExtents extents) {
-        // These bounds are currently in web Mercator pixels, which are relevant to Grids but are not natural units
-        // for FreeformPointSets. There are only unique minimal web Mercator bounds for FreeformPointSets if
-        // the zoom level is fixed in OpportunityDataset.
-        // Perhaps these metadata bounds should be WGS84 instead, it depends how the UI uses them.
-        this.west = extents.west;
-        this.north = extents.north;
-        this.width = extents.width;
-        this.height = extents.height;
-        this.zoom = extents.zoom;
+    public static FileStorageKey getStorageKey(OpportunityDataset dataset, FileStorageFormat fileFormat) {
+        return new FileStorageKey(GRIDS, storageLocation(dataset, fileFormat.extension));
     }
 
     /** Analysis region this dataset was uploaded in. */

@@ -1,7 +1,5 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.scenario.FakeGraph.TransitNetwork;
@@ -20,6 +18,7 @@ import org.locationtech.jts.geom.Envelope;
 
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.List;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static com.conveyal.r5.streets.EdgeStore.intToLts;
@@ -79,7 +78,7 @@ public class ModifyStreetsTest {
         task.accessModes = EnumSet.of(LegMode.WALK);
         task.directModes = EnumSet.of(LegMode.WALK);
         task.transitModes = EnumSet.noneOf(TransitModes.class);
-        task.percentiles = new int[]{50};
+        task.percentiles = List.of(50);
         task.fromLat = FROM_LAT;
         task.fromLon = FROM_LON;
 

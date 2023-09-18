@@ -1,36 +1,46 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.List;
 
 /**
  * Created by matthewc on 3/28/16.
  */
+@BsonDiscriminator(key = "type", value = "reroute")
 public class Reroute extends Modification {
     public String getType() {
         return "reroute";
     }
 
-    /** The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification. */
+    /**
+     * The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification.
+     */
     public String feed;
-    public String[] routes;
-    public String[] trips;
+    public List<String> routes;
+    public List<String> trips;
 
     public String fromStop;
     public String toStop;
 
     public List<Segment> segments;
 
-    /** speed of the adjusted segment, km/h, per segment */
-    public int[] segmentSpeeds;
+    /**
+     * speed of the adjusted segment, km/h, per segment
+     */
+    public List<Integer> segmentSpeeds;
 
-    /** Default dwell time, seconds */
+    /**
+     * Default dwell time, seconds
+     */
     public int dwellTime;
 
-    /** Dwell times at adjusted stops, seconds */
-    // using Integer not int because Integers can be null
-    public Integer[] dwellTimes;
+    /**
+     * Dwell times at adjusted stops, seconds
+     */
+    public List<Integer> dwellTimes;
 
-    public com.conveyal.r5.analyst.scenario.Reroute toR5 () {
+    public com.conveyal.r5.analyst.scenario.Reroute toR5() {
         com.conveyal.r5.analyst.scenario.Reroute rr = new com.conveyal.r5.analyst.scenario.Reroute();
         rr.comment = name;
 

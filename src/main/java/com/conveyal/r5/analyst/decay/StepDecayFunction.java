@@ -1,12 +1,19 @@
 package com.conveyal.r5.analyst.decay;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 /**
  * Simple cliff-edge weight function. No parameters to set or validate.
  */
+@BsonDiscriminator(key = "type", value = "step")
 public class StepDecayFunction extends DecayFunction {
+    @Override
+    public String getType() {
+        return "step";
+    }
 
     @Override
-    public void prepare () {
+    public void prepare() {
         // Nothing to validate or prepare.
     }
 

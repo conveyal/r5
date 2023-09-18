@@ -3,16 +3,22 @@ package com.conveyal.analysis.models;
 import com.conveyal.analysis.UserPermissions;
 import org.bson.types.ObjectId;
 
-/** The base type for objects stored in our newer AnalysisDB using the Mongo Java driver's POJO functionality. */
-public class BaseModel {
-    // Can retrieve `createdAt` from here
-    public ObjectId _id;
+import java.util.Date;
 
-    // For version management. ObjectId's contain a timestamp, so can retrieve `updatedAt` from here.
-    public ObjectId nonce;
+/**
+ * The base type for objects stored in AnalysisDB using the Mongo Java driver's POJO functionality.
+ */
+public abstract class BaseModel {
+    public String _id;
+
+    // For version management.
+    public String nonce;
 
     public String createdBy = null;
     public String updatedBy = null;
+
+    public Date createdAt = null;
+    public Date updatedAt = null;
 
     // Who owns this?
     public String accessGroup = null;
@@ -20,17 +26,24 @@ public class BaseModel {
     // Everything has a name
     public String name = null;
 
-    // package private to encourage use of static factory methods
-    BaseModel (UserPermissions user, String name) {
-        this._id = new ObjectId();
-        this.nonce = new ObjectId();
-        this.createdBy = user.email;
-        this.updatedBy = user.email;
-        this.accessGroup = user.accessGroup;
+    public BaseModel(UserPermissions user, String name) {
+        this(user);
         this.name = name;
     }
 
-    /** Zero argument constructor required for MongoDB driver automatic POJO deserialization. */
-    public BaseModel () { }
+    public BaseModel(UserPermissions user) {
+        this._id = new ObjectId().toString();
+        this.nonce = new ObjectId().toString();
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+        this.createdBy = user.email;
+        this.updatedBy = user.email;
+        this.accessGroup = user.accessGroup;
+    }
 
+    /**
+     * Zero argument constructor required for MongoDB driver automatic POJO deserialization.
+     */
+    public BaseModel() {
+    }
 }

@@ -1,11 +1,11 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.UserPermissions;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.validator.model.Priority;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -17,12 +17,12 @@ import java.util.stream.Collectors;
 
 /**
  * Represents a transport Bundle (GTFS and OSM).
- *
+ * <p>
  * Previously the OSM was specified at the Region level, so every Bundle in the same Region used the same OSM data.
- *
+ * <p>
  * All of the data is stored in S3, however some information is duplicated here for convenience.
  */
-public class Bundle extends Model implements Cloneable {
+public class Bundle extends BaseModel implements Cloneable {
     public String regionId;
 
     // Unique key that allows for linking new bundles to previously uploaded OSM.
@@ -47,11 +47,22 @@ public class Bundle extends Model implements Cloneable {
     public int feedsComplete;
     public int totalFeeds;
 
-    public static String bundleScopeFeedId (String feedId, String feedGroupId) {
+    public static String bundleScopeFeedId(String feedId, String feedGroupId) {
         return String.format("%s_%s", feedId, feedGroupId);
     }
 
-    public Bundle clone () {
+    public Bundle(UserPermissions user) {
+        super(user);
+    }
+
+    /**
+     * Zero argument constructor required for MongoDB driver automatic POJO deserialization.
+     */
+    public Bundle() {
+
+    }
+
+    public Bundle clone() {
         try {
             return (Bundle) super.clone();
         } catch (CloneNotSupportedException e) {
@@ -59,16 +70,20 @@ public class Bundle extends Model implements Cloneable {
         }
     }
 
-    /** Simplified model for storing the first N errors of each type in Mongo. */
+    /**
+     * Simplified model for storing the first N errors of each type in Mongo.
+     */
     public static class GtfsErrorSummary {
         public String file;
         public Integer line;
         public String field;
         public String message;
-        public GtfsErrorSummary () { /* For deserialization. */ }
-        public GtfsErrorSummary (GTFSError error) {
+
+        public GtfsErrorSummary() { /* For deserialization. */ }
+
+        public GtfsErrorSummary(GTFSError error) {
             file = error.file;
-            line = error.line > 0 ? (int)(error.line) : null;
+            line = error.line > 0 ? (int) (error.line) : null;
             field = error.field;
             message = error.getMessage();
         }
@@ -158,8 +173,7 @@ public class Bundle extends Model implements Cloneable {
          * and trips. Also, at this time the only usage of these fields is to explicitly show in the user interface that
          * a date does or does not have service.
          */
-        @JsonIgnore
-        public void setServiceDates (GTFSFeed feed) {
+        private void setServiceDates(GTFSFeed feed) {
             List<LocalDate> datesOfService = feed.getDatesOfService();
             datesOfService.sort(Comparator.naturalOrder());
             serviceStart = datesOfService.get(0);

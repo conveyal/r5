@@ -1,16 +1,24 @@
 package com.conveyal.analysis.results;
 
+import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.FileStorageKey;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 import static com.conveyal.r5.common.Util.human;
 
@@ -37,16 +45,22 @@ import static com.conveyal.r5.common.Util.human;
  * <li>(repeated 4-byte int) values of each pixel in row-major order: axis order (row, column, channel).</li>
  * </ol>
  */
-public class GridResultWriter extends BaseResultWriter {
+public class GridResultWriter implements RegionalResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
-    private RandomAccessFile randomAccessFile;
+    private final File bufferFile = FileUtils.createScratchFile("grid");
+    private final FileStorage fileStorage;
+    private final RandomAccessFile randomAccessFile;
 
-    /** The version of the access grids we produce */
+    /**
+     * The version of the access grids we produce
+     */
     private static final int ACCESS_GRID_VERSION = 0;
 
-    /** The offset to get to the data section of the access grid file. */
+    /**
+     * The offset to get to the data section of the access grid file.
+     */
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
     /**
@@ -59,23 +73,57 @@ public class GridResultWriter extends BaseResultWriter {
      */
     private final int channels;
 
+    private final int percentileIndex;
+    private final int destinationIndex;
+
     /**
-     * Construct an writer for a single regional analysis result grid, using the proprietary
+     * The file name of the grid.
+     */
+    private final String gridFileName;
+
+    /**
+     * We create one GridResultWriter for each destination pointset and percentile.
+     * Each of those output files contains data for all specified travel time cutoffs at each origin.
+     */
+    public static List<GridResultWriter> createWritersFromTask(RegionalAnalysis regionalAnalysis, RegionalTask task, FileStorage fileStorage) {
+        int nPercentiles = task.percentiles.size();
+        int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.size();
+        // Create one grid writer per percentile and destination pointset.
+        var gridWriters = new ArrayList<GridResultWriter>();
+        for (int destinationIndex = 0; destinationIndex < nDestinationPointSets; destinationIndex++) {
+            for (int percentileIndex = 0; percentileIndex < nPercentiles; percentileIndex++) {
+                String destinationPointSetId = regionalAnalysis.destinationPointSetIds.get(destinationIndex);
+                gridWriters.add(new GridResultWriter(
+                        task,
+                        fileStorage,
+                        percentileIndex,
+                        destinationIndex,
+                        destinationPointSetId
+                ));
+            }
+        }
+        return gridWriters;
+    }
+
+    /**
+     * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter (RegionalTask task, FileStorage fileStorage) {
-        super(fileStorage);
+    GridResultWriter(RegionalTask task, FileStorage fileStorage, int percentileIndex, int destinationIndex, String destinationPointSetId) {
+        this.fileStorage = fileStorage;
+        this.gridFileName = String.format("%s_%s_P%d.access", task.jobId, destinationPointSetId, task.percentiles.get(percentileIndex));
+        this.percentileIndex = percentileIndex;
+        this.destinationIndex = destinationIndex;
         int width = task.width;
         int height = task.height;
-        this.channels = task.cutoffsMinutes.length;
+        this.channels = task.cutoffsMinutes.size();
         LOG.info(
-            "Expecting multi-origin results for grid with width {}, height {}, {} values per origin.",
-            width,
-            height,
-            channels
+                "Expecting multi-origin results for grid with width {}, height {}, {} values per origin.",
+                width,
+                height,
+                channels
         );
-        super.prepare(task.jobId);
 
         try {
             // Write the access grid file header to the temporary file.
@@ -111,11 +159,15 @@ public class GridResultWriter extends BaseResultWriter {
         }
     }
 
-    /** Gzip the access grid and upload it to file storage (such as AWS S3). */
+    /**
+     * Gzip the access grid and upload it to file storage (such as AWS S3).
+     */
     @Override
-    protected synchronized void finish (String fileName) throws IOException {
-        super.finish(fileName);
+    public synchronized void finish() throws IOException {
         randomAccessFile.close();
+        var gzippedFile = FileUtils.gzipFile(bufferFile);
+        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
+        bufferFile.delete();
     }
 
     /**
@@ -123,25 +175,32 @@ public class GridResultWriter extends BaseResultWriter {
      *      in a byte buffer instead of writing mini byte buffers into files? We should also be able
      *      to use a filechannel with native order.
      */
-    private static byte[] intToLittleEndianByteArray (int i) {
+    private static byte[] intToLittleEndianByteArray(int i) {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
         byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
         byteBuffer.putInt(i);
         return byteBuffer.array();
     }
 
+    @Override
+    public void writeOneWorkResult(RegionalWorkResult workResult) throws Exception {
+        // Drop work results for this particular origin into a little-endian output file.
+        int[][] percentilesForGrid = workResult.accessibilityValues[destinationIndex];
+        int[] cutoffsForPercentile = percentilesForGrid[percentileIndex];
+        writeOneOrigin(workResult.taskId, cutoffsForPercentile);
+    }
+
     /**
      * Write all channels at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
      * coordinates. Flatten them to compute file offsets and for the origin checklist.
      */
-    synchronized void writeOneOrigin (int taskNumber, int[] values) throws IOException {
+    private void writeOneOrigin(int taskNumber, int[] values) throws IOException {
         if (values.length != channels) {
             throw new IllegalArgumentException("Number of channels to be written does not match this writer.");
         }
         long offset = HEADER_LENGTH_BYTES + (taskNumber * channels * Integer.BYTES);
         // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
-        // TODO why is the method also synchronized then?
-        synchronized (this) {
+        synchronized (randomAccessFile) {
             randomAccessFile.seek(offset);
             // FIXME should this be delta-coded? The Selecting grid reducer seems to expect it to be.
             int lastValue = 0;
@@ -154,7 +213,7 @@ public class GridResultWriter extends BaseResultWriter {
     }
 
     @Override
-    synchronized void terminate () throws IOException {
+    public synchronized void terminate() throws IOException {
         randomAccessFile.close();
         bufferFile.delete();
     }

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * This either returns a network that can be immediately used for a certain analysis task (if it's already prepared)
@@ -152,8 +153,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final String networkId;
         public final String scenarioId;
         public final WebMercatorExtents destinationGridExtents;
-        public final EnumSet<StreetMode> allModes;
-        public final EnumSet<StreetMode> egressModes;
+        public final Set<StreetMode> allModes;
+        public final Set<StreetMode> egressModes;
 
         /**
          * If a destination opportunity grid is present in the request - not a grid ID but the actual grid object,
@@ -188,7 +189,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             );
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether
             // transit is used). See code in TravelTimeComputer for when each is used.
-            this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
+            this.allModes = LegMode.toStreetModeSet(task.directModes);
+            this.allModes.addAll(LegMode.toStreetModeSet(task.accessModes));
             this.allModes.addAll(this.egressModes);
 
             this.destinationGridExtents = task.getWebMercatorExtents();

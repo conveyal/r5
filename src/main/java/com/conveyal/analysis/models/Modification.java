@@ -3,9 +3,9 @@ package com.conveyal.analysis.models;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.collect.Sets;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,19 +31,21 @@ import static com.google.common.base.Preconditions.checkNotNull;
         @JsonSubTypes.Type(name = "add-streets", value = AddStreets.class),
         @JsonSubTypes.Type(name = "modify-streets", value = ModifyStreets.class)
 })
-public abstract class Modification extends Model implements Cloneable {
-    /** the type of this modification, see JsonSubTypes annotation above */
-    public abstract String getType ();
+@BsonDiscriminator(key = "type")
+public abstract class Modification extends BaseModel implements Cloneable {
+    /**
+     * the type of this modification, see JsonSubTypes annotation above
+     */
+    public abstract String getType();
 
-    public Modification clone () throws CloneNotSupportedException {
+    public Modification clone() throws CloneNotSupportedException {
         return (Modification) super.clone();
     }
 
-    /** What project is this modification a part of? */
+    /**
+     * What project is this modification a part of?
+     */
     public String projectId;
-
-    /** what variants is this modification a part of? */
-    public boolean[] variants;
 
     /** A description/comment about this modification */
     public String description;
@@ -51,12 +53,12 @@ public abstract class Modification extends Model implements Cloneable {
     /**
      * Add scope to each ID in an array of IDs and return as an unordered Set. Used in converting internal
      * analysis-backend modification types to R5 modifications sent to the workers. See feedScopeId() for more details.
-     *
+     * <p>
      * This preserves null arrays coming in from MongoDB (in the internal analysis-backend modification types) because
      * in R5 modifications, the null set has a distinct meaning from an empty set (null matches everything, empty set
      * matches nothing). TODO We should probably disallow and fail on empty sets though, since they must be mistakes.
      */
-    public static Set<String> feedScopedIdSet (String feed, String[] ids) {
+    public static Set<String> feedScopedIdSet(String feed, List<String> ids) {
         if (ids == null) {
             return null;
         } else {
@@ -69,13 +71,9 @@ public abstract class Modification extends Model implements Cloneable {
      * not tolerate nulls, because it is never directly used on top level fields of a modification where nulls have
      * meaning.
      */
-    public static String[] feedScopedIdArray (String feed, String[] ids) {
+    public static String[] feedScopedIdArray(String feed, List<String> ids) {
         checkNotNull(ids);
-        String[] scopedIds = new String[ids.length];
-        for (int i = 0; i < ids.length; i++) {
-            scopedIds[i] = feedScopeId(feed, ids[i]);
-        }
-        return scopedIds;
+        return ids.stream().map(id -> feedScopeId(feed, id)).collect(Collectors.toList()).toArray(new String[]{});
     }
 
     /**

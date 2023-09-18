@@ -9,8 +9,8 @@ import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.Path;
+import com.conveyal.r5.transit.path.PatternSequence;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
@@ -104,10 +104,10 @@ public class TravelTimeReducer {
         // Validate and process the travel time percentiles.
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
         task.validatePercentiles();
-        this.nPercentiles = task.percentiles.length;
+        this.nPercentiles = task.percentiles.size();
         this.percentileIndexes = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
-            percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles[p]);
+            percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles.get(p));
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
@@ -148,11 +148,11 @@ public class TravelTimeReducer {
         if (calculateAccessibility) {
             checkNotNull(decayFunction);
             task.validateCutoffsMinutes();
-            this.nCutoffs = task.cutoffsMinutes.length;
+            this.nCutoffs = task.cutoffsMinutes.size();
             this.cutoffsSeconds = new int[nCutoffs];
             this.zeroPointsForCutoffs = new int[nCutoffs];
             for (int c = 0; c < nCutoffs; c++) {
-                final int cutoffSeconds = task.cutoffsMinutes[c] * 60;
+                final int cutoffSeconds = task.cutoffsMinutes.get(c) * 60;
                 this.cutoffsSeconds[c] = cutoffSeconds;
                 this.zeroPointsForCutoffs[c] = decayFunction.reachesZeroAt(cutoffSeconds);
             }

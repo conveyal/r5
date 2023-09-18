@@ -1,8 +1,13 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
+import java.util.List;
+
 /**
  * Created by matthewc on 3/2/16.
  */
+@BsonDiscriminator(key = "type", value = "remove-stops")
 public class RemoveStops extends Modification {
     public String getType() {
         return "remove-stops";
@@ -10,11 +15,11 @@ public class RemoveStops extends Modification {
 
     public String feed;
 
-    public String[] routes;
+    public List<String> routes;
 
-    public String[] trips;
+    public List<String> trips;
 
-    public String[] stops;
+    public List<String> stops;
 
     public int secondsSavedAtEachStop = 0;
 

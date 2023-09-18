@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,7 +224,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private void computeAccessTimes() {
         StreetRouter streetRouter = new StreetRouter(network.streetLayer);
 
-        EnumSet<LegMode> modes = request.accessModes;
+        var modes = request.accessModes;
         LegMode mode;
         if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;

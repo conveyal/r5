@@ -2,26 +2,37 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.analysis.results.MultiOriginAssembler;
+import com.conveyal.file.FileStorageFormat;
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.ChaosParameters;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.mongodb.QueryBuilder;
+import com.mongodb.client.model.Filters;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.bson.conversions.Bson;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Request sent from the UI to the backend. It is actually distinct from the task that the broker
@@ -60,12 +71,14 @@ public class AnalysisRequest {
     public float walkSpeed;
     public int maxTripDurationMinutes = 120;
     public int maxRides = 4;
-    public int[] percentiles;
-    public int[] cutoffsMinutes;
+    public List<Integer> percentiles;
+    public List<Integer> cutoffsMinutes;
     public int maxWalkTime = 20;
     public int maxBikeTime = 20;
 
-    /** Web Mercator zoom level; 9 (~250 m by ~250 m) is standard. */
+    /**
+     * Web Mercator zoom level; 9 (~250 m by ~250 m) is standard.
+     */
     public int zoom = 9;
 
     // Parameters that aren't currently configurable in the UI =====================================
@@ -109,7 +122,7 @@ public class AnalysisRequest {
      * On the other hand, in a single point request this may be null, in which case the worker will report only
      * travel times to destinations and not accessibility figures.
      */
-    public String[] destinationPointSetIds;
+    public List<String> destinationPointSetIds;
 
     /** Whether to save all results in a regional analysis to S3 for display in a "static site". */
     public boolean makeTauiSite = false;
@@ -162,20 +175,156 @@ public class AnalysisRequest {
     public ChaosParameters injectFault;
 
     /**
+     * Create a Travel Time Surface task from this request.
+     */
+    public TravelTimeSurfaceTask toTravelTimeSurfaceTask(AnalysisDB db, UserPermissions user) {
+        var task = new TravelTimeSurfaceTask();
+        var scenario = createScenario(db, user);
+        populateBaseTask(task, scenario);
+        populateInjectFault(task, user);
+        return task;
+    }
+
+    /**
+     * Create a regional task from this request.
+     */
+    public RegionalTask toRegionalTask(AnalysisDB db, UserPermissions user) {
+        var task = new RegionalTask();
+        var scenario = createScenario(db, user);
+        populateBaseTask(task, scenario);
+        populateInjectFault(task, user);
+
+        task.oneToOne = oneToOne;
+        task.recordTimes = recordTimes;
+
+        // For now, we support calculating paths in regional analyses only for freeform origins.
+        task.includePathResults = originPointSetId != null && recordPaths;
+        task.recordAccessibility = recordAccessibility;
+
+        // Set the destination PointSets, which are required for all non-Taui regional requests.
+        checkNotNull(destinationPointSetIds);
+        checkState(destinationPointSetIds.size() > 0,
+                "At least one destination pointset ID must be supplied.");
+        int nPointSets = destinationPointSetIds.size();
+        task.destinationPointSetKeys = new ArrayList<>();
+        var foundOpportunityDatasets = db.opportunities.findPermitted(Filters.in("_id", destinationPointSetIds), user);
+        try (var cursor = foundOpportunityDatasets.cursor()) {
+            var opportunityDatasets = db.opportunities.toArray(cursor);
+            for (var dataset : opportunityDatasets) {
+                checkNotNull(dataset, "Opportunity dataset could not be found in database.");
+                task.destinationPointSetKeys.add(OpportunityDataset.storageLocation(dataset));
+
+                // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
+                // The worker will perform equivalent checks via the GridTransformWrapper constructor,
+                // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
+                if (dataset.format == FileStorageFormat.FREEFORM) {
+                    checkArgument(
+                            nPointSets == 1,
+                            "If a freeform destination PointSet is specified, it must be the only one."
+                    );
+                } else {
+                    checkArgument(
+                            dataset.zoom == opportunityDatasets.get(0).zoom,
+                            "If multiple grids are specified as destinations, they must have identical resolutions (web mercator zoom levels)."
+                    );
+                }
+            }
+
+            // For backward compatibility with old workers, communicate any single pointSet via the deprecated field.
+            if (nPointSets == 1) {
+                task.grid = task.destinationPointSetKeys.get(0);
+            }
+        }
+
+        // Also do a preflight validation of the cutoffs and percentiles arrays for all non-TAUI regional tasks.
+        task.validateCutoffsMinutes();
+        task.validatePercentiles();
+
+        // If our destinations are freeform, preload the destination pointset on the backend.
+        // This allows MultiOriginAssembler to know the number of points, and in one-to-one mode to look up their IDs.
+        // Initialization order is important here: destinationPointSetKeys must already be set above.
+        if (task.destinationPointSetKeys.get(0).endsWith(FileStorageFormat.FREEFORM.extension)) {
+            checkArgument(task.destinationPointSetKeys.size() == 1);
+            task.destinationPointSets = new PointSet[]{
+                    PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys.get(0))
+            };
+
+            MultiOriginAssembler.ensureOdPairsUnderLimit(task, task.destinationPointSets[0]);
+        }
+
+        // Set the origin pointset key if an ID is specified. Currently, this will always be a freeform pointset.
+        // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
+        if (originPointSetId != null) {
+            var dataset = db.opportunities.findByIdIfPermitted(originPointSetId, user);
+            task.originPointSetKey = OpportunityDataset.storageLocation(dataset);
+            task.originPointSet = PointSetCache.readFreeFormFromFileStore(task.originPointSetKey);
+        }
+
+        if (task.recordTimes) {
+            checkArgument(
+                    task.destinationPointSets != null &&
+                            task.destinationPointSets.length == 1 &&
+                            task.destinationPointSets[0] instanceof FreeFormPointSet,
+                    "recordTimes can only be used with a single destination pointset, which must be freeform (non-grid)."
+            );
+        }
+
+        return task;
+    }
+
+    /**
+     * Create a taui task from this request.
+     */
+    public RegionalTask toTauiTask(AnalysisDB db, UserPermissions user) {
+        var task = new RegionalTask();
+        var scenario = createScenario(db, user);
+        populateBaseTask(task, scenario);
+        populateInjectFault(task, user);
+
+        // Making a Taui site implies writing static travel time and path files per origin, but not accessibility.
+        task.makeTauiSite = true;
+        task.includePathResults = true;
+        task.oneToOne = false;
+        task.recordAccessibility = false;
+        task.recordTimes = true;
+
+        return task;
+    }
+
+    private void populateInjectFault(AnalysisWorkerTask task, UserPermissions user) {
+        // Intentionally introduce errors for testing purposes, but only for admin users.
+        if (injectFault != null) {
+            if (user.admin) {
+                task.injectFault = injectFault;
+            } else {
+                throw new IllegalArgumentException("Must be admin user to inject faults.");
+            }
+        }
+    }
+
+    /**
      * Create the R5 `Scenario` from this request.
      */
-    public Scenario createScenario (UserPermissions userPermissions) {
-        QueryBuilder query = "all".equals(scenarioId)
-                ? QueryBuilder.start("projectId").is(projectId)
-                : QueryBuilder.start("_id").in(modificationIds);
-        Collection<Modification> modifications = Persistence.modifications.findPermitted(query.get(), userPermissions);
-        // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
-        String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
-        String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
-        Scenario scenario = new Scenario();
-        scenario.id = scenarioId;
-        scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
-        return scenario;
+    private Scenario createScenario(AnalysisDB db, UserPermissions userPermissions) {
+        Bson query = "all".equals(scenarioId)
+                ? Filters.eq("projectId", projectId)
+                : Filters.in("_id", modificationIds);
+        Bson queryWithPermissions = Filters.and(
+                Filters.eq("accessGroup", userPermissions.accessGroup),
+                query
+        );
+
+        try (var cursor = db.modifications.findPermitted(query, userPermissions).cursor()) {
+            var modifications = db.modifications.toArray(cursor);
+
+            // `findPermitted` sorts by creation time by default. Nonces will be in the same order each time.
+            String nonces = Arrays.toString(modifications.stream().map(m -> m.nonce).toArray());
+            String scenarioId = String.format("%s-%s", bundleId, DigestUtils.sha1Hex(nonces));
+            Scenario scenario = new Scenario();
+            scenario.id = scenarioId;
+            scenario.modifications = modifications.stream().map(com.conveyal.analysis.models.Modification::toR5).collect(Collectors.toList());
+            return scenario;
+        }
     }
 
     /**
@@ -191,10 +340,9 @@ public class AnalysisRequest {
      * TODO arguably this should be done by a method on the task classes themselves, with common parts factored out
      *      to the same method on the superclass.
      */
-    public void populateTask (AnalysisWorkerTask task, UserPermissions userPermissions) {
+    private void populateBaseTask(AnalysisWorkerTask task, Scenario scenario) {
         if (bounds == null) throw AnalysisServerException.badRequest("Analysis bounds must be set.");
-
-        task.scenario = createScenario(userPermissions);
+        task.scenario = scenario;
         task.scenarioId = task.scenario.id;
         task.graphId = bundleId;
         task.workerVersion = workerVersion;
@@ -242,28 +390,22 @@ public class AnalysisRequest {
         task.monteCarloDraws = monteCarloDraws;
         task.percentiles = percentiles;
         task.cutoffsMinutes = cutoffsMinutes;
-        
+
         task.logRequest = logRequest;
 
         task.accessModes = getEnumSetFromString(accessModes);
         task.directModes = getEnumSetFromString(directModes);
         task.egressModes = getEnumSetFromString(egressModes);
-        task.transitModes = transitModes != null && !"".equals(transitModes)
-                ? EnumSet.copyOf(Arrays.stream(transitModes.split(",")).map(TransitModes::valueOf).collect(Collectors.toList()))
-                : EnumSet.noneOf(TransitModes.class);
+        if (transitModes != null && !"".equals(transitModes)) {
+            task.transitModes = EnumSet.copyOf(Arrays.stream(transitModes.split(",")).map(TransitModes::valueOf).collect(Collectors.toList()));
+        } else {
+            task.transitModes = EnumSet.noneOf(TransitModes.class);
+        }
 
         // Use the decay function supplied by the UI, defaulting to a zero-width step function if none is supplied.
         task.decayFunction = decayFunction;
         if (task.decayFunction == null) {
             task.decayFunction = new StepDecayFunction();
-        }
-        // Intentionally introduce errors for testing purposes, but only for admin users.
-        if (injectFault != null) {
-            if (userPermissions.admin) {
-                task.injectFault = injectFault;
-            } else {
-                throw new IllegalArgumentException("Must be admin user to inject faults.");
-            }
         }
     }
 
@@ -274,4 +416,5 @@ public class AnalysisRequest {
             return EnumSet.noneOf(LegMode.class);
         }
     }
+
 }

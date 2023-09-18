@@ -1,12 +1,14 @@
 package com.conveyal.analysis.models;
 
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.stream.Collectors;
+import java.util.List;
 
 /**
  * Adjust the speed of a route.
  */
+@BsonDiscriminator(key = "type", value = "adjust-speed")
 public class AdjustSpeed extends Modification {
     public String getType() {
         return "adjust-speed";
@@ -14,18 +16,24 @@ public class AdjustSpeed extends Modification {
 
     public String feed;
 
-    public String[] routes;
+    public List<String> routes;
 
-    /** At least one trip from each pattern to modify. Does not select single trips, only whole patterns. */
-    public String[] trips;
+    /**
+     * At least one trip from each pattern to modify. Does not select single trips, only whole patterns.
+     */
+    public List<String> trips;
 
-    /** array of [from stop, to stop] specifying single hops this should be applied to */
-    public String[][] hops;
+    /**
+     * array of [from stop, to stop] specifying single hops this should be applied to
+     */
+    public List<List<String>> hops;
 
-    /** the factor by which to scale speed. 1 means no change, 2 means faster. */
+    /**
+     * the factor by which to scale speed. 1 means no change, 2 means faster.
+     */
     public double scale;
 
-    public com.conveyal.r5.analyst.scenario.AdjustSpeed toR5 () {
+    public com.conveyal.r5.analyst.scenario.AdjustSpeed toR5() {
         com.conveyal.r5.analyst.scenario.AdjustSpeed as = new com.conveyal.r5.analyst.scenario.AdjustSpeed();
         as.comment = name;
 
@@ -36,8 +44,8 @@ public class AdjustSpeed extends Modification {
         }
 
         if (hops != null) {
-            as.hops = new ArrayList<>(hops.length);
-            for (String[] hopStops : hops) {
+            as.hops = new ArrayList<>(hops.size());
+            for (List<String> hopStops : hops) {
                 as.hops.add(feedScopedIdArray(feed, hopStops));
             }
         }

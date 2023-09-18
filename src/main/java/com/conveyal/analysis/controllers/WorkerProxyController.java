@@ -4,7 +4,7 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.analysis.models.Bundle;
-import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -36,9 +36,11 @@ public class WorkerProxyController implements HttpController {
     private static final Logger LOG = LoggerFactory.getLogger(WorkerProxyController.class);
 
     private final Broker broker;
+    private final AnalysisDB db;
 
-    public WorkerProxyController (Broker broker) {
+    public WorkerProxyController(Broker broker, AnalysisDB db) {
         this.broker = broker;
+        this.db = db;
     }
 
     @Override
@@ -56,7 +58,7 @@ public class WorkerProxyController implements HttpController {
      * Get the address of an existing worker or create a new worker and return `null`.
      */
     private String getOrStartWorker (String bundleId, String workerVersion, UserPermissions userPermissions) {
-        Bundle bundle = Persistence.bundles.findByIdIfPermitted(bundleId, userPermissions);
+        Bundle bundle = db.bundles.findByIdIfPermitted(bundleId, userPermissions);
         WorkerCategory workerCategory = new WorkerCategory(bundle._id, workerVersion);
         String address = broker.getWorkerAddress(workerCategory);
         if (address == null) {

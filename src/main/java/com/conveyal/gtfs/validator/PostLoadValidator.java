@@ -6,7 +6,9 @@ import com.conveyal.gtfs.error.ForbiddenFieldError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.error.RangeError;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
+import com.conveyal.gtfs.error.SuspectStopLocationError;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.storage.BooleanAsciiGrid;
 
 import java.util.List;
 
@@ -33,6 +35,7 @@ public class PostLoadValidator {
     public void validate () {
         validateCalendarServices();
         validateParentStations();
+        validateStopPopulationDensity();
     }
 
     /**
@@ -43,6 +46,20 @@ public class PostLoadValidator {
         if (feed.services.isEmpty()) {
             feed.errors.add(new GeneralError("calendar.txt", 0, "service_id",
                     "Feed does not define any services in calendar or calendar_dates."));
+        }
+    }
+
+    /**
+     * Validate that stops are not in locations with no people. This can happen from incorrect coordinate transforms
+     * into WGS84. Stops are often located on "null island" at (0,0). This can also happen in other coordinate systems
+     * before they are transformed to WGS84: the origin of a common French coordinate system is in the Sahara.
+     */
+    private void validateStopPopulationDensity () {
+        BooleanAsciiGrid popGrid = BooleanAsciiGrid.forEarthPopulation();
+        for (Stop stop : feed.stops.values()) {
+            if (!(popGrid.getValueForCoords(stop.stop_lon, stop.stop_lat))) {
+                feed.errors.add(new SuspectStopLocationError(stop.stop_id, stop.sourceFileLine));
+            }
         }
     }
 

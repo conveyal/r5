@@ -43,7 +43,7 @@ public class FareRule extends Entity {
 
             Fare fare = fares.computeIfAbsent(fareId, Fare::new);
             FareRule fr = new FareRule();
-            fr.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            fr.sourceFileLine = row;
             fr.fare_id = fare.fare_id;
             fr.route_id = getStringField("route_id", false);
             fr.origin_id = getStringField("origin_id", false);

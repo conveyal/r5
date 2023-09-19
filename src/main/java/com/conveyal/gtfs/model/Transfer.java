@@ -31,7 +31,7 @@ public class Transfer extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
-            tr.sourceFileLine    = row + 1; // offset line number by 1 to account for 0-based row index
+            tr.sourceFileLine    = row;
             tr.from_stop_id      = getStringField("from_stop_id", true);
             tr.to_stop_id        = getStringField("to_stop_id", true);
             tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
@@ -48,6 +48,7 @@ public class Transfer extends Entity {
             getRefField("from_trip_id", false, feed.trips);
             getRefField("to_trip_id", false, feed.trips);
 
+            // row number used as an arbitrary unique string to give MapDB a key.
             feed.transfers.put(Long.toString(row), tr);
         }
 

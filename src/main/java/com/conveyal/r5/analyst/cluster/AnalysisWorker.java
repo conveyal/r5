@@ -205,8 +205,8 @@ public class AnalysisWorker implements Component {
         // Create an executor with one thread per processor. The default task rejection policy is "Abort".
         // The number of threads will only increase from the core pool size toward the max pool size when the queue is
         // full. We no longer exceed the queue length in normal operation, so the thread pool will remain at core size.
-        // "[The] core pool size is the threshold beyond which [an] executor service prefers to queue up the task than
-        // spawn a new thread."
+        // "[The] core pool size is the threshold beyond which [an] executor service prefers to queue up the task
+        // [rather] than spawn a new thread." https://stackoverflow.com/a/72684387/778449
         // The executor's queue is rather long because some tasks complete very fast and we poll at most once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
         LOG.info("Java reports the number of available processors is: {}", availableProcessors);
@@ -613,9 +613,10 @@ public class AnalysisWorker implements Component {
                 // Broker returned some work. Use the lenient object mapper to decode it in case the broker is a
                 // newer version so sending unrecognizable fields.
                 // ReadValue closes the stream, releasing the HTTP connection.
-                List<RegionalTask> tasks = JsonUtilities.lenientObjectMapper.readValue(responseEntity.getContent(),
-                        new TypeReference<List<RegionalTask>>() {});
-                return tasks;
+                return JsonUtilities.lenientObjectMapper.readValue(
+                        responseEntity.getContent(),
+                        new TypeReference<List<RegionalTask>>() {}
+                );
             }
             // Non-200 response code or a null entity. Something is weird.
             LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());

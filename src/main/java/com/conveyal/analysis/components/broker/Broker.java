@@ -107,9 +107,14 @@ public class Broker implements Component {
 
     /**
      * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
-     * never send more than the minimum of the two values. 50 tasks gives response bodies of about 65kB.
+     * never send more than the minimum of the two values. 50 tasks gives response bodies of about 65kB. If this value
+     * is too high, all remaining tasks in a job could be distributed to a single worker leaving none for the other
+     * workers, creating a slow-joiner problem especially if the tasks are complicated and slow to complete.
+     *
+     * The value should eventually be tuned. The current value of 16 is just the value used by the previous sporadic
+     * polling system (WorkerStatus.LEGACY_WORKER_MAX_TASKS) which may not be ideal but is known to work.
      */
-    public final int MAX_TASKS_PER_WORKER = 100;
+    public final int MAX_TASKS_PER_WORKER = 16;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
@@ -348,7 +353,6 @@ public class Broker implements Component {
         }
         // Return up to N tasks that are waiting to be processed.
         if (maxTasksRequested > MAX_TASKS_PER_WORKER) {
-            LOG.warn("Worker requested {} tasks, reducing to {}.", maxTasksRequested, MAX_TASKS_PER_WORKER);
             maxTasksRequested = MAX_TASKS_PER_WORKER;
         }
         return job.generateSomeTasksToDeliver(maxTasksRequested);

@@ -78,7 +78,7 @@ public class AnalysisWorker implements Component {
     private static final int POLL_INTERVAL_MIN_SECONDS = 1;
     private static final int POLL_INTERVAL_MAX_SECONDS = 15;
     private static final int POLL_JITTER_SECONDS = 5;
-    private static final int QUEUE_SLOTS_PER_PROCESSOR = 10;
+    private static final int QUEUE_SLOTS_PER_PROCESSOR = 8;
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.

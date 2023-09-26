@@ -7,19 +7,19 @@ import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
- * An instance of this is included in a OneOriginResult for reporting the nearest N destinations. If we use more than
- * one destination point set they are already constrained to all be aligned with the same number of destinations.
+ * An instance of this is included in a OneOriginResult for reporting how many opportunities are encountered during each
+ * minute of travel. If we use more than one destination point set they are already constrained to all be aligned with
+ * the same number of destinations.
  *
  * The data retained here feed into three different kinds of results: "Dual" accessibility (the number of opportunities
- * reached in a given number of minutes of travel time); temporal opportunity density (akin to a probability density
+ * reached in a given number of minutes of travel time); temporal opportunity density (analogous to a probability density
  * function, how many opportunities are encountered during each minute of travel, whose integral is the cumulative
- * accessibility curve); and the nearest one or more opportunities to a given origin.
- * (expand from comments on https://github.com/conveyal/r5/pull/884)
+ * accessibility curve).
  *
  * Originally this class was tracking the identity of the N nearest points rather than just binning them by travel time.
  * This is more efficient in cases where N is small, and allows retaining the one-second resolution. However currently
  * there does not seem to be much demand among users for this level of detail, so it has been removed in the interest
- * of simplicity and maintainability.
+ * of simplicity and maintainability. See issue 884 for more comments on implementation trade-offs.
  */
 public class TemporalDensityResult {
 
@@ -34,7 +34,6 @@ public class TemporalDensityResult {
     /**
      * The temporal density of opportunities. For each destination set, for each percentile, for each minute of
      * travel from 0 to 120, the number of opportunities reached in travel times from i (inclusive) to i+1 (exclusive).
-     *
      */
     public final double[][][] opportunitiesPerMinute;
 

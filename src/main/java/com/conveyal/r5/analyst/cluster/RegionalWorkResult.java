@@ -38,6 +38,12 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues;
 
     /**
+     * The temporal density of opportunities - how many are reached during each minute of travel.
+     * Quantities of opportunities for each [destinationGrid, percentile, minute].
+     */
+    public double[][][] opportunitiesPerMinute;
+
+    /**
      * If this field is non-null, the worker is reporting an error that compromises the quality of the result at this
      * origin point, and potentially for then entire regional analysis. Put into a Set on backend since all workers
      * will probably report the same problem, but we may want to tolerate errors on a small number of origin points to
@@ -59,6 +65,7 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
+        this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

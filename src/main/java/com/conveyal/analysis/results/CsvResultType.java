@@ -5,5 +5,5 @@ package com.conveyal.analysis.results;
  * do serve to enumerate the acceptable parameters coming over the HTTP API.
  */
 public enum CsvResultType {
-    ACCESS, TIMES, PATHS
+    ACCESS, TIMES, PATHS, TDENSITY
 }

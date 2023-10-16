@@ -150,6 +150,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
+    // FIXME Grid.java has seemingly identical definitions of these same mercator-to-wgs methods.
+    //   These methods should just be wrappers that pass in this WebMercatorGridPointSet's zoom level.
+    //   Grid also has methods that distinguish between pixel corner and center. Those corner methods should be renamed.
+    //   WebMercatorGridPointSet, Grid, and WebMercatorExtents are in the same package and should share methods.
 
     /**
      * Return the x pixel number containing the given longitude at this grid's zoom level, relative to the left edge

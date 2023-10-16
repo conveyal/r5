@@ -458,19 +458,25 @@ public class Grid extends PointSet {
         return extents.width * extents.height;
     }
 
-    /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
+    /* Functions below derived from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
+
+    /** Like lonToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double lonToFractionalPixel (double lon, int zoom) {
+        return (lon + 180) / 360 * Math.pow(2, zoom) * 256;
+    }
 
     /**
-     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
-     * zoom level.
+     * Return the absolute (world) x pixel number of all pixels containing the given line of longitude
+     * at the given zoom level.
      */
     public static int lonToPixel (double lon, int zoom) {
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+        return (int) lonToFractionalPixel(lon, zoom);
     }
 
     /**
      * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
-     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     * west edge of the world (assuming an integer x pixel number). Noninteger x pixel coordinates will return
+     * WGS84 locations within that pixel.
      */
     public static double pixelToLon (double xPixel, int zoom) {
         return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
@@ -484,18 +490,15 @@ public class Grid extends PointSet {
         return pixelToLon(xPixel + 0.5, zoom);
     }
 
-    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
-    public static int latToPixel (double lat, int zoom) {
+    /** Like latToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double latToFractionalPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
-        return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return (1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256;
     }
 
-    /**
-     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
-     * measured southward from the north edge of the world.
-     */
-    public static double pixelToCenterLat (int yPixel, int zoom) {
-        return pixelToLat(yPixel + 0.5, zoom);
+    /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
+    public static int latToPixel (double lat, int zoom) {
+        return (int) latToFractionalPixel(lat, zoom);
     }
 
     /**
@@ -505,6 +508,14 @@ public class Grid extends PointSet {
      */
     public static double pixelToLat (double yPixel, int zoom) {
         return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+    }
+
+    /**
+     * Return the latitude of the center of all pixels at the given zoom level and absolute (world) y pixel number
+     * measured southward from the north edge of the world.
+     */
+    public static double pixelToCenterLat (int yPixel, int zoom) {
+        return pixelToLat(yPixel + 0.5, zoom);
     }
 
     /**

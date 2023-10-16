@@ -154,23 +154,26 @@ public class WebMercatorExtents {
     private static final double WGS_EPSILON = 0.00001;
 
     /**
-     * Wrapper to forWgsEnvelope where the envelope is shrunk uniformly by only a meter or two in each direction. This
+     * Wrapper to forWgsEnvelope where the envelope is trimmed uniformly by only a meter or two in each direction. This
      * helps handle lack of numerical precision where floating point math is intended to yield integers and envelopes
      * that exactly line up with Mercator grid edges (though the latter is also handled by the main constructor).
-     * A left or top edge coordinate that ends up the tiniest bit below the intended integer will be truncated all the
-     * way to the next lower pixel number. A bottom or right edge coordinate that ends up a tiny bit above the intended
-     * integer will tack a whole row of pixels onto the grid. Neither of these are horrible in isolation (grid is one
-     * pixel too big) but when applied repeatedly, as when basing one analysis on another in a chain, the grid will grow
-     * larger and larger, yielding incomparable result grids.
      *
-     * I originally attempted to do this with lat/lonToPixel functions that would snap to pixel edges, but the snapping
-     * needs to pull in different directions on different edges of the envelope. Just transforming the envelope is simpler.
+     * Without this trimming, when receiving an envelope that's supposed to lie on integer web Mercator pixel
+     * boundaries, a left or top edge coordinate may end up the tiniest bit below the intended integer and be
+     * truncated all the way down to the next lower pixel number. A bottom or right edge coordinate that ends up a tiny
+     * bit above the intended integer will tack a whole row of pixels onto the grid. Neither of these are horrible in
+     * isolation (the grid is just one pixel bigger than absolutely necessary) but when applied repeatedly, as when
+     * basing one analysis on another in a chain, the grid will grow larger and larger, yielding mismatched result grids.
+     *
+     * I originally attempted to handle this with lat/lonToPixel functions that would snap to pixel edges, but the
+     * snapping needs to pull in different directions on different edges of the envelope. Just transforming the envelope
+     * by trimming it slightly is simpler and has the intended effect.
      *
      * Trimming is not appropriate in every use case. If you have an envelope that's a tight fit around a set of points
      * (opportunities) and the left edge of that envelope is within the trimming distance of a web Mercator pixel edge,
-     * those opportunities will be outside the resulting WebMercatorExtents. When preparing grids to contain sets of
-     * points, it is probably better to deal with numerical imprecision by expanding the envelope slightly instead of
-     * contracting it.
+     * those opportunities will be outside the resulting WebMercatorExtents. When preparing grids intended to contain
+     * a set of points, it is probably better to deal with numerical imprecision by expanding the envelope slightly
+     * instead of contracting it. A separate method is supplied for this purpose.
      */
     public static WebMercatorExtents forTrimmedWgsEnvelope (Envelope wgsEnvelope, int zoom) {
         checkArgument(wgsEnvelope.getWidth() > 3 * WGS_EPSILON, "Envelope is too narrow.");

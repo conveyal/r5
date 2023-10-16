@@ -4,8 +4,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Envelope;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 class WebMercatorExtentsTest {
 
     /**

@@ -8,7 +8,6 @@ import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -64,14 +63,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
-import static org.apache.commons.math3.util.FastMath.atan;
-import static org.apache.commons.math3.util.FastMath.cos;
-import static org.apache.commons.math3.util.FastMath.log;
-import static org.apache.commons.math3.util.FastMath.sinh;
-import static org.apache.commons.math3.util.FastMath.tan;
+import static java.lang.Math.PI;
+import static java.lang.Math.atan;
+import static java.lang.Math.cos;
+import static java.lang.Math.log;
+import static java.lang.Math.pow;
+import static java.lang.Math.sinh;
+import static java.lang.Math.tan;
+import static java.lang.Math.toDegrees;
+import static java.lang.Math.toRadians;
 
 /**
  * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
@@ -462,6 +464,7 @@ public class Grid extends PointSet {
 
     /** Like lonToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
     public static double lonToFractionalPixel (double lon, int zoom) {
+        // Factor of 256 yields a pixel value rather than the tile number.
         return (lon + 180) / 360 * Math.pow(2, zoom) * 256;
     }
 
@@ -474,12 +477,13 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
-     * west edge of the world (assuming an integer x pixel number). Noninteger x pixel coordinates will return
-     * WGS84 locations within that pixel.
+     * Given an integer web Mercator pixel number, return the longitude in degrees of the west edge of that pixel at
+     * the given zoom level measured from the west edge of the world (not relative to this grid or to any particular
+     * tile). Given a non-integer web Mercator pixel number, return WGS84 locations within that pixel.
+     * Naming should somehow be revised to clarify that it doesn't return the center of the pixel.
      */
     public static double pixelToLon (double xPixel, int zoom) {
-        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+        return xPixel / (pow(2, zoom) * 256) * 360 - 180;
     }
 
     /**
@@ -492,7 +496,7 @@ public class Grid extends PointSet {
 
     /** Like latToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
     public static double latToFractionalPixel (double lat, int zoom) {
-        double latRad = FastMath.toRadians(lat);
+        final double latRad = toRadians(lat);
         return (1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256;
     }
 
@@ -502,12 +506,16 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
-     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
-     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+     * Given an integer web Mercator pixel number, return the latitude in degrees of the north edge of that pixel at the
+     * given zoom level relative to the top (north) edge of the world (not relative to this grid or to any particular
+     * tile). Given a non-integer web Mercator pixel number, return WGS84 locations within that pixel.
+     *
+     * TODO Profile this some time because we had versions using both FastMath and built-in Math functions.
+     * The difference should be less significant these days. Java now has a StrictMath and the normal Math is optimized.
      */
     public static double pixelToLat (double yPixel, int zoom) {
-        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+        final double tile = yPixel / 256d;
+        return toDegrees(atan(sinh(PI - tile * PI * 2 / pow(2, zoom))));
     }
 
     /**

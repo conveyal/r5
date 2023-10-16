@@ -150,54 +150,33 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
-    // FIXME Grid.java has seemingly identical definitions of these same mercator-to-wgs methods.
-    //   These methods should just be wrappers that pass in this WebMercatorGridPointSet's zoom level.
-    //   Grid also has methods that distinguish between pixel corner and center. Those corner methods should be renamed.
-    //   WebMercatorGridPointSet, Grid, and WebMercatorExtents are in the same package and should share methods.
 
     /**
-     * Return the x pixel number containing the given longitude at this grid's zoom level, relative to the left edge
-     * of the world  (not relative to this grid or to any particular tile).
-     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
+     * See com.conveyal.r5.analyst.Grid#lonToPixel(double, int)
      */
     public int lonToPixel (double lon) {
-        // factor of 256 is to get a pixel value not a tile number
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+        return Grid.lonToPixel(lon, zoom);
     }
 
     /**
-     * Return the y pixel number containing the given latitude at this grid's zoom level, relative to the top edge of
-     * the world (not relative to this grid or to any particular tile).
-     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
+     * See com.conveyal.r5.analyst.Grid#latToPixel(double, int)
      */
     public int latToPixel (double lat) {
-        double invCos = 1 / Math.cos(Math.toRadians(lat));
-        double tan = Math.tan(Math.toRadians(lat));
-        double ln = Math.log(tan + invCos);
-        return (int) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return Grid.latToPixel(lat, zoom);
     }
 
     /**
-     * Return the longitude in degrees of the west edge of any pixel at the specified x coordinate relative to the left
-     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
-     * TODO This method could be reusable and static if zoom level was a parameter.
-     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
-     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
+     * See com.conveyal.r5.analyst.Grid#pixelToLon(double, int)
      */
     public double pixelToLon (double x) {
-        return x / (Math.pow(2, zoom) * 256) * 360 - 180;
+        return Grid.pixelToLon(x, zoom);
     }
 
     /**
-     * Return the latitude in degrees of the north edge of any pixel at the specified y coordinate relative to the top
-     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
-     * TODO This method could be reusable and static if zoom level was a parameter.
-     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
-     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
+     * See com.conveyal.r5.analyst.Grid#pixelToLat(double, int)
      */
     public double pixelToLat (double y) {
-        double tile = y / 256d;
-        return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
+        return Grid.pixelToLat(y, zoom);
     }
 
     @Override

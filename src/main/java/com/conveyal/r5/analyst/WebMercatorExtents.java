@@ -10,7 +10,12 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.util.Arrays;
 
-import static com.conveyal.r5.analyst.Grid.*;
+import static com.conveyal.r5.analyst.Grid.latToFractionalPixel;
+import static com.conveyal.r5.analyst.Grid.latToPixel;
+import static com.conveyal.r5.analyst.Grid.lonToFractionalPixel;
+import static com.conveyal.r5.analyst.Grid.lonToPixel;
+import static com.conveyal.r5.analyst.Grid.pixelToLat;
+import static com.conveyal.r5.analyst.Grid.pixelToLon;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkElementIndex;
 import static com.google.common.base.Preconditions.checkNotNull;

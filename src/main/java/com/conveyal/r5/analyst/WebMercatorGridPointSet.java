@@ -12,6 +12,8 @@ import java.io.Serializable;
 
 import static com.conveyal.r5.analyst.Grid.latToPixel;
 import static com.conveyal.r5.analyst.Grid.lonToPixel;
+import static com.conveyal.r5.analyst.Grid.pixelToCenterLat;
+import static com.conveyal.r5.analyst.Grid.pixelToCenterLon;
 import static com.conveyal.r5.analyst.Grid.pixelToLat;
 import static com.conveyal.r5.analyst.Grid.pixelToLon;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
@@ -115,14 +117,14 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public double getLat(int i) {
-        long y = i / this.width + this.north;
-        return pixelToLat(y, zoom);
+        final int y = i / this.width + this.north;
+        return pixelToCenterLat(y, zoom);
     }
 
     @Override
     public double getLon(int i) {
-        long x = i % this.width + this.west;
-        return pixelToLon(x, zoom);
+        final int x = i % this.width + this.west;
+        return pixelToCenterLon(x, zoom);
     }
 
     @Override

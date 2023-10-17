@@ -26,7 +26,7 @@ class WebMercatorExtentsTest {
      * digits (as when they are stored in a database or serialized over the wire).
      */
     @ParameterizedTest
-    @ValueSource(ints = {9, 10, 11})
+    @ValueSource(ints = {9, 10, 11, 12})
     void wgsMercatorStability (int zoom) {
         Envelope wgsEnvelope = new Envelope();
         wgsEnvelope.expandToInclude(10.22222222, 45.111111);
@@ -49,7 +49,7 @@ class WebMercatorExtentsTest {
      * one cell (rather than zero cells). Also check an envelope with a tiny nonzero envelope away from cell edges.
      */
     @ParameterizedTest
-    @ValueSource(ints = {9, 10, 11})
+    @ValueSource(ints = {9, 10, 11, 12})
     void singleCellExtents (int zoom) {
         Envelope wgsEnvelope = new Envelope();
 

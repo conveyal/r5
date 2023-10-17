@@ -125,6 +125,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     public TIntList getPointsInEnvelope (Envelope envelopeFixedDegrees) {
         // Convert fixed-degree envelope to floating, then to world-scale web Mercator pixels at this grid's zoom level.
         // This is not very DRY since we do something very similar in the constructor and elsewhere.
+        // These are the integer pixel numbers containing the envelope, so iteration below must be inclusive of the max.
         int west = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinX()));
         int east = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxX()));
         int north = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxY()));

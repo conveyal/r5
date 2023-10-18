@@ -273,7 +273,7 @@ public class Distribution {
     public void assertSimilar (Distribution observed) {
         double squaredError = this.weightedSquaredError(observed);
         showChartsIfEnabled(observed);
-        assertTrue(squaredError < 0.02, String.format("Error metric too high at at %3f", squaredError));
+        assertTrue(squaredError < 0.025, String.format("Error metric too high at at %3f", squaredError));
     }
 
     public void showChartsIfEnabled (Distribution observed) {

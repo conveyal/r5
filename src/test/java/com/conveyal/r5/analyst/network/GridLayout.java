@@ -169,10 +169,6 @@ public class GridLayout {
         return new GridSinglePointTaskBuilder(this);
     }
 
-    public GridSinglePointTaskBuilder copyTask(AnalysisWorkerTask task) {
-        return new GridSinglePointTaskBuilder(this, task);
-    }
-
     /** Get the minimum envelope containing all the points in this grid. */
     public Envelope gridEnvelope () {
         Coordinate farCorner = getIntersectionLatLon(widthAndHeightInBlocks, widthAndHeightInBlocks);
@@ -201,13 +197,6 @@ public class GridLayout {
             Arrays.fill(grid.grid[c], density);
         }
         return grid;
-    }
-
-    public int pointIndex(AnalysisWorkerTask task, int x, int y) {
-        Coordinate destLatLon = this.getIntersectionLatLon(x, y);
-        // Here is a bit of awkwardness where WebMercatorGridPointSet and Grid both extend PointSet, but don't share
-        // their grid referencing code, so one would have to be converted to the other to get the point index.
-        return new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
     }
 
     public String nextIntegerId() {

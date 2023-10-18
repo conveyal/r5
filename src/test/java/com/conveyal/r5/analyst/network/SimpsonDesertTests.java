@@ -13,7 +13,6 @@ import org.locationtech.jts.geom.CoordinateXY;
 import java.io.FileOutputStream;
 import java.time.LocalTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -181,25 +180,23 @@ public class SimpsonDesertTests {
         gridLayout.routes.get(0).hopTimeScaling = hopTimeScaling;
         TransportNetwork network = gridLayout.generateNetwork();
 
-        // 1. Standard rider: upstream overtaking means Trip B departs origin first and is fastest to destination.
-        AnalysisWorkerTask standardRider = gridLayout.newTaskBuilder()
+        // 0. Reuse this task builder to produce several tasks. See caveats on build() method.
+        GridSinglePointTaskBuilder taskBuilder = gridLayout.newTaskBuilder()
                 .departureTimeWindow(7, 0, 5)
                 .maxRides(1)
                 .setOrigin(30, 50)
                 .uniformOpportunityDensity(10)
-                .singleFreeformDestination(42, 50)
-                .build();
+                .singleFreeformDestination(42, 50);
 
+        // 1. Standard rider: upstream overtaking means Trip B departs origin first and is fastest to destination.
+        AnalysisWorkerTask standardRider = taskBuilder.build();
         OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes();
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus 7 minute ride.
         Distribution standardExpected = new Distribution(30, 5).delay(7);
         standardExpected.multiAssertSimilar(standardResult.travelTimes, 0);
 
         // 2. Naive rider: downstream overtaking means Trip A departs origin first but is not fastest to destination.
-        AnalysisWorkerTask naiveRider = gridLayout.copyTask(standardRider)
-                .setOrigin(10, 50)
-                .build();
-
+        AnalysisWorkerTask naiveRider = taskBuilder.setOrigin(10, 50).build();
         OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes();
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus 36 minute ride.
         Distribution naiveExpected = new Distribution(10, 5).delay(36);
@@ -207,10 +204,8 @@ public class SimpsonDesertTests {
 
         // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
         // when boarding Trip A is possible
-        AnalysisWorkerTask savvyRider = gridLayout.copyTask(naiveRider)
-                .departureTimeWindow(7, 13, 5)
-                .build();
-
+        AnalysisWorkerTask savvyRider = taskBuilder
+                .departureTimeWindow(7, 13, 5).build();
         OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
         // Trip B departs stop 10 at 7:25. So 8-13 minute wait, plus 16 minute ride.
         Distribution savvyExpected = new Distribution(8, 5).delay(16);

@@ -19,13 +19,9 @@ import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
 /**
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
- * It provides convenience methods to set all the necessary fields.
- *
- * Usually we would rather search out to freeform pointsets containing a few exact points instead of grid pointsets
- * which will not align exactly with the street intersections. However as of this writing single point tasks could only
- * search out to grids, which are hard-wired into fields of the task, not derived from the pointset object.
- *
- * We may actually want to test with regional tasks to make this less strange, and eventually merge both request types.
+ * It provides convenience methods to set all the necessary fields. This builder may be reused to produce
+ * several tasks in a row with different settings, but only use the most recently produced one at any time.
+ * See build() for further explanation.
  */
 public class GridSinglePointTaskBuilder {
 
@@ -58,25 +54,10 @@ public class GridSinglePointTaskBuilder {
         task.recordTravelTimeHistograms = true;
     }
 
-    public GridSinglePointTaskBuilder (GridLayout layout, AnalysisWorkerTask task) {
-        this.gridLayout = layout;
-        this.task = task.clone();
-    }
-
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
         Coordinate origin = gridLayout.getIntersectionLatLon(gridX, gridY);
         task.fromLat = origin.y;
         task.fromLon = origin.x;
-        return this;
-    }
-
-    public GridSinglePointTaskBuilder setDestination (int gridX, int gridY) {
-        Coordinate destination = gridLayout.getIntersectionLatLon(gridX, gridY);
-        task.destinationPointSets = new PointSet[] { new FreeFormPointSet(destination) };
-        task.destinationPointSetKeys = new String[] { "ID" };
-        task.toLat = destination.y;
-        task.toLon = destination.x;
-        task.includePathResults = true;
         return this;
     }
 
@@ -152,8 +133,15 @@ public class GridSinglePointTaskBuilder {
         return this;
     }
 
+    /**
+     * Produce a new AnalysisWorkerTask object based on the settings applied to this builder. The builder remains
+     * valid after this operation, and later calls to build() after further modifying the settings will return
+     * separate AnalysisWorkerTask objects. HOWEVER despite the use of clone(), these task objects share references
+     * to some sub-objects such as arrays or Sets. To avoid problems, only use the most recently produced task from
+     * the builder. Do not continue using tasks produced by previous calls to build().
+     */
     public AnalysisWorkerTask build () {
-        return task;
+        return task.clone();
     }
 
 }

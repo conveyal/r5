@@ -29,6 +29,7 @@ import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
  */
 public class GridSinglePointTaskBuilder {
 
+    public static final int DEFAULT_MONTE_CARLO_DRAWS = 4800; // 40 per minute over a two hour window.
     private final GridLayout gridLayout;
     private final AnalysisWorkerTask task;
 
@@ -50,7 +51,7 @@ public class GridSinglePointTaskBuilder {
         // In single point tasks all 121 cutoffs are required (there is a check).
         task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
         task.decayFunction = new StepDecayFunction();
-        task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
+        task.monteCarloDraws = DEFAULT_MONTE_CARLO_DRAWS;
         // By default, traverse one block in a round predictable number of seconds.
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
         // Record more detailed information to allow comparison to theoretical travel time distributions.
@@ -128,8 +129,26 @@ public class GridSinglePointTaskBuilder {
         return this;
     }
 
+    /**
+     * When trying to verify more complex distributions, the Monte Carlo approach may introduce too much noise.
+     * Increasing the number of draws will yield a better approximation of the true travel time distribution
+     * (while making the tests run slower).
+     */
     public GridSinglePointTaskBuilder monteCarloDraws (int draws) {
         task.monteCarloDraws = draws;
+        return this;
+    }
+
+    /**
+     * This eliminates any difficulty estimating the final segment of egress, walking from the street to a gridded
+     * travel time sample point. Although egress time is something we'd like to test too, it is not part of the transit
+     * routing we're concentrating on here, and will vary as the Simpson Desert street grid does not align with our
+     * web Mercator grid pixels. Using a single measurement point also greatly reduces the amount of travel time
+     * histograms that must be computed and retained, improving the memory and run time cost of tests.
+     */
+    public GridSinglePointTaskBuilder singleFreeformDestination(int x, int y) {
+        FreeFormPointSet ps = new FreeFormPointSet(gridLayout.getIntersectionLatLon(x, y));
+        task.destinationPointSets = new PointSet[] { ps };
         return this;
     }
 

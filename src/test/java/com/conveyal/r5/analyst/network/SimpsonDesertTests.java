@@ -50,7 +50,6 @@ public class SimpsonDesertTests {
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
-                .uniformOpportunityDensity(10)
                 .singleFreeformDestination(40, 40)
                 .build();
 
@@ -88,7 +87,6 @@ public class SimpsonDesertTests {
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
-                .uniformOpportunityDensity(10)
                 .singleFreeformDestination(40, 40)
                 .build();
 
@@ -123,7 +121,6 @@ public class SimpsonDesertTests {
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
-                .uniformOpportunityDensity(10)
                 .singleFreeformDestination(40, 40)
                 .monteCarloDraws(10000)
                 .build();
@@ -187,7 +184,6 @@ public class SimpsonDesertTests {
                 .departureTimeWindow(7, 0, 5)
                 .maxRides(1)
                 .setOrigin(30, 50)
-                .uniformOpportunityDensity(10)
                 .singleFreeformDestination(42, 50);
 
         // 1. Standard rider: upstream overtaking means Trip B departs origin first and is fastest to destination.
@@ -230,7 +226,6 @@ public class SimpsonDesertTests {
         AnalysisWorkerTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
-                .uniformOpportunityDensity(10)
                 .singleFreeformDestination(80, 80)
                 .monteCarloDraws(10000)
                 .build();

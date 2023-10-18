@@ -7,6 +7,7 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.common.Util;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
@@ -87,8 +89,8 @@ public class TravelTimeComputer {
         ) {
             // Freeform destinations. Destination PointSet was set by handleOneRequest in the main AnalystWorker.
             destinations = request.destinationPointSets[0];
-        } else if (request.destinationPointSets != null) {
-            LOG.warn("ONLY VALID IN TESTING: Using PointSet object embedded in request where this is not standard.");
+        } else if (!isNullOrEmpty(request.destinationPointSets)) {
+            LOG.warn("ONLY VALID IN TESTING: Using PointSet object embedded in request outside regional analysis.");
             destinations = request.destinationPointSets[0];
         } else {
             // Gridded (non-freeform) destinations. This method finds them differently for regional and single requests.

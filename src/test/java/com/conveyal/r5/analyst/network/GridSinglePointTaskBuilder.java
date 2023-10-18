@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
@@ -14,6 +15,7 @@ import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
@@ -52,6 +54,14 @@ public class GridSinglePointTaskBuilder {
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
         // Record more detailed information to allow comparison to theoretical travel time distributions.
         task.recordTravelTimeHistograms = true;
+        // Set the destination grid extents on the task, otherwise if no freeform PointSet is specifid, it will fail
+        // checks on the grid dimensions and zoom level.
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(gridLayout.gridEnvelope(), DEFAULT_ZOOM);
+        task.zoom = extents.zoom;
+        task.north = extents.north;
+        task.west = extents.west;
+        task.width = extents.width;
+        task.height = extents.height;
     }
 
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
@@ -91,26 +101,6 @@ public class GridSinglePointTaskBuilder {
     }
 
     /**
-     * Even if you're not actually using the opportunity count, you should call this to set the grid extents on the
-     * resulting task. Otherwise it will fail checks on the grid dimensions and zoom level.
-     */
-    public GridSinglePointTaskBuilder uniformOpportunityDensity (double density) {
-        Grid grid = gridLayout.makeUniformOpportunityDataset(density);
-        task.destinationPointSets = new PointSet[] { grid };
-        task.destinationPointSetKeys = new String[] { "GRID" };
-
-        // In a single point task, the grid of destinations is given with these fields, not from the pointset object.
-        // The destination point set (containing the opportunity densities) must then match these same dimensions.
-        task.zoom = grid.extents.zoom;
-        task.north = grid.extents.north;
-        task.west = grid.extents.west;
-        task.width = grid.extents.width;
-        task.height = grid.extents.height;
-
-        return this;
-    }
-
-    /**
      * When trying to verify more complex distributions, the Monte Carlo approach may introduce too much noise.
      * Increasing the number of draws will yield a better approximation of the true travel time distribution
      * (while making the tests run slower).
@@ -121,6 +111,9 @@ public class GridSinglePointTaskBuilder {
     }
 
     /**
+     * Create a FreeformPointSet with a single point in it situated at the specified street intersection, and embed
+     * that PointSet in the request. In normal usage supplying FreeformPointSets as destination is only done for
+     * regional analysis tasks, but a testing code path exists to handle their presence on single point requests.
      * This eliminates any difficulty estimating the final segment of egress, walking from the street to a gridded
      * travel time sample point. Although egress time is something we'd like to test too, it is not part of the transit
      * routing we're concentrating on here, and will vary as the Simpson Desert street grid does not align with our
@@ -129,6 +122,8 @@ public class GridSinglePointTaskBuilder {
      */
     public GridSinglePointTaskBuilder singleFreeformDestination(int x, int y) {
         FreeFormPointSet ps = new FreeFormPointSet(gridLayout.getIntersectionLatLon(x, y));
+        // Downstream code expects to see the same number of keys and PointSet objects so initialize both.
+        task.destinationPointSetKeys = new String[] { "POINT_SET" };
         task.destinationPointSets = new PointSet[] { ps };
         return this;
     }

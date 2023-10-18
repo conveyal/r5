@@ -175,30 +175,6 @@ public class GridLayout {
         return new Envelope(originPoint.x, farCorner.x, originPoint.y, farCorner.y);
     }
 
-    /**
-     * Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell.
-     * TODO maybe derive this from the network's gridded pointset rather than the GridLayout.
-     */
-    public Grid makeUniformOpportunityDataset (double density) {
-        Grid grid = new Grid(DEFAULT_ZOOM, this.gridEnvelope());
-        for (double[] column : grid.grid) {
-            Arrays.fill(column, density);
-        }
-        return grid;
-    }
-
-    /**
-     * Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell in the
-     * eastern half of the grid.
-     */
-    public Grid makeRightHalfOpportunityDataset (double density) {
-        Grid grid = new Grid(DEFAULT_ZOOM, this.gridEnvelope());
-        for (int c = grid.grid.length / 2; c < grid.grid.length; c++) {
-            Arrays.fill(grid.grid[c], density);
-        }
-        return grid;
-    }
-
     public String nextIntegerId() {
         return Integer.toString(nextIntegerId++);
     }

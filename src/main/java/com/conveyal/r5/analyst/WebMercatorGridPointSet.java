@@ -10,6 +10,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 
+import static com.conveyal.r5.analyst.Grid.latToPixel;
+import static com.conveyal.r5.analyst.Grid.lonToPixel;
+import static com.conveyal.r5.analyst.Grid.pixelToLat;
+import static com.conveyal.r5.analyst.Grid.pixelToLon;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -82,10 +86,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         LOG.info("Creating WebMercatorGridPointSet with WGS84 extents {}", wgsEnvelope);
         checkWgsEnvelopeSize(wgsEnvelope, "grid point set");
         this.zoom = DEFAULT_ZOOM;
-        int west = lonToPixel(wgsEnvelope.getMinX());
-        int east = lonToPixel(wgsEnvelope.getMaxX());
-        int north = latToPixel(wgsEnvelope.getMaxY());
-        int south = latToPixel(wgsEnvelope.getMinY());
+        int west = lonToPixel(wgsEnvelope.getMinX(), zoom);
+        int east = lonToPixel(wgsEnvelope.getMaxX(), zoom);
+        int north = latToPixel(wgsEnvelope.getMaxY(), zoom);
+        int south = latToPixel(wgsEnvelope.getMinY(), zoom);
         this.west = west;
         this.north = north;
         this.height = south - north;
@@ -112,23 +116,23 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     @Override
     public double getLat(int i) {
         long y = i / this.width + this.north;
-        return pixelToLat(y);
+        return pixelToLat(y, zoom);
     }
 
     @Override
     public double getLon(int i) {
         long x = i % this.width + this.west;
-        return pixelToLon(x);
+        return pixelToLon(x, zoom);
     }
 
     @Override
     public TIntList getPointsInEnvelope (Envelope envelopeFixedDegrees) {
         // Convert fixed-degree envelope to floating, then to world-scale web Mercator pixels at this grid's zoom level.
         // This is not very DRY since we do something very similar in the constructor and elsewhere.
-        int west = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinX()));
-        int east = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxX()));
-        int north = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxY()));
-        int south = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinY()));
+        int west = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinX()), zoom);
+        int east = lonToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxX()), zoom);
+        int north = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMaxY()), zoom);
+        int south = latToPixel(fixedDegreesToFloating(envelopeFixedDegrees.getMinY()), zoom);
         // Make the envelope's pixel values relative to the edges of this WebMercatorGridPointSet, rather than
         // absolute world-scale coordinates at this zoom level.
         west -= this.west;
@@ -147,53 +151,6 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
             }
         }
         return pointsInEnvelope;
-    }
-
-    // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
-
-    /**
-     * Return the x pixel number containing the given longitude at this grid's zoom level, relative to the left edge
-     * of the world  (not relative to this grid or to any particular tile).
-     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
-     */
-    public int lonToPixel (double lon) {
-        // factor of 256 is to get a pixel value not a tile number
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
-    }
-
-    /**
-     * Return the y pixel number containing the given latitude at this grid's zoom level, relative to the top edge of
-     * the world (not relative to this grid or to any particular tile).
-     * TODO This method could be reusable and static if zoom level was a parameter. And moved to WebMercatorExtents.
-     */
-    public int latToPixel (double lat) {
-        double invCos = 1 / Math.cos(Math.toRadians(lat));
-        double tan = Math.tan(Math.toRadians(lat));
-        double ln = Math.log(tan + invCos);
-        return (int) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
-    }
-
-    /**
-     * Return the longitude in degrees of the west edge of any pixel at the specified x coordinate relative to the left
-     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
-     * TODO This method could be reusable and static if zoom level was a parameter.
-     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
-     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
-     */
-    public double pixelToLon (double x) {
-        return x / (Math.pow(2, zoom) * 256) * 360 - 180;
-    }
-
-    /**
-     * Return the latitude in degrees of the north edge of any pixel at the specified y coordinate relative to the top
-     * edge of the world (not relative to this grid or to any particular tile), at this grid's zoom level.
-     * TODO This method could be reusable and static if zoom level was a parameter.
-     *      It should probably also be renamed to clarify that it doesn't return the center of the pixel.
-     *      Another equivalent method is found in Grid, and should probably be merged with this one and WebMercatorExtents.
-     */
-    public double pixelToLat (double y) {
-        double tile = y / 256d;
-        return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
     }
 
     @Override
@@ -215,8 +172,8 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     }
 
     public int getPointIndexContaining (double lon, double lat) {
-        int x = lonToPixel(lon) - west;
-        int y = latToPixel(lat) - north;
+        int x = lonToPixel(lon, zoom) - west;
+        int y = latToPixel(lat, zoom) - north;
         return y * width + x;
     }
 

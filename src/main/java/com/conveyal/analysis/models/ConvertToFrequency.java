@@ -32,9 +32,6 @@ public class ConvertToFrequency extends Modification {
         /** trip from which to copy travel times */
         public String sourceTrip;
 
-        /** trips on the selected patterns which could be used as source trips */
-        public String[] patternTrips;
-
         public AddTrips.PatternTimetable toR5 (String feed) {
             AddTrips.PatternTimetable pt = toBaseR5Timetable();
 

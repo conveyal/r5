@@ -12,6 +12,8 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -55,6 +57,7 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
      */
     CsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
         super(fileStorage);
+        checkArgument(task.originPointSet != null, "CsvResultWriters require FreeFormPointSet origins.");
         super.prepare(task.jobId);
         this.fileName = task.jobId + "_" + resultType() +".csv";
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));

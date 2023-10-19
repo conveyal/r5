@@ -177,7 +177,7 @@ public class Job {
     /**
      * @param maxTasks the maximum number of tasks to return.
      * @return some tasks that are not yet marked as completed and have not yet been delivered in
-     *         this delivery pass.
+     *         this delivery pass. May return an empty list, but never null.
      */
     public List<RegionalTask> generateSomeTasksToDeliver (int maxTasks) {
         List<RegionalTask> tasks = new ArrayList<>(maxTasks);

@@ -216,9 +216,7 @@ public class AnalysisRequest {
         task.maxFare = maxFare;
         task.inRoutingFareCalculator = inRoutingFareCalculator;
 
-        // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
-        //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forTrimmedWgsEnvelope(bounds.envelope(), zoom);
         task.height = extents.height;
         task.north = extents.north;
         task.west = extents.west;

@@ -72,6 +72,7 @@ import static org.apache.commons.math3.util.FastMath.cos;
 import static org.apache.commons.math3.util.FastMath.log;
 import static org.apache.commons.math3.util.FastMath.sinh;
 import static org.apache.commons.math3.util.FastMath.tan;
+import static org.apache.commons.math3.util.FastMath.toRadians;
 
 /**
  * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
@@ -458,19 +459,27 @@ public class Grid extends PointSet {
         return extents.width * extents.height;
     }
 
-    /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
+    /* Functions below derived from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
-    /**
-     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
-     * zoom level.
-     */
-    public static int lonToPixel (double lon, int zoom) {
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+    /** Like lonToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double lonToFractionalPixel (double lon, int zoom) {
+        // Factor of 256 yields a pixel value rather than the tile number.
+        return (lon + 180) / 360 * Math.pow(2, zoom) * 256;
     }
 
     /**
-     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
-     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     * Return the absolute (world) x pixel number of all pixels containing the given line of longitude
+     * at the given zoom level.
+     */
+    public static int lonToPixel (double lon, int zoom) {
+        return (int) lonToFractionalPixel(lon, zoom);
+    }
+
+    /**
+     * Given an integer web Mercator pixel number, return the longitude in degrees of the west edge of that pixel at
+     * the given zoom level measured from the west edge of the world (not relative to this grid or to any particular
+     * tile). Given a non-integer web Mercator pixel number, return WGS84 locations within that pixel.
+     * Naming should somehow be revised to clarify that it doesn't return the center of the pixel.
      */
     public static double pixelToLon (double xPixel, int zoom) {
         return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
@@ -484,10 +493,15 @@ public class Grid extends PointSet {
         return pixelToLon(xPixel + 0.5, zoom);
     }
 
+    /** Like latToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double latToFractionalPixel (double lat, int zoom) {
+        final double latRad = toRadians(lat);
+        return (1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256;
+    }
+
     /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
     public static int latToPixel (double lat, int zoom) {
-        double latRad = FastMath.toRadians(lat);
-        return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return (int) latToFractionalPixel(lat, zoom);
     }
 
     /**
@@ -753,9 +767,7 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Rasterize a FreeFormFointSet into a Grid.
-     * Currently intended only for UI display of FreeFormPointSets, or possibly for previews of accessibility results
-     * during
+     * Rasterize a FreeFormFointSet into a Grid. Currently intended only for UI display of FreeFormPointSets.
      */
     public static Grid fromFreeForm (FreeFormPointSet freeForm, int zoom) {
         // TODO make and us a strongly typed WgsEnvelope class here and in various places

@@ -377,15 +377,15 @@ public class EgressCostTable implements Serializable {
                         int targetInSuperLinkage = distanceTable[i];
                         int distance = distanceTable[i + 1];
 
-                        int superX = targetInSuperLinkage % superGrid.width;
-                        int superY = targetInSuperLinkage / superGrid.width;
+                        int superX = targetInSuperLinkage % superGrid.extents.width;
+                        int superY = targetInSuperLinkage / superGrid.extents.width;
 
-                        int subX = superX + superGrid.west - subGrid.west;
-                        int subY = superY + superGrid.north - subGrid.north;
+                        int subX = superX + superGrid.extents.west - subGrid.extents.west;
+                        int subY = superY + superGrid.extents.north - subGrid.extents.north;
 
                         // Only retain distance information for points that fall within this sub-grid.
-                        if (subX >= 0 && subX < subGrid.width && subY >= 0 && subY < subGrid.height) {
-                            int targetInSubLinkage = subY * subGrid.width + subX;
+                        if (subX >= 0 && subX < subGrid.extents.width && subY >= 0 && subY < subGrid.extents.height) {
+                            int targetInSubLinkage = subY * subGrid.extents.width + subX;
                             newDistanceTable.add(targetInSubLinkage);
                             newDistanceTable.add(distance); // distance to target does not change when we crop the pointset
                         }

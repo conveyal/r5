@@ -123,7 +123,7 @@ public class Grid extends PointSet {
      * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
     public Grid (int zoom, Envelope wgsEnvelope) {
-        this(WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom));
+        this(WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, zoom));
     }
 
     public static class PixelWeight {
@@ -618,7 +618,7 @@ public class Grid extends PointSet {
         reader.close();
 
         checkWgsEnvelopeSize(envelope, "CSV points");
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forBufferedWgsEnvelope(envelope, zoom);
         checkPixelCount(extents, numericColumns.size());
 
         if (progressListener != null) {
@@ -690,7 +690,7 @@ public class Grid extends PointSet {
         ShapefileReader reader = new ShapefileReader(shapefile);
         Envelope envelope = reader.wgs84Bounds();
         checkWgsEnvelopeSize(envelope, "Shapefile");
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forBufferedWgsEnvelope(envelope, zoom);
         List<String> numericAttributes = reader.numericAttributes();
         Set<String> uniqueNumericAttributes = new HashSet<>(numericAttributes);
         if (uniqueNumericAttributes.size() != numericAttributes.size()) {
@@ -772,7 +772,7 @@ public class Grid extends PointSet {
     public static Grid fromFreeForm (FreeFormPointSet freeForm, int zoom) {
         // TODO make and us a strongly typed WgsEnvelope class here and in various places
         Envelope wgsEnvelope = freeForm.getWgsEnvelope();
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, zoom);
         Grid grid = new Grid(webMercatorExtents);
         grid.name = freeForm.name;
         for (int f = 0; f < freeForm.featureCount(); f++) {

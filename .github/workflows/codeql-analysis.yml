@@ -45,11 +45,11 @@ jobs:
 
     # Java setup step completes very fast, no need to run in a preconfigured docker container.
     # CodeQL is intended to detect any Java toolchains added to the execution environment.
-    - name: Set up JDK 20
+    - name: Set up JDK 21
       uses: actions/setup-java@v3
       with:
-        distribution: temurin
-        java-version: 20
+        distribution: corretto
+        java-version: 21
         cache: gradle
 
     # Initializes the CodeQL tools for scanning.

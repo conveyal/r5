@@ -11,12 +11,12 @@ version gitVersion()
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(20))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
 jar {
-    // For Java 11 Modules, specify a module name.
+    // For Java 11+ Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
     // Main-Class BackendMain will start a local backend.
     // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.

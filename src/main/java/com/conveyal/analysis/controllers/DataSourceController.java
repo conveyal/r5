@@ -20,14 +20,11 @@ import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.geotools.data.geojson.GeoJSONWriter;
 import org.opengis.feature.simple.SimpleFeature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
 import java.io.File;
 import java.io.OutputStream;
-import java.lang.invoke.MethodHandles;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +33,6 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
-import static com.mongodb.client.model.Filters.eq;
 
 /**
  * Controller that handles CRUD of DataSources, which are Mongo metadata about user-uploaded files.
@@ -44,9 +40,6 @@ import static com.mongodb.client.model.Filters.eq;
  * Currently this handles only one subtype: SpatialDataSource, which represents GIS-like vector geospatial data.
  */
 public class DataSourceController implements HttpController {
-
-    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
     // Component Dependencies
     private final FileStorage fileStorage;
     private final TaskScheduler taskScheduler;
@@ -69,13 +62,6 @@ public class DataSourceController implements HttpController {
         // TODO should this be done once in AnalysisDB and the collection reused everywhere? Is that threadsafe?
         this.dataSourceCollection = database.getAnalysisCollection(
             "dataSources", DataSource.class, SpatialDataSource.class, OsmDataSource.class, GtfsDataSource.class
-        );
-    }
-
-    /** HTTP GET: Retrieve all DataSource records, filtered by the (required) regionId query parameter. */
-    private List<DataSource> getAllDataSourcesForRegion (Request req, Response res) {
-        return dataSourceCollection.findPermitted(
-                eq("regionId", req.queryParams("regionId")), UserPermissions.from(req)
         );
     }
 
@@ -180,8 +166,6 @@ public class DataSourceController implements HttpController {
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/dataSource", () -> {
-            sparkService.get("/", this::getAllDataSourcesForRegion, toJson);
-            sparkService.get("/:_id", this::getOneDataSourceById, toJson);
             sparkService.delete("/:_id", this::deleteOneDataSourceById, toJson);
             sparkService.get("/:_id/preview", this::getDataSourcePreview, toJson);
             sparkService.post("", this::handleUpload, toJson);

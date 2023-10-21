@@ -20,7 +20,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -42,9 +41,7 @@ import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
-import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
-import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -83,15 +80,6 @@ public class RegionalAnalysisController implements HttpController {
                 DBProjection.exclude("request.scenario.modifications"),
                 userPermissions
         );
-    }
-
-    private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(Request req, Response res) {
-        return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
-    }
-
-    // Note: this includes the modifications object which can be very large
-    private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
     }
 
     /**
@@ -517,43 +505,17 @@ public class RegionalAnalysisController implements HttpController {
         return regionalAnalysis;
     }
 
-    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
-        RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
-    }
-
-    /**
-     * Return a JSON-wrapped URL for the file in FileStorage containing the JSON representation of the scenario for
-     * the given regional analysis.
-     */
-    private JsonNode getScenarioJsonUrl (Request request, Response response) {
-        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
-                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
-        // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
-        final String networkId = regionalAnalysis.bundleId;
-        final String scenarioId = regionalAnalysis.request.scenarioId;
-        checkNotNull(networkId, "RegionalAnalysis did not contain a network ID.");
-        checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
-        String scenarioUrl = fileStorage.getURL(
-                new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
-        return JsonUtil.objectNode().put("url", scenarioUrl);
-    }
-
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/region", () -> {
-            sparkService.get("/:regionId/regional", this::getRegionalAnalysesForRegion, toJson);
             sparkService.get("/:regionId/regional/running", this::getRunningAnalyses, toJson);
         });
         sparkService.path("/api/regional", () -> {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
-            sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
             sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
-            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
-            sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);
         });
     }
 

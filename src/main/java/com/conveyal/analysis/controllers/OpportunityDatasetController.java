@@ -358,6 +358,9 @@ public class OpportunityDatasetController implements HttpController {
                 } else if (uploadFormat == FileStorageFormat.SHP) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
                     pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
+                } else if (uploadFormat == FileStorageFormat.GEOJSON) {
+                    LOG.info("Detected opportunity dataset stored as GeoJSON.");
+                    pointsets.addAll(Grid.fromGeoJson(fileItems.get(0).getInputStream(), zoom, status));
                 } else if (uploadFormat == FileStorageFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.

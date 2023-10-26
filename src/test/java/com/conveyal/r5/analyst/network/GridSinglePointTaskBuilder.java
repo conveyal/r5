@@ -54,7 +54,7 @@ public class GridSinglePointTaskBuilder {
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
         // Record more detailed information to allow comparison to theoretical travel time distributions.
         task.recordTravelTimeHistograms = true;
-        // Set the destination grid extents on the task, otherwise if no freeform PointSet is specifid, it will fail
+        // Set the destination grid extents on the task, otherwise if no freeform PointSet is specified, the task will fail
         // checks on the grid dimensions and zoom level.
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(gridLayout.gridEnvelope(), DEFAULT_ZOOM);
         task.zoom = extents.zoom;

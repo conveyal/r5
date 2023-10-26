@@ -16,6 +16,9 @@ import org.geotools.data.FeatureWriter;
 import org.geotools.data.FileDataStore;
 import org.geotools.data.FileDataStoreFinder;
 import org.geotools.data.Transaction;
+import org.geotools.data.geojson.GeoJSONReader;
+import org.geotools.data.simple.SimpleFeatureCollection;
+import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
@@ -749,6 +752,70 @@ public class Grid extends PointSet {
                 LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });
+        reader.close();
+        return new ArrayList<>(grids.values());
+    }
+
+    /**
+     * Take an `InputStream` containing GeoJson Features and turn it into an opportunity grid.
+     */
+    public static List<Grid> fromGeoJson (InputStream geoJsonInputStream, int zoom, ProgressListener progressListener)
+            throws IOException {
+        GeoJSONReader reader = new GeoJSONReader(geoJsonInputStream);
+        SimpleFeatureCollection features = reader.getFeatures();
+        Envelope envelope = features.getBounds();
+
+        checkWgsEnvelopeSize(envelope, "Shapefile");
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+
+        int total = features.size();
+        if (progressListener != null) {
+            progressListener.setTotalItems(total);
+        }
+
+        AtomicInteger count = new AtomicInteger(0);
+        HashMap<String, Grid> grids = new HashMap<>();
+
+        SimpleFeatureIterator featureIterator = features.features();
+        while (featureIterator.hasNext()) {
+            SimpleFeature feature = featureIterator.next();
+            Geometry geom = (Geometry) feature.getDefaultGeometry();
+
+            for (var p : feature.getProperties()) {
+                var val = p.getValue();
+
+                if (!(val instanceof Number)) continue;
+                double numericVal = ((Number) val).doubleValue();
+                if (numericVal == 0) continue;
+
+                String attributeName = p.getName().getLocalPart();
+
+                Grid grid = grids.get(attributeName);
+                if (grid == null) {
+                    grid = new Grid(extents);
+                    grid.name = attributeName;
+                    grids.put(attributeName, grid);
+                }
+
+                if (geom instanceof Point) {
+                    Point point = (Point) geom;
+                    // already in WGS 84
+                    grid.incrementPoint(point.getY(), point.getX(), numericVal);
+                } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
+                    grid.rasterize(geom, numericVal);
+                } else {
+                    throw new IllegalArgumentException("Unsupported geometry type: " + geom);
+                }
+            }
+
+            int currentCount = count.incrementAndGet();
+            if (progressListener != null) {
+                progressListener.setCompletedItems(currentCount);
+            }
+            if (currentCount % 10000 == 0) {
+                LOG.info("{} / {} features read", human(currentCount), human(total));
+            }
+        }
         reader.close();
         return new ArrayList<>(grids.values());
     }

@@ -13,20 +13,18 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.bson.types.ObjectId;
 import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
@@ -107,19 +105,25 @@ public class BundleController implements HttpController {
         // Do some initial synchronous work setting up the bundle to fail fast if the request is bad.
         final Map<String, List<FileItem>> files = HttpUtils.getRequestFiles(req.raw());
         final Bundle bundle = new Bundle();
+        final File osmPbfFile;
+        final List<File> gtfsZipFiles;
         try {
             bundle.name = files.get("bundleName").get(0).getString("UTF-8");
             bundle.regionId = files.get("regionId").get(0).getString("UTF-8");
 
             if (files.get("osmId") != null) {
+                osmPbfFile = null;
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
                 Bundle bundleWithOsm = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get()).next();
                 if (bundleWithOsm == null) {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }
+            } else {
+                osmPbfFile = HttpUtils.storeFileItem(files.get("osm").get(0));
             }
 
             if (files.get("feedGroupId") != null) {
+                gtfsZipFiles = null;
                 bundle.feedGroupId = files.get("feedGroupId").get(0).getString("UTF-8");
                 Bundle bundleWithFeed = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get()).next();
                 if (bundleWithFeed == null) {
@@ -134,6 +138,8 @@ public class BundleController implements HttpController {
                 bundle.feeds = bundleWithFeed.feeds;
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
+            } else {
+                gtfsZipFiles = HttpUtils.storeFileItems(files.get("feedGroup"));
             }
             UserPermissions userPermissions = UserPermissions.from(req);
             bundle.accessGroup = userPermissions.accessGroup;
@@ -155,16 +161,15 @@ public class BundleController implements HttpController {
             .withWorkProduct(BUNDLE, bundle._id, bundle.regionId)
             .withAction(progressListener -> {
               try {
-                if (bundle.osmId == null) {
+                if (osmPbfFile != null) {
                     // Process uploaded OSM.
                     bundle.osmId = new ObjectId().toString();
-                    DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
                     // Here we perform minimal validation by loading the OSM, but don't retain the resulting MapDB.
                     OSM osm = new OSM(null);
                     osm.intersectionDetection = true;
                     // Number of entities in an OSM file is unknown, so derive progress from the number of bytes read.
                     // Wrapping in buffered input stream should reduce number of progress updates.
-                    osm.readPbf(ProgressInputStream.forFileItem(fi, progressListener));
+                    osm.readPbf(ProgressInputStream.forFile(osmPbfFile, progressListener));
                     // osm.readPbf(new BufferedInputStream(fi.getInputStream()));
                     Envelope osmBounds = new Envelope();
                     for (Node n : osm.nodes.values()) {
@@ -173,10 +178,10 @@ public class BundleController implements HttpController {
                     osm.close();
                     checkWgsEnvelopeSize(osmBounds, "OSM data");
                     // Store the source OSM file. Note that we're not storing the derived MapDB file here.
-                    fileStorage.moveIntoStorage(OSMCache.getKey(bundle.osmId), fi.getStoreLocation());
+                    fileStorage.moveIntoStorage(OSMCache.getKey(bundle.osmId), osmPbfFile);
                 }
 
-                if (bundle.feedGroupId == null) {
+                if (gtfsZipFiles != null) {
                     // Process uploaded GTFS files
                     bundle.feedGroupId = new ObjectId().toString();
 
@@ -186,8 +191,7 @@ public class BundleController implements HttpController {
                     bundle.feeds = new ArrayList<>();
                     bundle.totalFeeds = files.get("feedGroup").size();
 
-                    for (FileItem fileItem : files.get("feedGroup")) {
-                        File feedFile = ((DiskFileItem) fileItem).getStoreLocation();
+                    for (File feedFile : gtfsZipFiles) {
                         ZipFile zipFile = new ZipFile(feedFile);
                         File tempDbFile = FileUtils.createScratchFile("db");
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");

@@ -27,15 +27,15 @@ public abstract class DataSourceUtil {
      * @throws DataSourceException if the type of the upload can't be detected or preconditions are violated.
      * @return the expected type of the uploaded file or files, never null.
      */
-    public static FileStorageFormat detectUploadFormatAndValidate (List<File> fileItems) {
-        if (isNullOrEmpty(fileItems)) {
+    public static FileStorageFormat detectUploadFormatAndValidate (List<File> files) {
+        if (isNullOrEmpty(files)) {
             throw new DataSourceException("You must select some files to upload.");
         }
-        Set<String> fileExtensions = extractFileExtensions(fileItems);
+        Set<String> fileExtensions = extractFileExtensions(files);
         if (fileExtensions.isEmpty()) {
             throw new DataSourceException("No file extensions seen, cannot detect upload type.");
         }
-        checkFileCharacteristics(fileItems);
+        checkFileCharacteristics(files);
         if (fileExtensions.contains("zip")) {
             throw new DataSourceException("Upload of spatial .zip files not yet supported");
             // TODO unzip and process unzipped files - will need to peek inside to detect GTFS uploads first.
@@ -45,7 +45,7 @@ public abstract class DataSourceUtil {
         final Set<String> shapefileExtensions = Sets.newHashSet("shp", "dbf", "prj");
         if ( ! Sets.intersection(fileExtensions, shapefileExtensions).isEmpty()) {
             if (fileExtensions.containsAll(shapefileExtensions)) {
-                verifyBaseNamesSame(fileItems);
+                verifyBaseNamesSame(files);
                 // TODO check that any additional file is .shx, and that there are no more than 4 files.
             } else {
                 throw new DataSourceException("You must multi-select at least SHP, DBF, and PRJ files for shapefile upload.");
@@ -113,5 +113,4 @@ public abstract class DataSourceUtil {
             }
         }
     }
-
 }

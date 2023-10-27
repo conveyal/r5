@@ -1,14 +1,17 @@
 package com.conveyal.analysis.util;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemFactory;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -36,8 +39,7 @@ public abstract class HttpUtils {
         // If we always saved the FileItems via write() or read them with getInputStream() they would not all need to
         // be on disk.
         try {
-            FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
-            ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
+            ServletFileUpload sfu = new ServletFileUpload();
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
             throw AnalysisServerException.fileUpload(ExceptionUtils.stackTraceString(e));
@@ -64,6 +66,51 @@ public abstract class HttpUtils {
         } catch (UnsupportedEncodingException e) {
             throw AnalysisServerException.badRequest(String.format("Multipart form field '%s' had unsupported encoding",
                     fieldName));
+        }
+    }
+
+    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems) {
+        return storeFileItemsAndUnzip(fileItems, FileUtils.createScratchDirectory());
+    }
+
+    /**
+     * Convert `FileItem`s into `File`s and move them into the given directory. Automatically unzip files. Return the
+     * list of new `File` handles.
+     */
+    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems, File directory) {
+        List<File> files = new ArrayList<>();
+        for (FileItem fi : fileItems) {
+            File file = storeFileItemInDirectory(fi, directory);
+            String name = file.getName();
+            if (name.toLowerCase().endsWith(".zip")) {
+                files.addAll(FileUtils.unZipFileIntoDirectory(file, directory));
+            } else {
+                files.add(file);
+            }
+        }
+        return files;
+    }
+
+    public static List<File> storeFileItems(List<FileItem> fileItems) {
+        File directory = FileUtils.createScratchDirectory();
+        List<File> files = new ArrayList<>();
+        for (FileItem fileItem : fileItems) {
+            files.add(storeFileItemInDirectory(fileItem, directory));
+        }
+        return files;
+    }
+
+    public static File storeFileItem(FileItem fileItem) {
+        return storeFileItemInDirectory(fileItem, FileUtils.createScratchDirectory());
+    }
+
+    public static File storeFileItemInDirectory(FileItem fileItem, File directory) {
+        try {
+            File file = new File(directory, fileItem.getName());
+            fileItem.getInputStream().transferTo(FileUtils.getOutputStream(file));
+            return file;
+        } catch (IOException e) {
+            throw new DataSourceException(e.getMessage());
         }
     }
 }

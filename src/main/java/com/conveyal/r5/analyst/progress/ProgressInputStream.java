@@ -1,8 +1,10 @@
 package com.conveyal.r5.analyst.progress;
 
+import com.conveyal.file.FileUtils;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.io.input.ProxyInputStream;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -54,4 +56,12 @@ public class ProgressInputStream extends ProxyInputStream {
         }
     }
 
+    /**
+     * Given an uploaded file, report progress on reading it.
+     */
+    public static ProgressInputStream forFile (File file, ProgressListener progressListener) {
+        checkArgument(file.length() < Integer.MAX_VALUE);
+        progressListener.beginTask("Reading file " + file.getName(), (int)(file.length()));
+        return new ProgressInputStream(progressListener, FileUtils.getInputStream(file));
+    }
 }

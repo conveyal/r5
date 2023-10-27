@@ -345,6 +345,7 @@ public class OpportunityDatasetController implements HttpController {
             parameters = extractStringParameters(formFields);
         } catch (Exception e) {
             status.completeWithError(e);
+            res.status(400);
             return status;
         }
 

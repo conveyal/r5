@@ -30,14 +30,6 @@ public abstract class HttpUtils {
         // The Javadoc on this factory class doesn't say anything about thread safety. Looking at the source code it
         // all looks threadsafe. But also very lightweight to instantiate, so in this code run by multiple threads
         // we play it safe and always create a new factory.
-        // Setting a size threshold of 0 causes all files to be written to disk, which allows processing them in a
-        // uniform way in other threads, after the request handler has returned. This does however cause some very
-        // small form fields to be written to disk files. Ideally we'd identify the smallest actual file we'll ever
-        // handle and set the threshold a little higher. The downside is that if a tiny file is actually uploaded even
-        // by accident, our code will not be able to get a file handle for it and fail. Some legitimate files like
-        // Shapefile .prj sidecars can be really small.
-        // If we always saved the FileItems via write() or read them with getInputStream() they would not all need to
-        // be on disk.
         try {
             ServletFileUpload sfu = new ServletFileUpload();
             return sfu.parseParameterMap(req);
@@ -69,15 +61,12 @@ public abstract class HttpUtils {
         }
     }
 
-    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems) {
-        return storeFileItemsAndUnzip(fileItems, FileUtils.createScratchDirectory());
-    }
-
     /**
-     * Convert `FileItem`s into `File`s and move them into the given directory. Automatically unzip files. Return the
-     * list of new `File` handles.
+     * Convert `FileItem`s into `File`s and move them into a temp directory. Automatically unzip files. Return the list
+     * of new `File` handles.
      */
-    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems, File directory) {
+    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems) {
+        File directory = FileUtils.createScratchDirectory();
         List<File> files = new ArrayList<>();
         for (FileItem fi : fileItems) {
             File file = storeFileItemInDirectory(fi, directory);
@@ -91,6 +80,9 @@ public abstract class HttpUtils {
         return files;
     }
 
+    /**
+     * Convert `FileItem`s into `File`s and move them into a temporary directory. Return the list of new `File` handles.
+     */
     public static List<File> storeFileItems(List<FileItem> fileItems) {
         File directory = FileUtils.createScratchDirectory();
         List<File> files = new ArrayList<>();

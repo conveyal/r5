@@ -329,6 +329,8 @@ public class OpportunityDatasetController implements HttpController {
         OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, sourceName);
         addStatusAndRemoveOldStatuses(status);
 
+        // TODO should we delete this temporary directory at the end?
+        final File tmpDirectory = FileUtils.createScratchDirectory();
         final List<File> files = new ArrayList<>();
         final List<FileItem> fileItems;
         final FileStorageFormat uploadFormat;
@@ -338,8 +340,9 @@ public class OpportunityDatasetController implements HttpController {
             // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
             fileItems = formFields.remove("files");
             for (var fi : fileItems) {
-                var dfi = (DiskFileItem) fi;
-                files.add(dfi.getStoreLocation());
+                var tmpFile = new File(tmpDirectory, fi.getName());
+                Files.move(((DiskFileItem) fi).getStoreLocation(), tmpFile);
+                files.add(tmpFile);
             }
             uploadFormat = detectUploadFormatAndValidate(files);
             parameters = extractStringParameters(formFields);
@@ -541,7 +544,7 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         // Copy the shapefile component files into a temporary directory with a fixed base name.
-        File tempDir = Files.createTempDir();
+        File tempDir = FileUtils.createScratchDirectory();
 
         File shpFile = new File(tempDir, "grid.shp");
         Files.copy(filesByExtension.get("SHP"), shpFile);

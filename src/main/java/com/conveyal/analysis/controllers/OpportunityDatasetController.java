@@ -11,7 +11,6 @@ import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -25,12 +24,12 @@ import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.analyst.progress.WorkProduct;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -275,7 +274,7 @@ public class OpportunityDatasetController implements HttpController {
      * This method executes in a blocking (synchronous) manner, but it can take a while so should be called within an
      * non-blocking asynchronous task.
      */
-    private List<FreeFormPointSet> createFreeFormPointSetsFromCsv(FileItem csvFileItem, Map<String, String> params) {
+    private List<FreeFormPointSet> createFreeFormPointSetsFromCsv(File csvFile, Map<String, String> params) {
 
         String latField = params.get("latField");
         String lonField = params.get("lonField");
@@ -296,12 +295,11 @@ public class OpportunityDatasetController implements HttpController {
 
         try {
             List<FreeFormPointSet> pointSets = new ArrayList<>();
-            InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-            pointSets.add(FreeFormPointSet.fromCsv(csvStreamProvider, latField, lonField, idField, countField));
+            pointSets.add(FreeFormPointSet.fromCsv(csvFile, latField, lonField, idField, countField));
             // The second pair of lat and lon fields allow creating two matched pointsets from the same CSV.
             // This is used for one-to-one travel times between specific origins/destinations.
             if (latField2 != null && lonField2 != null) {
-                pointSets.add(FreeFormPointSet.fromCsv(csvStreamProvider, latField2, lonField2, idField, countField));
+                pointSets.add(FreeFormPointSet.fromCsv(csvFile, latField2, lonField2, idField, countField));
             }
             return pointSets;
         } catch (Exception e) {
@@ -331,6 +329,7 @@ public class OpportunityDatasetController implements HttpController {
         OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, sourceName);
         addStatusAndRemoveOldStatuses(status);
 
+        final List<File> files = new ArrayList<>();
         final List<FileItem> fileItems;
         final FileStorageFormat uploadFormat;
         final Map<String, String> parameters;
@@ -338,7 +337,11 @@ public class OpportunityDatasetController implements HttpController {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
             // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
             fileItems = formFields.remove("files");
-            uploadFormat = detectUploadFormatAndValidate(fileItems);
+            for (var fi : fileItems) {
+                var dfi = (DiskFileItem) fi;
+                files.add(dfi.getStoreLocation());
+            }
+            uploadFormat = detectUploadFormatAndValidate(files);
             parameters = extractStringParameters(formFields);
         } catch (Exception e) {
             status.completeWithError(e);
@@ -354,35 +357,35 @@ public class OpportunityDatasetController implements HttpController {
                 List<PointSet> pointsets = new ArrayList<>();
                 if (uploadFormat == FileStorageFormat.GRID) {
                     LOG.info("Detected opportunity dataset stored in Conveyal binary format.");
-                    pointsets.addAll(createGridsFromBinaryGridFiles(fileItems, status));
+                    pointsets.addAll(createGridsFromBinaryGridFiles(files, status));
                 } else if (uploadFormat == FileStorageFormat.SHP) {
                     LOG.info("Detected opportunity dataset stored as ESRI shapefile.");
-                    pointsets.addAll(createGridsFromShapefile(fileItems, zoom, status));
+                    pointsets.addAll(createGridsFromShapefile(files, zoom, status));
                 } else if (uploadFormat == FileStorageFormat.CSV) {
                     LOG.info("Detected opportunity dataset stored as CSV");
                     // Create a grid even when user has requested a freeform pointset so we have something to visualize.
-                    FileItem csvFileItem = fileItems.get(0);
+                    File csvFile = files.get(0);
                     // FIXME why were we uploading to S3 using the file path not the UUID?
                     // writeFileToS3(csvFile);
                     // TODO report progress / status as with grids. That involves pre-scanning the CSV which would be
                     //      facilitated by retaining the CSV server side and later converting to pointset.
                     boolean requestedFreeForm = Boolean.parseBoolean(parameters.get("freeform"));
                     // Hack to enable freeform pointset building without exposing a UI element, via file name.
-                    if (csvFileItem.getName().contains("FREEFORM_PS.")) {
+                    if (csvFile.getName().contains("FREEFORM_PS.")) {
                         requestedFreeForm = true;
                     }
                     if (requestedFreeForm) {
                         LOG.info("Processing CSV as freeform (rather than gridded) pointset as requested.");
                         // This newer process creates a FreeFormPointSet only for the specified count fields,
                         // as well as a Grid to assist in visualization of the uploaded data.
-                        for (FreeFormPointSet freeForm : createFreeFormPointSetsFromCsv(csvFileItem, parameters)) {
+                        for (FreeFormPointSet freeForm : createFreeFormPointSetsFromCsv(csvFile, parameters)) {
                             Grid gridFromFreeForm = Grid.fromFreeForm(freeForm, zoom);
                             pointsets.add(freeForm);
                             pointsets.add(gridFromFreeForm);
                         }
                     } else {
                         // This is the common default process: create a grid for every non-ignored field in the CSV.
-                        pointsets.addAll(createGridsFromCsv(csvFileItem, formFields, zoom, status));
+                        pointsets.addAll(createGridsFromCsv(csvFile, formFields, zoom, status));
                     }
                 }
                 if (pointsets.isEmpty()) {
@@ -473,7 +476,7 @@ public class OpportunityDatasetController implements HttpController {
      * TODO explain latField2 usage
      * @return one or two Grids for each numeric column in the CSV input.
      */
-    private List<Grid> createGridsFromCsv(FileItem csvFileItem,
+    private List<Grid> createGridsFromCsv(File csvFile,
                                                  Map<String, List<FileItem>> query,
                                                  int zoom,
                                                  OpportunityDatasetUploadStatus status) throws Exception {
@@ -488,12 +491,11 @@ public class OpportunityDatasetController implements HttpController {
         String lonField2 = HttpUtils.getFormField(query, "lonField2", false);
 
         List<String> ignoreFields = Arrays.asList(idField, latField2, lonField2);
-        InputStreamProvider csvStreamProvider = new FileItemInputStreamProvider(csvFileItem);
-        List<Grid> grids = Grid.fromCsv(csvStreamProvider, latField, lonField, ignoreFields, zoom, status);
+        List<Grid> grids = Grid.fromCsv(csvFile, latField, lonField, ignoreFields, zoom, status);
         // TODO verify correctness of this second pass
         if (latField2 != null && lonField2 != null) {
             ignoreFields = Arrays.asList(idField, latField, lonField);
-            grids.addAll(Grid.fromCsv(csvStreamProvider, latField2, lonField2, ignoreFields, zoom, status));
+            grids.addAll(Grid.fromCsv(csvFile, latField2, lonField2, ignoreFields, zoom, status));
         }
 
         return grids;
@@ -503,14 +505,14 @@ public class OpportunityDatasetController implements HttpController {
      * Create a grid from an input stream containing a binary grid file.
      * For those in the know, we can upload manually created binary grid files.
      */
-    private List<Grid> createGridsFromBinaryGridFiles(List<FileItem> uploadedFiles,
+    private List<Grid> createGridsFromBinaryGridFiles(List<File> uploadedFiles,
                                                              OpportunityDatasetUploadStatus status) throws Exception {
 
         List<Grid> grids = new ArrayList<>();
         status.totalFeatures = uploadedFiles.size();
-        for (FileItem fileItem : uploadedFiles) {
-            Grid grid = Grid.read(fileItem.getInputStream());
-            String name = fileItem.getName();
+        for (File file : uploadedFiles) {
+            Grid grid = Grid.read(FileUtils.getInputStream(file));
+            String name = file.getName();
             // Remove ".grid" from the name
             if (name.contains(".grid")) name = name.split(".grid")[0];
             grid.name = name;
@@ -522,37 +524,37 @@ public class OpportunityDatasetController implements HttpController {
     }
 
     /**
-     * Preconditions: fileItems must contain SHP, DBF, and PRJ files, and optionally SHX. All files should have the
+     * Preconditions: files must contain SHP, DBF, and PRJ files, and optionally SHX. All files should have the
      * same base name, and should not contain any other files but these three or four.
      */
-    private List<Grid> createGridsFromShapefile(List<FileItem> fileItems,
+    private List<Grid> createGridsFromShapefile(List<File> files,
                                                        int zoom,
                                                        OpportunityDatasetUploadStatus status) throws Exception {
 
         // In the caller, we should have already verified that all files have the same base name and have an extension.
         // Extract the relevant files: .shp, .prj, .dbf, and .shx.
         // We need the SHX even though we're looping over every feature as they might be sparse.
-        Map<String, FileItem> filesByExtension = new HashMap<>();
-        for (FileItem fileItem : fileItems) {
-            filesByExtension.put(FilenameUtils.getExtension(fileItem.getName()).toUpperCase(), fileItem);
+        Map<String, File> filesByExtension = new HashMap<>();
+        for (File file : files) {
+            filesByExtension.put(FilenameUtils.getExtension(file.getName()).toUpperCase(), file);
         }
 
         // Copy the shapefile component files into a temporary directory with a fixed base name.
         File tempDir = Files.createTempDir();
 
         File shpFile = new File(tempDir, "grid.shp");
-        filesByExtension.get("SHP").write(shpFile);
+        Files.copy(filesByExtension.get("SHP"), shpFile);
 
         File prjFile = new File(tempDir, "grid.prj");
-        filesByExtension.get("PRJ").write(prjFile);
+        Files.copy(filesByExtension.get("PRJ"), prjFile);
 
         File dbfFile = new File(tempDir, "grid.dbf");
-        filesByExtension.get("DBF").write(dbfFile);
+        Files.copy(filesByExtension.get("DBF"), dbfFile);
 
         // The .shx file is an index. It is optional, and not needed for dense shapefiles.
         if (filesByExtension.containsKey("SHX")) {
             File shxFile = new File(tempDir, "grid.shx");
-            filesByExtension.get("SHX").write(shxFile);
+            Files.copy(filesByExtension.get("SHX"), shxFile);
         }
 
         List<Grid> grids = Grid.fromShapefile(shpFile, zoom, status);

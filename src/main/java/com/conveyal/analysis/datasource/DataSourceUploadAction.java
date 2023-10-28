@@ -25,8 +25,6 @@ import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormat
 import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a batch of uploaded files, put them into FileStorage, categorize and validate them, and record metadata as
@@ -51,12 +49,6 @@ public class DataSourceUploadAction implements TaskAction {
      */
     private DataSourceIngester ingester;
 
-    /**
-     * The file to be ingested, after it has been moved into storage. For Shapefiles and other such "sidecar" formats,
-     * this is the main file (.shp), with the same base name and in the same directory as all its sidecar files.
-     */
-    private File file;
-
     // This method is a stopgaps - it seems like this should be done differently.
     public String getDataSourceName () {
         return ingester.dataSource().name;
@@ -77,8 +69,8 @@ public class DataSourceUploadAction implements TaskAction {
     @Override
     public final void action (ProgressListener progressListener) throws Exception {
         progressListener.setWorkProduct(ingester.dataSource().toWorkProduct());
-        moveFilesIntoStorage(progressListener);
-        ingester.ingest(file, progressListener);
+        File dataSourceFile = moveFilesIntoStorage(progressListener);
+        ingester.ingest(dataSourceFile, progressListener);
         dataSourceCollection.insert(ingester.dataSource());
     }
 
@@ -90,11 +82,12 @@ public class DataSourceUploadAction implements TaskAction {
      * We should also consider whether preprocessing like conversion of GTFS to MapDBs should happen at this upload
      * stage. If so, then this logic needs to change a bit.
      */
-    private final void moveFilesIntoStorage (ProgressListener progressListener) {
+    private File moveFilesIntoStorage (ProgressListener progressListener) {
         // Loop through uploaded files, registering the extensions and writing to storage
         // (with filenames that correspond to the source id)
         progressListener.beginTask("Moving files into storage...", 1);
         final String dataSourceId = ingester.dataSource()._id.toString();
+        File dataSourceFile = null;
         for (File file : files) {
             // Use canonical extension from file type - files may be uploaded with e.g. tif instead of tiff or geotiff.
             String extension = ingester.dataSource().fileFormat.extension;
@@ -106,11 +99,14 @@ public class DataSourceUploadAction implements TaskAction {
             FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, extension);
             fileStorage.moveIntoStorage(key, file);
             if (files.size() == 1 || extension.equalsIgnoreCase(SHP.extension)) {
-                file = fileStorage.getFile(key);
+                dataSourceFile = fileStorage.getFile(key);
             }
         }
-        checkNotNull(file);
-        checkState(file.exists());
+
+        if (dataSourceFile == null || !dataSourceFile.exists()) {
+            throw new DataSourceException("Uploaded file cannot be found.");
+        }
+        return dataSourceFile;
     }
 
     /**

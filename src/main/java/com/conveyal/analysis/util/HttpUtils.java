@@ -1,15 +1,15 @@
 package com.conveyal.analysis.util;
 
 import com.conveyal.analysis.AnalysisServerException;
-import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItem;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.File;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +30,17 @@ public abstract class HttpUtils {
         // The Javadoc on this factory class doesn't say anything about thread safety. Looking at the source code it
         // all looks threadsafe. But also very lightweight to instantiate, so in this code run by multiple threads
         // we play it safe and always create a new factory.
+        // Setting a size threshold of 0 causes all files to be written to disk, which allows processing them in a
+        // uniform way in other threads, after the request handler has returned. This does however cause some very
+        // small form fields to be written to disk files. Ideally we'd identify the smallest actual file we'll ever
+        // handle and set the threshold a little higher. The downside is that if a tiny file is actually uploaded even
+        // by accident, our code will not be able to get a file handle for it and fail. Some legitimate files like
+        // Shapefile .prj sidecars can be really small.
+        // If we always saved the FileItems via write() or read them with getInputStream() they would not all need to
+        // be on disk.
         try {
-            ServletFileUpload sfu = new ServletFileUpload();
+            DiskFileItemFactory diskFileItemFactory = new DiskFileItemFactory(0, null);
+            ServletFileUpload sfu = new ServletFileUpload(diskFileItemFactory);
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
             throw AnalysisServerException.fileUpload(ExceptionUtils.stackTraceString(e));
@@ -97,12 +106,11 @@ public abstract class HttpUtils {
     }
 
     public static File storeFileItemInDirectory(FileItem fileItem, File directory) {
-        try {
-            File file = new File(directory, fileItem.getName());
-            fileItem.getInputStream().transferTo(FileUtils.getOutputStream(file));
-            return file;
-        } catch (IOException e) {
-            throw new DataSourceException(e.getMessage());
+        File file = new File(directory, fileItem.getName());
+        boolean renameSuccessful = ((DiskFileItem) fileItem).getStoreLocation().renameTo(file);
+        if (!renameSuccessful) {
+            throw AnalysisServerException.fileUpload("Error storing file in directory on disk. File.renameTo() failed.");
         }
+        return file;
     }
 }

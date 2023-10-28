@@ -71,17 +71,17 @@ public abstract class HttpUtils {
     }
 
     /**
-     * Convert `FileItem`s into `File`s and move them into a temp directory. Automatically unzip files. Return the list
-     * of new `File` handles.
+     * Extracts `FileItem`s contents locally in a temp directory. Automatically unzip files. Return the list of new
+     * `File` handles.
      */
-    public static List<File> storeFileItemsAndUnzip(List<FileItem> fileItems) {
+    public static List<File> extractFilesFromFileItemsAndUnzip(List<FileItem> fileItems) {
         File directory = FileUtils.createScratchDirectory();
         List<File> files = new ArrayList<>();
         for (FileItem fi : fileItems) {
-            File file = storeFileItemInDirectory(fi, directory);
+            File file = moveFileItemIntoDirectory(fi, directory);
             String name = file.getName();
             if (name.toLowerCase().endsWith(".zip")) {
-                files.addAll(FileUtils.unZipFileIntoDirectory(file, directory));
+                files.addAll(FileUtils.unzipFileIntoDirectory(file, directory));
             } else {
                 files.add(file);
             }
@@ -90,22 +90,28 @@ public abstract class HttpUtils {
     }
 
     /**
-     * Convert `FileItem`s into `File`s and move them into a temporary directory. Return the list of new `File` handles.
+     * Move `FileItem`s contents into a temporary directory. Return the list of new `File` handles.
      */
-    public static List<File> storeFileItems(List<FileItem> fileItems) {
+    public static List<File> saveFileItemsLocally(List<FileItem> fileItems) {
         File directory = FileUtils.createScratchDirectory();
         List<File> files = new ArrayList<>();
         for (FileItem fileItem : fileItems) {
-            files.add(storeFileItemInDirectory(fileItem, directory));
+            files.add(moveFileItemIntoDirectory(fileItem, directory));
         }
         return files;
     }
 
-    public static File storeFileItem(FileItem fileItem) {
-        return storeFileItemInDirectory(fileItem, FileUtils.createScratchDirectory());
+    /**
+     * Save the contents of a `FileItem` in a temporary directory and return the `File`.
+     */
+    public static File saveFileItemLocally(FileItem fileItem) {
+        return moveFileItemIntoDirectory(fileItem, FileUtils.createScratchDirectory());
     }
 
-    public static File storeFileItemInDirectory(FileItem fileItem, File directory) {
+    /**
+     * Move the contents of a `FileItem` to the given directory by calling `renameTo`.
+     */
+    public static File moveFileItemIntoDirectory(FileItem fileItem, File directory) {
         File file = new File(directory, fileItem.getName());
         boolean renameSuccessful = ((DiskFileItem) fileItem).getStoreLocation().renameTo(file);
         if (!renameSuccessful) {

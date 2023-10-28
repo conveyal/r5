@@ -123,7 +123,7 @@ public abstract class FileUtils {
     /**
      * Extract the files inside a zipped file into a given directory and return the `File` handles to the new files.
      */
-    public static List<File> unZipFileIntoDirectory(File zipFile, File directory) {
+    public static List<File> unzipFileIntoDirectory(File zipFile, File directory) {
         List<File> files = new ArrayList<>();
         ZipInputStream zis = new ZipInputStream(FileUtils.getInputStream(zipFile));
         ZipEntry zipEntry;

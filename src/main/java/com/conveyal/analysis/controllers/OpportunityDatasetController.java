@@ -333,7 +333,7 @@ public class OpportunityDatasetController implements HttpController {
         try {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
             // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
-            files = HttpUtils.storeFileItemsAndUnzip(formFields.remove("files"));
+            files = HttpUtils.extractFilesFromFileItemsAndUnzip(formFields.remove("files"));
             uploadFormat = DataSourceUtil.detectUploadFormatAndValidate(files);
             parameters = extractStringParameters(formFields);
         } catch (Exception e) {

@@ -119,7 +119,7 @@ public class BundleController implements HttpController {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }
             } else {
-                osmPbfFile = HttpUtils.storeFileItem(files.get("osm").get(0));
+                osmPbfFile = HttpUtils.saveFileItemLocally(files.get("osm").get(0));
             }
 
             if (files.get("feedGroupId") != null) {
@@ -139,7 +139,7 @@ public class BundleController implements HttpController {
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             } else {
-                gtfsZipFiles = HttpUtils.storeFileItems(files.get("feedGroup"));
+                gtfsZipFiles = HttpUtils.saveFileItemsLocally(files.get("feedGroup"));
             }
             UserPermissions userPermissions = UserPermissions.from(req);
             bundle.accessGroup = userPermissions.accessGroup;

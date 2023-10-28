@@ -121,7 +121,7 @@ public class DataSourceUploadAction implements TaskAction {
         // Extract required parameters. Throws AnalysisServerException on failure, e.g. if a field is missing.
         final String sourceName = getFormField(formFields, "sourceName", true);
         final String regionId = getFormField(formFields, "regionId", true);
-        final List<File> files = HttpUtils.storeFileItemsAndUnzip(formFields.get("sourceFiles"));
+        final List<File> files = HttpUtils.extractFilesFromFileItemsAndUnzip(formFields.get("sourceFiles"));
 
         FileStorageFormat format = DataSourceUtil.detectUploadFormatAndValidate(files);
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);

@@ -4,7 +4,6 @@ import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
@@ -109,13 +108,15 @@ public abstract class HttpUtils {
     }
 
     /**
-     * Move the contents of a `FileItem` to the given directory by calling `renameTo`.
+     * Move the contents of a `FileItem` to the given directory by calling `write`. `DiskFileItem`s will call `renameTo`
+     * if the `FileItem's contents are already on the disk.
      */
     public static File moveFileItemIntoDirectory(FileItem fileItem, File directory) {
         File file = new File(directory, fileItem.getName());
-        boolean renameSuccessful = ((DiskFileItem) fileItem).getStoreLocation().renameTo(file);
-        if (!renameSuccessful) {
-            throw AnalysisServerException.fileUpload("Error storing file in directory on disk. File.renameTo() failed.");
+        try {
+            fileItem.write(file);
+        } catch (Exception e) {
+            throw new AnalysisServerException(e, "Error storing file in directory on disk. FileItem.write() failed.");
         }
         return file;
     }

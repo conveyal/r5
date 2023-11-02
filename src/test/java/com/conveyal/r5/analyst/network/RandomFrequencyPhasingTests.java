@@ -52,6 +52,7 @@ public class RandomFrequencyPhasingTests {
                 .weekendMorningPeak()
                 .setOrigin(20, 20)
                 .monteCarloDraws(1000)
+                .singleFreeformDestination(0, 0)
                 .build();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);

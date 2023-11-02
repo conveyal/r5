@@ -185,6 +185,18 @@ public class WebMercatorExtents {
     }
 
     /**
+     * The opposite of forTrimmedWgsEnvelope: makes the envelope a tiny bit bigger before constructing the extents.
+     * This helps deal with numerical imprecision where we want to be sure all points within a supplied envelope will
+     * fall inside cells of the resulting web Mercator grid.
+     */
+    public static WebMercatorExtents forBufferedWgsEnvelope (Envelope wgsEnvelope, int zoom) {
+        // Expand a protective copy of the envelope slightly.
+        wgsEnvelope = wgsEnvelope.copy();
+        wgsEnvelope.expandBy(WGS_EPSILON);
+        return WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+    }
+
+    /**
      * Produces a new Envelope in WGS84 coordinates that tightly encloses the pixels of this WebMercatorExtents.
      * The edges of that Envelope will run exactly down the borders between neighboring web Mercator pixels.
      */

@@ -28,6 +28,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
     public final WebMercatorExtents extents;
+
     /** Base pointset; linkages will be shared with this pointset */
     public final WebMercatorGridPointSet basePointSet;
 
@@ -36,9 +37,15 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
      * @oaram basePointSet the super-grid pointset from which linkages will be copied or shared, or null if no
      *        such grid exists.
      */
-    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height, WebMercatorGridPointSet basePointSet) {
-        this.extents = new WebMercatorExtents(west, north, width, height, zoom);
+    public WebMercatorGridPointSet(WebMercatorExtents extents, WebMercatorGridPointSet basePointSet) {
+        // All fields of extents are final, no need to make a protective copy.
+        this.extents = extents;
         this.basePointSet = basePointSet;
+    }
+
+    /** The resulting PointSet will not have a null basePointSet, so should generally not be used for linking. */
+    public WebMercatorGridPointSet (WebMercatorExtents extents) {
+        this(extents, null);
     }
 
     /**
@@ -51,19 +58,15 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     /**
      * TODO specific data types for Web Mercator and WGS84 floating point envelopes
-     * @param wgsEnvelope an envelope in floating-point WGS84 degrees
+     * @param wgsEnvelope an envelope in floating-point WGS84 degrees. The envelope will be expanded ever so slightly
+     *                    to ensure any objects within it are sure to fall within the resulting mercator extents, even
+     *                    if subject to loss of precision during later coordinate calculations.
      */
     public WebMercatorGridPointSet (Envelope wgsEnvelope) {
         LOG.info("Creating WebMercatorGridPointSet with WGS84 extents {}", wgsEnvelope);
         checkWgsEnvelopeSize(wgsEnvelope, "grid point set");
-        // NOTE the width and height calculations were wrong before, use standard ones in WebMercatorExtents
-        this.extents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, WebMercatorExtents.DEFAULT_ZOOM); // USE TRIMMED?
+        this.extents = WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, WebMercatorExtents.DEFAULT_ZOOM);
         this.basePointSet = null;
-    }
-
-    /** The resulting PointSet will not have a null basePointSet, so should generally not be used for linking. */
-    public WebMercatorGridPointSet (WebMercatorExtents extents) {
-        this(extents.zoom, extents.west, extents.north, extents.width, extents.height, null);
     }
 
     @Override

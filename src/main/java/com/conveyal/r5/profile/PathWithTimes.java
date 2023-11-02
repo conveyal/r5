@@ -19,6 +19,14 @@ import java.util.stream.Stream;
  * A path that also includes itineraries and bounds for all possible trips on the paths (even those which may not be optimal)
  */
 public class PathWithTimes extends Path {
+
+    /**
+     * Minimum time between alighting from one vehicle and boarding another, in seconds.
+     * Appears to be used only in McRaptor and point-to-point searches.
+     * TODO make this configurable, and use loop-transfers from transfers.txt.
+     */
+    public static final int BOARD_SLACK_SECONDS = 60;
+
     /** Stats for the entire path */
     public Stats stats;
 
@@ -92,7 +100,7 @@ public class PathWithTimes extends Path {
         // loop over departures within the time window
         // firstTrip is the trip on the first pattern
         int firstTrip = 0;
-        while (times[0][firstTrip][0] < req.fromTime + accessTime + FastRaptorWorker.BOARD_SLACK_SECONDS) firstTrip++;
+        while (times[0][firstTrip][0] < req.fromTime + accessTime + BOARD_SLACK_SECONDS) firstTrip++;
 
         // now interleave times
         double walkSpeedMillimetersPerSecond = req.walkSpeed * 1000;
@@ -137,7 +145,7 @@ public class PathWithTimes extends Path {
 
                     // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
                     // See also below in computeStatistics
-                    time = times[patIdx][trip][1] + transferTime + FastRaptorWorker.BOARD_SLACK_SECONDS;
+                    time = times[patIdx][trip][1] + transferTime + BOARD_SLACK_SECONDS;
                     itin.arriveAtBoardStopTimes[patIdx + 1] = time;
                 }
             }

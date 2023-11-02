@@ -23,7 +23,7 @@ public class StatsCalculator {
 
         for (int start = req.fromTime; start < req.toTime; start += 60) {
             // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
-            int timeAtOriginStop = start + accessTime + FastRaptorWorker.BOARD_SLACK_SECONDS;
+            int timeAtOriginStop = start + accessTime + PathWithTimes.BOARD_SLACK_SECONDS;
             int bestTimeAtDestinationStop = Integer.MAX_VALUE;
 
             PathWithTimes.Itinerary bestItinerary = null;

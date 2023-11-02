@@ -80,6 +80,12 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
         }
     }
 
+    /**
+     * WARNING This whole tree of classes contains non-primitive compound fields. Cloning WILL NOT DEEP COPY these
+     * fields. Modifying some aspects of the cloned object may modify the same aspects of the one it was cloned from.
+     * Unfortunately these classes have a large number of fields and maintaining hand written copy constructors for
+     * them might be an even greater liability than carefully choosing how to use clone().
+     */
     public RegionalTask clone () {
         return (RegionalTask) super.clone();
     }

@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
@@ -14,21 +15,19 @@ import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
 /**
  * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
- * It provides convenience methods to set all the necessary fields.
- *
- * Usually we would rather search out to freeform pointsets containing a few exact points instead of grid pointsets
- * which will not align exactly with the street intersections. However as of this writing single point tasks could only
- * search out to grids, which are hard-wired into fields of the task, not derived from the pointset object.
- *
- * We may actually want to test with regional tasks to make this less strange, and eventually merge both request types.
+ * It provides convenience methods to set all the necessary fields. This builder may be reused to produce
+ * several tasks in a row with different settings, but only use the most recently produced one at any time.
+ * See build() for further explanation.
  */
 public class GridSinglePointTaskBuilder {
 
+    public static final int DEFAULT_MONTE_CARLO_DRAWS = 4800; // 40 per minute over a two hour window.
     private final GridLayout gridLayout;
     private final AnalysisWorkerTask task;
 
@@ -50,32 +49,25 @@ public class GridSinglePointTaskBuilder {
         // In single point tasks all 121 cutoffs are required (there is a check).
         task.cutoffsMinutes = IntStream.rangeClosed(0, 120).toArray();
         task.decayFunction = new StepDecayFunction();
-        task.monteCarloDraws = 1200; // Ten per minute over a two hour window.
+        task.monteCarloDraws = DEFAULT_MONTE_CARLO_DRAWS;
         // By default, traverse one block in a round predictable number of seconds.
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
         // Record more detailed information to allow comparison to theoretical travel time distributions.
         task.recordTravelTimeHistograms = true;
-    }
-
-    public GridSinglePointTaskBuilder (GridLayout layout, AnalysisWorkerTask task) {
-        this.gridLayout = layout;
-        this.task = task.clone();
+        // Set the destination grid extents on the task, otherwise if no freeform PointSet is specified, the task will fail
+        // checks on the grid dimensions and zoom level.
+        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(gridLayout.gridEnvelope(), DEFAULT_ZOOM);
+        task.zoom = extents.zoom;
+        task.north = extents.north;
+        task.west = extents.west;
+        task.width = extents.width;
+        task.height = extents.height;
     }
 
     public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
         Coordinate origin = gridLayout.getIntersectionLatLon(gridX, gridY);
         task.fromLat = origin.y;
         task.fromLon = origin.x;
-        return this;
-    }
-
-    public GridSinglePointTaskBuilder setDestination (int gridX, int gridY) {
-        Coordinate destination = gridLayout.getIntersectionLatLon(gridX, gridY);
-        task.destinationPointSets = new PointSet[] { new FreeFormPointSet(destination) };
-        task.destinationPointSetKeys = new String[] { "ID" };
-        task.toLat = destination.y;
-        task.toLon = destination.x;
-        task.includePathResults = true;
         return this;
     }
 
@@ -109,32 +101,42 @@ public class GridSinglePointTaskBuilder {
     }
 
     /**
-     * Even if you're not actually using the opportunity count, you should call this to set the grid extents on the
-     * resulting task. Otherwise it will fail checks on the grid dimensions and zoom level.
+     * When trying to verify more complex distributions, the Monte Carlo approach may introduce too much noise.
+     * Increasing the number of draws will yield a better approximation of the true travel time distribution
+     * (while making the tests run slower).
      */
-    public GridSinglePointTaskBuilder uniformOpportunityDensity (double density) {
-        Grid grid = gridLayout.makeUniformOpportunityDataset(density);
-        task.destinationPointSets = new PointSet[] { grid };
-        task.destinationPointSetKeys = new String[] { "GRID" };
-
-        // In a single point task, the grid of destinations is given with these fields, not from the pointset object.
-        // The destination point set (containing the opportunity densities) must then match these same dimensions.
-        task.zoom = grid.extents.zoom;
-        task.north = grid.extents.north;
-        task.west = grid.extents.west;
-        task.width = grid.extents.width;
-        task.height = grid.extents.height;
-
-        return this;
-    }
-
     public GridSinglePointTaskBuilder monteCarloDraws (int draws) {
         task.monteCarloDraws = draws;
         return this;
     }
 
+    /**
+     * Create a FreeformPointSet with a single point in it situated at the specified street intersection, and embed
+     * that PointSet in the request. In normal usage supplying FreeformPointSets as destination is only done for
+     * regional analysis tasks, but a testing code path exists to handle their presence on single point requests.
+     * This eliminates any difficulty estimating the final segment of egress, walking from the street to a gridded
+     * travel time sample point. Although egress time is something we'd like to test too, it is not part of the transit
+     * routing we're concentrating on here, and will vary as the Simpson Desert street grid does not align with our
+     * web Mercator grid pixels. Using a single measurement point also greatly reduces the amount of travel time
+     * histograms that must be computed and retained, improving the memory and run time cost of tests.
+     */
+    public GridSinglePointTaskBuilder singleFreeformDestination(int x, int y) {
+        FreeFormPointSet ps = new FreeFormPointSet(gridLayout.getIntersectionLatLon(x, y));
+        // Downstream code expects to see the same number of keys and PointSet objects so initialize both.
+        task.destinationPointSetKeys = new String[] { "POINT_SET" };
+        task.destinationPointSets = new PointSet[] { ps };
+        return this;
+    }
+
+    /**
+     * Produce a new AnalysisWorkerTask object based on the settings applied to this builder. The builder remains
+     * valid after this operation, and later calls to build() after further modifying the settings will return
+     * separate AnalysisWorkerTask objects. HOWEVER despite the use of clone(), these task objects share references
+     * to some sub-objects such as arrays or Sets. To avoid problems, only use the most recently produced task from
+     * the builder. Do not continue using tasks produced by previous calls to build().
+     */
     public AnalysisWorkerTask build () {
-        return task;
+        return task.clone();
     }
 
 }

@@ -61,10 +61,13 @@ public class DistributionChart extends ApplicationFrame {
         return chart;
     }
 
+    // Note that the points are placed at the minute boundary, though the numbers represent densities over one minute.
+    // They should probably be represented as filled bars across the minute or as points midway across the minute.
     private static TimeSeriesCollection createTimeSeriesDataset (Distribution... distributions) {
         TimeSeriesCollection dataset = new TimeSeriesCollection();
+        int d = 0;
         for (Distribution distribution : distributions) {
-            TimeSeries ts = new TimeSeries("X");
+            TimeSeries ts = new TimeSeries("Distribution " + (d++));
             for (int i = distribution.skip(); i < distribution.fullWidth(); i++) {
                 double p = distribution.probabilityOf(i);
                 ts.add(new Minute(i, 0, 1, 1, 2000), p);

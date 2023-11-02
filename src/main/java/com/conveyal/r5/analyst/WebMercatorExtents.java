@@ -8,6 +8,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
+import java.io.Serializable;
 import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.Grid.latToFractionalPixel;
@@ -29,10 +30,15 @@ import static com.google.common.base.Preconditions.checkState;
  *      and OpportunityGrid (AKA Grid) which adds opportunity counts. These can compose, not necessarily subclass.
  *      Of course they could all be one class, with the opportunity grid nulled out when there is no density.
  */
-public class WebMercatorExtents {
+public class WebMercatorExtents implements Serializable {
 
-    private static final int MIN_ZOOM = 9;
-    private static final int MAX_ZOOM = 12;
+    /**
+     * Default Web Mercator zoom level for grids (origin/destination layers, aggregation area masks, etc.).
+     * Level 10 is probably ideal but will quadruple calculation relative to 9.
+     */
+    public static final int DEFAULT_ZOOM = 9;
+    public static final int MIN_ZOOM = 9;
+    public static final int MAX_ZOOM = 12;
     private static final int MAX_GRID_CELLS = 5_000_000;
 
     /** The pixel number of the westernmost pixel (smallest x value). */
@@ -96,6 +102,12 @@ public class WebMercatorExtents {
             checkArgument(pointSets.length == 1, "You may only specify one non-gridded PointSet.");
             return null;
         }
+    }
+
+    public static int parseZoom(String zoomString) {
+        int zoom = (zoomString == null) ? DEFAULT_ZOOM : Integer.parseInt(zoomString);
+        checkArgument(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM);
+        return zoom;
     }
 
     /**

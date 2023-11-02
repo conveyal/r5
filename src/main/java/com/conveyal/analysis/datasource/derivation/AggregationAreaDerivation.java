@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
 import static com.conveyal.r5.analyst.progress.WorkProductType.AGGREGATION_AREA;
 import static com.conveyal.r5.util.ShapefileReader.GeometryType.POLYGON;
 import static com.google.common.base.Preconditions.checkArgument;

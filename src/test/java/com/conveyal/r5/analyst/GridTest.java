@@ -181,7 +181,7 @@ public class GridTest {
     /** Test that latitude/longitude to pixel conversions are correct */
     @Test
     public void testLatLonPixelConversions () {
-        final int ZOOM = WebMercatorGridPointSet.DEFAULT_ZOOM;
+        final int ZOOM = WebMercatorExtents.DEFAULT_ZOOM;
         for (double lat : new double [] { -75, -25, 0, 25, 75 }) {
             assertEquals(lat, Grid.pixelToLat(Grid.latToPixel(lat, ZOOM), ZOOM), 1e-2);
         }

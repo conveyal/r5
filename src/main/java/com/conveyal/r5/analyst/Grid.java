@@ -8,7 +8,6 @@ import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -64,14 +63,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.parseDouble;
-import static org.apache.commons.math3.util.FastMath.atan;
-import static org.apache.commons.math3.util.FastMath.cos;
-import static org.apache.commons.math3.util.FastMath.log;
-import static org.apache.commons.math3.util.FastMath.sinh;
-import static org.apache.commons.math3.util.FastMath.tan;
+import static java.lang.Math.PI;
+import static java.lang.Math.atan;
+import static java.lang.Math.cos;
+import static java.lang.Math.log;
+import static java.lang.Math.pow;
+import static java.lang.Math.sinh;
+import static java.lang.Math.tan;
+import static java.lang.Math.toDegrees;
+import static java.lang.Math.toRadians;
 
 /**
  * Class that represents a grid of opportunity counts in the spherical Mercator "projection" at a given zoom level.
@@ -122,7 +124,7 @@ public class Grid extends PointSet {
      * @param wgsEnvelope Envelope of grid, in absolute WGS84 lat/lon coordinates
      */
     public Grid (int zoom, Envelope wgsEnvelope) {
-        this(WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom));
+        this(WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, zoom));
     }
 
     public static class PixelWeight {
@@ -458,22 +460,30 @@ public class Grid extends PointSet {
         return extents.width * extents.height;
     }
 
-    /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
+    /* Functions below derived from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
-    /**
-     * Return the absolute (world) x pixel number of all pixels the given line of longitude falls within at the given
-     * zoom level.
-     */
-    public static int lonToPixel (double lon, int zoom) {
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+    /** Like lonToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double lonToFractionalPixel (double lon, int zoom) {
+        // Factor of 256 yields a pixel value rather than the tile number.
+        return (lon + 180) / 360 * Math.pow(2, zoom) * 256;
     }
 
     /**
-     * Return the longitude of the west edge of any pixel at the given zoom level and x pixel number measured from the
-     * west edge of the world (assuming an integer pixel). Noninteger pixels will return locations within that pixel.
+     * Return the absolute (world) x pixel number of all pixels containing the given line of longitude
+     * at the given zoom level.
+     */
+    public static int lonToPixel (double lon, int zoom) {
+        return (int) lonToFractionalPixel(lon, zoom);
+    }
+
+    /**
+     * Given an integer web Mercator pixel number, return the longitude in degrees of the west edge of that pixel at
+     * the given zoom level measured from the west edge of the world (not relative to this grid or to any particular
+     * tile). Given a non-integer web Mercator pixel number, return WGS84 locations within that pixel.
+     * Naming should somehow be revised to clarify that it doesn't return the center of the pixel.
      */
     public static double pixelToLon (double xPixel, int zoom) {
-        return xPixel / (Math.pow(2, zoom) * 256) * 360 - 180;
+        return xPixel / (pow(2, zoom) * 256) * 360 - 180;
     }
 
     /**
@@ -484,10 +494,28 @@ public class Grid extends PointSet {
         return pixelToLon(xPixel + 0.5, zoom);
     }
 
+    /** Like latToPixel but returns fractional values for positions within a pixel instead of integer pixel numbers. */
+    public static double latToFractionalPixel (double lat, int zoom) {
+        final double latRad = toRadians(lat);
+        return (1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256;
+    }
+
     /** Return the absolute (world) y pixel number of all pixels the given line of latitude falls within. */
     public static int latToPixel (double lat, int zoom) {
-        double latRad = FastMath.toRadians(lat);
-        return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return (int) latToFractionalPixel(lat, zoom);
+    }
+
+    /**
+     * Given an integer web Mercator pixel number, return the latitude in degrees of the north edge of that pixel at the
+     * given zoom level relative to the top (north) edge of the world (not relative to this grid or to any particular
+     * tile). Given a non-integer web Mercator pixel number, return WGS84 locations within that pixel.
+     *
+     * TODO Profile this some time because we had versions using both FastMath and built-in Math functions.
+     * The difference should be less significant these days. Java now has a StrictMath and the normal Math is optimized.
+     */
+    public static double pixelToLat (double yPixel, int zoom) {
+        final double tile = yPixel / 256d;
+        return toDegrees(atan(sinh(PI - tile * PI * 2 / pow(2, zoom))));
     }
 
     /**
@@ -496,15 +524,6 @@ public class Grid extends PointSet {
      */
     public static double pixelToCenterLat (int yPixel, int zoom) {
         return pixelToLat(yPixel + 0.5, zoom);
-    }
-
-    /**
-     * Return the latitude of the north edge of any pixel at the given zoom level and y coordinate relative to the top
-     * edge of the world (assuming an integer pixel). Noninteger pixels will return locations within the pixel.
-     * We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
-     */
-    public static double pixelToLat (double yPixel, int zoom) {
-        return FastMath.toDegrees(atan(sinh(Math.PI - (yPixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /**
@@ -604,7 +623,7 @@ public class Grid extends PointSet {
         reader.close();
 
         checkWgsEnvelopeSize(envelope, "CSV points");
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forBufferedWgsEnvelope(envelope, zoom);
         checkPixelCount(extents, numericColumns.size());
 
         if (progressListener != null) {
@@ -676,7 +695,7 @@ public class Grid extends PointSet {
         ShapefileReader reader = new ShapefileReader(shapefile);
         Envelope envelope = reader.wgs84Bounds();
         checkWgsEnvelopeSize(envelope, "Shapefile");
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forBufferedWgsEnvelope(envelope, zoom);
         List<String> numericAttributes = reader.numericAttributes();
         Set<String> uniqueNumericAttributes = new HashSet<>(numericAttributes);
         if (uniqueNumericAttributes.size() != numericAttributes.size()) {
@@ -753,14 +772,12 @@ public class Grid extends PointSet {
     }
 
     /**
-     * Rasterize a FreeFormFointSet into a Grid.
-     * Currently intended only for UI display of FreeFormPointSets, or possibly for previews of accessibility results
-     * during
+     * Rasterize a FreeFormFointSet into a Grid. Currently intended only for UI display of FreeFormPointSets.
      */
     public static Grid fromFreeForm (FreeFormPointSet freeForm, int zoom) {
         // TODO make and us a strongly typed WgsEnvelope class here and in various places
         Envelope wgsEnvelope = freeForm.getWgsEnvelope();
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, zoom);
+        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, zoom);
         Grid grid = new Grid(webMercatorExtents);
         grid.name = freeForm.name;
         for (int f = 0; f < freeForm.featureCount(); f++) {

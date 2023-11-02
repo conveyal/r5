@@ -37,8 +37,8 @@ public class GridTransformWrapper extends PointSet {
     // This could certainly be made more efficient (but complex) by forcing sequential iteration over opportunity counts
     // and disallowing random access, using a new PointSetIterator class that allows reading lat, lon, and counts.
     private int transformIndex (int i) {
-        final int x = (i % targetGrid.width) + targetGrid.west - sourceGrid.extents.west;
-        final int y = (i / targetGrid.width) + targetGrid.north - sourceGrid.extents.north;
+        final int x = (i % targetGrid.extents.width) + targetGrid.extents.west - sourceGrid.extents.west;
+        final int y = (i / targetGrid.extents.width) + targetGrid.extents.north - sourceGrid.extents.north;
         if (x < 0 || x >= sourceGrid.extents.width || y < 0 || y >= sourceGrid.extents.height) {
             // Point in target grid lies outside source grid, there is no valid index. Return special value.
             return -1;

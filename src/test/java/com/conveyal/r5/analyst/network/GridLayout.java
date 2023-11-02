@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+import static com.conveyal.r5.analyst.WebMercatorExtents.DEFAULT_ZOOM;
 
 /**
  * This is used in testing, to represent and create gridded transport systems with very regular spacing of roads and

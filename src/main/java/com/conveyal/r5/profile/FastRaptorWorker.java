@@ -55,12 +55,6 @@ public class FastRaptorWorker {
      */
     public static final int UNREACHED = Integer.MAX_VALUE;
 
-    /**
-     * Minimum time between alighting from one vehicle and boarding another, in seconds.
-     * TODO make this configurable, and use loop-transfers from transfers.txt.
-     */
-    public static final int BOARD_SLACK_SECONDS = 60;
-
     public static final int SECONDS_PER_MINUTE = 60;
 
     /**
@@ -70,8 +64,10 @@ public class FastRaptorWorker {
     private static final int DEPARTURE_STEP_SEC = 60;
 
     /**
-     * Minimum wait for boarding to account for schedule variation.
-     * FIXME clarify why this is separate from BOARD_SLACK. If it is not, merge the two constants into BOARD_SLACK_SEC.
+     * To be considered for boarding, a vehicle must depart at least this long after the rider arrives at the stop.
+     * Intuitively, "leave this long for transfers" to account for schedule variation or other unexpected variations.
+     * This is separate from BOARD_SLACK_SECONDS used in McRaptor and point-to-point searches, in case someone needs
+     * to set them independently.
      */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 

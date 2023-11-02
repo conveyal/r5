@@ -15,7 +15,7 @@ import java.time.LocalTime;
 import java.util.EnumSet;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
+import static com.conveyal.r5.analyst.WebMercatorExtents.DEFAULT_ZOOM;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 

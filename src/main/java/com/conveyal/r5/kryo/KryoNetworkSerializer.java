@@ -47,7 +47,7 @@ public abstract class KryoNetworkSerializer {
      *
      * History of Network Version (NV) changes:
      * nv4 2023-11-02 WebMercatorGridPointSet now contains nested WebMercatorExtents
-     * nv3 2023-18-01 use Kryo 5 serialization format
+     * nv3 2023-01-18 use Kryo 5 serialization format
      * nv2 2022-04-05
      * nv1 2021-04-30 stopped using r5 version string (which caused networks to be rebuilt for every new r5 version)
      */

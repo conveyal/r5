@@ -18,6 +18,7 @@ import com.conveyal.analysis.results.GridResultWriter;
 import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.analysis.results.PathCsvResultWriter;
 import com.conveyal.analysis.results.RegionalResultWriter;
+import com.conveyal.analysis.results.TemporalDensityCsvResultWriter;
 import com.conveyal.analysis.results.TimeCsvResultWriter;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -639,10 +640,12 @@ public class RegionalAnalysisController implements HttpController {
         if (!task.makeTauiSite) {
             if (task.recordAccessibility) {
                 if (task.originPointSet != null) {
+                    // Freeform origins - create CSV regional analysis results
                     var accessWriter = new AccessCsvResultWriter(task, fileStorage);
                     resultWriters.add(accessWriter);
                     regionalAnalysis.resultStorage.put(accessWriter.resultType(), accessWriter.getFileName());
                 } else {
+                    // Gridded origins - create gridded regional analysis results
                     resultWriters.addAll(GridResultWriter.createWritersFromTask(regionalAnalysis, task, fileStorage));
                 }
             }
@@ -657,6 +660,20 @@ public class RegionalAnalysisController implements HttpController {
                 var pathsWriter = new PathCsvResultWriter(task, fileStorage);
                 resultWriters.add(pathsWriter);
                 regionalAnalysis.resultStorage.put(pathsWriter.resultType(), pathsWriter.getFileName());
+            }
+
+            if (task.includeTemporalDensity) {
+                if (task.originPointSet == null) {
+                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
+                    // We might want to record a grid of dual accessibility values, but this will require some serious
+                    // refactoring of the GridResultWriter.
+                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
+                    throw AnalysisServerException.badRequest("Temporal density of opportunities cannot be recorded for gridded origin points.");
+                } else {
+                    var tDensityWriter = new TemporalDensityCsvResultWriter(task, fileStorage);
+                    resultWriters.add(tDensityWriter);
+                    regionalAnalysis.resultStorage.put(tDensityWriter.resultType(), tDensityWriter.getFileName());
+                }
             }
             checkArgument(notNullOrEmpty(resultWriters), "A regional analysis should always create at least one grid or CSV file.");
         }

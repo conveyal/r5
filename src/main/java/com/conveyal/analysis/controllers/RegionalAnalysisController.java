@@ -25,7 +25,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -634,7 +633,7 @@ public class RegionalAnalysisController implements HttpController {
         var assembler = new MultiOriginAssembler(regionalJob, regionalAnalysis.createResultWriters(task));
 
         // Stored scenario is needed by workers. Must be done ahead of enqueueing the job.
-        storeScenarioJson(task.graphId, task.scenario);
+        storeRegionalAnalysisScenarioJson(task);
 
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
         broker.enqueueTasksForRegionalJob(regionalJob, assembler);
@@ -650,11 +649,11 @@ public class RegionalAnalysisController implements HttpController {
     /**
      * Store the regional analysis scenario as JSON for retrieval by the workers.
      */
-    private void storeScenarioJson(String graphId, Scenario scenario) throws IOException {
-        String fileName = getScenarioFilename(graphId, scenario.id);
+    private void storeRegionalAnalysisScenarioJson(RegionalTask task) throws IOException {
+        String fileName = getScenarioFilename(task.graphId, task.scenario.id);
         FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
         File localScenario = FileUtils.createScratchFile("json");
-        JsonUtil.objectMapper.writeValue(localScenario, scenario);
+        JsonUtil.objectMapper.writeValue(localScenario, task.scenario);
         fileStorage.moveIntoStorage(fileStorageKey, localScenario);
     }
 

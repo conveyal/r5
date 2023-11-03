@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.PointSet;
@@ -24,10 +23,6 @@ import java.util.Map;
 public class MultiOriginAssembler {
 
     public static final Logger LOG = LoggerFactory.getLogger(MultiOriginAssembler.class);
-
-    private static final int MAX_FREEFORM_OD_PAIRS = 16_000_000;
-
-    private static final int MAX_FREEFORM_DESTINATIONS = 4_000_000;
 
     /**
      * The object representing the progress of the regional analysis as tracked by the broker.
@@ -66,23 +61,6 @@ public class MultiOriginAssembler {
         this.job = job;
         this.resultWriters = resultWriters;
         this.originsReceived = new BitSet(job.nTasksTotal);
-    }
-
-    /**
-     * Check that origin and destination sets are not too big for generating CSV files.
-     */
-    public static void ensureOdPairsUnderLimit(RegionalTask task, PointSet destinationPointSet) {
-        // This requires us to have already loaded this destination pointset instance into the transient field.
-        if ((task.recordTimes || task.includePathResults) && !task.oneToOne) {
-            if (task.getTasksTotal() * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
-                    destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
-            ) {
-                throw new AnalysisServerException(String.format(
-                        "Freeform requests limited to %d destinations and %d origin-destination pairs.",
-                        MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
-                ));
-            }
-        }
     }
 
     /**

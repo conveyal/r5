@@ -1,15 +1,6 @@
 package com.conveyal.file;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -92,9 +83,8 @@ public abstract class FileUtils {
      */
     public static File gzipFile(File file) {
         try {
-            var gzippedFile = createScratchFile();
-            var gzippedOs = new GZIPOutputStream(getOutputStream(gzippedFile));
-            transferFromFileTo(file, gzippedOs);
+            File gzippedFile = createScratchFile();
+            transferFromFileTo(file, new GZIPOutputStream(getOutputStream(gzippedFile)));
             return gzippedFile;
         } catch (IOException e) {
             throw new RuntimeException(e);

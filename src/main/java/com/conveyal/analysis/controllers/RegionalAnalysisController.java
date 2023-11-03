@@ -565,7 +565,7 @@ public class RegionalAnalysisController implements HttpController {
             task.destinationPointSets = new PointSet[] {
                     PointSetCache.readFreeFormFromFileStore(task.destinationPointSetKeys[0])
             };
-            MultiOriginAssembler.ensureOdPairsUnderLimit(task, task.destinationPointSets[0]);
+            task.checkIsUnderOdPairLimit(task.destinationPointSets[0]);
         }
         if (task.recordTimes) {
             checkArgument(

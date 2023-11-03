@@ -1,11 +1,10 @@
 package com.conveyal.r5.analyst.network;
 
 import com.conveyal.r5.analyst.FreeFormPointSet;
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
@@ -20,21 +19,25 @@ import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKDAY_DATE;
 import static com.conveyal.r5.analyst.network.GridGtfsGenerator.WEEKEND_DATE;
 
 /**
- * This creates a task for use in tests. It uses a builder pattern but for a non-immutable task object.
- * It provides convenience methods to set all the necessary fields. This builder may be reused to produce
- * several tasks in a row with different settings, but only use the most recently produced one at any time.
- * See build() for further explanation.
+ * This creates a task for use in tests. It uses a builder pattern but modifies a non-immutable task object. It
+ * provides convenience methods to set all the necessary fields. This builder may be reused to produce several tasks in
+ * a row with different settings, but only use the most recently produced one at any time. See build() for further
+ * explanation. We want to use a limited number of destinations at exact points instead of Mercator gridded
+ * destinations, which would not be exactly aligned with the desert grid. Therefore we create regional tasks rather
+ * than single-point TravelTimeSurfaceTasks because single-point tasks always have gridded destinations (they always
+ * return gridded travel times which must be exactly aligned with any accessibility destinations).
  */
-public class GridSinglePointTaskBuilder {
+public class GridRegionalTaskBuilder {
 
     public static final int DEFAULT_MONTE_CARLO_DRAWS = 4800; // 40 per minute over a two hour window.
     private final GridLayout gridLayout;
-    private final AnalysisWorkerTask task;
 
-    public GridSinglePointTaskBuilder (GridLayout gridLayout) {
+    private final RegionalTask task;
+
+    public GridRegionalTaskBuilder(GridLayout gridLayout) {
         this.gridLayout = gridLayout;
         // We will accumulate settings into this task.
-        task = new TravelTimeSurfaceTask();
+        task = new RegionalTask();
         task.date = WEEKDAY_DATE;
         // Set defaults that can be overridden by calling builder methods.
         task.accessModes = EnumSet.of(LegMode.WALK);
@@ -52,10 +55,11 @@ public class GridSinglePointTaskBuilder {
         task.monteCarloDraws = DEFAULT_MONTE_CARLO_DRAWS;
         // By default, traverse one block in a round predictable number of seconds.
         task.walkSpeed = gridLayout.streetGridSpacingMeters / gridLayout.walkBlockTraversalTimeSeconds;
+        // Unlike single point tasks, travel time recording must be enabled manually on regional tasks.
+        task.recordTimes = true;
         // Record more detailed information to allow comparison to theoretical travel time distributions.
         task.recordTravelTimeHistograms = true;
-        // Set the destination grid extents on the task, otherwise if no freeform PointSet is specified, the task will fail
-        // checks on the grid dimensions and zoom level.
+        // Set the grid extents on the task, otherwise the task will fail checks on the grid dimensions and zoom level.
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(gridLayout.gridEnvelope(), DEFAULT_ZOOM);
         task.zoom = extents.zoom;
         task.north = extents.north;
@@ -64,38 +68,38 @@ public class GridSinglePointTaskBuilder {
         task.height = extents.height;
     }
 
-    public GridSinglePointTaskBuilder setOrigin (int gridX, int gridY) {
+    public GridRegionalTaskBuilder setOrigin (int gridX, int gridY) {
         Coordinate origin = gridLayout.getIntersectionLatLon(gridX, gridY);
         task.fromLat = origin.y;
         task.fromLon = origin.x;
         return this;
     }
 
-    public GridSinglePointTaskBuilder weekdayMorningPeak () {
+    public GridRegionalTaskBuilder weekdayMorningPeak () {
         task.date = WEEKDAY_DATE;
         morningPeak();
         return this;
     }
 
-    public GridSinglePointTaskBuilder weekendMorningPeak () {
+    public GridRegionalTaskBuilder weekendMorningPeak () {
         task.date = WEEKEND_DATE;
         morningPeak();
         return this;
     }
 
-    public GridSinglePointTaskBuilder morningPeak () {
+    public GridRegionalTaskBuilder morningPeak () {
         task.fromTime = LocalTime.of(7, 00).toSecondOfDay();
         task.toTime = LocalTime.of(9, 00).toSecondOfDay();
         return this;
     }
 
-    public GridSinglePointTaskBuilder departureTimeWindow(int startHour, int startMinute, int durationMinutes) {
+    public GridRegionalTaskBuilder departureTimeWindow(int startHour, int startMinute, int durationMinutes) {
         task.fromTime = LocalTime.of(startHour, startMinute).toSecondOfDay();
         task.toTime = LocalTime.of(startHour, startMinute + durationMinutes).toSecondOfDay();
         return this;
     }
 
-    public GridSinglePointTaskBuilder maxRides(int rides) {
+    public GridRegionalTaskBuilder maxRides(int rides) {
         task.maxRides = rides;
         return this;
     }
@@ -105,7 +109,7 @@ public class GridSinglePointTaskBuilder {
      * Increasing the number of draws will yield a better approximation of the true travel time distribution
      * (while making the tests run slower).
      */
-    public GridSinglePointTaskBuilder monteCarloDraws (int draws) {
+    public GridRegionalTaskBuilder monteCarloDraws (int draws) {
         task.monteCarloDraws = draws;
         return this;
     }
@@ -120,7 +124,7 @@ public class GridSinglePointTaskBuilder {
      * web Mercator grid pixels. Using a single measurement point also greatly reduces the amount of travel time
      * histograms that must be computed and retained, improving the memory and run time cost of tests.
      */
-    public GridSinglePointTaskBuilder singleFreeformDestination(int x, int y) {
+    public GridRegionalTaskBuilder singleFreeformDestination(int x, int y) {
         FreeFormPointSet ps = new FreeFormPointSet(gridLayout.getIntersectionLatLon(x, y));
         // Downstream code expects to see the same number of keys and PointSet objects so initialize both.
         task.destinationPointSetKeys = new String[] { "POINT_SET" };

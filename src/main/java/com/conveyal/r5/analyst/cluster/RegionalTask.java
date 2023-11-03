@@ -46,7 +46,8 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
     public boolean oneToOne = false;
 
     /**
-     * Whether to record travel times between origins and destinations
+     * Whether to record travel times between origins and destinations. This is done automatically for
+     * TravelTimeSurfaceTask (single point tasks) but must be manually enabled on RegionalTasks using this field.
      */
     public boolean recordTimes;
 

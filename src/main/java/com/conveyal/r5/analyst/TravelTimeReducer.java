@@ -346,6 +346,8 @@ public class TravelTimeReducer {
     /**
      * Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
      * calculate travel times. They will only be used if we're calculating accessibility.
+     * TODO: expand to cover all cases where destinationPointSets are present, not just accessibility to Mercator grids.
+     * Need to verify first: should this be skipped for one-to-one regional requests on FreeFormPointSets?
      */
     public void checkOpportunityExtents (PointSet travelTimePointSet) {
         if (calculateAccessibility) {

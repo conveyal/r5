@@ -60,22 +60,23 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
 
     @Override
     public int nTargetsPerOrigin () {
-        // In TravelTimeSurfaceTasks, the set of destinations is always determined by the web mercator extents in the
-        // request. A single WebMercatorGridPointSet is created with those extents. A single small freeform PointSet may
-        // also be present, but only in testing situations. The checkState assertions serve to verify assumptions that
-        // destinationPointSets are always set and we can polymorphically fetch the number of items for all normal and
-        // testing use cases. Once that is clearly working the assertions could be removed.
-        checkState(!isNullOrEmpty(destinationPointSets), "Expected destination PointSets to be present.");
-        checkState(destinationPointSets.length == 1, "Expected a single destination PointSet in TravelTimeSurfaceTask.");
-        PointSet destinations = destinationPointSets[0];
-        int nFeatures = destinations.featureCount();
-        if (destinations instanceof FreeFormPointSet) {
-            LOG.warn("Should currently be used only in testing: FreeFormPointSet specified in TravelTimeSurfaceTask.");
-            checkState(nFeatures == 1);
-        } else {
-            checkState(nFeatures == width * height);
+        // In TravelTimeSurfaceTasks (single-point or single-origin tasks), the set of destinations is always
+        // determined by the web mercator extents in the request itself. In many cases the destinationPointSets field
+        // is empty, but when destinationPointSets are present (when we're calculating accessibility), those PointSets
+        // are required to be gridded and exactly match the task extents (e.g. Grids wrapped in GridTransformWrapper).
+        // In normal usage this requirement is validated by TravelTimeReducer#checkOpportunityExtents but that function
+        // only checks when we're computing accessibility, and is only called when destinations are gridded. The
+        // assertions here serve to further verify this requirement, as we've seen it violated before in tests.
+        final int nTargets = width * height;
+        if (destinationPointSets != null) {
+            for (PointSet pointSet : destinationPointSets) {
+                checkState(
+                        pointSet.featureCount() == nTargets,
+                        "Destination PointSet expected to exactly match extents embedded in single point task."
+                );
+            }
         }
-        return nFeatures;
+        return nTargets;
     }
 
 }

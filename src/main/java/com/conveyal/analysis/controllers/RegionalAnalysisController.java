@@ -12,14 +12,8 @@ import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.AccessCsvResultWriter;
 import com.conveyal.analysis.results.CsvResultType;
-import com.conveyal.analysis.results.GridResultWriter;
 import com.conveyal.analysis.results.MultiOriginAssembler;
-import com.conveyal.analysis.results.PathCsvResultWriter;
-import com.conveyal.analysis.results.RegionalResultWriter;
-import com.conveyal.analysis.results.TemporalDensityCsvResultWriter;
-import com.conveyal.analysis.results.TimeCsvResultWriter;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -636,51 +630,8 @@ public class RegionalAnalysisController implements HttpController {
         // Create the regional job
         var regionalJob = new Job(task, WorkerTags.fromRegionalAnalysis(regionalAnalysis));
 
-        // Create the result writers. Store their result file paths in the database.
-        var resultWriters = new ArrayList<RegionalResultWriter>();
-        if (!task.makeTauiSite) {
-            if (task.recordAccessibility) {
-                if (task.originPointSet != null) {
-                    // Freeform origins - create CSV regional analysis results
-                    var accessWriter = new AccessCsvResultWriter(task);
-                    resultWriters.add(accessWriter);
-                    regionalAnalysis.resultStorage.put(accessWriter.resultType(), accessWriter.getFileName());
-                } else {
-                    // Gridded origins - create gridded regional analysis results
-                    resultWriters.addAll(GridResultWriter.createWritersFromTask(regionalAnalysis, task));
-                }
-            }
-
-            if (task.recordTimes) {
-                var timesWriter = new TimeCsvResultWriter(task);
-                resultWriters.add(timesWriter);
-                regionalAnalysis.resultStorage.put(timesWriter.resultType(), timesWriter.getFileName());
-            }
-
-            if (task.includePathResults) {
-                var pathsWriter = new PathCsvResultWriter(task);
-                resultWriters.add(pathsWriter);
-                regionalAnalysis.resultStorage.put(pathsWriter.resultType(), pathsWriter.getFileName());
-            }
-
-            if (task.includeTemporalDensity) {
-                if (task.originPointSet == null) {
-                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
-                    // We might want to record a grid of dual accessibility values, but this will require some serious
-                    // refactoring of the GridResultWriter.
-                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
-                    throw AnalysisServerException.badRequest("Temporal density of opportunities cannot be recorded for gridded origin points.");
-                } else {
-                    var tDensityWriter = new TemporalDensityCsvResultWriter(task);
-                    resultWriters.add(tDensityWriter);
-                    regionalAnalysis.resultStorage.put(tDensityWriter.resultType(), tDensityWriter.getFileName());
-                }
-            }
-            checkArgument(notNullOrEmpty(resultWriters), "A regional analysis should always create at least one grid or CSV file.");
-        }
-
         // Create the multi-origin assembler with the writers.
-        var assembler = new MultiOriginAssembler(regionalJob, resultWriters);
+        var assembler = new MultiOriginAssembler(regionalJob, regionalAnalysis.createResultWriters(task));
 
         // Stored scenario is needed by workers. Must be done ahead of enqueueing the job.
         storeScenarioJson(task.graphId, task.scenario);

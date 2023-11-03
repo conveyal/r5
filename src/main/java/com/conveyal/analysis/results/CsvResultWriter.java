@@ -61,7 +61,7 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
      * Construct a writer to record incoming results in a CSV file, with header row consisting of
      * "origin", "destination", and the supplied indicator.
      */
-    public CsvResultWriter (RegionalTask task) {
+    CsvResultWriter (RegionalTask task) {
         checkArgument(task.originPointSet != null, "CsvResultWriters require FreeFormPointSet origins.");
         String[] columns = columnHeaders();
         csvWriter = getBufferedCsvWriter(columns);

@@ -90,6 +90,8 @@ public class Broker implements Component {
     private final Config config;
 
     // Component Dependencies
+    // Result assemblers return files that need to be permanently stored.
+    private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
 
@@ -136,22 +138,17 @@ public class Broker implements Component {
     private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
 
     /**
-     * Result assemblers return files that need to be permanently stored.
-     */
-    private final FileStorage fileStorage;
-
-    /**
      * keep track of which graphs we have launched workers on and how long ago we launched them, so
      * that we don't re-request workers which have been requested.
      */
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, EventBus eventBus, WorkerLauncher workerLauncher, FileStorage fileStorage) {
+    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
         this.config = config;
+        this.fileStorage = fileStorage;
         this.eventBus = eventBus;
         this.workerLauncher = workerLauncher;
-        this.fileStorage = fileStorage;
     }
 
     /**

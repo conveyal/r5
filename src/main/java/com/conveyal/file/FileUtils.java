@@ -1,17 +1,13 @@
 package com.conveyal.file;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public abstract class FileUtils {
     /**
@@ -122,5 +118,52 @@ public abstract class FileUtils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Extract the files inside a zipped file into a given directory and return the `File` handles to the new files.
+     */
+    public static List<File> unzipFileIntoDirectory(File zipFile, File directory) {
+        List<File> files = new ArrayList<>();
+        ZipInputStream zis = new ZipInputStream(FileUtils.getInputStream(zipFile));
+        ZipEntry zipEntry;
+        byte[] buffer = new byte[1024];
+        try {
+            while ((zipEntry = zis.getNextEntry()) != null) {
+                String entryName = zipEntry.getName();
+                File newFile = new File(directory, entryName);
+                if (zipEntry.isDirectory()) {
+                    // Skip special `__MACOSX` directories.
+                    if (entryName.toUpperCase().contains("__MACOSX")) continue;
+                    if (!newFile.isDirectory() && !newFile.mkdirs()) {
+                        throw new IOException("Failed to create directory " + newFile);
+                    }
+                } else {
+                    // Skip file names beginning with a "."
+                    if (Path.of(entryName).getFileName().startsWith(".")) continue;
+
+                    // fix for Windows-created archives
+                    File parent = newFile.getParentFile();
+                    if (!parent.isDirectory() && !parent.mkdirs()) {
+                        throw new IOException("Failed to create directory " + parent);
+                    }
+
+                    // write file content
+                    FileOutputStream fos = new FileOutputStream(newFile);
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {
+                        fos.write(buffer, 0, len);
+                    }
+                    fos.close();
+                    files.add(newFile);
+                }
+            }
+            zis.closeEntry();
+            zis.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage());
+        }
+
+        return files;
     }
 }

@@ -1,8 +1,9 @@
 package com.conveyal.r5.analyst.progress;
 
-import org.apache.commons.fileupload.FileItem;
+import com.conveyal.file.FileUtils;
 import org.apache.commons.io.input.ProxyInputStream;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -13,7 +14,7 @@ import static org.apache.commons.io.IOUtils.EOF;
  * This will report progress as the total number of bytes that have passed through the stream, like CountingInputStream.
  * This can exceed 100% of the file size if the caller uses mark and reset. The progressListener should be
  * pre-configured with the total number of bytes expected and a detail message using ProgressListener::beginTask.
- * The static method forFileItem() demonstrates usage when reading from a file of known length.
+ * The static method forFile() demonstrates usage when reading from a file of known length.
  */
 public class ProgressInputStream extends ProxyInputStream {
 
@@ -40,18 +41,10 @@ public class ProgressInputStream extends ProxyInputStream {
 
     /**
      * Given an uploaded file, report progress on reading it.
-     * Incrementing the progress seems to introduce some inefficiency when performing unbuffered small reads, such as
-     * calls to InputStream.read() which are used by DataInputStream to read numbers.
-     * TODO wrap in buffered input stream to reduce small read calls, or tune to only report once per percentage?
      */
-    public static ProgressInputStream forFileItem (FileItem fileItem, ProgressListener progressListener) {
-        try {
-            checkArgument(fileItem.getSize() < Integer.MAX_VALUE);
-            progressListener.beginTask("Reading file " + fileItem.getName(), (int)(fileItem.getSize()));
-            return new ProgressInputStream(progressListener, fileItem.getInputStream());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public static ProgressInputStream forFile (File file, ProgressListener progressListener) {
+        checkArgument(file.length() < Integer.MAX_VALUE);
+        progressListener.beginTask("Reading file " + file.getName(), (int)(file.length()));
+        return new ProgressInputStream(progressListener, FileUtils.getInputStream(file));
     }
-
 }

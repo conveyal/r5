@@ -1,14 +1,16 @@
 package com.conveyal.analysis.util;
 
 import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -36,8 +38,8 @@ public abstract class HttpUtils {
         // If we always saved the FileItems via write() or read them with getInputStream() they would not all need to
         // be on disk.
         try {
-            FileItemFactory fileItemFactory = new DiskFileItemFactory(0, null);
-            ServletFileUpload sfu = new ServletFileUpload(fileItemFactory);
+            DiskFileItemFactory diskFileItemFactory = new DiskFileItemFactory(0, null);
+            ServletFileUpload sfu = new ServletFileUpload(diskFileItemFactory);
             return sfu.parseParameterMap(req);
         } catch (Exception e) {
             throw AnalysisServerException.fileUpload(ExceptionUtils.stackTraceString(e));
@@ -65,5 +67,57 @@ public abstract class HttpUtils {
             throw AnalysisServerException.badRequest(String.format("Multipart form field '%s' had unsupported encoding",
                     fieldName));
         }
+    }
+
+    /**
+     * Extracts `FileItem`s contents locally in a temp directory. Automatically unzip files. Return the list of new
+     * `File` handles.
+     */
+    public static List<File> extractFilesFromFileItemsAndUnzip(List<FileItem> fileItems) {
+        File directory = FileUtils.createScratchDirectory();
+        List<File> files = new ArrayList<>();
+        for (FileItem fi : fileItems) {
+            File file = moveFileItemIntoDirectory(fi, directory);
+            String name = file.getName();
+            if (name.toLowerCase().endsWith(".zip")) {
+                files.addAll(FileUtils.unzipFileIntoDirectory(file, directory));
+            } else {
+                files.add(file);
+            }
+        }
+        return files;
+    }
+
+    /**
+     * Move `FileItem`s contents into a temporary directory. Return the list of new `File` handles.
+     */
+    public static List<File> saveFileItemsLocally(List<FileItem> fileItems) {
+        File directory = FileUtils.createScratchDirectory();
+        List<File> files = new ArrayList<>();
+        for (FileItem fileItem : fileItems) {
+            files.add(moveFileItemIntoDirectory(fileItem, directory));
+        }
+        return files;
+    }
+
+    /**
+     * Save the contents of a `FileItem` in a temporary directory and return the `File`.
+     */
+    public static File saveFileItemLocally(FileItem fileItem) {
+        return moveFileItemIntoDirectory(fileItem, FileUtils.createScratchDirectory());
+    }
+
+    /**
+     * Move the contents of a `FileItem` to the given directory by calling `write`. `DiskFileItem`s will call `renameTo`
+     * if the `FileItem's contents are already on the disk.
+     */
+    public static File moveFileItemIntoDirectory(FileItem fileItem, File directory) {
+        File file = new File(directory, fileItem.getName());
+        try {
+            fileItem.write(file);
+        } catch (Exception e) {
+            throw new AnalysisServerException(e, "Error storing file in directory on disk. FileItem.write() failed.");
+        }
+        return file;
     }
 }

@@ -3,6 +3,7 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.analysis.datasource.DataSourceUtil;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.OpportunityDataset;
@@ -29,7 +30,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
@@ -55,7 +55,6 @@ import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
@@ -327,30 +326,24 @@ public class OpportunityDatasetController implements HttpController {
         // are recorded in a persistent purpose-built way rather than falling back on the UI's catch-all error window.
         // TODO more standardized mechanism for tracking asynchronous tasks and catching exceptions on them
         OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, sourceName);
-        addStatusAndRemoveOldStatuses(status);
 
-        // TODO should we delete this temporary directory at the end?
-        final File tmpDirectory = FileUtils.createScratchDirectory();
-        final List<File> files = new ArrayList<>();
-        final List<FileItem> fileItems;
+        final List<File> files;
         final FileStorageFormat uploadFormat;
         final Map<String, String> parameters;
         try {
             // Validate inputs and parameters, which will throw an exception if there's anything wrong with them.
             // Call remove() rather than get() so that subsequent code will see only string parameters, not the files.
-            fileItems = formFields.remove("files");
-            for (var fi : fileItems) {
-                var tmpFile = new File(tmpDirectory, fi.getName());
-                Files.move(((DiskFileItem) fi).getStoreLocation(), tmpFile);
-                files.add(tmpFile);
-            }
-            uploadFormat = detectUploadFormatAndValidate(files);
+            files = HttpUtils.extractFilesFromFileItemsAndUnzip(formFields.remove("files"));
+            uploadFormat = DataSourceUtil.detectUploadFormatAndValidate(files);
             parameters = extractStringParameters(formFields);
         } catch (Exception e) {
             status.completeWithError(e);
             res.status(400);
             return status;
         }
+
+        // Add the status to the region wide tracker before we begin the heavy tasks.
+        addStatusAndRemoveOldStatuses(status);
 
         // We are going to call several potentially slow blocking methods to create and persist new pointsets.
         // This whole series of actions will be run sequentially but within an asynchronous Executor task.
@@ -631,6 +624,7 @@ public class OpportunityDatasetController implements HttpController {
         public Status status = Status.PROCESSING;
         public String name;
         public String message;
+        public String stackTrace;
         public Date createdAt;
         public Date completedAt;
 
@@ -647,7 +641,8 @@ public class OpportunityDatasetController implements HttpController {
         }
 
         public void completeWithError (Exception e) {
-            message = "Unable to create opportunity dataset. " + ExceptionUtils.stackTraceString(e);
+            stackTrace = ExceptionUtils.stackTraceString(e);
+            message = "Unable to create opportunity dataset. " + e.getMessage();
             completed(Status.ERROR);
         }
 

@@ -3,25 +3,23 @@ package com.conveyal.analysis.datasource;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
+import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.analyst.progress.TaskAction;
 import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
@@ -123,15 +121,9 @@ public class DataSourceUploadAction implements TaskAction {
         // Extract required parameters. Throws AnalysisServerException on failure, e.g. if a field is missing.
         final String sourceName = getFormField(formFields, "sourceName", true);
         final String regionId = getFormField(formFields, "regionId", true);
-        final List<FileItem> fileItems = formFields.get("sourceFiles");
-        final List<File> files = new ArrayList<>();
+        final List<File> files = HttpUtils.extractFilesFromFileItemsAndUnzip(formFields.get("sourceFiles"));
 
-        for (var fi : fileItems) {
-            var dfi = (DiskFileItem) fi;
-            files.add(dfi.getStoreLocation());
-        }
-
-        FileStorageFormat format = detectUploadFormatAndValidate(files);
+        FileStorageFormat format = DataSourceUtil.detectUploadFormatAndValidate(files);
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);
 
         String originalFileNames = files.stream().map(File::getName).collect(Collectors.joining(", "));

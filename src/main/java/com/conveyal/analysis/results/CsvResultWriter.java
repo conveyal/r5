@@ -1,7 +1,6 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileCategory;
-import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -15,9 +14,9 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -30,7 +29,6 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
     private static final Logger LOG = LoggerFactory.getLogger(CsvResultWriter.class);
     private final File bufferFile = FileUtils.createScratchFile("csv");
     private final CsvWriter csvWriter;
-    private final FileStorage fileStorage;
     private int nDataColumns;
 
     /**
@@ -63,9 +61,8 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
      * Construct a writer to record incoming results in a CSV file, with header row consisting of
      * "origin", "destination", and the supplied indicator.
      */
-    CsvResultWriter (RegionalTask task, FileStorage fileStorage) {
+    public CsvResultWriter (RegionalTask task) {
         checkArgument(task.originPointSet != null, "CsvResultWriters require FreeFormPointSet origins.");
-        this.fileStorage = fileStorage;
         String[] columns = columnHeaders();
         csvWriter = getBufferedCsvWriter(columns);
         this.nDataColumns = columns.length;
@@ -77,6 +74,9 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
         return task.jobId + "_" + resultType() + ".csv";
     }
 
+    /**
+     * Initialize the CsvWriter with a row of the supplied data columns.
+     */
     private CsvWriter getBufferedCsvWriter(String[] columnHeaders) {
         try {
             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
@@ -89,25 +89,17 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
     }
 
     /**
-     * Writes a header row containing the supplied data columns.
-     */
-    protected void setDataColumns(String... columns) throws IOException {
-        this.nDataColumns = columns.length;
-        csvWriter.writeRecord(columns);
-    }
-
-    /**
      * Gzip the csv file and move it into permanent file storage such as AWS S3.
      * Note: stored file will undergo gzip compression but be stored with a .csv extension.
      * When this file is downloaded from the UI, the browser will decompress, yielding a logically named .csv file.
      * Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
      */
     @Override
-    public synchronized void finish () throws IOException {
+    public synchronized Map.Entry<FileStorageKey, File> finish () throws IOException {
         csvWriter.close();
         var gzippedFile = FileUtils.gzipFile(bufferFile);
-        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, getFileName()), gzippedFile);
         bufferFile.delete();
+        return Map.entry(new FileStorageKey(FileCategory.RESULTS, getFileName()), gzippedFile);
     }
 
     /**

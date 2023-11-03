@@ -642,23 +642,23 @@ public class RegionalAnalysisController implements HttpController {
             if (task.recordAccessibility) {
                 if (task.originPointSet != null) {
                     // Freeform origins - create CSV regional analysis results
-                    var accessWriter = new AccessCsvResultWriter(task, fileStorage);
+                    var accessWriter = new AccessCsvResultWriter(task);
                     resultWriters.add(accessWriter);
                     regionalAnalysis.resultStorage.put(accessWriter.resultType(), accessWriter.getFileName());
                 } else {
                     // Gridded origins - create gridded regional analysis results
-                    resultWriters.addAll(GridResultWriter.createWritersFromTask(regionalAnalysis, task, fileStorage));
+                    resultWriters.addAll(GridResultWriter.createWritersFromTask(regionalAnalysis, task));
                 }
             }
 
             if (task.recordTimes) {
-                var timesWriter = new TimeCsvResultWriter(task, fileStorage);
+                var timesWriter = new TimeCsvResultWriter(task);
                 resultWriters.add(timesWriter);
                 regionalAnalysis.resultStorage.put(timesWriter.resultType(), timesWriter.getFileName());
             }
 
             if (task.includePathResults) {
-                var pathsWriter = new PathCsvResultWriter(task, fileStorage);
+                var pathsWriter = new PathCsvResultWriter(task);
                 resultWriters.add(pathsWriter);
                 regionalAnalysis.resultStorage.put(pathsWriter.resultType(), pathsWriter.getFileName());
             }
@@ -671,7 +671,7 @@ public class RegionalAnalysisController implements HttpController {
                     // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
                     throw AnalysisServerException.badRequest("Temporal density of opportunities cannot be recorded for gridded origin points.");
                 } else {
-                    var tDensityWriter = new TemporalDensityCsvResultWriter(task, fileStorage);
+                    var tDensityWriter = new TemporalDensityCsvResultWriter(task);
                     resultWriters.add(tDensityWriter);
                     regionalAnalysis.resultStorage.put(tDensityWriter.resultType(), tDensityWriter.getFileName());
                 }

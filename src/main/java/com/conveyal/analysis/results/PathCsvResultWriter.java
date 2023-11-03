@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
@@ -13,8 +12,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathCsvResultWriter extends CsvResultWriter {
 
-    public PathCsvResultWriter (RegionalTask task, FileStorage fileStorage) {
-        super(task, fileStorage);
+    public PathCsvResultWriter (RegionalTask task) {
+        super(task);
     }
 
     @Override

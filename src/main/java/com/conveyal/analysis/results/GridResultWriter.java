@@ -2,7 +2,6 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.file.FileCategory;
-import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
@@ -19,6 +18,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.r5.common.Util.human;
 
@@ -50,7 +50,6 @@ public class GridResultWriter implements RegionalResultWriter {
     private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
     private final File bufferFile = FileUtils.createScratchFile("grid");
-    private final FileStorage fileStorage;
     private final RandomAccessFile randomAccessFile;
 
     /** The version of the access grids we produce */
@@ -77,7 +76,7 @@ public class GridResultWriter implements RegionalResultWriter {
      * We create one GridResultWriter for each destination pointset and percentile.
      * Each of those output files contains data for all specified travel time cutoffs at each origin.
      */
-    public static List<GridResultWriter> createWritersFromTask(RegionalAnalysis regionalAnalysis, RegionalTask task, FileStorage fileStorage) {
+    public static List<GridResultWriter> createWritersFromTask(RegionalAnalysis regionalAnalysis, RegionalTask task) {
         int nPercentiles = task.percentiles.length;
         int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
         // Create one grid writer per percentile and destination pointset.
@@ -87,7 +86,6 @@ public class GridResultWriter implements RegionalResultWriter {
                 String destinationPointSetId = regionalAnalysis.destinationPointSetIds[destinationIndex];
                 gridWriters.add(new GridResultWriter(
                         task,
-                        fileStorage,
                         percentileIndex,
                         destinationIndex,
                         destinationPointSetId
@@ -102,8 +100,7 @@ public class GridResultWriter implements RegionalResultWriter {
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter (RegionalTask task, FileStorage fileStorage, int percentileIndex, int destinationIndex, String destinationPointSetId) {
-        this.fileStorage = fileStorage;
+    GridResultWriter (RegionalTask task, int percentileIndex, int destinationIndex, String destinationPointSetId) {
         this.gridFileName = String.format("%s_%s_P%d.access", task.jobId, destinationPointSetId, task.percentiles[percentileIndex]);
         this.percentileIndex = percentileIndex;
         this.destinationIndex = destinationIndex;
@@ -153,11 +150,11 @@ public class GridResultWriter implements RegionalResultWriter {
 
     /** Gzip the access grid and upload it to file storage (such as AWS S3). */
     @Override
-    public synchronized void finish () throws IOException {
+    public synchronized Map.Entry<FileStorageKey, File> finish () throws IOException {
         randomAccessFile.close();
         var gzippedFile = FileUtils.gzipFile(bufferFile);
-        fileStorage.moveIntoStorage(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
         bufferFile.delete();
+        return Map.entry(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
     }
 
     /**

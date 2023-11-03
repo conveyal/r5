@@ -2,6 +2,7 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -9,8 +10,11 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This assembles regional results arriving from workers into one or more files per regional analysis on
@@ -89,7 +93,8 @@ public class MultiOriginAssembler {
      * this class are also synchronized for good measure. There should be no additional cost to retaining the lock when
      * entering those methods.
      */
-    public synchronized void handleMessage (RegionalWorkResult workResult) throws Exception {
+    public synchronized Map<FileStorageKey, File> handleMessage (RegionalWorkResult workResult) throws Exception {
+        var resultFiles = new HashMap<FileStorageKey, File>();
         for (RegionalResultWriter writer : resultWriters) {
             writer.writeOneWorkResult(workResult);
         }
@@ -105,12 +110,14 @@ public class MultiOriginAssembler {
             LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
             try {
                 for (RegionalResultWriter writer : resultWriters) {
-                    writer.finish();
+                    var result = writer.finish();
+                    resultFiles.put(result.getKey(), result.getValue());
                 }
             } catch (Exception e) {
                 LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
             }
         }
+        return resultFiles;
     }
 
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */

@@ -7,6 +7,7 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.results.MultiOriginAssembler;
+import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
@@ -135,16 +136,22 @@ public class Broker implements Component {
     private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
 
     /**
+     * Result assemblers return files that need to be permanently stored.
+     */
+    private final FileStorage fileStorage;
+
+    /**
      * keep track of which graphs we have launched workers on and how long ago we launched them, so
      * that we don't re-request workers which have been requested.
      */
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, EventBus eventBus, WorkerLauncher workerLauncher) {
+    public Broker (Config config, EventBus eventBus, WorkerLauncher workerLauncher, FileStorage fileStorage) {
         this.config = config;
         this.eventBus = eventBus;
         this.workerLauncher = workerLauncher;
+        this.fileStorage = fileStorage;
     }
 
     /**
@@ -451,7 +458,12 @@ public class Broker implements Component {
             // It contains some slow nested operations to move completed results into storage. Really we should not do
             // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
             // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
-            assembler.handleMessage(workResult);
+            var resultFiles = assembler.handleMessage(workResult);
+
+            // Store all result files permanently.
+            for (var resultFile : resultFiles.entrySet()) {
+                this.fileStorage.moveIntoStorage(resultFile.getKey(), resultFile.getValue());
+            }
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));

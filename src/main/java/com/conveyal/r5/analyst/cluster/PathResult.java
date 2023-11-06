@@ -108,7 +108,7 @@ public class PathResult {
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
                     String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer);
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, true);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {

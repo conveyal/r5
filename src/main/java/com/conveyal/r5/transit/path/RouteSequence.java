@@ -28,15 +28,15 @@ public class RouteSequence {
     }
 
     /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
-    public String[] detailsWithGtfsIds(TransitLayer transitLayer){
+    public String[] detailsWithGtfsIds(TransitLayer transitLayer, boolean includeNames){
         StringJoiner routeIds = new StringJoiner("|");
         StringJoiner boardStopIds = new StringJoiner("|");
         StringJoiner alightStopIds = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), false));
-            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), false));
-            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), false));
+            routeIds.add(transitLayer.routeString(routes.get(i), includeNames));
+            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), includeNames));
+            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), includeNames));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);

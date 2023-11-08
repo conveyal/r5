@@ -15,11 +15,11 @@ import java.util.List;
  * Greedy fare calculator for the Chicago Transit Authority.
  * Just looks at rail and bus, not at Metra, PACE, etc., and does not handle out-of-system rail transfers.
  */
-public class ChicagoInRoutingFareCalculator extends InRoutingFareCalculator {
+public class ChicagoCTAInRoutingFareCalculator extends InRoutingFareCalculator {
     public static final int L_FARE = 225;
     public static final int BUS_FARE = 200;
     public static final int TRANSFER_FARE = 25;
-    private static final Logger LOG = LoggerFactory.getLogger(ChicagoInRoutingFareCalculator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ChicagoCTAInRoutingFareCalculator.class);
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {

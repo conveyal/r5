@@ -25,7 +25,8 @@ import java.util.Map;
 @JsonSubTypes({
         @JsonSubTypes.Type(name = "boston", value = BostonInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "bogota", value = BogotaInRoutingFareCalculator.class),
-        @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "chicago-cta", value = ChicagoCTAInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "chicago-rta", value = ChicagoRTAInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "bogota-mixed", value = BogotaMixedInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "nyc", value = NYCInRoutingFareCalculator.class),

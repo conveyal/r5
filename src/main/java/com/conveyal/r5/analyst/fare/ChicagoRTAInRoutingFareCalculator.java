@@ -58,6 +58,12 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
             this.unlimited = false;
         }
 
+        private CTAPaceTransferAllowance (int value, int number, int expirationTime, boolean unlimited) {
+            super(value, number, expirationTime);
+            this.unlimited = unlimited;
+        }
+
+
         private CTAPaceTransferAllowance (boolean unlimited) {
             this.unlimited = unlimited;
         }
@@ -66,6 +72,15 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
             assert this.value + fareToBoard < CTA_PACE_DAY_PASS;
             return new CTAPaceTransferAllowance(Math.max(fareToBoard, this.value), this.number - 1, this.expirationTime);
         }
+
+
+        @Override
+        public CTAPaceTransferAllowance tightenExpiration (int maxClockTime) {
+            // copied from TransferAllowance but need to override so that everything stays a BostonTransferAllowance
+            int expirationTime = Math.min(this.expirationTime, maxClockTime);
+            return new CTAPaceTransferAllowance(this.value, this.number, expirationTime, this.unlimited);
+        }
+
 
     }
 

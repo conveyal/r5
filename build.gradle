@@ -215,7 +215,7 @@ dependencies {
     }
 
     // Bill of Materials for AWS SDK, specifying a coherent set of versions for these artifacts.
-    implementation platform(group: 'software.amazon.awssdk', name: 'bom', version: '2.13.72')
+    implementation platform(group: 'software.amazon.awssdk', name: 'bom', version: '2.21.17')
 
     // Persistent storage of files / objects on Amazon S3.
     // This is used only for Seamless Census, and is the only use of AWS SDK dependencies in R5.

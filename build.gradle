@@ -214,9 +214,14 @@ dependencies {
         // TODO eventually migrate over to Java's built-in HTTP client.
     }
 
+    // Bill of Materials for AWS SDK, specifying a coherent set of versions for these artifacts.
+    implementation platform(group: 'software.amazon.awssdk', name: 'bom', version: '2.13.72')
+
     // Persistent storage of files / objects on Amazon S3.
-    // Now used only for Seamless Census TODO eliminate this final AWS dependency
-    implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
+    // This is used only for Seamless Census, and is the only use of AWS SDK dependencies in R5.
+    // Unfortunately it's not straightforward to move the seamless census tools out to a repo where we have the AWS
+    // dependencies because they require several other dependencies present in R5, and provide file-based census data.
+    implementation group: 'software.amazon.awssdk', name: 's3'
 
     // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
     implementation 'org.apache.commons:commons-math3:3.0'

@@ -1,10 +1,8 @@
 package com.conveyal.data.census;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
+import org.apache.commons.io.IOUtils;
 import org.locationtech.jts.geom.Envelope;
 import org.mapdb.BTreeKeySerializer;
 import org.mapdb.BTreeMap;
@@ -13,6 +11,9 @@ import org.mapdb.DBMaker;
 import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
@@ -132,16 +134,29 @@ public class ShapeDataStore {
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         // initialize an S3 client
-        AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+        S3Client s3 = S3Client.create();
         try {
             writeTilesInternal((x, y) -> {
                 PipedInputStream is = new PipedInputStream();
                 PipedOutputStream os = new PipedOutputStream(is);
-                ObjectMetadata metadata = new ObjectMetadata();
-                metadata.setContentType("application/gzip");
+
+                PutObjectRequest request = PutObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(String.format("%d/%d.pbf.gz", x, y))
+                        .contentType("application/gzip")
+                        .build();
 
                 // perform the upload in its own thread so it doesn't deadlock
-                executor.execute(() -> s3.putObject(bucketName, String.format("%d/%d.pbf.gz", x, y), is, metadata));
+                executor.execute(() -> {
+                    try {
+                        // The new S3 API requires us to know the content length before sending, so streaming
+                        // seems impossible and we have to buffer to a byte array.
+                        byte[] tileBytes = is.readAllBytes();
+                        s3.putObject(request, RequestBody.fromBytes(tileBytes));
+                    } catch (IOException e) {
+                        throw new RuntimeException("Failed to transfer all bytes from tile writer to s3.", e);
+                    }
+                });
                 return os;
             });
         } finally {

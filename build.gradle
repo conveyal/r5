@@ -156,15 +156,15 @@ dependencies {
         exclude group: 'org.slf4j', module: 'slf4j-simple'
     }
 
-    // Database driver.
-    implementation 'org.mongodb:mongodb-driver-sync:4.8.2'
+    // Database driver. Version is matched with transitive dependency on Mongojack.
+    implementation 'org.mongodb:mongodb-driver-sync:4.8.1'
 
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
-    implementation 'org.mongojack:mongojack:2.10.1'
+    implementation 'org.mongojack:mongojack:4.8.1'
 
     // JSON serialization and deserialization from and to Java objects
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
 
     // Parses CSV. GTFS is a set of zipped CSV files, and some of our other inputs are CSV files.
     implementation 'net.sourceforge.javacsv:javacsv:2.0'

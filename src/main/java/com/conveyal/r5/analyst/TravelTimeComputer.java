@@ -88,11 +88,9 @@ public class TravelTimeComputer {
         ) {
             // Freeform destinations. Destination PointSet was set by handleOneRequest in the main AnalystWorker.
             destinations = request.destinationPointSets[0];
-        } else if (!isNullOrEmpty(request.destinationPointSets)) {
-            LOG.warn("ONLY VALID IN TESTING: Using PointSet object embedded in request outside regional analysis.");
-            destinations = request.destinationPointSets[0];
         } else {
             // Gridded (non-freeform) destinations. This method finds them differently for regional and single requests.
+            // We don't support freeform destinations for single point requests, as they must also return gridded travel times.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
             destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);

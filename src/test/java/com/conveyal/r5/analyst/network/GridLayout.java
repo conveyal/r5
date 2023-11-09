@@ -2,9 +2,6 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -13,12 +10,9 @@ import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Envelope;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
-
-import static com.conveyal.r5.analyst.WebMercatorExtents.DEFAULT_ZOOM;
 
 /**
  * This is used in testing, to represent and create gridded transport systems with very regular spacing of roads and
@@ -165,8 +159,8 @@ public class GridLayout {
     }
 
     /** Creates a builder for analysis worker tasks, which represent searches on this grid network. */
-    public GridSinglePointTaskBuilder newTaskBuilder() {
-        return new GridSinglePointTaskBuilder(this);
+    public GridRegionalTaskBuilder newTaskBuilder() {
+        return new GridRegionalTaskBuilder(this);
     }
 
     /** Get the minimum envelope containing all the points in this grid. */

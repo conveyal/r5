@@ -23,11 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * version to the next of R5 (a form of snapshot testing) this checks that they match theoretically expected travel
  * times given headways, transfer points, distances, common trunks and competing lines, etc.
  *
- * Originally we were using web Mercator gridded destinations, as this was the only option in single point analyses.
+ * Originally we were using web Mercator gridded destinations, as this was the only option in single point tasks.
  * Because these tests record travel time distributions at the destinations using a large number of Monte Carlo draws,
  * this was doing a lot of work and storing a lot of data for up to thousands of destinations we weren't actually using.
- * A testing code path now exists to measure travel times to one or more freeform destinations in single point mode.
- * However, it is still possible to measure times to the whole grid if singleFreeformDestination is not called.
+ * Regional tasks with freeform destinations are now used to measure travel times to a limited number of points.
+ * This could be extended to use gridded destination PointSets for future tests.
  */
 public class SimpsonDesertTests {
 
@@ -64,8 +64,7 @@ public class SimpsonDesertTests {
         // always 10 minutes. So scheduled range is expected to be 1 minute slack, 0-20 minutes wait, 10 minutes ride,
         // 10 minutes wait, 10 minutes ride, giving 31 to 51 minutes.
         // This estimation logic could be better codified as something like TravelTimeEstimate.waitWithHeadaway(20) etc.
-
-        // TODO For some reason observed is off by 1 minute, figure out why.
+        // TODO: For some reason observed is dealyed by 1 minute. Figure out why, perhaps due to integer minute binning.
         Distribution expected = new Distribution(31, 20).delay(1);
         expected.multiAssertSimilar(oneOriginResult.travelTimes, 0);
     }
@@ -179,7 +178,7 @@ public class SimpsonDesertTests {
         TransportNetwork network = gridLayout.generateNetwork();
 
         // 0. Reuse this task builder to produce several tasks. See caveats on build() method.
-        GridSinglePointTaskBuilder taskBuilder = gridLayout.newTaskBuilder()
+        GridRegionalTaskBuilder taskBuilder = gridLayout.newTaskBuilder()
                 .departureTimeWindow(7, 0, 5)
                 .maxRides(1)
                 .setOrigin(30, 50)

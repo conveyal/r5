@@ -28,16 +28,15 @@ public class CensusExtractor {
 
     public static void main (String... args) throws IOException {
         if (args.length < 3 || args.length > 6) {
-            System.err.println("usage: CensusExtractor (s3://bucket|data_dir) n e s w [outfile.json]");
-            System.err.println("   or: CensusExtractor (s3://bucket|data_dir) boundary.geojson [outfile.json]");
+            System.err.println("usage: CensusExtractor data_dir n e s w [outfile.json]");
+            System.err.println("   or: CensusExtractor data_dir boundary.geojson [outfile.json]");
             return;
         }
+        SeamlessSource source = new FileSeamlessSource(args[0]);
+        run(source, args);
+    }
 
-        SeamlessSource source;
-        if (!args[0].startsWith("s3://"))
-            source = new FileSeamlessSource(args[0]);
-        else
-            source = new S3SeamlessSource(args[0].substring(5));
+    protected static void run (SeamlessSource source, String... args) throws IOException {
 
         long start = System.currentTimeMillis();
 

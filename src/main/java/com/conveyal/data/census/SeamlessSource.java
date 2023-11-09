@@ -34,6 +34,11 @@ public abstract class SeamlessSource {
 
     private static final GeometryFactory geometryFactory = new GeometryFactory();
 
+    /**
+     * @return A human-readable name for the source of extracted data, e.g. for distinguishing between different years.
+     */
+    public abstract String name();
+
     /** Extract features by bounding box */
     public Map<Long, GeobufFeature> extract(
             double north, double east, double south, double west, boolean onDisk, ProgressListener progressListener

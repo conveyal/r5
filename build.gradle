@@ -212,11 +212,8 @@ dependencies {
     implementation ('org.apache.httpcomponents:httpclient:4.5.6') {
         because 'Force use of version used by AWS SDK instead of other versions used by our transitive dependencies.'
         // TODO eventually migrate over to Java's built-in HTTP client.
+        // TODO check that this remains coherent with other dependencies
     }
-
-    // Persistent storage of files / objects on Amazon S3.
-    // Now used only for Seamless Census TODO eliminate this final AWS dependency
-    implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
 
     // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
     implementation 'org.apache.commons:commons-math3:3.0'

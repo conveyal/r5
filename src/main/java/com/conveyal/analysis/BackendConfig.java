@@ -4,7 +4,6 @@ import com.conveyal.analysis.components.HttpApi;
 import com.conveyal.analysis.components.LocalWorkerLauncher;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.LocalFileStorage;
 import org.slf4j.Logger;
@@ -18,7 +17,6 @@ public class BackendConfig extends ConfigBase implements
         AnalysisDB.Config,
         Broker.Config,
         HttpApi.Config,
-        SeamlessCensusGridExtractor.Config,
         LocalWorkerLauncher.Config,
         LocalFileStorage.Config
 {
@@ -36,8 +34,6 @@ public class BackendConfig extends ConfigBase implements
     private final String localCacheDirectory;
     private final int serverPort;
     private final String allowOrigin;
-    private final String seamlessCensusBucket;
-    private final String seamlessCensusRegion;
     private final int lightThreads;
     private final int heavyThreads;
     private final int maxWorkers;
@@ -64,8 +60,6 @@ public class BackendConfig extends ConfigBase implements
         serverPort = intProp("server-port");
         offline = boolProp("offline");
         allowOrigin = strProp("access-control-allow-origin");
-        seamlessCensusBucket = strProp("seamless-census-bucket");
-        seamlessCensusRegion = strProp("seamless-census-region");
         lightThreads = intProp("light-threads");
         heavyThreads = intProp("heavy-threads");
         maxWorkers = intProp("max-workers");
@@ -83,8 +77,6 @@ public class BackendConfig extends ConfigBase implements
     @Override public String  localCacheDirectory()  { return localCacheDirectory;}
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public String  allowOrigin()          { return allowOrigin; }
-    @Override public String  seamlessCensusRegion() { return seamlessCensusRegion; }
-    @Override public String  seamlessCensusBucket() { return seamlessCensusBucket; }
     @Override public int     serverPort()           { return serverPort; }
     @Override public boolean offline()              { return offline; }
     @Override public int     maxWorkers()           { return maxWorkers; }

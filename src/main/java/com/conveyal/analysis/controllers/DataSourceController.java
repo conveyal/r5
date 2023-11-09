@@ -142,7 +142,7 @@ public class DataSourceController implements HttpController {
         final String regionId = req.params("regionId");
         final int zoom = parseZoom(req.queryParams("zoom"));
         UserPermissions userPermissions = UserPermissions.from(req);
-        SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
+        SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName());
         source.regionId = regionId;
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")

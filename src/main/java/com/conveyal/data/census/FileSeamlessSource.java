@@ -15,6 +15,11 @@ public class FileSeamlessSource extends SeamlessSource {
         this.directory = new File(path);
     }
 
+    @Override
+    public String name() {
+        return directory.getName();
+    }
+
     @Override protected InputStream getInputStream(int x, int y) throws IOException {
         File dir = new File(directory, x + "");
         File file = new File(dir, y + ".pbf.gz");

@@ -148,14 +148,14 @@ public class OpportunityDatasetController implements HttpController {
         // Common UUID for all LODES datasets created in this download (e.g. so they can be grouped together and
         // deleted as a batch using deleteSourceSet) TODO use DataGroup and DataSource (creating only one DataSource per region).
         // The bucket name contains the specific lodes data set and year so works as an appropriate name
-        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName);
+        final OpportunityDatasetUploadStatus status = new OpportunityDatasetUploadStatus(regionId, extractor.sourceName());
         addStatusAndRemoveOldStatuses(status);
 
         // TODO we should be reusing the same source from Mongo, not making new ephemeral ones on each extract operation
-        SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName);
+        SpatialDataSource source = new SpatialDataSource(userPermissions, extractor.sourceName());
         source.regionId = regionId;
         // Make a new group that will containin the N OpportunityDatasets we're saving.
-        String description = String.format("Import %s to %s", extractor.sourceName, region.name);
+        String description = String.format("Import %s to %s", extractor.sourceName(), region.name);
         DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), description);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")

@@ -8,6 +8,7 @@ import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.LocalFilesController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.data.census.FileSeamlessSource;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.streets.OSMCache;
@@ -35,7 +36,7 @@ public class LocalBackendComponents extends BackendComponents {
         // TODO add nested LocalWorkerComponents here, to reuse some components, and pass it into the LocalWorkerLauncher?
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
-        censusExtractor = new SeamlessCensusGridExtractor(config);
+        censusExtractor = new SeamlessCensusGridExtractor(new FileSeamlessSource("cache/census"));
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
         List<HttpController> httpControllers = standardHttpControllers();
         httpControllers.add(new LocalFilesController(fileStorage));

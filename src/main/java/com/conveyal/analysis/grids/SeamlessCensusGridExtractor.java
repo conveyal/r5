@@ -2,7 +2,7 @@ package com.conveyal.analysis.grids;
 
 import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.models.Bounds;
-import com.conveyal.data.census.S3SeamlessSource;
+import com.conveyal.data.census.SeamlessSource;
 import com.conveyal.data.geobuf.GeobufFeature;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -31,19 +31,15 @@ public class SeamlessCensusGridExtractor implements Component {
             "Workers Data creation date"
     ));
 
-    public interface Config {
-        String seamlessCensusRegion ();
-        String seamlessCensusBucket ();
+    private final SeamlessSource source;
+
+    /** @return a human-readable name for the source of extracted data, e.g. for distinguishing between different years. */
+    public final String sourceName () {
+        return source.name();
     }
 
-    private final S3SeamlessSource source;
-
-    /** A human-readable name for the source of extracted data, e.g. for distinguishing between different years. */
-    public final String sourceName;
-
-    public SeamlessCensusGridExtractor (Config config) {
-        source = new S3SeamlessSource(config.seamlessCensusRegion(), config.seamlessCensusBucket());
-        sourceName = config.seamlessCensusBucket();
+    public SeamlessCensusGridExtractor (SeamlessSource source) {
+        this.source = source;
     }
 
     /**

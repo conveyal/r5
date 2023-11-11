@@ -558,7 +558,11 @@ public class TransitLayer implements Serializable, Cloneable {
         }
 
         if (level == LoadLevel.FULL) {
-            this.fares = new HashMap<>(gtfs.fares);
+            if (this.fares == null) {
+                this.fares = new HashMap<>(gtfs.fares);
+            } else {
+                this.fares.putAll(gtfs.fares);
+            }
         }
 
         // Will be useful in naming patterns.

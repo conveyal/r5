@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -183,7 +182,9 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                 Fare fare = fares.getFareOrDefault(null, boardStopZoneId, alightStopZoneId);
                 cumulativeFarePaid += payFullFare(fare);
             } else {
+                // We have a pass offering unlimited rides, so continue
                 if (transferAllowance.unlimited) continue;
+
                 int fareToPay = 0;
                 if (agency == Agency.PACE) {
                     String shortenedRouteId = route.route_id.split("-")[0];
@@ -196,6 +197,7 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                         if (boardStation.equals("40890")) { // Boarding at O'Hare; buy a day pass to cover the surcharge
                             cumulativeFarePaid += CTA_PACE_DAY_PASS - transferAllowance.value;
                             transferAllowance = new CTAPaceTransferAllowance(true);
+                            break;
                         }
 
                         if (ride > 0) {

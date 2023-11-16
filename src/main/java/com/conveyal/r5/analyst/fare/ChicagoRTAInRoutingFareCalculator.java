@@ -201,16 +201,19 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                         if (ride > 0) {
                             // If we have already taken a ride, check whether we can do an in-system (behind fare gate)
                             // transfer
-                            int fromStopIndex = alightStops.get(ride - 1);
-                            String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
-                            if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) {
-                                // Transfer behind gates, no Ventra tap or change in transfer allowance
-                                continue;
+                            int prevPattern = patterns.get(ride - 1);
+                            RouteInfo prevRoute =
+                                    transitLayer.routes.get(transitLayer.tripPatterns.get(prevPattern).routeIndex);
+                            if (prevRoute.route_type == 1) {
+                                int fromStopIndex = alightStops.get(ride - 1);
+                                String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+                                if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) {
+                                    // Transfer behind gates, no Ventra tap or change in transfer allowance
+                                    break;
+                                }
                             }
                         }
-                        else {
-                            fareToPay = CTA_L_FARE;
-                        }
+                        fareToPay = CTA_L_FARE;
                     }
                     else fareToPay = CTA_BUS_FARE;
                 }

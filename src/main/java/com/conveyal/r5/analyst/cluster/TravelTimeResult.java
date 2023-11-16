@@ -37,6 +37,9 @@ public class TravelTimeResult {
      * This is optional, generally used only for debugging and testing, so may be null if no histograms are recorded.
      * Since this is used for debugging and testing it might even be interesting to do it at one-second resolution or
      * just store every travel time, but binning makes it easy to compare with probability distributions.
+     * Note that this is one histogram _per target_ showing on how many iterations each travel time is the fastest,
+     * _not_ one histogram per origin/percentile showing how many destinations are reached at each travel time. The
+     * latter is essentially the discrete derivative of step-function accessibility and is tracked elsewhere (TemporalDensityResult).
      */
     int[][] histograms;
 

@@ -9,8 +9,9 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
+import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
-import com.esotericsoftware.kryo.util.DefaultStreamFactory;
+import com.esotericsoftware.kryo.util.DefaultInstantiatorStrategy;
 import com.esotericsoftware.kryo.util.MapReferenceResolver;
 import gnu.trove.impl.hash.TPrimitiveHash;
 import gnu.trove.list.array.TIntArrayList;
@@ -43,8 +44,14 @@ public abstract class KryoNetworkSerializer {
      * It should also be changed when the semantic content changes from that produced by earlier versions, even when
      * the serialization format itself does not change. This will ensure newer workers will not load cached older files.
      * We considered using an ISO date string as the version but that could get confusing when seen in filenames.
+     *
+     * History of Network Version (NV) changes:
+     * nv4 2023-11-02 WebMercatorGridPointSet now contains nested WebMercatorExtents
+     * nv3 2023-01-18 use Kryo 5 serialization format
+     * nv2 2022-04-05
+     * nv1 2021-04-30 stopped using r5 version string (which caused networks to be rebuilt for every new r5 version)
      */
-    public static final String NETWORK_FORMAT_VERSION = "nv2";
+    public static final String NETWORK_FORMAT_VERSION = "nv3";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 
@@ -61,7 +68,7 @@ public abstract class KryoNetworkSerializer {
     private static Kryo makeKryo () {
         Kryo kryo;
         if (COUNT_CLASS_INSTANCES) {
-            kryo = new Kryo(new InstanceCountingClassResolver(), new MapReferenceResolver(), new DefaultStreamFactory());
+            kryo = new Kryo(new InstanceCountingClassResolver(), null);
         } else {
             kryo = new Kryo();
         }
@@ -88,7 +95,7 @@ public abstract class KryoNetworkSerializer {
         // The default strategy requires every class you serialize, even in your dependencies, to have a zero-arg
         // constructor (which can be private). The setInstantiatorStrategy method completely replaces that default
         // strategy. The nesting below specifies the Java approach as a fallback strategy to the default strategy.
-        kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
+        kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
         return kryo;
     }
 

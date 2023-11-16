@@ -22,4 +22,7 @@
     <logger name="org.eclipse.jetty" level="WARN" />
     <logger name="com.conveyal.r5.profile.FastRaptorWorker" level="INFO" />
 
+    <logger name="com.conveyal.analysis.controllers.BrokerController" level="INFO" />
+    <logger name="com.conveyal.r5.analyst.cluster.AnalysisWorker" level="INFO" />
+
 </configuration>

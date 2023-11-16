@@ -201,13 +201,13 @@ public class LinkedPointSet implements Serializable {
             throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
         }
         WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) sourceLinkage.pointSet;
-        if (superGrid.zoom != subGrid.zoom) {
+        if (superGrid.extents.zoom != subGrid.extents.zoom) {
             throw new IllegalArgumentException("Source and sub-grid zoom level do not match.");
         }
-        if (subGrid.west + subGrid.width < superGrid.west //sub-grid is entirely west of super-grid
-                || superGrid.west + superGrid.width < subGrid.west // super-grid is entirely west of sub-grid
-                || subGrid.north + subGrid.height < superGrid.north //sub-grid is entirely north of super-grid (note Web Mercator conventions)
-                || superGrid.north + superGrid.height < subGrid.north) { //super-grid is entirely north of sub-grid
+        if (subGrid.extents.west + subGrid.extents.width < superGrid.extents.west //sub-grid is entirely west of super-grid
+                || superGrid.extents.west + superGrid.extents.width < subGrid.extents.west // super-grid is entirely west of sub-grid
+                || subGrid.extents.north + subGrid.extents.height < superGrid.extents.north //sub-grid is entirely north of super-grid (note Web Mercator conventions)
+                || superGrid.extents.north + superGrid.extents.height < subGrid.extents.north) { //super-grid is entirely north of sub-grid
             LOG.warn("Sub-grid is entirely outside the super-grid.  Points will not be linked to any street edges.");
         }
 
@@ -219,7 +219,7 @@ public class LinkedPointSet implements Serializable {
         this.baseLinkage = sourceLinkage;
         this.cropped = true; // This allows calling the correct cost table builder function later, see Javadoc on field.
 
-        int nCells = subGrid.width * subGrid.height;
+        int nCells = subGrid.extents.width * subGrid.extents.height;
         edges = new int[nCells];
         distancesToEdge_mm = new int[nCells];
         distances0_mm = new int[nCells];
@@ -231,16 +231,16 @@ public class LinkedPointSet implements Serializable {
         // Copy a subset of linkage information (edges and distances for each cell) over from the source linkage to
         // the new sub-linkage. This basically crops a smaller rectangle out of the larger one (or copies it if
         // dimensions are the same). Variables x, y, and pixel are relative to the new linkage, not the source one.
-        for (int y = 0, pixel = 0; y < subGrid.height; y++) {
-            for (int x = 0; x < subGrid.width; x++, pixel++) {
-                int sourceColumn = subGrid.west + x - superGrid.west;
-                int sourceRow = subGrid.north + y - superGrid.north;
-                if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height) { //point is outside super-grid
+        for (int y = 0, pixel = 0; y < subGrid.extents.height; y++) {
+            for (int x = 0; x < subGrid.extents.width; x++, pixel++) {
+                int sourceColumn = subGrid.extents.west + x - superGrid.extents.west;
+                int sourceRow = subGrid.extents.north + y - superGrid.extents.north;
+                if (sourceColumn < 0 || sourceColumn >= superGrid.extents.width || sourceRow < 0 || sourceRow >= superGrid.extents.height) { //point is outside super-grid
                     // Set the edge value to -1 to indicate no linkage.
                     // Distances should never be read downstream, so they don't need to be set here.
                     edges[pixel] = -1;
                 } else { //point is inside super-grid
-                    int sourcePixel = sourceRow * superGrid.width + sourceColumn;
+                    int sourcePixel = sourceRow * superGrid.extents.width + sourceColumn;
                     edges[pixel] = sourceLinkage.edges[sourcePixel];
                     distancesToEdge_mm[pixel] = sourceLinkage.distancesToEdge_mm[sourcePixel];
                     distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];

@@ -14,6 +14,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -45,6 +46,7 @@ import spark.Response;
 
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -52,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.conveyal.r5.common.Util.human;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -289,7 +292,8 @@ public class BrokerController implements HttpController {
         // We could call response.body(jsonMapper.writeValueAsBytes(object));
         // but then the calling handler functions need to explicitly return null which is weird.
         try {
-            return jsonMapper.writeValueAsString(object);
+            String body = jsonMapper.writeValueAsString(object);
+            return body;
         } catch (JsonProcessingException e) {
             throw AnalysisServerException.unknown(e);
         }
@@ -362,7 +366,7 @@ public class BrokerController implements HttpController {
         broker.recordWorkerObservation(workerStatus);
         WorkerCategory workerCategory = workerStatus.getWorkerCategory();
         // See if any appropriate tasks exist for this worker.
-        List<RegionalTask> tasks = broker.getSomeWork(workerCategory);
+        List<RegionalTask> tasks = broker.getSomeWork(workerCategory, workerStatus.maxTasksRequested);
         // If there is no work for the worker, signal this clearly with a "no content" code,
         // so the worker can sleep a while before the next polling attempt.
         if (tasks.isEmpty()) {

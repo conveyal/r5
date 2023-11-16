@@ -251,8 +251,7 @@ public class FreeFormPointSet extends PointSet {
     public WebMercatorExtents getWebMercatorExtents () {
         final int DEFAULT_ZOOM = 9;
         Envelope wgsEnvelope = this.getWgsEnvelope();
-        WebMercatorExtents webMercatorExtents = WebMercatorExtents.forWgsEnvelope(wgsEnvelope, DEFAULT_ZOOM);
-        return webMercatorExtents;
+        return WebMercatorExtents.forBufferedWgsEnvelope(wgsEnvelope, DEFAULT_ZOOM);
     }
 
     /** Construct a freeform point set containing one opportunity at each specified geographic coordinate. */

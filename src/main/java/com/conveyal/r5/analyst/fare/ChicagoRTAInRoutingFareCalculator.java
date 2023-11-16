@@ -182,22 +182,29 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                 Fare fare = fares.getFareOrDefault(null, boardStopZoneId, alightStopZoneId);
                 cumulativeFarePaid += payFullFare(fare);
             } else {
-                // We have a pass offering unlimited rides, so continue
-                if (transferAllowance.unlimited) continue;
-
                 int fareToPay = 0;
                 if (agency == Agency.PACE) {
                     String shortenedRouteId = route.route_id.split("-")[0];
                     if (paceFreeRoutes.contains(shortenedRouteId)) continue;
+                    if (transferAllowance.unlimited) {
+                        if (pacePremiumRoutes.contains(shortenedRouteId)) {
+                            cumulativeFarePaid += PACE_PREMIUM_TRANSFER;
+                            // TODO update transfer allowance to cover transfer to subsequent premium routes
+                        }
+                        continue;
+                    }
                     if (pacePremiumRoutes.contains(shortenedRouteId)) fareToPay = PACE_PREMIUM_FARE;
                     else fareToPay = PACE_REGULAR_FARE;
                 } if (agency == Agency.CTA) {
+                    // We have a pass offering unlimited rides, so continue
+                    if (transferAllowance.unlimited) continue;
+
                     if (route.route_type == 1) {
                         // Boarding metro (CTA "L" service)
                         if (boardStation.equals("40890")) { // Boarding at O'Hare; buy a day pass to cover the surcharge
                             cumulativeFarePaid += CTA_PACE_DAY_PASS - transferAllowance.value;
                             transferAllowance = new CTAPaceTransferAllowance(true);
-                            break;
+                            continue;
                         }
 
                         if (ride > 0) {
@@ -211,7 +218,7 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                                 String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
                                 if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) {
                                     // Transfer behind gates, no Ventra tap or change in transfer allowance
-                                    break;
+                                    continue;
                                 }
                             }
                         }
@@ -223,7 +230,6 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
                     // We have a transfer to redeem
                     if (fareToPay <= transferAllowance.value) {
                         // No additional fare required to board
-                        // TODO handle special case of PACE_PREMIUM_TRANSFER from day pass
                         transferAllowance = transferAllowance.redeem(fareToPay);
                     } else {
                         // Additional fare required (transferring to a more expensive service than previously ridden)

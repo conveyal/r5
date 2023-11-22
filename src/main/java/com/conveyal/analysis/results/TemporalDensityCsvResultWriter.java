@@ -35,7 +35,7 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
         headers.add("destinations");
         headers.add("percentile");
         // The number of minutes needed to reach d destination opportunities
-        headers.add("D" + dualThreshold);
+        headers.add("dual");
         // The opportunity density during each of 120 minutes
         for (int m = 0; m < 120; m += 1) {
             headers.add(Integer.toString(m));

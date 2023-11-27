@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'maven-publish'
     id 'com.palantir.git-version' version '2.0.0'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.conveyal'
@@ -19,7 +20,7 @@ jar {
     // For Java 11+ Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
     // Main-Class BackendMain will start a local backend.
-    // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install the right JVM.
+    // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install or select the right JVM.
     // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.r5',
@@ -29,6 +30,10 @@ jar {
             'Implementation-Vendor': 'Conveyal LLC',
             'Implementation-Version': project.version
     }
+}
+
+shadowJar {
+    mergeServiceFiles()
 }
 
 // Allow reflective access by ObjectDiffer to normally closed Java internals. Used for round-trip testing serialization.
@@ -42,8 +47,8 @@ test {
                '--add-opens=java.base/java.lang=ALL-UNNAMED']
 }
 
-// `gradle publish` will upload both shadow and simple JAR to Github Packages
-// On GH Actions, GITHUB_ACTOR env variable is supplied without specifying it in action yml.
+// Set up publication of jar files to GitHub Packages Maven repository.
+// On GitHub Actions, GITHUB_ACTOR env variable is supplied without specifying it in action yml.
 publishing {
     repositories {
         maven {
@@ -56,10 +61,12 @@ publishing {
         }
     }
     publications {
-        // The presence of the shadow plugin somehow causes the shadow-jar to also be automatically included in this
-        // publication. Ideally we want to produce the shadow jar and upload it to S3 as a worker, but only publish the
-        // much smaller plain JAR without dependencies to Github Packages. On the other hand, we may want to publish
-        // shadow jars for tagged releases.
+        // The shadow plugin automatically creates and registers a component called "shadow" for integration with this
+        // Maven publish plugin. `gradle publish` will then upload both shadow jar and simple jar to Github Packages.
+        // See https://imperceptiblethoughts.com/shadow/getting-started/#default-java-groovy-tasks
+        // To run R5 with dependencies, Conveyal does not use shadow jars anymore, only the zip distribution or runBackend.
+        // For development builds and tests we don't need to produce a shadow jar, only publish the much smaller plain
+        // jar without dependencies to Github Packages. For now, we continue to attach shadow jars to tagged releases.
         gpr(MavenPublication) {
             from(components.java)
         }

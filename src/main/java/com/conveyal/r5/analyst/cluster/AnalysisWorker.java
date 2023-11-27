@@ -13,6 +13,7 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
@@ -75,8 +76,10 @@ public class AnalysisWorker implements Component {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorker.class);
 
-    public static final int POLL_WAIT_SECONDS = 15;
-    public static final int POLL_MAX_RANDOM_WAIT = 5;
+    private static final int POLL_INTERVAL_MIN_SECONDS = 1;
+    private static final int POLL_INTERVAL_MAX_SECONDS = 15;
+    private static final int POLL_JITTER_SECONDS = 5;
+    private static final int QUEUE_SLOTS_PER_PROCESSOR = 8;
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.
@@ -111,8 +114,6 @@ public class AnalysisWorker implements Component {
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final NetworkPreloader networkPreloader;
 
-    private final Random random = new Random();
-
     /** The common root of all API URLs contacted by this worker, e.g. http://localhost:7070/api/ */
     protected final String brokerBaseUrl;
 
@@ -126,8 +127,11 @@ public class AnalysisWorker implements Component {
      */
     private final List<RegionalWorkResult> workResults = new ArrayList<>();
 
-    /** The last time (in milliseconds since the epoch) that we polled for work. */
-    private long lastPollingTime;
+    /**
+     * The last time (in milliseconds since the epoch) that we polled for work.
+     * The initial value of zero causes the worker to poll the backend immediately on startup avoiding a delay.
+     */
+    private long lastPollingTime = 0;
 
     /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
     private final ThroughputTracker throughputTracker = new ThroughputTracker();
@@ -162,7 +166,7 @@ public class AnalysisWorker implements Component {
 
     /**
      * A queue to hold a backlog of regional analysis tasks.
-     * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
+     * This avoids "slow joiner" syndrome where we wait until all N fetched tasks have finished,
      * but one of the tasks takes much longer than all the rest.
      * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
      * Can this be replaced with the general purpose TaskScheduler component?
@@ -199,66 +203,100 @@ public class AnalysisWorker implements Component {
     /** The main worker event loop which fetches tasks from a broker and schedules them for execution. */
     public void startPolling () {
 
-        // Create executors with up to one thread per processor.
-        // The default task rejection policy is "Abort".
-        // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
+        // Create an executor with one thread per processor. The default task rejection policy is "Abort".
+        // The number of threads will only increase from the core pool size toward the max pool size when the queue is
+        // full. We no longer exceed the queue length in normal operation, so the thread pool will remain at core size.
+        // "[The] core pool size is the threshold beyond which [an] executor service prefers to queue up the task
+        // [rather] than spawn a new thread." https://stackoverflow.com/a/72684387/778449
+        // The executor's queue is rather long because some tasks complete very fast and we poll at most once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        LOG.debug("Java reports the number of available processors is: {}", availableProcessors);
-        int maxThreads = availableProcessors;
-        int taskQueueLength = availableProcessors * 6;
-        LOG.debug("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
+        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+        final int maxThreads = availableProcessors;
+        final int taskQueueLength = availableProcessors * QUEUE_SLOTS_PER_PROCESSOR;
+        LOG.info("Maximum number of regional processing threads is {}, target length of task queue is {}.", maxThreads, taskQueueLength);
         BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
-        regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
+        regionalTaskExecutor = new ThreadPoolExecutor(maxThreads, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
-        // Main polling loop to fill the regional work queue.
+        // This is the main polling loop that fills the regional work queue.
         // Go into an endless loop polling for regional tasks that can be computed asynchronously.
         // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
         // people all over the world have been jumping through hoops to try to achieve this simple behavior
         // with no real success, at least without writing bug and deadlock-prone custom executor services.
-        // Two alternative approaches are trying to keep the queue full and waiting for the queue to be almost empty.
-        // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
-        // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
-        // see https://stackoverflow.com/a/15185004/778449
-        // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
-        // then fetch more work only when the queue is getting empty.
+        // Our current (revised) approach is to slowly spin-wait, checking whether the queue is low and sleeping briefly,
+        // then fetching more work only when the queue is getting empty.
+
+        // Allows slowing down polling when not actively receiving tasks.
+        boolean receivedWorkLastTime = false;
+
+        // Before first polling the broker, randomly wait a few seconds to spread load when many workers start at once.
+        sleepSeconds((new Random()).nextInt(POLL_JITTER_SECONDS));
         while (true) {
-            List<RegionalTask> tasks = getSomeWork();
-            if (tasks == null || tasks.isEmpty()) {
-                // Either there was no work, or some kind of error occurred.
-                // Sleep for a while before polling again, adding a random component to spread out the polling load.
-                // TODO only randomize delay on the first round, after that it's excessive.
-                int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
-                LOG.debug("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
-                sleepSeconds(POLL_WAIT_SECONDS + randomWait);
+            // We establish a lower limit on the wait time between polling to avoid flooding the broker with requests.
+            // If worker handles all tasks in its internal queue in less than this time, this is a speed bottleneck.
+            // This can happen in areas unconnected to transit and when travel time cutoffs are very low.
+            sleepSeconds(POLL_INTERVAL_MIN_SECONDS);
+            // Determine whether to poll this cycle - is the queue running empty, or has the maximum interval passed?
+            {
+                long currentTime = System.currentTimeMillis();
+                boolean maxIntervalExceeded = (currentTime - lastPollingTime) > (POLL_INTERVAL_MAX_SECONDS * 1000);
+                int tasksInQueue = taskQueue.size();
+                // Poll any time we have less tasks in the queue than processors.
+                boolean shouldPoll = maxIntervalExceeded || (receivedWorkLastTime && (tasksInQueue < availableProcessors));
+                LOG.debug("Last polled {} sec ago. Task queue length is {}.", (currentTime - lastPollingTime)/1000, taskQueue.size());
+                if (!shouldPoll) {
+                    continue;
+                }
+                lastPollingTime = currentTime;
+            }
+            // This will request tasks even when queue is rather full.
+            // For now, assume more but smaller task and result chunks is better at leveling broker load.
+            int tasksToRequest = taskQueue.remainingCapacity();
+            // Alternatively: Only request tasks when queue is short. Otherwise, only report results and status.
+            // int tasksToRequest = (tasksInQueue < minQueueLength) ? taskQueue.remainingCapacity() : 0;
+
+            List<RegionalTask> tasks = getSomeWork(tasksToRequest);
+            boolean noWorkReceived = tasks == null || tasks.isEmpty();
+            receivedWorkLastTime = !noWorkReceived; // Allows variable speed polling on the next iteration.
+            if (noWorkReceived) {
+                // Either the broker supplied no work or an error occurred.
                 continue;
             }
             for (RegionalTask task : tasks) {
-                // Try to enqueue each task for execution, repeatedly failing until the queue is not full.
-                // The list of fetched tasks essentially serves as a secondary queue, which is awkward. This is using
-                // exceptions for normal flow control, which is nasty. We should do this differently (#596).
-                while (true) {
-                    try {
-                        // TODO define non-anonymous runnable class to instantiate here, specifically for async regional tasks.
-                        regionalTaskExecutor.execute(() -> {
-                            try {
-                                this.handleOneRegionalTask(task);
-                            } catch (Throwable t) {
-                                LOG.error(
-                                    "An error occurred while handling a regional task, reporting to backend. {}",
-                                    ExceptionUtils.stackTraceString(t)
-                                );
-                                synchronized (workResults) {
-                                    workResults.add(new RegionalWorkResult(t, task));
-                                }
-                            }
-                        });
-                        break;
-                    } catch (RejectedExecutionException e) {
-                        // Queue is full, wait a bit and try to feed it more tasks. If worker handles all tasks in its
-                        // internal queue in less than 1 second, this is a speed bottleneck. This happens with regions
-                        // unconnected to transit and with very small travel time cutoffs.
-                        sleepSeconds(1);
-                    }
+                // Executor services require blocking queues of fixed length. Tasks must be enqueued one by one, and
+                // may fail with a RejectedExecutionException if we exceed the queue length. We choose queue length
+                // and requested number of tasks carefully to avoid overfilling the queue, but should handle the
+                // exceptions just in case something is misconfigured.
+                try {
+                    regionalTaskExecutor.execute(new RegionalTaskRunnable(task));
+                } catch (RejectedExecutionException e) {
+                    LOG.error("Regional task could not be enqueued for processing (queue length exceeded). Task dropped.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Runnable inner class which can access the needed methods on AnalysisWorker (handleOneRegionalTask).
+     * However that method is only called from these runnables - it could potentially be inlined into run().
+     */
+    protected class RegionalTaskRunnable implements Runnable {
+        RegionalTask task;
+
+        public RegionalTaskRunnable(RegionalTask task) {
+            this.task = task;
+        }
+
+        @Override
+        public void run() {
+            try {
+                handleOneRegionalTask(task);
+            } catch (Throwable t) {
+                LOG.error(
+                        "An error occurred while handling a regional task, reporting to backend. {}",
+                        ExceptionUtils.stackTraceString(t)
+                );
+                synchronized (workResults) {
+                    workResults.add(new RegionalWorkResult(t, task));
                 }
             }
         }
@@ -344,10 +382,10 @@ public class AnalysisWorker implements Component {
             timeGridWriter.writeToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addJsonToGrid(
                     byteArrayOutputStream,
-                    oneOriginResult.accessibility,
+                    oneOriginResult,
                     transportNetwork.scenarioApplicationWarnings,
                     transportNetwork.scenarioApplicationInfo,
-                    oneOriginResult.paths != null ? new PathResultSummary(oneOriginResult.paths, transportNetwork.transitLayer) : null
+                    transportNetwork.transitLayer
             );
         }
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
@@ -457,7 +495,7 @@ public class AnalysisWorker implements Component {
             // progress. This avoids crashing the backend by sending back massive 2 million element travel times
             // that have already been written to S3, and throwing exceptions on old backends that can't deal with
             // null AccessibilityResults.
-            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null);
+            oneOriginResult = new OneOriginResult(null, new AccessibilityResult(task), null, null);
         }
 
         // Accumulate accessibility results, which will be returned to the backend in batches.
@@ -489,6 +527,8 @@ public class AnalysisWorker implements Component {
 
         public PathResultSummary pathSummaries;
 
+        public double[][][] opportunitiesPerMinute;
+
         @Override
         public String toString () {
             return String.format(
@@ -508,24 +548,33 @@ public class AnalysisWorker implements Component {
      * and no serious errors, we use a success error code.
      * TODO distinguish between warnings and errors - we already distinguish between info and warnings.
      * This could be turned into a GridJsonBlock constructor, with the JSON writing code in an instance method.
+     * Note that this is very similar to the RegionalWorkResult constructor, and some duplication of logic could be
+     * achieved by somehow merging the two.
      */
     public static void addJsonToGrid (
             OutputStream outputStream,
-            AccessibilityResult accessibilityResult,
+            OneOriginResult oneOriginResult,
             List<TaskError> scenarioApplicationWarnings,
             List<TaskError> scenarioApplicationInfo,
-            PathResultSummary pathResult
+            TransitLayer transitLayer // Only used if oneOriginResult contains paths, can be null otherwise
     ) throws IOException {
         var jsonBlock = new GridJsonBlock();
         jsonBlock.scenarioApplicationInfo = scenarioApplicationInfo;
         jsonBlock.scenarioApplicationWarnings = scenarioApplicationWarnings;
-        if (accessibilityResult != null) {
-            // Due to the application of distance decay functions, we may want to make the shift to non-integer
-            // accessibility values (especially for cases where there are relatively few opportunities across the whole
-            // study area). But we'd need to control the number of decimal places serialized into the JSON.
-            jsonBlock.accessibility = accessibilityResult.getIntValues();
+        if (oneOriginResult != null) {
+            if (oneOriginResult.accessibility != null) {
+                // Due to the application of distance decay functions, we may want to make the shift to non-integer
+                // accessibility values (especially for cases where there are relatively few opportunities across the whole
+                // study area). But we'd need to control the number of decimal places serialized into the JSON.
+                jsonBlock.accessibility = oneOriginResult.accessibility.getIntValues();
+            }
+            if (oneOriginResult.paths != null) {
+                jsonBlock.pathSummaries = new PathResultSummary(oneOriginResult.paths, transitLayer);
+            }
+            if (oneOriginResult.density != null) {
+                jsonBlock.opportunitiesPerMinute = oneOriginResult.density.opportunitiesPerMinute;
+            }
         }
-        jsonBlock.pathSummaries = pathResult;
         LOG.debug("Travel time surface written, appending {}.", jsonBlock);
         // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
         // But then you also have to handle the case where you are returning raw bytes.
@@ -539,10 +588,13 @@ public class AnalysisWorker implements Component {
      * Also returns any accumulated work results to the backend.
      * @return a list of work tasks, or null if there was no work to do, or if no work could be fetched.
      */
-    public List<RegionalTask> getSomeWork () {
+    public List<RegionalTask> getSomeWork (int tasksToRequest) {
+        LOG.debug("Polling backend to report status and request up to {} tasks.", tasksToRequest);
         String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus(this);
+        workerStatus.maxTasksRequested = tasksToRequest;
+        workerStatus.pollIntervalSeconds = POLL_INTERVAL_MAX_SECONDS;
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {
@@ -552,7 +604,7 @@ public class AnalysisWorker implements Component {
 
         // Compute throughput in tasks per minute and include it in the worker status report.
         // We poll too frequently to compute throughput just since the last poll operation.
-        // TODO reduce polling frequency (larger queue in worker), compute shorter-term throughput.
+        // We may want to reduce polling frequency (with larger queue in worker) and compute shorter-term throughput.
         workerStatus.tasksPerMinuteByJobId = throughputTracker.getTasksPerMinuteByJobId();
 
         // Report how often we're polling for work, just for monitoring.
@@ -573,8 +625,10 @@ public class AnalysisWorker implements Component {
                 // Broker returned some work. Use the lenient object mapper to decode it in case the broker is a
                 // newer version so sending unrecognizable fields.
                 // ReadValue closes the stream, releasing the HTTP connection.
-                return JsonUtilities.lenientObjectMapper.readValue(responseEntity.getContent(),
-                        new TypeReference<List<RegionalTask>>() {});
+                return JsonUtilities.lenientObjectMapper.readValue(
+                        responseEntity.getContent(),
+                        new TypeReference<List<RegionalTask>>() {}
+                );
             }
             // Non-200 response code or a null entity. Something is weird.
             LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());

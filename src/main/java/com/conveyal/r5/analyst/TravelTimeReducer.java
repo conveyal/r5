@@ -46,6 +46,9 @@ public class TravelTimeReducer {
     /** Retains the paths to one or all destinations, for recording in CSV or reporting in the UI. */
     private PathResult pathResult = null;
 
+    /** Represents how many destinations are reached in each minute of travel from this origin. */
+    private TemporalDensityResult temporalDensityResult = null;
+
     /** If we are calculating accessibility, the PointSets containing opportunities. */
     private PointSet[] destinationPointSets;
 
@@ -121,6 +124,8 @@ public class TravelTimeReducer {
         this.destinationPointSets = task.destinationPointSets;
         if (task instanceof TravelTimeSurfaceTask) {
             calculateTravelTimes = true;
+            // In single-point analyses, destination pointsets may be missing if the user has not selected one in the
+            // UI, or if the user has selected the step decay function instead of one of the other decay functions.
             calculateAccessibility = notNullOrEmpty(task.destinationPointSets);
         } else {
             // Maybe we should define recordAccessibility and recordTimes on the common superclass AnalysisWorkerTask.
@@ -139,6 +144,9 @@ public class TravelTimeReducer {
         }
         if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
+        }
+        if (task.includeTemporalDensity) {
+            temporalDensityResult = new TemporalDensityResult(task);
         }
 
         // Validate and copy the travel time cutoffs, converting them to seconds to avoid repeated multiplication
@@ -271,6 +279,9 @@ public class TravelTimeReducer {
                 }
             }
         }
+        if (temporalDensityResult != null) {
+            temporalDensityResult.recordOneTarget(target, travelTimePercentilesSeconds);
+        }
     }
 
     /**
@@ -329,12 +340,14 @@ public class TravelTimeReducer {
      * origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult);
+        return new OneOriginResult(travelTimeResult, accessibilityResult, pathResult, temporalDensityResult);
     }
 
     /**
      * Sanity check: all opportunity data sets should have the same size and location as the points to which we'll
      * calculate travel times. They will only be used if we're calculating accessibility.
+     * TODO: expand to cover all cases where destinationPointSets are present, not just accessibility to Mercator grids.
+     * Need to verify first: should this be skipped for one-to-one regional requests on FreeFormPointSets?
      */
     public void checkOpportunityExtents (PointSet travelTimePointSet) {
         if (calculateAccessibility) {

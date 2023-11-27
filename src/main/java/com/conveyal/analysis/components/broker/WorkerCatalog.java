@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -21,7 +22,8 @@ import java.util.Objects;
  */
 public class WorkerCatalog {
 
-    public static final int WORKER_RECORD_DURATION_MSEC = 2 * 60 * 1000;
+    /** If a worker says it will poll every s seconds or less, wait s plus this number before considering it gone. */
+    private static final int POLLING_TOLERANCE_SECONDS = 5;
 
     /**
      * The information supplied by workers the last time they polled for more tasks.
@@ -74,9 +76,9 @@ public class WorkerCatalog {
      */
     private synchronized void purgeDeadWorkers () {
         long now = System.currentTimeMillis();
-        long oldestAcceptable = now - WORKER_RECORD_DURATION_MSEC;
         List<WorkerObservation> ancientObservations = new ArrayList<>();
         for (WorkerObservation observation : observationsByWorkerId.values()) {
+            long oldestAcceptable = now - ((observation.status.pollIntervalSeconds + POLLING_TOLERANCE_SECONDS) * 1000);
             if (observation.lastSeen < oldestAcceptable) {
                 ancientObservations.add(observation);
             }

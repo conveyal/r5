@@ -459,7 +459,7 @@ public class Broker implements Component {
 
             // Store all result files permanently.
             for (var resultFile : resultFiles.entrySet()) {
-                this.fileStorage.moveIntoStorage(resultFile.getKey(), resultFile.getValue());
+                fileStorage.moveIntoStorage(resultFile.getKey(), resultFile.getValue());
             }
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));

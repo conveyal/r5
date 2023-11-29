@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -76,14 +75,14 @@ public class GridResultWriter implements RegionalResultWriter {
      * We create one GridResultWriter for each destination pointset and percentile.
      * Each of those output files contains data for all specified travel time cutoffs at each origin.
      */
-    public static List<GridResultWriter> createWritersFromTask(RegionalAnalysis regionalAnalysis, RegionalTask task) {
+    public static List<GridResultWriter> createWritersFromTask(String[] destinationPointSetIds, RegionalTask task) {
         int nPercentiles = task.percentiles.length;
-        int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
+        int nDestinationPointSets = destinationPointSetIds.length;
         // Create one grid writer per percentile and destination pointset.
         var gridWriters = new ArrayList<GridResultWriter>();
         for (int destinationIndex = 0; destinationIndex < nDestinationPointSets; destinationIndex++) {
             for (int percentileIndex = 0; percentileIndex < nPercentiles; percentileIndex++) {
-                String destinationPointSetId = regionalAnalysis.destinationPointSetIds[destinationIndex];
+                String destinationPointSetId = destinationPointSetIds[destinationIndex];
                 gridWriters.add(new GridResultWriter(
                         task,
                         percentileIndex,
@@ -148,7 +147,9 @@ public class GridResultWriter implements RegionalResultWriter {
         }
     }
 
-    /** Gzip the access grid and upload it to file storage (such as AWS S3). */
+    /**
+     * Gzip the access grid and return the files.
+     */
     @Override
     public synchronized Map.Entry<FileStorageKey, File> finish () throws IOException {
         randomAccessFile.close();

@@ -1,22 +1,11 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.results.AccessCsvResultWriter;
 import com.conveyal.analysis.results.CsvResultType;
-import com.conveyal.analysis.results.GridResultWriter;
-import com.conveyal.analysis.results.PathCsvResultWriter;
-import com.conveyal.analysis.results.RegionalResultWriter;
-import com.conveyal.analysis.results.TemporalDensityCsvResultWriter;
-import com.conveyal.analysis.results.TimeCsvResultWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
-import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Represents a single regional (multi-origin) accessibility analysis,
@@ -111,56 +100,6 @@ public class RegionalAnalysis extends Model implements Cloneable {
      * any of that logic.
      */
     public Map<CsvResultType, String> resultStorage = new HashMap<>();
-
-    /**
-     * Create results writers for this regional analysis and a task. Stores the result paths that are created by the
-     * writers.
-     */
-    public List<RegionalResultWriter> createResultWriters(RegionalTask task) {
-        // Create the result writers. Store their result file paths in the database.
-        var resultWriters = new ArrayList<RegionalResultWriter>();
-        if (!task.makeTauiSite) {
-            if (task.recordAccessibility) {
-                if (task.originPointSet != null) {
-                    // Freeform origins - create CSV regional analysis results
-                    var accessWriter = new AccessCsvResultWriter(task);
-                    resultWriters.add(accessWriter);
-                    resultStorage.put(accessWriter.resultType(), accessWriter.getFileName());
-                } else {
-                    // Gridded origins - create gridded regional analysis results
-                    resultWriters.addAll(GridResultWriter.createWritersFromTask(this, task));
-                }
-            }
-
-            if (task.recordTimes) {
-                var timesWriter = new TimeCsvResultWriter(task);
-                resultWriters.add(timesWriter);
-                resultStorage.put(timesWriter.resultType(), timesWriter.getFileName());
-            }
-
-            if (task.includePathResults) {
-                var pathsWriter = new PathCsvResultWriter(task);
-                resultWriters.add(pathsWriter);
-                resultStorage.put(pathsWriter.resultType(), pathsWriter.getFileName());
-            }
-
-            if (task.includeTemporalDensity) {
-                if (task.originPointSet == null) {
-                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
-                    // We might want to record a grid of dual accessibility values, but this will require some serious
-                    // refactoring of the GridResultWriter.
-                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
-                    throw new RuntimeException("Temporal density of opportunities cannot be recorded for gridded origin points.");
-                } else {
-                    var tDensityWriter = new TemporalDensityCsvResultWriter(task);
-                    resultWriters.add(tDensityWriter);
-                    resultStorage.put(tDensityWriter.resultType(), tDensityWriter.getFileName());
-                }
-            }
-            checkArgument(notNullOrEmpty(resultWriters), "A regional analysis should always create at least one grid or CSV file.");
-        }
-        return resultWriters;
-    }
 
     public RegionalAnalysis clone () {
         try {

@@ -17,7 +17,7 @@ public class SpeedMatcher extends ShapefileMatcher {
     @Override
     void setEdgePair (SimpleFeature feature, int attributeIndex, EdgeStore.Edge edge) {
         if (feature.getAttribute(attributeIndex) != null) {
-            double speedKph = KPH_PER_MPH * ((Number) feature.getAttribute(attributeIndex)).doubleValue();
+            double speedKph = ((Number) feature.getAttribute(attributeIndex)).doubleValue();
             edge.setSpeedKph(speedKph);
             edge.advance();
             edge.setSpeedKph(speedKph);

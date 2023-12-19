@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Set;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A Job is a collection of tasks that represent all the origins in a regional analysis. All the
@@ -61,13 +60,13 @@ public class Job {
      * The number of remaining tasks can be derived from the deliveredTasks BitSet, but as an
      * optimization we keep a separate counter to avoid constantly scanning over that whole bitset.
      */
-    protected int nTasksCompleted;
+    protected int nTasksCompleted = 0;
 
     /**
      * The total number of task deliveries that have occurred. A task may be counted more than
      * once if it is redelivered.
      */
-    protected int nTasksDelivered;
+    protected int nTasksDelivered = 0;
 
     /** Every task in this job will be based on this template task, but have its origin coordinates changed. */
     public final RegionalTask templateTask;
@@ -128,23 +127,31 @@ public class Job {
      */
     public final Set<String> errors = new HashSet();
 
-    public Job (RegionalTask templateTask, WorkerTags workerTags) {
-        this.jobId = templateTask.jobId;
-        this.templateTask = templateTask;
-        this.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
-        this.nTasksCompleted = 0;
-        this.nextTaskToDeliver = 0;
-
-        if (templateTask.originPointSetKey != null) {
-            checkNotNull(templateTask.originPointSet);
-            this.nTasksTotal = templateTask.originPointSet.featureCount();
-        } else {
-            this.nTasksTotal = templateTask.width * templateTask.height;
-        }
-
-        this.completedTasks = new BitSet(nTasksTotal);
+    public Job (RegionalTask task, WorkerTags workerTags) {
+        templateTask = templateTaskFromRegionalTask(task);
+        jobId = task.jobId;
+        workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
+        nTasksTotal = task.getTasksTotal();
+        completedTasks = new BitSet(nTasksTotal);
         this.workerTags = workerTags;
+    }
 
+    /**
+     * The single RegionalTask object represents a lot of individual accessibility tasks at many different origin
+     * points, typically on a grid. Before passing that RegionalTask on to the Broker (which distributes tasks to
+     * workers and tracks progress), we remove the details of the scenario, substituting the scenario's unique ID
+     * to save time and bandwidth. This avoids repeatedly sending the scenario details to the worker in every task,
+     * as they are often quite voluminous. The workers will fetch the scenario once from S3 and cache it based on
+     * its ID only. We protectively clone this task because we're going to null out its scenario field, and don't
+     * want to affect the original object which contains all the scenario details.
+     */
+    private static RegionalTask templateTaskFromRegionalTask(RegionalTask task) {
+        RegionalTask templateTask = task.clone();
+        // First replace the inline scenario with a scenario ID, storing the scenario for retrieval by workers.
+        templateTask.scenarioId = templateTask.scenario.id;
+        // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
+        templateTask.scenario = null;
+        return templateTask;
     }
 
     public boolean markTaskCompleted(int taskId) {

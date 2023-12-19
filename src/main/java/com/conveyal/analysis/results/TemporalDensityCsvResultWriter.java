@@ -1,10 +1,8 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,8 +15,8 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
 
     private final int dualThreshold;
 
-    public TemporalDensityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, fileStorage);
+    public TemporalDensityCsvResultWriter(RegionalTask task) {
+        super(task);
         dualThreshold = task.dualAccessibilityThreshold;
     }
 

@@ -177,19 +177,23 @@ public class Broker implements Component {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
         }
+        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
+        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
+        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
         WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
         Job job = new Job(templateTask, workerTags);
-        jobs.put(job.workerCategory, job);
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
+        // If any parameters fail checks here, an exception may cause this method to exit early.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
-        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
         MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
+        // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
+        jobs.put(job.workerCategory, job);
+
+        // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
         if (config.testTaskRedelivery()) {
-            // This is a fake job for testing, don't confuse the worker startup code below with null graph ID.
             return;
         }
 

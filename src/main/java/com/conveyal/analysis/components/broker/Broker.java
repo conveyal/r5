@@ -398,7 +398,11 @@ public class Broker implements Component {
      */
     private synchronized void recordJobError (Job job, String error) {
         if (job != null) {
-            job.errors.add(error);
+            // Limit the number of errors recorded to one.
+            // Still using a Set<String> instead of just String since the set of errors is exposed in a UI-facing API.
+            if (job.errors.isEmpty()) {
+                job.errors.add(error);
+            }
         }
     }
 

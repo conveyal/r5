@@ -2,6 +2,8 @@ package com.conveyal.analysis.components.eventbus;
 
 import com.conveyal.r5.util.ExceptionUtils;
 
+import static com.conveyal.r5.util.ExceptionUtils.filterStackTrace;
+
 /**
  * This Event is fired each time a Throwable (usually an Exception or Error) occurs on the backend. It can then be
  * recorded or tracked in various places - the console logs, Slack, etc. This could eventually be used for errors on
@@ -57,22 +59,6 @@ public class ErrorEvent extends Event {
             builder.append(filterStackTrace(stackTrace));
         }
         return builder.toString();
-    }
-
-    private static String filterStackTrace (String stackTrace) {
-        if (stackTrace == null) return null;
-        final String unknownFrame = "Unknown stack frame, probably optimized out by JVM.";
-        String error = stackTrace.lines().findFirst().get();
-        String frame = stackTrace.lines()
-                .map(String::strip)
-                .filter(s -> s.startsWith("at "))
-                .findFirst().orElse(unknownFrame);
-        String conveyalFrame = stackTrace.lines()
-                .map(String::strip)
-                .filter(s -> s.startsWith("at com.conveyal."))
-                .filter(s -> !frame.equals(s))
-                .findFirst().orElse("");
-        return String.join("\n", error, frame, conveyalFrame);
     }
 
 }

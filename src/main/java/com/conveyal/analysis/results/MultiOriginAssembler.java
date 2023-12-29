@@ -101,14 +101,14 @@ public class MultiOriginAssembler {
                 int nODPairs = task.oneToOne ? nOriginsTotal : nOriginsTotal * nDestinations;
                 if (task.recordTimes &&
                     (nDestinations > MAX_FREEFORM_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
-                    throw new AnalysisServerException(String.format(
+                    throw AnalysisServerException.badRequest(String.format(
                        "Travel time results limited to %d destinations and %d origin-destination pairs.",
                        MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
                     ));
                 }
                 if (task.includePathResults &&
                     (nDestinations > PathResult.MAX_PATH_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
-                    throw new AnalysisServerException(String.format(
+                    throw AnalysisServerException.badRequest(String.format(
                         "Path results limited to %d destinations and %d origin-destination pairs.",
                         PathResult.MAX_PATH_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
                     ));

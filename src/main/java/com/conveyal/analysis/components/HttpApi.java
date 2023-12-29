@@ -26,7 +26,6 @@ import static com.conveyal.analysis.AnalysisServerException.Type.FORBIDDEN;
 import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
 import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
-import static com.conveyal.r5.util.ExceptionUtils.filterStackTrace;
 
 /**
  * This Component is a web server that serves up our HTTP API endpoints, contacted by both the UI and the workers.
@@ -180,7 +179,7 @@ public class HttpApi implements Component {
         // Include a stack trace except when the error is known to be about unauthenticated or unauthorized access,
         // in which case we don't want to leak information about the server to people scanning it for weaknesses.
         if (type != UNAUTHORIZED && type != FORBIDDEN) {
-            body.put("stackTrace", filterStackTrace(errorEvent.stackTrace));
+            body.put("stackTrace", errorEvent.filteredStackTrace);
         }
         response.status(code);
         response.type("application/json");

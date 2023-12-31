@@ -38,7 +38,7 @@ public class PathResult {
      * These results are returned to the backend over an HTTP API so we don't want to risk making them too huge.
      * This could be set to a higher number in cases where you know the result return channel can handle the size.
      */
-    public static int maxDestinations = 5000;
+    public static final int MAX_PATH_DESTINATIONS = 5_000;
 
     private final int nDestinations;
     /**
@@ -49,7 +49,7 @@ public class PathResult {
     public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
     private final TransitLayer transitLayer;
 
-    public static String[] DATA_COLUMNS = new String[]{
+    public static final String[] DATA_COLUMNS = new String[]{
             "routes",
             "boardStops",
             "alightStops",
@@ -70,8 +70,8 @@ public class PathResult {
             // In regional analyses, return paths to all destinations
             nDestinations = task.nTargetsPerOrigin();
             // This limitation reflects the initial design, for use with freeform pointset destinations
-            if (nDestinations > maxDestinations) {
-                throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + maxDestinations);
+            if (nDestinations > MAX_PATH_DESTINATIONS) {
+                throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + MAX_PATH_DESTINATIONS);
             }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];

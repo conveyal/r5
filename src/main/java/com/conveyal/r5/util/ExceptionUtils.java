@@ -55,8 +55,8 @@ public abstract class ExceptionUtils {
      * and all additional frames that come from Conveyal packages. This yields a much shorter stack trace that still
      * shows where the exception was thrown and where the problem originates in our own code.
      */
-    public static String filterStackTrace (String stackTrace) {
-        if (stackTrace == null) return null;
+    public static String filterStackTrace (Throwable throwable) {
+        String stackTrace = stackTraceString(throwable);
         final String unknownFrame = "Unknown stack frame, probably optimized out by JVM.";
         String error = stackTrace.lines().findFirst().get();
         String frame = stackTrace.lines()
@@ -69,10 +69,6 @@ public abstract class ExceptionUtils {
                 .filter(s -> !frame.equals(s))
                 .findFirst().orElse("");
         return String.join("\n", error, frame, conveyalFrame);
-    }
-
-    public static String filterStackTrace (Throwable throwable) {
-        return filterStackTrace(stackTraceString(throwable));
     }
 
 }

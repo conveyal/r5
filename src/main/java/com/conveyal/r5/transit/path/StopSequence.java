@@ -11,6 +11,7 @@ import static com.google.common.base.Preconditions.checkState;
 /**
  * A door-to-door path, i.e. access/egress characteristics and transit legs (keyed on characteristics including per-leg
  * in-vehicle times but not specific trips/patterns/routes), which may be repeated at different departure times.
+ * The integer stop indexes here are the indexes within the TransitLayer, not within the TripPattern or Trip ridden.
  *
  * Instances are constructed initially from transit legs, with access and egress set in successive operations.
  */

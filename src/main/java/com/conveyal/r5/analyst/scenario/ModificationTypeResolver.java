@@ -49,6 +49,7 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
             .put("raster-cost", RasterCost.class)
             .put("shapefile-lts", ShapefileLts.class)
             .put("set-fare-calculator", SetFareCalculator.class)
+            .put("select-link", SelectLink.class)
             .build();
 
     @Override

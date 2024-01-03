@@ -3,6 +3,7 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
+import com.google.common.collect.Lists;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TObjectIntMap;
 import org.locationtech.jts.geom.Coordinate;
@@ -92,6 +93,7 @@ public class TripPattern implements Serializable, Cloneable {
     }
 
     public TripPattern(String routeId, Iterable<StopTime> stopTimes, TObjectIntMap<String> indexForUnscopedStopId) {
+        // FIXME We don't need to explicitly use a spliterator to make a list. Lists.newArrayList(stopTimes);
         List<StopTime> stopTimeList = StreamSupport.stream(stopTimes.spliterator(), false).collect(Collectors.toList());
         int nStops = stopTimeList.size();
         stops = new int[nStops];

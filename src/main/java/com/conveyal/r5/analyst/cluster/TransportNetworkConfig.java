@@ -32,7 +32,7 @@ public class TransportNetworkConfig {
     /** ID of the OSM file, for use with OSMCache */
     public String osmId;
 
-    /** IDs of the GTFS files, for use with GTFSCache */
+    /** IDs of the GTFS files, for use with GTFSCache. These are "bundle-scoped" in the form feedId_feedGroupId. */
     public List<String> gtfsIds;
 
     /** The fare calculator for analysis, if any. TODO this is not yet wired up to TransportNetwork.setFareCalculator. */

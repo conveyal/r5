@@ -85,16 +85,18 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** The MapDB database handling persistence of Maps to a pair of disk files behind the scenes. */
     private DB db;
 
-    /** An ID (sometimes declared by the feed itself) which may remain the same across successive feed versions. */
+    /**
+     *  An ID (sometimes declared by the feed itself) which may remain the same across successive feed versions.
+     *  In R5 as of 2023 this is always overwritten with a unique UUID to avoid problems with successive feed versions
+     *  or edited/modified versions of the same feeds.
+     */
     public String feedId;
 
     /**
-     * This field was merged in from the wrapper FeedSource. It is a unique identifier for this particular GTFS file.
-     * Successive versions of the data for the same operators, or even different copies of the same operator's data
-     * uploaded by different people, should have different uniqueIds.
-     * In practice this is mostly copied into WrappedGTFSEntity instances used in the Analysis GraphQL API.
+     * In R5 as of 2023, this field will contain the bundle-scoped feed ID used to fetch the feed object from the
+     * GTFSCache (but is not present on disk or before saving - only after it's been reloaded from a file by the cache).
      */
-    public transient String uniqueId; // set this to feedId until it is overwritten, to match FeedSource behavior
+    public transient String uniqueId;
 
     // All tables below should be MapDB maps so the entire GTFSFeed is persistent and uses constant memory.
 

@@ -53,6 +53,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -170,7 +171,8 @@ public class Grid extends PointSet {
 
         double area = geometry.getArea();
         if (area < 1e-12) {
-            throw new IllegalArgumentException("Feature geometry is too small");
+            LOG.warn("Discarding feature. Its area is too small to serve as a denominator ({} square degrees).", area);
+            return Collections.EMPTY_LIST;
         }
 
         if (area > MAX_FEATURE_AREA_SQ_DEG) {

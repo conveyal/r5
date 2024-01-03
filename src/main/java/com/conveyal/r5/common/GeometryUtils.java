@@ -8,6 +8,7 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineSegment;
+import org.locationtech.jts.geom.Polygon;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
@@ -16,6 +17,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 /**
  * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
  * Also contains reusable methods for validating WGS84 envelopes and latitude and longitude values.
+ *
+ * FIXME we have two geometry util classes com.conveyal.r5.common.GeometryUtils and com.conveyal.gtfs.util.GeometryUtil
+ * Each has its own GeometryFactory.
  */
 public class GeometryUtils {
     public static final GeometryFactory geometryFactory = new GeometryFactory();
@@ -170,6 +174,35 @@ public class GeometryUtils {
                     thingBeingChecked, roughWgsEnvelopeArea(envelope), MAX_BOUNDING_BOX_AREA_SQ_KM
             ));
         }
+    }
+
+    /**
+     * Given floating point WGS84 latitude and longitude and a radius in meters, create an envelope inscribing that
+     * circle.
+     */
+    public static Envelope envelopeForCircle (double lon, double lat, double radiusMeters) {
+        checkLat(lat);
+        checkLon(lon);
+        checkArgument(radiusMeters < 1000, "Radius must be less than 1km.");
+        Envelope envelope = new Envelope();
+        envelope.expandToInclude(lon, lat);
+        double latExpansion = SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters);
+        double lonExpansion = SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, lat);
+        envelope.expandBy(lonExpansion, latExpansion);
+        return envelope;
+    }
+
+    /**
+     * Some geometry operations such as intersections and inclusion can only operate on Geometries, not Envelopes.
+     */
+    public static Polygon polygonForEnvelope (Envelope env) {
+        return geometryFactory.createPolygon(new Coordinate[] {
+                new Coordinate(env.getMinX(), env.getMinY()),
+                new Coordinate(env.getMinX(), env.getMaxY()),
+                new Coordinate(env.getMaxX(), env.getMaxY()),
+                new Coordinate(env.getMaxX(), env.getMinY()),
+                new Coordinate(env.getMinX(), env.getMinY())
+        });
     }
 
 }

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.path.Path;
 import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.RouteSequence;
@@ -9,9 +10,16 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.lang3.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.awt.*;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -32,6 +40,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class PathResult {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
     /**
      * The maximum number of destinations for which we'll generate detailed path information in a single request.
      * Detailed path information was added on to the original design, which returned a simple grid of travel times.
@@ -41,12 +51,14 @@ public class PathResult {
     public static final int MAX_PATH_DESTINATIONS = 5_000;
 
     private final int nDestinations;
+
     /**
      * Array with one entry per destination. Each entry is a map from a "path template" to the associated iteration
      * details. For now, the path template is a route-based path ignoring per-iteration details such as wait time.
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
     public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+
     private final TransitLayer transitLayer;
 
     public static final String[] DATA_COLUMNS = new String[]{
@@ -83,6 +95,15 @@ public class PathResult {
      * pattern-based keys
      */
     public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
+
+        // When selected link analysis is enabled, filter down the PatternSequence-Iteration Multimap to retain only
+        // those keys passing through the selected links.
+        // TODO Maybe selectedLink should be on TransitLayer, and somehow indicate the number of removed iterations.
+        if (transitLayer.parentNetwork.selectedLink != null) {
+            patterns = transitLayer.parentNetwork.selectedLink.filterPatterns(patterns);
+        }
+
+        // The rest of this runs independent of whether a SelectedLink filtered down the patterns-iterations map.
         Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
         patterns.forEach(((patternSeq, iteration) -> routes.put(new RouteSequence(patternSeq, transitLayer), iteration)));
         iterationsForPathTemplates[targetIndex] = routes;
@@ -103,6 +124,35 @@ public class PathResult {
             summary[d] = new ArrayList<>();
             Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
             if (iterationMap != null) {
+                // SelectedLink case: collapse all RouteSequences and Iterations for this OD pair into one to simplify.
+                // This could also be done by merging all Iterations under a single RouteSequence with all route IDs.
+                if (transitLayer.parentNetwork.selectedLink != null) {
+                    int nIterations = 0;
+                    TIntSet allRouteIds = new TIntHashSet();
+                    double summedTotalTime = 0;
+                    for (RouteSequence routeSequence: iterationMap.keySet()) {
+                        Collection<Iteration> iterations = iterationMap.get(routeSequence);
+                        nIterations += iterations.size();
+                        allRouteIds.addAll(routeSequence.routes);
+                        summedTotalTime += iterations.stream().mapToInt(i -> i.totalTime).sum();
+                    }
+                    // Many destinations will have no iterations at all passing through the SelectedLink area.
+                    // Skip those to keep the CSV output short.
+                    if (nIterations > 0) {
+                        String[] row = new String[DATA_COLUMNS.length];
+                        Arrays.fill(row, "ALL");
+                        String allRouteIdsPipeSeparated = Arrays.stream(allRouteIds.toArray())
+                                .mapToObj(transitLayer.routes::get)
+                                .map(routeInfo -> routeInfo.route_id)
+                                .collect(Collectors.joining("|"));
+                        row[0] = allRouteIdsPipeSeparated;
+                        row[row.length - 1] = Integer.toString(nIterations);
+                        row[row.length - 2] = String.format("%.1f", summedTotalTime / nIterations / 60d); // Average total time
+                        summary[d].add(row);
+                    }
+                    continue;
+                }
+                // Standard (non SelectedLink) case.
                 for (RouteSequence routeSequence: iterationMap.keySet()) {
                     Collection<Iteration> iterations = iterationMap.get(routeSequence);
                     int nIterations = iterations.size();

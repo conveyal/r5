@@ -89,7 +89,7 @@ public class IntegrationTest {
         assertTrue(features.containsKey(110010014023009L));
 
         // read the workplace area characteristics csv
-        InputStream csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "jobs"), "dc_wac_S000_JT00_2013.csv.gz")));
+        InputStream csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "jobs"), "DC_2021_wac.csv.gz")));
         reader = new CsvReader(new InputStreamReader(csv));
         reader.readHeaders();
 
@@ -153,7 +153,7 @@ public class IntegrationTest {
         assertTrue(foundJobsEntry);
 
         // read the rac csv
-        csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "workforce"), "dc_rac_S000_JT00_2013.csv.gz")));
+        csv = new GZIPInputStream(new FileInputStream(new File(new File(dir, "workforce"), "DC_2021_rac.csv.gz")));
         reader = new CsvReader(new InputStreamReader(csv));
 
         reader.readHeaders();

@@ -160,8 +160,11 @@ public class MultiOriginAssembler {
                     regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
                 }
             }
+        } catch (AnalysisServerException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.stackTraceString(e));
+            // Handle any obscure problems we don't want end users to see without context of MultiOriginAssembler.
+            throw new RuntimeException("Exception while creating multi-origin assembler: " + e.toString(), e);
         }
     }
 

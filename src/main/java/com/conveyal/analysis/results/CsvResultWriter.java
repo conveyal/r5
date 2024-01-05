@@ -41,7 +41,12 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
      */
     public abstract CsvResultType resultType ();
 
-    /** Override to provide column names for this CSV writer. */
+    /**
+     * Override to provide column names for this CSV writer.
+     * NOTE: Due to Java weirdness, subclass implementations of this method will be called by the CsvResultWriter
+     * constructor at a time when fields of the subclass remain initialized, but uninitialized final primitive
+     * fields are still readable! Do not read subclass fields in these implementations until/unless this is restructured.
+     */
     protected abstract String[] columnHeaders ();
 
     /** Override to extract row values from a single origin result. */

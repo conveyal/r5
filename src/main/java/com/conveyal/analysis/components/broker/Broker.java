@@ -177,19 +177,23 @@ public class Broker implements Component {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
         }
+        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
+        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
+        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
         WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
         Job job = new Job(templateTask, workerTags);
-        jobs.put(job.workerCategory, job);
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
+        // If any parameters fail checks here, an exception may cause this method to exit early.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
-        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
         MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
+        // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
+        jobs.put(job.workerCategory, job);
+
+        // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
         if (config.testTaskRedelivery()) {
-            // This is a fake job for testing, don't confuse the worker startup code below with null graph ID.
             return;
         }
 
@@ -385,14 +389,20 @@ public class Broker implements Component {
     }
 
     /**
-     * When job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
+     * Record an error that happened while a worker was processing a task on the given job. This method is tolerant
+     * of job being null, because it's called on a code path where any number of things could be wrong or missing.
+     * This method also ensures synchronization of writes to Jobs from any non-synchronized sections of an HTTP handler.
+     * Once job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
      * The Job will stop delivering tasks, allowing workers to shut down, but will continue to exist allowing the user
      * to see the error message. User will then need to manually delete it, which will remove the result assembler.
-     * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
      */
     private synchronized void recordJobError (Job job, String error) {
         if (job != null) {
-            job.errors.add(error);
+            // Limit the number of errors recorded to one.
+            // Still using a Set<String> instead of just String since the set of errors is exposed in a UI-facing API.
+            if (job.errors.isEmpty()) {
+                job.errors.add(error);
+            }
         }
     }
 
@@ -488,19 +498,21 @@ public class Broker implements Component {
         // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
         // because that method only uses final fields of the job.
         Job job = null;
-        MultiOriginAssembler assembler;
         try {
+            MultiOriginAssembler assembler;
             synchronized (this) {
                 job = findJob(workResult.jobId);
+                // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                // This will mark the job as errored and not-active, stopping distribution of tasks to workers.
+                // To ensure that happens, record errors before any other conditional that could exit this method.
+                if (workResult.error != null) {
+                    recordJobError(job, workResult.error);
+                    return;
+                }
                 assembler = resultAssemblers.get(workResult.jobId);
                 if (job == null || assembler == null || !job.isActive()) {
                     // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
                     LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
-                    return;
-                }
-                if (workResult.error != null) {
-                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
-                    recordJobError(job, workResult.error);
                     return;
                 }
                 // Mark tasks completed first before passing results to the assembler. On the final result received,

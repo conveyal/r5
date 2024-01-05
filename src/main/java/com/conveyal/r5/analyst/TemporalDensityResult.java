@@ -33,7 +33,8 @@ public class TemporalDensityResult {
 
     /**
      * The temporal density of opportunities. For each destination set, for each percentile, for each minute of
-     * travel from 0 to 120, the number of opportunities reached in travel times from i (inclusive) to i+1 (exclusive).
+     * travel m from 0 to 119, the number of opportunities reached in travel times from m (inclusive) to m+1
+     * (exclusive).
      */
     public final double[][][] opportunitiesPerMinute;
 
@@ -57,7 +58,7 @@ public class TemporalDensityResult {
                     break; // If any percentile is unreached, all higher ones are also unreached.
                 }
                 int m = travelTimePercentilesSeconds[p] / 60;
-                if (m <= 120) {
+                if (m < 120) {
                     opportunitiesPerMinute[d][p][m] += dps.getOpportunityCount(target);
                 }
             }

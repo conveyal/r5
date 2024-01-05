@@ -45,11 +45,13 @@ public abstract class KryoNetworkSerializer {
      * the serialization format itself does not change. This will ensure newer workers will not load cached older files.
      * We considered using an ISO date string as the version but that could get confusing when seen in filenames.
      *
-     * History of Network Version (NV) changes:
-     * nv4 2023-11-02 WebMercatorGridPointSet now contains nested WebMercatorExtents
-     * nv3 2023-01-18 use Kryo 5 serialization format
-     * nv2 2022-04-05
-     * nv1 2021-04-30 stopped using r5 version string (which caused networks to be rebuilt for every new r5 version)
+     * History of Network Version (NV) changes (in production releases):
+     * nv3 since v7.0: switched to Kryo 5 serialization, WebMercatorGridPointSet now contains nested WebMercatorExtents
+     * nv2 since 2022-04-05
+     * nv1 since 2021-04-30: stopped rebuilding networks for every new r5 version, manually setting this version string
+     *
+     * When prototyping new features, use a unique identifier such as the branch or a commit ID, not sequential nvX ones.
+     * This avoids conflicts when multiple changes are combined in a single production release, or some are abandoned.
      */
     public static final String NETWORK_FORMAT_VERSION = "nv3";
 

@@ -1,14 +1,17 @@
 package com.conveyal.r5.shapefile;
 
+import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.util.LambdaCounter;
 import com.conveyal.r5.util.ShapefileReader;
 import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.index.strtree.STRtree;
+import org.locationtech.jts.operation.distance.DistanceOp;
 import org.opengis.feature.simple.SimpleFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +21,6 @@ import java.io.FileWriter;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.streets.EdgeStore.intToLts;
 import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
 
 /**
@@ -59,6 +61,8 @@ public class ShapefileMatcher {
     private StreetLayer streets;
     private int ltsAttributeIndex = -1;
 
+    private double matchLimitMeters;
+
     public ShapefileMatcher (StreetLayer streets) {
         this.streets = streets;
     }
@@ -72,12 +76,15 @@ public class ShapefileMatcher {
      * OSM_INFERRED, OSM_EXPLICIT, SHAPEFILE_MATCH etc. This could also apply to things like speeds and slopes.
      * The values could be retained only for the duration of network building unless we have a reason to keep them.
      */
-    public void match (String shapefileName, String attributeName) {
+    public void match (String shapefileName, String attributeName, double matchLimitMeters) {
         try {
             indexFeatures(shapefileName, attributeName);
         } catch (Throwable t) {
             throw new RuntimeException("Could not load and index shapefile.", t);
         }
+
+        this.matchLimitMeters = matchLimitMeters;
+
         LOG.info("Matching edges and setting bike LTS flags...");
         // Even single-threaded this is pretty fast for small extracts, but it's readily paralellized.
         final LambdaCounter edgePairCounter =
@@ -107,19 +114,23 @@ public class ShapefileMatcher {
                 streets.edgeStore.nEdgePairs() - edgePairCounter.getCount());
     }
 
-    // Match metric is currently Hausdorff distance, eventually replace with something that accounts for overlap length.
+    // For features within the given matchLimitMeters, choose the closest based on Hausdorff distance.
+    // This could eventually be replaced with something that accounts for overlap length.
     private SimpleFeature findBestMatch (LineString edgeGeometry) {
         SimpleFeature bestFeature = null;
         double bestDistance = Double.POSITIVE_INFINITY;
         List<SimpleFeature> features = featureIndex.query(edgeGeometry.getEnvelopeInternal());
         for (SimpleFeature feature : features) {
-            // Note that we're using unprojected coordinates so x distance is exaggerated realtive to y.
-            DiscreteHausdorffDistance dhd = new DiscreteHausdorffDistance(extractLineString(feature), edgeGeometry);
-            double distance = dhd.distance();
-            // distance = overlap(extractLineString(feature), edgeGeometry);
-            if (bestDistance > distance) {
-                bestDistance = distance;
-                bestFeature = feature;
+            Coordinate[] nearestPoints = new DistanceOp(extractLineString(feature), edgeGeometry).nearestPoints();
+            if (SphericalDistanceLibrary.fastDistance(nearestPoints[0], nearestPoints[1]) < matchLimitMeters) {
+                // Note that we're using unprojected coordinates so x distance is exaggerated relative to y.
+                DiscreteHausdorffDistance dhd = new DiscreteHausdorffDistance(extractLineString(feature), edgeGeometry);
+                double distance = dhd.distance();
+                // distance = overlap(extractLineString(feature), edgeGeometry);
+                if (bestDistance > distance) {
+                    bestDistance = distance;
+                    bestFeature = feature;
+                }
             }
         }
         return bestFeature;

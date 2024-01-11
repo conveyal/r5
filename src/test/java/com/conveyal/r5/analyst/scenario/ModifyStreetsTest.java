@@ -83,12 +83,12 @@ public class ModifyStreetsTest {
         task.fromLat = FROM_LAT;
         task.fromLon = FROM_LON;
 
-        WebMercatorGridPointSet gps = new WebMercatorGridPointSet(network);
-        task.north = gps.north;
-        task.west = gps.west;
-        task.height = gps.height;
-        task.width = gps.width;
-        task.zoom = gps.zoom;
+        WebMercatorGridPointSet grid = new WebMercatorGridPointSet(network);
+        task.north = grid.extents.north;
+        task.west = grid.extents.west;
+        task.height = grid.extents.height;
+        task.width = grid.extents.width;
+        task.zoom = grid.extents.zoom;
 
         var streetRouter = new StreetRouter(network.streetLayer);
         streetRouter.profileRequest = task;

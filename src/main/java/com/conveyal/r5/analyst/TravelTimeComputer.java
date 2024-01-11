@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
 import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
@@ -77,19 +78,19 @@ public class TravelTimeComputer {
 
         // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
         // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
-        // destination pointset is used for all steps below.
+        // destination PointSet is used for all steps below.
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         PointSet destinations;
-
         if (request instanceof  RegionalTask
             && !request.makeTauiSite
             && request.destinationPointSets[0] instanceof FreeFormPointSet
         ) {
-            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
+            // Freeform destinations. Destination PointSet was set by handleOneRequest in the main AnalystWorker.
             destinations = request.destinationPointSets[0];
         } else {
-            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
+            // Gridded (non-freeform) destinations. This method finds them differently for regional and single requests.
+            // We don't support freeform destinations for single point requests, as they must also return gridded travel times.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
             destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);

@@ -1,7 +1,17 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+
+import static com.conveyal.r5.common.Util.isNullOrEmpty;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Instances are serialized and sent from the backend to workers processing single point,
@@ -12,6 +22,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * TODO rename to something like SinglePointTask because these can now return accessibility, travel time, paths, etc.
  */
 public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
+
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     // FIXME red flag - what is this enum enumerating Java types?
 
@@ -48,8 +60,23 @@ public class TravelTimeSurfaceTask extends AnalysisWorkerTask {
 
     @Override
     public int nTargetsPerOrigin () {
-        // In TravelTimeSurfaceTasks, the set of destinations is always determined by the web mercator extents.
-        return width * height;
+        // In TravelTimeSurfaceTasks (single-point or single-origin tasks), the set of destinations is always
+        // determined by the web mercator extents in the request itself. In many cases the destinationPointSets field
+        // is empty, but when destinationPointSets are present (when we're calculating accessibility), those PointSets
+        // are required to be gridded and exactly match the task extents (e.g. Grids wrapped in GridTransformWrapper).
+        // In normal usage this requirement is validated by TravelTimeReducer#checkOpportunityExtents but that function
+        // only checks when we're computing accessibility, and is only called when destinations are gridded. The
+        // assertions here serve to further verify this requirement, as we've seen it violated before in tests.
+        final int nTargets = width * height;
+        if (destinationPointSets != null) {
+            for (PointSet pointSet : destinationPointSets) {
+                checkState(
+                        pointSet.featureCount() == nTargets,
+                        "Destination PointSet expected to exactly match extents embedded in single point task."
+                );
+            }
+        }
+        return nTargets;
     }
 
 }

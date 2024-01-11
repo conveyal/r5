@@ -177,5 +177,17 @@ public class GridTest {
             assertEquals(aSum, bSum, gridSumTolerance);
         }
     }
+    
+    /** Test that latitude/longitude to pixel conversions are correct */
+    @Test
+    public void testLatLonPixelConversions () {
+        final int ZOOM = WebMercatorExtents.DEFAULT_ZOOM;
+        for (double lat : new double [] { -75, -25, 0, 25, 75 }) {
+            assertEquals(lat, Grid.pixelToLat(Grid.latToPixel(lat, ZOOM), ZOOM), 1e-2);
+        }
+        for (double lon : new double [] { -175, -90, 0, 90, 175}) {
+            assertEquals(lon, Grid.pixelToLon(Grid.lonToPixel(lon, ZOOM), ZOOM), 1e-2);
+        }
+    }
 
 }

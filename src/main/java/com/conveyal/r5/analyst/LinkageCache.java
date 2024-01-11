@@ -95,7 +95,7 @@ public class LinkageCache {
                             key.streetLayer,
                             key.streetMode
                     );
-                    if (basePointSetLinkage != null && basePointSet.zoom == keyPointSet.zoom) {
+                    if (basePointSetLinkage != null && basePointSet.extents.zoom == keyPointSet.extents.zoom) {
                         LOG.info("Cutting linkage for {} out of existing linkage for {}.", keyPointSet, basePointSet);
                         return new LinkedPointSet(basePointSetLinkage, keyPointSet);
                     }

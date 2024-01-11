@@ -2,6 +2,8 @@ package com.conveyal.analysis.components.eventbus;
 
 import com.conveyal.r5.util.ExceptionUtils;
 
+import static com.conveyal.r5.util.ExceptionUtils.filterStackTrace;
+
 /**
  * This Event is fired each time a Throwable (usually an Exception or Error) occurs on the backend. It can then be
  * recorded or tracked in various places - the console logs, Slack, etc. This could eventually be used for errors on
@@ -9,11 +11,11 @@ import com.conveyal.r5.util.ExceptionUtils;
  */
 public class ErrorEvent extends Event {
 
-    // We may serialize this object, so we convert the Throwable to two strings to control its representation.
+    // All Events are intended to be eligible for serialization into a log or database, so we convert the Throwable to
+    // some Strings to determine its representation in a simple way.
     // For flexibility in event handlers, it is tempting to hold on to the original Throwable instead of derived
     // Strings. Exceptions are famously slow, but it's the initial creation and filling in the stack trace that are
-    // slow. Once the instace exists, repeatedly examining its stack trace should not be prohibitively costly. Still,
-    // we do probably gain some efficiency by converting the stack trace to a String once and reusing that.
+    // slow. Once the instance exists, repeatedly examining its stack trace should not be prohibitively costly.
 
     public final String summary;
 
@@ -23,11 +25,16 @@ public class ErrorEvent extends Event {
      */
     public final String httpPath;
 
+    /** The full stack trace of the exception that occurred. */
     public final String stackTrace;
+
+    /** A minimal stack trace showing the immediate cause within Conveyal code. */
+    public final String filteredStackTrace;
 
     public ErrorEvent (Throwable throwable, String httpPath) {
         this.summary = ExceptionUtils.shortCauseString(throwable);
         this.stackTrace = ExceptionUtils.stackTraceString(throwable);
+        this.filteredStackTrace = ExceptionUtils.filterStackTrace(throwable);
         this.httpPath = httpPath;
     }
 
@@ -54,25 +61,9 @@ public class ErrorEvent extends Event {
         if (verbose) {
             builder.append(stackTrace);
         } else {
-            builder.append(filterStackTrace(stackTrace));
+            builder.append(filteredStackTrace);
         }
         return builder.toString();
-    }
-
-    private static String filterStackTrace (String stackTrace) {
-        if (stackTrace == null) return null;
-        final String unknownFrame = "Unknown stack frame, probably optimized out by JVM.";
-        String error = stackTrace.lines().findFirst().get();
-        String frame = stackTrace.lines()
-                .map(String::strip)
-                .filter(s -> s.startsWith("at "))
-                .findFirst().orElse(unknownFrame);
-        String conveyalFrame = stackTrace.lines()
-                .map(String::strip)
-                .filter(s -> s.startsWith("at com.conveyal."))
-                .filter(s -> !frame.equals(s))
-                .findFirst().orElse("");
-        return String.join("\n", error, frame, conveyalFrame);
     }
 
 }

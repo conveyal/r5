@@ -48,36 +48,41 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * This class distributes the tasks making up regional jobs to workers.
  * <p>
- * It should aim to draw tasks fairly from all organizations, and fairly from all jobs within each
- * organization, while attempting to respect the transport network affinity of each worker, giving
- * the worker tasks that require the same network it has been using recently.
+ * It respects the declared transport network affinity of each worker, giving the worker tasks that
+ * relate to the same network it has been using recently, and is therefore already loaded in memory.
  * <p>
- * Previously workers long-polled for work, holding lots of connections open. Now they short-poll
- * and sleep for a while if there's no work. This is simpler and allows us to work withing much more
- * standard HTTP frameworks.
+ * In our initial design, workers long-polled for work, holding lots of connections open. This was
+ * soon revised to short-poll and sleep for a while when there's no work. This was found to be
+ * simpler, allowing use of standard HTTP frameworks instead of custom networking code.
  * <p>
- * The fact that workers continuously re-poll for work every 10-30 seconds serves as a signal to the
- * broker that they are still alive and waiting. This also allows the broker to maintain a catalog
- * of active workers.
+ * Issue conveyal/r5#596 arose because we'd only poll when a worker was running low on tasks or
+ * idling. A worker could disappear for a long time, leaving the backend to assume it had shut down
+ * or crashed. Workers were revised to poll more frequently even when they were busy and didn't
+ * need any new tasks to work on, providing a signal to the broker that they are still alive and
+ * functioning. This allows the broker to maintain a more accurate catalog of active workers.
  * <p>
- * Because (at least currently) two organizations never share the same graph, we can get by with
- * pulling tasks cyclically or randomly from all the jobs, and actively shape the number of workers
- * with affinity for each graph by forcing some of them to accept tasks on graphs other than the one
- * they have declared affinity for.
+ * Most methods on this class are synchronized because they can be called from many HTTP handler
+ * threads at once (when many workers are polling at once). We should occasionally evaluate whether
+ * synchronizing all methods to make this threadsafe is a performance issue. If so, fine-grained
+ * locking may be advantageous, but as a rule it is much harder to design, test, and maintain.
  * <p>
- * This could be thought of as "affinity homeostasis". We  will constantly keep track of the ideal
+ * Workers were originally intended to migrate from one network to another to handle subsequent jobs
+ * without waiting for more cloud compute instances to start up. In practice we currently assign
+ * each worker a single network, but the balance of workers assigned to each network and the reuse
+ * of workers could in principle be made more sophisticated. The remainder of the comments below
+ * provide context for how this could be refined or improved.
+ *
+ * Because (at least currently) two organizations never share the same graph, we could get by with
+ * pulling tasks cyclically or randomly from all the jobs, and could actively shape the number of
+ * workers with affinity for each graph by forcing some of them to accept tasks on graphs other than
+ * the one they have declared affinity for. If the pool of workers was allowed to grow very large,
+ * we could aim to draw tasks fairly from all organizations, and fairly from all jobs within each
+ * organization.
+ * <p>
+ * We have described this approach as "affinity homeostasis": constantly keep track of the ideal
  * proportion of workers by graph (based on active jobs), and the true proportion of consumers by
  * graph (based on incoming polling), then we can decide when a worker's graph affinity should be
- * ignored and what it should be forced to.
- * <p>
- * It may also be helpful to mark jobs every time they are skipped in the LRU queue. Each time a job
- * is serviced, it is taken out of the queue and put at its end. Jobs that have not been serviced
- * float to the top.
- * <p>
- * Most methods on this class are synchronized, because they can be called from many HTTP handler
- * threads at once.
- *
- * TODO evaluate whether synchronizing all methods to make this threadsafe is a performance issue.
+ * ignored and what graph it should be forced to.
  */
 public class Broker implements Component {
 
@@ -100,7 +105,15 @@ public class Broker implements Component {
     private final ListMultimap<WorkerCategory, Job> jobs =
             MultimapBuilder.hashKeys().arrayListValues().build();
 
-    /** The most tasks to deliver to a worker at a time. */
+    /**
+     * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
+     * never send more than the minimum of the two values. 50 tasks gives response bodies of about 65kB. If this value
+     * is too high, all remaining tasks in a job could be distributed to a single worker leaving none for the other
+     * workers, creating a slow-joiner problem especially if the tasks are complicated and slow to complete.
+     *
+     * The value should eventually be tuned. The current value of 16 is just the value used by the previous sporadic
+     * polling system (WorkerStatus.LEGACY_WORKER_MAX_TASKS) which may not be ideal but is known to work.
+     */
     public final int MAX_TASKS_PER_WORKER = 16;
 
     /**
@@ -164,19 +177,23 @@ public class Broker implements Component {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
         }
+        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
+        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
+        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
         WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
         Job job = new Job(templateTask, workerTags);
-        jobs.put(job.workerCategory, job);
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
+        // If any parameters fail checks here, an exception may cause this method to exit early.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
-        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
         MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
+        // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
+        jobs.put(job.workerCategory, job);
+
+        // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
         if (config.testTaskRedelivery()) {
-            // This is a fake job for testing, don't confuse the worker startup code below with null graph ID.
             return;
         }
 
@@ -317,9 +334,13 @@ public class Broker implements Component {
 
     /**
      * Attempt to find some tasks that match what a worker is requesting.
-     * Always returns a list, which may be empty if there is nothing to deliver.
+     * Always returns a non-null List, which may be empty if there is nothing to deliver.
+     * Number of tasks in the list is strictly limited to maxTasksRequested.
      */
-    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory) {
+    public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory, int maxTasksRequested) {
+        if (maxTasksRequested <= 0) {
+            return Collections.EMPTY_LIST;
+        }
         Job job;
         if (config.offline()) {
             // Working in offline mode; get tasks from the first job that has any tasks to deliver.
@@ -335,7 +356,10 @@ public class Broker implements Component {
             return Collections.EMPTY_LIST;
         }
         // Return up to N tasks that are waiting to be processed.
-        return job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
+        if (maxTasksRequested > MAX_TASKS_PER_WORKER) {
+            maxTasksRequested = MAX_TASKS_PER_WORKER;
+        }
+        return job.generateSomeTasksToDeliver(maxTasksRequested);
     }
 
     /**
@@ -365,14 +389,20 @@ public class Broker implements Component {
     }
 
     /**
-     * When job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
+     * Record an error that happened while a worker was processing a task on the given job. This method is tolerant
+     * of job being null, because it's called on a code path where any number of things could be wrong or missing.
+     * This method also ensures synchronization of writes to Jobs from any non-synchronized sections of an HTTP handler.
+     * Once job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
      * The Job will stop delivering tasks, allowing workers to shut down, but will continue to exist allowing the user
      * to see the error message. User will then need to manually delete it, which will remove the result assembler.
-     * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
      */
     private synchronized void recordJobError (Job job, String error) {
         if (job != null) {
-            job.errors.add(error);
+            // Limit the number of errors recorded to one.
+            // Still using a Set<String> instead of just String since the set of errors is exposed in a UI-facing API.
+            if (job.errors.isEmpty()) {
+                job.errors.add(error);
+            }
         }
     }
 
@@ -468,19 +498,21 @@ public class Broker implements Component {
         // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
         // because that method only uses final fields of the job.
         Job job = null;
-        MultiOriginAssembler assembler;
         try {
+            MultiOriginAssembler assembler;
             synchronized (this) {
                 job = findJob(workResult.jobId);
+                // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                // This will mark the job as errored and not-active, stopping distribution of tasks to workers.
+                // To ensure that happens, record errors before any other conditional that could exit this method.
+                if (workResult.error != null) {
+                    recordJobError(job, workResult.error);
+                    return;
+                }
                 assembler = resultAssemblers.get(workResult.jobId);
                 if (job == null || assembler == null || !job.isActive()) {
                     // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
                     LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
-                    return;
-                }
-                if (workResult.error != null) {
-                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
-                    recordJobError(job, workResult.error);
                     return;
                 }
                 // Mark tasks completed first before passing results to the assembler. On the final result received,

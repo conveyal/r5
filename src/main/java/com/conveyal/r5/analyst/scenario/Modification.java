@@ -39,7 +39,7 @@ public abstract class Modification implements Serializable {
      * The maximum number of error messages in each category (info/warning/error) to store in each modification.
      * This prevents bandwidth/latency/memory problems from sending enormous lists of errors back to the client.
      */
-    public static final int MAX_MESSAGES = 5;
+    public static final int MAX_MESSAGES = 40;
     
     /** Free-text comment describing this modification instance and what it's intended to do or represent. */
     public String comment;

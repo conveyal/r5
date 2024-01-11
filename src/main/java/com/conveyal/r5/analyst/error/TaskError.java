@@ -30,21 +30,15 @@ public class TaskError {
     }
 
     /**
-     * This constructor is used for errors that occur while applying a scenario to a network.
-     * messages will generally be either the errors or warnings associated with the modification, which is why there is
-     * a separate argument; otherwise we wouldn't know whether errors or warnings were desired.
+     * This constructor is used for errors, warnings, or informational messages that occur
+     * while applying a scenario to a network.
      */
     public TaskError(Modification modification, Collection<String> messages) {
         this.modificationId = modification.comment;
         this.title = "while applying the modification entitled '" + modification.comment + "'.";
         checkArgument(messages.size() <= Modification.MAX_MESSAGES + 1);
         this.messages.addAll(messages);
-    }
-
-    public TaskError(String modificationId, String title, String detail) {
-        this.modificationId = modificationId;
-        this.title = title;
-        this.messages.add(detail);
+        this.messages.sort(String::compareTo);
     }
 
 }

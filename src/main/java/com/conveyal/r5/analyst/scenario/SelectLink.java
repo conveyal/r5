@@ -61,15 +61,15 @@ public class SelectLink extends Modification {
         for (TripPattern tripPattern : network.transitLayer.tripPatterns) {
             String feedId = feedIdForTripPattern(tripPattern);
             if (isNullOrEmpty(feedId)) {
-                errors.add("Could not find feed ID prefix in route ID " + tripPattern.routeId);
+                addError("Could not find feed ID prefix in route ID " + tripPattern.routeId);
                 continue;
             }
             GTFSFeed feed = feedForUnscopedId.get(feedId);
             if (feed == null) {
-                errors.add("Could not find feed for ID " + feedId);
+                addError("Could not find feed for ID " + feedId);
             }
         }
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     @Override
@@ -133,7 +133,7 @@ public class SelectLink extends Modification {
         // Store the resulting precomputed information in a SelectedLink instance on the TransportNetwork.
         // This could also be on the TransitLayer, but we may eventually want to include street edges in SelectedLink.
         network.selectedLink = new SelectedLink(network.transitLayer, hopsInTripPattern);
-        return errors.size() > 0;
+        return hasErrors();
     }
 
     // By returning false for both affects methods, we make a very shallow copy of the TransitNetwork for efficiency.

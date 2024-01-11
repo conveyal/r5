@@ -48,6 +48,8 @@ public class SelectLink extends Modification {
 
     private Map<String, GTFSFeed> feedForUnscopedId;
 
+    private int nPatternsWithoutShapes = 0;
+
     @Override
     public boolean resolve(TransportNetwork network) {
         // Convert the incoming description of the selected link area to a Geometry for computing intersections.
@@ -87,6 +89,9 @@ public class SelectLink extends Modification {
             String feedId = feedIdForTripPattern(tripPattern);
             GTFSFeed feed = feedForUnscopedId.get(feedId);
             TransitLayer.addShapeToTripPattern(feed, tripPattern);
+            if (tripPattern.shape == null) {
+                nPatternsWithoutShapes += 1;
+            }
             // TransitLayer parameter enables fetching straight lines between stops in case shapes are not present.
             List<LineString> hopGeometries = tripPattern.getHopGeometries(network.transitLayer);
             TIntArrayList intersectedHops = new TIntArrayList();
@@ -100,7 +105,11 @@ public class SelectLink extends Modification {
                 hopsInTripPattern.put(patternIndex, intersectedHops.toArray());
             }
         }
-
+        if (nPatternsWithoutShapes > 0) {
+            addInfo( "Out of %d patterns, %d had no shapes and used straight lines.".formatted(
+                    network.transitLayer.tripPatterns.size(), nPatternsWithoutShapes
+            ));
+        }
         // After finding all links (TripPattern hops) in the SelectedLink area, release the GTFSFeeds which don't really
         // belong in a Modification. This avoids memory leaks, and protects us from inadvertently relying on or
         // modifying those feed objects later.

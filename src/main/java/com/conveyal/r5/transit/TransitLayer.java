@@ -439,45 +439,50 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPattern tripPattern
     ) {
         // First, find an exemplar trip that is representative of the TripPattern.
-        boolean foundExemplarTrip = false;
         Trip trip = null;
         Iterable<StopTime> stopTimes = null;
         for (TripSchedule tripSchedule : tripPattern.tripSchedules) {
-            // In constructor, TripSchedule.tripId = String.join(":", trip.feed_id, trip.trip_id);
+            // In constructor, TripSchedule.tripId is set to String.join(":", trip.feed_id, trip.trip_id).
             String[] tripIdParts = tripSchedule.tripId.split(":");
             if (!tripIdParts[0].equals(gtfsFeed.feedId)) {
                 LOG.warn("Feed ID scope of trip ID for TripSchedule in TripPattern does not match supplied GTFS feed.");
                 continue;
             }
             String unscopedTripId = tripIdParts[1];
-            trip = gtfsFeed.trips.get(unscopedTripId);
-            if (trip == null) {
+            Trip candidateTrip = gtfsFeed.trips.get(unscopedTripId);
+            if (candidateTrip == null) {
                 LOG.warn("Could not find trip for unscoped ID " + unscopedTripId);
                 continue;
             }
-            if (trip.shape_id == null) {
-                continue;
+            if (trip == null || candidateTrip.shape_id != null) {
+                try {
+                    // FIXME here and below: why did we need interpolated stop times? We are only the positions right?
+                    Iterable<StopTime> candidateStopTimes = gtfsFeed.getInterpolatedStopTimesForTrip(unscopedTripId);
+                    // Iterable<StopTime> candidateStopTimes = gtfsFeed.getOrderedStopTimesForTrip(unscopedTripId);
+                    // All checks succeeded, retain the information from this trip as the exemplar for the pattern.
+                    trip = candidateTrip;
+                    stopTimes = candidateStopTimes;
+                } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
+                    continue;
+                }
             }
-            try {
-                stopTimes = gtfsFeed.getInterpolatedStopTimesForTrip(unscopedTripId);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                continue;
+            if (candidateTrip.shape_id != null) {
+                // Found exemplar trip with explicit shape, no need to search further.
+                // Otherwise, we found a suitable trip but its shape will be composed of straight lines.
+                // Retain it, but continue iterative search for trips in pattern having explicit shapes.
+                break;
             }
-            // All checks succeeded, record the information from this trip as the exemplar for the pattern.
-            foundExemplarTrip = true;
-            break;
         }
         // Could add a possibly slow check: get each trip, check if exemplarTrip.shapeId equals shape in each trip.
         // LOG.warn(String.format("Multiple trips in the same TripPattern have different shapes (e.g. %s and %s)")
 
-        if (!foundExemplarTrip) {
-            LOG.warn("Did not find any exemplar trip with usable Shape and StopTimes for pattern " + tripPattern);
+        if (trip == null) {
+            LOG.warn("Did not find any exemplar trip with usable StopTimes for pattern " + tripPattern);
             return;
         }
-        // This is assigned outside the loop only to make it final, as required by lambdas below.
         final Shape shape = gtfsFeed.getShape(trip.shape_id);
         if (shape == null) {
-            LOG.error("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
+            LOG.debug("Trip {} has no explicit shape, straight lines will be used.", trip.trip_id, trip.shape_id);
             return;
         }
         tripPattern.shape = shape.geometry;

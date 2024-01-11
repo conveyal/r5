@@ -333,9 +333,7 @@ public class TransportNetworkCache implements Component {
         transferFinder.findParkRideTransfer();
 
         // Apply modifications embedded in the TransportNetworkConfig JSON
-        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
-                RasterCost.class, ShapefileLts.class, SelectLink.class
-        );
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(RasterCost.class, ShapefileLts.class);
         if (config.modifications != null) {
             // Scenario scenario = new Scenario();
             // scenario.modifications = config.modifications;

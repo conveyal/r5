@@ -126,7 +126,7 @@ public class SelectLink extends Modification {
                 patterns.size(), nPatternsWithoutShapes
             ));
         }
-        // After finding all links (TripPattern hops) in the SelectedLink area, release the GTFSFeeds which don't really
+        // After finding all links (TripPattern hops) in the SelectedLink area, release the GTFSFeeds. They don't really
         // belong in a Modification. This avoids memory leaks, and protects us from inadvertently relying on or
         // modifying those feed objects later.
         feedForUnscopedId = null;
@@ -140,12 +140,13 @@ public class SelectLink extends Modification {
                     .map(s -> tripPattern.stops[s])
                     .mapToObj(network.transitLayer.stopNames::get)
                     .collect(Collectors.joining(", "));
-            String message = String.format("Route %s direction %s after stop %s", routeInfo.getName(), tripPattern.directionId, stopNames);
+            // Report route name here rather than ID, as the name is better defined on routes created by modifications.
+            String message = String.format("Route %s direction %s after stop %s",
+                    routeInfo.getName(), tripPattern.directionId, stopNames);
             addInfo(message);
             LOG.info(message);
             return true;
         });
-
         // Store the resulting precomputed information in a SelectedLink instance on the TransportNetwork.
         // This could also be on the TransitLayer, but we may eventually want to include street edges in SelectedLink.
         network.selectedLink = new SelectedLink(network.transitLayer, hopsInTripPattern);

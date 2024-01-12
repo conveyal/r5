@@ -9,6 +9,11 @@ import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import org.geotools.referencing.GeodeticCalculator;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateSequence;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.LineSegment;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
@@ -23,6 +28,7 @@ import java.util.stream.Collectors;
 import static com.conveyal.r5.common.GeometryUtils.envelopeForCircle;
 import static com.conveyal.r5.common.GeometryUtils.polygonForEnvelope;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static org.geotools.referencing.crs.DefaultGeographicCRS.WGS84;
 
 /**
  * This custom Modification restricts CSV path output to only include transit passing through a specified rectangle.
@@ -42,6 +48,10 @@ public class SelectLink extends Modification {
 
     public double radiusMeters;
 
+    public double headingDegrees = Double.NaN;
+
+    public double headingTolerance = 45;
+
     /// Private derived fields used in subsequent calculations.
 
     private Polygon boxPolygon;
@@ -51,6 +61,8 @@ public class SelectLink extends Modification {
     private int nPatternsWithoutShapes = 0;
 
     private int nPatternsWithoutGtfs = 0;
+
+    private boolean matchHeading;
 
     @Override
     public boolean resolve(TransportNetwork network) {
@@ -70,6 +82,16 @@ public class SelectLink extends Modification {
             GTFSFeed feed = feedForUnscopedId.get(feedId);
             if (feed == null) {
                 addError("Could not find feed for ID " + feedId);
+            }
+        }
+        // TODO use heading tolerance of 180 to mean "any direction".
+        if (Double.isFinite(headingDegrees)) {
+            matchHeading = true;
+            if (headingDegrees < 0 || headingDegrees >= 360) {
+                addError("Heading must be in the range [0...360).");
+            }
+            if (!Double.isFinite(headingDegrees) || headingTolerance <= 0 || headingTolerance > 80) {
+                addError("Heading tolerance must be in the range (0...80].");
             }
         }
         return hasErrors();
@@ -108,7 +130,7 @@ public class SelectLink extends Modification {
             TIntArrayList intersectedHops = new TIntArrayList();
             for (int hop = 0; hop < hopGeometries.size(); hop++) {
                 LineString hopGeometry = hopGeometries.get(hop);
-                if (boxPolygon.intersects(hopGeometry)) {
+                if (boxPolygon.intersects(hopGeometry) && headingMatches(hopGeometry)) {
                     intersectedHops.add(hop);
                 }
             }
@@ -151,6 +173,44 @@ public class SelectLink extends Modification {
         // This could also be on the TransitLayer, but we may eventually want to include street edges in SelectedLink.
         network.selectedLink = new SelectedLink(network.transitLayer, hopsInTripPattern);
         return hasErrors();
+    }
+
+    /**
+     * NOTE this depends entirely on the hop geometries being directional, in the direction of vehicle movement.
+     * In shapes from GTFS feeds, this depends on shape_dist_traveled increasing as stop_sequence increases on a trip.
+     * This seems to be a requirement in the GTFS spec but could stand to be reworded for clarity:
+     * https://gtfs.org/schedule/reference/#shapestxt
+     * We also don't seem to validate this requirement when we load GTFS or add shapes to a TripPattern.
+     */
+    private boolean headingMatches (LineString hopGeometry) {
+        if (!matchHeading) {
+            return true;
+        }
+        // First cut out only the part of the lineString that's inside the area of interest.
+        Geometry intersection = boxPolygon.intersection(hopGeometry);
+        if (intersection instanceof LineString fragment) {
+            // Iterate over line segments, check if any inside the bounding box match heading.
+            GeodeticCalculator geodeticCalculator = new GeodeticCalculator(WGS84);
+            CoordinateSequence coords = fragment.getCoordinateSequence();
+            for (int i = 0; i < coords.size() - 1; i++) {
+                Coordinate c0 = coords.getCoordinate(i);
+                Coordinate c1 = coords.getCoordinate(i + 1);
+                geodeticCalculator.setStartingGeographicPoint(c0.x, c0.y);
+                geodeticCalculator.setDestinationGeographicPoint(c1.x, c1.y);
+                double azimuth = geodeticCalculator.getAzimuth();
+                double delta = (headingDegrees - azimuth) % 360;
+                if (delta > 180) {
+                    delta = 360 - delta;
+                }
+                // LOG.info("Target {} measured {} diff {}", headingDegrees, azimuth, delta);
+                if (delta <= headingTolerance) {
+                    return true;
+                }
+            }
+        } else {
+            LOG.warn("Intersection yielded non-linestring type " + intersection.getGeometryType());
+        }
+        return false;
     }
 
     // By returning false for both affects methods, we make a very shallow copy of the TransitNetwork for efficiency.

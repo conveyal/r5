@@ -37,6 +37,8 @@ public class RouteSequence {
             routeIds.add(transitLayer.routeString(routes.get(i), false));
             boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), false));
             alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), false));
+            alightStopIds.add(":");
+            alightStopIds.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);

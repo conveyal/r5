@@ -842,4 +842,8 @@ public class TransitLayer implements Serializable, Cloneable {
         if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
         return stop;
     }
+
+    public String feedFromStop(int stopIndex) {
+        return stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[0];
+    }
 }

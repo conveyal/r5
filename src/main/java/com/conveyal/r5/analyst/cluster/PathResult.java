@@ -53,6 +53,7 @@ public class PathResult {
             "routes",
             "boardStops",
             "alightStops",
+            "feedIds",
             "rideTimes",
             "accessTime",
             "egressTime",

@@ -34,7 +34,7 @@ public class MultistageTraversalTimeCalculator implements TraversalTimeCalculato
     public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
         final int baseTraversalTimeSeconds = base.traversalTimeSeconds(currentEdge, streetMode, req);
         int t = baseTraversalTimeSeconds;
-        if (!streetMode.equals(StreetMode.CAR)) {
+        if (!StreetMode.CAR.equals(streetMode)) {
             for (CostField costField : costFields) {
                 t += costField.additionalTraversalTimeSeconds(currentEdge, baseTraversalTimeSeconds);
             }

@@ -21,6 +21,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.net.HttpHeaders;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -35,11 +36,18 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -166,7 +174,7 @@ public class RegionalAnalysisController implements HttpController {
     ) throws IOException {
         String regionalAnalysisId = analysis._id;
         int cutoffMinutes = analysis.cutoffsMinutes != null ? analysis.cutoffsMinutes[cutoffIndex] : analysis.cutoffMinutes;
-        LOG.debug(
+        LOG.info(
             "Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {} in format {}.",
             cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
         );
@@ -228,6 +236,58 @@ public class RegionalAnalysisController implements HttpController {
 
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
         }
+        return singleCutoffFileStorageKey;
+    }
+
+    private Object getAllRegionalResults (Request req, Response res) throws IOException {
+        // Get the UUID of the regional analysis for which we want the output data.
+        final String regionalAnalysisId = req.params("_id");
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(req.params("_id")).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                UserPermissions.from(req)
+        ).iterator().next();
+        if (analysis == null || analysis.deleted) {
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+        }
+        List<FileStorageKey> fileStorageKeys = new ArrayList<>();
+        if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
+            throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
+        }
+        for (String destinationPointSetId : analysis.destinationPointSetIds) {
+            for (int cutoffIndex = 0; cutoffIndex < analysis.cutoffsMinutes.length; cutoffIndex++) {
+                for (int percentile : analysis.travelTimePercentiles) {
+                    FileStorageKey fileStorageKey = getSingleCutoffGrid(
+                        analysis,
+                        cutoffIndex,
+                        destinationPointSetId,
+                        percentile,
+                        FileStorageFormat.GEOTIFF
+                    );
+                    fileStorageKeys.add(fileStorageKey);
+                }
+            }
+        }
+        File tempZipFile = File.createTempFile("regional", ".zip");
+        tempZipFile.delete(); // FIXME: zipfs doesn't work on existing empty files, the file has to not exist.
+        tempZipFile.deleteOnExit();
+        Map<String, String> env = Map.of("create", "true");
+        URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
+        try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
+            for (FileStorageKey fileStorageKey : fileStorageKeys) {
+                Path storagePath = fileStorage.getFile(fileStorageKey).toPath();
+                Path zipPath = zipFilesystem.getPath(storagePath.getFileName().toString());
+                Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, analysis._id + "_ALL.zip");
+        fileStorage.moveIntoStorage(fileStorageKey, tempZipFile);
+        String humanReadableName = analysis.name + ".zip";
+        res.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"%s\"".formatted(humanReadableName));
+        return JsonUtil.toJsonString(JsonUtil.objectNode()
+            .put("url", fileStorage.getURL(fileStorageKey))
+            .put("name", humanReadableName)
+        );
     }
 
     /**
@@ -563,6 +623,7 @@ public class RegionalAnalysisController implements HttpController {
         sparkService.path("/api/regional", () -> {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id", this::getRegionalAnalysis);
+            sparkService.get("/:_id/all", this::getAllRegionalResults);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults);
             sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
             sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);

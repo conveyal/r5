@@ -527,8 +527,11 @@ public class RegionalAnalysisController implements HttpController {
      * the given regional analysis.
      */
     private JsonNode getScenarioJsonUrl (Request request, Response response) {
-        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
-                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.findByIdIfPermitted(
+                request.params("_id"),
+                DBProjection.exclude("request.scenario.modifications"),
+                UserPermissions.from(request)
+        );
         // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
         final String networkId = regionalAnalysis.bundleId;
         final String scenarioId = regionalAnalysis.request.scenarioId;

@@ -34,7 +34,7 @@ public class TigerLineSource {
         for (SimpleFeatureIterator it = sfc.features(); it.hasNext();) {
             GeobufFeature feat = new GeobufFeature(it.next());
             feat.id = null;
-            feat.numericId = Long.parseLong((String) feat.properties.get("GEOID10"));
+            feat.numericId = Long.parseLong((String) feat.properties.get("GEOID20"));
             feat.properties = new HashMap<>();
             store.add(feat);
         }

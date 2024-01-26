@@ -43,12 +43,11 @@ public class MongoMap<V extends Model> {
         return (int) wrappedCollection.getCount();
     }
 
-    public V findByIdFromRequestIfPermitted(Request request) {
-        return findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
-    }
-
-    public V findByIdIfPermitted(String id, UserPermissions userPermissions) {
-        V result = wrappedCollection.findOneById(id);
+    /**
+     * `fields` is nullable.
+     */
+    public V findByIdIfPermitted(String id, DBObject fields, UserPermissions userPermissions) {
+        V result = wrappedCollection.findOneById(id, fields);
 
         if (result == null) {
             throw AnalysisServerException.notFound(String.format(
@@ -59,6 +58,14 @@ public class MongoMap<V extends Model> {
         } else {
             return result;
         }
+    }
+
+    public V findByIdIfPermitted(String id, UserPermissions userPermissions) {
+        return findByIdIfPermitted(id, null, userPermissions);
+    }
+
+    public V findByIdFromRequestIfPermitted(Request request) {
+        return findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
     }
 
     public V get(String key) {

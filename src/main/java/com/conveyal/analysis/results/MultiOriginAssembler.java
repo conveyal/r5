@@ -7,6 +7,8 @@ import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
@@ -89,21 +91,27 @@ public class MultiOriginAssembler {
             this.job = job;
             this.nOriginsTotal = job.nTasksTotal;
             this.originsReceived = new BitSet(job.nTasksTotal);
-            // Check that origin and destination sets are not too big for generating CSV files.
-            if (!job.templateTask.makeTauiSite &&
-                 job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
-            ) {
-               // This requires us to have already loaded this destination pointset instance into the transient field.
-                PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
-                if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
-                    if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
-                        destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
-                    ) {
-                        throw new AnalysisServerException(String.format(
-                            "Freeform requests limited to %d destinations and %d origin-destination pairs.",
-                            MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
-                        ));
-                    }
+            // If results have been requested for freeform origins, check that the origin and
+            // destination pointsets are not too big for generating CSV files.
+            RegionalTask task = job.templateTask;
+            if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+                // This requires us to have already loaded this destination pointset instance into the transient field.
+                PointSet destinationPointSet = task.destinationPointSets[0];
+                int nDestinations = destinationPointSet.featureCount();
+                int nODPairs = task.oneToOne ? nOriginsTotal : nOriginsTotal * nDestinations;
+                if (task.recordTimes &&
+                    (nDestinations > MAX_FREEFORM_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
+                    throw AnalysisServerException.badRequest(String.format(
+                       "Travel time results limited to %d destinations and %d origin-destination pairs.",
+                       MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                    ));
+                }
+                if (task.includePathResults &&
+                    (nDestinations > PathResult.MAX_PATH_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
+                    throw AnalysisServerException.badRequest(String.format(
+                        "Path results limited to %d destinations and %d origin-destination pairs.",
+                        PathResult.MAX_PATH_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                    ));
                 }
             }
 
@@ -152,8 +160,11 @@ public class MultiOriginAssembler {
                     regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
                 }
             }
+        } catch (AnalysisServerException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.stackTraceString(e));
+            // Handle any obscure problems we don't want end users to see without context of MultiOriginAssembler.
+            throw new RuntimeException("Exception while creating multi-origin assembler: " + e.toString(), e);
         }
     }
 

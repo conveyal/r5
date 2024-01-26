@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -156,105 +157,27 @@ public class RegionalAnalysisController implements HttpController {
         }
     }
 
-    /**
-     * This used to extract a particular percentile of a regional analysis as a grid file.
-     * Now it just gets the single percentile that exists for any one analysis, either from the local buffer file
-     * for an analysis still in progress, or from S3 for a completed analysis.
-     */
-    private Object getRegionalResults (Request req, Response res) throws IOException {
-
-        // Get some path parameters out of the URL.
-        // The UUID of the regional analysis for which we want the output data
-        final String regionalAnalysisId = req.params("_id");
-        // The response file format: PNG, TIFF, or GRID
-        final String fileFormatExtension = req.params("format");
-
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(req.params("_id")).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
-        ).iterator().next();
-
-        if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
-        }
-
-        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
-        // and multiple output files per analysis (for different percentiles of travel time and/or different
-        // destination pointsets). These initial values are for older regional analysis results with only a single
-        // cutoff, and no percentile or destination gridId in the file name.
-        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
-        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
-        int percentile = analysis.travelTimePercentile;
-        int cutoffMinutes = analysis.cutoffMinutes;
-        int cutoffIndex = 0;
-        String destinationPointSetId = analysis.grid;
-
-        // Handle newer regional analyses with multiple cutoffs in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
-        if (analysis.cutoffsMinutes != null) {
-            int nCutoffs = analysis.cutoffsMinutes.length;
-            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
-            cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
-            checkState(cutoffIndex >= 0,
-                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.cutoffsMinutes)
-            );
-        }
-
-        // Handle newer regional analyses with multiple percentiles in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        if (analysis.travelTimePercentiles != null) {
-            int nPercentiles = analysis.travelTimePercentiles.length;
-            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
-                    "Percentile for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.travelTimePercentiles));
-        }
-
-        // Handle even newer regional analyses with multiple destination pointsets per analysis.
-        if (analysis.destinationPointSetIds != null) {
-            int nGrids = analysis.destinationPointSetIds.length;
-            checkState(nGrids > 0, "Regional analysis has no grids.");
-            destinationPointSetId = req.queryParams("destinationPointSetId");
-            if (destinationPointSetId == null) {
-                destinationPointSetId = analysis.destinationPointSetIds[0];
-            }
-            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
-                    "Destination gridId must be one of: %s",
-                    String.join(",", analysis.destinationPointSetIds));
-        }
-
-        // We started implementing the ability to retrieve and display partially completed analyses.
-        // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
-
-        if (broker.findJob(regionalAnalysisId) != null) {
-            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
-        }
-
-        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
-        // aren't any (only CSV, because origins are freeform).
-        // How can we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
-
-        // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
-        LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
-                cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
-        FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
-        }
-
+    private FileStorageKey getSingleCutoffGrid (
+            RegionalAnalysis analysis,
+            int cutoffIndex,
+            String destinationPointSetId,
+            int percentile,
+            FileStorageFormat fileFormat
+    ) throws IOException {
+        String regionalAnalysisId = analysis._id;
+        int cutoffMinutes = analysis.cutoffsMinutes != null ? analysis.cutoffsMinutes[cutoffIndex] : analysis.cutoffMinutes;
+        LOG.debug(
+            "Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {} in format {}.",
+            cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
+        );
         // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
         // We do this even for results generated by older workers, so they will be re-extracted with the new name.
         // These grids are reasonably small, we may be able to just send all cutoffs to the UI instead of selecting.
-        String singleCutoffKey =
-                String.format("%s_%s_P%d_C%d.%s", regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, fileFormatExtension);
-
-        // A lot of overhead here - UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        String singleCutoffKey = String.format(
+            "%s_%s_P%d_C%d.%s",
+            regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes,
+            fileFormat.extension.toLowerCase(Locale.ROOT)
+        );
         FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
         if (!fileStorage.exists(singleCutoffFileStorageKey)) {
             // An accessibility grid for this particular cutoff has apparently never been extracted from the
@@ -288,10 +211,10 @@ public class RegionalAnalysisController implements HttpController {
             InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
             Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
 
-            File localFile = FileUtils.createScratchFile(format.toString());
+            File localFile = FileUtils.createScratchFile(fileFormat.toString());
             FileOutputStream fos = new FileOutputStream(localFile);
 
-            switch (format) {
+            switch (fileFormat) {
                 case GRID:
                     grid.write(new GZIPOutputStream(fos));
                     break;
@@ -305,6 +228,95 @@ public class RegionalAnalysisController implements HttpController {
 
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
         }
+    }
+
+    /**
+     * This used to extract a particular percentile of a regional analysis as a grid file.
+     * Now it just gets the single percentile that exists for any one analysis, either from the local buffer file
+     * for an analysis still in progress, or from S3 for a completed analysis.
+     */
+    private Object getRegionalResults (Request req, Response res) throws IOException {
+
+        // Get some path parameters out of the URL.
+        // The UUID of the regional analysis for which we want the output data
+        final String regionalAnalysisId = req.params("_id");
+        // The response file format: PNG, TIFF, or GRID
+        final String fileFormatExtension = req.params("format"); // FIXME this may be case sensitive (could make multiple files for different requests)
+
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(req.params("_id")).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                UserPermissions.from(req)
+        ).iterator().next();
+
+        if (analysis == null || analysis.deleted) {
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+        }
+
+        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
+        // and multiple output files per analysis (for different percentiles of travel time and/or different
+        // destination pointsets). These initial values are for older regional analysis results with only a single
+        // cutoff, and no percentile or destination gridId in the file name.
+        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
+        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
+        int percentile = analysis.travelTimePercentile;
+        int cutoffIndex = 0; // For old single-cutoff outputs, we can still select the zeroth grid.
+        String destinationPointSetId = analysis.grid;
+
+        // Handle newer regional analyses with multiple cutoffs in an array.
+        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
+        // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
+        if (analysis.cutoffsMinutes != null) {
+            int nCutoffs = analysis.cutoffsMinutes.length;
+            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
+            int cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
+            cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
+            checkState(cutoffIndex >= 0,
+                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
+                    Ints.join(", ", analysis.cutoffsMinutes)
+            );
+        }
+
+        // Handle newer regional analyses with multiple percentiles in an array.
+        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
+        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
+        if (analysis.travelTimePercentiles != null) {
+            int nPercentiles = analysis.travelTimePercentiles.length;
+            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
+            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
+            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
+                    "Percentile for this regional analysis must be taken from this list: (%s)",
+                    Ints.join(", ", analysis.travelTimePercentiles));
+        }
+
+        // Handle even newer regional analyses with multiple destination pointsets per analysis.
+        if (analysis.destinationPointSetIds != null) {
+            int nGrids = analysis.destinationPointSetIds.length;
+            checkState(nGrids > 0, "Regional analysis has no grids.");
+            destinationPointSetId = req.queryParams("destinationPointSetId");
+            if (destinationPointSetId == null) {
+                destinationPointSetId = analysis.destinationPointSetIds[0];
+            }
+            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
+                    "Destination gridId must be one of: %s",
+                    String.join(",", analysis.destinationPointSetIds));
+        }
+        // We started implementing the ability to retrieve and display partially completed analyses.
+        // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
+        if (broker.findJob(regionalAnalysisId) != null) {
+            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
+        }
+        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        //       aren't any (only CSV, because origins are freeform).
+        // How should we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
+        FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
+        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
+            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
+        }
+        // Process has a lot of overhead: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        FileStorageKey singleCutoffFileStorageKey = getSingleCutoffGrid(
+                analysis, cutoffIndex, destinationPointSetId, percentile, format
+        );
         return JsonUtil.toJsonString(
                 JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
         );

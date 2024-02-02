@@ -160,6 +160,9 @@ public class SelectedLink {
 
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+    /** A unique identifier distinguishing this SelectedLink from all others being used at the same time. */
+    public final String label;
+
     /**
      * Contains all TripPattern inter-stop hops that pass through the selected link area for fast hash-based lookup.
      * Keys are the index of a TripPattern in the TransitLayer, and values are arrays of stop positions within that
@@ -179,7 +182,8 @@ public class SelectedLink {
      */
     private final TransitLayer transitLayer;
 
-    public SelectedLink(TransitLayer transitLayer, TIntObjectMap<int[]> hopsInTripPattern) {
+    public SelectedLink(String label, TransitLayer transitLayer, TIntObjectMap<int[]> hopsInTripPattern) {
+        this.label = label;
         this.transitLayer = transitLayer;
         this.hopsInTripPattern = hopsInTripPattern;
     }

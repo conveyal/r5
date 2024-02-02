@@ -62,7 +62,13 @@ public class PathResult {
      * as long as every path is being retained. When filtering down to a subset of paths, such as only those passing
      * through a selected link, we need this additional array to retain the information.
      */
-    private final int[] nUnfilteredIterationsReachingDestination;
+    private int[] nUnfilteredIterationsReachingDestination;
+
+    /**
+     * In case the scenario includes multiple select-link modifications, we store separate groups of patterns
+     * for each selected link, at each destination.
+     */
+    private List<Multimap<RouteSequence, Iteration>>[] iterationsForEachSelectedLink;
 
     private final TransitLayer transitLayer;
 
@@ -91,9 +97,12 @@ public class PathResult {
                 throw new UnsupportedOperationException("Number of detailed path destinations exceeds limit of " + MAX_PATH_DESTINATIONS);
             }
         }
-        // FIXME should we be allocating these large arrays when not recording paths?
         iterationsForPathTemplates = new Multimap[nDestinations];
-        nUnfilteredIterationsReachingDestination = new int[nDestinations];
+        // Only allocate these large arrays when select-link modifications are present.
+        if (transitLayer.parentNetwork.selectedLinks != null) {
+            nUnfilteredIterationsReachingDestination = new int[nDestinations];
+            iterationsForEachSelectedLink = new ArrayList[nDestinations];
+        }
         this.transitLayer = transitLayer;
     }
 
@@ -102,21 +111,36 @@ public class PathResult {
      * pattern-based keys
      */
     public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
-        // The size of a multimap is the number of mappings (number of values), not number of unique keys.
-        // This size method appears to be O(1), see: com.google.common.collect.AbstractMapBasedMultimap.size
-        nUnfilteredIterationsReachingDestination[targetIndex] = patterns.size();
-
         // When selected link analysis is enabled, filter down the PatternSequence-Iteration Multimap to retain only
         // those keys passing through the selected links.
         // Maybe selectedLink instance should be on TransitLayer not TransportNetwork.
-        if (transitLayer.parentNetwork.selectedLink != null) {
-            patterns = transitLayer.parentNetwork.selectedLink.filterPatterns(patterns);
+        if (transitLayer.parentNetwork.selectedLinks != null) {
+            // The size of a multimap is the number of mappings (number of values), not number of unique keys.
+            // This size method appears to be O(1), see: com.google.common.collect.AbstractMapBasedMultimap.size
+            nUnfilteredIterationsReachingDestination[targetIndex] = patterns.size();
+            // Unfortunate Java "effectively final" silliness, but older iteration style gets ugly here too.
+            final var finalPatterns = patterns;
+            iterationsForEachSelectedLink[targetIndex] = transitLayer.parentNetwork.selectedLinks.stream()
+                    .map(selectedLink -> selectedLink.filterPatterns(finalPatterns))
+                    .map(this::collapsePatternsToRoutes)
+                    .collect(Collectors.toList());
+            // Combining all the iterations from many select-links is tricky or nonsensical. They represent different
+            // locations with different proportions of iterations passing through them, possibly grouped differently
+            // into routes. It's probably best to list the non-summed iterations separately for each select-link.
+        } else {
+            // Standard case: no SelectedLink filtered down the patterns-iterations map. These maps will be left
+            // null if the filtering did happen, to clearly distinguish between the two cases.
+            iterationsForPathTemplates[targetIndex] = collapsePatternsToRoutes(patterns);
         }
+    }
 
-        // The rest of this runs independent of whether a SelectedLink filtered down the patterns-iterations map.
-        Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
+    // Cannot be static as it uses the transitlayer field to look up routes.
+    private Multimap<RouteSequence, Iteration> collapsePatternsToRoutes (
+            Multimap<PatternSequence, Iteration> patterns
+    ) {
+        final Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
         patterns.forEach(((patternSeq, iteration) -> routes.put(new RouteSequence(patternSeq, transitLayer), iteration)));
-        iterationsForPathTemplates[targetIndex] = routes;
+        return routes;
     }
 
     /**
@@ -131,18 +155,22 @@ public class PathResult {
     public ArrayList<String[]>[] summarizeIterations(Stat stat) {
         ArrayList<String[]>[] summary = new ArrayList[nDestinations];
         for (int d = 0; d < nDestinations; d++) {
+            // Hold all the summary CSV rows for this particular destination
             summary[d] = new ArrayList<>();
-            Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
-            if (iterationMap != null) {
-                // SelectedLink case: collapse all RouteSequences and Iterations for this OD pair into one to simplify.
-                // iterationMap is empty (not null) for destinations that were reached without using the selected link.
-                // This could also be done by merging all Iterations under a single RouteSequence with all route IDs.
-                if (transitLayer.parentNetwork.selectedLink != null) {
+            // SelectedLink case: collapse all RouteSequences and Iterations for this OD pair into one to simplify.
+            // iterationMap is empty (not null) for destinations that were reached without using the selected link.
+            // This could also be done by merging all Iterations under a single RouteSequence with all route IDs.
+            // Looks like array may be non-null but with null values if transit search fails (no origin linkage).
+            if (iterationsForEachSelectedLink != null && iterationsForEachSelectedLink[d] != null) {
+                // TODO transpose to list of arrays instead of array of lists, factor selectedLink iteration outside this method call
+                int n = 0; // TODO handle this list-zip better (Streams.zip())
+                for (var patternsForSelectedLink : iterationsForEachSelectedLink[d]) {
+                    String selectedLinkLabel = transitLayer.parentNetwork.selectedLinks.get(n++).label;
                     int nIterations = 0;
                     TIntSet allRouteIds = new TIntHashSet();
                     double summedTotalTime = 0;
-                    for (RouteSequence routeSequence: iterationMap.keySet()) {
-                        Collection<Iteration> iterations = iterationMap.get(routeSequence);
+                    for (RouteSequence routeSequence : patternsForSelectedLink.keySet()) {
+                        Collection<Iteration> iterations = patternsForSelectedLink.get(routeSequence);
                         nIterations += iterations.size();
                         allRouteIds.addAll(routeSequence.routes);
                         summedTotalTime += iterations.stream().mapToInt(i -> i.totalTime).sum();
@@ -161,22 +189,29 @@ public class PathResult {
                             .mapToObj(ri -> transitLayer.routeString(ri, true))
                             .collect(Collectors.joining("|"));
                     String iterationProportion = "%.3f".formatted(
-                            nIterations / (double)(nUnfilteredIterationsReachingDestination[d]));
-                    row[0] = allRouteIdsPipeSeparated;
+                            nIterations / (double) (nUnfilteredIterationsReachingDestination[d]));
+                    row[0] = selectedLinkLabel + ": " + allRouteIdsPipeSeparated;
                     row[row.length - 1] = iterationProportion;
                     // Report average of total time over all retained iterations, different than mean/min approach below.
                     row[row.length - 2] = String.format("%.1f", summedTotalTime / nIterations / 60d);
                     summary[d].add(row);
-                    // Fall through to the standard case below, so the summary row is followed by its component parts.
-                    // We could optionally continue to the next loop iteration here, to return only the summary row.
+                    // TODO call the standard case below, so the summary row is followed by its component parts.
+                    // We could optionally continue to the next outer for loop iteration here, to return only the summary row.
                 }
-                // Standard (non SelectedLink) case.
+            }
+            // Standard (non SelectedLink) case.
+            Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
+            // It looks like this could just be: if (iterationmap == null) continue; (to clarify without indentation)
+            // When some destinations are reached, any unreached ones are empty maps rather than nulls. They will be
+            // null if no search happens at all (origin is not connected to network) in which case maybe we should skip
+            // this step. This makes and stores an array of CSV rows as arrayLists, one for each destination.
+            if (iterationMap != null) {
                 for (RouteSequence routeSequence: iterationMap.keySet()) {
                     Collection<Iteration> iterations = iterationMap.get(routeSequence);
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
                     String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer);
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, true);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {

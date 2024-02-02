@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,8 @@ public class SelectLink extends Modification {
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
     /// Public fields supplied on the custom modification.
+
+    public String label; // Fall back on comment if not present
 
     public double lon;
 
@@ -93,6 +96,9 @@ public class SelectLink extends Modification {
             if (!Double.isFinite(headingDegrees) || headingTolerance <= 0 || headingTolerance > 80) {
                 addError("Heading tolerance must be in the range (0...80].");
             }
+        }
+        if (label == null) {
+            label = comment;
         }
         return hasErrors();
     }
@@ -171,7 +177,10 @@ public class SelectLink extends Modification {
         });
         // Store the resulting precomputed information in a SelectedLink instance on the TransportNetwork.
         // This could also be on the TransitLayer, but we may eventually want to include street edges in SelectedLink.
-        network.selectedLink = new SelectedLink(network.transitLayer, hopsInTripPattern);
+        if (network.selectedLinks == null) {
+            network.selectedLinks = new ArrayList();
+        }
+        network.selectedLinks.add(new SelectedLink(label, network.transitLayer, hopsInTripPattern));
         return hasErrors();
     }
 

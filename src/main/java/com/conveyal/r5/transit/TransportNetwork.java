@@ -99,7 +99,7 @@ public class TransportNetwork implements Serializable {
      * potentially fuzzy floating point geometries, and need to be retained across many requests, so it's modeled as a
      * scenario modification. This is not ideal but it works. This modification can be applied at network build time.
      */
-    public transient SelectedLink selectedLink;
+    public transient List<SelectedLink> selectedLinks;
 
     /**
      * Build some simple derived index tables that are not serialized with the network.

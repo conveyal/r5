@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit.path;
 
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -8,6 +9,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.StringJoiner;
+
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_AND_NAME;
 
 /** A door-to-door path that includes the routes ridden between stops */
 public class RouteSequence {
@@ -28,15 +31,15 @@ public class RouteSequence {
     }
 
     /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
-    public String[] detailsWithGtfsIds(TransitLayer transitLayer, boolean includeNames){
+    public String[] detailsWithGtfsIds (TransitLayer transitLayer, EntityRepresentation nameOrId){
         StringJoiner routeIds = new StringJoiner("|");
         StringJoiner boardStopIds = new StringJoiner("|");
         StringJoiner alightStopIds = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), includeNames));
-            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), includeNames));
-            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), includeNames));
+            routeIds.add(transitLayer.routeString(routes.get(i), nameOrId));
+            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), nameOrId));
+            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), nameOrId));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
@@ -55,9 +58,9 @@ public class RouteSequence {
     public Collection<TransitLeg> transitLegs(TransitLayer transitLayer) {
         Collection<TransitLeg> transitLegs = new ArrayList<>();
         for (int i = 0; i < routes.size(); i++) {
-            String routeString = transitLayer.routeString(routes.get(i), true);
-            String boardStop = transitLayer.stopString(stopSequence.boardStops.get(i), true);
-            String alightStop = transitLayer.stopString(stopSequence.alightStops.get(i), true);
+            String routeString = transitLayer.routeString(routes.get(i), ID_AND_NAME);
+            String boardStop = transitLayer.stopString(stopSequence.boardStops.get(i), ID_AND_NAME);
+            String alightStop = transitLayer.stopString(stopSequence.alightStops.get(i), ID_AND_NAME);
             transitLegs.add(new TransitLeg(routeString, stopSequence.rideTimesSeconds.get(i), boardStop, alightStop));
         }
         return transitLegs;

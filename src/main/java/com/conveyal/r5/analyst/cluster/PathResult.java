@@ -19,6 +19,9 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_AND_NAME;
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_ONLY;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -47,7 +50,10 @@ public class PathResult {
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
     public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+
     private final TransitLayer transitLayer;
+
+    private TransitLayer.EntityRepresentation nameOrId;
 
     public static final String[] DATA_COLUMNS = new String[]{
             "routes",
@@ -76,6 +82,17 @@ public class PathResult {
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
+        if (task.flags == null) {
+            nameOrId = ID_ONLY;
+        } else {
+            boolean includeEntityNames = task.flags.contains("csv_names");
+            boolean includeEntityIds = !task.flags.contains("csv_no_ids");
+            if (includeEntityIds && includeEntityNames) {
+                this.nameOrId = ID_AND_NAME;
+            } else if (includeEntityNames) {
+                this.nameOrId = NAME_ONLY;
+            }
+        }
     }
 
     /**
@@ -108,7 +125,7 @@ public class PathResult {
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
                     String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, true);
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, nameOrId);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {

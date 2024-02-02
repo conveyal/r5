@@ -8,6 +8,7 @@ import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
@@ -20,8 +21,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.net.HttpHeaders;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -46,20 +45,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.file.UrlWithHumanName.filenameCleanString;
 import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
+import static org.eclipse.jetty.http.MimeTypes.Type.TEXT_HTML;
 
 /**
  * Spark HTTP handler methods that allow launching new regional analyses, as well as deleting them and fetching
@@ -328,28 +328,15 @@ public class RegionalAnalysisController implements HttpController {
             }
             fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
         }
-        String humanReadableZipName = friendlyAnalysisName + ".zip";
-        res.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"%s\"".formatted(humanReadableZipName));
-        return JsonUtil.toJsonString(JsonUtil.objectNode()
-            .put("url", fileStorage.getURL(zippedResultsKey))
-            .put("name", humanReadableZipName)
-        );
-    }
-
-    private String filenameCleanString (String original) {
-        String ret = original.replaceAll("\\W+", "_");
-        if (ret.length() > 20) {
-            ret = ret.substring(0, 20);
-        }
-        return ret;
+//        res.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"%s\"".formatted(humanReadableZipName));
+        res.type(APPLICATION_JSON.asString());
+        return fileStorage.getJsonUrl(zippedResultsKey, analysis.name, "zip");
     }
 
     /**
      * This used to extract a particular percentile of a regional analysis as a grid file.
-     * Now it just gets the single percentile that exists for any one analysis, either from the local buffer file
-     * for an analysis still in progress, or from S3 for a completed analysis.
      */
-    private Object getRegionalResults (Request req, Response res) throws IOException {
+    private UrlWithHumanName getRegionalResults (Request req, Response res) throws IOException {
 
         // Get some path parameters out of the URL.
         // The UUID of the regional analysis for which we want the output data
@@ -431,12 +418,20 @@ public class RegionalAnalysisController implements HttpController {
         FileStorageKey singleCutoffFileStorageKey = getSingleCutoffGrid(
                 analysis, cutoffIndex, destinationPointSetId, percentile, format
         );
-        return JsonUtil.toJsonString(
-                JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
-        );
+        res.type(APPLICATION_JSON.asString());
+        // Substitute human readable name and shorten destination UUID.
+        // TODO better system for resolving UUID to human readable names in single and multi-grid cases
+        //      Or maybe only allow multi-grid download for saving by end user, and single grid is purely internal.
+        int firstUnderscore = singleCutoffFileStorageKey.path.indexOf('_');
+        int secondUnderscore = singleCutoffFileStorageKey.path.indexOf('_', firstUnderscore + 1);
+        int lastDot = singleCutoffFileStorageKey.path.lastIndexOf('.');
+        String humanName = analysis.name +
+                singleCutoffFileStorageKey.path.substring(firstUnderscore, firstUnderscore + 6) +
+                singleCutoffFileStorageKey.path.substring(secondUnderscore, lastDot);
+        return fileStorage.getJsonUrl(singleCutoffFileStorageKey, humanName, format.extension);
     }
 
-    private String getCsvResults (Request req, Response res) {
+    private Object getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
         final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
         // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
@@ -458,7 +453,10 @@ public class RegionalAnalysisController implements HttpController {
 
         FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, storageKey);
 
-        res.type("text/plain");
+        // TODO handle JSON with human name on UI side
+        // res.type(APPLICATION_JSON.asString());
+        // return fileStorage.getJsonUrl(fileStorageKey, analysis.name, resultType + ".csv");
+        res.type(TEXT_HTML.asString());
         return fileStorage.getURL(fileStorageKey);
     }
 
@@ -652,7 +650,7 @@ public class RegionalAnalysisController implements HttpController {
      * Return a JSON-wrapped URL for the file in FileStorage containing the JSON representation of the scenario for
      * the given regional analysis.
      */
-    private JsonNode getScenarioJsonUrl (Request request, Response response) {
+    private UrlWithHumanName getScenarioJsonUrl (Request request, Response response) {
         RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.findByIdIfPermitted(
                 request.params("_id"),
                 DBProjection.exclude("request.scenario.modifications"),
@@ -663,9 +661,9 @@ public class RegionalAnalysisController implements HttpController {
         final String scenarioId = regionalAnalysis.request.scenarioId;
         checkNotNull(networkId, "RegionalAnalysis did not contain a network ID.");
         checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
-        String scenarioUrl = fileStorage.getURL(
-                new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
-        return JsonUtil.objectNode().put("url", scenarioUrl);
+        FileStorageKey scenarioKey = new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId));
+        response.type(APPLICATION_JSON.asString());
+        return fileStorage.getJsonUrl(scenarioKey, regionalAnalysis.name, "scenario.json");
     }
 
     @Override
@@ -676,11 +674,12 @@ public class RegionalAnalysisController implements HttpController {
         });
         sparkService.path("/api/regional", () -> {
             // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
+            // Wait, do we have any endpoints that write grids into responses? It looks like they all return URLs now.
             sparkService.get("/:_id", this::getRegionalAnalysis);
-            sparkService.get("/:_id/all", this::getAllRegionalResults);
-            sparkService.get("/:_id/grid/:format", this::getRegionalResults);
-            sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
-            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
+            sparkService.get("/:_id/all", this::getAllRegionalResults, toJson);
+            sparkService.get("/:_id/grid/:format", this::getRegionalResults, toJson);
+            sparkService.get("/:_id/csv/:resultType", this::getCsvResults, toJson);
+            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl, toJson);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
             sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);

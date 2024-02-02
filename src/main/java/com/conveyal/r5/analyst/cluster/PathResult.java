@@ -7,6 +7,7 @@ import com.conveyal.r5.transit.path.PatternSequence;
 import com.conveyal.r5.transit.path.RouteSequence;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
@@ -25,6 +26,7 @@ import java.util.StringJoiner;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.common.Util.newFixedSizeList;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -65,10 +67,10 @@ public class PathResult {
     private int[] nUnfilteredIterationsReachingDestination;
 
     /**
-     * In case the scenario includes multiple select-link modifications, we store separate groups of patterns
-     * for each selected link, at each destination.
+     * In case the scenario includes multiple select-link modifications, for each selected link we store separate
+     * groups of iterations at each destination.
      */
-    private List<Multimap<RouteSequence, Iteration>>[] iterationsForEachSelectedLink;
+    private List<Multimap<RouteSequence, Iteration>[]> iterationsForDestinationForSelectedLink;
 
     private final TransitLayer transitLayer;
 
@@ -101,152 +103,199 @@ public class PathResult {
         // Only allocate these large arrays when select-link modifications are present.
         if (transitLayer.parentNetwork.selectedLinks != null) {
             nUnfilteredIterationsReachingDestination = new int[nDestinations];
-            iterationsForEachSelectedLink = new ArrayList[nDestinations];
+            iterationsForDestinationForSelectedLink = newFixedSizeList(
+                    transitLayer.parentNetwork.selectedLinks.size(),
+                    () -> new Multimap[nDestinations]
+            );
         }
         this.transitLayer = transitLayer;
     }
 
     /**
      * Populate the multimap of path templates to iterations, reducing by using route-based keys instead of
-     * pattern-based keys
+     * pattern-based keys.
+     * TODO maybe we should be converting this to its final CSV form in a streaming manner instead of storing it.
      */
     public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
         // When selected link analysis is enabled, filter down the PatternSequence-Iteration Multimap to retain only
         // those keys passing through the selected links.
         // Maybe selectedLink instance should be on TransitLayer not TransportNetwork.
-        if (transitLayer.parentNetwork.selectedLinks != null) {
+        final var selectedLinks = transitLayer.parentNetwork.selectedLinks;
+        if (selectedLinks != null) {
             // The size of a multimap is the number of mappings (number of values), not number of unique keys.
             // This size method appears to be O(1), see: com.google.common.collect.AbstractMapBasedMultimap.size
             nUnfilteredIterationsReachingDestination[targetIndex] = patterns.size();
-            // Unfortunate Java "effectively final" silliness, but older iteration style gets ugly here too.
-            final var finalPatterns = patterns;
-            iterationsForEachSelectedLink[targetIndex] = transitLayer.parentNetwork.selectedLinks.stream()
-                    .map(selectedLink -> selectedLink.filterPatterns(finalPatterns))
-                    .map(this::collapsePatternsToRoutes)
-                    .collect(Collectors.toList());
+            for (int i = 0; i < selectedLinks.size(); i++) {
+                var selectedLink = selectedLinks.get(i);
+                var iterationsForDestination = iterationsForDestinationForSelectedLink.get(i);
+                iterationsForDestination[targetIndex] = collapsePatternsToRoutes(selectedLink.filterPatterns(patterns));
+            }
             // Combining all the iterations from many select-links is tricky or nonsensical. They represent different
             // locations with different proportions of iterations passing through them, possibly grouped differently
             // into routes. It's probably best to list the non-summed iterations separately for each select-link.
         } else {
-            // Standard case: no SelectedLink filtered down the patterns-iterations map. These maps will be left
-            // null if the filtering did happen, to clearly distinguish between the two cases.
+            // Standard case: no SelectedLink filtered down the patterns-iterations map. The elements of this array
+            // will be left null if the filtering did happen, clearly distinguishing between the two cases.
             iterationsForPathTemplates[targetIndex] = collapsePatternsToRoutes(patterns);
         }
     }
 
-    // Cannot be static as it uses the transitlayer field to look up routes.
+    /**
+     * Given a map from PatternSequences to the Iterations that used those sequences of patterns, merge the map
+     * entries according to which route the patterns belong to.
+     * The only thing preventing this method from being static is that it uses the transitLayer to look up route names.
+     */
     private Multimap<RouteSequence, Iteration> collapsePatternsToRoutes (
-            Multimap<PatternSequence, Iteration> patterns
+            Multimap<PatternSequence, Iteration> patternIterations
     ) {
-        final Multimap<RouteSequence, Iteration> routes = HashMultimap.create();
-        patterns.forEach(((patternSeq, iteration) -> routes.put(new RouteSequence(patternSeq, transitLayer), iteration)));
-        return routes;
+        // This could probably be replaced with ImmutableListMultimap.toImmutableListMultimap collector.
+        final Multimap<RouteSequence, Iteration> routeIterations = HashMultimap.create();
+        patternIterations.forEach(((patternSeq, iteration) ->
+                routeIterations.put(new RouteSequence(patternSeq, transitLayer), iteration))
+        );
+        return routeIterations;
     }
 
     /**
      * Summary of iterations for each destination, suitable for writing to a CSV. Conversion to strings happens here
      * (on distributed workers) to minimize pressure on the central Broker's assembler.
+     * TODO this would probably benefit from factoring out a bunch of named record types (return and parameter types).
      *
      * @param stat whether the reported per-leg wait times should correspond to the iteration with the minimum or mean
      *             total waiting time.
      * @return For each destination, a list of String[]s summarizing path templates. For each path template, details
      *          of the itinerary with waiting time closest to the requested stat are included.
      */
-    public ArrayList<String[]>[] summarizeIterations(Stat stat) {
-        ArrayList<String[]>[] summary = new ArrayList[nDestinations];
+    public ArrayList<String[]>[] summarizeIterations (Stat stat) {
+        ArrayList<String[]>[] csvRowsForDestinations = new ArrayList[nDestinations];
+        final var selectedLinks = transitLayer.parentNetwork.selectedLinks;
+        // For each destination, build up a list of CSV rows representing iteration paths that reached that destination.
+        // Iteration order (over destinations, then selected links) is dictated by distributed computation. Workers
+        // are working on one origin at a time, so while we might prefer the final file to be ordered by selected link,
+        // without a final sort of the entire file the selected links would end up interleaved inside each origin.
         for (int d = 0; d < nDestinations; d++) {
-            // Hold all the summary CSV rows for this particular destination
-            summary[d] = new ArrayList<>();
-            // SelectedLink case: collapse all RouteSequences and Iterations for this OD pair into one to simplify.
-            // iterationMap is empty (not null) for destinations that were reached without using the selected link.
-            // This could also be done by merging all Iterations under a single RouteSequence with all route IDs.
-            // Looks like array may be non-null but with null values if transit search fails (no origin linkage).
-            if (iterationsForEachSelectedLink != null && iterationsForEachSelectedLink[d] != null) {
-                // TODO transpose to list of arrays instead of array of lists, factor selectedLink iteration outside this method call
-                int n = 0; // TODO handle this list-zip better (Streams.zip())
-                for (var patternsForSelectedLink : iterationsForEachSelectedLink[d]) {
-                    String selectedLinkLabel = transitLayer.parentNetwork.selectedLinks.get(n++).label;
-                    int nIterations = 0;
-                    TIntSet allRouteIds = new TIntHashSet();
-                    double summedTotalTime = 0;
-                    for (RouteSequence routeSequence : patternsForSelectedLink.keySet()) {
-                        Collection<Iteration> iterations = patternsForSelectedLink.get(routeSequence);
-                        nIterations += iterations.size();
-                        allRouteIds.addAll(routeSequence.routes);
-                        summedTotalTime += iterations.stream().mapToInt(i -> i.totalTime).sum();
+            if (selectedLinks != null) {
+                ArrayList<String[]> csvRows = new ArrayList<>();
+                for (int s = 0; s < selectedLinks.size(); s++) {
+                    var selectedLink = selectedLinks.get(s);
+                    var iterationsMap = iterationsForDestinationForSelectedLink.get(s)[d];
+                    var summaryRow = iterationsToSummaryCsvRow(iterationsMap, selectedLink.label, d);
+                    if (summaryRow != null) {
+                        csvRows.add(summaryRow);
+                        csvRows.addAll(iterationsToCsvRows(iterationsMap, d, stat));
                     }
-                    // Many destinations will have no iterations at all passing through the SelectedLink area.
-                    // Skip those to keep the CSV output short (and to avoid division by zero below).
-                    if (nIterations == 0) {
-                        continue;
-                    }
-                    String[] row = new String[DATA_COLUMNS.length];
-                    Arrays.fill(row, "ALL");
-                    transitLayer.routeString(1, true);
-                    String allRouteIdsPipeSeparated = Arrays.stream(allRouteIds.toArray())
-                            // If includeName is set to false we record only the ID without the name.
-                            // Name works better than ID for routes added by modifications, which have random IDs.
-                            .mapToObj(ri -> transitLayer.routeString(ri, true))
-                            .collect(Collectors.joining("|"));
-                    String iterationProportion = "%.3f".formatted(
-                            nIterations / (double) (nUnfilteredIterationsReachingDestination[d]));
-                    row[0] = selectedLinkLabel + ": " + allRouteIdsPipeSeparated;
-                    row[row.length - 1] = iterationProportion;
-                    // Report average of total time over all retained iterations, different than mean/min approach below.
-                    row[row.length - 2] = String.format("%.1f", summedTotalTime / nIterations / 60d);
-                    summary[d].add(row);
-                    // TODO call the standard case below, so the summary row is followed by its component parts.
-                    // We could optionally continue to the next outer for loop iteration here, to return only the summary row.
+                }
+                csvRowsForDestinations[d] = csvRows;
+            } else {
+                csvRowsForDestinations[d] = iterationsToCsvRows(iterationsForPathTemplates[d], d, stat);
+            }
+        }
+        return csvRowsForDestinations;
+    }
+
+    /**
+     * SelectedLink case: collapse all RouteSequences and Iterations for this OD pair into one simple summary.
+     * patternIteration is empty (not null) for destinations that were reached without using the selected link.
+     * Looks like array may be non-null but with null values if transit search fails (no origin linkage).
+     * Returns null if there are no iterations here, indicating that for this selected link, this destination need not
+     * be included in the CSV output.
+     * The only thing preventing this method from being static is that it uses the transitLayer to look up route names.
+     */
+    private String[] iterationsToSummaryCsvRow (
+            Multimap<RouteSequence, Iteration> patternIterations, String selectedLinkLabel, int destinationIndex
+    ) {
+        // If no transit search occurred, the iterations map may be null rather than empty.
+        // We could entirely skip the CSV writing in this case, but full (non-select-link) results may want
+        // output rows for every OD pair even when the origin did not use any transit.
+        if (patternIterations == null) {
+            return null;
+        }
+        int nIterations = 0;
+        TIntSet allRouteIds = new TIntHashSet();
+        double summedTotalTime = 0;
+        for (RouteSequence routeSequence : patternIterations.keySet()) {
+            Collection<Iteration> iterations = patternIterations.get(routeSequence);
+            nIterations += iterations.size();
+            allRouteIds.addAll(routeSequence.routes);
+            summedTotalTime += iterations.stream().mapToInt(i -> i.totalTime).sum();
+        }
+        // Many destinations will have no iterations at all passing through the SelectedLink area.
+        // Skip those to keep the CSV output short (and to avoid division by zero below).
+        if (nIterations == 0) {
+            return null;
+        }
+        String[] row = new String[DATA_COLUMNS.length];
+        Arrays.fill(row, "ALL");
+        String allRouteIdsPipeSeparated = Arrays.stream(allRouteIds.toArray())
+                // If includeName is set to false we record only the ID without the name.
+                // Name works better than ID for routes added by modifications, which have random IDs.
+                .mapToObj(ri -> transitLayer.routeString(ri, true))
+                .collect(Collectors.joining("|"));
+        String iterationProportion = "%.3f".formatted(
+                nIterations / (double) (nUnfilteredIterationsReachingDestination[destinationIndex]));
+        row[0] = selectedLinkLabel + ": " + allRouteIdsPipeSeparated;
+        row[row.length - 1] = iterationProportion;
+        // Report average of total time over all retained iterations, different than mean/min approach below.
+        row[row.length - 2] = String.format("%.1f", summedTotalTime / nIterations / 60d);
+        return row;
+    }
+
+    /**
+     * Standard (non SelectedLink) case.
+     * Factored out to allow repeated calls generating multiple sets of CSV rows when multiple select-links present.
+     * The only thing preventing this method from being static is that it uses the transitLayer to look up route names.
+     */
+    private ArrayList<String[]> iterationsToCsvRows (
+        Multimap<RouteSequence, Iteration> iterationMap, int destinationIndex, Stat stat
+    ) {
+        // Hold all the summary CSV rows for this particular destination.
+        ArrayList<String[]> summary = new ArrayList<>();
+        // When some destinations are reached, any unreached ones are empty maps rather than nulls. They will be
+        // null if no search happens at all (origin is not connected to network) in which case maybe we should skip
+        // this step.
+        if (iterationMap == null) {
+            return summary; // FIXME return type does not allow List.of() or EMPTY_LIST;
+        }
+        // Make and stores an array of CSV rows as arrayLists, one for each destination.
+        for (RouteSequence routeSequence: iterationMap.keySet()) {
+            Collection<Iteration> iterations = iterationMap.get(routeSequence);
+            int nIterations = iterations.size();
+            checkState(nIterations > 0, "A path was stored without any iterations");
+            String waits = null, transfer = null, totalTime = null;
+            String[] path = routeSequence.detailsWithGtfsIds(transitLayer, true);
+            double targetValue;
+            IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
+            if (stat == Stat.MINIMUM) {
+                targetValue = totalWaits.min().orElse(-1);
+            } else if (stat == Stat.MEAN){
+                targetValue = totalWaits.average().orElse(-1);
+            } else {
+                throw new RuntimeException("Unrecognized statistic for path summary");
+            }
+            double score = Double.MAX_VALUE;
+            for (Iteration iteration: iterations) {
+                // TODO clean up, maybe re-using approaches from PathScore?
+                double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
+                if (thisScore < score) {
+                    StringJoiner waitTimes = new StringJoiner("|");
+                    iteration.waitTimes.forEach(w -> {
+                            waitTimes.add(String.format("%.1f", w / 60f));
+                            return true;
+                    });
+                    waits = waitTimes.toString();
+                    transfer =  String.format("%.1f", routeSequence.stopSequence.transferTime(iteration) / 60f);
+                    totalTime = String.format("%.1f", iteration.totalTime / 60f);
+                    if (thisScore == 0) break;
+                    score = thisScore;
                 }
             }
-            // Standard (non SelectedLink) case.
-            Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
-            // It looks like this could just be: if (iterationmap == null) continue; (to clarify without indentation)
-            // When some destinations are reached, any unreached ones are empty maps rather than nulls. They will be
-            // null if no search happens at all (origin is not connected to network) in which case maybe we should skip
-            // this step. This makes and stores an array of CSV rows as arrayLists, one for each destination.
-            if (iterationMap != null) {
-                for (RouteSequence routeSequence: iterationMap.keySet()) {
-                    Collection<Iteration> iterations = iterationMap.get(routeSequence);
-                    int nIterations = iterations.size();
-                    checkState(nIterations > 0, "A path was stored without any iterations");
-                    String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, true);
-                    double targetValue;
-                    IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
-                    if (stat == Stat.MINIMUM) {
-                        targetValue = totalWaits.min().orElse(-1);
-                    } else if (stat == Stat.MEAN){
-                        targetValue = totalWaits.average().orElse(-1);
-                    } else {
-                        throw new RuntimeException("Unrecognized statistic for path summary");
-                    }
-                    double score = Double.MAX_VALUE;
-                    for (Iteration iteration: iterations) {
-                        // TODO clean up, maybe re-using approaches from PathScore?
-                        double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
-                        if (thisScore < score) {
-                            StringJoiner waitTimes = new StringJoiner("|");
-                            iteration.waitTimes.forEach(w -> {
-                                    waitTimes.add(String.format("%.1f", w / 60f));
-                                    return true;
-                            });
-                            waits = waitTimes.toString();
-                            transfer =  String.format("%.1f", routeSequence.stopSequence.transferTime(iteration) / 60f);
-                            totalTime = String.format("%.1f", iteration.totalTime / 60f);
-                            if (thisScore == 0) break;
-                            score = thisScore;
-                        }
-                    }
-                    // Check above guarantees that nIterations is nonzero, so total iterations must be nonzero,
-                    // avoiding divide by zero.
-                    String iterationProportion = "%.3f".formatted(
-                            nIterations / (double)(nUnfilteredIterationsReachingDestination[d]));
-                    String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, iterationProportion);
-                    checkState(row.length == DATA_COLUMNS.length);
-                    summary[d].add(row);
-                }
-            }
+            // Check above guarantees that nIterations is nonzero, so total iterations must be nonzero,
+            // avoiding divide by zero.
+            String iterationProportion = "%.3f".formatted(
+                    nIterations / (double)(nUnfilteredIterationsReachingDestination[destinationIndex]));
+            String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, iterationProportion);
+            checkState(row.length == DATA_COLUMNS.length);
+            summary.add(row);
         }
         return summary;
     }

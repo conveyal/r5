@@ -100,9 +100,10 @@ public class PathResult {
             }
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
-        // Only allocate these large arrays when select-link modifications are present.
+        // Only strictly necessary for select-link case, but makes reporting process more uniform in the general case.
+        nUnfilteredIterationsReachingDestination = new int[nDestinations];
+        // Only allocate this large 2D list-of-arrays when select-link modifications are present.
         if (transitLayer.parentNetwork.selectedLinks != null) {
-            nUnfilteredIterationsReachingDestination = new int[nDestinations];
             iterationsForDestinationForSelectedLink = newFixedSizeList(
                     transitLayer.parentNetwork.selectedLinks.size(),
                     () -> new Multimap[nDestinations]
@@ -117,6 +118,8 @@ public class PathResult {
      * TODO maybe we should be converting this to its final CSV form in a streaming manner instead of storing it.
      */
     public void setTarget(int targetIndex, Multimap<PatternSequence, Iteration> patterns) {
+        // Only strictly necessary for select-link case, but makes reporting process more uniform in the general case.
+        nUnfilteredIterationsReachingDestination[targetIndex] = patterns.size();
         // When selected link analysis is enabled, filter down the PatternSequence-Iteration Multimap to retain only
         // those keys passing through the selected links.
         // Maybe selectedLink instance should be on TransitLayer not TransportNetwork.
@@ -124,7 +127,6 @@ public class PathResult {
         if (selectedLinks != null) {
             // The size of a multimap is the number of mappings (number of values), not number of unique keys.
             // This size method appears to be O(1), see: com.google.common.collect.AbstractMapBasedMultimap.size
-            nUnfilteredIterationsReachingDestination[targetIndex] = patterns.size();
             for (int i = 0; i < selectedLinks.size(); i++) {
                 var selectedLink = selectedLinks.get(i);
                 var iterationsForDestination = iterationsForDestinationForSelectedLink.get(i);
@@ -179,15 +181,15 @@ public class PathResult {
                 for (int s = 0; s < selectedLinks.size(); s++) {
                     var selectedLink = selectedLinks.get(s);
                     var iterationsMap = iterationsForDestinationForSelectedLink.get(s)[d];
-                    var summaryRow = iterationsToSummaryCsvRow(iterationsMap, selectedLink.label, d);
+                    var summaryRow = iterationsToSummaryCsvRow(iterationsMap, d, selectedLink.label);
                     if (summaryRow != null) {
                         csvRows.add(summaryRow);
-                        csvRows.addAll(iterationsToCsvRows(iterationsMap, d, stat));
+                        csvRows.addAll(iterationsToCsvRows(iterationsMap, d, selectedLink.label, stat));
                     }
                 }
                 csvRowsForDestinations[d] = csvRows;
             } else {
-                csvRowsForDestinations[d] = iterationsToCsvRows(iterationsForPathTemplates[d], d, stat);
+                csvRowsForDestinations[d] = iterationsToCsvRows(iterationsForPathTemplates[d], d, null, stat);
             }
         }
         return csvRowsForDestinations;
@@ -202,7 +204,7 @@ public class PathResult {
      * The only thing preventing this method from being static is that it uses the transitLayer to look up route names.
      */
     private String[] iterationsToSummaryCsvRow (
-            Multimap<RouteSequence, Iteration> patternIterations, String selectedLinkLabel, int destinationIndex
+        Multimap<RouteSequence, Iteration> patternIterations, int destinationIndex, String selectedLinkLabel
     ) {
         // If no transit search occurred, the iterations map may be null rather than empty.
         // We could entirely skip the CSV writing in this case, but full (non-select-link) results may want
@@ -232,8 +234,11 @@ public class PathResult {
                 .mapToObj(ri -> transitLayer.routeString(ri, true))
                 .collect(Collectors.joining("|"));
         String iterationProportion = "%.3f".formatted(
-                nIterations / (double) (nUnfilteredIterationsReachingDestination[destinationIndex]));
-        row[0] = selectedLinkLabel + ": " + allRouteIdsPipeSeparated;
+            nIterations / (double) (nUnfilteredIterationsReachingDestination[destinationIndex])
+        );
+        // FIXME delimiter inside string is only acceptable as a temporary solution to add a final column without a header.
+        // Can't inject a comma because the CSV writer library will quote escape it.
+        row[0] = selectedLinkLabel + "; TOTAL " + allRouteIdsPipeSeparated;
         row[row.length - 1] = iterationProportion;
         // Report average of total time over all retained iterations, different than mean/min approach below.
         row[row.length - 2] = String.format("%.1f", summedTotalTime / nIterations / 60d);
@@ -246,7 +251,7 @@ public class PathResult {
      * The only thing preventing this method from being static is that it uses the transitLayer to look up route names.
      */
     private ArrayList<String[]> iterationsToCsvRows (
-        Multimap<RouteSequence, Iteration> iterationMap, int destinationIndex, Stat stat
+        Multimap<RouteSequence, Iteration> iterationMap, int destinationIndex, String selectedLinkLabel, Stat stat
     ) {
         // Hold all the summary CSV rows for this particular destination.
         ArrayList<String[]> summary = new ArrayList<>();
@@ -293,6 +298,11 @@ public class PathResult {
             // avoiding divide by zero.
             String iterationProportion = "%.3f".formatted(
                     nIterations / (double)(nUnfilteredIterationsReachingDestination[destinationIndex]));
+            // FIXME delimiter inside string is a temporary solution to add a final column without a header.
+            // Can't inject a comma because the CSV writer library will quote escape it.
+            if (selectedLinkLabel != null) {
+                path[0] = selectedLinkLabel + "; " + path[0];
+            }
             String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, iterationProportion);
             checkState(row.length == DATA_COLUMNS.length);
             summary.add(row);

@@ -888,14 +888,14 @@ public class TransitLayer implements Serializable, Cloneable {
      * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
      * also include a route_short_name or route_long_name (if they are not null).
      */
-    public String routeString(int routeIndex, boolean includeName) {
+    public String routeString(int routeIndex, boolean nameNotId) {
         RouteInfo routeInfo = routes.get(routeIndex);
         String route = routeInfo.route_id;
-        if (includeName) {
+        if (nameNotId) {
             if (routeInfo.route_short_name != null) {
-                route += " (" + routeInfo.route_short_name + ")";
+                route = routeInfo.route_short_name;
             } else if (routeInfo.route_long_name != null){
-                route += " (" + routeInfo.route_long_name + ")";
+                route = routeInfo.route_long_name;
             }
         }
         return route;

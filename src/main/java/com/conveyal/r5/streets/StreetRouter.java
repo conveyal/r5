@@ -503,8 +503,11 @@ public class StreetRouter {
         } else if (flagSearch != null) {
             routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         }
+        int nStatesHandled = 0;
+        int nEdgesTraversed[] = new int[1];
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
+            nStatesHandled += 1;
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
@@ -566,7 +569,15 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
+                // Skip over backtracking edges
+//                if (s0.backState != null && s0.backState.vertex ==
+//                        (profileRequest.reverseSearch ? edge.getFromVertex() : edge.getToVertex())
+//                ) {
+//                    // Do not take edges that go straight back to where we came from.
+//                    return true;
+//                }
                 State s1 = edge.traverse(s0, streetMode, profileRequest, timeCalculator);
+                nEdgesTraversed[0] += 1; // work around effectively final
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -582,7 +593,8 @@ public class StreetRouter {
             debugPrintStream.close();
         }
         long routingTimeMsec = System.currentTimeMillis() - startTime;
-        LOG.debug("Routing took {} msec", routingTimeMsec);
+        LOG.info("Routing by {} took {} msec", this.streetMode, routingTimeMsec);
+        LOG.info("States handled {}, edges traversed {}, total edges {}", nStatesHandled, nEdgesTraversed[0], streetLayer.edgeStore.nEdges());
     }
 
     /**

@@ -150,7 +150,7 @@ public class StreetRouter {
      * by taking advantage of the fact that we almost always have a single state per edge
      * (the only time we don't is when we're in the middle of a turn restriction).
      */
-    TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
+    TIntObjectMap<State> bestStatesAtEdge = new TIntObjectHashMap<>();
 
     // The queue is prioritized by the specified optimization objective variable.
     PriorityQueue<State> queue = new PriorityQueue<>(
@@ -238,25 +238,21 @@ public class StreetRouter {
         //  Javadoc stating that MAX_VALUE always means unreachable). See suggestion in R5 #647.
         TIntIntMap result = new TIntIntHashMap(DEFAULT_CAPACITY, DEFAULT_LOAD_FACTOR, -1, Integer.MAX_VALUE);
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
-        bestStatesAtEdge.forEachEntry((eidx, states) -> {
+        bestStatesAtEdge.forEachEntry((eidx, state) -> {
             if (eidx < 0) return true;
             // Iterating over a little list and reducing the values with a stream might be slow.
             // TODO We should try replacing this with states.get(0) and see if it makes building distance tables faster.
-            State state = states.stream()
-                    .reduce((s0, s1) -> s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
-            e.seek(eidx);
             int vidx = e.getToVertex();
-
-            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(quantityToMinimize))
+            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(quantityToMinimize)) {
                 result.put(vidx, state.getRoutingVariable(quantityToMinimize));
-
+            }
             return true; // continue iteration
         });
         return result;
     }
 
     /**
-     * After a search has been run, calling this method will returns a map from vertex indexes to the value of
+     * After a search has been run, calling this method will return a map from vertex indexes to the value of
      * the objective variable for the optimal path to that vertex, but only for vertices with a certain flag set.
      *
      * There is currently an optimization that makes a special case where {@link VertexFlagVisitor}
@@ -266,31 +262,7 @@ public class StreetRouter {
      * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
     public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
-        if (flagSearch == flag && routingVisitor instanceof VertexFlagVisitor) {
-            return ((VertexFlagVisitor) routingVisitor).getVertices();
-        }
-        TIntObjectMap<State> result = new TIntObjectHashMap<>();
-        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
-        VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
-        bestStatesAtEdge.forEachEntry((eidx, states) -> {
-            if (eidx < 0) return true;
-
-            State state = states.stream().reduce((s0, s1) ->
-                    s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
-            e.seek(eidx);
-            int vidx = e.getToVertex();
-            v.seek(vidx);
-
-            if (v.getFlag(flag)) {
-                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(quantityToMinimize) >
-                                                            state.getRoutingVariable(quantityToMinimize)) {
-                    result.put(vidx, state);
-                }
-            }
-
-            return true; // continue iteration
-        });
-        return result;
+        throw new UnsupportedOperationException();
     }
 
     public StreetRouter (StreetLayer streetLayer) {
@@ -358,8 +330,8 @@ public class StreetRouter {
 
         // If there is a turn restriction on this edge, we need to indicate that we are beginning the search in a
         // turn restriction.
-        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
-        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
+//        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
+//        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
 
         // These initial states are not recorded as bestStates, they will be added when they come out of the queue.
         // FIXME but wait - we are putting them in the bestStates for some reason.
@@ -554,7 +526,7 @@ public class StreetRouter {
             // by traversing the same edge. Check that the state coming off the queue has not been dominated before
             // exploring it. States at the origin may have their backEdge set to a negative number to indicate that
             // they have no backEdge (were not produced by traversing an edge). Skip the check for those states.
-            if (s0.backEdge >= 0 && !bestStatesAtEdge.get(s0.backEdge).contains(s0)) continue;
+            if (s0.backEdge >= 0 && !bestStatesAtEdge.get(s0.backEdge).equals(s0)) continue;
 
             // If the search has reached the destination, the state coming off the queue is the best way to get there.
             if (toVertex > 0 && toVertex == s0.vertex) break;
@@ -566,7 +538,6 @@ public class StreetRouter {
             // Hit RoutingVistor callbacks to monitor search progress.
             if (routingVisitor != null) {
                 routingVisitor.visitVertex(s0);
-
                 if (routingVisitor.shouldBreakSearch()) {
                     LOG.debug("{} routing visitor stopped search", routingVisitor.getClass().getSimpleName());
                     queue.clear();
@@ -622,16 +593,12 @@ public class StreetRouter {
         // States in turn restrictions are incomparable (don't dominate and aren't dominated by other states)
         // If the new state is not in a turn restriction, check whether it dominates any existing states and remove them.
         // Multimap returns empty list for missing keys.
-        for (Iterator<State> it = bestStatesAtEdge.get(newState.backEdge).iterator(); it.hasNext(); ) {
-            State existingState = it.next();
-            if (dominates(existingState, newState)) {
-                // If any existing state dominates the new one, bail out early and declare the new state dominated.
-                // We want to check if the existing state dominates the new one before the other way around because
-                // when states are equal, the existing one should win (and the special case for turn restrictions).
-                return true;
-            } else if (dominates(newState, existingState)) {
-                it.remove();
-            }
+        State existingState = bestStatesAtEdge.get(newState.backEdge);
+        if (dominates(existingState, newState)) {
+            // If any existing state dominates the new one, bail out early and declare the new state dominated.
+            // We want to check if the existing state dominates the new one before the other way around because
+            // when states are equal, the existing one should win (and the special case for turn restrictions).
+            return true;
         }
         return false; // Nothing existing has dominated this new state: it's non-dominated.
     }
@@ -661,31 +628,12 @@ public class StreetRouter {
      * @return true if s1 is better *or equal* to s2, otherwise return false.
      */
     private boolean dominates (State s1, State s2) {
-        if (s1.turnRestrictions == null && s2.turnRestrictions == null) {
-            // The simple case where neither state has turn restrictions.
-            // Note this is <= rather than < because we want an existing state with the same weight to beat a new one.
-            return s1.getRoutingVariable(quantityToMinimize) <= s2.getRoutingVariable(quantityToMinimize);
+        if (s1 == null) {
+            return false; // non-existing state cannot dominate new state
         }
-        // At least one of the states has turn restrictions.
-        // Generally, a state with turn restrictions cannot dominate another state and cannot be dominated.
-        // However, if we make all turn-restricted states strictly incomparable we can get infinite loops with
-        // adjacent turn restrictions, see #88.
-        // So we make an exception that states with exactly the same turn restrictions dominate one another.
-        // In practice, this means once we have a state with a certain set of turn restrictions, we don't allow any
-        // more at the same location.
-        if (s1.turnRestrictions != null && s2.turnRestrictions != null &&
-            s1.turnRestrictions.size() == s2.turnRestrictions.size()) {
-                boolean[] same = new boolean[]{true}; // Trick to circumvent java "effectively final" ridiculousness.
-                s1.turnRestrictions.forEachEntry((ridx, pos) -> {
-                    if (!s2.turnRestrictions.containsKey(ridx) || s2.turnRestrictions.get(ridx) != pos) same[0] = false;
-                    return same[0]; // Continue iteration until a difference is discovered, then bail out.
-                });
-                if (same[0]) return true; // s1 dominates s2 because it has the same turn restrictions.
-                // TODO shouldn't we add a test to see which one has the lower dominance variable, just to make this more principled?
-                // As in: states are comparable only when they have the same set of turn restrictions.
-        }
-        // At least one of the states has turn restrictions. Neither dominates the other.
-        return false;
+        // The simple case where neither state has turn restrictions.
+        // Note this is <= rather than < because we want an existing state with the same weight to beat a new one.
+        return s1.getRoutingVariable(quantityToMinimize) <= s2.getRoutingVariable(quantityToMinimize);
     }
 
     /**
@@ -693,13 +641,11 @@ public class StreetRouter {
      * There can be more than one state at the end of an edge due to turn restrictions
      */
     public State getStateAtEdge (int edgeIndex) {
-        Collection<State> states = bestStatesAtEdge.get(edgeIndex);
-        if (states.isEmpty()) {
+        State state = bestStatesAtEdge.get(edgeIndex);
+        if (state == null) {
             return null; // Unreachable
         }
-        // Get the lowest weight, even if it's in the middle of a turn restriction.
-        return states.stream().reduce((s0, s1) ->
-                s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
+        return state;
     }
 
     /**
@@ -760,25 +706,8 @@ public class StreetRouter {
         }
         // TODO change iteration style to imperative
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
-            Collection<State> states = bestStatesAtEdge.get(it.next());
-            // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
-            // we don't need the turn restrictions any more because we're at the end of the search
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), profileRequest.reverseSearch))
-                    .map(s -> {
-                        State ret = new State(-1, split.edge, s);
-                        ret.streetMode = s.streetMode;
-
-                        // figure out the turn cost
-                        int turnCost = this.timeCalculator.turnTimeSeconds(s.backEdge, split.edge, s.streetMode);
-                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
-
-                        // TODO length of perpendicular
-                        ret.incrementTimeInSeconds(turnCost + traversalCost);
-                        ret.distance += split.distance0_mm;
-
-                        return ret;
-                    })
-                    .forEach(candidateStates::add);
+            State state = bestStatesAtEdge.get(it.next());
+            candidateStates.add(state);
         }
 
         // Advance to the backward edge of the pair that was split
@@ -791,20 +720,18 @@ public class StreetRouter {
         }
 
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
-            Collection<State> states = bestStatesAtEdge.get(it.next());
-            for (State state : states) {
-                if (!e.canTurnFrom(state, new State(-1, split.edge + 1, state), profileRequest.reverseSearch)) {
-                    continue;
-                }
-                State ret = new State(-1, split.edge + 1, state);
-                ret.streetMode = state.streetMode;
-                int turnCost = this.timeCalculator.turnTimeSeconds(state.backEdge, split.edge + 1, state.streetMode);
-                int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, state.streetMode));
-                ret.distance += split.distance1_mm;
-                // TODO length of perpendicular
-                ret.incrementTimeInSeconds(turnCost + traversalCost);
-                candidateStates.add(ret);
+            State state = bestStatesAtEdge.get(it.next());
+            if (!e.canTurnFrom(state, new State(-1, split.edge + 1, state), profileRequest.reverseSearch)) {
+                continue;
             }
+            State ret = new State(-1, split.edge + 1, state);
+            ret.streetMode = state.streetMode;
+            int turnCost = this.timeCalculator.turnTimeSeconds(state.backEdge, split.edge + 1, state.streetMode);
+            int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, state.streetMode));
+            ret.distance += split.distance1_mm;
+            // TODO length of perpendicular
+            ret.incrementTimeInSeconds(turnCost + traversalCost);
+            candidateStates.add(ret);
         }
 
         return candidateStates.stream()
@@ -1201,7 +1128,7 @@ public class StreetRouter {
      */
     public void keepRoutingOnFoot() {
         queue.clear();
-        bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
+        bestStatesAtEdge.forEachEntry((edgeId, state) -> queue.add(state));
         streetMode = StreetMode.WALK;
         route();
     }

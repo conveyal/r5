@@ -392,35 +392,35 @@ public class EdgeStore implements Serializable {
      * @param reverseSearch if this is reverse search
      * @param s1 new state
      */
-    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch, StreetRouter.State s1) {
-        if (reverseSearch) {
-            // add turn restrictions that start on this edge
-            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
-            // if/when it gets changed.
-            if (streetMode == StreetMode.CAR && turnRestrictionsReverse.containsKey(s1.backEdge)) {
-                if (s1.turnRestrictions == null)
-                    s1.turnRestrictions = new TIntIntHashMap();
-                turnRestrictionsReverse.get(s1.backEdge).forEach(r -> {
-                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
-                    return true; // continue iteration
-                });
-                //LOG.info("RRTADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
-            }
-        } else {
-            // add turn restrictions that start on this edge
-            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
-            // if/when it gets changed.
-            if (streetMode == StreetMode.CAR && turnRestrictions.containsKey(s1.backEdge)) {
-                if (s1.turnRestrictions == null)
-                    s1.turnRestrictions = new TIntIntHashMap();
-                turnRestrictions.get(s1.backEdge).forEach(r -> {
-                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
-                    return true; // continue iteration
-                });
-                //LOG.info("TADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
-            }
-        }
-    }
+//    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch, StreetRouter.State s1) {
+//        if (reverseSearch) {
+//            // add turn restrictions that start on this edge
+//            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+//            // if/when it gets changed.
+//            if (streetMode == StreetMode.CAR && turnRestrictionsReverse.containsKey(s1.backEdge)) {
+//                if (s1.turnRestrictions == null)
+//                    s1.turnRestrictions = new TIntIntHashMap();
+//                turnRestrictionsReverse.get(s1.backEdge).forEach(r -> {
+//                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+//                    return true; // continue iteration
+//                });
+//                //LOG.info("RRTADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+//            }
+//        } else {
+//            // add turn restrictions that start on this edge
+//            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+//            // if/when it gets changed.
+//            if (streetMode == StreetMode.CAR && turnRestrictions.containsKey(s1.backEdge)) {
+//                if (s1.turnRestrictions == null)
+//                    s1.turnRestrictions = new TIntIntHashMap();
+//                turnRestrictions.get(s1.backEdge).forEach(r -> {
+//                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+//                    return true; // continue iteration
+//                });
+//                //LOG.info("TADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+//            }
+//        }
+//    }
 
     /**
      * Inner class that serves as a cursor: points to a single edge in this store, and can be moved to other indexes.
@@ -641,15 +641,15 @@ public class EdgeStore implements Serializable {
             // A new instance representing the state after traversing this edge. Fields will be filled in later.
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
 
-            if (!canTurnFrom(s0, s1, req.reverseSearch)) {
-                return null;
-            }
-
-            // Null out turn restrictions if they're empty
-            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) {
-                s1.turnRestrictions = null;
-            }
-            startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
+//            if (!canTurnFrom(s0, s1, req.reverseSearch)) {
+//                return null;
+//            }
+//
+//            // Null out turn restrictions if they're empty
+//            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) {
+//                s1.turnRestrictions = null;
+//            }
+//            startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
 
             //We allow two links in a row if this is a first state (negative back edge or no backState
             //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
@@ -719,65 +719,6 @@ public class EdgeStore implements Serializable {
 
         /** Can we turn onto this edge from this state? Also copies still-applicable restrictions forward. */
         public boolean canTurnFrom(StreetRouter.State s0, StreetRouter.State s1, boolean reverseSearch) {
-            // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
-            // if/when it gets changed.
-            if (s0.turnRestrictions != null && s0.streetMode == StreetMode.CAR) {
-                // clone turn restrictions
-                s1.turnRestrictions = new TIntIntHashMap(s0.turnRestrictions);
-
-                RESTRICTIONS: for (TIntIntIterator it = s1.turnRestrictions.iterator(); it.hasNext();) {
-                    it.advance();
-                    int ridx = it.key();
-                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
-
-                    // check via ways if applicable
-                    // subtract 1 because the first (fromEdge) is not a via edge
-                    int posInRestriction = it.value() - 1;
-                    int toEdge = restriction.toEdge;
-                    int[] viaEdges = restriction.viaEdges;
-
-                    if (reverseSearch) {
-                        //In reverse search order of from/to and viaEdges is changed since we search from toEdge to fromEdge
-                        toEdge = restriction.fromEdge;
-                        if (viaEdges.length > 1) {
-                            TurnRestriction.reverse(viaEdges);
-                        }
-                    }
-
-                    if (posInRestriction < viaEdges.length) {
-                        if (s1.backEdge != restriction.viaEdges[posInRestriction]) {
-                            // we have exited the restriction
-                            if (restriction.only) return false;
-                            else {
-                                it.remove(); // no need to worry about this one anymore
-                                continue RESTRICTIONS;
-                            }
-                        }
-                        else {
-                            // increment position
-                            it.setValue(it.value() + 1);
-                        }
-                    }
-                    else {
-                        if (toEdge != s1.backEdge) {
-                            // we have exited the restriction
-                            if (restriction.only)
-                                return false;
-                            else {
-                                it.remove();
-                                continue RESTRICTIONS;
-                            }
-                        } else {
-                            if (!restriction.only)
-                                return false;
-                            else {
-                                it.remove(); // done with this restriction
-                                continue RESTRICTIONS;
-                            }
-                        }
-                    }
-                }
-            }
             return true;
         }
 

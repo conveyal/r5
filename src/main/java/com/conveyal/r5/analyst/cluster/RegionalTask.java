@@ -74,11 +74,8 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      */
     @Override
     public WebMercatorExtents getWebMercatorExtents() {
-        if (makeTauiSite) {
-            return WebMercatorExtents.forTask(this);
-        } else {
-            return WebMercatorExtents.forPointsets(this.destinationPointSets);
-        }
+        return WebMercatorExtents.forTask(this);
+        // TODO Use previous conditional logic with custom flag (request.flags.CROP_DESTINATIONS)
     }
 
     /**

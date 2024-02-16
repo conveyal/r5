@@ -12,8 +12,10 @@ import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.transit.TransitLayer;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.checkerframework.checker.units.qual.C;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -182,6 +184,9 @@ public class AnalysisRequest {
      */
     public Set<String> flags;
 
+    /** Control the details of CSV regional analysis output, including whether to output IDs, names, or both. */
+    public CsvResultOptions csvResultOptions = new CsvResultOptions();
+
     /**
      * Create the R5 `Scenario` from this request.
      */
@@ -288,6 +293,7 @@ public class AnalysisRequest {
         task.includeTemporalDensity = includeTemporalDensity;
         task.dualAccessibilityThreshold = dualAccessibilityThreshold;
         task.flags = flags;
+        task.csvResultOptions = csvResultOptions;
     }
 
     private EnumSet<LegMode> getEnumSetFromString (String s) {

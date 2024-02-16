@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit.path;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
 import gnu.trove.list.TIntList;
@@ -10,7 +11,7 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.StringJoiner;
 
-import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_AND_NAME;
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_AND_ID;
 
 /** A door-to-door path that includes the routes ridden between stops */
 public class RouteSequence {
@@ -31,15 +32,15 @@ public class RouteSequence {
     }
 
     /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
-    public String[] detailsWithGtfsIds (TransitLayer transitLayer, EntityRepresentation nameOrId){
+    public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
         StringJoiner routeIds = new StringJoiner("|");
         StringJoiner boardStopIds = new StringJoiner("|");
         StringJoiner alightStopIds = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), nameOrId));
-            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), nameOrId));
-            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), nameOrId));
+            routeIds.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
+            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
+            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
@@ -58,9 +59,9 @@ public class RouteSequence {
     public Collection<TransitLeg> transitLegs(TransitLayer transitLayer) {
         Collection<TransitLeg> transitLegs = new ArrayList<>();
         for (int i = 0; i < routes.size(); i++) {
-            String routeString = transitLayer.routeString(routes.get(i), ID_AND_NAME);
-            String boardStop = transitLayer.stopString(stopSequence.boardStops.get(i), ID_AND_NAME);
-            String alightStop = transitLayer.stopString(stopSequence.alightStops.get(i), ID_AND_NAME);
+            String routeString = transitLayer.routeString(routes.get(i), NAME_AND_ID);
+            String boardStop = transitLayer.stopString(stopSequence.boardStops.get(i), NAME_AND_ID);
+            String alightStop = transitLayer.stopString(stopSequence.alightStops.get(i), NAME_AND_ID);
             transitLegs.add(new TransitLeg(routeString, stopSequence.rideTimesSeconds.get(i), boardStop, alightStop));
         }
         return transitLegs;

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridTransformWrapper;
@@ -183,6 +184,9 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * This should be used to replace all previous special behavior flags that were embedded inside analysis names etc.
      */
     public Set<String> flags;
+
+    /** Control the details of CSV regional analysis output, including whether to output IDs, names, or both. */
+    public CsvResultOptions csvResultOptions;
 
     /**
      * Is this a single point or regional request? Needed to encode types in JSON serialization. Can that type field be

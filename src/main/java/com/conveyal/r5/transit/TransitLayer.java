@@ -819,7 +819,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     public enum EntityRepresentation {
-        ID_ONLY, NAME_ONLY, ID_AND_NAME
+        ID_ONLY, NAME_ONLY, NAME_AND_ID
     }
 
     /**
@@ -841,7 +841,7 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         return switch (nameOrId) {
             case NAME_ONLY -> name;
-            case ID_AND_NAME -> id + " (" + name + ")";
+            case NAME_AND_ID -> name + " (" + id + ")";
             default -> id;
         };
     }
@@ -869,7 +869,7 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         return switch (nameOrId) {
             case NAME_ONLY -> stopName;
-            case ID_AND_NAME -> stopId + " (" + stopName + ")";
+            case NAME_AND_ID -> stopName + " (" + stopId + ")";
             default -> stopId;
         };
     }

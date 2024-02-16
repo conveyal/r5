@@ -6,7 +6,6 @@ package com.conveyal.file;
  * so is only appropriate for cases where it doesn't need to be machine discoverable using a UUID. The humanName can
  * be used as the download attribute of an HTML link, or as the attachment name in a content-disposition header.
  * Instances of this record are intended to be serialized to JSON as an HTTP API response.
- * // TODO make this into a class with factory methods and move static cleanFilename method here.
  */
 public class UrlWithHumanName {
     public final String url;

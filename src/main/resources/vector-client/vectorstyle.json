@@ -5,7 +5,7 @@
     "r5": {
       "type": "vector",
       "tiles": [
-        "http://localhost:7070/networkVectorTiles/5f4ee64db8b6303fdd2fdec2/{z}/{x}/{y}"
+        "http://localhost:7070/dummy"
       ],
       "maxzoom": 14
     },
@@ -30,7 +30,7 @@
   "terrain": { "source": "dem-terrain", "exaggeration": 1.4 },
   "glyphs": "mapbox://fonts/mapbox/{fontstack}/{range}.pbf",
   "layers": [
-    {"id": "hillshading", "source": "dem-hillshade", "type": "hillshade"},
+    {"id": "hillshading", "source": "dem-hillshade", "type": "hillshade", "layout": {"visibility": "none"}},
     {
       "id": "water",
       "source": "mapbox-streets",
@@ -43,20 +43,39 @@
     {
       "id": "patterns",
       "source": "r5",
-      "source-layer": "edges",
+      "source-layer": "conveyal:gtfs:patternShapes",
       "type": "line",
-      "filter": ["get", "car"],
       "paint": {
-        "line-color": [
-          "interpolate",
-          ["linear"],
-          ["get", "lts"],
-          1,
-          ["to-color","#0f0"],
-          2,
-          ["to-color","#099"],
-          4,
-          ["to-color","#f00"]
+        "line-opacity": 0.5,
+        "line-color": ["concat", "#", ["get", "routeColor"]],
+        "line-width": [ "interpolate", ["exponential", 1.25], ["zoom"], 8, 1, 22, 15 ]
+      }
+    },
+    {
+      "id": "stops",
+      "source": "r5",
+      "source-layer": "conveyal:gtfs:stops",
+      "type": "circle",
+      "paint": {
+        "circle-radius": [ "interpolate", ["exponential", 1.25], ["zoom"], 8, 2, 22, 20 ]
+      }
+    },
+    {
+      "id": "stop-labels",
+      "source": "r5",
+      "source-layer": "conveyal:gtfs:stops",
+      "type": "symbol",
+      "paint": {
+        "text-halo-color": "rgba(255, 255, 255, 1)",
+        "text-halo-width": 0.5
+      },
+      "layout": {
+        "text-field": "{name}",
+        "text-justify": "auto",
+        "text-padding": 5,
+        "text-size": 10,
+        "text-variable-anchor": [
+          "top-left"
         ]
       }
     }

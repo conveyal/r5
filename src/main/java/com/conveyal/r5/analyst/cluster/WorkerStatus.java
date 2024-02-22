@@ -24,6 +24,8 @@ import java.util.Set;
 public class WorkerStatus {
 
     private static final Logger LOG = LoggerFactory.getLogger(WorkerStatus.class);
+    private static final int LEGACY_WORKER_MAX_TASKS = 16;
+    public static final int LEGACY_WORKER_MAX_POLL_INTERVAL_SECONDS = 2 * 60;
 
     public String architecture;
     public int processors;
@@ -49,6 +51,20 @@ public class WorkerStatus {
     public String jvmVersion;
     public String ipAddress;
     public List<RegionalWorkResult> results;
+
+    /**
+     * Then maximum number of tasks the broker should send to this worker. May be zero if its work queue is full.
+     * Default value determines the number of tasks to send to older workers that don't send this value when they poll.
+     */
+    public int maxTasksRequested = LEGACY_WORKER_MAX_TASKS;
+
+    /**
+     * The maximum amount of time the worker will wait before polling again. After this much time passes the backend
+     * may consider the worker lost or shut down. The backend should be somewhat lenient here as there could be delays
+     * due to connection setup, API contention etc. The default value reflects how how long the backend should wait to
+     * hear from older workers that don't send this value.
+     */
+    public int pollIntervalSeconds = LEGACY_WORKER_MAX_POLL_INTERVAL_SECONDS;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }

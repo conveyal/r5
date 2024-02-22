@@ -35,7 +35,7 @@ import java.util.Map;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.parseZoom;
+import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
 import static com.mongodb.client.model.Filters.eq;
 
 /**

@@ -7,6 +7,8 @@ import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
@@ -89,28 +91,36 @@ public class MultiOriginAssembler {
             this.job = job;
             this.nOriginsTotal = job.nTasksTotal;
             this.originsReceived = new BitSet(job.nTasksTotal);
-            // Check that origin and destination sets are not too big for generating CSV files.
-            if (!job.templateTask.makeTauiSite &&
-                 job.templateTask.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)
-            ) {
-               // This requires us to have already loaded this destination pointset instance into the transient field.
-                PointSet destinationPointSet = job.templateTask.destinationPointSets[0];
-                if ((job.templateTask.recordTimes || job.templateTask.includePathResults) && !job.templateTask.oneToOne) {
-                    if (nOriginsTotal * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
-                        destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
-                    ) {
-                        throw new AnalysisServerException(String.format(
-                            "Freeform requests limited to %d destinations and %d origin-destination pairs.",
-                            MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
-                        ));
-                    }
+            // If results have been requested for freeform origins, check that the origin and
+            // destination pointsets are not too big for generating CSV files.
+            RegionalTask task = job.templateTask;
+            if (!task.makeTauiSite && task.destinationPointSetKeys[0].endsWith(FileStorageFormat.FREEFORM.extension)) {
+                // This requires us to have already loaded this destination pointset instance into the transient field.
+                PointSet destinationPointSet = task.destinationPointSets[0];
+                int nDestinations = destinationPointSet.featureCount();
+                int nODPairs = task.oneToOne ? nOriginsTotal : nOriginsTotal * nDestinations;
+                if (task.recordTimes &&
+                    (nDestinations > MAX_FREEFORM_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
+                    throw AnalysisServerException.badRequest(String.format(
+                       "Travel time results limited to %d destinations and %d origin-destination pairs.",
+                       MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                    ));
+                }
+                if (task.includePathResults &&
+                    (nDestinations > PathResult.MAX_PATH_DESTINATIONS || nODPairs > MAX_FREEFORM_OD_PAIRS)) {
+                    throw AnalysisServerException.badRequest(String.format(
+                        "Path results limited to %d destinations and %d origin-destination pairs.",
+                        PathResult.MAX_PATH_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                    ));
                 }
             }
 
             if (job.templateTask.recordAccessibility) {
                 if (job.templateTask.originPointSet != null) {
+                    // Freeform origins - create CSV regional analysis results
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
+                    // Gridded origins - create gridded regional analysis results
                     resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
                 }
             }
@@ -121,6 +131,20 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.includePathResults) {
                 resultWriters.add(new PathCsvResultWriter(job.templateTask, fileStorage));
+            }
+
+            if (job.templateTask.includeTemporalDensity) {
+                if (job.templateTask.originPointSet == null) {
+                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
+                    // We might want to record a grid of dual accessibility values, but this will require some serious
+                    // refactoring of the GridResultWriter.
+                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
+                    throw new IllegalArgumentException("Temporal density of opportunities cannot be recorded for gridded origin points.");
+                } else {
+                    // Freeform origins.
+                    // Output includes temporal density of opportunities and optionally dual accessibility.
+                    resultWriters.add(new TemporalDensityCsvResultWriter(job.templateTask, fileStorage));
+                }
             }
 
             checkArgument(job.templateTask.makeTauiSite || notNullOrEmpty(resultWriters),
@@ -136,8 +160,11 @@ public class MultiOriginAssembler {
                     regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
                 }
             }
+        } catch (AnalysisServerException e) {
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Exception while creating multi-origin assembler: " + ExceptionUtils.stackTraceString(e));
+            // Handle any obscure problems we don't want end users to see without context of MultiOriginAssembler.
+            throw new RuntimeException("Exception while creating multi-origin assembler: " + e.toString(), e);
         }
     }
 

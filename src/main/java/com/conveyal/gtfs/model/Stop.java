@@ -45,7 +45,7 @@ public class Stop extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Stop s = new Stop();
-            s.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            s.sourceFileLine = row;
             s.stop_id   = getStringField("stop_id", true);
             s.stop_code = getStringField("stop_code", false);
             s.stop_name = getStringField("stop_name", true);

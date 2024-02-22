@@ -24,6 +24,11 @@ public abstract class DistributionTester {
         }
     }
 
+    /**
+     * Given an expected distribution of travel times at a destination and the standard five percentiles of travel time
+     * at that same destination as computed by our router, check that the computed values seem to be drawn from the
+     * theoretically correct distribution.
+     */
     public static void assertExpectedDistribution (Distribution expectedDistribution, int[] values) {
         for (int p = 0; p < PERCENTILES.length; p++) {
             int expected = expectedDistribution.findPercentile(PERCENTILES[p]);

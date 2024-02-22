@@ -123,8 +123,11 @@ public class Job {
     public int deliveryPass = 0;
 
     /**
-     * If any error compromises the usabilty or quality of results from any origin, it is recorded here.
+     * If any error compromises the usability or quality of results from any origin, it is recorded here.
      * This is a Set because identical errors are likely to be reported from many workers or individual tasks.
+     * The presence of an error here causes the job to be considered "errored" and "inactive" and stop delivering tasks.
+     * There is some risk here of accumulating unbounded amounts of large error messages (see #919).
+     * The field type could be changed to a single String instead of Set, but it's exposed on a UI-facing API as a Set.
      */
     public final Set<String> errors = new HashSet();
 
@@ -177,7 +180,7 @@ public class Job {
     /**
      * @param maxTasks the maximum number of tasks to return.
      * @return some tasks that are not yet marked as completed and have not yet been delivered in
-     *         this delivery pass.
+     *         this delivery pass. May return an empty list, but never null.
      */
     public List<RegionalTask> generateSomeTasksToDeliver (int maxTasks) {
         List<RegionalTask> tasks = new ArrayList<>(maxTasks);

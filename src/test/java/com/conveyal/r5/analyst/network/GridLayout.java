@@ -2,9 +2,6 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -13,12 +10,9 @@ import org.locationtech.jts.geom.CoordinateXY;
 import org.locationtech.jts.geom.Envelope;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
-
-import static com.conveyal.r5.analyst.WebMercatorGridPointSet.DEFAULT_ZOOM;
 
 /**
  * This is used in testing, to represent and create gridded transport systems with very regular spacing of roads and
@@ -165,49 +159,14 @@ public class GridLayout {
     }
 
     /** Creates a builder for analysis worker tasks, which represent searches on this grid network. */
-    public GridSinglePointTaskBuilder newTaskBuilder() {
-        return new GridSinglePointTaskBuilder(this);
-    }
-
-    public GridSinglePointTaskBuilder copyTask(AnalysisWorkerTask task) {
-        return new GridSinglePointTaskBuilder(this, task);
+    public GridRegionalTaskBuilder newTaskBuilder() {
+        return new GridRegionalTaskBuilder(this);
     }
 
     /** Get the minimum envelope containing all the points in this grid. */
     public Envelope gridEnvelope () {
         Coordinate farCorner = getIntersectionLatLon(widthAndHeightInBlocks, widthAndHeightInBlocks);
         return new Envelope(originPoint.x, farCorner.x, originPoint.y, farCorner.y);
-    }
-
-    /**
-     * Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell.
-     * TODO maybe derive this from the network's gridded pointset rather than the GridLayout.
-     */
-    public Grid makeUniformOpportunityDataset (double density) {
-        Grid grid = new Grid(DEFAULT_ZOOM, this.gridEnvelope());
-        for (double[] column : grid.grid) {
-            Arrays.fill(column, density);
-        }
-        return grid;
-    }
-
-    /**
-     * Create a gridded pointset coextensive with this grid, with the given number of opportunities in each cell in the
-     * eastern half of the grid.
-     */
-    public Grid makeRightHalfOpportunityDataset (double density) {
-        Grid grid = new Grid(DEFAULT_ZOOM, this.gridEnvelope());
-        for (int c = grid.grid.length / 2; c < grid.grid.length; c++) {
-            Arrays.fill(grid.grid[c], density);
-        }
-        return grid;
-    }
-
-    public int pointIndex(AnalysisWorkerTask task, int x, int y) {
-        Coordinate destLatLon = this.getIntersectionLatLon(x, y);
-        // Here is a bit of awkwardness where WebMercatorGridPointSet and Grid both extend PointSet, but don't share
-        // their grid referencing code, so one would have to be converted to the other to get the point index.
-        return new WebMercatorGridPointSet(task.getWebMercatorExtents()).getPointIndexContaining(destLatLon);
     }
 
     public String nextIntegerId() {

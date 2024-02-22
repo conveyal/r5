@@ -21,7 +21,7 @@ public class GridRoute {
     public Orientation orientation;
     public boolean bidirectional;
 
-    /** Explicit departure times from first stop; if set, startHour and endHour will be ignored*/
+    /** Explicit departure times from first stop; if set, startHour and endHour will be ignored. */
     public int[] startTimes;
 
     /** Override default hop times. Map of (trip, stopAtStartOfHop) to factor by which default hop is multiplied. */

@@ -9,7 +9,7 @@ import java.util.zip.GZIPInputStream;
 
 /**
  * Loads an ESRI ASCII grid containing integers and allows looking up values as booleans (where > 0).
- * This is used for
+ * This can be used for a basic stop location test using a simple population raster.
  */
 public class BooleanAsciiGrid {
 
@@ -51,19 +51,22 @@ public class BooleanAsciiGrid {
     }
 
     /**
-     * Get a grid for places where population density is over 5 people per square kilometer.
+     * Get a grid for places where population density is over 5 people per square kilometer in any neighboring cell.
      * We use the Gridded Population of the World v3 data set for 2015 UN-adjusted population density.
      * This data set was downloaded at 1/4 degree resolution in ESRI ASCII grid format. The grid file was edited
      * manually to eliminate the no-data value header, since I could not find a way to operate on no-value cells in the
      * QGIS raster calculator. Then the raster calculator in QGIS was used with the formula ("glds00ag15@1" > 5),
      * which makes all cells with population density above the threshold have a value of one,
-     * and all others a value of zero (since the no data value in the grid is -9999). This was then exported as another
-     * ASCII grid file, which zips well. The license for this data set is Creative Commons Attribution.
+     * and all others a value of zero (since the no data value in the grid is -9999). Next, the GRASS r.neighbors tool
+     * in QGIS was used to blur this layer, adding to each cell the sum of the neighboring eight cells ("neighborhood
+     * size" of 3, the dimension in each direction). A final logical operation ("blurred@1" > 0) was applied, with the
+     * result exported as another ASCII grid file, which zips well. The license for this data set is Creative Commons
+     * Attribution.
      * See http://sedac.ciesin.columbia.edu/data/collection/gpw-v3
      */
     public static BooleanAsciiGrid forEarthPopulation() {
         try {
-            InputStream gridStream = BooleanAsciiGrid.class.getResourceAsStream("gpwv3-quarter-boolean.asc");
+            InputStream gridStream = BooleanAsciiGrid.class.getResourceAsStream("gpwv3-quarter-buffer-boolean.asc");
             return new BooleanAsciiGrid(gridStream, false);
         } catch (Exception ex) {
             throw new RuntimeException(ex);

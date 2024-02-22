@@ -78,19 +78,19 @@ public class TravelTimeComputer {
 
         // Find the set of destinations for a travel time calculation, not yet linked to the street network, and with
         // no associated opportunities. By finding the extents and destinations up front, we ensure the exact same
-        // destination pointset is used for all steps below.
+        // destination PointSet is used for all steps below.
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
         PointSet destinations;
-
         if (request instanceof  RegionalTask
             && !request.makeTauiSite
             && request.destinationPointSets[0] instanceof FreeFormPointSet
         ) {
-            // Freeform; destination pointset was set by handleOneRequest in the main AnalystWorker
+            // Freeform destinations. Destination PointSet was set by handleOneRequest in the main AnalystWorker.
             destinations = request.destinationPointSets[0];
         } else {
-            // Gridded (non-freeform) destinations. The extents are found differently in regional and single requests.
+            // Gridded (non-freeform) destinations. This method finds them differently for regional and single requests.
+            // We don't support freeform destinations for single point requests, as they must also return gridded travel times.
             WebMercatorExtents destinationGridExtents = request.getWebMercatorExtents();
             // Make a WebMercatorGridPointSet with the right extents, referring to the network's base grid and linkage.
             destinations = AnalysisWorkerTask.gridPointSetCache.get(destinationGridExtents, network.fullExtentGridPointSet);
@@ -167,14 +167,16 @@ public class TravelTimeComputer {
             // The generalized cost calculations currently increment time and weight by the same amount.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
-            // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
-            // This implies you are dropped off or have a very easy parking spot for your vehicle.
-            // This kind of multi-stage search should also be used when building egress distance cost tables.
-            if (accessMode != StreetMode.WALK) {
-                sr.keepRoutingOnFoot();
-            }
 
             if (request.hasTransit()) {
+                // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
+                // This implies you are dropped off or have a very easy parking spot for your vehicle.
+                // This kind of multi-stage search should also be used when building egress distance cost tables.
+                // Note that this can take up to twice as long as the initial car/bike search. Do it only when the
+                // walking is necessary, and when the radius of the car/bike search is limited, as for transit access.
+                if (accessMode != StreetMode.WALK) {
+                    sr.keepRoutingOnFoot();
+                }
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();

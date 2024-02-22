@@ -162,6 +162,21 @@ public class AnalysisRequest {
     public ChaosParameters injectFault;
 
     /**
+     * Whether to include the number of opportunities reached during each minute of travel in results sent back
+     * to the broker. Requires both an origin and destination pointset to be specified, and in the case of regional
+     * analyses the origins must be non-gridded, and results will be collated to CSV.
+     * It should be possible to enable regional results for gridded origins as well.
+     */
+    public boolean includeTemporalDensity = false;
+
+    /**
+     * If this is set to a value above zero, report the amount of time needed to reach the given number of
+     * opportunities from this origin (known technically as "dual accessibility").
+     */
+    public int dualAccessibilityThreshold = 0;
+
+
+    /**
      * Create the R5 `Scenario` from this request.
      */
     public Scenario createScenario (UserPermissions userPermissions) {
@@ -201,9 +216,7 @@ public class AnalysisRequest {
         task.maxFare = maxFare;
         task.inRoutingFareCalculator = inRoutingFareCalculator;
 
-        // TODO define class with static factory function WebMercatorGridBounds.fromLatLonBounds().
-        //      Also include getIndex(x, y), getX(index), getY(index), totalTasks()
-        WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(bounds.envelope(), zoom);
+        WebMercatorExtents extents = WebMercatorExtents.forTrimmedWgsEnvelope(bounds.envelope(), zoom);
         task.height = extents.height;
         task.north = extents.north;
         task.west = extents.west;
@@ -265,6 +278,9 @@ public class AnalysisRequest {
                 throw new IllegalArgumentException("Must be admin user to inject faults.");
             }
         }
+
+        task.includeTemporalDensity = includeTemporalDensity;
+        task.dualAccessibilityThreshold = dualAccessibilityThreshold;
     }
 
     private EnumSet<LegMode> getEnumSetFromString (String s) {

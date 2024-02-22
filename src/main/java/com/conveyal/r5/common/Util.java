@@ -3,6 +3,7 @@ package com.conveyal.r5.common;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public abstract class Util {
 
@@ -64,6 +65,21 @@ public abstract class Util {
         int[] array = new int[length];
         Arrays.fill(array, defaultValue);
         return array;
+    }
+
+    /**
+     * Convenience method to create a 2D array and fill it immediately with new instances of a class.
+     * The supplier can be a method reference to a constructor like ToBeInstantiated::new, and the returned
+     * array will be of that type.
+     */
+    public static <T> T[][] newObjectArray (int d1, int d2, Supplier<T> supplier) {
+        T[][] result = (T[][]) new Object[d1][d2];
+        for (int x = 0; x < d1; x++) {
+            for (int y = 0; y < d2; y++) {
+                result[x][y] = supplier.get();
+            }
+        }
+        return result;
     }
 
 }

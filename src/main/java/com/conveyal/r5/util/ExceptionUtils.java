@@ -50,4 +50,25 @@ public abstract class ExceptionUtils {
         return shortCauseString(throwable) + "\n[detail follows]\n" + stackTraceString(throwable);
     }
 
+    /**
+     * Given a full stack trace string with one frame per line, keep only the exception name, the first stack frame,
+     * and all additional frames that come from Conveyal packages. This yields a much shorter stack trace that still
+     * shows where the exception was thrown and where the problem originates in our own code.
+     */
+    public static String filterStackTrace (Throwable throwable) {
+        String stackTrace = stackTraceString(throwable);
+        final String unknownFrame = "Unknown stack frame, probably optimized out by JVM.";
+        String error = stackTrace.lines().findFirst().get();
+        String frame = stackTrace.lines()
+                .map(String::strip)
+                .filter(s -> s.startsWith("at "))
+                .findFirst().orElse(unknownFrame);
+        String conveyalFrame = stackTrace.lines()
+                .map(String::strip)
+                .filter(s -> s.startsWith("at com.conveyal."))
+                .filter(s -> !frame.equals(s))
+                .findFirst().orElse("");
+        return String.join("\n", error, frame, conveyalFrame);
+    }
+
 }

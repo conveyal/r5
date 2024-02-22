@@ -38,6 +38,12 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues;
 
     /**
+     * The temporal density of opportunities - how many are reached during each minute of travel.
+     * Quantities of opportunities for each [destinationGrid, percentile, minute].
+     */
+    public double[][][] opportunitiesPerMinute;
+
+    /**
      * If this field is non-null, the worker is reporting an error that compromises the quality of the result at this
      * origin point, and potentially for then entire regional analysis. Put into a Set on backend since all workers
      * will probably report the same problem, but we may want to tolerate errors on a small number of origin points to
@@ -59,14 +65,21 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
+        this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 
-    /** Constructor used when results for this origin are considered unusable due to an unhandled error. */
+    /**
+     * Constructor used when results for this origin are considered unusable due to an unhandled error. Besides the
+     * short-form exception, most result fields are left null. There is no information to communicate, and because
+     * errors are often produced faster than valid results, we don't want to flood the backend with unnecessarily
+     * voluminous error reports. The short-form exception message is used for a similar reason, to limit the total size
+     * of error messages.
+     */
     public RegionalWorkResult(Throwable t, RegionalTask task) {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
-        this.error = ExceptionUtils.shortAndLongString(t);
+        this.error = ExceptionUtils.filterStackTrace(t);
     }
 
 }

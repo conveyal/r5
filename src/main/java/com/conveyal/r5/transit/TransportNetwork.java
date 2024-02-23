@@ -4,6 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.SelectedLink;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -90,6 +91,15 @@ public class TransportNetwork implements Serializable {
 
     /** Information about the effects of apparently correct scenario application, null on a base network */
     public transient List<TaskError> scenarioApplicationInfo;
+
+    /**
+     * If non-null, CSV path outputs will be filtered down to only include paths passing through this one specific area.
+     * This is not really a characteristic of the network, it's more similar to request-scoped parameters like
+     * AnalysisRequest.recordPaths. However, it requires some data structures that are slow to build, keyed on floating
+     * potentially fuzzy floating point geometries, and need to be retained across many requests, so it's modeled as a
+     * scenario modification. This is not ideal but it works. This modification can be applied at network build time.
+     */
+    public transient List<SelectedLink> selectedLinks;
 
     /**
      * Build some simple derived index tables that are not serialized with the network.

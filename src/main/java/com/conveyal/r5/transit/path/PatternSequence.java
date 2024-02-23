@@ -6,11 +6,15 @@ import gnu.trove.list.TIntList;
 import java.util.Objects;
 
 /**
- * A door-to-door path that includes the patterns ridden between stops
+ * A door-to-door path made up of transit legs, each composed of a TripPattern, board and alight stop.
+ * There is also information on ride and wait times and access and egress modes.
  */
 public class PatternSequence {
-    /** Pattern indexes (those used in R5 transit layer) for each transit leg */
+
+    /** Pattern indexes (those used in R5 TransitLayer) for each transit leg in the itinerary. */
     public final TIntList patterns;
+
+    /** Other information associated with each of the legs: board and alight stops, ride times etc. */
     public final StopSequence stopSequence;
 
     /**

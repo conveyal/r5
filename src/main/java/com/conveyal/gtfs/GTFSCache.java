@@ -48,10 +48,10 @@ public class GTFSCache implements Component {
     // The following two caches hold spatial indexes of GTFS geometries for generating Mapbox vector tiles, one spatial
     // index per feed keyed on BundleScopedFeedId. They could potentially be combined such that cache values are a
     // compound type holding two indexes, or cache values are a single index containing a mix of different geometry
-    // types that are filtered on iteration. They could also be integreated into the GTFSFeed values of the main
-    // GTFSCache#cache. However GTFSFeed is already a very long class, and we may want to tune eviction parameters
+    // types that are filtered on iteration. They could also be integrated into the GTFSFeed values of the main
+    // GTFSCache#cache. However, GTFSFeed is already a very long class, and we may want to tune eviction parameters
     // separately for GTFSFeed and these indexes. While GTFSFeeds are expected to incur constant memory use, the
-    // spatial indexes are potentially unlimited in size and we may want to evict them faster or limit their quantity.
+    // spatial indexes are potentially unlimited in size, so we may want to evict them faster or limit their quantity.
     // We have decided to keep them as separate caches until we're certain of the chosen eviction tuning parameters.
 
     /** A cache of spatial indexes of TripPattern shapes, keyed on the BundleScopedFeedId. */
@@ -127,6 +127,8 @@ public class GTFSCache implements Component {
         // The feedId of the GTFSFeed objects may not be unique - we can have multiple versions of the same feed
         // covering different time periods, uploaded by different users. Therefore we record another ID here that is
         // known to be unique across the whole application - the ID used to fetch the feed.
+        // NOTE as of 2023, this is no longer true. All uploaded feeds have assigned unique UUIDs so as far as I know
+        // they can't collide, we don't need this uniqueId field, and we may not even need bundle-scoped feed IDs.
         feed.uniqueId = id;
         return feed;
     }

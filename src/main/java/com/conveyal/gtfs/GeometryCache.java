@@ -19,7 +19,7 @@ import java.util.function.BiConsumer;
  * LoadingCache so should be thread safe and provide granular per-key locking, which is convenient when serving up
  * lots of simultaneous vector tile requests.
  *
- * This is currently used only for looking up geomertries when producing Mapbox vector map tiles, hence the single
+ * This is currently used only for looking up geometries when producing Mapbox vector map tiles, hence the single
  * set of hard-wired cache eviction parameters. For more general use we'd want another constructor to change them.
  */
 public class GeometryCache<T extends Geometry> {

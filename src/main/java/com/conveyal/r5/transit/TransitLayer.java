@@ -63,6 +63,10 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
 
+    /**
+     * If this is true, the detailed shapes from GTFS will be retained in the TransitLayer.
+     * If false, straight-line shapes will be used between stops.
+     */
     public static final boolean SAVE_SHAPES = false;
 
     /**
@@ -230,7 +234,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
         LOG.info("Creating trip patterns and schedules.");
 
-        // These are temporary maps used only for grouping purposes.
+        // These are temporary maps used only for grouping purposes within this one GTFS feed, not all feeds in a bundle.
         Map<String, TripPattern> tripPatternForPatternId = new HashMap<>();
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
 
@@ -242,7 +246,6 @@ public class TransitLayer implements Serializable, Cloneable {
             Trip trip = gtfs.trips.get(tripId);
             Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip.
-            String scopedRouteId = String.join(":", gtfs.feedId, trip.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -270,9 +273,10 @@ public class TransitLayer implements Serializable, Cloneable {
                     continue TRIPS;
                 }
 
-                if (previousDeparture == st.arrival_time) { //Teleportation: arrive at downstream stop immediately after departing upstream
-                    //often the result of a stop_times input with time values rounded to the nearest minute.
-                    //TODO check if the distance of the hop is reasonably traveled in less than 60 seconds, which may vary by mode.
+                if (previousDeparture == st.arrival_time) {
+                    // Teleportation: arrive at downstream stop immediately after departing upstream
+                    // often the result of a stop_times input with time values rounded to the nearest minute.
+                    // TODO check if the distance of the hop is reasonably traveled in less than 60 seconds, which may vary by mode.
                     nZeroDurationHops++;
                 }
 
@@ -288,79 +292,24 @@ public class TransitLayer implements Serializable, Cloneable {
 
             String patternId = gtfs.patternForTrip.get(tripId);
 
+            // Fetch or make the internal R5 TripPattern for the given gtfs-lib Pattern.
+            // Note that gtfs-lib Pattern IDs are UUIDs, so should be unique even across different feeds.
+            // The first time we encounter a trip with a given Pattern ID, we make the TripPattern.
+            // Certain characteristics of the pattern are derived from that Trip (notably the Shape) but could in
+            // theory be different on each trip in the pattern. In this edge case, encounter order of trips matters.
             TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(String.format("%s:%s", gtfs.feedId, route.route_id), stopTimes, indexForUnscopedStopId);
-
-                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
-                // create it.
                 if (level == LoadLevel.FULL) {
+                    // If we haven't seen the route yet _from this feed_ (as IDs are only feed-unique) create it.
                     if (!routeIndexForRoute.containsKey(trip.route_id)) {
                         int routeIndex = routes.size();
                         RouteInfo ri = new RouteInfo(route, gtfs.agency.get(route.agency_id));
                         routes.add(ri);
                         routeIndexForRoute.put(trip.route_id, routeIndex);
                     }
-
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
-
-                    if (trip.shape_id != null && SAVE_SHAPES) {
-                        Shape shape = gtfs.getShape(trip.shape_id);
-                        if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
-                        else {
-                            // TODO this will not work if some trips in the pattern don't have shapes
-                            tripPattern.shape = shape.geometry;
-
-                            // project stops onto shape
-                            boolean stopsHaveShapeDistTraveled = StreamSupport.stream(stopTimes.spliterator(), false)
-                                    .noneMatch(st -> Double.isNaN(st.shape_dist_traveled));
-                            boolean shapePointsHaveDistTraveled = DoubleStream.of(shape.shape_dist_traveled)
-                                    .noneMatch(Double::isNaN);
-
-                            LinearLocation[] locations;
-
-                            if (stopsHaveShapeDistTraveled && shapePointsHaveDistTraveled) {
-                                // create linear locations from dist traveled
-                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
-                                        .map(st -> {
-                                            double dist = st.shape_dist_traveled;
-
-                                            int segment = 0;
-
-                                            while (segment < shape.shape_dist_traveled.length - 2 &&
-                                                    dist > shape.shape_dist_traveled[segment + 1]
-                                                    ) segment++;
-
-                                            double endSegment = shape.shape_dist_traveled[segment + 1];
-                                            double beginSegment = shape.shape_dist_traveled[segment];
-                                            double proportion = (dist - beginSegment) / (endSegment - beginSegment);
-
-                                            return new LinearLocation(segment, proportion);
-                                        }).toArray(LinearLocation[]::new);
-                            } else {
-                                // naive snapping
-                                LocationIndexedLineInLocalCoordinateSystem line =
-                                        new LocationIndexedLineInLocalCoordinateSystem(shape.geometry.getCoordinates());
-
-                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
-                                        .map(st -> {
-                                            Stop stop = gtfs.stops.get(st.stop_id);
-                                            return line.project(new Coordinate(stop.stop_lon, stop.stop_lat));
-                                        })
-                                        .toArray(LinearLocation[]::new);
-                            }
-
-                            tripPattern.stopShapeSegment = new int[locations.length];
-                            tripPattern.stopShapeFraction = new float[locations.length];
-
-                            for (int i = 0; i < locations.length; i++) {
-                                tripPattern.stopShapeSegment[i] = locations[i].getSegmentIndex();
-                                tripPattern.stopShapeFraction[i] = (float) locations[i].getSegmentFraction();
-                            }
-                        }
-                    }
                 }
-
                 tripPatternForPatternId.put(patternId, tripPattern);
                 tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
@@ -387,11 +336,21 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         LOG.info("Done creating {} trips on {} patterns.", nTripsAdded, tripPatternForPatternId.size());
 
+        // Store shapes and associated linear locations of stops on the set of patterns created by this one GTFS feed.
+        // Instead, we usually perform this one pattern at a time on demand, only when needed by modifications.
+        if (SAVE_SHAPES) {
+            LOG.info("Referencing stop locations to shapes and breaking shapes into per-hop segments...");
+            for (TripPattern tripPattern : tripPatternForPatternId.values()) {
+                addShapeToTripPattern(gtfs, tripPattern);
+            }
+            LOG.info("Done processing shapes.");
+        }
+
         LOG.info("{} zero-duration hops found.", nZeroDurationHops);
 
         LOG.info("Chaining trips together according to blocks to model interlining...");
         // Chain together trips served by the same vehicle that allow transfers by simply staying on board.
-        // Elsewhere this is done by grouping by (serviceId, blockId) but this is not supported by the spec.
+        // This is done elsewhere by grouping by (serviceId, blockId) but this is not supported by the spec.
         // Discussion started on gtfs-changes.
         tripsForBlock.asMap().forEach((blockId, trips) -> {
             TripSchedule[] schedules = trips.toArray(new TripSchedule[trips.size()]);
@@ -411,9 +370,8 @@ public class TransitLayer implements Serializable, Cloneable {
         LOG.info("Finding the approximate center of the transport network...");
         findCenter(gtfs.stops.values());
 
-        //Set transportNetwork timezone
-        //If there are no agencies (which is strange) it is GMT
-        //Otherwise it is set to first valid agency timezone and warning is shown if agencies have different timezones
+        // Set TransportNetwork timezone. If there are no agencies (which is strange) it defaults to GMT.
+        // Otherwise, it is set to first valid agency timezone. Warning is shown if agencies have different timezones.
         if (gtfs.agency.size() == 0) {
             timeZone = ZoneId.of("GMT");
             LOG.warn("graph contains no agencies; API request times will be interpreted as GMT.");
@@ -466,6 +424,117 @@ public class TransitLayer implements Serializable, Cloneable {
 //            RouteTopology topology = new RouteTopology(routeAndDirection.first, routeAndDirection.second, patternsForRouteDirection.get(routeAndDirection));
 //        }
 
+    }
+
+    /**
+     * This code has been factored out of loadFromGtfs because it adds a lot of data to the TransportNetwork. We usually
+     * don't run it when creating the TransportNetwork, but instead run it as needed on single TripPatterns to save
+     * space. Factoring pieces out of loadFromGtfs also makes that method a bit more readable as it's very long.
+     * TODO test how much this actually increases feed size and consider enabling it when creating TransportNetworks.
+     * This could also be changed to return a compound type of the (shape, stopShapeSegment, and stopShapeFraction)
+     * fields of TripPattern, or only an array or list of hop geometries (if we don't ever want to persist them).
+     */
+    public static void addShapeToTripPattern (
+            GTFSFeed gtfsFeed,
+            TripPattern tripPattern
+    ) {
+        // First, find an exemplar trip that is representative of the TripPattern.
+        Trip trip = null;
+        Iterable<StopTime> stopTimes = null;
+        for (TripSchedule tripSchedule : tripPattern.tripSchedules) {
+            // In constructor, TripSchedule.tripId is set to String.join(":", trip.feed_id, trip.trip_id).
+            String[] tripIdParts = tripSchedule.tripId.split(":");
+            if (!tripIdParts[0].equals(gtfsFeed.feedId)) {
+                LOG.warn("Feed ID scope of trip ID for TripSchedule in TripPattern does not match supplied GTFS feed.");
+                continue;
+            }
+            String unscopedTripId = tripIdParts[1];
+            Trip candidateTrip = gtfsFeed.trips.get(unscopedTripId);
+            if (candidateTrip == null) {
+                LOG.warn("Could not find trip for unscoped ID " + unscopedTripId);
+                continue;
+            }
+            if (trip == null || candidateTrip.shape_id != null) {
+                try {
+                    // FIXME here and below: why did we need interpolated stop times? We are only the positions right?
+                    Iterable<StopTime> candidateStopTimes = gtfsFeed.getInterpolatedStopTimesForTrip(unscopedTripId);
+                    // Iterable<StopTime> candidateStopTimes = gtfsFeed.getOrderedStopTimesForTrip(unscopedTripId);
+                    // All checks succeeded, retain the information from this trip as the exemplar for the pattern.
+                    trip = candidateTrip;
+                    stopTimes = candidateStopTimes;
+                } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
+                    continue;
+                }
+            }
+            if (candidateTrip.shape_id != null) {
+                // Found exemplar trip with explicit shape, no need to search further.
+                // Otherwise, we found a suitable trip but its shape will be composed of straight lines.
+                // Retain it, but continue iterative search for trips in pattern having explicit shapes.
+                break;
+            }
+        }
+        // Could add a possibly slow check: get each trip, check if exemplarTrip.shapeId equals shape in each trip.
+        // LOG.warn(String.format("Multiple trips in the same TripPattern have different shapes (e.g. %s and %s)")
+
+        if (trip == null) {
+            LOG.warn("Did not find any exemplar trip with usable StopTimes for pattern " + tripPattern);
+            return;
+        }
+        final Shape shape = gtfsFeed.getShape(trip.shape_id);
+        if (shape == null) {
+            LOG.debug("Trip {} has no explicit shape, straight lines will be used.", trip.trip_id, trip.shape_id);
+            return;
+        }
+        tripPattern.shape = shape.geometry;
+
+        // Project stop locations onto the shape geometry.
+
+        boolean stopsHaveShapeDistTraveled = StreamSupport.stream(stopTimes.spliterator(), false)
+                .noneMatch(st -> Double.isNaN(st.shape_dist_traveled));
+        boolean shapePointsHaveDistTraveled = DoubleStream.of(shape.shape_dist_traveled)
+                .noneMatch(Double::isNaN);
+
+        LinearLocation[] locations;
+
+        if (stopsHaveShapeDistTraveled && shapePointsHaveDistTraveled) {
+            // Create linear locations from the distance traveled along the shape.
+            final Shape finalShape = shape;
+            locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                    .map(st -> {
+                        double dist = st.shape_dist_traveled;
+
+                        int segment = 0;
+
+                        while (segment < finalShape.shape_dist_traveled.length - 2 &&
+                                dist > finalShape.shape_dist_traveled[segment + 1]
+                        ) segment++;
+
+                        double endSegment = finalShape.shape_dist_traveled[segment + 1];
+                        double beginSegment = finalShape.shape_dist_traveled[segment];
+                        double proportion = (dist - beginSegment) / (endSegment - beginSegment);
+
+                        return new LinearLocation(segment, proportion);
+                    }).toArray(LinearLocation[]::new);
+        } else {
+            // naive snapping
+            LocationIndexedLineInLocalCoordinateSystem line =
+                    new LocationIndexedLineInLocalCoordinateSystem(shape.geometry.getCoordinates());
+
+            locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                    .map(st -> {
+                        Stop stop = gtfsFeed.stops.get(st.stop_id);
+                        return line.project(new Coordinate(stop.stop_lon, stop.stop_lat));
+                    })
+                    .toArray(LinearLocation[]::new);
+        }
+
+        tripPattern.stopShapeSegment = new int[locations.length];
+        tripPattern.stopShapeFraction = new float[locations.length];
+
+        for (int i = 0; i < locations.length; i++) {
+            tripPattern.stopShapeSegment[i] = locations[i].getSegmentIndex();
+            tripPattern.stopShapeFraction[i] = (float) locations[i].getSegmentFraction();
+        }
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.
@@ -819,14 +888,14 @@ public class TransitLayer implements Serializable, Cloneable {
      * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
      * also include a route_short_name or route_long_name (if they are not null).
      */
-    public String routeString(int routeIndex, boolean includeName) {
+    public String routeString(int routeIndex, boolean nameNotId) {
         RouteInfo routeInfo = routes.get(routeIndex);
         String route = routeInfo.route_id;
-        if (includeName) {
+        if (nameNotId) {
             if (routeInfo.route_short_name != null) {
-                route += " (" + routeInfo.route_short_name + ")";
+                route = routeInfo.route_short_name;
             } else if (routeInfo.route_long_name != null){
-                route += " (" + routeInfo.route_long_name + ")";
+                route = routeInfo.route_long_name;
             }
         }
         return route;

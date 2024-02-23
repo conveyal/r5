@@ -6,11 +6,13 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.SelectLink;
 import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
@@ -32,6 +34,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -133,6 +136,25 @@ public class TransportNetworkCache implements Component {
             LOG.debug("Applying scenario to base network...");
             // Fetch the full scenario if an ID was specified.
             Scenario scenario = resolveScenario(networkId, scenarioId);
+
+            // EXPERIMENTAL: Allow select-link modification type to read GTFSFeeds, to see all shape geometries.
+            for (Modification modification : scenario.modifications) {
+                if (modification instanceof SelectLink) {
+                    // This seems to be the only way to see the original bundle-scoped feed IDs and reverse-map them.
+                    TransportNetworkConfig networkConfig = loadNetworkConfig(networkId);
+                    Map<String, GTFSFeed> feedForUnscopedId = new HashMap<>();
+                    for (String bundleScopedFeedId : networkConfig.gtfsIds) {
+                        GTFSFeed feed = gtfsCache.get(bundleScopedFeedId);
+                        String unscopedFeedId = feed.feedId; // The unscoped ID known inside the TripPatterns
+                        GTFSFeed existingValue = feedForUnscopedId.put(unscopedFeedId, feed);
+                        if (existingValue != null) {
+                            LOG.warn("Feed ID collision when removing bundle/feedGroup scope from IDs.");
+                        }
+                    }
+                    ((SelectLink) modification).injectGtfs(feedForUnscopedId);
+                }
+            }
+
             // Apply any scenario modifications to the network before use, performing protective copies where necessary.
             // We used to prepend a filter to the scenario, removing trips that are not running during the search time window.
             // However, because we are caching transportNetworks with scenarios already applied to them, we can’t use
@@ -159,7 +181,14 @@ public class TransportNetworkCache implements Component {
         return new FileStorageKey(BUNDLES, getR5NetworkFilename(networkId));
     }
 
-    /** @return the network configuration (AKA manifest) for the given network ID, or null if no config file exists. */
+    /**
+     * Each bundle has a corresponding JSON file listing its OSM and GTFS IDs among other things. Its base name is the
+     * UUID of the bundle, which is also the UUID of any derived TransportNetworks.
+     * There is a one-to-one correspondence between bundles and TransportNetworks: the ID of a TransportNetwork, as
+     * well as the base of its filename, are identical to the ID of its corresponding bundle of input data.
+     * TransportNetworks are always built on the workers, based on the contents of the JSON network config.
+     * @return the network configuration (AKA manifest) for the given network ID, or null if no config file exists.
+     */
     private TransportNetworkConfig loadNetworkConfig (String networkId) {
         FileStorageKey configFileKey = new FileStorageKey(BUNDLES, getNetworkConfigFilename(networkId));
         if (!fileStorage.exists(configFileKey)) {
@@ -167,7 +196,7 @@ public class TransportNetworkCache implements Component {
         }
         File configFile = fileStorage.getFile(configFileKey);
         try {
-            // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            // Use lenient mapper to mimic behavior in objectFromRequestBody. Method closes the file when complete.
             return JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
             throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
@@ -304,9 +333,7 @@ public class TransportNetworkCache implements Component {
         transferFinder.findParkRideTransfer();
 
         // Apply modifications embedded in the TransportNetworkConfig JSON
-        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
-                RasterCost.class, ShapefileLts.class
-        );
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(RasterCost.class, ShapefileLts.class);
         if (config.modifications != null) {
             // Scenario scenario = new Scenario();
             // scenario.modifications = config.modifications;

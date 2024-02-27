@@ -765,7 +765,7 @@ public class Grid extends PointSet {
         SimpleFeatureCollection features = reader.getFeatures();
         Envelope envelope = features.getBounds();
 
-        checkWgsEnvelopeSize(envelope, "Shapefile");
+        checkWgsEnvelopeSize(envelope, "GeoJSON file");
         WebMercatorExtents extents = WebMercatorExtents.forWgsEnvelope(envelope, zoom);
 
         int total = features.size();

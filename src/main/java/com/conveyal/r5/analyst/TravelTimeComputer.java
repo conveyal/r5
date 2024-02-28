@@ -180,18 +180,18 @@ public class TravelTimeComputer {
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
-                TIntIntMap adjustedTravelTimesToSeconds = new TIntIntHashMap();
+                TIntIntMap adjustedTravelTimesToStopsSeconds = new TIntIntHashMap();
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying access times to {} transit stops (to wait for {} pick-up).",
                             accessService.waitTimesForStops.size(),
                             accessMode);
                     accessService.waitTimesForStops.forEachEntry((stop, wait) -> {
                         if (travelTimesToStopsSeconds.containsKey(stop)) {
-                            adjustedTravelTimesToSeconds.put(stop, wait + travelTimesToStopsSeconds.get(stop));
+                            adjustedTravelTimesToStopsSeconds.put(stop, wait + travelTimesToStopsSeconds.get(stop));
                         }
                         return true;
                     });
-                    bestAccessOptions.update(adjustedTravelTimesToSeconds, accessMode);
+                    bestAccessOptions.update(adjustedTravelTimesToStopsSeconds, accessMode);
                 } else {
                     bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
                 }

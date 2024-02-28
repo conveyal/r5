@@ -39,13 +39,6 @@ public class PickupDelay extends Modification {
     public String zonePolygons;
 
     /**
-     * The identifier of the polygon layer containing the stops associated with the zones, if any.
-     * Having two different polygon files raises questions about whether the attribute names can be set separately,
-     * and how we would factor out that aspect of the polygon loading code.
-     */
-    // public String stopPolygons;
-
-    /**
      * The name of the attribute (floating-point) within the polygon layer that contains the pick-up wait time
      * (in minutes). Negative waiting times mean the area is not served at all.
      */
@@ -95,12 +88,6 @@ public class PickupDelay extends Modification {
 
     /** The result of resolving this modification against the TransportNetwork. */
     private transient PickupWaitTimes pickupWaitTimes;
-
-    /**
-     * These polygons contain the stops served by the zones. Wait times are also loaded for these polygons and will be
-     * used on the egress end of the itinerary.
-     */
-    //private transient IndexedPolygonCollection stopPolygons;
 
     // Implementations of methods for the Modification interface
 

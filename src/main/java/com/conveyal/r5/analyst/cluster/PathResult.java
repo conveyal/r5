@@ -64,7 +64,8 @@ public class PathResult {
             "transferTime",
             "waitTimes",
             "totalTime",
-            "nIterations"
+            "nIterations",
+            "group"
     };
 
     public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
@@ -141,7 +142,10 @@ public class PathResult {
                             score = thisScore;
                         }
                     }
-                    String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, String.valueOf(nIterations));
+                    String group = ""; // Reserved for future use
+                    String[] row = ArrayUtils.addAll(
+                            path, transfer, waits, totalTime, String.valueOf(nIterations), group
+                    );
                     checkState(row.length == DATA_COLUMNS.length);
                     summary[d].add(row);
                 }

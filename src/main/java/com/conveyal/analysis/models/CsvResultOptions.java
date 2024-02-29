@@ -1,6 +1,5 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
 
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;

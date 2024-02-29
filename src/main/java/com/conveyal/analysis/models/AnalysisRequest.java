@@ -12,7 +12,6 @@ import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.transit.TransitLayer;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.checkerframework.checker.units.qual.C;

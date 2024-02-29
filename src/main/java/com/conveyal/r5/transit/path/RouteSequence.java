@@ -33,22 +33,26 @@ public class RouteSequence {
 
     /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
     public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
-        StringJoiner routeIds = new StringJoiner("|");
-        StringJoiner boardStopIds = new StringJoiner("|");
-        StringJoiner alightStopIds = new StringJoiner("|");
+        StringJoiner routeString = new StringJoiner("|");
+        StringJoiner boardStops = new StringJoiner("|");
+        StringJoiner alightStops = new StringJoiner("|");
+        StringJoiner feedString = new StringJoiner("|");
         StringJoiner rideTimes = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
-            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
-            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
+            routeString.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
+            boardStops.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
+            alightStops.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
+            if (csvOptions.feedRepresentation != null) {
+                feedString.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
+            }
             rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
         String egressTime = stopSequence.egress == null ? null : String.format("%.1f", stopSequence.egress.time / 60f);
         return new String[]{
-                routeIds.toString(),
-                boardStopIds.toString(),
-                alightStopIds.toString(),
+                routeString.toString(),
+                boardStops.toString(),
+                alightStops.toString(),
                 rideTimes.toString(),
                 accessTime,
                 egressTime

@@ -14,7 +14,6 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.checkerframework.checker.units.qual.C;
 
 import java.time.LocalDate;
 import java.util.ArrayList;

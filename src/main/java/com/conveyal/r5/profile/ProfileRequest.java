@@ -123,6 +123,8 @@ public class ProfileRequest implements Serializable, Cloneable {
     
     /** the maximum number of options presented PER ACCESS MODE */
     public int limit;
+
+    public boolean lockSchedules = false;
     
     /** The modes used to access transit */
     @JsonSerialize(using = LegModeSetSerializer.class)

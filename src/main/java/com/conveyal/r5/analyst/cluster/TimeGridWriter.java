@@ -161,7 +161,11 @@ public class TimeGridWriter {
                 for (int x = 0; x < extents.width; x++) {
                     for (int n = 0; n < travelTimeResult.nSamplesPerPoint; n++) {
                         val = travelTimeResult.values[n][(y * extents.width + x)];
-                        if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
+                        if (val < FastRaptorWorker.UNREACHED) {
+                            raster.setSample(x, y, n, val);
+                        } else {
+                            raster.setSample(x, y, n, 999);
+                        }
                     }
                 }
             }

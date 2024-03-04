@@ -23,6 +23,8 @@ public class SpeedConfig {
      */
     public int defaultSpeed;
 
+    private static double SCALE = 1.0;
+
     /**
      * Build a speed factory given a config node, or fallback to the default if none is specified.
      *
@@ -62,18 +64,18 @@ public class SpeedConfig {
     public static SpeedConfig defaultConfig() {
         SpeedConfig speedConfig = new SpeedConfig();
         speedConfig.units = SpeedUnit.MPH;
-        speedConfig.addCarSpeed("motorway", 65);
-        speedConfig.addCarSpeed("motorway_link", 35);
-        speedConfig.addCarSpeed("trunk", 55);
-        speedConfig.addCarSpeed("trunk_link", 35);
-        speedConfig.addCarSpeed("primary", 45);
-        speedConfig.addCarSpeed("primary_link", 25);
-        speedConfig.addCarSpeed("secondary", 35);
-        speedConfig.addCarSpeed("secondary_link", 25);
-        speedConfig.addCarSpeed("tertiary", 25);
-        speedConfig.addCarSpeed("tertiary_link", 25);
-        speedConfig.addCarSpeed("living_street", 5);
-        speedConfig.defaultSpeed = 25;
+        speedConfig.addCarSpeed("motorway", (int) (65  * SCALE));
+        speedConfig.addCarSpeed("motorway_link", (int) (35 * SCALE));
+        speedConfig.addCarSpeed("trunk", (int) (55 * SCALE));
+        speedConfig.addCarSpeed("trunk_link", (int) (35 * SCALE));
+        speedConfig.addCarSpeed("primary", (int)  (45 * SCALE));
+        speedConfig.addCarSpeed("primary_link", (int)  (25 * SCALE));
+        speedConfig.addCarSpeed("secondary", (int)  (35  * SCALE));
+        speedConfig.addCarSpeed("secondary_link", (int) (25 * SCALE));
+        speedConfig.addCarSpeed("tertiary", (int) (25 * SCALE));
+        speedConfig.addCarSpeed("tertiary_link", (int) (25 * SCALE));
+        speedConfig.addCarSpeed("living_street", (int) (5 * SCALE));
+        speedConfig.defaultSpeed = (int) (25  * SCALE);
         return speedConfig;
     }
 

@@ -51,6 +51,7 @@ public class RouteSequence {
             routeJoiner.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
             boardStopJoiner.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
             alightStopJoiner.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
+            if (csvOptions.feedRepresentation != null) {
                 feedJoiner.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
             }
             rideTimeJoiner.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));

@@ -34,6 +34,12 @@ public class RouteSequence {
     /**
      * Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer.
      * @param csvOptions indicates whether names or IDs should be returned for certain fields.
+     * @return array of pipe-concatenated strings, with the route, board stop, alight stop, ride time, and feed for
+     * each transit leg, as well as the access and egress time.
+     * 
+     * If csvOptions.feedRepresentation is not null, the feed values will be R5-generated UUID for boarding stop of
+     * each leg. We are grabbing the feed ID from the stop rather than the route (which might seem like a better
+     * representative of the leg) because stops happen to have a readily available feed ID.
      */
     public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
         StringJoiner routeJoiner = new StringJoiner("|");

@@ -56,6 +56,7 @@ public class RouteSequence {
                 boardStopJoiner.toString(),
                 alightStopJoiner.toString(),
                 rideTimeJoiner.toString(),
+                feedJoiner.toString(),
                 accessTime,
                 egressTime
         };

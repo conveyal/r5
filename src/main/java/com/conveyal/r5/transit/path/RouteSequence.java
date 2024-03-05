@@ -36,27 +36,26 @@ public class RouteSequence {
      * @param csvOptions indicates whether names or IDs should be returned for certain fields.
      */
     public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
-        StringJoiner routeString = new StringJoiner("|");
-        StringJoiner boardStops = new StringJoiner("|");
-        StringJoiner alightStops = new StringJoiner("|");
-        StringJoiner feedString = new StringJoiner("|");
-        StringJoiner rideTimes = new StringJoiner("|");
+        StringJoiner routeJoiner = new StringJoiner("|");
+        StringJoiner boardStopJoiner = new StringJoiner("|");
+        StringJoiner alightStopJoiner = new StringJoiner("|");
+        StringJoiner feedJoiner = new StringJoiner("|");
+        StringJoiner rideTimeJoiner = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeString.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
-            boardStops.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
-            alightStops.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
-            if (csvOptions.feedRepresentation != null) {
-                feedString.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
+            routeJoiner.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
+            boardStopJoiner.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
+            alightStopJoiner.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
+                feedJoiner.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
             }
-            rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
+            rideTimeJoiner.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
         String egressTime = stopSequence.egress == null ? null : String.format("%.1f", stopSequence.egress.time / 60f);
         return new String[]{
-                routeString.toString(),
-                boardStops.toString(),
-                alightStops.toString(),
-                rideTimes.toString(),
+                routeJoiner.toString(),
+                boardStopJoiner.toString(),
+                alightStopJoiner.toString(),
+                rideTimeJoiner.toString(),
                 accessTime,
                 egressTime
         };

@@ -31,7 +31,10 @@ public class RouteSequence {
         }
     }
 
-    /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
+    /**
+     * Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer.
+     * @param csvOptions indicates whether names or IDs should be returned for certain fields.
+     */
     public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
         StringJoiner routeString = new StringJoiner("|");
         StringJoiner boardStops = new StringJoiner("|");

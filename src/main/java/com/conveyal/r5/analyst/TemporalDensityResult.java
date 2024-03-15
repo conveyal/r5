@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.google.common.base.Preconditions;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
@@ -87,6 +88,36 @@ public class TemporalDensityResult {
             }
         }
         return result;
+    }
+
+    public int[][][] fakeDualAccess (RegionalTask task) {
+        int nPointSets = task.destinationPointSets.length;
+        int nCutoffs = task.cutoffsMinutes.length;
+        int[][][] dualAccess = new int[nPointSets][nPercentiles][nCutoffs];
+        for (int d = 0; d < nPointSets; d++) {
+            for (int p = 0; p < nPercentiles; p++) {
+                // Hack: use cutoffs as dual access thresholds
+                for (int c = 0; c < nCutoffs - 1; c++) {
+                    int m = 0;
+                    double sum = 0;
+                    while (sum < task.cutoffsMinutes[c] && m < 120) {
+                        sum += opportunitiesPerMinute[d][p][m];
+                        m += 1;
+                    }
+                    dualAccess[d][p][c] = m == 0 ? 999 : m;
+                }
+                // But hack above won't allow thresholds over 120; so use the dualAccessibilityThreshold instead of
+                // the last cutoff
+                int m = 0;
+                double sum = 0;
+                while (sum < task.dualAccessibilityThreshold && m < 120) {
+                    sum += opportunitiesPerMinute[d][p][m];
+                    m += 1;
+                }
+                dualAccess[d][p][nCutoffs - 1] = m == 0 ? 999 : m;
+            }
+        }
+        return dualAccess;
     }
 
     public int[][] minutesToReachOpportunities() {

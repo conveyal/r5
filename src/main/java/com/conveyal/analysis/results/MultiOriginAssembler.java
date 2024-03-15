@@ -139,7 +139,8 @@ public class MultiOriginAssembler {
                     // We might want to record a grid of dual accessibility values, but this will require some serious
                     // refactoring of the GridResultWriter.
                     // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
-                    throw new IllegalArgumentException("Temporal density of opportunities cannot be recorded for gridded origin points.");
+                    // throw new IllegalArgumentException("Temporal density of opportunities cannot be recorded for " +
+                    //        "gridded origin points.");
                 } else {
                     // Freeform origins.
                     // Output includes temporal density of opportunities and optionally dual accessibility.

@@ -63,7 +63,7 @@ public class RegionalWorkResult {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
-        this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
+        this.accessibilityValues = result.accessibility == null ? null : result.density.fakeDualAccess(task);
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
         this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing

@@ -65,7 +65,7 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         if (result.accessibility == null) {
             this.accessibilityValues = null;
-        } else if (task.flags.contains("gridDualAccess")) {
+        } else if (task.hasFlag("gridDualAccess")) {
             this.accessibilityValues = result.density.fakeDualAccess(task);
         } else {
             this.accessibilityValues = result.accessibility.getIntValues();

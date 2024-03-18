@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -406,6 +407,10 @@ public class AnalysisWorker implements Component {
     protected void handleOneRegionalTask (RegionalTask task) throws Throwable {
 
         LOG.debug("Handling regional task {}", task.toString());
+
+        // Force dual access results for grid (remove once broker has been relaunched to support custom flags)
+        LOG.info("Forcing dual access results");
+        task.flags = Set.of("gridDualAccess");
 
         if (task.injectFault != null) {
             task.injectFault.considerShutdownOrException(task.taskId);

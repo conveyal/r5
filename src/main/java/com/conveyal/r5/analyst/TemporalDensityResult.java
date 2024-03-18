@@ -95,11 +95,12 @@ public class TemporalDensityResult {
      * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
      * the cutoffs and task.dualAccessibilityThreshold) in the specified destination layer at a given percentile of
      * travel time. If the threshold cannot be reached in less than 120 minutes, returns 0.
-     * This is a temporary experimental feature, (ab)using existing features in the UI and backend so that grid access
-     * results can be obtained without any changes to those other components of our system. It uses the supplied
-     * task.cutoffsMinutes, except for the last one, as dual access thresholds. In place of the last cutoffsMinutes
-     * value, it uses task.dualAccessibilityThreshold (which is initialized to 0, so this is safe even if a user does
-     * not supply it).
+     * This is a temporary experimental feature, (ab)using existing features in the UI and backend so that dual access
+     * results for grid origins can be obtained without any changes to those other components of our system. It uses
+     * the supplied task.cutoffsMinutes as dual access thresholds. If a nonzero task.dualAccessibility In place of the
+     * last
+     * cutoffsMinutes value, it uses task.dualAccessibilityThreshold (which is initialized to 0, so this is safe even
+     * if a user does not supply it).
      */
     public int[][][] fakeDualAccess (RegionalTask task) {
         int nPointSets = task.destinationPointSets.length;
@@ -108,7 +109,7 @@ public class TemporalDensityResult {
         for (int d = 0; d < nPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
                 // Hack: use cutoffs as dual access thresholds
-                for (int c = 0; c < nCutoffs - 1; c++) {
+                for (int c = 0; c < nCutoffs; c++) {
                     int m = 0;
                     double sum = 0;
                     while (sum < task.cutoffsMinutes[c] && m < 120) {
@@ -117,15 +118,17 @@ public class TemporalDensityResult {
                     }
                     dualAccess[d][p][c] = m;
                 }
-                // But the hack above won't allow thresholds over 120 (see validateCutoffsMinutes()); so use the
-                // dualAccessibilityThreshold instead of the last cutoff.
-                int m = 0;
-                double sum = 0;
-                while (sum < task.dualAccessibilityThreshold && m < 120) {
-                    sum += opportunitiesPerMinute[d][p][m];
-                    m += 1;
+                // But the hack above won't allow thresholds over 120 (see validateCutoffsMinutes()); so overwrite
+                // the value for the last cutoff if a nonzero task.dualAccessibilityThreshold value is supplied.
+                if (task.dualAccessibilityThreshold != 0) {
+                    int m = 0;
+                    double sum = 0;
+                    while (sum < task.dualAccessibilityThreshold && m < 120) {
+                        sum += opportunitiesPerMinute[d][p][m];
+                        m += 1;
+                    }
+                    dualAccess[d][p][nCutoffs - 1] = m;
                 }
-                dualAccess[d][p][nCutoffs - 1] = m;
             }
         }
         return dualAccess;

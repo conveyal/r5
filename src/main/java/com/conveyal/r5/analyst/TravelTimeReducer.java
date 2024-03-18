@@ -145,7 +145,7 @@ public class TravelTimeReducer {
         if (task.includePathResults) {
             pathResult = new PathResult(task, network.transitLayer);
         }
-        if (task.includeTemporalDensity || task.flags.contains("gridDualAccess")) {
+        if (task.includeTemporalDensity || task.hasFlag("gridDualAccess")) {
             temporalDensityResult = new TemporalDensityResult(task);
         }
 

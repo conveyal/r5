@@ -63,7 +63,13 @@ public class RegionalWorkResult {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
-        this.accessibilityValues = result.accessibility == null ? null : result.density.fakeDualAccess(task);
+        if (result.accessibility == null) {
+            this.accessibilityValues = null;
+        } else if (task.flags.contains("gridDualAccess")) {
+            this.accessibilityValues = result.density.fakeDualAccess(task);
+        } else {
+            this.accessibilityValues = result.accessibility.getIntValues();
+        }
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
         this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing

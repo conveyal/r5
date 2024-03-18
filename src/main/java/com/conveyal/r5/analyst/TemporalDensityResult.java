@@ -90,6 +90,17 @@ public class TemporalDensityResult {
         return result;
     }
 
+    /**
+     * Writes dual access travel time values (in minutes) to our standard access grid format. The value returned (for
+     * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
+     * the cutoffs and task.dualAccessibilityThreshold) in the specified destination layer at a given percentile of
+     * travel time. If the threshold cannot be reached in less than 120 minutes, returns 0.
+     * This is a temporary experimental feature, (ab)using existing features in the UI and backend so that grid access
+     * results can be obtained without any changes to those other components of our system. It uses the supplied
+     * task.cutoffsMinutes, except for the last one, as dual access thresholds. In place of the last cutoffsMinutes
+     * value, it uses task.dualAccessibilityThreshold (which is initialized to 0, so this is safe even if a user does
+     * not supply it).
+     */
     public int[][][] fakeDualAccess (RegionalTask task) {
         int nPointSets = task.destinationPointSets.length;
         int nCutoffs = task.cutoffsMinutes.length;
@@ -104,17 +115,17 @@ public class TemporalDensityResult {
                         sum += opportunitiesPerMinute[d][p][m];
                         m += 1;
                     }
-                    dualAccess[d][p][c] = m == 0 ? 999 : m;
+                    dualAccess[d][p][c] = m;
                 }
-                // But hack above won't allow thresholds over 120; so use the dualAccessibilityThreshold instead of
-                // the last cutoff
+                // But the hack above won't allow thresholds over 120 (see validateCutoffsMinutes()); so use the
+                // dualAccessibilityThreshold instead of the last cutoff.
                 int m = 0;
                 double sum = 0;
                 while (sum < task.dualAccessibilityThreshold && m < 120) {
                     sum += opportunitiesPerMinute[d][p][m];
                     m += 1;
                 }
-                dualAccess[d][p][nCutoffs - 1] = m == 0 ? 999 : m;
+                dualAccess[d][p][nCutoffs - 1] = m;
             }
         }
         return dualAccess;

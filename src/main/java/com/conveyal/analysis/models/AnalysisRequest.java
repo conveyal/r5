@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -175,6 +176,14 @@ public class AnalysisRequest {
      */
     public int dualAccessibilityThreshold = 0;
 
+    /**
+     * Freeform (untyped) flags for enabling experimental, undocumented, or arcane behavior in backend or workers.
+     * This should be used to replace all previous special behavior flags that were embedded inside analysis names etc.
+     */
+    public Set<String> flags;
+
+    /** Control the details of CSV regional analysis output, including whether to output IDs, names, or both. */
+    public CsvResultOptions csvResultOptions = new CsvResultOptions();
 
     /**
      * Create the R5 `Scenario` from this request.
@@ -281,6 +290,8 @@ public class AnalysisRequest {
 
         task.includeTemporalDensity = includeTemporalDensity;
         task.dualAccessibilityThreshold = dualAccessibilityThreshold;
+        task.flags = flags;
+        task.csvResultOptions = csvResultOptions;
     }
 
     private EnumSet<LegMode> getEnumSetFromString (String s) {

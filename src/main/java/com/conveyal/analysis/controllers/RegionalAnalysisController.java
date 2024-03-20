@@ -267,7 +267,7 @@ public class RegionalAnalysisController implements HttpController {
             if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
                 throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
             }
-            // Map from cryptic UUIDs to human readable strings that can replace them.
+            // Map from cryptic UUIDs to human-readable strings that can replace them.
             Map<String, String> friendlyReplacements = new HashMap<>();
             {
                 // Replace the regional analysis ID with its name.
@@ -414,21 +414,22 @@ public class RegionalAnalysisController implements HttpController {
         if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
             throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
         }
-        // Process has a lot of overhead: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        // Significant overhead here: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
         FileStorageKey singleCutoffFileStorageKey = getSingleCutoffGrid(
                 analysis, cutoffIndex, destinationPointSetId, percentile, format
         );
+        // Create alternative human-readable filename. Similar to internal storage key name, but using a shortened
+        // ID for the destinations and the user-specified name for the project. This project name may contain invalid
+        // characters, but will be sanitized by getJsonUrl. We use the end of the dataset ID rather than the beginning
+        // because it's more likely to be different when several datasets are created in rapid succession.
+        String shortDestinationId = destinationPointSetId.substring(
+                destinationPointSetId.length() - 5, destinationPointSetId.length()
+        );
+        int cutoffMinutes =
+                analysis.cutoffsMinutes != null ? analysis.cutoffsMinutes[cutoffIndex] : analysis.cutoffMinutes;
+        String rawHumanName = String.format("%s_%s_P%d_C%d", analysis.name, shortDestinationId, percentile, cutoffMinutes);
         res.type(APPLICATION_JSON.asString());
-        // Substitute human readable name and shorten destination UUID.
-        // TODO better system for resolving UUID to human readable names in single and multi-grid cases
-        //      Or maybe only allow multi-grid download for saving by end user, and single grid is purely internal.
-        int firstUnderscore = singleCutoffFileStorageKey.path.indexOf('_');
-        int secondUnderscore = singleCutoffFileStorageKey.path.indexOf('_', firstUnderscore + 1);
-        int lastDot = singleCutoffFileStorageKey.path.lastIndexOf('.');
-        String humanName = analysis.name +
-                singleCutoffFileStorageKey.path.substring(firstUnderscore, firstUnderscore + 6) +
-                singleCutoffFileStorageKey.path.substring(secondUnderscore, lastDot);
-        return fileStorage.getJsonUrl(singleCutoffFileStorageKey, humanName, format.extension);
+        return fileStorage.getJsonUrl(singleCutoffFileStorageKey, rawHumanName, format.extension.toLowerCase(Locale.ROOT));
     }
 
     private Object getCsvResults (Request req, Response res) {

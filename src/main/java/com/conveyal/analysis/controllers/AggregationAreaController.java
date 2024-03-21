@@ -10,6 +10,7 @@ import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
+import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.r5.analyst.progress.Task;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.bson.conversions.Bson;
@@ -27,6 +28,7 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
 
 /**
  * Stores vector aggregationAreas (used to define the region of a weighted average accessibility metric).
@@ -98,10 +100,10 @@ public class AggregationAreaController implements HttpController {
     }
 
     /** Returns a JSON-wrapped URL for the mask grid of the aggregation area whose id matches the path parameter. */
-    private ObjectNode getAggregationAreaGridUrl (Request req, Response res) {
+    private UrlWithHumanName getAggregationAreaGridUrl (Request req, Response res) {
         AggregationArea aggregationArea = aggregationAreaCollection.findPermittedByRequestParamId(req);
-        String url = fileStorage.getURL(aggregationArea.getStorageKey());
-        return JsonUtil.objectNode().put("url", url);
+        res.type(APPLICATION_JSON.asString());
+        return fileStorage.getJsonUrl(aggregationArea.getStorageKey(), aggregationArea.name, "grid");
     }
 
     @Override

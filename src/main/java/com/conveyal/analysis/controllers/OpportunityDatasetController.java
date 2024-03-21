@@ -18,6 +18,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
@@ -61,6 +62,7 @@ import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.GRIDS;
 import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
 import static com.conveyal.r5.analyst.progress.WorkProductType.OPPORTUNITY_DATASET;
+import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
 
 /**
  * Controller that handles fetching opportunity datasets (grids and other pointset formats).
@@ -94,10 +96,6 @@ public class OpportunityDatasetController implements HttpController {
     /** Store upload status objects FIXME trivial Javadoc */
     private final List<OpportunityDatasetUploadStatus> uploadStatuses = new ArrayList<>();
 
-    private ObjectNode getJsonUrl (FileStorageKey key) {
-        return JsonUtil.objectNode().put("url", fileStorage.getURL(key));
-    }
-
     private void addStatusAndRemoveOldStatuses(OpportunityDatasetUploadStatus status) {
         uploadStatuses.add(status);
         LocalDateTime now = LocalDateTime.now();
@@ -113,10 +111,11 @@ public class OpportunityDatasetController implements HttpController {
         );
     }
 
-    private Object getOpportunityDataset(Request req, Response res) {
+    private UrlWithHumanName getOpportunityDataset(Request req, Response res) {
         OpportunityDataset dataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
         if (dataset.format == FileStorageFormat.GRID) {
-            return getJsonUrl(dataset.getStorageKey());
+            res.type(APPLICATION_JSON.asString());
+            return fileStorage.getJsonUrl(dataset.getStorageKey(), dataset.sourceName + "_" + dataset.name, "grid");
         } else {
             // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
             // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
@@ -564,9 +563,10 @@ public class OpportunityDatasetController implements HttpController {
      * Respond to a request with a redirect to a downloadable file.
      * @param req should specify regionId, opportunityDatasetId, and an available download format (.tiff or .grid)
      */
-    private Object downloadOpportunityDataset (Request req, Response res) throws IOException {
+    private UrlWithHumanName downloadOpportunityDataset (Request req, Response res) throws IOException {
         FileStorageFormat downloadFormat;
         String format = req.params("format");
+        res.type(APPLICATION_JSON.asString());
         try {
             downloadFormat = FileStorageFormat.valueOf(format.toUpperCase());
         } catch (IllegalArgumentException iae) {
@@ -576,38 +576,32 @@ public class OpportunityDatasetController implements HttpController {
             String regionId = req.params("_id");
             String gridKey = format;
             FileStorageKey storageKey = new FileStorageKey(GRIDS, String.format("%s/%s.grid", regionId, gridKey));
-            return getJsonUrl(storageKey);
+            return fileStorage.getJsonUrl(storageKey, gridKey, "grid");
         }
-
-        if (FileStorageFormat.GRID.equals(downloadFormat)) return getOpportunityDataset(req, res);
-
+        if (FileStorageFormat.GRID.equals(downloadFormat)) {
+            return getOpportunityDataset(req, res);
+        }
         final OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdFromRequestIfPermitted(req);
-
         FileStorageKey gridKey = opportunityDataset.getStorageKey(FileStorageFormat.GRID);
         FileStorageKey formatKey = opportunityDataset.getStorageKey(downloadFormat);
-
         // if this grid is not on S3 in the requested format, try to get the .grid format
         if (!fileStorage.exists(gridKey)) {
             throw AnalysisServerException.notFound("Requested grid does not exist.");
         }
-
         if (!fileStorage.exists(formatKey)) {
             // get the grid and convert it to the requested format
             File gridFile = fileStorage.getFile(gridKey);
             Grid grid = Grid.read(new GZIPInputStream(new FileInputStream(gridFile))); // closes input stream
             File localFile = FileUtils.createScratchFile(downloadFormat.toString());
             FileOutputStream fos = new FileOutputStream(localFile);
-
             if (FileStorageFormat.PNG.equals(downloadFormat)) {
                 grid.writePng(fos);
             } else if (FileStorageFormat.GEOTIFF.equals(downloadFormat)) {
                 grid.writeGeotiff(fos);
             }
-
             fileStorage.moveIntoStorage(formatKey, localFile);
         }
-
-        return getJsonUrl(formatKey);
+        return fileStorage.getJsonUrl(formatKey, opportunityDataset.sourceName + "_" + opportunityDataset.name, downloadFormat.extension);
     }
 
     /**

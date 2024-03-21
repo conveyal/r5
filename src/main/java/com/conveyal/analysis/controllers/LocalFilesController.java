@@ -33,7 +33,9 @@ public class LocalFilesController implements HttpController {
         FileStorageKey key = new FileStorageKey(category, filename);
         File file = fileStorage.getFile(key);
         FileStorageFormat format = FileStorageFormat.fromFilename(filename);
-        res.type(format.mimeType);
+        if (format != null) {
+            res.type(format.mimeType);
+        }
 
         // If the content-encoding is set to gzip, Spark automatically gzips the response. This double-gzips anything
         // that was already gzipped. Some of our files are already gzipped, and we rely on the the client browser to

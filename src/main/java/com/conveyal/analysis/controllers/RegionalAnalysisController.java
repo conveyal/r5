@@ -6,9 +6,9 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
+import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.util.JsonUtil;
@@ -16,6 +16,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
@@ -44,7 +45,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -169,19 +169,32 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     /**
+     * Associate a storage key with a human-readable name.
+     * Currently, this record type is only used within the RegionalAnalysisController class.
+     */
+    private record HumanKey(FileStorageKey storageKey, String humanName) { };
+
+    /**
      * Get a regional analysis results raster for a single (percentile, cutoff, destination) combination, in one of
      * several image file formats. This method was factored out for use from two different API endpoints, one for
      * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
+     * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
      */
-    private FileStorageKey getSingleCutoffGrid (
+    private HumanKey getSingleCutoffGrid (
             RegionalAnalysis analysis,
-            int cutoffIndex,
-            String destinationPointSetId,
+            OpportunityDataset destinations,
+            int cutoffMinutes,
             int percentile,
             FileStorageFormat fileFormat
     ) throws IOException {
-        String regionalAnalysisId = analysis._id;
-        int cutoffMinutes = analysis.cutoffsMinutes != null ? analysis.cutoffsMinutes[cutoffIndex] : analysis.cutoffMinutes;
+        final String regionalAnalysisId = analysis._id;
+        final String destinationPointSetId = destinations._id;
+        // Selecting the zeroth cutoff still makes sense for older analyses that don't allow an array of N cutoffs.
+        int cutoffIndex = 0;
+        if (analysis.cutoffsMinutes != null) {
+            cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
+            checkState(cutoffIndex >= 0);
+        }
         LOG.info(
             "Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {} in format {}.",
             cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
@@ -244,69 +257,40 @@ public class RegionalAnalysisController implements HttpController {
 
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
         }
-        return singleCutoffFileStorageKey;
+        String analysisHumanName = humanNameForEntity(analysis);
+        String destinationHumanName = humanNameForEntity(destinations);
+        String resultHumanFilename = filenameCleanString(
+                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, cutoffMinutes)
+            ) + "." + fileFormat.extension.toLowerCase(Locale.ROOT);
+        // Note that the returned human filename already contains the appropriate extension.
+        return new HumanKey(singleCutoffFileStorageKey, resultHumanFilename);
     }
 
     private Object getAllRegionalResults (Request req, Response res) throws IOException {
-        // Get the UUID of the regional analysis for which we want the output data.
         final String regionalAnalysisId = req.params("_id");
         final UserPermissions userPermissions = UserPermissions.from(req);
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(req.params("_id")).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                userPermissions
-        ).iterator().next();
-        if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+        final RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
+        if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
+            throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
+        }
+        if (analysis.request.originPointSetKey != null) {
+            throw AnalysisServerException.badRequest("Batch result download only available for gridded origins.");
         }
         FileStorageKey zippedResultsKey = new FileStorageKey(RESULTS, analysis._id + "_ALL.zip");
-        // Keep only alphanumeric characters and underscores from user-specified analysis name.
-        String friendlyAnalysisName = filenameCleanString(analysis.name);
         if (!fileStorage.exists(zippedResultsKey)) {
-            List<FileStorageKey> fileStorageKeys = new ArrayList<>();
-            if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
-                throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
-            }
-            // Map from cryptic UUIDs to human-readable strings that can replace them.
-            Map<String, String> friendlyReplacements = new HashMap<>();
-            {
-                // Replace the regional analysis ID with its name.
-                friendlyReplacements.put(analysis._id, friendlyAnalysisName);
-                // Replace each destination point set ID with its name.
-                int d = 0;
-                for (String destinationPointSetId : analysis.destinationPointSetIds) {
-                    OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(
-                            destinationPointSetId,
-                            userPermissions
-                    );
-                    checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
-                    // Avoid name collisions, prepend an integer.
-                    String friendlyDestinationName = "D%d_%s".formatted(d++, filenameCleanString(opportunityDataset.name));
-                    friendlyReplacements.put(destinationPointSetId, friendlyDestinationName);
-                }
-            }
-            // Iterate over all combinations and generate one geotiff grid output for each one.
-            // TODO check whether origins are freeform: if (analysis.request.originPointSetKey == null) ?
+            // Iterate over all dest, cutoff, percentile combinations and generate one geotiff grid output for each one.
+            List<HumanKey> humanKeys = new ArrayList<>();
             for (String destinationPointSetId : analysis.destinationPointSetIds) {
-                for (int cutoffIndex = 0; cutoffIndex < analysis.cutoffsMinutes.length; cutoffIndex++) {
+                OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
+                for (int cutoffMinutes : analysis.cutoffsMinutes) {
                     for (int percentile : analysis.travelTimePercentiles) {
-                        FileStorageKey fileStorageKey = getSingleCutoffGrid(
-                                analysis,
-                                cutoffIndex,
-                                destinationPointSetId,
-                                percentile,
-                                FileStorageFormat.GEOTIFF
+                        HumanKey gridKey = getSingleCutoffGrid(
+                                analysis, destinations, cutoffMinutes, percentile, FileStorageFormat.GEOTIFF
                         );
-                        fileStorageKeys.add(fileStorageKey);
+                        humanKeys.add(gridKey);
                     }
                 }
             }
-            // Also include any CSV files that were generated. TODO these are gzipped, decompress and re-compress.
-            // for (String csvStorageName : analysis.resultStorage.values()) {
-            //    LOG.info("Including {} in results zip file.", csvStorageName);
-            //    FileStorageKey csvKey = new FileStorageKey(RESULTS, csvStorageName);
-            //    fileStorageKeys.add(csvKey);
-            // }
             File tempZipFile = File.createTempFile("regional", ".zip");
             // Zipfs can't open existing empty files, the file has to not exist. FIXME: Non-dangerous race condition
             // Examining ZipFileSystemProvider reveals a "useTempFile" env parameter, but this is for the individual entries.
@@ -315,49 +299,68 @@ public class RegionalAnalysisController implements HttpController {
             Map<String, String> env = Map.of("create", "true");
             URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
             try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
-                for (FileStorageKey fileStorageKey : fileStorageKeys) {
-                    Path storagePath = fileStorage.getFile(fileStorageKey).toPath();
-                    String nameInZip = storagePath.getFileName().toString();
-                    // This is so inefficient but it should work.
-                    for (String replacementKey : friendlyReplacements.keySet()) {
-                        nameInZip = nameInZip.replace(replacementKey, friendlyReplacements.get(replacementKey));
-                    }
-                    Path zipPath = zipFilesystem.getPath(nameInZip);
+                for (HumanKey key : humanKeys) {
+                    Path storagePath = fileStorage.getFile(key.storageKey).toPath();
+                    Path zipPath = zipFilesystem.getPath(key.humanName);
                     Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
             fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
         }
-//        res.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"%s\"".formatted(humanReadableZipName));
         res.type(APPLICATION_JSON.asString());
-        return fileStorage.getJsonUrl(zippedResultsKey, analysis.name, "zip");
+        String analysisHumanName = humanNameForEntity(analysis);
+        return fileStorage.getJsonUrl(zippedResultsKey, analysisHumanName, "zip");
     }
 
     /**
-     * This used to extract a particular percentile of a regional analysis as a grid file.
+     * Given an Entity, make a human-readable name for the entity composed of its user-supplied name as well as
+     * the most rapidly changing digits of its ID to disambiguate in case multiple entities have the same name.
+     * It is also possible to find the exact entity in many web UI fields using this suffix of its ID.
      */
-    private UrlWithHumanName getRegionalResults (Request req, Response res) throws IOException {
+    private static String humanNameForEntity (Model entity) {
+        // Most or all IDs encountered are MongoDB ObjectIDs. The first four and middle five bytes are slow-changing
+        // and would not disambiguate between data sets. Only the 3-byte counter at the end will be sure to change.
+        // See https://www.mongodb.com/docs/manual/reference/method/ObjectId/
+        final String id = entity._id;
+        checkArgument(id.length() > 6, "ID had too few characters.");
+        String shortId = id.substring(id.length() - 6, id.length());
+        String humanName = "%s_%s".formatted(filenameCleanString(entity.name), shortId);
+        return humanName;
+    }
 
-        // Get some path parameters out of the URL.
-        // The UUID of the regional analysis for which we want the output data
+    /** Fetch destination OpportunityDataset from database, followed by a check that it was present. */
+    private static OpportunityDataset getDestinations (String destinationPointSetId, UserPermissions userPermissions) {
+        OpportunityDataset opportunityDataset =
+                Persistence.opportunityDatasets.findByIdIfPermitted(destinationPointSetId, userPermissions);
+        checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
+        return opportunityDataset;
+    }
+
+    /** Fetch RegionalAnalysis from database by ID, followed by a check that it was present and not deleted. */
+    private static RegionalAnalysis getAnalysis (String analysisId, UserPermissions userPermissions) {
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(analysisId).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                userPermissions
+        ).iterator().next();
+        if (analysis == null || analysis.deleted) {
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+        }
+        return analysis;
+    }
+
+    /** Extract a particular percentile and cutoff of a regional analysis in one of several different raster formats. */
+    private UrlWithHumanName getRegionalResults (Request req, Response res) throws IOException {
+        // It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        // aren't any (only CSV, because origins are freeform). How should we determine whether this analysis is
+        // expected to have no gridded results and cleanly return a 404?
         final String regionalAnalysisId = req.params("_id");
-        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
-        //       aren't any (only CSV, because origins are freeform).
-        // How should we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
         FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
         if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
             throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
         }
-
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(req.params("_id")).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
-        ).iterator().next();
-
-        if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
-        }
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
 
         // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
         // and multiple output files per analysis (for different percentiles of travel time and/or different
@@ -366,7 +369,7 @@ public class RegionalAnalysisController implements HttpController {
         // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
         // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
         int percentile = analysis.travelTimePercentile;
-        int cutoffIndex = 0; // For old single-cutoff outputs, we can still select the zeroth grid.
+        int cutoffMinutes = analysis.cutoffMinutes;
         String destinationPointSetId = analysis.grid;
 
         // Handle newer regional analyses with multiple cutoffs in an array.
@@ -375,9 +378,8 @@ public class RegionalAnalysisController implements HttpController {
         if (analysis.cutoffsMinutes != null) {
             int nCutoffs = analysis.cutoffsMinutes.length;
             checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            int cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
-            cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
-            checkState(cutoffIndex >= 0,
+            cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
+            checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(cutoffMinutes),
                     "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
                     Ints.join(", ", analysis.cutoffsMinutes)
             );
@@ -413,21 +415,10 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
         }
         // Significant overhead here: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
-        FileStorageKey singleCutoffFileStorageKey = getSingleCutoffGrid(
-                analysis, cutoffIndex, destinationPointSetId, percentile, format
-        );
-        // Create alternative human-readable filename. Similar to internal storage key name, but using a shortened
-        // ID for the destinations and the user-specified name for the project. This project name may contain invalid
-        // characters, but will be sanitized by getJsonUrl. We use the end of the dataset ID rather than the beginning
-        // because it's more likely to be different when several datasets are created in rapid succession.
-        String shortDestinationId = destinationPointSetId.substring(
-                destinationPointSetId.length() - 5, destinationPointSetId.length()
-        );
-        int cutoffMinutes =
-                analysis.cutoffsMinutes != null ? analysis.cutoffsMinutes[cutoffIndex] : analysis.cutoffMinutes;
-        String rawHumanName = String.format("%s_%s_P%d_C%d", analysis.name, shortDestinationId, percentile, cutoffMinutes);
+        OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
+        HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, cutoffMinutes, percentile, format);
         res.type(APPLICATION_JSON.asString());
-        return fileStorage.getJsonUrl(singleCutoffFileStorageKey, rawHumanName, format.extension.toLowerCase(Locale.ROOT));
+        return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
     }
 
     private Object getCsvResults (Request req, Response res) {

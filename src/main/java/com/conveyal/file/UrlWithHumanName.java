@@ -19,14 +19,19 @@ public class UrlWithHumanName {
     private static final int TRUNCATE_FILENAME_CHARS = 220;
 
     /**
-     * Given an arbitrary string, make it safe for use as a friendly human-readable filename.
-     * This can yield non-unique strings and is intended for files downloaded by end users that do not need to be
-     * machine-discoverable by unique IDs.
+     * Given an arbitrary string, make it safe for use in a friendly human-readable filename. This can yield non-unique
+     * strings and is intended for files downloaded by end users that do not need to be machine-discoverable by unique
+     * IDs. A length of up to 255 characters will work with most filesystems and within ZIP files. In all names we
+     * generate, the end of the name more uniquely identifies it (contains a fragment of a hex object ID or contains
+     * the distinguishing factors such as cutoff and percentile for files within a ZIP archive). Therefore, we truncate
+     * to a suffix rather than a prefix when the name is too long. We keep the length somewhat under 255 in case some
+     * other short suffix needs to be appended before use as a filename.
+     * Note that this will strip dot characters out of the string, so any dot and extension must be suffixed later.
      */
     public static String filenameCleanString (String original) {
         String ret = original.replaceAll("\\W+", "_");
         if (ret.length() > TRUNCATE_FILENAME_CHARS) {
-            ret = ret.substring(0, TRUNCATE_FILENAME_CHARS);
+            ret = ret.substring(ret.length() - TRUNCATE_FILENAME_CHARS, ret.length());
         }
         return ret;
     }

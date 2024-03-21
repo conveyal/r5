@@ -31,25 +31,39 @@ public class RouteSequence {
         }
     }
 
-    /** Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer. */
+    /**
+     * Returns details summarizing this route sequence, using GTFS ids stored in the supplied transitLayer.
+     * @param csvOptions indicates whether names or IDs should be returned for certain fields.
+     * @return array of pipe-concatenated strings, with the route, board stop, alight stop, ride time, and feed for
+     * each transit leg, as well as the access and egress time.
+     * 
+     * If csvOptions.feedRepresentation is not null, the feed values will be R5-generated UUID for boarding stop of
+     * each leg. We are grabbing the feed ID from the stop rather than the route (which might seem like a better
+     * representative of the leg) because stops happen to have a readily available feed ID.
+     */
     public String[] detailsWithGtfsIds (TransitLayer transitLayer, CsvResultOptions csvOptions){
-        StringJoiner routeIds = new StringJoiner("|");
-        StringJoiner boardStopIds = new StringJoiner("|");
-        StringJoiner alightStopIds = new StringJoiner("|");
-        StringJoiner rideTimes = new StringJoiner("|");
+        StringJoiner routeJoiner = new StringJoiner("|");
+        StringJoiner boardStopJoiner = new StringJoiner("|");
+        StringJoiner alightStopJoiner = new StringJoiner("|");
+        StringJoiner feedJoiner = new StringJoiner("|");
+        StringJoiner rideTimeJoiner = new StringJoiner("|");
         for (int i = 0; i < routes.size(); i++) {
-            routeIds.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
-            boardStopIds.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
-            alightStopIds.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
-            rideTimes.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
+            routeJoiner.add(transitLayer.routeString(routes.get(i), csvOptions.routeRepresentation));
+            boardStopJoiner.add(transitLayer.stopString(stopSequence.boardStops.get(i), csvOptions.stopRepresentation));
+            alightStopJoiner.add(transitLayer.stopString(stopSequence.alightStops.get(i), csvOptions.stopRepresentation));
+            if (csvOptions.feedRepresentation != null) {
+                feedJoiner.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
+            }
+            rideTimeJoiner.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
         }
         String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
         String egressTime = stopSequence.egress == null ? null : String.format("%.1f", stopSequence.egress.time / 60f);
         return new String[]{
-                routeIds.toString(),
-                boardStopIds.toString(),
-                alightStopIds.toString(),
-                rideTimes.toString(),
+                routeJoiner.toString(),
+                boardStopJoiner.toString(),
+                alightStopJoiner.toString(),
+                rideTimeJoiner.toString(),
+                feedJoiner.toString(),
                 accessTime,
                 egressTime
         };

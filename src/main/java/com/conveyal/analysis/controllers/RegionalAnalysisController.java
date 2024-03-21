@@ -341,8 +341,13 @@ public class RegionalAnalysisController implements HttpController {
         // Get some path parameters out of the URL.
         // The UUID of the regional analysis for which we want the output data
         final String regionalAnalysisId = req.params("_id");
-        // The response file format: PNG, TIFF, or GRID
-        final String fileFormatExtension = req.params("format"); // FIXME this may be case sensitive (could make multiple files for different requests)
+        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        //       aren't any (only CSV, because origins are freeform).
+        // How should we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
+        FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
+        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
+            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
+        }
 
         RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
                 QueryBuilder.start("_id").is(req.params("_id")).get(),
@@ -406,13 +411,6 @@ public class RegionalAnalysisController implements HttpController {
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
         if (broker.findJob(regionalAnalysisId) != null) {
             throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
-        }
-        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
-        //       aren't any (only CSV, because origins are freeform).
-        // How should we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
-        FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
         }
         // Significant overhead here: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
         FileStorageKey singleCutoffFileStorageKey = getSingleCutoffGrid(
@@ -674,8 +672,6 @@ public class RegionalAnalysisController implements HttpController {
             sparkService.get("/:regionId/regional/running", this::getRunningAnalyses, toJson);
         });
         sparkService.path("/api/regional", () -> {
-            // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
-            // Wait, do we have any endpoints that write grids into responses? It looks like they all return URLs now.
             sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/all", this::getAllRegionalResults, toJson);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults, toJson);

@@ -666,7 +666,7 @@ public class RegionalAnalysisController implements HttpController {
             sparkService.get("/:_id", this::getRegionalAnalysis);
             sparkService.get("/:_id/all", this::getAllRegionalResults, toJson);
             sparkService.get("/:_id/grid/:format", this::getRegionalResults, toJson);
-            sparkService.get("/:_id/csv/:resultType", this::getCsvResults, toJson);
+            sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
             sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl, toJson);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);

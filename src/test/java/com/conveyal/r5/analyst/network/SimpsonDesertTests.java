@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.TimeGridWriter;
+import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -200,12 +201,14 @@ public class SimpsonDesertTests {
 
         // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
         // when boarding Trip A is possible
-        AnalysisWorkerTask savvyRider = taskBuilder
-                .departureTimeWindow(7, 13, 5).build();
-        OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
-        // Trip B departs stop 10 at 7:25. So 8-13 minute wait, plus 16 minute ride.
-        Distribution savvyExpected = new Distribution(8, 5).delay(16);
-        savvyExpected.multiAssertSimilar(savvyResult.travelTimes, 0);
+        if (FastRaptorWorker.ENABLE_OPTIMIZATION_RANGE_RAPTOR) {
+            AnalysisWorkerTask savvyRider = taskBuilder
+                    .departureTimeWindow(7, 13, 5).build();
+            OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
+            // Trip B departs stop 10 at 7:25. So 8-13 minute wait, plus 16 minute ride.
+            Distribution savvyExpected = new Distribution(8, 5).delay(16);
+            savvyExpected.multiAssertSimilar(savvyResult.travelTimes, 0);
+        }
     }
 
     /**

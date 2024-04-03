@@ -42,6 +42,21 @@ public class PathCsvResultWriter extends CsvResultWriter {
         return rows;
     }
 
+    // Around 2024-04 we wanted to expand the number of CSV columns and needed to update the dimension checks below.
+    // The number of columns is checked twice, once in this specific CsvResultWriter implementation and once in the
+    // abstract superclass.
+    // We don't want to introduce a column count check with tolerance that is applied separately to each row, because
+    // this will not catch a whole class of problems where the worker instances are not producing a consistent number
+    // of columns across origins.
+    // We do ideally want to allow experimental workers that add an unknown number of columns, but they should add those
+    // columns to every row. This requires some kind of negotiated, flexible protocol between the backend and workers.
+    // Or some system where the first worker response received sets expectations and all other responses must match.
+    // We thought this through and decided it was too big a change to introduce immediately.
+    // So we only accept one specific quantity of CSV columns, but fail with a very specific message when we see a
+    // number of CSV columns that we recognize as coming from an obsolete worker version. Breaking backward
+    // compatibility is acceptable here because CSV paths are still considered an experimental feature.
+    // Ideally this very case-specific check and error message will be removed when some more general system is added.
+
     @Override
     protected void checkDimension (RegionalWorkResult workResult) {
         // Path CSV output only supports a single freeform pointset for now.
@@ -53,6 +68,11 @@ public class PathCsvResultWriter extends CsvResultWriter {
         for (ArrayList<String[]> oneDestination : workResult.pathResult) {
             // Number of distinct paths per destination is variable, don't validate it.
             for (String[] iterationDetails : oneDestination) {
+                if (iterationDetails.length == 10) {
+                    throw new IllegalArgumentException(
+                            "Please use worker version newer than v7.1. CSV columns in path results have changed."
+                    );
+                }
                 checkDimension(workResult, "columns", iterationDetails.length, PathResult.DATA_COLUMNS.length);
             }
         }

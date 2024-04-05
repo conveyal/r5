@@ -697,7 +697,7 @@ public class TransitLayer implements Serializable, Cloneable {
             return TransitModes.FERRY;
         } else if (routeType >= 1300 && routeType < 1400) { //Telecabin Service
             return TransitModes.GONDOLA;
-        } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
+        } else if (routeType >= 1400 && routeType < 1500) { //Funicular Service
             return TransitModes.FUNICULAR;
         } else if (routeType >= 1500 && routeType < 1600) { //Taxi Service
             throw new IllegalArgumentException("Taxi route_type code not supported: " + routeType);

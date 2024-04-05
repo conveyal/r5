@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
@@ -18,29 +19,32 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Remove all stops outside the bounding box,
- * then remove all stop_times outside the bounding box,
- * recording all trips with two or more stop_times inside the bounding box.
- * Then remove all trips with no stoptimes or one single stoptime,
- * then remove all transfers whose stops have been removed.
- *
- * Note that this does not crop the GTFS shapes, only the stops and stoptimes.
- * Therefore in some tools like Transport Analyst, the data set will appear to extend beyond the bounding box
- * because the entire shapes are drawn.
+ * Remove all stops outside the bounding box, then remove all stop_times outside the bounding box, recording all
+ * trips with two or more stop_times inside the bounding box.  Then remove all trips with no stoptimes or one single
+ * stoptime, and remove all transfers whose stops have been removed.
+ * Also removes all routes with route_types that we don't support (TPEG >= 1500).
+ * Note that this does not crop the GTFS shapes, only the stops and stoptimes. Therefore, in tools like the R5 web UI,
+ * the data set will appear to extend beyond the bounding box because the entire shapes are drawn.
  */
 public class CropGTFS {
 
     // Logger is not super useful because as a library, gtfs-lib has no logger implementation defined by default.
     private static final Logger LOG = LoggerFactory.getLogger(CropGTFS.class);
 
-    private static final String inputFile = "/Users/abyrd/test-est/gtfs_fr-cha_pourOAD.zip";
-    private static final String outputFile = ""; //"/Users/abyrd/geodata/nl/NL-2016-08-23-noplatforms-noshapes.gtfs.zip";
+    private static final String inputFile = "/Users/abyrd/data/stockholm/sweden.gtfs.zip";
+    private static final String outputFile = "/Users/abyrd/data/stockholm/stockholm-filtered.gtfs.zip";
 
     // Replace all stops with their parent stations to simplify trip patterns.
     private static final boolean MERGE_STATIONS = true;
 
     // Remove all shapes from the GTFS to make it simpler to render in a web UI
     private static final boolean REMOVE_SHAPES = true;
+
+    // Remove all routes with taxi and car modes, as well as trips and stoptimes that reference them transitively.
+    private static final boolean REMOVE_UNSUPPORTED_MODES = true;
+
+    // Remove all transfers before writing out.
+    private static final boolean REMOVE_TRANSFERS = true;
 
     public static void main (String[] args) {
 
@@ -52,7 +56,43 @@ public class CropGTFS {
         Set<String> retainedTripIds = new HashSet<>();
 
         // The geometry within which we will keep all stops
-        Geometry bounds = Geometries.getNetherlandsWithoutTexel();
+        Geometry bounds = Geometries.getStockholm();
+
+        if (REMOVE_UNSUPPORTED_MODES) {
+            System.out.println("Removing routes with unsupported route_type (mode of transport)...");
+            Set<String> routeIdsRemoved = new HashSet<>();
+            for (Iterator<Route> routeIterator = feed.routes.values().iterator(); routeIterator.hasNext(); ) {
+                Route route = routeIterator.next();
+                if (route.route_type >= 1500) {
+                    routeIterator.remove();
+                    routeIdsRemoved.add(route.route_id);
+                }
+            }
+            Set<String> tripIdsRemoved = new HashSet<>();
+            for (Iterator<Trip> tripIterator = feed.trips.values().iterator(); tripIterator.hasNext(); ) {
+                Trip trip = tripIterator.next();
+                if (routeIdsRemoved.contains(trip.route_id)) {
+                    tripIterator.remove();
+                    tripIdsRemoved.add(trip.trip_id);
+                }
+            }
+            int nStopTimesRemoved = 0;
+            for (Iterator<StopTime> it = feed.stop_times.values().iterator(); it.hasNext(); ) {
+                StopTime st = it.next();
+                if (tripIdsRemoved.contains(st.trip_id)) {
+                    it.remove();
+                    nStopTimesRemoved += 1;
+                }
+            }
+            System.out.println("Number of routes removed: " + routeIdsRemoved.size());
+            System.out.println("Number of trips removed: " + tripIdsRemoved.size());
+            System.out.println("Number of stop_times removed: " + nStopTimesRemoved);
+        }
+
+        if (REMOVE_TRANSFERS) {
+            feed.transfers.clear();
+            System.out.println("Removed all transfers.");
+        }
 
         System.out.println("Removing stops outside bounding box...");
         Map<String, String> stopIdReplacements = new HashMap<>(); // Used when collapsing stops into stations.
@@ -75,6 +115,7 @@ public class CropGTFS {
         }
 
         if (MERGE_STATIONS) {
+            int nUpdated = 0;
             System.out.println("Replacing stop_ids in stop_times with those of their parent stations...");
             for (Fun.Tuple2 key : feed.stop_times.keySet()) {
                 StopTime stopTime = feed.stop_times.get(key);
@@ -83,8 +124,10 @@ public class CropGTFS {
                     // Entry.setValue is an unsupported operation in MapDB, just re-put the StopTime.
                     stopTime.stop_id = replacementStopId;
                     feed.stop_times.put(key, stopTime);
+                    nUpdated += 1;
                 }
             }
+            System.out.println("Number of stop_times updated: " + nUpdated);
         }
 
         if (REMOVE_SHAPES) {

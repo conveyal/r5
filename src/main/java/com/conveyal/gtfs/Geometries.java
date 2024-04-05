@@ -508,4 +508,8 @@ public class Geometries {
         return geometryFactory.toGeometry(new Envelope(4.002074, 4.98848, 51.696796, 52.278661));
     }
 
+    public static Geometry getStockholm() {
+        // return geometryFactory.toGeometry(new Envelope(16.96617,19.42143, 58.59599,60.49487));
+        return geometryFactory.toGeometry(new Envelope(17.21558,19.23706,58.79098,60.17157));
+    }
 }

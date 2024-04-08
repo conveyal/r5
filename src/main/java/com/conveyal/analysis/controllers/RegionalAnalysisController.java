@@ -31,7 +31,6 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -631,6 +630,9 @@ public class RegionalAnalysisController implements HttpController {
         // Persist this newly created RegionalAnalysis to Mongo.
         // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
         Persistence.regionalAnalyses.create(regionalAnalysis);
+
+        // Set the `jobId` from the newly created regional analysis.
+        task.jobId = regionalAnalysis._id;
 
         // Create the regional job
         var regionalJob = new Job(task, WorkerTags.fromRegionalAnalysis(regionalAnalysis));

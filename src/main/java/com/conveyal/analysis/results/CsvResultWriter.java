@@ -1,6 +1,7 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileCategory;
+import com.conveyal.file.FileEntry;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -14,7 +15,6 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -95,11 +95,11 @@ public abstract class CsvResultWriter implements RegionalResultWriter {
      * Downloads through another channel (e.g. aws s3 cp), will need to be decompressed manually.
      */
     @Override
-    public synchronized Map.Entry<FileStorageKey, File> finish () throws IOException {
+    public synchronized FileEntry finish() throws IOException {
         csvWriter.close();
         var gzippedFile = FileUtils.gzipFile(bufferFile);
         bufferFile.delete();
-        return Map.entry(new FileStorageKey(FileCategory.RESULTS, getFileName()), gzippedFile);
+        return new FileEntry(new FileStorageKey(FileCategory.RESULTS, getFileName()), gzippedFile);
     }
 
     /**

@@ -14,7 +14,6 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
-import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
@@ -27,7 +26,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
-import org.apache.commons.math3.analysis.function.Exp;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -46,7 +44,6 @@ import spark.Response;
 
 import java.net.NoRouteToHostException;
 import java.net.SocketTimeoutException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -54,7 +51,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.conveyal.r5.common.Util.human;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -351,12 +347,10 @@ public class BrokerController implements HttpController {
      * modifies the contents of the task queue.
      */
     private Object workerPoll (Request request, Response response) {
-
         WorkerStatus workerStatus = objectFromRequestBody(request, WorkerStatus.class);
-        List<RegionalWorkResult> perOriginResults = workerStatus.results;
 
         // Record any regional analysis results that were supplied by the worker and mark them completed.
-        for (RegionalWorkResult workResult : perOriginResults) {
+        for (RegionalWorkResult workResult : workerStatus.results) {
             broker.handleRegionalWorkResult(workResult);
         }
         // Clear out the results field so it's not visible in the worker list API endpoint.
@@ -368,7 +362,7 @@ public class BrokerController implements HttpController {
         // See if any appropriate tasks exist for this worker.
         List<RegionalTask> tasks = broker.getSomeWork(workerCategory, workerStatus.maxTasksRequested);
         // If there is no work for the worker, signal this clearly with a "no content" code,
-        // so the worker can sleep a while before the next polling attempt.
+        // so the worker can sleep for a while before the next polling attempt.
         if (tasks.isEmpty()) {
             return jsonResponse(response, HttpStatus.NO_CONTENT_204, tasks);
         } else {

@@ -1,19 +1,14 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.components.broker.Job;
-import com.conveyal.file.FileStorageKey;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.cluster.PathResult;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.file.FileEntry;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
+import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * This assembles regional results arriving from workers into one or more files per regional analysis on
@@ -71,31 +66,34 @@ public class MultiOriginAssembler {
      * this class are also synchronized for good measure. There should be no additional cost to retaining the lock when
      * entering those methods.
      */
-    public synchronized Map<FileStorageKey, File> handleMessage (RegionalWorkResult workResult) throws Exception {
-        var resultFiles = new HashMap<FileStorageKey, File>();
-        for (RegionalResultWriter writer : resultWriters) {
-            writer.writeOneWorkResult(workResult);
-        }
+    public void handleMessage(RegionalWorkResult workResult) throws Exception {
         // Don't double-count origins if we receive them more than once. Atomic get-and-increment requires
         // synchronization, currently achieved by synchronizing this entire method.
         if (!originsReceived.get(workResult.taskId)) {
             originsReceived.set(workResult.taskId);
             nComplete += 1;
-        }
 
-        // If finished, run finish on all the result writers.
-        if (nComplete == job.nTasksTotal) {
-            LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
-            try {
-                for (RegionalResultWriter writer : resultWriters) {
-                    var result = writer.finish();
-                    resultFiles.put(result.getKey(), result.getValue());
-                }
-            } catch (Exception e) {
-                LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
+            for (RegionalResultWriter writer : resultWriters) {
+                writer.writeOneWorkResult(workResult);
             }
         }
+    }
+
+    public List<FileEntry> finish() {
+        var resultFiles = new ArrayList<FileEntry>(resultWriters.size());
+        LOG.info("Finished receiving data for multi-origin analysis {}", job.jobId);
+        try {
+            for (RegionalResultWriter writer : resultWriters) {
+                resultFiles.add(writer.finish());
+            }
+        } catch (Exception e) {
+            LOG.error("Error uploading results of multi-origin analysis {}", job.jobId, e);
+        }
         return resultFiles;
+    }
+
+    public boolean isComplete() {
+        return nComplete == job.nTasksTotal;
     }
 
     /** Clean up and cancel this grid assembler, typically when a job is canceled while still being processed. */

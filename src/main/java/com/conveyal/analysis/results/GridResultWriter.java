@@ -1,6 +1,7 @@
 package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileCategory;
+import com.conveyal.file.FileEntry;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
@@ -17,7 +18,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static com.conveyal.r5.common.Util.human;
 
@@ -151,11 +151,11 @@ public class GridResultWriter implements RegionalResultWriter {
      * Gzip the access grid and return the files.
      */
     @Override
-    public synchronized Map.Entry<FileStorageKey, File> finish () throws IOException {
+    public synchronized FileEntry finish() throws IOException {
         randomAccessFile.close();
         var gzippedFile = FileUtils.gzipFile(bufferFile);
         bufferFile.delete();
-        return Map.entry(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
+        return new FileEntry(new FileStorageKey(FileCategory.RESULTS, gridFileName), gzippedFile);
     }
 
     /**

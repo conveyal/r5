@@ -144,7 +144,7 @@ public class Broker implements Component {
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
+    public Broker(Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
         this.config = config;
         this.fileStorage = fileStorage;
         this.eventBus = eventBus;
@@ -345,9 +345,7 @@ public class Broker implements Component {
         TObjectIntMap<String> workersPerJob = workerCatalog.activeWorkersPerJob();
         Collection<JobStatus> jobStatuses = new ArrayList<>();
         for (Job job : jobs.values()) {
-            JobStatus jobStatus = new JobStatus(job);
-            jobStatus.activeWorkers = workersPerJob.get(job.jobId);
-            jobStatuses.add(jobStatus);
+            jobStatuses.add(new JobStatus(job, workersPerJob.get(job.jobId)));
         }
         return jobStatuses;
     }
@@ -451,15 +449,19 @@ public class Broker implements Component {
                 // results from spurious redeliveries, before the assembler is busy finalizing and uploading results.
                 markTaskCompleted(job, workResult.taskId);
             }
+
             // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
             // It contains some slow nested operations to move completed results into storage. Really we should not do
             // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
             // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
-            var resultFiles = assembler.handleMessage(workResult);
+            assembler.handleMessage(workResult);
 
-            // Store all result files permanently.
-            for (var resultFile : resultFiles.entrySet()) {
-                fileStorage.moveIntoStorage(resultFile.getKey(), resultFile.getValue());
+            if (assembler.isComplete()) {
+                var resultFiles = assembler.finish();
+                // Store all result files permanently.
+                for (var resultFile : resultFiles) {
+                    fileStorage.moveIntoStorage(resultFile.key(), resultFile.file());
+                }
             }
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));

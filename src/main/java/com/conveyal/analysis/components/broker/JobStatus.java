@@ -46,7 +46,7 @@ public class JobStatus {
     public JobStatus () { /* do nothing */ }
 
     /** Summarize the given job to return its status over the REST API. */
-    public JobStatus (Job job) {
+    public JobStatus(Job job, int activeWorkers) {
         this.jobId = job.jobId;
         this.graphId = job.workerCategory.graphId;
         this.workerCommit = job.workerCategory.workerVersion;
@@ -56,5 +56,6 @@ public class JobStatus {
         this.deliveries = job.nTasksDelivered;
         this.deliveryPass = job.deliveryPass;
         this.errors = job.errors;
+        this.activeWorkers = activeWorkers;
     }
 }

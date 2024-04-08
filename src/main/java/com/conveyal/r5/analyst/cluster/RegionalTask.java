@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a task to be performed as part of a regional analysis.
@@ -9,6 +10,8 @@ import com.conveyal.r5.analyst.WebMercatorExtents;
  */
 public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
 
+    public static final int MAX_FREEFORM_OD_PAIRS = 16_000_000;
+    public static final int MAX_FREEFORM_DESTINATIONS = 4_000_000;
     /**
      * The storage key for the pointset we will compute access to (e.g. regionId/datasetId.grid).
      * This is named grid instead of destinationPointSetId for backward compatibility, namely the ability to start
@@ -112,4 +115,29 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
         }
     }
 
+    public int getTasksTotal() {
+        if (originPointSetKey != null) {
+            Preconditions.checkNotNull(originPointSet);
+            return originPointSet.featureCount();
+        } else {
+            return width * height;
+        }
+    }
+
+    /**
+     * Check that origin and destination sets are not too big for generating CSV files.
+     */
+    public void checkIsUnderOdPairLimit(PointSet destinationPointSet) {
+        // This requires us to have already loaded this destination pointset instance into the transient field.
+        if ((recordTimes || includePathResults) && !oneToOne) {
+            if (getTasksTotal() * destinationPointSet.featureCount() > MAX_FREEFORM_OD_PAIRS ||
+                    destinationPointSet.featureCount() > MAX_FREEFORM_DESTINATIONS
+            ) {
+                throw new RuntimeException(String.format(
+                        "Freeform requests limited to %d destinations and %d origin-destination pairs.",
+                        MAX_FREEFORM_DESTINATIONS, MAX_FREEFORM_OD_PAIRS
+                ));
+            }
+        }
+    }
 }

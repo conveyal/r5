@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.Path;
@@ -47,19 +48,24 @@ public class PathResult {
      * With additional changes, patterns could be collapsed further to route combinations or modes.
      */
     public final Multimap<RouteSequence, Iteration>[] iterationsForPathTemplates;
+
     private final TransitLayer transitLayer;
+
+    private final CsvResultOptions csvOptions;
 
     public static final String[] DATA_COLUMNS = new String[]{
             "routes",
             "boardStops",
             "alightStops",
+            "feedIds",
             "rideTimes",
             "accessTime",
             "egressTime",
             "transferTime",
             "waitTimes",
             "totalTime",
-            "nIterations"
+            "nIterations",
+            "group"
     };
 
     public PathResult(AnalysisWorkerTask task, TransitLayer transitLayer) {
@@ -76,6 +82,7 @@ public class PathResult {
         }
         iterationsForPathTemplates = new Multimap[nDestinations];
         this.transitLayer = transitLayer;
+        this.csvOptions = task.csvResultOptions;
     }
 
     /**
@@ -108,7 +115,7 @@ public class PathResult {
                     int nIterations = iterations.size();
                     checkState(nIterations > 0, "A path was stored without any iterations");
                     String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer);
+                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, csvOptions);
                     double targetValue;
                     IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
                     if (stat == Stat.MINIMUM) {
@@ -135,7 +142,10 @@ public class PathResult {
                             score = thisScore;
                         }
                     }
-                    String[] row = ArrayUtils.addAll(path, transfer, waits, totalTime, String.valueOf(nIterations));
+                    String group = ""; // Reserved for future use
+                    String[] row = ArrayUtils.addAll(
+                            path, transfer, waits, totalTime, String.valueOf(nIterations), group
+                    );
                     checkState(row.length == DATA_COLUMNS.length);
                     summary[d].add(row);
                 }

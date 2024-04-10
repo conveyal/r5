@@ -94,4 +94,15 @@ public interface FileStorage extends Component {
         }
     }
 
+    default UrlWithHumanName getJsonUrl (FileStorageKey key, String rawHumanName, String humanExtension) {
+        String url = this.getURL(key);
+        return UrlWithHumanName.fromCleanedName(url, rawHumanName, humanExtension);
+    }
+
+    /** This assumes the humanFileName is already a complete filename (cleaned and truncated with any extension). */
+    default UrlWithHumanName getJsonUrl (FileStorageKey key, String humanFileName) {
+        String url = this.getURL(key);
+        return new UrlWithHumanName(url, humanFileName);
+    }
+
 }

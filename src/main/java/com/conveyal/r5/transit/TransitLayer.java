@@ -54,6 +54,9 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;
+import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_ONLY;
+
 
 /**
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
@@ -815,31 +818,66 @@ public class TransitLayer implements Serializable, Cloneable {
         return stops;
     }
 
+    public enum EntityRepresentation {
+        ID_ONLY, NAME_ONLY, NAME_AND_ID
+    }
+
     /**
      * For the given pattern index, returns the GTFS routeId. If includeName is true, the returned string will
      * also include a route_short_name or route_long_name (if they are not null).
      */
-    public String routeString(int routeIndex, boolean includeName) {
+    public String routeString (int routeIndex, EntityRepresentation nameOrId) {
         RouteInfo routeInfo = routes.get(routeIndex);
-        String route = routeInfo.route_id;
-        if (includeName) {
-            if (routeInfo.route_short_name != null) {
-                route += " (" + routeInfo.route_short_name + ")";
-            } else if (routeInfo.route_long_name != null){
-                route += " (" + routeInfo.route_long_name + ")";
+        String name = routeInfo.route_short_name;
+        String id = routeInfo.route_id;
+        // If we might actually use the name, check some fallbacks.
+        if (nameOrId != ID_ONLY) {
+            if (name == null) {
+                name = routeInfo.route_long_name;
+            }
+            if (name == null) {
+                name = routeInfo.route_id;
             }
         }
-        return route;
+        return switch (nameOrId) {
+            case NAME_ONLY -> name;
+            case NAME_AND_ID -> name + " (" + id + ")";
+            default -> id;
+        };
     }
 
     /**
      * For the given stop index, returns the GTFS stopId (stripped of R5's feedId prefix) and, if includeName is true,
      * stopName.
      */
-    public String stopString(int stopIndex, boolean includeName) {
-        // TODO use a compact feed index, instead of splitting to remove feedIds
-        String stop = stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[1];
-        if (includeName) stop += " (" + stopNames.get(stopIndex) + ")";
-        return stop;
+    public String stopString(int stopIndex, EntityRepresentation nameOrId) {
+        String stopId = stopIdForIndex.get(stopIndex);
+        String stopName = stopNames.get(stopIndex);
+        // I'd trust the JVM JIT to optimize out these assignments on different code paths, but not the split call.
+        if (nameOrId != NAME_ONLY) {
+            if (stopId == null) {
+                stopId = "[new]";
+            } else {
+                // TODO use a compact feed ID instead of splitting to remove feedIds (or put feedId into another CSV field)
+                stopId = stopId.split(":")[1];
+            }
+        }
+        if (nameOrId != ID_ONLY) {
+            if (stopName == null) {
+                stopName = "[new]";
+            }
+        }
+        return switch (nameOrId) {
+            case NAME_ONLY -> stopName;
+            case NAME_AND_ID -> stopName + " (" + stopId + ")";
+            default -> stopId;
+        };
+    }
+
+    /**
+     * For a supplied stopIndex in the transit layer, return the feed id (which we prepend to the GTFS stop id).
+     */
+    public String feedFromStop(int stopIndex) {
+        return stopIdForIndex.get(stopIndex) == null ? "[new]" : stopIdForIndex.get(stopIndex).split(":")[0];
     }
 }

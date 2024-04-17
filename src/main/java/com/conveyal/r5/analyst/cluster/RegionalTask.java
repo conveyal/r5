@@ -74,8 +74,11 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
      */
     @Override
     public WebMercatorExtents getWebMercatorExtents() {
-        return WebMercatorExtents.forTask(this);
-        // TODO Use previous conditional logic with custom flag (request.flags.CROP_DESTINATIONS)
+        if (makeTauiSite || this.hasFlag("CROP_DESTINATIONS")) {
+            return WebMercatorExtents.forTask(this);
+        } else {
+            return WebMercatorExtents.forPointsets(this.destinationPointSets);
+        }
     }
 
     /**
@@ -107,6 +110,10 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
         } else {
             return destinationPointSets[0].featureCount();
         }
+    }
+
+    public boolean hasFlag (String flag) {
+        return this.flags != null && this.flags.contains(flag);
     }
 
 }

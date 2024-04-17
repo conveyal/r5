@@ -61,6 +61,7 @@ public abstract class BaseResultWriter {
 
         // There's probably a more elegant way to do this with NIO and without closing the buffer.
         // That would be Files.copy(File.toPath(),X) or ByteStreams.copy.
+        // Perhaps better: we could wrap the output buffer in a gzip output stream and zip as we write out.
         InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
         OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedResultFile)));
         ByteStreams.copy(is, os);

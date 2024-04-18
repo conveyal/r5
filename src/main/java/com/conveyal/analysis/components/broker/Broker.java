@@ -110,10 +110,18 @@ public class Broker implements Component {
      * is too high, all remaining tasks in a job could be distributed to a single worker leaving none for the other
      * workers, creating a slow-joiner problem especially if the tasks are complicated and slow to complete.
      *
-     * The value should eventually be tuned. The current value of 16 is just the value used by the previous sporadic
+     * The value should eventually be tuned. The value of 16 is the value used by the previous sporadic
      * polling system (WorkerStatus.LEGACY_WORKER_MAX_TASKS) which may not be ideal but is known to work.
+     *
+     * NOTE that as a side effect this limits the total throughput of each worker to:
+     * MAX_TASKS_PER_WORKER / AnalysisWorker#POLL_INTERVAL_MIN_SECONDS tasks per second.
+     * It is entirely plausible for half or more of the origins in a job to be unconnected to any roadways (water,
+     * deserts etc.) In this case the system may need to burn through millions of origins, only checking that they
+     * aren't attached to anything in the selected scenario. Not doing so could double the run time of an analysis.
+     * It may be beneficial to assign origins to workers more randomly, or to introduce a mechanism to pre-scan for
+     * disconnected origins or at least concisely signal large blocks of them in worker responses.    
      */
-    public static final int MAX_TASKS_PER_WORKER = 16;
+    public static final int MAX_TASKS_PER_WORKER = 40;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of

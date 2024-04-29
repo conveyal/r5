@@ -179,7 +179,7 @@ public class HttpApi implements Component {
         // Include a stack trace except when the error is known to be about unauthenticated or unauthorized access,
         // in which case we don't want to leak information about the server to people scanning it for weaknesses.
         if (type != UNAUTHORIZED && type != FORBIDDEN) {
-            body.put("stackTrace", errorEvent.stackTrace);
+            body.put("stackTrace", errorEvent.filteredStackTrace);
         }
         response.status(code);
         response.type("application/json");

@@ -95,15 +95,14 @@ public class Broker implements Component {
         boolean testTaskRedelivery ();
     }
 
-    private Config config;
+    private final Config config;
 
     // Component Dependencies
     private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
 
-    private final ListMultimap<WorkerCategory, Job> jobs =
-            MultimapBuilder.hashKeys().arrayListValues().build();
+    private final ListMultimap<WorkerCategory, Job> jobs = MultimapBuilder.hashKeys().arrayListValues().build();
 
     /**
      * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
@@ -111,27 +110,35 @@ public class Broker implements Component {
      * is too high, all remaining tasks in a job could be distributed to a single worker leaving none for the other
      * workers, creating a slow-joiner problem especially if the tasks are complicated and slow to complete.
      *
-     * The value should eventually be tuned. The current value of 16 is just the value used by the previous sporadic
+     * The value should eventually be tuned. The value of 16 is the value used by the previous sporadic
      * polling system (WorkerStatus.LEGACY_WORKER_MAX_TASKS) which may not be ideal but is known to work.
+     *
+     * NOTE that as a side effect this limits the total throughput of each worker to:
+     * MAX_TASKS_PER_WORKER / AnalysisWorker#POLL_INTERVAL_MIN_SECONDS tasks per second.
+     * It is entirely plausible for half or more of the origins in a job to be unconnected to any roadways (water,
+     * deserts etc.) In this case the system may need to burn through millions of origins, only checking that they
+     * aren't attached to anything in the selected scenario. Not doing so could double the run time of an analysis.
+     * It may be beneficial to assign origins to workers more randomly, or to introduce a mechanism to pre-scan for
+     * disconnected origins or at least concisely signal large blocks of them in worker responses.    
      */
-    public final int MAX_TASKS_PER_WORKER = 16;
+    public static final int MAX_TASKS_PER_WORKER = 40;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
-    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
+    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
      * results are received for a given workerCategory. Do so after receiving results for an
      * arbitrary task toward the beginning of the job
      */
-    public final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
+    public static final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
 
     /** The maximum number of spot instances allowable in an automatic request */
-    public final int MAX_WORKERS_PER_CATEGORY = 250;
+    public static final int MAX_WORKERS_PER_CATEGORY = 250;
 
     /**
      * How long to give workers to start up (in ms) before assuming that they have started (and
@@ -139,15 +146,11 @@ public class Broker implements Component {
      */
     public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
 
-
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     private WorkerCatalog workerCatalog = new WorkerCatalog();
 
-    /**
-     * These objects piece together results received from workers into one regional analysis result
-     * file per job.
-     */
-    private static Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
+    /** These objects piece together results received from workers into one regional analysis result file per job. */
+    private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
 
     /**
      * keep track of which graphs we have launched workers on and how long ago we launched them, so
@@ -177,19 +180,23 @@ public class Broker implements Component {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
         }
+        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
+        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
+        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
         WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
         Job job = new Job(templateTask, workerTags);
-        jobs.put(job.workerCategory, job);
 
         // Register the regional job so results received from multiple workers can be assembled into one file.
+        // If any parameters fail checks here, an exception may cause this method to exit early.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        // Note: if this fails with an exception we'll have a job enqueued, possibly being processed, with no assembler.
-        // That is not catastrophic, but the user may need to recognize and delete the stalled regional job.
         MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
         resultAssemblers.put(templateTask.jobId, assembler);
 
+        // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
+        jobs.put(job.workerCategory, job);
+
+        // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
         if (config.testTaskRedelivery()) {
-            // This is a fake job for testing, don't confuse the worker startup code below with null graph ID.
             return;
         }
 
@@ -385,14 +392,20 @@ public class Broker implements Component {
     }
 
     /**
-     * When job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
+     * Record an error that happened while a worker was processing a task on the given job. This method is tolerant
+     * of job being null, because it's called on a code path where any number of things could be wrong or missing.
+     * This method also ensures synchronization of writes to Jobs from any non-synchronized sections of an HTTP handler.
+     * Once job.errors is non-empty, job.isErrored() becomes true and job.isActive() becomes false.
      * The Job will stop delivering tasks, allowing workers to shut down, but will continue to exist allowing the user
      * to see the error message. User will then need to manually delete it, which will remove the result assembler.
-     * This method ensures synchronization of writes to Jobs from the unsynchronized worker poll HTTP handler.
      */
     private synchronized void recordJobError (Job job, String error) {
         if (job != null) {
-            job.errors.add(error);
+            // Limit the number of errors recorded to one.
+            // Still using a Set<String> instead of just String since the set of errors is exposed in a UI-facing API.
+            if (job.errors.isEmpty()) {
+                job.errors.add(error);
+            }
         }
     }
 
@@ -488,19 +501,21 @@ public class Broker implements Component {
         // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
         // because that method only uses final fields of the job.
         Job job = null;
-        MultiOriginAssembler assembler;
         try {
+            MultiOriginAssembler assembler;
             synchronized (this) {
                 job = findJob(workResult.jobId);
+                // Record any error reported by the worker and don't pass bad results on to regional result assembly.
+                // This will mark the job as errored and not-active, stopping distribution of tasks to workers.
+                // To ensure that happens, record errors before any other conditional that could exit this method.
+                if (workResult.error != null) {
+                    recordJobError(job, workResult.error);
+                    return;
+                }
                 assembler = resultAssemblers.get(workResult.jobId);
                 if (job == null || assembler == null || !job.isActive()) {
                     // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
                     LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
-                    return;
-                }
-                if (workResult.error != null) {
-                    // Record any error reported by the worker and don't pass bad results on to regional result assembly.
-                    recordJobError(job, workResult.error);
                     return;
                 }
                 // Mark tasks completed first before passing results to the assembler. On the final result received,

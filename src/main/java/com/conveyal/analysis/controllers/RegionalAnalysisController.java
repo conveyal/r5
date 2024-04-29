@@ -3,24 +3,28 @@ package com.conveyal.analysis.controllers;
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
+import com.conveyal.analysis.models.Model;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
+import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
+import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.conveyal.r5.analyst.progress.Task;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -35,19 +39,35 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.file.UrlWithHumanName.filenameCleanString;
 import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static org.eclipse.jetty.http.MimeTypes.Type.APPLICATION_JSON;
+import static org.eclipse.jetty.http.MimeTypes.Type.TEXT_HTML;
+import static org.eclipse.jetty.http.MimeTypes.Type.TEXT_PLAIN;
 
 /**
  * Spark HTTP handler methods that allow launching new regional analyses, as well as deleting them and fetching
@@ -68,10 +88,12 @@ public class RegionalAnalysisController implements HttpController {
 
     private final Broker broker;
     private final FileStorage fileStorage;
+    private final TaskScheduler taskScheduler;
 
-    public RegionalAnalysisController (Broker broker, FileStorage fileStorage) {
+    public RegionalAnalysisController (Broker broker, FileStorage fileStorage, TaskScheduler taskScheduler) {
         this.broker = broker;
         this.fileStorage = fileStorage;
+        this.taskScheduler = taskScheduler;
     }
 
     private Collection<RegionalAnalysis> getRegionalAnalysesForRegion(String regionId, UserPermissions userPermissions) {
@@ -157,104 +179,44 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     /**
-     * This used to extract a particular percentile of a regional analysis as a grid file.
-     * Now it just gets the single percentile that exists for any one analysis, either from the local buffer file
-     * for an analysis still in progress, or from S3 for a completed analysis.
+     * Associate a storage key with a human-readable name.
+     * Currently, this record type is only used within the RegionalAnalysisController class.
      */
-    private Object getRegionalResults (Request req, Response res) throws IOException {
+    private record HumanKey(FileStorageKey storageKey, String humanName) { };
 
-        // Get some path parameters out of the URL.
-        // The UUID of the regional analysis for which we want the output data
-        final String regionalAnalysisId = req.params("_id");
-        // The response file format: PNG, TIFF, or GRID
-        final String fileFormatExtension = req.params("format");
-
-        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
-                QueryBuilder.start("_id").is(req.params("_id")).get(),
-                DBProjection.exclude("request.scenario.modifications"),
-                UserPermissions.from(req)
-        ).iterator().next();
-
-        if (analysis == null || analysis.deleted) {
-            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
-        }
-
-        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
-        // and multiple output files per analysis (for different percentiles of travel time and/or different
-        // destination pointsets). These initial values are for older regional analysis results with only a single
-        // cutoff, and no percentile or destination gridId in the file name.
-        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
-        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
-        int percentile = analysis.travelTimePercentile;
-        int cutoffMinutes = analysis.cutoffMinutes;
+    /**
+     * Get a regional analysis results raster for a single (percentile, cutoff, destination) combination, in one of
+     * several image file formats. This method was factored out for use from two different API endpoints, one for
+     * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
+     * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
+     */
+    private HumanKey getSingleCutoffGrid (
+            RegionalAnalysis analysis,
+            OpportunityDataset destinations,
+            int cutoffMinutes,
+            int percentile,
+            FileStorageFormat fileFormat
+    ) throws IOException {
+        final String regionalAnalysisId = analysis._id;
+        final String destinationPointSetId = destinations._id;
+        // Selecting the zeroth cutoff still makes sense for older analyses that don't allow an array of N cutoffs.
         int cutoffIndex = 0;
-        String destinationPointSetId = analysis.grid;
-
-        // Handle newer regional analyses with multiple cutoffs in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
         if (analysis.cutoffsMinutes != null) {
-            int nCutoffs = analysis.cutoffsMinutes.length;
-            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
             cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
-            checkState(cutoffIndex >= 0,
-                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.cutoffsMinutes)
-            );
+            checkState(cutoffIndex >= 0);
         }
-
-        // Handle newer regional analyses with multiple percentiles in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        if (analysis.travelTimePercentiles != null) {
-            int nPercentiles = analysis.travelTimePercentiles.length;
-            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
-                    "Percentile for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.travelTimePercentiles));
-        }
-
-        // Handle even newer regional analyses with multiple destination pointsets per analysis.
-        if (analysis.destinationPointSetIds != null) {
-            int nGrids = analysis.destinationPointSetIds.length;
-            checkState(nGrids > 0, "Regional analysis has no grids.");
-            destinationPointSetId = req.queryParams("destinationPointSetId");
-            if (destinationPointSetId == null) {
-                destinationPointSetId = analysis.destinationPointSetIds[0];
-            }
-            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
-                    "Destination gridId must be one of: %s",
-                    String.join(",", analysis.destinationPointSetIds));
-        }
-
-        // We started implementing the ability to retrieve and display partially completed analyses.
-        // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
-
-        if (broker.findJob(regionalAnalysisId) != null) {
-            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
-        }
-
-        // FIXME It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
-        // aren't any (only CSV, because origins are freeform).
-        // How can we determine whether this analysis is expected to have no gridded results and cleanly return a 404?
-
-        // The analysis has already completed, results should be stored and retrieved from S3 via redirects.
-        LOG.debug("Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {}.",
-                cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId);
-        FileStorageFormat format = FileStorageFormat.valueOf(fileFormatExtension.toUpperCase());
-        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"tiff\".");
-        }
-
+        LOG.info(
+            "Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {} in format {}.",
+            cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
+        );
         // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
         // We do this even for results generated by older workers, so they will be re-extracted with the new name.
         // These grids are reasonably small, we may be able to just send all cutoffs to the UI instead of selecting.
-        String singleCutoffKey =
-                String.format("%s_%s_P%d_C%d.%s", regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, fileFormatExtension);
-
-        // A lot of overhead here - UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        String singleCutoffKey = String.format(
+            "%s_%s_P%d_C%d.%s",
+            regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes,
+            fileFormat.extension.toLowerCase(Locale.ROOT)
+        );
         FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
         if (!fileStorage.exists(singleCutoffFileStorageKey)) {
             // An accessibility grid for this particular cutoff has apparently never been extracted from the
@@ -288,10 +250,10 @@ public class RegionalAnalysisController implements HttpController {
             InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
             Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
 
-            File localFile = FileUtils.createScratchFile(format.toString());
+            File localFile = FileUtils.createScratchFile(fileFormat.toString());
             FileOutputStream fos = new FileOutputStream(localFile);
 
-            switch (format) {
+            switch (fileFormat) {
                 case GRID:
                     grid.write(new GZIPOutputStream(fos));
                     break;
@@ -302,15 +264,201 @@ public class RegionalAnalysisController implements HttpController {
                     grid.writeGeotiff(fos);
                     break;
             }
-
+            LOG.debug("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
+            LOG.debug("Finished transferring single-cutoff grid {} to storage.", singleCutoffKey);
         }
-        return JsonUtil.toJsonString(
-                JsonUtil.objectNode().put("url", fileStorage.getURL(singleCutoffFileStorageKey))
-        );
+        String analysisHumanName = humanNameForEntity(analysis);
+        String destinationHumanName = humanNameForEntity(destinations);
+        String resultHumanFilename = filenameCleanString(
+                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, cutoffMinutes)
+            ) + "." + fileFormat.extension.toLowerCase(Locale.ROOT);
+        // Note that the returned human filename already contains the appropriate extension.
+        return new HumanKey(singleCutoffFileStorageKey, resultHumanFilename);
     }
 
-    private String getCsvResults (Request req, Response res) {
+    // Prevent multiple requests from creating the same files in parallel.
+    // This could potentially be integrated into FileStorage with enum return values or an additional boolean method.
+    private Set<String> filesBeingPrepared = Collections.synchronizedSet(new HashSet<>());
+
+    private Object getAllRegionalResults (Request req, Response res) throws IOException {
+        final String regionalAnalysisId = req.params("_id");
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        final RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
+        if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
+            throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
+        }
+        if (analysis.request.originPointSetKey != null) {
+            throw AnalysisServerException.badRequest("Batch result download only available for gridded origins.");
+        }
+        FileStorageKey zippedResultsKey = new FileStorageKey(RESULTS, analysis._id + "_ALL.zip");
+        if (fileStorage.exists(zippedResultsKey)) {
+            res.type(APPLICATION_JSON.asString());
+            String analysisHumanName = humanNameForEntity(analysis);
+            return fileStorage.getJsonUrl(zippedResultsKey, analysisHumanName, "zip");
+        }
+        if (filesBeingPrepared.contains(zippedResultsKey.path)) {
+            res.type(TEXT_PLAIN.asString());
+            res.status(HttpStatus.ACCEPTED_202);
+            return "Geotiff zip is already being prepared in the background.";
+        }
+        // File did not exist. Create it in the background and ask caller to request it later.
+        filesBeingPrepared.add(zippedResultsKey.path);
+        Task task = Task.create("Zip all geotiffs for regional analysis " + analysis.name)
+            .forUser(userPermissions)
+            .withAction(progressListener -> {
+                int nSteps = analysis.destinationPointSetIds.length * analysis.cutoffsMinutes.length *
+                        analysis.travelTimePercentiles.length * 2 + 1;
+                progressListener.beginTask("Creating and archiving geotiffs...", nSteps);
+                // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
+                List<HumanKey> humanKeys = new ArrayList<>();
+                for (String destinationPointSetId : analysis.destinationPointSetIds) {
+                    OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
+                    for (int cutoffMinutes : analysis.cutoffsMinutes) {
+                        for (int percentile : analysis.travelTimePercentiles) {
+                            HumanKey gridKey = getSingleCutoffGrid(
+                                    analysis, destinations, cutoffMinutes, percentile, FileStorageFormat.GEOTIFF
+                            );
+                            humanKeys.add(gridKey);
+                            progressListener.increment();
+                        }
+                    }
+                }
+                File tempZipFile = File.createTempFile("regional", ".zip");
+                // Zipfs can't open existing empty files, the file has to not exist. FIXME: Non-dangerous race condition
+                // Examining ZipFileSystemProvider reveals a "useTempFile" env parameter, but this is for the individual
+                // entries. May be better to just use zipOutputStream which would also allow gzip - zip CSV conversion.
+                tempZipFile.delete();
+                Map<String, String> env = Map.of("create", "true");
+                URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
+                try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
+                    for (HumanKey key : humanKeys) {
+                        Path storagePath = fileStorage.getFile(key.storageKey).toPath();
+                        Path zipPath = zipFilesystem.getPath(key.humanName);
+                        Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
+                        progressListener.increment();
+                    }
+                }
+                fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
+                progressListener.increment();
+                filesBeingPrepared.remove(zippedResultsKey.path);
+            });
+        taskScheduler.enqueue(task);
+        res.type(TEXT_PLAIN.asString());
+        res.status(HttpStatus.ACCEPTED_202);
+        return "Building geotiff zip in background.";
+    }
+
+    /**
+     * Given an Entity, make a human-readable name for the entity composed of its user-supplied name as well as
+     * the most rapidly changing digits of its ID to disambiguate in case multiple entities have the same name.
+     * It is also possible to find the exact entity in many web UI fields using this suffix of its ID.
+     */
+    private static String humanNameForEntity (Model entity) {
+        // Most or all IDs encountered are MongoDB ObjectIDs. The first four and middle five bytes are slow-changing
+        // and would not disambiguate between data sets. Only the 3-byte counter at the end will be sure to change.
+        // See https://www.mongodb.com/docs/manual/reference/method/ObjectId/
+        final String id = entity._id;
+        checkArgument(id.length() > 6, "ID had too few characters.");
+        String shortId = id.substring(id.length() - 6, id.length());
+        String humanName = "%s_%s".formatted(filenameCleanString(entity.name), shortId);
+        return humanName;
+    }
+
+    /** Fetch destination OpportunityDataset from database, followed by a check that it was present. */
+    private static OpportunityDataset getDestinations (String destinationPointSetId, UserPermissions userPermissions) {
+        OpportunityDataset opportunityDataset =
+                Persistence.opportunityDatasets.findByIdIfPermitted(destinationPointSetId, userPermissions);
+        checkNotNull(opportunityDataset, "Opportunity dataset could not be found in database.");
+        return opportunityDataset;
+    }
+
+    /** Fetch RegionalAnalysis from database by ID, followed by a check that it was present and not deleted. */
+    private static RegionalAnalysis getAnalysis (String analysisId, UserPermissions userPermissions) {
+        RegionalAnalysis analysis = Persistence.regionalAnalyses.findPermitted(
+                QueryBuilder.start("_id").is(analysisId).get(),
+                DBProjection.exclude("request.scenario.modifications"),
+                userPermissions
+        ).iterator().next();
+        if (analysis == null || analysis.deleted) {
+            throw AnalysisServerException.notFound("The specified regional analysis is unknown or has been deleted.");
+        }
+        return analysis;
+    }
+
+    /** Extract a particular percentile and cutoff of a regional analysis in one of several different raster formats. */
+    private UrlWithHumanName getRegionalResults (Request req, Response res) throws IOException {
+        // It is possible that regional analysis is complete, but UI is trying to fetch gridded results when there
+        // aren't any (only CSV, because origins are freeform). How should we determine whether this analysis is
+        // expected to have no gridded results and cleanly return a 404?
+        final String regionalAnalysisId = req.params("_id");
+        FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
+        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
+            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
+        }
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
+
+        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
+        // and multiple output files per analysis (for different percentiles of travel time and/or different
+        // destination pointsets). These initial values are for older regional analysis results with only a single
+        // cutoff, and no percentile or destination gridId in the file name.
+        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
+        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
+        int percentile = analysis.travelTimePercentile;
+        int cutoffMinutes = analysis.cutoffMinutes;
+        String destinationPointSetId = analysis.grid;
+
+        // Handle newer regional analyses with multiple cutoffs in an array.
+        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
+        // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
+        if (analysis.cutoffsMinutes != null) {
+            int nCutoffs = analysis.cutoffsMinutes.length;
+            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
+            cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
+            checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(cutoffMinutes),
+                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
+                    Ints.join(", ", analysis.cutoffsMinutes)
+            );
+        }
+
+        // Handle newer regional analyses with multiple percentiles in an array.
+        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
+        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
+        if (analysis.travelTimePercentiles != null) {
+            int nPercentiles = analysis.travelTimePercentiles.length;
+            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
+            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
+            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
+                    "Percentile for this regional analysis must be taken from this list: (%s)",
+                    Ints.join(", ", analysis.travelTimePercentiles));
+        }
+
+        // Handle even newer regional analyses with multiple destination pointsets per analysis.
+        if (analysis.destinationPointSetIds != null) {
+            int nGrids = analysis.destinationPointSetIds.length;
+            checkState(nGrids > 0, "Regional analysis has no grids.");
+            destinationPointSetId = req.queryParams("destinationPointSetId");
+            if (destinationPointSetId == null) {
+                destinationPointSetId = analysis.destinationPointSetIds[0];
+            }
+            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
+                    "Destination gridId must be one of: %s",
+                    String.join(",", analysis.destinationPointSetIds));
+        }
+        // We started implementing the ability to retrieve and display partially completed analyses.
+        // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
+        if (broker.findJob(regionalAnalysisId) != null) {
+            throw AnalysisServerException.notFound("Analysis is incomplete, no results file is available.");
+        }
+        // Significant overhead here: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
+        OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
+        HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, cutoffMinutes, percentile, format);
+        res.type(APPLICATION_JSON.asString());
+        return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
+    }
+
+    private Object getCsvResults (Request req, Response res) {
         final String regionalAnalysisId = req.params("_id");
         final CsvResultType resultType = CsvResultType.valueOf(req.params("resultType").toUpperCase());
         // If the resultType parameter received on the API is unrecognized, valueOf throws IllegalArgumentException
@@ -332,7 +480,10 @@ public class RegionalAnalysisController implements HttpController {
 
         FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, storageKey);
 
-        res.type("text/plain");
+        // TODO handle JSON with human name on UI side
+        // res.type(APPLICATION_JSON.asString());
+        // return fileStorage.getJsonUrl(fileStorageKey, analysis.name, resultType + ".csv");
+        res.type(TEXT_HTML.asString());
         return fileStorage.getURL(fileStorageKey);
     }
 
@@ -526,17 +677,20 @@ public class RegionalAnalysisController implements HttpController {
      * Return a JSON-wrapped URL for the file in FileStorage containing the JSON representation of the scenario for
      * the given regional analysis.
      */
-    private JsonNode getScenarioJsonUrl (Request request, Response response) {
-        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses
-                .findByIdIfPermitted(request.params("_id"), UserPermissions.from(request));
+    private UrlWithHumanName getScenarioJsonUrl (Request request, Response response) {
+        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.findByIdIfPermitted(
+                request.params("_id"),
+                DBProjection.exclude("request.scenario.modifications"),
+                UserPermissions.from(request)
+        );
         // In the persisted objects, regionalAnalysis.scenarioId seems to be null. Get it from the embedded request.
         final String networkId = regionalAnalysis.bundleId;
         final String scenarioId = regionalAnalysis.request.scenarioId;
         checkNotNull(networkId, "RegionalAnalysis did not contain a network ID.");
         checkNotNull(scenarioId, "RegionalAnalysis did not contain an embedded request with scenario ID.");
-        String scenarioUrl = fileStorage.getURL(
-                new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId)));
-        return JsonUtil.objectNode().put("url", scenarioUrl);
+        FileStorageKey scenarioKey = new FileStorageKey(BUNDLES, getScenarioFilename(regionalAnalysis.bundleId, scenarioId));
+        response.type(APPLICATION_JSON.asString());
+        return fileStorage.getJsonUrl(scenarioKey, regionalAnalysis.name, "scenario.json");
     }
 
     @Override
@@ -546,11 +700,11 @@ public class RegionalAnalysisController implements HttpController {
             sparkService.get("/:regionId/regional/running", this::getRunningAnalyses, toJson);
         });
         sparkService.path("/api/regional", () -> {
-            // For grids, no transformer is supplied: render raw bytes or input stream rather than transforming to JSON.
             sparkService.get("/:_id", this::getRegionalAnalysis);
-            sparkService.get("/:_id/grid/:format", this::getRegionalResults);
+            sparkService.get("/:_id/all", this::getAllRegionalResults, toJson);
+            sparkService.get("/:_id/grid/:format", this::getRegionalResults, toJson);
             sparkService.get("/:_id/csv/:resultType", this::getCsvResults);
-            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl);
+            sparkService.get("/:_id/scenarioJsonUrl", this::getScenarioJsonUrl, toJson);
             sparkService.delete("/:_id", this::deleteRegionalAnalysis, toJson);
             sparkService.post("", this::createRegionalAnalysis, toJson);
             sparkService.put("/:_id", this::updateRegionalAnalysis, toJson);

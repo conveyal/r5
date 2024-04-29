@@ -100,6 +100,8 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
         // CsvWriter is not threadsafe and multiple threads may call this, so after values are generated,
         // the actual writing is synchronized (TODO confirm)
         // Is result row generation slow enough to bother synchronizing only the following block?
+        // This first dimension check is specific to each subclass. The check in the loop below is more general,
+        // applying to all subclasses (after the subclass-specific rowValues method may have added some columns).
         checkDimension(workResult);
         Iterable<String[]> rows = rowValues(workResult);
         synchronized (this) {

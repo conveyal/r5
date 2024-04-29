@@ -69,11 +69,17 @@ public class RegionalWorkResult {
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 
-    /** Constructor used when results for this origin are considered unusable due to an unhandled error. */
+    /**
+     * Constructor used when results for this origin are considered unusable due to an unhandled error. Besides the
+     * short-form exception, most result fields are left null. There is no information to communicate, and because
+     * errors are often produced faster than valid results, we don't want to flood the backend with unnecessarily
+     * voluminous error reports. The short-form exception message is used for a similar reason, to limit the total size
+     * of error messages.
+     */
     public RegionalWorkResult(Throwable t, RegionalTask task) {
         this.jobId = task.jobId;
         this.taskId = task.taskId;
-        this.error = ExceptionUtils.shortAndLongString(t);
+        this.error = ExceptionUtils.filterStackTrace(t);
     }
 
 }

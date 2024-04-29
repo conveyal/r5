@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridTransformWrapper;
@@ -15,6 +16,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.Arrays;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -176,6 +178,15 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
      * testing or even production systems in order to observe and improve their robustness to failure.
      */
     public ChaosParameters injectFault;
+
+    /**
+     * Freeform (untyped) flags for enabling experimental, undocumented, or arcane worker behavior.
+     * This should be used to replace all previous special behavior flags that were embedded inside analysis names etc.
+     */
+    public Set<String> flags;
+
+    /** Control the details of CSV regional analysis output, including whether to output IDs, names, or both. */
+    public CsvResultOptions csvResultOptions;
 
     /**
      * Is this a single point or regional request? Needed to encode types in JSON serialization. Can that type field be

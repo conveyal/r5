@@ -36,9 +36,16 @@ public class ChicagoRTAInRoutingFareCalculator extends InRoutingFareCalculator {
     // Day pass provides unlimited rides, except on Pace Premium routes ($2.25 per boarding upcharge) and Metra
     public static final int CTA_PACE_DAY_PASS = 500;
 
+    // Stations that are connected behind faregates, or that have farecard transfers
     private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(
-                new HashSet<>(Arrays.asList("41660", "40260", "40370")), // Lake, State/Lake, Washington
-                new HashSet<>(Arrays.asList("40070", "40560", "40850")) // Jackson (Blue), Jackson (Red), HW Library
+                // State/Lake, Lake (Red), Washington (Blue)
+                new HashSet<>(Arrays.asList("41660", "40260")),
+                new HashSet<>(Arrays.asList("41660", "40370")),
+                new HashSet<>(Arrays.asList("40260", "40370")),
+                // Jackson (Blue), Jackson (Red), Harold Washington Library-State/Van Buren
+                new HashSet<>(Arrays.asList("40070", "40560")),
+                new HashSet<>(Arrays.asList("40070", "40850")),
+                new HashSet<>(Arrays.asList("40560", "40850"))
             ));
 
     private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation){

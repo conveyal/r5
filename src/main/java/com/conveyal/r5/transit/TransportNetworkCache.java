@@ -110,8 +110,7 @@ public class TransportNetworkCache implements Component {
      * Find a transport network by ID, building or loading as needed from pre-existing OSM, GTFS, MapDB, or Kryo files.
      * This should never return null. If a TransportNetwork can't be built or loaded, an exception will be thrown.
      */
-    public synchronized @Nonnull
-    TransportNetwork getNetwork (String networkId) throws TransportNetworkException {
+    public TransportNetwork getNetwork (String networkId) throws TransportNetworkException {
         try {
             return networkCache.get(networkId);
         } catch (Exception e) {
@@ -137,18 +136,19 @@ public class TransportNetworkCache implements Component {
      * base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId rather than a
      * compound key of (networkId, scenarioId).
      *
-     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused.
+     * Reusing scenario networks automatically leads to reuse of the associated PointSet linkages and egress tables.
      * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving
      *      the scenario against caches on S3 or local disk should be pulled out into a separate function.
      * The problem is that then you resolve the scenario every time, even when the ID is enough to look up the already
      * built network. So we need to pass the whole task in here, so either the ID or full scenario are visible.
      *
-     * Thread safety notes: This entire method is synchronized so access by multiple threads will be sequential.
-     * The first thread will have a chance to build and store the requested scenario before any others see it.
-     * This means each new scenario will be applied one after the other. This is probably OK as long as building egress
-     * tables is already parallelized.
+     * Thread safety: getNetwork and getNetworkForScenario are threadsafe caches, so access to the same key by multiple
+     * threads will occur sequentially without repeatedly or simultaneously performing the same loading actions.
+     * Javadoc on the Caffeine LoadingCache indicates that it will throw exceptions when the cache loader method throws
+     * them, without establishing a mapping in the cache. So exceptions occurring during scenario application are
+     * expected to bubble up unimpeded.
      */
-    public synchronized TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
+    public TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
         TransportNetwork scenarioNetwork = scenarioNetworkCache.get(new BaseAndScenarioId(networkId, scenarioId));
         return scenarioNetwork;
     }

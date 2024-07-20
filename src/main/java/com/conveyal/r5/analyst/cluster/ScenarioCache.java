@@ -44,7 +44,7 @@ public class ScenarioCache {
     public synchronized void storeScenario (Scenario scenario) {
         Scenario existingScenario = scenariosById.put(scenario.id, scenario);
         if (existingScenario != null) {
-            LOG.debug("Scenario cache already contained a this scenario.");
+            LOG.debug("Scenario cache already contained this scenario.");
         }
     }
 

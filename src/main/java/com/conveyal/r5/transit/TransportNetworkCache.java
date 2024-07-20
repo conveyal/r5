@@ -185,6 +185,7 @@ public class TransportNetworkCache implements Component {
             // The switch to use JSON manifests instead of zips occurred in 32a1aebe in July 2016.
             // Over six years have passed, buildNetworkFromBundleZip is deprecated and could probably be removed.
             LOG.warn("No network config (aka manifest) found. Assuming old-format network inputs bundle stored as a single ZIP file.");
+            // FIXME Bundle ZIP building to reduce duplicate code.
             network = buildNetworkFromBundleZip(networkId);
         } else {
             network = buildNetworkFromConfig(networkConfig);

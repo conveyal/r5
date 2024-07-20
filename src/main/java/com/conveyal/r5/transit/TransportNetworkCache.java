@@ -57,7 +57,8 @@ public class TransportNetworkCache implements Component {
      * (e.g. the regional task queue is bigger than the size of each queued regional job) we might end up working on
      * a mix of tasks from N different scenarios. Note also that scenarios hold references to their base networks, so
      * caching multiple scenario networks can theoretically keep just as many TransportNetworks in memory.
-     * But in practice, all cloud workers currently remain on a single for their entire lifespan.
+     * But in practice, in non-local (cloud) operation a given worker instance is locked to a single network for its
+     * entire lifespan.
      */
     public static final int MAX_CACHED_SCENARIO_NETWORKS = 10;
 

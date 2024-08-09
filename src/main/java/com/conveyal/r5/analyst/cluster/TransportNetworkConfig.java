@@ -54,4 +54,11 @@ public class TransportNetworkConfig {
      */
     public Set<StreetMode> buildGridsForModes;
 
+    /**
+     * Specifies which "labeler" to use when setting traversal mode permissions from OSM tags. For now, only
+     * implemented with "sidewalk" to use the SidewalkTraversalPermissionLayer. This should eventually be cleaned up
+     * (specifying different labelers, using enums).
+     */
+    public String traversalPermissionLabeler;
+
 }

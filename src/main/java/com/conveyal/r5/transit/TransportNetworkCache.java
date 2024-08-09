@@ -281,7 +281,8 @@ public class TransportNetworkCache implements Component {
 
         TransportNetwork network = new TransportNetwork();
 
-        network.streetLayer = new StreetLayer();
+        network.streetLayer = new StreetLayer(config);
+
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
 
         network.streetLayer.parentNetwork = network;

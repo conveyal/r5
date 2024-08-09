@@ -6,12 +6,14 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
+import com.conveyal.r5.labeling.SidewalkTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.SpeedLabeler;
 import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
@@ -132,8 +134,8 @@ public class StreetLayer implements Serializable, Cloneable {
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
 
     // TODO these are only needed when building the network, should we really be keeping them here in the layer?
-    //      We should instead have a network builder that holds references to this transient state.
-    // TODO don't hardwire to US
+    //      We should instead have a network builder that holds references to this transient state. Note initial
+    //      approach of specifying a TraversalPermissionLabeler in TransportNetworkConfig.
     private transient TraversalPermissionLabeler permissionLabeler = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
@@ -207,6 +209,16 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public StreetLayer() {
         speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
+    }
+
+    public StreetLayer(TransportNetworkConfig config) {
+        this();
+        if (config != null && config.traversalPermissionLabeler != null) {
+            // TODO cleaner mapping
+            if ("sidewalk".equals(config.traversalPermissionLabeler)) {
+                permissionLabeler = new SidewalkTraversalPermissionLabeler();
+            }
+        }
     }
 
     /** Load street layer from an OSM-lib OSM DB */

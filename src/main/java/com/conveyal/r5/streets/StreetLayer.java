@@ -213,11 +213,11 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public StreetLayer(TransportNetworkConfig config) {
         this();
-        if (config != null && config.traversalPermissionLabeler != null) {
-            // TODO cleaner mapping
-            if ("sidewalk".equals(config.traversalPermissionLabeler)) {
+        if (config != null) {
+            // FIXME hack to force use of SIdewalkTraversalPermissionLabeler in cluster use
+            // if ("sidewalk".equals(config.traversalPermissionLabeler)) {
                 permissionLabeler = new SidewalkTraversalPermissionLabeler();
-            }
+            // }
         }
     }
 

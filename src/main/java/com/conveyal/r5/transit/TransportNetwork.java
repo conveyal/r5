@@ -4,9 +4,11 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetLayer;
@@ -81,8 +83,6 @@ public class TransportNetwork implements Serializable {
      */
     public String scenarioId = null;
 
-    public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
-
     public InRoutingFareCalculator fareCalculator;
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
@@ -100,7 +100,9 @@ public class TransportNetwork implements Serializable {
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
     }
-
+    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles) {
+        return fromFiles(osmSourceFile, gtfsSourceFiles, null);
+    }
     /**
      * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
      * more than one PBF file into a single OSM storage object. However they might be from different points in time, so
@@ -114,9 +116,11 @@ public class TransportNetwork implements Serializable {
      * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
      * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
+
     public static TransportNetwork fromFiles (
             String osmSourceFile,
-            List<String> gtfsSourceFiles
+            List<String> gtfsSourceFiles,
+            String configFile
     ) throws DuplicateFeedException {
         // Load OSM data into MapDB to pass into network builder.
         OSM osm = new OSM(osmSourceFile + ".mapdb");
@@ -124,21 +128,37 @@ public class TransportNetwork implements Serializable {
         osm.readFromFile(osmSourceFile);
         // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
         Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
-        return fromInputs(osm, feeds);
+        if (configFile == null) {
+            return fromInputs(osm, feeds);
+        } else {
+            try {
+                // Use lenient mapper to mimic behavior in objectFromRequestBody.
+                TransportNetworkConfig config = JsonUtilities.lenientObjectMapper.readValue(configFile,
+                        TransportNetworkConfig.class);
+                return fromInputs(osm, feeds, config);
+            } catch (IOException e) {
+                throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
+            }
+        }
+    }
+
+    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
+        return fromInputs(osm, gtfsFeeds, null);
     }
 
     /**
-     * This is the core method for building a street and transit network. It takes osm-lib and gtfs-lib objects as
-     * parameters. It is wrapped in various other methods that create those OSM and GTFS objects from filenames, input
-     * directories etc. The supplied OSM object must have intersections already detected.
-     * The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
+     * This is the method for building a street and transit network locally (as opposed to
+     * TransportNetworkCache#buildNetworkfromConfig, which is used in cluster builds). This method takes osm-lib,
+     * gtfs-lib, and config objects as parameters. It is wrapped in various other methods that create those OSM and
+     * GTFS objects from filenames, input directories etc. The supplied OSM object must have intersections already
+     * detected. The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
      */
-    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
+    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds, TransportNetworkConfig config) {
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
         // Make street layer from OSM data in MapDB
-        StreetLayer streetLayer = new StreetLayer();
+        StreetLayer streetLayer = new StreetLayer(config);
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
@@ -180,14 +200,16 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Scan a directory detecting all the files that are network inputs, then build a network from those files.
+     * Scan a directory detecting all the files that are network inputs, then build a network from those files. This
+     * method is used in the PointToPointRouterServer, not the cluster-based analysis backend.
      *
-     * NOTE the feedId of the gtfs feeds laoded here will be the ones declared by the feeds or based on their filenames.
+     * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
      * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
+        File configFile = null;
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
                 case GTFS:
@@ -202,6 +224,9 @@ public class TransportNetwork implements Serializable {
                         LOG.warn("Can only load one OSM file at a time.");
                     }
                     break;
+                case CONFIG:
+                    LOG.info("Found config file {}", file);
+                    configFile = file;
                 case DEM:
                     LOG.warn("DEM file '{}' not yet supported.", file);
                     break;
@@ -213,7 +238,11 @@ public class TransportNetwork implements Serializable {
             LOG.error("An OSM PBF file is required to build a network.");
             return null;
         } else {
-            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
+            if (configFile == null) {
+                return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
+            } else {
+                return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, configFile.getAbsolutePath());
+            }
         }
     }
 
@@ -259,6 +288,7 @@ public class TransportNetwork implements Serializable {
             if (name.endsWith(".pbf") || name.endsWith(".vex")) return OSM;
             if (name.endsWith(".tif") || name.endsWith(".tiff")) return DEM; // Digital elevation model (elevation raster)
             if (name.endsWith("network.dat")) return OUTPUT;
+            if (name.endsWith(".json")) return CONFIG;
             return OTHER;
         }
     }

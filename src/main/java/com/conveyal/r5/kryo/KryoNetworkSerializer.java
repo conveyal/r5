@@ -53,7 +53,7 @@ public abstract class KryoNetworkSerializer {
      * When prototyping new features, use a unique identifier such as the branch or a commit ID, not sequential nvX ones.
      * This avoids conflicts when multiple changes are combined in a single production release, or some are abandoned.
      */
-    public static final String NETWORK_FORMAT_VERSION = "nv3";
+    public static final String NETWORK_FORMAT_VERSION = "1fe1c83e";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 

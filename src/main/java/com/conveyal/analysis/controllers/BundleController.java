@@ -13,7 +13,6 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
@@ -81,6 +80,7 @@ public class BundleController implements HttpController {
     public void registerEndpoints (Service sparkService) {
         sparkService.path("/api/bundle", () -> {
             sparkService.get("", this::getBundles, toJson);
+            sparkService.get("/:_id/config", this::getBundleConfig, toJson);
             sparkService.get("/:_id", this::getBundle, toJson);
             sparkService.post("", this::create, toJson);
             sparkService.put("/:_id", this::update, toJson);
@@ -110,7 +110,6 @@ public class BundleController implements HttpController {
         try {
             bundle.name = files.get("bundleName").get(0).getString("UTF-8");
             bundle.regionId = files.get("regionId").get(0).getString("UTF-8");
-
             if (files.get("osmId") != null) {
                 bundle.osmId = files.get("osmId").get(0).getString("UTF-8");
                 Bundle bundleWithOsm = Persistence.bundles.find(QueryBuilder.start("osmId").is(bundle.osmId).get()).next();
@@ -118,7 +117,6 @@ public class BundleController implements HttpController {
                     throw AnalysisServerException.badRequest("Selected OSM does not exist.");
                 }
             }
-
             if (files.get("feedGroupId") != null) {
                 bundle.feedGroupId = files.get("feedGroupId").get(0).getString("UTF-8");
                 Bundle bundleWithFeed = Persistence.bundles.find(QueryBuilder.start("feedGroupId").is(bundle.feedGroupId).get()).next();
@@ -134,6 +132,12 @@ public class BundleController implements HttpController {
                 bundle.feeds = bundleWithFeed.feeds;
                 bundle.feedsComplete = bundleWithFeed.feedsComplete;
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
+            }
+            if (files.get("config") != null) {
+                // For validation, rather than reading as freeform JSON, deserialize into a model class instance.
+                // However, only the instance fields specifying things other than OSM and GTFS IDs will be retained.
+                String configString = files.get("config").get(0).getString();
+                bundle.config = JsonUtil.objectMapper.readValue(configString, TransportNetworkConfig.class);
             }
             UserPermissions userPermissions = UserPermissions.from(req);
             bundle.accessGroup = userPermissions.accessGroup;
@@ -274,15 +278,19 @@ public class BundleController implements HttpController {
         return bundle;
     }
 
+    /** SIDE EFFECTS: This method will change the field bundle.config before writing it. */
     private void writeNetworkConfigToCache (Bundle bundle) throws IOException {
-        TransportNetworkConfig networkConfig = new TransportNetworkConfig();
-        networkConfig.osmId = bundle.osmId;
-        networkConfig.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
-
+        // If the user specified additional network configuration options, they should already be in bundle.config.
+        // If no custom options were specified, we start with a fresh, empty instance.
+        if (bundle.config == null) {
+            bundle.config = new TransportNetworkConfig();
+        }
+        // This will overwrite and override any inconsistent osm and gtfs IDs that were mistakenly supplied by the user.
+        bundle.config.osmId = bundle.osmId;
+        bundle.config.gtfsIds = bundle.feeds.stream().map(f -> f.bundleScopedFeedId).collect(Collectors.toList());
         String configFileName = bundle._id + ".json";
         File configFile = FileUtils.createScratchFile("json");
-        JsonUtil.objectMapper.writeValue(configFile, networkConfig);
-
+        JsonUtil.objectMapper.writeValue(configFile, bundle.config);
         FileStorageKey key = new FileStorageKey(BUNDLES, configFileName);
         fileStorage.moveIntoStorage(key, configFile);
     }
@@ -310,6 +318,27 @@ public class BundleController implements HttpController {
         }
 
         return bundle;
+    }
+
+    /**
+     * There are two copies of the Bundle/Network config: one in the Bundle entry in the database and one in a JSON
+     * file (obtainable by the workers). This method always reads the one in the file, which has been around longer
+     * and is considered the definitive source of truth. The entry in the database is a newer addition and has only
+     * been around since September 2024.
+     */
+    private TransportNetworkConfig getBundleConfig (Request request, Response res) {
+        // Unfortunately this mimics logic in TransportNetworkCache. Deduplicate in a static utility method?
+        String id = GTFSCache.cleanId(request.params("_id"));
+        FileStorageKey key = new FileStorageKey(BUNDLES, id, "json");
+        File networkConfigFile = fileStorage.getFile(key);
+        // Unlike in the worker, we expect the backend to have a model field for every known network/bundle option.
+        // Threfore, use the default objectMapper that does not tolerate unknown fields.
+        try {
+            return JsonUtil.objectMapper.readValue(networkConfigFile, TransportNetworkConfig.class);
+        } catch (Exception exception) {
+            LOG.error("Exception deserializing stored network config", exception);
+            return null;
+        }
     }
 
     private Collection<Bundle> getBundles (Request req, Response res) {

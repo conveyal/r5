@@ -5,6 +5,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.validator.model.Priority;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDate;
@@ -46,6 +47,11 @@ public class Bundle extends Model implements Cloneable {
 
     public int feedsComplete;
     public int totalFeeds;
+
+    // The definitive TransportNetworkConfig is a JSON file stored alonside the feeds in file storage. It is
+    // duplicated here to record any additional user-specified options that were supplied when the bundle was created.
+    // It may contain redundant copies of information stored in the outer level Bundle such as OSM and GTFS feed IDs.
+    public TransportNetworkConfig config;
 
     public static String bundleScopeFeedId (String feedId, String feedGroupId) {
         return String.format("%s_%s", feedId, feedGroupId);

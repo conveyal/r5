@@ -2,12 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RasterCost;
-import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.profile.StreetMode;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
 import java.util.Set;

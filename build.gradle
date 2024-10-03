@@ -165,7 +165,7 @@ dependencies {
     }
 
     // Database driver.
-    implementation 'org.mongodb:mongo-java-driver:3.11.0'
+    implementation 'org.mongodb:mongodb-driver-legacy:5.2.0'
 
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
     implementation 'org.mongojack:mongojack:2.10.1'

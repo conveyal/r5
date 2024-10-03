@@ -39,7 +39,6 @@ public class WorkerStatus {
     public String workerVersion;
     public String workerId;
     public Set<String> networks = new HashSet<>();
-    public Set<String> scenarios = new HashSet<>();
     public double secondsSinceLastPoll;
     public Map<String, Integer> tasksPerMinuteByJobId;
     @JsonUnwrapped(prefix = "ec2")
@@ -86,7 +85,6 @@ public class WorkerStatus {
         // networks = worker.networkPreloader.transportNetworkCache.getLoadedNetworkIds();
         // For now we report a single network, even before it's loaded.
         networks = Sets.newHashSet(worker.networkId);
-        scenarios = worker.networkPreloader.transportNetworkCache.getAppliedScenarios();
         ec2 = worker.ec2info;
 
         OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean();

@@ -55,14 +55,10 @@ public class TransportNetwork implements Serializable {
     public TransitLayer transitLayer;
 
     /**
-     * This stores any number of lightweight scenario networks built upon the current base network.
-     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
-     * A single network cache at the top level could store base networks and scenarios since they all have globally
-     * unique IDs. A hierarchical cache does have the advantage of evicting all the scenarios with the associated
-     * base network, which keeps the references in the scenarios from holding on to the base network. But considering
-     * that we have never started evicting networks (other than for a "cache" of one element) this might be getting
-     * ahead of ourselves.
+     * This field is no longer used. It has been moved to TransportNetworkCache, but this one remains for now, to
+     * avoid any inadvertent incompatibilities with serialized network files or serialization library settings.
      */
+    @Deprecated
     public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
     /**

@@ -21,7 +21,6 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.QueryBuilder;
@@ -137,9 +136,8 @@ public class BundleController implements HttpController {
             if (files.get("config") != null) {
                 // For validation, rather than reading as freeform JSON, deserialize into a model class instance.
                 // However, only the instance fields specifying things other than OSM and GTFS IDs will be retained.
-                // Use strict object mapper (from the strict/lenient pair) to fail on misspelled field names.
                 String configString = files.get("config").get(0).getString();
-                bundle.config = JsonUtilities.objectMapper.readValue(configString, TransportNetworkConfig.class);
+                bundle.config = JsonUtil.objectMapper.readValue(configString, TransportNetworkConfig.class);
             }
             UserPermissions userPermissions = UserPermissions.from(req);
             bundle.accessGroup = userPermissions.accessGroup;

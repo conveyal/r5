@@ -48,7 +48,7 @@ public class Bundle extends Model implements Cloneable {
     public int feedsComplete;
     public int totalFeeds;
 
-    // The definitive TransportNetworkConfig is a JSON file stored alonside the feeds in file storage. It is
+    // The definitive TransportNetworkConfig is a JSON file stored alongside the feeds in file storage. It is
     // duplicated here to record any additional user-specified options that were supplied when the bundle was created.
     // It may contain redundant copies of information stored in the outer level Bundle such as OSM and GTFS feed IDs.
     public TransportNetworkConfig config;

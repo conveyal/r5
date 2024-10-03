@@ -168,6 +168,8 @@ public class TransportNetworkCache implements Component {
         File configFile = fileStorage.getFile(configFileKey);
         try {
             // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            // A single network configuration file might be used across several worker versions. Unknown field names
+            // may be present for other worker versions unknown to this one. So we can't strictly validate field names.
             return JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
             throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);

@@ -134,8 +134,9 @@ public class BundleController implements HttpController {
                 bundle.totalFeeds = bundleWithFeed.totalFeeds;
             }
             if (files.get("config") != null) {
-                // For validation, rather than reading as freeform JSON, deserialize into a model class instance.
-                // However, only the instance fields specifying things other than OSM and GTFS IDs will be retained.
+                // Validation by deserializing into a model class instance. Unknown fields are ignored to
+                // allow sending config to custom or experimental workers with features unknown to the backend.
+                // The fields specifying OSM and GTFS IDs are not expected here. They will be ignored and overwritten.
                 String configString = files.get("config").get(0).getString();
                 bundle.config = JsonUtil.objectMapper.readValue(configString, TransportNetworkConfig.class);
             }

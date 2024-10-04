@@ -18,8 +18,8 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
+import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -327,13 +327,17 @@ public class BundleController implements HttpController {
      * and is considered the definitive source of truth. The entry in the database is a newer addition and has only
      * been around since September 2024.
      */
-    private TransportNetworkConfig getBundleConfig (Request request, Response res) {
+    private TransportNetworkConfig getBundleConfig(Request request, Response res) throws IOException {
         // Unfortunately this mimics logic in TransportNetworkCache. Deduplicate in a static utility method?
         String id = GTFSCache.cleanId(request.params("_id"));
         FileStorageKey key = new FileStorageKey(BUNDLES, id, "json");
         File networkConfigFile = fileStorage.getFile(key);
+        if (!networkConfigFile.exists()) {
+            throw AnalysisServerException.notFound("Bundle configuration file could not be found.");
+        }
+
         // Unlike in the worker, we expect the backend to have a model field for every known network/bundle option.
-        // Threfore, use the default objectMapper that does not tolerate unknown fields.
+        // Therefore, use the default objectMapper that does not tolerate unknown fields.
         try {
             return JsonUtil.objectMapper.readValue(networkConfigFile, TransportNetworkConfig.class);
         } catch (Exception exception) {

@@ -25,14 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.Set;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.DATASOURCES;
@@ -207,10 +202,8 @@ public class TransportNetworkCache implements Component {
         TransportNetworkConfig networkConfig = loadNetworkConfig(networkId);
         if (networkConfig == null) {
             // The switch to use JSON manifests instead of zips occurred in 32a1aebe in July 2016.
-            // Over six years have passed, buildNetworkFromBundleZip is deprecated and could probably be removed.
-            LOG.warn("No network config (aka manifest) found. Assuming old-format network inputs bundle stored as a single ZIP file.");
-            // FIXME Bundle ZIP building to reduce duplicate code.
-            network = buildNetworkFromBundleZip(networkId);
+            // buildNetworkFromBundleZip was deprecated for years then removed in 2024.
+            throw new RuntimeException("No network config (aka manifest) found.");
         } else {
             network = buildNetworkFromConfig(networkConfig);
         }
@@ -243,70 +236,19 @@ public class TransportNetworkCache implements Component {
         return network;
     }
 
-    /** Build a transport network given a network ID, using a zip of all bundle files in S3. */
-    @Deprecated
-    private TransportNetwork buildNetworkFromBundleZip (String networkId) {
-        // The location of the inputs that will be used to build this graph
-        File dataDirectory = FileUtils.createScratchDirectory();
-        FileStorageKey zipKey = new FileStorageKey(BUNDLES, networkId + ".zip");
-        File zipFile = fileStorage.getFile(zipKey);
-
-        try {
-            ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                File entryDestination = new File(dataDirectory, entry.getName());
-                if (!entryDestination.toPath().normalize().startsWith(dataDirectory.toPath())) {
-                    throw new Exception("Bad zip entry");
-                }
-
-                // Are both these mkdirs calls necessary?
-                entryDestination.getParentFile().mkdirs();
-                if (entry.isDirectory())
-                    entryDestination.mkdirs();
-                else {
-                    OutputStream entryFileOut = new FileOutputStream(entryDestination);
-                    zis.transferTo(entryFileOut);
-                    entryFileOut.close();
-                }
-            }
-            zis.close();
-        } catch (Exception e) {
-            // TODO delete cache dir which is probably corrupted.
-            LOG.warn("Error retrieving transportation network input files", e);
-            return null;
-        }
-
-        // Now we have a local copy of these graph inputs. Make a graph out of them.
-        TransportNetwork network;
-        try {
-            network = TransportNetwork.fromDirectory(dataDirectory);
-        } catch (DuplicateFeedException e) {
-            LOG.error("Duplicate feeds in transport network {}", networkId, e);
-            throw new RuntimeException(e);
-        }
-
-        // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.scenarioId = networkId;
-
-        return network;
-    }
-
     /**
      * Build a network from a JSON TransportNetworkConfig in file storage.
      * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
     private TransportNetwork buildNetworkFromConfig (TransportNetworkConfig config) {
-        // FIXME duplicate code. All internal building logic should be encapsulated in a method like
-        //  TransportNetwork.build(osm, gtfs1, gtfs2...)
-        // We currently have multiple copies of it, in buildNetworkFromConfig and buildNetworkFromBundleZip so you've
-        // got to remember to do certain things like set the network ID of the network in multiple places in the code.
-        // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
+        // FIXME All internal building logic should be encapsulated in a method like TransportNetwork.build(osm,
+        //  gtfs1, gtfs2...) (see various methods in TransportNetwork).
 
         TransportNetwork network = new TransportNetwork();
 
-        network.streetLayer = new StreetLayer();
+        network.streetLayer = new StreetLayer(config);
+
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
 
         network.streetLayer.parentNetwork = network;

@@ -136,7 +136,7 @@ public class StreetLayer implements Serializable, Cloneable {
     // TODO these are only needed when building the network, should we really be keeping them here in the layer?
     //      We should instead have a network builder that holds references to this transient state. Note initial
     //      approach of specifying a TraversalPermissionLabeler in TransportNetworkConfig.
-    private transient TraversalPermissionLabeler permissionLabeler = new USTraversalPermissionLabeler();
+    private transient TraversalPermissionLabeler permissionLabeler;
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedLabeler speedLabeler;
@@ -209,15 +209,21 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public StreetLayer() {
         speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
+        permissionLabeler = new USTraversalPermissionLabeler();
     }
 
     public StreetLayer(TransportNetworkConfig config) {
         this();
-        if (config != null && config.traversalPermissionLabeler != null) {
-            // TODO cleaner mapping
-            if ("sidewalk".equals(config.traversalPermissionLabeler)) {
-                permissionLabeler = new SidewalkTraversalPermissionLabeler();
-            }
+        if (config != null) {
+            permissionLabeler = switch (config.traversalPermissionLabeler) {
+                case "sidewalk" -> new SidewalkTraversalPermissionLabeler();
+                case null -> new USTraversalPermissionLabeler();
+                default -> throw new IllegalArgumentException(
+                        "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
+                );
+            };
+        } else {
+            permissionLabeler = new USTraversalPermissionLabeler();
         }
     }
 

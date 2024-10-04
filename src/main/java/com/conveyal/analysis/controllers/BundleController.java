@@ -327,7 +327,7 @@ public class BundleController implements HttpController {
      * and is considered the definitive source of truth. The entry in the database is a newer addition and has only
      * been around since September 2024.
      */
-    private TransportNetworkConfig getBundleConfig(Request request, Response res) throws IOException {
+    private TransportNetworkConfig getBundleConfig(Request request, Response res) {
         // Unfortunately this mimics logic in TransportNetworkCache. Deduplicate in a static utility method?
         String id = GTFSCache.cleanId(request.params("_id"));
         FileStorageKey key = new FileStorageKey(BUNDLES, id, "json");

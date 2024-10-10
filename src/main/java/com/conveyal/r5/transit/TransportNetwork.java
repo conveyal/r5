@@ -166,7 +166,7 @@ public class TransportNetwork implements Serializable {
         streetLayer.indexStreets();
 
         // Load transit data
-        TransitLayer transitLayer = new TransitLayer();
+        TransitLayer transitLayer = new TransitLayer(config);
         gtfsFeeds.forEach(gtfsFeed -> {
             transitLayer.loadFromGtfs(gtfsFeed);
             // Is there a reason we can't push this close call down into the loader method? Maybe exception handling?

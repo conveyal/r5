@@ -97,7 +97,10 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
      * data is prepared. 
      */
     public TransportNetwork synchronousPreload (AnalysisWorkerTask task) {
-        return buildValue(Key.forTask(task));
+        Key key = Key.forTask(task);
+        TransportNetwork scenarioNetwork = buildValue(key);
+        setComplete(key, scenarioNetwork);
+        return scenarioNetwork;
     }
 
     @Override
@@ -140,7 +143,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                 linkedPointSet.getEgressCostTable(progressListener);
             }
         }
-        // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.
+        // Finished building all needed inputs for analysis, return the completed network
         return scenarioNetwork;
     }
 

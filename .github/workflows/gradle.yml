@@ -50,5 +50,9 @@ jobs:
     - name: Publish to GH Packages
       # Supply access token to build.gradle (used in publishing.repositories.maven.credentials)
       env:
+        GITHUB_PACKAGE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: gradle publish
+permissions:
+  contents: read
+  packages: write

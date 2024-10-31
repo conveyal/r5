@@ -102,7 +102,6 @@ public abstract class AsyncLoader<K,V> {
      * Any exceptions that occur while building the value will escape this method, leaving the status as BUILDING.
      */
     protected V getBlocking (K key) {
-        setProgress(key, 0, "Starting...");
         V value = buildValue(key);
         synchronized (map) {
             map.put(key, new LoaderState(Status.PRESENT, "Loaded", 100, value));
@@ -135,6 +134,7 @@ public abstract class AsyncLoader<K,V> {
         if (enqueueLoadTask) {
             executor.execute(() -> {
                 try {
+                    setProgress(key, 0, "Starting...");
                     getBlocking(key);
                 } catch (Throwable t) {
                     // It's essential to trap Throwable rather than just Exception. Otherwise the executor

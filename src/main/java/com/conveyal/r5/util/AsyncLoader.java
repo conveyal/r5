@@ -134,8 +134,11 @@ public abstract class AsyncLoader<K,V> {
                     getBlocking(key);
                 } catch (Throwable t) {
                     // It's essential to trap Throwable rather than just Exception. Otherwise the executor
-                    // threads can be killed by any Error that happens, stalling the executor.
-                    setError(key, t);
+                    // threads can be killed by any Error that happens, stalling the executor. The below permanently
+                    // associates an error with the key. No further attempt will ever be made to create the value.
+                    synchronized (map) {
+                        map.put(key, new LoaderState(t));
+                    }
                     LOG.error("Async load failed: " + ExceptionUtils.stackTraceString(t));
                 }
             });
@@ -162,13 +165,4 @@ public abstract class AsyncLoader<K,V> {
         }
     }
 
-    /**
-     * Call this method inside the buildValue method to indicate that an unrecoverable error has happened.
-     * This will permanently associate an error with the key. No further attempt will ever be made to create the value.
-     */
-    protected void setError (K key, Throwable throwable) {
-        synchronized (map) {
-            map.put(key, new LoaderState(throwable));
-        }
-    }
 }

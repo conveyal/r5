@@ -94,7 +94,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
      * similar tasks will make interleaved calls to setProgress (with superficial map synchronization). Other than
      * causing a value to briefly revert from PRESENT to BUILDING this doesn't seem deeply problematic.
      * This is provided specifically for regional tasks, to ensure that they remain in preloading mode while all this
-     * data is prepared. 
+     * data is prepared.
+     * Any exceptions that occur while building the network will escape this method, leaving the status as BUILDING.
      */
     public TransportNetwork preloadBlocking (AnalysisWorkerTask task) {
         return getBlocking(Key.forTask(task));

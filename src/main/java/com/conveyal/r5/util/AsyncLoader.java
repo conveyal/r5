@@ -97,7 +97,10 @@ public abstract class AsyncLoader<K,V> {
         }
     }
 
-    /** This has been factored out of the executor runnables so subclasses can force a blocking (non-async) load. */
+    /**
+     * This has been factored out of the executor runnables so subclasses can force a blocking (non-async) load.
+     * Any exceptions that occur while building the value will escape this method, leaving the status as BUILDING.
+     */
     protected V getBlocking (K key) {
         setProgress(key, 0, "Starting...");
         V value = buildValue(key);
@@ -111,6 +114,7 @@ public abstract class AsyncLoader<K,V> {
      * Attempt to fetch the value for the supplied key.
      * If the value is not yet present, and not yet being computed / fetched, enqueue a task to do so.
      * Return a response that reports status, and may or may not contain the value.
+     * Any exception that occurs while building the value is caught and associated with the key with a status of ERROR.
      */
     public LoaderState<V> get (K key) {
         LoaderState<V> state = null;

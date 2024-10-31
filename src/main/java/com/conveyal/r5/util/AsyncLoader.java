@@ -97,6 +97,16 @@ public abstract class AsyncLoader<K,V> {
         }
     }
 
+    /** This has been factored out of the executor runnables so subclasses can force a blocking (non-async) load. */
+    protected V getBlocking (K key) {
+        setProgress(key, 0, "Starting...");
+        V value = buildValue(key);
+        synchronized (map) {
+            map.put(key, new LoaderState(Status.PRESENT, "Loaded", 100, value));
+        }
+        return value;
+    }
+
     /**
      * Attempt to fetch the value for the supplied key.
      * If the value is not yet present, and not yet being computed / fetched, enqueue a task to do so.
@@ -109,7 +119,7 @@ public abstract class AsyncLoader<K,V> {
             state = map.get(key);
             if (state == null) {
                 // Only enqueue a task to load the value for this key if another call hasn't already done it.
-                state = new LoaderState<V>(Status.WAITING, "Enqueued task...", 0, null);
+                state = new LoaderState<>(Status.WAITING, "Enqueued task...", 0, null);
                 map.put(key, state);
                 enqueueLoadTask = true;
             }
@@ -120,10 +130,8 @@ public abstract class AsyncLoader<K,V> {
         // Enqueue task outside the above block (synchronizing the fewest lines possible).
         if (enqueueLoadTask) {
             executor.execute(() -> {
-                setProgress(key, 0, "Starting...");
                 try {
-                    V value = buildValue(key);
-                    setComplete(key, value);
+                    getBlocking(key);
                 } catch (Throwable t) {
                     // It's essential to trap Throwable rather than just Exception. Otherwise the executor
                     // threads can be killed by any Error that happens, stalling the executor.
@@ -143,7 +151,7 @@ public abstract class AsyncLoader<K,V> {
      * It's not entirely clear this should return a value - might be better to call setValue within the overridden
      * method, just as we call setProgress or setError.
      */
-    protected abstract V buildValue(K key) throws Exception;
+    protected abstract V buildValue(K key);
 
     /**
      * Call this method inside the buildValue method to indicate progress.
@@ -154,15 +162,9 @@ public abstract class AsyncLoader<K,V> {
         }
     }
 
-    public void setComplete(K key, V value) {
-        synchronized (map) {
-            map.put(key, new LoaderState(Status.PRESENT, "Loaded", 100, value));
-        }
-    }
-
     /**
      * Call this method inside the buildValue method to indicate that an unrecoverable error has happened.
-     * FIXME this will permanently associate an error with the key. No further attempt will ever be made to create the value.
+     * This will permanently associate an error with the key. No further attempt will ever be made to create the value.
      */
     protected void setError (K key, Throwable throwable) {
         synchronized (map) {

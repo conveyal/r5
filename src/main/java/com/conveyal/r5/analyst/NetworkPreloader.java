@@ -79,7 +79,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         this.transportNetworkCache = transportNetworkCache;
     }
 
-    public LoaderState<TransportNetwork> preloadData (AnalysisWorkerTask task) {
+    public LoaderState<TransportNetwork> preload (AnalysisWorkerTask task) {
         if (task.scenario != null) {
             transportNetworkCache.rememberScenario(task.scenario);
         }
@@ -96,11 +96,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
      * This is provided specifically for regional tasks, to ensure that they remain in preloading mode while all this
      * data is prepared. 
      */
-    public TransportNetwork synchronousPreload (AnalysisWorkerTask task) {
-        Key key = Key.forTask(task);
-        TransportNetwork scenarioNetwork = buildValue(key);
-        setComplete(key, scenarioNetwork);
-        return scenarioNetwork;
+    public TransportNetwork preloadBlocking (AnalysisWorkerTask task) {
+        return getBlocking(Key.forTask(task));
     }
 
     @Override

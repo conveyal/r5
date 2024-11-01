@@ -21,7 +21,7 @@ import java.util.concurrent.ExecutionException;
  * There could instead be one instance per AnalystWorker or per JVM (static), but this would cause the mappings
  * including PointSets, StreetLayers, and Linkages (which hold references to the TransportNetwork) to stick around
  * even when we try to garbage collect a TransportNetwork. In cloud operation, this problem would not necessarily arise
- * in practice since workers are permanently associated with a single TransportNetwork.
+ * in practice since workers are permanently associated with a single base TransportNetwork.
  */
 public class LinkageCache {
 

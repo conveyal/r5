@@ -88,8 +88,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
     /**
      * A blocking way to ensure the network and all linkages and precomputed tables are prepared in advance of routing.
-     * Note that this does not perform any blocking or locking of its own - any synchronization will be that of the
-     * underlying caches (synchronized methods on TransportNetworkCache or LinkedPointSet). It also bypasses the
+     * Note that this does not perform any blocking or locking of its own. Any synchronization or turn-taking will be
+     * that of the underlying caches (TransportNetworkCache or LinkageCache). It also bypasses the
      * AsyncLoader locking that would usually allow only one buildValue operation at a time. All threads that call with
      * similar tasks will make interleaved calls to setProgress (with superficial map synchronization). Other than
      * causing a value to briefly revert from PRESENT to BUILDING this doesn't seem deeply problematic.

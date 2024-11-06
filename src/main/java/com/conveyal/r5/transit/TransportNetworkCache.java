@@ -219,6 +219,7 @@ public class TransportNetworkCache implements Component {
         network.transitLayer.buildDistanceTables(null);
 
         Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
+        buildGridsForModes.add(StreetMode.CAR);
         if (networkConfig != null && networkConfig.buildGridsForModes != null) {
             buildGridsForModes.addAll(networkConfig.buildGridsForModes);
         }

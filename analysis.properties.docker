@@ -1,17 +1,44 @@
-# When running in docker, we reference services running on other containers
-# The database is given the hostname mongo by the docker-compose links section
+# This file contains the configuration options for Conveyal Analysis Backend
+
+immediate-shutdown=false
+
+# The host and port of the Mongo server.
 database-uri=mongodb://mongo:27017
+
+# The name of the database in the Mongo instance.
 database-name=analysis
-frontend-url=https://ui:3000
-bundle-bucket=analysis-local-bundles
-grid-bucket=analysis-local-grids
-results-bucket=analysis-local-results
-resources-bucket=analysis-local-resources
+
+# The S3 bucket where we can find tiles of the entire US census, built with Conveyal seamless-census.
 seamless-census-bucket=lodes-data-2014
 seamless-census-region=us-east-1
+
+# When offline is true, authentication and other services are not used.
+# This is only partially true - regional results will still be saved on S3.
 offline=true
+
+# The AWS region in which the server is running, and in which you want to run worker machines.
+aws-region=eu-west-1
+
+# The port on which the server will listen for connections from clients and workers.
 server-port=7070
-local-cache=cache
+
+# The origin where the frontend is hosted. When running locally, this will generally be http://localhost:3000.
+# It should be relatively safe to set this to * (allowing requests from anywhere) when authentication is enabled.
+# This increases attack surface though, so it is preferable to set this to the specific origin where the UI is hosted.
+access-control-allow-origin=http://localhost:3000
+
+# A temporary location to store scratch files. The path can be absolute or relative.
+# This allows you to locate temporary storage on an extra drive in case your main drive does not have enough space.
+local-cache=/app/files
+
+# Java threads for lighter async operations
 light-threads=3
+
+# Java threads for heavy operations
 heavy-threads=3
+
+# Max number of instances to start.
+# If there are more than this number running more instances will not be started.
+# This limit doesn't work very well because if you've manually started 200 workers on one graph,
+# the broker then won't start more workers for a completely different job.
 max-workers=8

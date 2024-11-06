@@ -19,6 +19,9 @@ gradlew
 # IntelliJ IDEA
 .idea/
 
+# Compose Volumes
+compose
+
 logs
 project/project
 project/target

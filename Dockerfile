@@ -1,16 +1,39 @@
-# Build with:
-# docker build . --build-arg r5version=$(gradle -q printVersion | head -n1)
-# or
-# docker build . --build-arg r5version=$(cat build/version.txt)
-# We could instead run the Gradle build and/or fetch version information 
-# using run actions within the Dockerfile
-FROM openjdk:11
-ARG r5version
-ENV R5_VERSION=$r5version
-ENV JVM_HEAP_GB=2
-WORKDIR /r5
-COPY build/libs/r5-${R5_VERSION}-all.jar .
-# Use a configuration that connects to the database on another host (container)
+FROM openjdk:21-slim-bullseye AS base
+
+
+FROM base AS builder
+WORKDIR /app
+
+# Install unzip
+RUN apt-get update && apt-get install -y unzip git
+
+# Install Gradle 8.5
+ENV GRADLE_VERSION=8.5
+ADD https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip /tmp/gradle.zip
+RUN unzip -d /opt/gradle /tmp/gradle.zip && \
+    ln -s /opt/gradle/gradle-${GRADLE_VERSION} /opt/gradle/latest && \
+    rm /tmp/gradle.zip
+
+# Add Gradle to PATH
+ENV PATH="/opt/gradle/latest/bin:${PATH}"
+
+# Copy the project files
+COPY . .
+
+# Run gradle build with more verbose output
+RUN gradle build
+
+# Run gradle shadowJar
+RUN gradle shadowJar
+
+# Move the built jar, which is named by git describe, to r5.jar
+RUN mv build/libs/r5-*-all.jar r5.jar
+
+
+FROM base AS runner
+WORKDIR /app
+COPY --from=builder /app/r5.jar r5.jar
 COPY analysis.properties.docker analysis.properties
+
 EXPOSE 7070
-CMD java -Xmx${JVM_HEAP_GB}g -cp r5-${R5_VERSION}-all.jar com.conveyal.analysis.BackendMain
+CMD java -Xmx16g -cp r5.jar com.conveyal.analysis.BackendMain

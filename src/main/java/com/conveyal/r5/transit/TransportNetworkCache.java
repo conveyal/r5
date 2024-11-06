@@ -25,17 +25,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.DATASOURCES;
@@ -53,10 +45,20 @@ public class TransportNetworkCache implements Component {
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetworkCache.class);
 
     /** Cache size is currently limited to one, i.e. the worker holds on to only one network at a time. */
-    private static final int DEFAULT_CACHE_SIZE = 1;
+    private static final int MAX_CACHED_NETWORKS = 1;
+
+    /**
+     * It might seem sufficient to hold only two scenarios (for single point scenario comparison). But in certain cases
+     * (e.g. the regional task queue is bigger than the size of each queued regional job) we might end up working on
+     * a mix of tasks from N different scenarios. Note also that scenarios hold references to their base networks, so
+     * caching multiple scenario networks can theoretically keep just as many TransportNetworks in memory.
+     * But in practice, in non-local (cloud) operation a given worker instance is locked to a single network for its
+     * entire lifespan.
+     */
+    public static final int MAX_CACHED_SCENARIO_NETWORKS = 10;
 
     // TODO change all other caches from Guava to Caffeine caches. This one is already a Caffeine cache.
-    private final LoadingCache<String, TransportNetwork> cache;
+    private final LoadingCache<String, TransportNetwork> networkCache;
 
     private final FileStorage fileStorage;
     private final GTFSCache gtfsCache;
@@ -64,15 +66,39 @@ public class TransportNetworkCache implements Component {
 
     /**
      * A table of already seen scenarios, avoiding downloading them repeatedly from S3 and allowing us to replace
-     * scenarios with only their IDs, and reverse that replacement later.
+     * scenarios with only their IDs, and reverse that replacement later. Note that this caches the Scenario objects
+     * themselves, not the TransportNetworks built from those Scenarios.
      */
     private final ScenarioCache scenarioCache = new ScenarioCache();
+
+    /**
+     * This record type is used for the private, encapsulated cache of TransportNetworks for different scenarios.
+     * Scenario IDs are unique so we could look up these networks by scenario ID alone. However the cache values need
+     * to be derived entirely from the cache keys. We need some way to look up the base network so we include its ID.
+     */
+    private record BaseAndScenarioId (String baseNetworkId, String scenarioId) { }
+
+    /**
+     * This stores a number of lightweight scenario networks built upon the current base network.
+     * Each scenario TransportNetwork has its own LinkageCache, containing LinkedPointSets that each have their own
+     * EgressCostTable. In practice this can exhaust memory, e.g. after using bicycle egress for about 50 scenarios.
+     * The previous hierarchical arrangement of caches has the advantage of evicting all the scenarios with the
+     * associated base network, which keeps the references in the scenarios from holding on to the base network.
+     * But considering that we have never started evicting networks (other than for a "cache" of one element) this
+     * eviction can be handled in other ways.
+     */
+    private LoadingCache<BaseAndScenarioId, TransportNetwork> scenarioNetworkCache;
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
     public TransportNetworkCache (FileStorage fileStorage, GTFSCache gtfsCache, OSMCache osmCache) {
         this.osmCache = osmCache;
         this.gtfsCache = gtfsCache;
-        this.cache = createCache(DEFAULT_CACHE_SIZE);
+        this.networkCache = Caffeine.newBuilder()
+                .maximumSize(MAX_CACHED_NETWORKS)
+                .build(this::loadNetwork);
+        this.scenarioNetworkCache = Caffeine.newBuilder()
+                .maximumSize(MAX_CACHED_SCENARIO_NETWORKS)
+                .build(this::loadScenario);
         this.fileStorage = fileStorage;
     }
 
@@ -80,10 +106,9 @@ public class TransportNetworkCache implements Component {
      * Find a transport network by ID, building or loading as needed from pre-existing OSM, GTFS, MapDB, or Kryo files.
      * This should never return null. If a TransportNetwork can't be built or loaded, an exception will be thrown.
      */
-    public synchronized @Nonnull
-    TransportNetwork getNetwork (String networkId) throws TransportNetworkException {
+    public TransportNetwork getNetwork (String networkId) throws TransportNetworkException {
         try {
-            return cache.get(networkId);
+            return networkCache.get(networkId);
         } catch (Exception e) {
             throw new TransportNetworkException("Could not load TransportNetwork into cache. ", e);
         }
@@ -107,43 +132,35 @@ public class TransportNetworkCache implements Component {
      * base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId rather than a
      * compound key of (networkId, scenarioId).
      *
-     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused.
+     * Reusing scenario networks automatically leads to reuse of the associated PointSet linkages and egress tables.
      * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving
      *      the scenario against caches on S3 or local disk should be pulled out into a separate function.
      * The problem is that then you resolve the scenario every time, even when the ID is enough to look up the already
      * built network. So we need to pass the whole task in here, so either the ID or full scenario are visible.
      *
-     * Thread safety notes: This entire method is synchronized so access by multiple threads will be sequential.
-     * The first thread will have a chance to build and store the requested scenario before any others see it.
-     * This means each new scenario will be applied one after the other. This is probably OK as long as building egress
-     * tables is already parallelized.
+     * Thread safety: getNetwork and getNetworkForScenario are threadsafe caches, so access to the same key by multiple
+     * threads will occur sequentially without repeatedly or simultaneously performing the same loading actions.
+     * Javadoc on the Caffeine LoadingCache indicates that it will throw exceptions when the cache loader method throws
+     * them, without establishing a mapping in the cache. So exceptions occurring during scenario application are
+     * expected to bubble up unimpeded.
      */
-    public synchronized TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
-        // If the networkId is different than previous calls, a new network will be loaded. Its transient nested map
-        // of scenarios will be empty at first. This ensures it's initialized if null.
-        // FIXME apparently this can't happen - the field is transient and initialized in TransportNetwork.
-        TransportNetwork baseNetwork = this.getNetwork(networkId);
-        if (baseNetwork.scenarios == null) {
-            baseNetwork.scenarios = new HashMap<>();
-        }
+    public TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
+        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(new BaseAndScenarioId(networkId, scenarioId));
+        return scenarioNetwork;
+    }
 
-        TransportNetwork scenarioNetwork =  baseNetwork.scenarios.get(scenarioId);
-        if (scenarioNetwork == null) {
-            // The network for this scenario was not found in the cache. Create that scenario network and cache it.
-            LOG.debug("Applying scenario to base network...");
-            // Fetch the full scenario if an ID was specified.
-            Scenario scenario = resolveScenario(networkId, scenarioId);
-            // Apply any scenario modifications to the network before use, performing protective copies where necessary.
-            // We used to prepend a filter to the scenario, removing trips that are not running during the search time window.
-            // However, because we are caching transportNetworks with scenarios already applied to them, we can’t use
-            // the InactiveTripsFilter. The solution may be to cache linked point sets based on scenario ID but always
-            // apply scenarios every time.
-            scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
-            LOG.debug("Done applying scenario. Caching the resulting network.");
-            baseNetwork.scenarios.put(scenario.id, scenarioNetwork);
-        } else {
-            LOG.debug("Reusing cached TransportNetwork for scenario {}.", scenarioId);
-        }
+    private TransportNetwork loadScenario (BaseAndScenarioId ids) {
+        TransportNetwork baseNetwork = this.getNetwork(ids.baseNetworkId());
+        LOG.debug("Scenario TransportNetwork not found. Applying scenario to base network and caching it.");
+        // Fetch the full scenario if an ID was specified.
+        Scenario scenario = resolveScenario(ids.baseNetworkId(), ids.scenarioId());
+        // Apply any scenario modifications to the network before use, performing protective copies where necessary.
+        // We used to prepend a filter to the scenario, removing trips that are not running during the search time window.
+        // However, because we are caching transportNetworks with scenarios already applied to them, we can’t use
+        // the InactiveTripsFilter. The solution may be to cache linked point sets based on scenario ID but always
+        // apply scenarios every time.
+        TransportNetwork scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
+        LOG.debug("Done applying scenario. Caching the resulting network.");
         return scenarioNetwork;
     }
 
@@ -168,6 +185,8 @@ public class TransportNetworkCache implements Component {
         File configFile = fileStorage.getFile(configFileKey);
         try {
             // Use lenient mapper to mimic behavior in objectFromRequestBody.
+            // A single network configuration file might be used across several worker versions. Unknown field names
+            // may be present for other worker versions unknown to this one. So we can't strictly validate field names.
             return JsonUtilities.lenientObjectMapper.readValue(configFile, TransportNetworkConfig.class);
         } catch (IOException e) {
             throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
@@ -183,9 +202,8 @@ public class TransportNetworkCache implements Component {
         TransportNetworkConfig networkConfig = loadNetworkConfig(networkId);
         if (networkConfig == null) {
             // The switch to use JSON manifests instead of zips occurred in 32a1aebe in July 2016.
-            // Over six years have passed, buildNetworkFromBundleZip is deprecated and could probably be removed.
-            LOG.warn("No network config (aka manifest) found. Assuming old-format network inputs bundle stored as a single ZIP file.");
-            network = buildNetworkFromBundleZip(networkId);
+            // buildNetworkFromBundleZip was deprecated for years then removed in 2024.
+            throw new RuntimeException("No network config (aka manifest) found.");
         } else {
             network = buildNetworkFromConfig(networkConfig);
         }
@@ -219,70 +237,19 @@ public class TransportNetworkCache implements Component {
         return network;
     }
 
-    /** Build a transport network given a network ID, using a zip of all bundle files in S3. */
-    @Deprecated
-    private TransportNetwork buildNetworkFromBundleZip (String networkId) {
-        // The location of the inputs that will be used to build this graph
-        File dataDirectory = FileUtils.createScratchDirectory();
-        FileStorageKey zipKey = new FileStorageKey(BUNDLES, networkId + ".zip");
-        File zipFile = fileStorage.getFile(zipKey);
-
-        try {
-            ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                File entryDestination = new File(dataDirectory, entry.getName());
-                if (!entryDestination.toPath().normalize().startsWith(dataDirectory.toPath())) {
-                    throw new Exception("Bad zip entry");
-                }
-
-                // Are both these mkdirs calls necessary?
-                entryDestination.getParentFile().mkdirs();
-                if (entry.isDirectory())
-                    entryDestination.mkdirs();
-                else {
-                    OutputStream entryFileOut = new FileOutputStream(entryDestination);
-                    zis.transferTo(entryFileOut);
-                    entryFileOut.close();
-                }
-            }
-            zis.close();
-        } catch (Exception e) {
-            // TODO delete cache dir which is probably corrupted.
-            LOG.warn("Error retrieving transportation network input files", e);
-            return null;
-        }
-
-        // Now we have a local copy of these graph inputs. Make a graph out of them.
-        TransportNetwork network;
-        try {
-            network = TransportNetwork.fromDirectory(dataDirectory);
-        } catch (DuplicateFeedException e) {
-            LOG.error("Duplicate feeds in transport network {}", networkId, e);
-            throw new RuntimeException(e);
-        }
-
-        // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.scenarioId = networkId;
-
-        return network;
-    }
-
     /**
      * Build a network from a JSON TransportNetworkConfig in file storage.
      * This describes the locations of files used to create a bundle, as well as options applied at network build time.
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
     private TransportNetwork buildNetworkFromConfig (TransportNetworkConfig config) {
-        // FIXME duplicate code. All internal building logic should be encapsulated in a method like
-        //  TransportNetwork.build(osm, gtfs1, gtfs2...)
-        // We currently have multiple copies of it, in buildNetworkFromConfig and buildNetworkFromBundleZip so you've
-        // got to remember to do certain things like set the network ID of the network in multiple places in the code.
-        // Maybe we should just completely deprecate bundle ZIPs and remove those code paths.
+        // FIXME All internal building logic should be encapsulated in a method like TransportNetwork.build(osm,
+        //  gtfs1, gtfs2...) (see various methods in TransportNetwork).
 
         TransportNetwork network = new TransportNetwork();
 
-        network.streetLayer = new StreetLayer();
+        network.streetLayer = new StreetLayer(config);
+
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
 
         network.streetLayer.parentNetwork = network;
@@ -356,12 +323,6 @@ public class TransportNetworkCache implements Component {
         return GTFSCache.cleanId(networkId) + ".json";
     }
 
-    private LoadingCache createCache(int size) {
-        return Caffeine.newBuilder()
-                .maximumSize(size)
-                .build(this::loadNetwork);
-    }
-
     /**
      * CacheLoader method, which should only be called by the LoadingCache.
      * Return the graph for the given unique identifier. Load pre-built serialized networks from local or remote
@@ -391,28 +352,6 @@ public class TransportNetworkCache implements Component {
         } catch (Exception e) {
             throw new TransportNetworkException("Exception occurred retrieving or building network.", e);
         }
-    }
-
-    /**
-     * This will eventually be used in WorkerStatus to report to the backend all loaded networks, to give it hints about
-     * what kind of tasks the worker is ready to work on immediately. This is made more complicated by the fact that
-     * workers are started up with no networks loaded, but with the intent for them to work on a particular job. So
-     * currently the workers just report which network they were started up for, and this method is not used.
-     *
-     * In the future, workers should just report an empty set of loaded networks, and the back end should strategically
-     * send them tasks when they come on line to assign them to networks as needed. But this will require a new
-     * mechanism to fairly allocate the workers to jobs.
-     */
-    public Set<String> getLoadedNetworkIds() {
-        return cache.asMap().keySet();
-    }
-
-    public Set<String> getAppliedScenarios() {
-        return cache.asMap().values().stream()
-                .filter(network -> network.scenarios != null)
-                .map(network -> network.scenarios.keySet())
-                .flatMap(Collection::stream)
-                .collect(Collectors.toSet());
     }
 
     /**

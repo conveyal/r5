@@ -12,15 +12,19 @@ public class SpeedMatcher extends ShapefileMatcher {
     }
 
     /**
-     * Set the speed value of an edge using a supplied feature with a speed attribute (in kilometers per hour)
+     * Set the speed value of an edge using a supplied feature with a speed attribute (converts from miles per hour).
+     * If a supplied feature has speed 0 or less, it is ignored.
      */
     @Override
     void setEdgePair (SimpleFeature feature, int attributeIndex, EdgeStore.Edge edge) {
         if (feature.getAttribute(attributeIndex) != null) {
-            double speedKph = KPH_PER_MPH * ((Number) feature.getAttribute(attributeIndex)).doubleValue();
-            edge.setSpeedKph(speedKph);
-            edge.advance();
-            edge.setSpeedKph(speedKph);
+            double speedMph = ((Number) feature.getAttribute(attributeIndex)).doubleValue();
+            if (speedMph > 0) {
+                double speedKph = KPH_PER_MPH * speedMph;
+                edge.setSpeedKph(speedKph);
+                edge.advance();
+                edge.setSpeedKph(speedKph);
+            }
         }
     }
 }

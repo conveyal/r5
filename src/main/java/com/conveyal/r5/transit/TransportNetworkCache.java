@@ -217,12 +217,7 @@ public class TransportNetworkCache implements Component {
         // intermediate results while building linkages for other modes.
         // This is a candidate for optimization if car or bicycle scenarios are slow to apply.
         network.transitLayer.buildDistanceTables(null);
-
-        Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
-        if (networkConfig != null && networkConfig.buildGridsForModes != null) {
-            buildGridsForModes.addAll(networkConfig.buildGridsForModes);
-        }
-        network.rebuildLinkedGridPointSet(buildGridsForModes);
+        network.rebuildLinkedGridPointSet(StreetMode.WALK, StreetMode.BICYCLE, StreetMode.CAR);
 
         // Cache the serialized network on the local filesystem and mirror it to any remote storage.
         try {

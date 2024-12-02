@@ -167,14 +167,16 @@ public class TravelTimeComputer {
             // The generalized cost calculations currently increment time and weight by the same amount.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
-            // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
-            // This implies you are dropped off or have a very easy parking spot for your vehicle.
-            // This kind of multi-stage search should also be used when building egress distance cost tables.
-            if (accessMode != StreetMode.WALK) {
-                sr.keepRoutingOnFoot();
-            }
 
             if (request.hasTransit()) {
+                // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
+                // This implies you are dropped off or have a very easy parking spot for your vehicle.
+                // This kind of multi-stage search should also be used when building egress distance cost tables.
+                // Note that this can take up to twice as long as the initial car/bike search. Do it only when the
+                // walking is necessary, and when the radius of the car/bike search is limited, as for transit access.
+                if (accessMode != StreetMode.WALK) {
+                    sr.keepRoutingOnFoot();
+                }
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 // TODO add logic here if linkedStops are specified in pickupDelay?

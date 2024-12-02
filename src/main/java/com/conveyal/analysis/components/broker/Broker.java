@@ -95,15 +95,14 @@ public class Broker implements Component {
         boolean testTaskRedelivery ();
     }
 
-    private Config config;
+    private final Config config;
 
     // Component Dependencies
     private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
 
-    private final ListMultimap<WorkerCategory, Job> jobs =
-            MultimapBuilder.hashKeys().arrayListValues().build();
+    private final ListMultimap<WorkerCategory, Job> jobs = MultimapBuilder.hashKeys().arrayListValues().build();
 
     /**
      * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
@@ -111,27 +110,35 @@ public class Broker implements Component {
      * is too high, all remaining tasks in a job could be distributed to a single worker leaving none for the other
      * workers, creating a slow-joiner problem especially if the tasks are complicated and slow to complete.
      *
-     * The value should eventually be tuned. The current value of 16 is just the value used by the previous sporadic
+     * The value should eventually be tuned. The value of 16 is the value used by the previous sporadic
      * polling system (WorkerStatus.LEGACY_WORKER_MAX_TASKS) which may not be ideal but is known to work.
+     *
+     * NOTE that as a side effect this limits the total throughput of each worker to:
+     * MAX_TASKS_PER_WORKER / AnalysisWorker#POLL_INTERVAL_MIN_SECONDS tasks per second.
+     * It is entirely plausible for half or more of the origins in a job to be unconnected to any roadways (water,
+     * deserts etc.) In this case the system may need to burn through millions of origins, only checking that they
+     * aren't attached to anything in the selected scenario. Not doing so could double the run time of an analysis.
+     * It may be beneficial to assign origins to workers more randomly, or to introduce a mechanism to pre-scan for
+     * disconnected origins or at least concisely signal large blocks of them in worker responses.    
      */
-    public final int MAX_TASKS_PER_WORKER = 16;
+    public static final int MAX_TASKS_PER_WORKER = 40;
 
     /**
      * Used when auto-starting spot instances. Set to a smaller value to increase the number of
      * workers requested automatically
      */
-    public final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
-    public final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
+    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
      * results are received for a given workerCategory. Do so after receiving results for an
      * arbitrary task toward the beginning of the job
      */
-    public final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
+    public static final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
 
     /** The maximum number of spot instances allowable in an automatic request */
-    public final int MAX_WORKERS_PER_CATEGORY = 250;
+    public static final int MAX_WORKERS_PER_CATEGORY = 250;
 
     /**
      * How long to give workers to start up (in ms) before assuming that they have started (and
@@ -139,15 +146,11 @@ public class Broker implements Component {
      */
     public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
 
-
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     private WorkerCatalog workerCatalog = new WorkerCatalog();
 
-    /**
-     * These objects piece together results received from workers into one regional analysis result
-     * file per job.
-     */
-    private static Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
+    /** These objects piece together results received from workers into one regional analysis result file per job. */
+    private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
 
     /**
      * keep track of which graphs we have launched workers on and how long ago we launched them, so

@@ -88,8 +88,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
     /**
      * A blocking way to ensure the network and all linkages and precomputed tables are prepared in advance of routing.
-     * Note that this does not perform any blocking or locking of its own - any synchronization will be that of the
-     * underlying caches (synchronized methods on TransportNetworkCache or LinkedPointSet). It also bypasses the
+     * Note that this does not perform any blocking or locking of its own. Any synchronization or turn-taking will be
+     * that of the underlying caches (TransportNetworkCache or LinkageCache). It also bypasses the
      * AsyncLoader locking that would usually allow only one buildValue operation at a time. All threads that call with
      * similar tasks will make interleaved calls to setProgress (with superficial map synchronization). Other than
      * causing a value to briefly revert from PRESENT to BUILDING this doesn't seem deeply problematic.
@@ -110,11 +110,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
         // Get the set of points to which we are measuring travel time. Any smaller sub-grids created here will
         // reference the scenarioNetwork's built-in full-extent pointset, so can reuse its linkage.
-        // TODO handle multiple destination grids.
+        // FIXME handle multiple destination grids.
 
         if (key.destinationGridExtents == null) {
             // Special (and ideally temporary) case for regional freeform destinations, where there is no grid to link.
             // The null destinationGridExtents are created by the WebMercatorExtents#forPointsets else clause.
+            // FIXME there is no grid to link, but there are points and egress tables to make!
+            //  see com.conveyal.r5.analyst.cluster.AnalysisWorkerTask.loadAndValidateDestinationPointSets
             return scenarioNetwork;
         }
 

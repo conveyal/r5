@@ -4,6 +4,7 @@ import com.conveyal.analysis.BackendConfig;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.eventbus.ErrorLogger;
 import com.conveyal.analysis.components.eventbus.EventBus;
+import com.conveyal.analysis.controllers.AuthTokenController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.LocalFilesController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
@@ -31,7 +32,8 @@ public class LocalBackendComponents extends BackendComponents {
         // New (October 2019) DB layer, this should progressively replace the Persistence class
         database = new AnalysisDB(config);
         eventBus = new EventBus(taskScheduler);
-        authentication = new LocalAuthentication();
+        final TokenAuthentication tokenAuthentication = new TokenAuthentication(database);
+        authentication = tokenAuthentication;
         // TODO add nested LocalWorkerComponents here, to reuse some components, and pass it into the LocalWorkerLauncher?
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
@@ -39,6 +41,7 @@ public class LocalBackendComponents extends BackendComponents {
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
         List<HttpController> httpControllers = standardHttpControllers();
         httpControllers.add(new LocalFilesController(fileStorage));
+        httpControllers.add(new AuthTokenController(tokenAuthentication));
         httpApi = new HttpApi(fileStorage, authentication, eventBus, config, httpControllers);
         // compute = new LocalCompute();
         // persistence = persistence(local_Mongo)

@@ -314,7 +314,7 @@ public class AnalysisWorker implements Component {
     protected byte[] handleAndSerializeOneSinglePointTask (TravelTimeSurfaceTask task) throws IOException {
         LOG.debug("Handling single-point task {}", task.toString());
         // Get all the data needed to run one analysis task, or at least begin preparing it.
-        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
+        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preload(task);
 
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
@@ -467,7 +467,7 @@ public class AnalysisWorker implements Component {
         // LoadingCaches behind it. Specifically, the TransportNetworkCache and LinkageCache enforce turn-taking and
         // prevent redundant work. If those are ever removed, we would need either async regional task preparation, or
         // a synchronous mode with per-key blocking on AsyncLoader (kind of reinventing the wheel of LoadingCache).
-        TransportNetwork transportNetwork = networkPreloader.synchronousPreload(task);
+        TransportNetwork transportNetwork = networkPreloader.preloadBlocking(task);
 
         // If we are generating a static site, there must be a single metadata file for an entire batch of results.
         // Arbitrarily we create this metadata as part of the first task in the job.

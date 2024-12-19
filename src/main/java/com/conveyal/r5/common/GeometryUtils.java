@@ -23,8 +23,8 @@ public class GeometryUtils {
     /** Average of polar and equatorial radii, https://en.wikipedia.org/wiki/Earth */
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
 
-    /** Maximum area allowed for the bounding box of uploaded files -- large enough for California.  */
-    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 975_000;
+    /** Maximum area allowed for the bounding box of uploaded files -- large enough for Europe.  */
+    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 1_000_000;
 
     /**
      * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this

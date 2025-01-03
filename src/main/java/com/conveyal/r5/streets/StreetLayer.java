@@ -12,6 +12,7 @@ import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
+import com.conveyal.r5.labeling.NoMotorwayTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SidewalkTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.SpeedLabeler;
@@ -217,6 +218,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (config != null) {
             permissionLabeler = switch (config.traversalPermissionLabeler) {
                 case "sidewalk" -> new SidewalkTraversalPermissionLabeler();
+                case "noMotorway" -> new NoMotorwayTraversalPermissionLabeler();
                 case null -> new USTraversalPermissionLabeler();
                 default -> throw new IllegalArgumentException(
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler

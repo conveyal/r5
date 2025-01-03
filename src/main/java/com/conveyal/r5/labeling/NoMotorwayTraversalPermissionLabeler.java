@@ -19,7 +19,7 @@ public class NoMotorwayTraversalPermissionLabeler extends TraversalPermissionLab
     @Override
     public RoadPermission getPermissions(Way way) {
         RoadPermission rp = super.getPermissions(way);
-        if (way.tagIsTrue("motorway")) {
+        if (way.hasTag("highway", "motorway")) {
             rp.forward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
             rp.forward.remove(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
             rp.backward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);

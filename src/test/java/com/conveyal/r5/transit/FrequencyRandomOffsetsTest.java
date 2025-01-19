@@ -19,7 +19,7 @@ public class FrequencyRandomOffsetsTest {
     @Test
     public void testPhasing () {
         // make a fake transit layer
-        TransitLayer layer = new TransitLayer();
+        TransitLayer layer = new TransitLayer(null);
         layer.hasFrequencies = true;
         layer.hasSchedules = false;
 
@@ -86,7 +86,7 @@ public class FrequencyRandomOffsetsTest {
     @Test
     public void testPhasingAtLastStop () {
         // make a fake transit layer
-        TransitLayer layer = new TransitLayer();
+        TransitLayer layer = new TransitLayer(null);
         layer.hasFrequencies = true;
         layer.hasSchedules = false;
 

@@ -13,7 +13,6 @@ import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.FileItemInputStreamProvider;
 import com.conveyal.analysis.util.HttpUtils;
-import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
@@ -28,7 +27,6 @@ import com.conveyal.r5.analyst.progress.WorkProduct;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.io.Files;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.fileupload.FileItem;
@@ -116,13 +114,11 @@ public class OpportunityDatasetController implements HttpController {
         if (dataset.format == FileStorageFormat.GRID) {
             res.type(APPLICATION_JSON.asString());
             return fileStorage.getJsonUrl(dataset.getStorageKey(), dataset.sourceName + "_" + dataset.name, "grid");
+        } else if (dataset.format == FileStorageFormat.FREEFORM) {
+            res.type(APPLICATION_JSON.asString());
+            return fileStorage.getJsonUrl(dataset.getStorageKey(), dataset.sourceName + "_" + dataset.name, "freeform");
         } else {
-            // Currently the UI can only visualize grids, not other kinds of datasets (freeform points).
-            // We do generate a rasterized grid for each of the freeform pointsets we create, so ideally we'd redirect
-            // to that grid for display and preview, but the freeform and corresponding grid pointset have different
-            // IDs and there are no references between them.
-            LOG.error("We cannot yet visualize freeform pointsets. Returning nothing to the UI.");
-            return null;
+            throw AnalysisServerException.badRequest("Format " + dataset.format + " cannot be downloaded.");
         }
     }
 

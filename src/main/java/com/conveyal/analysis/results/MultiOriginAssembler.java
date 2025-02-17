@@ -10,7 +10,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
-import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +120,12 @@ public class MultiOriginAssembler {
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
                     // Gridded origins - create gridded regional analysis results
-                    resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
+                    resultWriters.add(new MultiGridResultWriter(
+                            regionalAnalysis,
+                            job.templateTask,
+                            job.templateTask.cutoffsMinutes.length,
+                            fileStorage
+                    ));
                 }
             }
 
@@ -157,7 +161,7 @@ public class MultiOriginAssembler {
                 // FIXME instanceof+cast is ugly, do this some other way or even record the Grids
                 if (writer instanceof CsvResultWriter) {
                     CsvResultWriter csvWriter = (CsvResultWriter) writer;
-                    regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
+                    regionalAnalysis.resultStorage.put(csvWriter.resultType, csvWriter.fileName);
                 }
             }
         } catch (AnalysisServerException e) {

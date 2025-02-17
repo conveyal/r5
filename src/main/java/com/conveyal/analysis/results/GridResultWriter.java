@@ -2,7 +2,7 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +41,7 @@ public class GridResultWriter extends BaseResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(GridResultWriter.class);
 
-    private RandomAccessFile randomAccessFile;
+    private final RandomAccessFile randomAccessFile;
 
     /** The version of the access grids we produce */
     private static final int ACCESS_GRID_VERSION = 0;
@@ -50,32 +50,31 @@ public class GridResultWriter extends BaseResultWriter {
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
     /**
-     * The number of different travel time cutoffs being applied when computing accessibility for each origin.
+     * The number of different travel time cutoffs or dual access thresholds being applied when computing values for
+     * each origin.
      * The number of values stored per origin cell in an accessibility results grid.
-     * Note that we're storing only the number of different cutoffs, but not the cutoff values themselves in the file.
-     * This means that the files can only be properly interpreted with the Mongo metadata from the regional analysis.
+     * Note that we're storing only the number of different channels, but not the values themselves in the file.
+     * This means that the files can only be properly interpreted with the metadata from the regional analysis.
      * This is an intentional choice to avoid changing the file format, and in any case these files are not expected
-     * to ever be used separately from an environment where the Mongo database is available.
+     * to ever be used separately from an environment where the metadata is available.
      */
     private final int channels;
 
     /**
-     * Construct an writer for a single regional analysis result grid, using the proprietary
+     * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter (RegionalTask task, FileStorage fileStorage) {
-        super(fileStorage);
-        int width = task.width;
-        int height = task.height;
-        this.channels = task.cutoffsMinutes.length;
+    GridResultWriter(WebMercatorExtents ext, int channels, String fileName, FileStorage fileStorage) {
+        super(fileName, fileStorage);
+        long bodyBytes = (long) ext.width * ext.height * channels * Integer.BYTES;
+        this.channels = channels;
         LOG.info(
             "Expecting multi-origin results for grid with width {}, height {}, {} values per origin.",
-            width,
-            height,
+                ext.width,
+                ext.height,
             channels
         );
-        super.prepare(task.jobId);
 
         try {
             // Write the access grid file header to the temporary file.
@@ -83,11 +82,11 @@ public class GridResultWriter extends BaseResultWriter {
             LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
             data.writeAscii("ACCESSGR");
             data.writeInt(ACCESS_GRID_VERSION);
-            data.writeInt(task.zoom);
-            data.writeInt(task.west);
-            data.writeInt(task.north);
-            data.writeInt(width);
-            data.writeInt(height);
+            data.writeInt(ext.zoom);
+            data.writeInt(ext.west);
+            data.writeInt(ext.north);
+            data.writeInt(ext.width);
+            data.writeInt(ext.height);
             data.writeInt(channels);
             data.close();
 
@@ -100,8 +99,8 @@ public class GridResultWriter extends BaseResultWriter {
             // IO limits on cloud servers with network storage. Even without initialization, any complete regional analysis
             // would overwrite every byte in the file with a result for some origin point, so the initial values are only
             // important when visualizing or debugging partially completed analysis results.
-            this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
-            randomAccessFile.setLength(HEADER_LENGTH_BYTES + (width * height * channels * Integer.BYTES));
+            randomAccessFile = new RandomAccessFile(bufferFile, "rw");
+            randomAccessFile.setLength(HEADER_LENGTH_BYTES + bodyBytes);
             LOG.info(
                     "Created temporary file to accumulate results from workers, size is {}.",
                     human(randomAccessFile.length(), "B")
@@ -113,8 +112,8 @@ public class GridResultWriter extends BaseResultWriter {
 
     /** Gzip the access grid and upload it to file storage (such as AWS S3). */
     @Override
-    protected synchronized void finish (String fileName) throws IOException {
-        super.finish(fileName);
+    protected synchronized void finish() throws IOException {
+        super.finish();
         randomAccessFile.close();
     }
 
@@ -138,7 +137,7 @@ public class GridResultWriter extends BaseResultWriter {
         if (values.length != channels) {
             throw new IllegalArgumentException("Number of channels to be written does not match this writer.");
         }
-        long offset = HEADER_LENGTH_BYTES + (taskNumber * channels * Integer.BYTES);
+        long offset = HEADER_LENGTH_BYTES + ((long) taskNumber * channels * Integer.BYTES);
         // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
         // TODO why is the method also synchronized then?
         synchronized (this) {

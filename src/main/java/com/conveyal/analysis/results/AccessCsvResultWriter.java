@@ -11,12 +11,7 @@ import java.util.List;
 public class AccessCsvResultWriter extends CsvResultWriter {
 
     public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, fileStorage);
-    }
-
-    @Override
-    public CsvResultType resultType () {
-        return CsvResultType.ACCESS;
+        super(task, CsvResultType.ACCESS, fileStorage);
     }
 
     @Override

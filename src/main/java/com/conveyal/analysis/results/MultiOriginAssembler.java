@@ -139,15 +139,21 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.includeTemporalDensity) {
                 if (job.templateTask.originPointSet == null) {
-                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
-                    // We might want to record a grid of dual accessibility values, but this will require some serious
-                    // refactoring of the GridResultWriter.
-                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
-                    throw new IllegalArgumentException("Temporal density of opportunities cannot be recorded for gridded origin points.");
+                    // Gridded origins.
+                    resultWriters.add(new MultiGridResultWriter(
+                            regionalAnalysis,
+                            job.templateTask,
+                            job.templateTask.dualAccessibilityThresholds.length,
+                            fileStorage
+                    ));
                 } else {
                     // Freeform origins.
                     // Output includes temporal density of opportunities and optionally dual accessibility.
-                    resultWriters.add(new TemporalDensityCsvResultWriter(job.templateTask, fileStorage));
+                    resultWriters.add(new TemporalDensityCsvResultWriter(
+                            job.templateTask,
+                            job.templateTask.dualAccessibilityThresholds[0],
+                            fileStorage
+                    ));
                 }
             }
 

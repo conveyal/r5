@@ -39,7 +39,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -598,6 +597,19 @@ public class RegionalAnalysisController implements HttpController {
                 task.destinationPointSets[0] instanceof FreeFormPointSet,
                 "recordTimes can only be used with a single destination pointset, which must be freeform (non-grid)."
             );
+        }
+        if (task.includeTemporalDensity) {
+            checkArgument(
+                    task.dualAccessibilityThresholds != null &&
+                            task.dualAccessibilityThresholds.length > 0,
+                    "dualAccessibilityThresholds not specified when includeTemporalDensity is enabled."
+            );
+            if (task.originPointSet == null) {
+                checkArgument(
+                        !task.recordAccessibility,
+                        "Accessibility and dual accessibility grids cannot be created simultaneously."
+                );
+            }
         }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.

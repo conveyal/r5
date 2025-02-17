@@ -26,8 +26,7 @@ public class TemporalDensityResult {
     // Internal state fields
 
     private final PointSet[] destinationPointSets;
-    private final int nPercentiles;
-    private final int opportunityThreshold;
+    private final int[] dualAccessibilityThresholds;
 
     // Externally visible fields for accumulating results
 
@@ -44,16 +43,15 @@ public class TemporalDensityResult {
             "Dual accessibility requires at least one destination pointset."
         );
         this.destinationPointSets = task.destinationPointSets;
-        this.nPercentiles = task.percentiles.length;
-        this.opportunityThreshold = task.dualAccessibilityThreshold;
-        this.opportunitiesPerMinute = new double[destinationPointSets.length][nPercentiles][120];
+        this.dualAccessibilityThresholds = task.dualAccessibilityThresholds;
+        this.opportunitiesPerMinute = new double[destinationPointSets.length][task.percentiles.length][120];
     }
 
     public void recordOneTarget (int target, int[] travelTimePercentilesSeconds) {
         // Increment histogram bin for the number of minutes of travel by the number of opportunities at the target.
         for (int d = 0; d < destinationPointSets.length; d++) {
             PointSet dps = destinationPointSets[d];
-            for (int p = 0; p < nPercentiles; p++) {
+            for (int p = 0; p < opportunitiesPerMinute.length; p++) {
                 if (travelTimePercentilesSeconds[p] == UNREACHED) {
                     break; // If any percentile is unreached, all higher ones are also unreached.
                 }
@@ -66,31 +64,30 @@ public class TemporalDensityResult {
     }
 
     /**
-     * Calculate "dual" accessibility from the accumulated temporal opportunity density array.
-     * @param n the threshold quantity of opportunities
-     * @return the minimum whole number of minutes necessary to reach n opportunities,
-     *         for each destination set and percentile of travel time.
+     * Writes dual accessibility values (in minutes) to our standard access grid format. The value returned (for
+     * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
+     * task.dualAccessibilityThresholds) in the specified destination layer at a given percentile of
+     * travel time. If the threshold cannot be reached in less than 120 minutes, returns 0.
      */
-    public int[][] minutesToReachOpportunities(int n) {
-        int[][] result = new int[destinationPointSets.length][nPercentiles];
-        for (int d = 0; d < destinationPointSets.length; d++) {
-            for (int p = 0; p < nPercentiles; p++) {
-                result[d][p] = -1;
-                double count = 0;
-                for (int m = 0; m < 120; m++) {
-                    count += opportunitiesPerMinute[d][p][m];
-                    if (count >= n) {
-                        result[d][p] = m + 1;
-                        break;
+    public int[][][] calculateDualAccessibilityGrid() {
+        int nPointSets = opportunitiesPerMinute.length;
+        int nPercentiles = opportunitiesPerMinute.length > 0 ? opportunitiesPerMinute[0].length : 0;
+        int nThresholds = dualAccessibilityThresholds.length;
+        int[][][] dualAccessibilityGrid = new int[nPointSets][nPercentiles][nThresholds];
+        for (int i = 0; i < nPointSets; i++) {
+            for (int j = 0; j < nPercentiles; j++) {
+                for (int k = 0; k < nThresholds; k++) {
+                    int threshold = dualAccessibilityThresholds[k];
+                    int minute = 0;
+                    double sum = 0;
+                    while (sum < threshold && minute < 120) {
+                        sum += opportunitiesPerMinute[i][j][minute];
+                        minute += 1;
                     }
+                    dualAccessibilityGrid[i][j][k] = minute;
                 }
             }
         }
-        return result;
+        return dualAccessibilityGrid;
     }
-
-    public int[][] minutesToReachOpportunities() {
-        return minutesToReachOpportunities(opportunityThreshold);
-    }
-
 }

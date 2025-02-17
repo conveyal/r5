@@ -65,7 +65,12 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
-        this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
+        if (result.density != null) {
+            this.opportunitiesPerMinute = result.density.opportunitiesPerMinute;
+            if (task.originPointSet == null) {
+                this.accessibilityValues = result.density.calculateDualAccessibilityGrid();
+            }
+        }
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

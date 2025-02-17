@@ -64,12 +64,36 @@ public class TemporalDensityResult {
     }
 
     /**
+     * As travel time cutoff increases, accessibility should increase.
+     * As percentile increases, travel time should decrease, and accessibility should decrease.
+     * If one of these invariants does not hold, there is something wrong with the calculations.
+     */
+    private void checkInvariants() {
+        int nPointSets = opportunitiesPerMinute.length;
+        int nPercentiles = opportunitiesPerMinute.length > 0 ? opportunitiesPerMinute[0].length : 0;
+        for (int d = 0; d < nPointSets; d++) {
+            for (int p = 0; p < nPercentiles; p++) {
+                for (int m = 0; m < 120; m++) {
+                    if (m > 0 && opportunitiesPerMinute[d][p][m] < opportunitiesPerMinute[d][p][m - 1]) {
+                        throw new AssertionError("Increasing travel time decreased accessibility.");
+                    }
+                    if (p > 0 && opportunitiesPerMinute[d][p][m] > opportunitiesPerMinute[d][p - 1][m]) {
+                        throw new AssertionError("Increasing percentile increased accessibility.");
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Writes dual accessibility values (in minutes) to our standard access grid format. The value returned (for
      * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
      * task.dualAccessibilityThresholds) in the specified destination layer at a given percentile of
      * travel time. If the threshold cannot be reached in less than 120 minutes, returns 0.
      */
     public int[][][] calculateDualAccessibilityGrid() {
+        checkInvariants();
+
         int nPointSets = opportunitiesPerMinute.length;
         int nPercentiles = opportunitiesPerMinute.length > 0 ? opportunitiesPerMinute[0].length : 0;
         int nThresholds = dualAccessibilityThresholds.length;
@@ -88,6 +112,7 @@ public class TemporalDensityResult {
                 }
             }
         }
+        // TODO check invariants
         return dualAccessibilityGrid;
     }
 }

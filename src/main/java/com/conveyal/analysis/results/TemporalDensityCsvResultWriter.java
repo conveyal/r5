@@ -18,13 +18,8 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
     private final int dualThreshold;
 
     public TemporalDensityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, fileStorage);
+        super(task, CsvResultType.TDENSITY, fileStorage);
         dualThreshold = task.dualAccessibilityThreshold;
-    }
-
-    @Override
-    public CsvResultType resultType () {
-        return CsvResultType.TDENSITY;
     }
 
     @Override

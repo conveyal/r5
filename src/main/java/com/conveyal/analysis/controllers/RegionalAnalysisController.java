@@ -402,17 +402,8 @@ public class RegionalAnalysisController implements HttpController {
         final UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
 
-        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
-        // and multiple output files per analysis (for different percentiles of travel time and/or different
-        // destination pointsets). These initial values are for older regional analysis results with only a single
-        // cutoff, and no percentile or destination gridId in the file name.
-        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
-        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
-        int percentile = analysis.travelTimePercentile;
-        int threshold = analysis.cutoffMinutes;
-        String destinationPointSetId = analysis.grid;
-
         // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
+        int threshold = 0;
         if (analysis.request.includeTemporalDensity) {
             int nThresholds = analysis.request.dualAccessThresholds.length;
             int[] thresholds = analysis.request.dualAccessThresholds;
@@ -434,30 +425,26 @@ public class RegionalAnalysisController implements HttpController {
             );
         }
 
-        // Handle newer regional analyses with multiple percentiles in an array.
         // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
         // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        if (analysis.travelTimePercentiles != null) {
-            int nPercentiles = analysis.travelTimePercentiles.length;
-            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
-                    "Percentile for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.travelTimePercentiles));
-        }
+        int nPercentiles = analysis.travelTimePercentiles.length;
+        checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
+        int percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
+        checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
+                "Percentile for this regional analysis must be taken from this list: (%s)",
+                Ints.join(", ", analysis.travelTimePercentiles));
 
-        // Handle even newer regional analyses with multiple destination pointsets per analysis.
-        if (analysis.destinationPointSetIds != null) {
-            int nGrids = analysis.destinationPointSetIds.length;
-            checkState(nGrids > 0, "Regional analysis has no grids.");
-            destinationPointSetId = req.queryParams("destinationPointSetId");
-            if (destinationPointSetId == null) {
-                destinationPointSetId = analysis.destinationPointSetIds[0];
-            }
-            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
-                    "Destination gridId must be one of: %s",
-                    String.join(",", analysis.destinationPointSetIds));
+        // Handle regional analyses with multiple destination pointsets per analysis.
+        int nGrids = analysis.destinationPointSetIds.length;
+        checkState(nGrids > 0, "Regional analysis has no grids.");
+        String destinationPointSetId = req.queryParams("destinationPointSetId");
+        if (destinationPointSetId == null) {
+            destinationPointSetId = analysis.destinationPointSetIds[0];
         }
+        checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
+                "Destination gridId must be one of: %s",
+                String.join(",", analysis.destinationPointSetIds));
+
         // We started implementing the ability to retrieve and display partially completed analyses.
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
         if (broker.findJob(regionalAnalysisId) != null) {
@@ -548,10 +535,7 @@ public class RegionalAnalysisController implements HttpController {
                 opportunityDatasets.add(opportunityDataset);
                 task.destinationPointSetKeys[i] = opportunityDataset.storageLocation();
             }
-            // For backward compatibility with old workers, communicate any single pointSet via the deprecated field.
-            if (nPointSets == 1) {
-                task.grid = task.destinationPointSetKeys[0];
-            }
+
             // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
             // The worker will perform equivalent checks via the GridTransformWrapper constructor,
             // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
@@ -659,34 +643,15 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.workerVersion = analysisRequest.workerVersion;
         regionalAnalysis.zoom = task.zoom;
 
-        // Store the full array of multiple cutoffs which will be understood by newer workers and backends,
-        // rather then the older single cutoff value.
+        // Store the full array of multiple cutoffs.
         checkNotNull(analysisRequest.cutoffsMinutes);
         checkArgument(analysisRequest.cutoffsMinutes.length > 0);
         regionalAnalysis.cutoffsMinutes = analysisRequest.cutoffsMinutes;
-        if (analysisRequest.cutoffsMinutes.length == 1) {
-            // Ensure older workers expecting a single cutoff will still function.
-            regionalAnalysis.cutoffMinutes = analysisRequest.cutoffsMinutes[0];
-        } else {
-            // Store invalid value in deprecated field (-1 was already used) to make it clear it should not be used.
-            regionalAnalysis.cutoffMinutes = -2;
-        }
 
         // Same process as for cutoffsMinutes, but for percentiles.
         checkNotNull(analysisRequest.percentiles);
         checkArgument(analysisRequest.percentiles.length > 0);
         regionalAnalysis.travelTimePercentiles = analysisRequest.percentiles;
-        if (analysisRequest.percentiles.length == 1) {
-            regionalAnalysis.travelTimePercentile = analysisRequest.percentiles[0];
-        } else {
-            regionalAnalysis.travelTimePercentile = -2;
-        }
-
-        // Propagate any changes to the cutoff and percentiles arrays down into the nested RegionalTask.
-        // TODO propagate single (non-array) values for old workers
-        // TODO propagate the other direction, setting these values when initializing the task
-        task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
-        task.percentiles = regionalAnalysis.travelTimePercentiles;
 
         // Persist this newly created RegionalAnalysis to Mongo.
         // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.

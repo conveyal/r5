@@ -18,8 +18,6 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public String projectId;
     public String scenarioId;
 
-    public int variant;
-
     public String workerVersion;
 
     public int zoom;
@@ -38,31 +36,12 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public RegionalTask request;
 
     /**
-     * Single percentile of travel time being used in this analysis. Older analyses could have only one percentile.
-     * If the analysis is pre-percentiles and is using Andrew Owen-style accessibility, value is -1.
-     * If the analysis has more than one percentile, value is -2.
-     */
-    @Deprecated
-    public int travelTimePercentile = -1;
-
-    /**
      * Newer regional analyses (since release X in February 2020) can have more than one percentile.
      * If this is non-null it completely supersedes travelTimePercentile, which should be ignored.
      */
     public int[] travelTimePercentiles;
 
-    /** Single destination pointset id (for older analyses that did not allow multiple sets of destinations). */
-    @Deprecated
-    public String grid;
-
     public String[] destinationPointSetIds;
-
-    /**
-     * Older analyses (up to about January 2020, before release X) had only one cutoff.
-     * New analyses with more than one cutoff will have this set to -2.
-     */
-    @Deprecated
-    public int cutoffMinutes;
 
     /**
      * The different travel time thresholds used in this analysis to include or exclude opportunities from an

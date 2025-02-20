@@ -36,10 +36,9 @@ import spark.Request;
 import spark.Response;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -185,7 +184,7 @@ public class RegionalAnalysisController implements HttpController {
     private record HumanKey(FileStorageKey storageKey, String humanName) { };
 
     /**
-     * Get a regional analysis results raster for a single (percentile, cutoff, destination) combination, in one of
+     * Get a regional analysis results raster for a single combination of parameters, in one of
      * several image file formats. This method was factored out for use from two different API endpoints, one for
      * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
      * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
@@ -223,38 +222,16 @@ public class RegionalAnalysisController implements HttpController {
         FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
         if (!fileStorage.exists(singleCutoffFileStorageKey)) {
             // An accessibility grid for this particular cutoff has apparently never been extracted from the
-            // regional results file before. Extract one and save it for future reuse. Older regional analyses
-            // did not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
-            // filenames of such regional accessibility results will not have a percentile or pointset ID.
-            // First try the newest form of regional results: multi-percentile, multi-destination-grid.
+            // regional results file before. Extract one and save it for future reuse.
             String multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
             FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-            if (!fileStorage.exists(multiCutoffFileStorageKey)) {
-                LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
-                // Fall back to second-oldest form: multi-percentile, single destination grid.
-                multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
-                multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                    checkArgument(analysis.destinationPointSetIds.length == 1);
-                } else {
-                    // Fall back on oldest form of results, single-percentile, single-destination-grid.
-                    multiCutoffKey = regionalAnalysisId + ".access";
-                    multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                    if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                        checkArgument(analysis.travelTimePercentiles.length == 1);
-                        checkArgument(analysis.destinationPointSetIds.length == 1);
-                    } else {
-                        throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
-                    }
-                }
-            }
             LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
 
-            InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
+            InputStream multiCutoffInputStream = FileUtils.getInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
             Grid grid = new SelectingGridReducer(thresholdIndex).compute(multiCutoffInputStream);
 
             File localFile = FileUtils.createScratchFile(fileFormat.toString());
-            FileOutputStream fos = new FileOutputStream(localFile);
+            OutputStream fos = FileUtils.getOutputStream(localFile);
 
             switch (fileFormat) {
                 case GRID:
@@ -288,9 +265,6 @@ public class RegionalAnalysisController implements HttpController {
         final String regionalAnalysisId = req.params("_id");
         final UserPermissions userPermissions = UserPermissions.from(req);
         final RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
-        if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
-            throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
-        }
         if (analysis.request.originPointSetKey != null) {
             throw AnalysisServerException.badRequest("Batch result download only available for gridded origins.");
         }

@@ -23,8 +23,13 @@ import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
  */
 public class TemporalDensityResult {
 
+    private static final int TIME_LIMIT = 120;
+
     // Internal state fields
 
+    private final int nPointSets;
+    private final int nPercentiles;
+    private final int nThresholds;
     private final PointSet[] destinationPointSets;
     private final int[] dualAccessibilityThresholds;
 
@@ -44,20 +49,23 @@ public class TemporalDensityResult {
         );
         this.destinationPointSets = task.destinationPointSets;
         this.dualAccessibilityThresholds = task.dualAccessibilityThresholds;
-        this.opportunitiesPerMinute = new double[destinationPointSets.length][task.percentiles.length][120];
+        this.nPercentiles = task.percentiles.length;
+        this.nPointSets = this.destinationPointSets.length;
+        this.nThresholds = this.dualAccessibilityThresholds.length;
+        opportunitiesPerMinute = new double[this.nPointSets][this.nPercentiles][TIME_LIMIT];
     }
 
     public void recordOneTarget (int target, int[] travelTimePercentilesSeconds) {
         // Increment histogram bin for the number of minutes of travel by the number of opportunities at the target.
-        for (int d = 0; d < destinationPointSets.length; d++) {
-            PointSet dps = destinationPointSets[d];
-            for (int p = 0; p < opportunitiesPerMinute.length; p++) {
-                if (travelTimePercentilesSeconds[p] == UNREACHED) {
+        for (int i = 0; i < nPointSets; i++) {
+            PointSet dps = destinationPointSets[i];
+            for (int j = 0; j < nPercentiles; j++) {
+                if (travelTimePercentilesSeconds[j] == UNREACHED) {
                     break; // If any percentile is unreached, all higher ones are also unreached.
                 }
-                int m = travelTimePercentilesSeconds[p] / 60;
-                if (m < 120) {
-                    opportunitiesPerMinute[d][p][m] += dps.getOpportunityCount(target);
+                int minutes = travelTimePercentilesSeconds[j] / 60;
+                if (minutes < TIME_LIMIT) {
+                    opportunitiesPerMinute[i][j][minutes] += dps.getOpportunityCount(target);
                 }
             }
         }
@@ -69,15 +77,13 @@ public class TemporalDensityResult {
      * If one of these invariants does not hold, there is something wrong with the calculations.
      */
     private void checkInvariants() {
-        int nPointSets = opportunitiesPerMinute.length;
-        int nPercentiles = opportunitiesPerMinute.length > 0 ? opportunitiesPerMinute[0].length : 0;
-        for (int d = 0; d < nPointSets; d++) {
-            for (int p = 0; p < nPercentiles; p++) {
-                for (int m = 0; m < 120; m++) {
-                    if (m > 0 && opportunitiesPerMinute[d][p][m] < opportunitiesPerMinute[d][p][m - 1]) {
+        for (int i = 0; i < nPointSets; i++) {
+            for (int j = 0; j < nPercentiles; j++) {
+                for (int m = 0; m < TIME_LIMIT; m++) {
+                    if (m > 0 && opportunitiesPerMinute[i][j][m] < opportunitiesPerMinute[i][j][m - 1]) {
                         throw new AssertionError("Increasing travel time decreased accessibility.");
                     }
-                    if (p > 0 && opportunitiesPerMinute[d][p][m] > opportunitiesPerMinute[d][p - 1][m]) {
+                    if (j > 0 && opportunitiesPerMinute[i][j][m] > opportunitiesPerMinute[i][j - 1][m]) {
                         throw new AssertionError("Increasing percentile increased accessibility.");
                     }
                 }
@@ -94,25 +100,21 @@ public class TemporalDensityResult {
     public int[][][] calculateDualAccessibilityGrid() {
         checkInvariants();
 
-        int nPointSets = opportunitiesPerMinute.length;
-        int nPercentiles = opportunitiesPerMinute.length > 0 ? opportunitiesPerMinute[0].length : 0;
-        int nThresholds = dualAccessibilityThresholds.length;
         int[][][] dualAccessibilityGrid = new int[nPointSets][nPercentiles][nThresholds];
         for (int i = 0; i < nPointSets; i++) {
             for (int j = 0; j < nPercentiles; j++) {
                 for (int k = 0; k < nThresholds; k++) {
                     int threshold = dualAccessibilityThresholds[k];
-                    int minute = 0;
+                    int minutes = 0;
                     double sum = 0;
-                    while (sum < threshold && minute < 120) {
-                        sum += opportunitiesPerMinute[i][j][minute];
-                        minute += 1;
+                    while (sum < threshold && minutes < TIME_LIMIT) {
+                        sum += opportunitiesPerMinute[i][j][minutes];
+                        minutes += 1;
                     }
-                    dualAccessibilityGrid[i][j][k] = minute;
+                    dualAccessibilityGrid[i][j][k] = minutes;
                 }
             }
         }
-        // TODO check invariants
         return dualAccessibilityGrid;
     }
 }

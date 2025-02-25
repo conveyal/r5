@@ -50,30 +50,29 @@ public class GridResultWriter extends BaseResultWriter {
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
     /**
-     * The number of different travel time cutoffs or dual access thresholds being applied when computing values for
-     * each origin.
+     * The number of thresholds (time or cumulative access) being applied when computing values for each origin.
      * The number of values stored per origin cell in an accessibility results grid.
-     * Note that we're storing only the number of different channels, but not the values themselves in the file.
+     * Note that we're storing only the number of different thresholds, but not the values themselves in the file.
      * This means that the files can only be properly interpreted with the metadata from the regional analysis.
      * This is an intentional choice to avoid changing the file format, and in any case these files are not expected
      * to ever be used separately from an environment where the metadata is available.
      */
-    private final int channels;
+    private final int nThresholds;
 
     /**
      * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter(WebMercatorExtents ext, int channels, String fileName, FileStorage fileStorage) {
+    GridResultWriter(WebMercatorExtents ext, int nThresholds, String fileName, FileStorage fileStorage) {
         super(fileName, fileStorage);
-        long bodyBytes = (long) ext.width * ext.height * channels * Integer.BYTES;
-        this.channels = channels;
+        long bodyBytes = (long) ext.width * ext.height * nThresholds * Integer.BYTES;
+        this.nThresholds = nThresholds;
         LOG.info(
             "Expecting multi-origin results for grid with width {}, height {}, {} values per origin.",
                 ext.width,
                 ext.height,
-            channels
+                nThresholds
         );
 
         try {
@@ -87,7 +86,7 @@ public class GridResultWriter extends BaseResultWriter {
             data.writeInt(ext.north);
             data.writeInt(ext.width);
             data.writeInt(ext.height);
-            data.writeInt(channels);
+            data.writeInt(nThresholds);
             data.close();
 
             // Initialize the temporary file where the accessibility results will be stored. Setting this newly created
@@ -130,14 +129,14 @@ public class GridResultWriter extends BaseResultWriter {
     }
 
     /**
-     * Write all channels at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
+     * Write all values at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
      * coordinates. Flatten them to compute file offsets and for the origin checklist.
      */
     synchronized void writeOneOrigin (int taskNumber, int[] values) throws IOException {
-        if (values.length != channels) {
-            throw new IllegalArgumentException("Number of channels to be written does not match this writer.");
+        if (values.length != nThresholds) {
+            throw new IllegalArgumentException("Number of thresholds to be written does not match this writer.");
         }
-        long offset = HEADER_LENGTH_BYTES + ((long) taskNumber * channels * Integer.BYTES);
+        long offset = HEADER_LENGTH_BYTES + ((long) taskNumber * nThresholds * Integer.BYTES);
         // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
         // TODO why is the method also synchronized then?
         synchronized (this) {

@@ -39,7 +39,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -55,7 +54,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
@@ -249,19 +247,17 @@ public class RegionalAnalysisController implements HttpController {
 
             InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
             Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
-
             File localFile = FileUtils.createScratchFile(fileFormat.toString());
-            FileOutputStream fos = new FileOutputStream(localFile);
 
             switch (fileFormat) {
                 case GRID:
-                    grid.write(new GZIPOutputStream(fos));
+                    grid.write(FileUtils.getGzipOutputStream(localFile));
                     break;
                 case PNG:
-                    grid.writePng(fos);
+                    grid.writePng(new FileOutputStream(localFile));
                     break;
                 case GEOTIFF:
-                    grid.writeGeotiff(fos);
+                    grid.writeGeotiff(new FileOutputStream(localFile));
                     break;
             }
             LOG.debug("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);

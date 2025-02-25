@@ -5,6 +5,7 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
+import com.conveyal.file.FileUtils;
 import org.locationtech.jts.geom.Envelope;
 import org.mapdb.BTreeKeySerializer;
 import org.mapdb.BTreeMap;
@@ -14,7 +15,6 @@ import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -27,7 +27,6 @@ import java.util.NavigableSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Store geographic data by ID, with index by zoom-11 tile.
@@ -171,7 +170,8 @@ public class ShapeDataStore {
             if (x != lastx || y != lasty) {
                 if (!featuresThisTile.isEmpty()) {
                     LOG.debug("x: {}, y: {}, {} features", lastx, lasty, featuresThisTile.size());
-                    GeobufEncoder enc = new GeobufEncoder(new GZIPOutputStream(new BufferedOutputStream(outputStreamForTile.apply(lastx, lasty))), PRECISION);
+                    OutputStream os = FileUtils.getGzipOutputStream(outputStreamForTile.apply(lastx, lasty));
+                    GeobufEncoder enc = new GeobufEncoder(os, PRECISION);
                     enc.writeFeatureCollection(featuresThisTile);
                     enc.close();
                     featuresThisTile.clear();

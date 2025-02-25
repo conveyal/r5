@@ -33,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
@@ -210,9 +209,8 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
 
             try {
                 File gridFile = FileUtils.createScratchFile("grid");
-                OutputStream os = new GZIPOutputStream(FileUtils.getOutputStream(gridFile));
+                OutputStream os = FileUtils.getGzipOutputStream(gridFile);
                 maskGrid.write(os);
-                os.close();
                 aggregationArea.dataGroupId = dataGroup._id.toString();
                 aggregationAreas.add(aggregationArea);
                 fileStorage.moveIntoStorage(aggregationArea.getStorageKey(), gridFile);

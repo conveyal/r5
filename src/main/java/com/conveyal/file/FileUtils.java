@@ -1,5 +1,7 @@
 package com.conveyal.file;
 
+import com.google.common.io.ByteStreams;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -12,6 +14,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public abstract class FileUtils {
     /**
@@ -106,6 +109,39 @@ public abstract class FileUtils {
         try {
             return new BufferedOutputStream(new FileOutputStream(file));
         } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Get a GZIPOutputStream to write to.
+     */
+    public static GZIPOutputStream getGzipOutputStream(OutputStream os) {
+        try {
+            return new GZIPOutputStream(os);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static GZIPOutputStream getGzipOutputStream(File file) {
+        return getGzipOutputStream(getOutputStream(file));
+    }
+
+    /**
+     * Gzip a file and return the Gzipped file.
+     */
+    public static File gzipFile(File file) {
+        try {
+            File gzippedResultFile = createScratchFile();
+            InputStream is = getInputStream(file);
+            OutputStream os = getGzipOutputStream(gzippedResultFile);
+            ByteStreams.copy(is, os);
+            is.close();
+            os.close();
+
+            return gzippedResultFile;
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

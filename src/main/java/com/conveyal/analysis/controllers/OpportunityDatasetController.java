@@ -41,7 +41,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -53,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -214,20 +212,14 @@ public class OpportunityDatasetController implements HttpController {
             try {
                 if (pointSet instanceof Grid) {
                     File gridFile = FileUtils.createScratchFile("grid");
-
-                    OutputStream fos = new GZIPOutputStream(new FileOutputStream(gridFile));
-                    ((Grid)pointSet).write(fos);
-
+                    ((Grid) pointSet).write(FileUtils.getGzipOutputStream(gridFile));
                     fileStorage.moveIntoStorage(dataset.getStorageKey(FileStorageFormat.GRID), gridFile);
                 } else if (pointSet instanceof FreeFormPointSet) {
                     // Upload serialized freeform pointset back to S3
                     FileStorageKey fileStorageKey = new FileStorageKey(GRIDS, source.regionId + "/" + dataset._id +
                             ".pointset");
                     File pointsetFile = FileUtils.createScratchFile("pointset");
-
-                    OutputStream os = new GZIPOutputStream(new FileOutputStream(pointsetFile));
-                    ((FreeFormPointSet)pointSet).write(os);
-
+                    ((FreeFormPointSet) pointSet).write(FileUtils.getGzipOutputStream(pointsetFile));
                     fileStorage.moveIntoStorage(fileStorageKey, pointsetFile);
                 } else {
                     throw new IllegalArgumentException("Unrecognized PointSet type, cannot persist it.");

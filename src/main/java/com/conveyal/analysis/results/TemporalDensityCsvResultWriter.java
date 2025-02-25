@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
@@ -14,8 +13,8 @@ import java.util.List;
  * as well as "dual" accessibility (the amount of time needed to reach n opportunities).
  */
 public class TemporalDensityCsvResultWriter extends CsvResultWriter {
-    public TemporalDensityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, CsvResultType.TDENSITY, fileStorage);
+    public TemporalDensityCsvResultWriter(RegionalTask task) throws IOException {
+        super(task);
     }
 
     @Override

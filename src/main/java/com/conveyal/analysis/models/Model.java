@@ -7,6 +7,8 @@ import javax.persistence.Id;
 import java.util.Date;
 
 import static com.conveyal.analysis.util.JsonUtil.objectMapper;
+import static com.conveyal.file.UrlWithHumanName.filenameCleanString;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * Shared superclass for data model classes that are serialized to communicate between the UI and the backend,
@@ -48,5 +50,20 @@ public abstract class Model implements Cloneable {
             e.printStackTrace();
             return super.toString();
         }
+    }
+
+    /**
+     * Given an Entity, make a human-readable name for the entity composed of its user-supplied name as well as
+     * the most rapidly changing digits of its ID to disambiguate in case multiple entities have the same name.
+     * It is also possible to find the exact entity in many web UI fields using this suffix of its ID.
+     */
+    public String humanName () {
+        // Most or all IDs encountered are MongoDB ObjectIDs. The first four and middle five bytes are slow-changing
+        // and would not disambiguate between data sets. Only the 3-byte counter at the end will be sure to change.
+        // See https://www.mongodb.com/docs/manual/reference/method/ObjectId/
+        checkArgument(_id.length() > 6, "ID had too few characters.");
+        String shortId = _id.substring(_id.length() - 6, _id.length());
+        String humanName = "%s_%s".formatted(filenameCleanString(name), shortId);
+        return humanName;
     }
 }

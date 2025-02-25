@@ -2,10 +2,16 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.results.CsvResultType;
+import com.conveyal.file.FileStorageFormat;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
 
+import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.file.FileCategory.RESULTS;
+
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -87,5 +93,37 @@ public class RegionalAnalysis extends Model implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw AnalysisServerException.unknown(e);
         }
+    }
+
+    private static String getMultiOriginFileBaseName(String analysisId, String destinations, int percentile) {
+        return String.format("%s_%s_P%d", analysisId, destinations, percentile);
+    }
+
+    public static FileStorageKey getMultiOriginAccessFileKey(String analysisId, String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(analysisId, destinations, percentile) + ".access");
+    }
+
+    public static FileStorageKey getSingleCutoffGridFileKey(String analysisId, String destinations, int percentile, int cutoff, FileStorageFormat format) {
+        String extension = format.extension.toLowerCase(Locale.ROOT);
+        String path = String.format("%s_C%d.%s", getMultiOriginFileBaseName(analysisId, destinations, percentile), cutoff, extension);
+        return new FileStorageKey(RESULTS, path);
+    }
+
+    public static FileStorageKey getMultiOriginDualAccessFileKey(String analysisId, String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(analysisId, destinations, percentile) + ".dual.access");
+    }
+
+    public static FileStorageKey getSingleThresholdDualAccessGridFileKey(String analysisId, String destinations, int percentile, int threshold, FileStorageFormat format) {
+        String extension = format.extension.toLowerCase(Locale.ROOT);
+        String path = String.format("%s_T%d.%s", getMultiOriginFileBaseName(analysisId, destinations, percentile), threshold, extension);
+        return new FileStorageKey(RESULTS, path);
+    }
+
+    public static FileStorageKey getCsvResultFileKey(String analysisId, CsvResultType resultType) {
+        return new FileStorageKey(RESULTS, analysisId + "_" + resultType + ".csv");
+    }
+
+    public static FileStorageKey getScenarioJsonFileKey(String analysisId, String scenarioId) {
+        return new FileStorageKey(BUNDLES, analysisId + "_" + scenarioId + ".json");
     }
 }

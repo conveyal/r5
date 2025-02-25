@@ -7,6 +7,7 @@ import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
+import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.MultiOriginAssembler;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -20,10 +21,12 @@ import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
+
 import gnu.trove.TCollections;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.TObjectLongMap;
 import gnu.trove.map.hash.TObjectLongHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +45,6 @@ import static com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent.St
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Action.REQUESTED;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.REGIONAL;
 import static com.conveyal.analysis.components.eventbus.WorkerEvent.Role.SINGLE_POINT;
-import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -189,7 +191,7 @@ public class Broker implements Component {
         // Register the regional job so results received from multiple workers can be assembled into one file.
         // If any parameters fail checks here, an exception may cause this method to exit early.
         // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job, fileStorage);
+        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job);
         resultAssemblers.put(templateTask.jobId, assembler);
 
         // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
@@ -227,8 +229,7 @@ public class Broker implements Component {
         templateTask.scenarioId = scenario.id;
         // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
         templateTask.scenario = null;
-        String fileName = String.format("%s_%s.json", regionalAnalysis.bundleId, scenario.id);
-        FileStorageKey fileStorageKey = new FileStorageKey(BUNDLES, fileName);
+        FileStorageKey fileStorageKey = RegionalAnalysis.getScenarioJsonFileKey(regionalAnalysis._id, scenario.id);
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);
@@ -523,11 +524,29 @@ public class Broker implements Component {
                 // results from spurious redeliveries, before the assembler is busy finalizing and uploading results.
                 markTaskCompleted(job, workResult.taskId);
             }
+
             // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
             // It contains some slow nested operations to move completed results into storage. Really we should not do
             // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
             // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
             assembler.handleMessage(workResult);
+
+            // If the assembler is finished receiving results, store the created files and mark the analysis complete.
+            if (job.isComplete()) {
+                for (Map.Entry<FileStorageKey, File> entry : assembler.finish().entrySet()) {
+                    File file = entry.getValue();
+                    fileStorage.moveIntoStorage(
+                            entry.getKey(),
+                            FileUtils.gzipFile(file)
+                    );
+                    file.delete();
+                }
+
+                // Mark the regional analysis as completed.
+                RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.get(workResult.jobId);
+                regionalAnalysis.complete = true;
+                Persistence.regionalAnalyses.put(regionalAnalysis);
+            }
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));

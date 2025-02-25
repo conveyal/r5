@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
@@ -13,8 +12,8 @@ import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
 
-    public TimeCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, CsvResultType.TIMES, fileStorage);
+    public TimeCsvResultWriter(RegionalTask task) throws IOException {
+        super(task);
     }
 
     @Override

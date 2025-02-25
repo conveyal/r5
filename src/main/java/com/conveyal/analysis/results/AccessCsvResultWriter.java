@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
@@ -9,9 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
-
-    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, CsvResultType.ACCESS, fileStorage);
+    public AccessCsvResultWriter(RegionalTask task) throws IOException {
+        super(task);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.TemporalDensityResult;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.util.ArrayList;
@@ -73,7 +74,7 @@ public class RegionalWorkResult {
         if (result.density != null) {
             this.opportunitiesPerMinute = result.density.opportunitiesPerMinute;
             if (task.originPointSet == null && task.dualAccessThresholds != null) {
-                this.dualAccessValues = result.density.calculateDualAccessForOrigin();
+                this.dualAccessValues = result.density.calculateDualAccessForOrigin(task.dualAccessThresholds);
             }
         }
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing

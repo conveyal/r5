@@ -13,13 +13,13 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 public class MultiGridResultWriter implements RegionalResultWriter {
     /**
      * We create one GridResultWriter for each destination pointset and percentile.
-     * Each of those output files contains data for all channels at each origin.
+     * Each of those output files contains data for all thresholds (time or cumulative access) at each origin.
      */
     private final GridResultWriter[][] gridResultWriters;
 
     /** Constructor */
     public MultiGridResultWriter (
-            RegionalAnalysis regionalAnalysis, RegionalTask task, int channels, FileStorage fileStorage
+            RegionalAnalysis regionalAnalysis, RegionalTask task, int nThresholds, FileStorage fileStorage
     ) {
         int nPercentiles = task.percentiles.length;
         int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
@@ -35,7 +35,7 @@ public class MultiGridResultWriter implements RegionalResultWriter {
                 );
                 gridResultWriters[d][p] = new GridResultWriter(
                         WebMercatorExtents.forTask(task),
-                        channels,
+                        nThresholds,
                         fileName,
                         fileStorage
                 );

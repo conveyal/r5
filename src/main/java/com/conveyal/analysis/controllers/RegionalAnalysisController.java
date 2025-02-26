@@ -39,7 +39,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -184,13 +183,24 @@ public class RegionalAnalysisController implements HttpController {
      */
     private record HumanKey(FileStorageKey storageKey, String humanName) { };
 
+    private HumanKey getSingleCutoffGrid(
+            RegionalAnalysis analysis,
+            OpportunityDataset destinations,
+            int cutoffMinutes,
+            int percentile,
+            FileStorageFormat fileFormat
+    ) throws IOException {
+        return getSingleCutoffGrid(fileStorage, analysis, destinations, cutoffMinutes, percentile, fileFormat);
+    }
+
     /**
      * Get a regional analysis results raster for a single (percentile, cutoff, destination) combination, in one of
      * several image file formats. This method was factored out for use from two different API endpoints, one for
      * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
      * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
      */
-    private HumanKey getSingleCutoffGrid (
+    public static HumanKey getSingleCutoffGrid(
+            FileStorage fileStorage,
             RegionalAnalysis analysis,
             OpportunityDataset destinations,
             int cutoffMinutes,

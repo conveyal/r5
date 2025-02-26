@@ -21,7 +21,7 @@ public abstract class BackendMain {
 
     public static void main (String... args) {
         final BackendComponents components = new LocalBackendComponents();
-        startServer(components);
+        startServer(components, new GenerateRegionalAnalysisResults(components.fileStorage));
     }
 
     protected static void startServer (BackendComponents components, TaskAction... postStartupTasks) {

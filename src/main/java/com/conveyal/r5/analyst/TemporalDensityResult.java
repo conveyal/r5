@@ -22,7 +22,6 @@ import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
  * of simplicity and maintainability. See issue 884 for more comments on implementation trade-offs.
  */
 public class TemporalDensityResult {
-
     private static final int TIME_LIMIT = 120;
 
     // Internal state fields
@@ -47,6 +46,7 @@ public class TemporalDensityResult {
             notNullOrEmpty(task.destinationPointSets),
             "Dual accessibility requires at least one destination pointset."
         );
+        // TODO check that thresholds are sorted
         this.destinationPointSets = task.destinationPointSets;
         this.dualAccessibilityThresholds = task.dualAccessibilityThresholds;
         this.nPercentiles = task.percentiles.length;
@@ -72,18 +72,21 @@ public class TemporalDensityResult {
     }
 
     /**
-     * As travel time cutoff increases, accessibility should increase.
-     * As percentile increases, travel time should decrease, and accessibility should decrease.
-     * If one of these invariants does not hold, there is something wrong with the calculations.
+     * Ensure that results have increasing accessibility while travel time increases and percentile decreases.
      */
     private void checkInvariants() {
+        double[][][] sums = new double[nPointSets][nPercentiles][TIME_LIMIT];
         for (int i = 0; i < nPointSets; i++) {
             for (int j = 0; j < nPercentiles; j++) {
+                double totalSum = 0;
                 for (int m = 0; m < TIME_LIMIT; m++) {
-                    if (m > 0 && opportunitiesPerMinute[i][j][m] < opportunitiesPerMinute[i][j][m - 1]) {
+                    totalSum += opportunitiesPerMinute[i][j][m];
+                    sums[i][j][m] = totalSum;
+
+                    if (m > 0 && sums[i][j][m] < sums[i][j][m - 1]) {
                         throw new AssertionError("Increasing travel time decreased accessibility.");
                     }
-                    if (j > 0 && opportunitiesPerMinute[i][j][m] > opportunitiesPerMinute[i][j - 1][m]) {
+                    if (j > 0 && sums[i][j][m] > sums[i][j - 1][m]) {
                         throw new AssertionError("Increasing percentile increased accessibility.");
                     }
                 }
@@ -115,6 +118,7 @@ public class TemporalDensityResult {
                 }
             }
         }
+
         return dualAccessibilityGrid;
     }
 }

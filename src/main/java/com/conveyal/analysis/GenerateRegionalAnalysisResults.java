@@ -46,19 +46,12 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                 int[] cutoffs = Objects.requireNonNullElseGet(regionalAnalysis.cutoffsMinutes, () -> new int[]{regionalAnalysis.cutoffMinutes});
                 String[] destinationPointSetIds = Objects.requireNonNullElseGet(regionalAnalysis.destinationPointSetIds, () -> new String[]{regionalAnalysis.grid});
 
-                // Save as modern types
-                regionalAnalysis.cutoffsMinutes = cutoffs;
-                regionalAnalysis.travelTimePercentiles = percentiles;
-                regionalAnalysis.destinationPointSetIds = destinationPointSetIds;
-                Persistence.regionalAnalyses.put(regionalAnalysis);
-
                 // Iterate through all values and generate all possible formats for them.
                 for (String destinationPointSetId : destinationPointSetIds) {
                     OpportunityDataset destinations = Persistence.opportunityDatasets.get(destinationPointSetId);
                     for (int cutoffMinutes : cutoffs) {
                         for (int percentile : percentiles) {
                             for (FileStorageFormat format : validFormats) {
-                                filesGenerated++;
                                 RegionalAnalysisController.getSingleCutoffGrid(
                                         fileStorage,
                                         regionalAnalysis,
@@ -67,10 +60,17 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                                         percentile,
                                         format
                                 );
+                                filesGenerated++;
                             }
                         }
                     }
                 }
+
+                // Save as modern types
+                regionalAnalysis.cutoffsMinutes = cutoffs;
+                regionalAnalysis.travelTimePercentiles = percentiles;
+                regionalAnalysis.destinationPointSetIds = destinationPointSetIds;
+                Persistence.regionalAnalyses.put(regionalAnalysis);
 
                 LOG.info("Finished processing {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
             }

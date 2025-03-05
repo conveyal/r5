@@ -16,6 +16,11 @@ import java.util.Objects;
 
 public class GenerateRegionalAnalysisResults implements TaskAction {
     private final FileStorage fileStorage;
+    private final FileStorageFormat[] validFormats = new FileStorageFormat[]{
+            FileStorageFormat.GRID,
+            FileStorageFormat.GEOTIFF,
+            FileStorageFormat.PNG
+    };
     public GenerateRegionalAnalysisResults (FileStorage fileStorage) {
         this.fileStorage = fileStorage;
     }
@@ -23,7 +28,7 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
     @Override
     public void action(ProgressListener progressListener) throws Exception {
         DBObject query = QueryBuilder.start().or(
-                QueryBuilder.start("travleTimePercentiles").is(null).get(),
+                QueryBuilder.start("travelTimePercentiles").is(null).get(),
                 QueryBuilder.start("cutoffsMinutes").is(null).get(),
                 QueryBuilder.start("destinationPointSetIds").is(null).get()
         ).get();
@@ -45,7 +50,7 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                     OpportunityDataset destinations = Persistence.opportunityDatasets.get(destinationPointSetId);
                     for (int cutoffMinutes : cutoffs) {
                         for (int percentile : percentiles) {
-                            for (FileStorageFormat format : FileStorageFormat.values()) {
+                            for (FileStorageFormat format : validFormats) {
                                 RegionalAnalysisController.getSingleCutoffGrid(
                                         fileStorage,
                                         regionalAnalysis,

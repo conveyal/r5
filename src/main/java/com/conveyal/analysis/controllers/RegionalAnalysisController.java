@@ -25,6 +25,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.util.SemVer;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -620,6 +621,11 @@ public class RegionalAnalysisController implements HttpController {
                 checkArgument(
                         !task.recordAccessibility,
                         "Accessibility and dual accessibility grids cannot be created simultaneously."
+                );
+
+                checkArgument(
+                        SemVer.gte(task.workerVersion, "v7.4"),
+                        "Dual accessibility with gridded origins requires a minimum worker version of v7.4"
                 );
             }
         }

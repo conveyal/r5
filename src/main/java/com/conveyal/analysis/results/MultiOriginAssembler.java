@@ -143,15 +143,15 @@ public class MultiOriginAssembler {
                     resultWriters.add(new MultiGridResultWriter(
                             regionalAnalysis,
                             job.templateTask,
-                            job.templateTask.dualAccessibilityThresholds.length,
+                            job.templateTask.dualAccessThresholds.length,
                             fileStorage
                     ));
                 } else {
                     // Freeform origins.
-                    // Output includes temporal density of opportunities and optionally dual accessibility.
+                    // Output includes temporal density of opportunities and optionally dual access.
                     resultWriters.add(new TemporalDensityCsvResultWriter(
                             job.templateTask,
-                            job.templateTask.dualAccessibilityThresholds[0],
+                            job.templateTask.dualAccessThresholds[0],
                             fileStorage
                     ));
                 }

@@ -15,11 +15,11 @@ import java.util.List;
  */
 public class TemporalDensityCsvResultWriter extends CsvResultWriter {
 
-    private final int dualAccessibilityThreshold;
+    private final int dualAccessThreshold;
 
-    public TemporalDensityCsvResultWriter(RegionalTask task, int dualAccessibilityThreshold, FileStorage fileStorage) throws IOException {
+    public TemporalDensityCsvResultWriter(RegionalTask task, int dualAccessThreshold, FileStorage fileStorage) throws IOException {
         super(task, CsvResultType.TDENSITY, fileStorage);
-        this.dualAccessibilityThreshold = dualAccessibilityThreshold;
+        this.dualAccessThreshold = dualAccessThreshold;
     }
 
     @Override
@@ -63,12 +63,12 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
                 row.add(originId);
                 row.add(task.destinationPointSetKeys[d]);
                 row.add(Integer.toString(task.percentiles[p]));
-                // One column containing dual accessibility value
+                // One column containing dual access value
                 double[] densitiesPerMinute = percentilesForDestPointset[p];
                 int m = 0;
                 double sum = 0;
                 // Find smallest integer M such that we have already reached D destinations after M minutes of travel.
-                while (sum < dualAccessibilityThreshold && m < 120) {
+                while (sum < dualAccessThreshold && m < 120) {
                     sum += densitiesPerMinute[m];
                     m += 1;
                 }

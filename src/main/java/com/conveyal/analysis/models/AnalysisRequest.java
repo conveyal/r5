@@ -171,9 +171,9 @@ public class AnalysisRequest {
 
     /**
      * Report the amount of time needed to reach the given number of
-     * opportunities from this origin (known technically as "dual accessibility").
+     * opportunities from this origin (known technically as "dual access").
      */
-    public int[] dualAccessibilityThresholds;
+    public int[] dualAccessThresholds;
 
     /**
      * Freeform (untyped) flags for enabling experimental, undocumented, or arcane behavior in backend or workers.
@@ -288,7 +288,7 @@ public class AnalysisRequest {
         }
 
         task.includeTemporalDensity = includeTemporalDensity;
-        task.dualAccessibilityThresholds = dualAccessibilityThresholds;
+        task.dualAccessThresholds = dualAccessThresholds;
         task.flags = flags;
         task.csvResultOptions = csvResultOptions;
     }

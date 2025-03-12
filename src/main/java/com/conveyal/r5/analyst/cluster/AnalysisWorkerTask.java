@@ -111,9 +111,9 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
 
     /**
      * If this is set to a value above zero, report the amount of time needed to reach the given number of
-     * opportunities from this origin (known technically as "dual accessibility").
+     * opportunities from this origin (known technically as "dual access").
      */
-    public int[] dualAccessibilityThresholds;
+    public int[] dualAccessThresholds;
 
     /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
     public boolean recordTravelTimeHistograms = false;

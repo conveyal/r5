@@ -68,7 +68,7 @@ public class RegionalWorkResult {
         if (result.density != null) {
             this.opportunitiesPerMinute = result.density.opportunitiesPerMinute;
             if (task.originPointSet == null) {
-                this.accessibilityValues = result.density.calculateDualAccessibilityGrid();
+                this.accessibilityValues = result.density.calculateDualAccessGrid();
             }
         }
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing

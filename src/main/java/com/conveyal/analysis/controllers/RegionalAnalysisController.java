@@ -202,7 +202,7 @@ public class RegionalAnalysisController implements HttpController {
         // Selecting the zeroth cutoff still makes sense for older analyses that don't allow an array of N cutoffs.
         int thresholdIndex = 0;
         if (analysis.request.includeTemporalDensity) {
-            thresholdIndex = new TIntArrayList(analysis.request.dualAccessibilityThresholds).indexOf(threshold);
+            thresholdIndex = new TIntArrayList(analysis.request.dualAccessThresholds).indexOf(threshold);
             checkState(thresholdIndex >= 0);
         } else if (analysis.cutoffsMinutes != null) {
             thresholdIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(threshold);
@@ -413,12 +413,12 @@ public class RegionalAnalysisController implements HttpController {
         String destinationPointSetId = analysis.grid;
 
         if (analysis.request.includeTemporalDensity) {
-            int nThresholds = analysis.request.dualAccessibilityThresholds.length;
-            int[] thresholds = analysis.request.dualAccessibilityThresholds;
+            int nThresholds = analysis.request.dualAccessThresholds.length;
+            int[] thresholds = analysis.request.dualAccessThresholds;
             checkState(nThresholds > 0, "Regional analysis has no thresholds.");
             threshold = getIntQueryParameter(req, "threshold", thresholds[nThresholds / 2]);
             checkArgument(new TIntArrayList(thresholds).contains(threshold),
-                    "Dual accessibility thresholds for this regional analysis must be taken from this list: (%s)",
+                    "Dual access thresholds for this regional analysis must be taken from this list: (%s)",
                     Ints.join(", ", thresholds)
             );
         } else if (analysis.cutoffsMinutes != null) {
@@ -613,19 +613,19 @@ public class RegionalAnalysisController implements HttpController {
         }
         if (task.includeTemporalDensity) {
             checkArgument(
-                    task.dualAccessibilityThresholds != null &&
-                            task.dualAccessibilityThresholds.length > 0,
-                    "dualAccessibilityThresholds not specified when includeTemporalDensity is enabled."
+                    task.dualAccessThresholds != null &&
+                            task.dualAccessThresholds.length > 0,
+                    "dualAccessThresholds not specified when includeTemporalDensity is enabled."
             );
             if (task.originPointSet == null) {
                 checkArgument(
                         !task.recordAccessibility,
-                        "Accessibility and dual accessibility grids cannot be created simultaneously."
+                        "Accessibility and dual access grids cannot be created simultaneously."
                 );
 
                 checkArgument(
                         SemVer.gte(task.workerVersion, "v7.4"),
-                        "Dual accessibility with gridded origins requires a minimum worker version of v7.4"
+                        "Dual access with gridded origins requires a minimum worker version of v7.4"
                 );
             }
         }

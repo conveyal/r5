@@ -30,7 +30,7 @@ public class TemporalDensityResult {
     private final int nPercentiles;
     private final int nThresholds;
     private final PointSet[] destinationPointSets;
-    private final int[] dualAccessibilityThresholds;
+    private final int[] dualAccessThresholds;
 
     // Externally visible fields for accumulating results
 
@@ -44,14 +44,14 @@ public class TemporalDensityResult {
     public TemporalDensityResult(AnalysisWorkerTask task) {
         Preconditions.checkArgument(
             notNullOrEmpty(task.destinationPointSets),
-            "Dual accessibility requires at least one destination pointset."
+                "Dual access requires at least one destination pointset."
         );
         // TODO check that thresholds are sorted
         this.destinationPointSets = task.destinationPointSets;
-        this.dualAccessibilityThresholds = task.dualAccessibilityThresholds;
+        this.dualAccessThresholds = task.dualAccessThresholds;
         this.nPercentiles = task.percentiles.length;
         this.nPointSets = this.destinationPointSets.length;
-        this.nThresholds = this.dualAccessibilityThresholds.length;
+        this.nThresholds = this.dualAccessThresholds.length;
         opportunitiesPerMinute = new double[this.nPointSets][this.nPercentiles][TIME_LIMIT];
     }
 
@@ -95,30 +95,30 @@ public class TemporalDensityResult {
     }
 
     /**
-     * Writes dual accessibility values (in minutes) to our standard access grid format. The value returned (for
+     * Writes dual access values (in minutes) to our standard access grid format. The value returned (for
      * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
-     * task.dualAccessibilityThresholds) in the specified destination layer at a given percentile of
+     * task.dualAccessThresholds) in the specified destination layer at a given percentile of
      * travel time. If the threshold cannot be reached in less than 120 minutes, returns 0.
      */
-    public int[][][] calculateDualAccessibilityGrid() {
+    public int[][][] calculateDualAccessGrid() {
         checkInvariants();
 
-        int[][][] dualAccessibilityGrid = new int[nPointSets][nPercentiles][nThresholds];
+        int[][][] dualAccessGrid = new int[nPointSets][nPercentiles][nThresholds];
         for (int i = 0; i < nPointSets; i++) {
             for (int j = 0; j < nPercentiles; j++) {
                 for (int k = 0; k < nThresholds; k++) {
-                    int threshold = dualAccessibilityThresholds[k];
+                    int threshold = dualAccessThresholds[k];
                     int minutes = 0;
                     double sum = 0;
                     while (sum < threshold && minutes < TIME_LIMIT) {
                         sum += opportunitiesPerMinute[i][j][minutes];
                         minutes += 1;
                     }
-                    dualAccessibilityGrid[i][j][k] = minutes;
+                    dualAccessGrid[i][j][k] = minutes;
                 }
             }
         }
 
-        return dualAccessibilityGrid;
+        return dualAccessGrid;
     }
 }

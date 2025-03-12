@@ -617,6 +617,7 @@ public class RegionalAnalysisController implements HttpController {
                             task.dualAccessThresholds.length > 0,
                     "dualAccessThresholds not specified when includeTemporalDensity is enabled."
             );
+
             if (task.originPointSet == null) {
                 checkArgument(
                         !task.recordAccessibility,
@@ -626,6 +627,11 @@ public class RegionalAnalysisController implements HttpController {
                 checkArgument(
                         SemVer.gte(task.workerVersion, "v7.4"),
                         "Dual access with gridded origins requires a minimum worker version of v7.4"
+                );
+            } else {
+                checkArgument(
+                        SemVer.gte(task.workerVersion, "v7.0"),
+                        "Dual access with freeform origins requires a minimum worker version of v7.0"
                 );
             }
         }

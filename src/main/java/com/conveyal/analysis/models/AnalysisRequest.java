@@ -170,8 +170,9 @@ public class AnalysisRequest {
     public boolean includeTemporalDensity = false;
 
     /**
-     * Report the amount of time needed to reach the given number of
-     * opportunities from this origin (known technically as "dual access").
+     * If set, and if includeTemporalDensity is true, results will 
+     * include the amount of time needed to reach each threshold 
+     * number of opportunities (known technically as "dual access").
      */
     public int[] dualAccessThresholds;
 

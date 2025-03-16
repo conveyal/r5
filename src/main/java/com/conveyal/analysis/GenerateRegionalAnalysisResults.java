@@ -10,6 +10,7 @@ import com.conveyal.r5.analyst.progress.TaskAction;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
+import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
         ).get();
         int filesGenerated = 0;
         try {
-            List<RegionalAnalysis> analyses = Persistence.regionalAnalyses.find(query).toArray();
+            List<RegionalAnalysis> analyses = Persistence.regionalAnalyses.find(query, DBProjection.exclude("request.scenario.modifications")).toArray();
             LOG.info("Query found {} regional analyses to process.", analyses.size());
             for (RegionalAnalysis regionalAnalysis : analyses) {
                 LOG.info("Processing regional analysis {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);

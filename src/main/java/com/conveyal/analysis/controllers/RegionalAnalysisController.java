@@ -190,7 +190,14 @@ public class RegionalAnalysisController implements HttpController {
             int percentile,
             FileStorageFormat fileFormat
     ) throws IOException {
-        return getSingleCutoffGrid(fileStorage, analysis, destinations, cutoffMinutes, percentile, fileFormat);
+        FileStorageKey storageKey = getSingleCutoffGrid(fileStorage, analysis, destinations._id, cutoffMinutes, percentile, fileFormat);
+        String analysisHumanName = humanNameForEntity(analysis);
+        String destinationHumanName = humanNameForEntity(destinations);
+        String resultHumanFilename = filenameCleanString(
+                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, cutoffMinutes)
+        ) + "." + fileFormat.extension.toLowerCase(Locale.ROOT);
+        // Note that the returned human filename already contains the appropriate extension.
+        return new HumanKey(storageKey, resultHumanFilename);
     }
 
     /**
@@ -199,16 +206,15 @@ public class RegionalAnalysisController implements HttpController {
      * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
      * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
      */
-    public static HumanKey getSingleCutoffGrid(
+    public static FileStorageKey getSingleCutoffGrid(
             FileStorage fileStorage,
             RegionalAnalysis analysis,
-            OpportunityDataset destinations,
+            String destinationPointSetId,
             int cutoffMinutes,
             int percentile,
             FileStorageFormat fileFormat
     ) throws IOException {
         final String regionalAnalysisId = analysis._id;
-        final String destinationPointSetId = destinations._id;
         // Selecting the zeroth cutoff still makes sense for older analyses that don't allow an array of N cutoffs.
         int cutoffIndex = 0;
         if (analysis.cutoffsMinutes != null) {
@@ -255,7 +261,7 @@ public class RegionalAnalysisController implements HttpController {
                     }
                 }
             }
-            LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
+            LOG.info("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
 
             InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
             Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
@@ -274,17 +280,11 @@ public class RegionalAnalysisController implements HttpController {
                     grid.writeGeotiff(fos);
                     break;
             }
-            LOG.debug("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);
+            LOG.info("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);
             fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
-            LOG.debug("Finished transferring single-cutoff grid {} to storage.", singleCutoffKey);
+            LOG.info("Finished transferring single-cutoff grid {} to storage.", singleCutoffKey);
         }
-        String analysisHumanName = humanNameForEntity(analysis);
-        String destinationHumanName = humanNameForEntity(destinations);
-        String resultHumanFilename = filenameCleanString(
-                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, cutoffMinutes)
-            ) + "." + fileFormat.extension.toLowerCase(Locale.ROOT);
-        // Note that the returned human filename already contains the appropriate extension.
-        return new HumanKey(singleCutoffFileStorageKey, resultHumanFilename);
+        return singleCutoffFileStorageKey;
     }
 
     // Prevent multiple requests from creating the same files in parallel.

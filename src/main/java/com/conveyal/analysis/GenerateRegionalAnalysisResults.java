@@ -1,7 +1,6 @@
 package com.conveyal.analysis;
 
 import com.conveyal.analysis.controllers.RegionalAnalysisController;
-import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.file.FileStorage;
@@ -48,14 +47,13 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
 
                 // Iterate through all values and generate all possible formats for them.
                 for (String destinationPointSetId : destinationPointSetIds) {
-                    OpportunityDataset destinations = Persistence.opportunityDatasets.get(destinationPointSetId);
                     for (int cutoffMinutes : cutoffs) {
                         for (int percentile : percentiles) {
                             for (FileStorageFormat format : validFormats) {
                                 RegionalAnalysisController.getSingleCutoffGrid(
                                         fileStorage,
                                         regionalAnalysis,
-                                        destinations,
+                                        destinationPointSetId,
                                         cutoffMinutes,
                                         percentile,
                                         format

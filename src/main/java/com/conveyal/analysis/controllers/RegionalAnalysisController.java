@@ -248,14 +248,14 @@ public class RegionalAnalysisController implements HttpController {
                 multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
                 multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
                 if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                    checkArgument(analysis.destinationPointSetIds.length == 1);
+                    checkArgument(analysis.destinationPointSetIds == null || analysis.destinationPointSetIds.length == 1);
                 } else {
                     // Fall back on oldest form of results, single-percentile, single-destination-grid.
                     multiCutoffKey = regionalAnalysisId + ".access";
                     multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
                     if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                        checkArgument(analysis.travelTimePercentiles.length == 1);
-                        checkArgument(analysis.destinationPointSetIds.length == 1);
+                        checkArgument(analysis.travelTimePercentiles == null || analysis.travelTimePercentiles.length == 1);
+                        checkArgument(analysis.destinationPointSetIds == null || analysis.destinationPointSetIds.length == 1);
                     } else {
                         throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
                     }

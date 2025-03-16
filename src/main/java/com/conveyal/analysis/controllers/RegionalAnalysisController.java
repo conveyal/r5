@@ -412,6 +412,7 @@ public class RegionalAnalysisController implements HttpController {
         int threshold = analysis.cutoffMinutes;
         String destinationPointSetId = analysis.grid;
 
+        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
         if (analysis.request.includeTemporalDensity) {
             int nThresholds = analysis.request.dualAccessThresholds.length;
             int[] thresholds = analysis.request.dualAccessThresholds;
@@ -423,7 +424,6 @@ public class RegionalAnalysisController implements HttpController {
             );
         } else if (analysis.cutoffsMinutes != null) {
             // Handle newer regional analyses with multiple cutoffs in an array.
-            // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
             // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
             int nCutoffs = analysis.cutoffsMinutes.length;
             checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");

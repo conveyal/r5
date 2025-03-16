@@ -103,9 +103,8 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
 
     /**
      * Whether to include the number of opportunities reached during each minute of travel in results sent back
-     * to the broker. Requires both an origin and destination pointset to be specified, and in the case of regional
-     * analyses the origins must be non-gridded, and results will be collated to CSV.
-     * It should be possible to enable regional results for gridded origins as well.
+     * to the broker. Requires a destination pointset to be specified. If an origin pointset is specified the results
+     * will be collated to CSV.
      */
     public boolean includeTemporalDensity = false;
 

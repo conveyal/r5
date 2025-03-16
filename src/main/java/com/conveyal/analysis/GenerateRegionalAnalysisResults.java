@@ -10,10 +10,10 @@ import com.conveyal.r5.analyst.progress.TaskAction;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
-import org.mongojack.DBCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Objects;
 
 public class GenerateRegionalAnalysisResults implements TaskAction {
@@ -36,10 +36,10 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                 QueryBuilder.start("destinationPointSetIds").is(null).get()
         ).get();
         int filesGenerated = 0;
-        try (DBCursor<RegionalAnalysis> cursor = Persistence.regionalAnalyses.find(query)) {
-            LOG.info("Query found {} regional analyses to process.", cursor.count());
-            while (cursor.hasNext()) {
-                RegionalAnalysis regionalAnalysis = cursor.next();
+        try {
+            List<RegionalAnalysis> analyses = Persistence.regionalAnalyses.find(query).toArray();
+            LOG.info("Query found {} regional analyses to process.", analyses.size());
+            for (RegionalAnalysis regionalAnalysis : analyses) {
                 LOG.info("Processing regional analysis {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
                 int[] percentiles = Objects.requireNonNullElseGet(regionalAnalysis.travelTimePercentiles, () -> new int[]{regionalAnalysis.travelTimePercentile});
                 int[] cutoffs = Objects.requireNonNullElseGet(regionalAnalysis.cutoffsMinutes, () -> new int[]{regionalAnalysis.cutoffMinutes});
@@ -63,6 +63,7 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                         }
                     }
                 }
+                LOG.info("Finished generating files for {} of {}. Migrating db entry now...", regionalAnalysis._id, regionalAnalysis.accessGroup);
 
                 // Save as modern types
                 regionalAnalysis.cutoffsMinutes = cutoffs;

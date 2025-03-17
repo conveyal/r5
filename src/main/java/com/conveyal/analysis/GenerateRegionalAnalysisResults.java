@@ -64,15 +64,15 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                         }
                     }
                 }
-                LOG.info("Finished generating files for {} of {}. Migrating db entry now...", regionalAnalysis._id, regionalAnalysis.accessGroup);
+                /* LOG.info("Migrating db entry for {} of {} now...", regionalAnalysis._id, regionalAnalysis.accessGroup);
 
                 // Save as modern types
                 regionalAnalysis.cutoffsMinutes = cutoffs;
                 regionalAnalysis.travelTimePercentiles = percentiles;
                 regionalAnalysis.destinationPointSetIds = destinationPointSetIds;
-                Persistence.regionalAnalyses.put(regionalAnalysis);
+                Persistence.regionalAnalyses.put(regionalAnalysis); */
 
-                LOG.info("Finished processing {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
+                LOG.info("Finished generating files for {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
             }
         } catch (Exception e) {
             LOG.error(ExceptionUtils.shortAndLongString(e));

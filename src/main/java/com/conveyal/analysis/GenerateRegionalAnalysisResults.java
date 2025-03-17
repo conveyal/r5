@@ -51,15 +51,20 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                     for (int cutoffMinutes : cutoffs) {
                         for (int percentile : percentiles) {
                             for (FileStorageFormat format : validFormats) {
-                                RegionalAnalysisController.getSingleCutoffGrid(
-                                        fileStorage,
-                                        regionalAnalysis,
-                                        destinationPointSetId,
-                                        cutoffMinutes,
-                                        percentile,
-                                        format
-                                );
-                                filesGenerated++;
+                                try {
+                                    RegionalAnalysisController.getSingleCutoffGrid(
+                                            fileStorage,
+                                            regionalAnalysis,
+                                            destinationPointSetId,
+                                            cutoffMinutes,
+                                            percentile,
+                                            format
+                                    );
+                                    filesGenerated++;
+                                } catch (Exception e) {
+                                    LOG.error("Error generating single cutoff grid for {}", regionalAnalysis._id);
+                                    LOG.error(ExceptionUtils.shortAndLongString(e));
+                                }
                             }
                         }
                     }
@@ -72,7 +77,7 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                 regionalAnalysis.destinationPointSetIds = destinationPointSetIds;
                 Persistence.regionalAnalyses.put(regionalAnalysis); */
 
-                LOG.info("Finished generating files for {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
+                LOG.info("Finished processing regional analysis {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
             }
         } catch (Exception e) {
             LOG.error(ExceptionUtils.shortAndLongString(e));

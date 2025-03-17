@@ -10,12 +10,15 @@ import com.conveyal.r5.analyst.progress.TaskAction;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.DBObject;
 import com.mongodb.QueryBuilder;
+import org.mongojack.DBCursor;
 import org.mongojack.DBProjection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class GenerateRegionalAnalysisResults implements TaskAction {
     private final FileStorage fileStorage;
@@ -31,14 +34,18 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
 
     @Override
     public void action(ProgressListener progressListener) throws Exception {
-        DBObject query = QueryBuilder.start().or(
-                QueryBuilder.start("travelTimePercentiles").is(null).get(),
-                QueryBuilder.start("cutoffsMinutes").is(null).get(),
-                QueryBuilder.start("destinationPointSetIds").is(null).get()
+        DBObject query = QueryBuilder.start().and(
+                QueryBuilder.start("deleted").is(false).get(),
+                QueryBuilder.start().or(
+                        QueryBuilder.start("travelTimePercentiles").is(null).get(),
+                        QueryBuilder.start("cutoffsMinutes").is(null).get(),
+                        QueryBuilder.start("destinationPointSetIds").is(null).get()
+                ).get()
         ).get();
         int filesGenerated = 0;
-        try {
-            List<RegionalAnalysis> analyses = Persistence.regionalAnalyses.find(query, DBProjection.exclude("request.scenario.modifications")).toArray();
+        Set<String> regionalAnalysesWithErrors = new HashSet<>();
+        try (DBCursor<RegionalAnalysis> cursor = Persistence.regionalAnalyses.find(query, DBProjection.exclude("request.scenario.modifications"))) {
+            List<RegionalAnalysis> analyses = cursor.toArray();
             LOG.info("Query found {} regional analyses to process.", analyses.size());
             for (RegionalAnalysis regionalAnalysis : analyses) {
                 LOG.info("Processing regional analysis {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
@@ -64,18 +71,12 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
                                 } catch (Exception e) {
                                     LOG.error("Error generating single cutoff grid for {}", regionalAnalysis._id);
                                     LOG.error(ExceptionUtils.shortAndLongString(e));
+                                    regionalAnalysesWithErrors.add(regionalAnalysis._id);
                                 }
                             }
                         }
                     }
                 }
-                /* LOG.info("Migrating db entry for {} of {} now...", regionalAnalysis._id, regionalAnalysis.accessGroup);
-
-                // Save as modern types
-                regionalAnalysis.cutoffsMinutes = cutoffs;
-                regionalAnalysis.travelTimePercentiles = percentiles;
-                regionalAnalysis.destinationPointSetIds = destinationPointSetIds;
-                Persistence.regionalAnalyses.put(regionalAnalysis); */
 
                 LOG.info("Finished processing regional analysis {} of {}.", regionalAnalysis._id, regionalAnalysis.accessGroup);
             }
@@ -83,5 +84,6 @@ public class GenerateRegionalAnalysisResults implements TaskAction {
             LOG.error(ExceptionUtils.shortAndLongString(e));
         }
         LOG.info("Method `getSingleCutoffGrid` was run {} times.", filesGenerated);
+        LOG.info("Errors found in {}", String.join(", ", regionalAnalysesWithErrors));
     }
 }

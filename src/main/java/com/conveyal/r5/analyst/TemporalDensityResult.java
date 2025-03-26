@@ -98,7 +98,7 @@ public class TemporalDensityResult {
      * Writes dual access values (in minutes) to our standard access grid format. The value returned (for
      * an origin) is the number of minutes required to reach a threshold number of opportunities (specified by
      * task.dualAccessThresholds) in the specified destination layer at a given percentile of
-     * travel time. If the threshold cannot be reached in less than 120 minutes, sets the value to -1.
+     * travel time. If the threshold cannot be reached in less than 120 minutes, sets the value to 0.
      */
     public int[][][] calculateDualAccessGrid() {
         checkInvariants();
@@ -116,7 +116,7 @@ public class TemporalDensityResult {
                     }
                     
                     if (sum < threshold) {
-                        dualAccessGrid[i][j][k] = -1;
+                        dualAccessGrid[i][j][k] = 0;
                     } else {
                         dualAccessGrid[i][j][k] = minutes;
                     }

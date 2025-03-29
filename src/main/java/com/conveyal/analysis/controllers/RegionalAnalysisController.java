@@ -427,7 +427,7 @@ public class RegionalAnalysisController implements HttpController {
             // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
             int nCutoffs = analysis.cutoffsMinutes.length;
             checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            threshold = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
+            threshold = getIntQueryParameter(req, "threshold", analysis.cutoffsMinutes[nCutoffs / 2]);
             checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(threshold),
                     "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
                     Ints.join(", ", analysis.cutoffsMinutes)

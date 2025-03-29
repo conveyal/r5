@@ -109,8 +109,8 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
     public boolean includeTemporalDensity = false;
 
     /**
-     * If this is set to a value above zero, report the amount of time needed to reach the given number of
-     * opportunities from this origin (known technically as "dual access").
+     * If set, and if `includeTemporalDensity` is true, results will include the amount of time needed to reach each
+     * threshold number of opportunities (known technically as "dual access").
      */
     public int[] dualAccessThresholds;
 

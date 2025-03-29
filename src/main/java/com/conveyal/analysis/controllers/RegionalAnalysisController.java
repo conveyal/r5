@@ -612,13 +612,12 @@ public class RegionalAnalysisController implements HttpController {
             );
         }
         if (task.includeTemporalDensity) {
-            checkArgument(
-                    task.dualAccessThresholds != null &&
-                            task.dualAccessThresholds.length > 0,
-                    "dualAccessThresholds not specified when includeTemporalDensity is enabled."
-            );
-
             if (task.originPointSet == null) {
+                checkArgument(
+                    task.dualAccessThresholds != null && task.dualAccessThresholds.length > 0,
+                    "`dualAccessThresholds` must be specified when dual access grid results are requested."
+                );
+
                 checkArgument(
                         !task.recordAccessibility,
                         "Accessibility and dual access grids cannot be created simultaneously."

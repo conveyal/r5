@@ -44,14 +44,13 @@ public class TemporalDensityResult {
     public TemporalDensityResult(AnalysisWorkerTask task) {
         Preconditions.checkArgument(
             notNullOrEmpty(task.destinationPointSets),
-                "Dual access requires at least one destination pointset."
+                "Temporal density requires at least one destination pointset."
         );
-        // TODO check that thresholds are sorted
         this.destinationPointSets = task.destinationPointSets;
         this.dualAccessThresholds = task.dualAccessThresholds;
         this.nPercentiles = task.percentiles.length;
         this.nPointSets = this.destinationPointSets.length;
-        this.nThresholds = this.dualAccessThresholds.length;
+        this.nThresholds = this.dualAccessThresholds == null ? 0 : this.dualAccessThresholds.length;
         opportunitiesPerMinute = new double[this.nPointSets][this.nPercentiles][TIME_LIMIT];
     }
 

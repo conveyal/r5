@@ -15,17 +15,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.analysis.datasource.DataSourceUtil.detectUploadFormatAndValidate;
+import static com.conveyal.analysis.util.HttpUtils.getFormField;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Given a batch of uploaded files, put them into FileStorage, categorize and validate them, and record metadata as
@@ -42,19 +41,13 @@ public class DataSourceUploadAction implements TaskAction {
     private final AnalysisCollection<DataSource> dataSourceCollection;
 
     /** The files provided in the HTTP post form. These will be moved into storage. */
-    private final List<FileItem> fileItems;
+    private final List<File> files;
 
     /**
      * This DataSourceIngester provides encapsulated loading and validation logic for a single format, by composition
      * rather than subclassing. Format ingestion does not require access to the fileStorage or the database collection.
      */
     private DataSourceIngester ingester;
-
-    /**
-     * The file to be ingested, after it has been moved into storage. For Shapefiles and other such "sidecar" formats,
-     * this is the main file (.shp), with the same base name and in the same directory as all its sidecar files.
-     */
-    private File file;
 
     // This method is a stopgaps - it seems like this should be done differently.
     public String getDataSourceName () {
@@ -64,20 +57,20 @@ public class DataSourceUploadAction implements TaskAction {
     public DataSourceUploadAction (
             FileStorage fileStorage,
             AnalysisCollection<DataSource> dataSourceCollection,
-            List<FileItem> fileItems,
+            List<File> files,
             DataSourceIngester ingester
     ) {
         this.fileStorage = fileStorage;
         this.dataSourceCollection = dataSourceCollection;
-        this.fileItems = fileItems;
+        this.files = files;
         this.ingester = ingester;
     }
 
     @Override
     public final void action (ProgressListener progressListener) throws Exception {
         progressListener.setWorkProduct(ingester.dataSource().toWorkProduct());
-        moveFilesIntoStorage(progressListener);
-        ingester.ingest(file, progressListener);
+        File dataSourceFile = moveFilesIntoStorage(progressListener);
+        ingester.ingest(dataSourceFile, progressListener);
         dataSourceCollection.insert(ingester.dataSource());
     }
 
@@ -89,28 +82,31 @@ public class DataSourceUploadAction implements TaskAction {
      * We should also consider whether preprocessing like conversion of GTFS to MapDBs should happen at this upload
      * stage. If so, then this logic needs to change a bit.
      */
-    private final void moveFilesIntoStorage (ProgressListener progressListener) {
+    private File moveFilesIntoStorage (ProgressListener progressListener) {
         // Loop through uploaded files, registering the extensions and writing to storage
         // (with filenames that correspond to the source id)
         progressListener.beginTask("Moving files into storage...", 1);
         final String dataSourceId = ingester.dataSource()._id.toString();
-        for (FileItem fileItem : fileItems) {
-            DiskFileItem dfi = (DiskFileItem) fileItem;
+        File dataSourceFile = null;
+        for (File file : files) {
             // Use canonical extension from file type - files may be uploaded with e.g. tif instead of tiff or geotiff.
             String extension = ingester.dataSource().fileFormat.extension;
-            if (fileItems.size() > 1) {
+            if (files.size() > 1) {
                 // If we have multiple files, as with Shapefile, just keep the original extension for each file.
                 // This could lead to orphaned files after a deletion, we might want to implement wildcard deletion.
-                extension = FilenameUtils.getExtension(fileItem.getName()).toLowerCase(Locale.ROOT);
+                extension = FilenameUtils.getExtension(file.getName()).toLowerCase(Locale.ROOT);
             }
             FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, extension);
-            fileStorage.moveIntoStorage(key, dfi.getStoreLocation());
-            if (fileItems.size() == 1 || extension.equalsIgnoreCase(SHP.extension)) {
-                file = fileStorage.getFile(key);
+            fileStorage.moveIntoStorage(key, file);
+            if (files.size() == 1 || extension.equalsIgnoreCase(SHP.extension)) {
+                dataSourceFile = fileStorage.getFile(key);
             }
         }
-        checkNotNull(file);
-        checkState(file.exists());
+
+        if (dataSourceFile == null || !dataSourceFile.exists()) {
+            throw new DataSourceException("Uploaded file cannot be found.");
+        }
+        return dataSourceFile;
     }
 
     /**
@@ -128,14 +124,20 @@ public class DataSourceUploadAction implements TaskAction {
         final String sourceName = getFormField(formFields, "sourceName", true);
         final String regionId = getFormField(formFields, "regionId", true);
         final List<FileItem> fileItems = formFields.get("sourceFiles");
+        final List<File> files = new ArrayList<>();
 
-        FileStorageFormat format = detectUploadFormatAndValidate(fileItems);
+        for (var fi : fileItems) {
+            var dfi = (DiskFileItem) fi;
+            files.add(dfi.getStoreLocation());
+        }
+
+        FileStorageFormat format = detectUploadFormatAndValidate(files);
         DataSourceIngester ingester = DataSourceIngester.forFormat(format);
 
-        String originalFileNames = fileItems.stream().map(FileItem::getName).collect(Collectors.joining(", "));
+        String originalFileNames = files.stream().map(File::getName).collect(Collectors.joining(", "));
         ingester.initializeDataSource(sourceName, originalFileNames, regionId, userPermissions);
         DataSourceUploadAction dataSourceUploadAction =
-                new DataSourceUploadAction(fileStorage, dataSourceCollection, fileItems, ingester);
+                new DataSourceUploadAction(fileStorage, dataSourceCollection, files, ingester);
 
         return dataSourceUploadAction;
     }

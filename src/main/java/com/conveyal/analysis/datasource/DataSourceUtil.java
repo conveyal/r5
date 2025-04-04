@@ -2,8 +2,6 @@ package com.conveyal.analysis.datasource;
 
 import com.conveyal.file.FileStorageFormat;
 import com.google.common.collect.Sets;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.apache.commons.io.FilenameUtils;
 
 import java.io.File;
@@ -29,7 +27,7 @@ public abstract class DataSourceUtil {
      * @throws DataSourceException if the type of the upload can't be detected or preconditions are violated.
      * @return the expected type of the uploaded file or files, never null.
      */
-    public static FileStorageFormat detectUploadFormatAndValidate (List<FileItem> fileItems) {
+    public static FileStorageFormat detectUploadFormatAndValidate (List<File> fileItems) {
         if (isNullOrEmpty(fileItems)) {
             throw new DataSourceException("You must select some files to upload.");
         }
@@ -78,10 +76,8 @@ public abstract class DataSourceUtil {
      * Check that all FileItems supplied are stored in disk files (not memory), that they are all readable and all
      * have nonzero size.
      */
-    private static void checkFileCharacteristics (List<FileItem> fileItems) {
-        for (FileItem fileItem : fileItems) {
-            checkState(fileItem instanceof DiskFileItem, "Uploaded file was not stored to disk.");
-            File diskFile = ((DiskFileItem)fileItem).getStoreLocation();
+    private static void checkFileCharacteristics (List<File> files) {
+        for (File diskFile : files) {
             checkState(diskFile.exists(), "Uploaded file does not exist on filesystem as expected.");
             checkState(diskFile.canRead(), "Read permissions were not granted on uploaded file.");
             checkState(diskFile.length() > 0, "Uploaded file was empty (contained no data).");
@@ -92,10 +88,10 @@ public abstract class DataSourceUtil {
      * Given a list of FileItems, return a set of all unique file extensions present, normalized to lower case.
      * Always returns a set instance which may be empty, but never null.
      */
-    private static Set<String> extractFileExtensions (List<FileItem> fileItems) {
+    private static Set<String> extractFileExtensions (List<File> files) {
         Set<String> fileExtensions = new HashSet<>();
-        for (FileItem fileItem : fileItems) {
-            String fileName = fileItem.getName();
+        for (File file : files) {
+            String fileName = file.getName();
             String extension = FilenameUtils.getExtension(fileName);
             if (extension.isEmpty()) {
                 throw new DataSourceException("Filename has no extension: " + fileName);
@@ -106,10 +102,10 @@ public abstract class DataSourceUtil {
     }
 
     /** In uploads containing more than one file, all files are expected to have the same name before the extension. */
-    private static void verifyBaseNamesSame (List<FileItem> fileItems) {
+    private static void verifyBaseNamesSame (List<File> files) {
         String firstBaseName = null;
-        for (FileItem fileItem : fileItems) {
-            String baseName = FilenameUtils.getBaseName(fileItem.getName());
+        for (File file : files) {
+            String baseName = FilenameUtils.getBaseName(file.getName());
             if (firstBaseName == null) {
                 firstBaseName = baseName;
             } else if (!firstBaseName.equals(baseName)) {

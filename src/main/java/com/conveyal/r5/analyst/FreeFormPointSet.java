@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.ParameterException;
-import com.conveyal.r5.util.InputStreamProvider;
+import com.conveyal.file.FileUtils;
 import com.csvreader.CsvReader;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -49,7 +50,7 @@ public class FreeFormPointSet extends PointSet {
      * for the points; if not, row numbers will be used as the ids.
      */
     public static FreeFormPointSet fromCsv (
-            InputStreamProvider csvInputStreamProvider,
+            File csvFile,
             String latField,
             String lonField,
             String idField,
@@ -61,7 +62,7 @@ public class FreeFormPointSet extends PointSet {
         int lonCol = -1;
         int idCol = -1;
         int countCol = -1;
-        try (InputStream csvInputStream = csvInputStreamProvider.getInputStream()) {
+        try (InputStream csvInputStream = FileUtils.getInputStream(csvFile)) {
             CsvReader reader = new CsvReader(csvInputStream, ',', StandardCharsets.UTF_8);
             reader.readHeaders();
             int nCols = reader.getHeaderCount();
@@ -105,7 +106,7 @@ public class FreeFormPointSet extends PointSet {
         /* If we reached here, the file is entirely readable. Re-read it from the beginning and record values. */
         // Note that we're doing two passes just so we know the array size. We could just use TIntLists.
         int rec = -1;
-        try (InputStream csvInputStream = csvInputStreamProvider.getInputStream()) {
+        try (InputStream csvInputStream = FileUtils.getInputStream(csvFile)) {
             CsvReader reader = new CsvReader(csvInputStream, ',', StandardCharsets.UTF_8);
             FreeFormPointSet ret = new FreeFormPointSet(nRecs);
             ret.name = countField != null ? countField : "[COUNT]";

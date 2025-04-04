@@ -1,17 +1,23 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.analyst.scenario.ondemand.AccessService;
+import com.conveyal.r5.analyst.scenario.ondemand.EgressService;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+
+import static com.conveyal.r5.analyst.scenario.ondemand.AccessService.NO_SERVICE_HERE;
 
 /**
  * This is the internal form of a PickupDelay modification that has been resolved against a particular TransportNetwork.
@@ -27,13 +33,18 @@ public class PickupWaitTimes {
     /**
      * This Map associates each on-demand pick-up zone with specific internal stop indexes in the TransitLayer.
      * On the access leg, someone picked up in the key zone can be dropped off at any of the transit stops that are
-     * values for that key. On the egress end, this is reversed. Because this map is used on both the access and egress
-     * ends, it should contain even polygons whose wait time data is negative (indicating they can't be used on access)
-     * because they may still be used for egress. TODO Clarify -- this implies stop zones should have delay = -1? But
-     * that's not congruent with egressWaitMinutes >= 0 in PickupDelay.
-     * If the Map is not present (null) then all the zones allow access to any stop in the network.
+     * values for that key. On the egress end, this is reversed.
+     * If this and destinationAreasForZonePolygon are both null, then all the zones allow access to any stop in the
+     * network.
      */
     private final Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon;
+
+    /**
+     * Map associating each on-demand pick-up zone with specific areas to which direct service (without using a
+     * scheduled transit mode) is provided. If this and stopNumbersForZonePolygon are both null, then all the zones
+     * provide service to all destinations.
+     */
+    private final Map<ModificationPolygon, Geometry> destinationAreasForZonePolygon;
 
     private final TIntObjectMap<EgressService> egressServiceForStop;
 
@@ -53,14 +64,16 @@ public class PickupWaitTimes {
     public PickupWaitTimes (
         IndexedPolygonCollection polygons,
         Map<ModificationPolygon, TIntSet> stopNumbersForZonePolygon,
+        Map<ModificationPolygon, Geometry> destinationAreasForZonePolygon,
         Collection<EgressService> egressServices,
         StreetMode streetMode
     ) {
         this.polygons = polygons;
         this.stopNumbersForZonePolygon = stopNumbersForZonePolygon;
+        this.destinationAreasForZonePolygon = destinationAreasForZonePolygon;
         this.egressServiceForStop = new TIntObjectHashMap<>();
         for (EgressService egressService : egressServices) {
-            egressService.egressStops.forEach(stop -> {
+            egressService.stops.forEach(stop -> {
                 egressServiceForStop.put(stop, egressService);
                 return true;
             });
@@ -69,31 +82,45 @@ public class PickupWaitTimes {
     }
 
     /**
-     * Given a particular departure location, get a description of the on-demand pickup service available there.
-     * Currently this chooses just one "best" zone polygon based on location and priority values in the polygons.
-     * @return an AccessService with the wait time to be picked up, and any restrictions on reachable stops.
+     * Given a particular departure location, get a description of the on-demand pickup services available there.
+     * @return an AccessService with the wait time to be picked up, and any restrictions on reachable stops and
+     * service areas
      */
     public AccessService getAccessService (double lat, double lon) {
         Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
-        ModificationPolygon polygon = polygons.getWinningPolygon(point);
-        double waitTimeMinutes = polygon == null ? polygons.defaultData : polygon.data;
-        if (waitTimeMinutes == -1) {
+        List<ModificationPolygon> intersectingPolygons = polygons.getIntersectingPolygons(point);
+
+        TIntIntMap waitTimesForStops = new TIntIntHashMap();
+
+        if (intersectingPolygons.size() == 0 && polygons.defaultData == -1) {
             return NO_SERVICE_HERE;
         }
-        // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
-        // By default all stops can be reached (null means no restrictions applied).
-        int waitTimeSeconds = (int) (waitTimeMinutes * 60);
-        TIntSet stopsReachable = null;
-        // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
-        if (stopNumbersForZonePolygon != null) {
-            stopsReachable = stopNumbersForZonePolygon.get(polygon);
-            if (stopsReachable == null) {
-                // No stops were associated with the winning polygon (e.g. it is itself a stop polygon).
-                // stopsReachable should be empty, since null signals "no filtering" (all stops reachable).
-                stopsReachable = new TIntHashSet();
+
+        for (ModificationPolygon polygon : intersectingPolygons) {
+            double waitTimeMinutes = polygon.data;
+            if (waitTimeMinutes == -1) {
+                return NO_SERVICE_HERE;
+            }
+            // Service is available here. Determine the waiting time, and any restrictions on which stops can be reached.
+            // By default all stops can be reached (null means no restrictions applied).
+            int waitTimeSeconds = (int) (waitTimeMinutes * 60);
+            // If an association has been made between pickup polygons and stop polygons, that restricts reachable stops.
+            if (stopNumbersForZonePolygon != null) {
+                TIntSet stopsReachable = stopNumbersForZonePolygon.get(polygon);
+                if (stopsReachable != null) {
+                    stopsReachable.forEach(stop -> {
+                        waitTimesForStops.put(stop, waitTimeSeconds);
+                        return true;
+                    });
+                }
             }
         }
-        return new AccessService(waitTimeSeconds, stopsReachable);
+
+        if (waitTimesForStops.isEmpty()) {
+            return NO_SERVICE_HERE;
+        } else {
+            return new AccessService(waitTimesForStops);
+        }
     }
 
     /**
@@ -102,67 +129,6 @@ public class PickupWaitTimes {
      */
     public EgressService getEgressService (int stopNumber) {
         return egressServiceForStop.get(stopNumber);
-    }
-
-    // TODO superclass Service contains all fields, and is the type of these two constants?
-
-    /** Special instance representing situations where a service is defined, but not available at this location. */
-    public static final AccessService NO_SERVICE_HERE = new AccessService(-1, null);
-
-    /** Special instance representing no on-demand service defined, so we can access all stops with no wait. */
-    public static final AccessService NO_WAIT_ALL_STOPS = new AccessService(0, null);
-
-    /**
-     * This represents an on-demand service available at a particular departure location.
-     * This is the result of evaluating the PickupWaitTimes at a particular place.
-     * Alternatively instead of defining this data-holder class we could allow passing a travel time map into a method
-     * on this class, and have this class transform it.
-     */
-    public static class AccessService {
-
-        /**
-         * The amount of time you have to wait at this location (in seconds) to be picked up on demand. Zero if you can
-         * be picked up immediately (e.g. a taxi stand outside a station), -1 if no service is available at all.
-         */
-        public final int waitTimeSeconds;
-
-        /**
-         * If a limitation is placed on the transit stops one is allowed to access using this service, this is the
-         * set of allowed stops. This is null if all stops are reachable and no filtering should happen.
-         * If we eventually want to reflect multiple services with different waits, we could instead return a
-         * TIntIntMap from allowed stop indexes to wait times.
-         */
-        public final TIntSet stopsReachable;
-
-        public AccessService (int waitTimeSeconds, TIntSet stopsReachable) {
-            this.waitTimeSeconds = waitTimeSeconds;
-            this.stopsReachable = stopsReachable;
-        }
-    }
-
-    // TODO pull all of these classes out into an on-demand Java package
-    // It's a bit weird that EgressServices are pre-computed and AccessService instances are built on demand.
-    // The two classes could be almost identical with the exception of comments. One could extend the other.
-    public static class EgressService {
-
-        public final int waitTimeSeconds;
-
-        public final TIntSet egressStops;
-
-        /**
-         * The geographic area one is allowed to access using this service. If null, no geographic restriction applies.
-         * This may be the union of several polygons that were all associated with one stop or group of stops.
-         * In floating point WGS84 (lon, lat) coordinates. Should be a polygon or multipolygon.
-         */
-        public final Geometry serviceArea;
-
-        public EgressService (int waitTimeSeconds, TIntSet egressStops, Geometry serviceArea) {
-            if (waitTimeSeconds < 0) throw new AssertionError("Wait times should always be non-negative.");
-            this.waitTimeSeconds = waitTimeSeconds;
-            this.egressStops = egressStops;
-            this.serviceArea = serviceArea;
-        }
-
     }
 
     public int getDefaultWaitInSeconds() {

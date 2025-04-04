@@ -571,25 +571,17 @@ public class RegionalAnalysisController implements HttpController {
             );
         }
         if (task.includeTemporalDensity) {
-            if (task.originPointSet == null) {
-                checkArgument(
-                    task.dualAccessThresholds != null && task.dualAccessThresholds.length > 0,
-                    "`dualAccessThresholds` must be specified when dual access grid results are requested."
-                );
+            task.validateDualAccessThresholds();
 
+            checkArgument(
+                    SemVer.gte(task.workerVersion, "v7.4"),
+                    "Dual access results require a minimum worker version of v7.4"
+            );
+            
+            if (task.originPointSet == null) {
                 checkArgument(
                         !task.recordAccessibility,
                         "Accessibility and dual access grids cannot be created simultaneously."
-                );
-
-                checkArgument(
-                        SemVer.gte(task.workerVersion, "v7.4"),
-                        "Dual access with gridded origins requires a minimum worker version of v7.4"
-                );
-            } else {
-                checkArgument(
-                        SemVer.gte(task.workerVersion, "v7.0"),
-                        "Dual access with freeform origins requires a minimum worker version of v7.0"
                 );
             }
         }

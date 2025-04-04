@@ -322,4 +322,15 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         }
     }
 
+    public void validateDualAccessThresholds () {
+        checkNotNull(dualAccessThresholds);
+        final int nThresholds = dualAccessThresholds.length;
+        checkArgument(nThresholds >= 1, "At least one dual access threshold must be supplied.");
+        for (int t = 0; t < nThresholds; t++) {
+            checkArgument(dualAccessThresholds[t] >= 0, "Dual access thresholds must be non-negative integers.");
+            if (t > 0) {
+                checkArgument(dualAccessThresholds[t] >= dualAccessThresholds[t - 1], "Dual access thresholds must be in ascending order.");
+            }
+        }
+    }
 }

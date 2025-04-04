@@ -67,7 +67,7 @@ public class RegionalWorkResult {
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
         if (result.density != null) {
             this.opportunitiesPerMinute = result.density.opportunitiesPerMinute;
-            if (task.originPointSet == null) {
+            if (task.originPointSet == null && task.dualAccessThresholds != null) {
                 this.accessibilityValues = result.density.calculateDualAccessGrid();
             }
         }

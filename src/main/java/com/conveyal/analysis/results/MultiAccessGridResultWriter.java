@@ -10,7 +10,7 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
  * Adapts our collection of grid writers (one for each destination pointset and percentile) to give them the
  * same interface as our CSV writers, so CSV and Grids can be processed similarly in MultiOriginAssembler.
  */
-public class MultiGridResultWriter implements RegionalResultWriter {
+public class MultiAccessGridResultWriter implements RegionalResultWriter {
     /**
      * We create one GridResultWriter for each destination pointset and percentile.
      * Each of those output files contains data for all thresholds (time or cumulative access) at each origin.
@@ -18,11 +18,12 @@ public class MultiGridResultWriter implements RegionalResultWriter {
     private final GridResultWriter[][] gridResultWriters;
 
     /** Constructor */
-    public MultiGridResultWriter (
+    public MultiAccessGridResultWriter (
             RegionalAnalysis regionalAnalysis, RegionalTask task, int nThresholds, FileStorage fileStorage
     ) {
         int nPercentiles = task.percentiles.length;
         int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
+        WebMercatorExtents extents = WebMercatorExtents.forTask(task);
         // Create one grid writer per percentile and destination pointset.
         gridResultWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
         for (int d = 0; d < nDestinationPointSets; d++) {
@@ -34,7 +35,7 @@ public class MultiGridResultWriter implements RegionalResultWriter {
                         task.percentiles[p]
                 );
                 gridResultWriters[d][p] = new GridResultWriter(
-                        WebMercatorExtents.forTask(task),
+                        extents,
                         nThresholds,
                         fileName,
                         fileStorage

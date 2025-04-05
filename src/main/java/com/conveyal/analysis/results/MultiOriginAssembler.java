@@ -120,7 +120,7 @@ public class MultiOriginAssembler {
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
                     // Gridded origins - create gridded regional analysis results
-                    resultWriters.add(new MultiGridResultWriter(
+                    resultWriters.add(new MultiAccessGridResultWriter(
                             regionalAnalysis,
                             job.templateTask,
                             job.templateTask.cutoffsMinutes.length,
@@ -140,7 +140,7 @@ public class MultiOriginAssembler {
             if (job.templateTask.includeTemporalDensity) {
                 if (job.templateTask.originPointSet == null) {
                     // Gridded origins.
-                    resultWriters.add(new MultiGridResultWriter(
+                    resultWriters.add(new MultiDualAccessGridResultWriter(
                             regionalAnalysis,
                             job.templateTask,
                             job.templateTask.dualAccessThresholds.length,

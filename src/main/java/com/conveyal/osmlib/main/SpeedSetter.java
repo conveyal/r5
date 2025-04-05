@@ -25,9 +25,13 @@ public class SpeedSetter {
                 String[] fields = line.split(",");
                 long osmWayId = Long.parseLong(fields[0]);
                 double speedKph = Double.parseDouble(fields[1]);
+                double walkFactor = Double.parseDouble(fields[2]);
+                double bikeFactor = Double.parseDouble(fields[2]);
                 Way way = osm.ways.get(osmWayId);
                 // R5 currently prioritizes maxspeed:motorcar above all other maxspeed tags
                 way.addOrReplaceTag("maxspeed:motorcar", String.format("%1.1f kph", speedKph));
+                way.addOrReplaceTag("walk_factor", String.format("%1.1f", walkFactor));
+                way.addOrReplaceTag("bike_factor", String.format("%1.1f", bikeFactor));
                 osm.ways.put(osmWayId, way);
             }
         }

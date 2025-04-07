@@ -10,17 +10,20 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
  * Adapts our collection of grid writers (one for each destination pointset and percentile) to give them the
  * same interface as our CSV writers, so CSV and Grids can be processed similarly in MultiOriginAssembler.
  */
-public class MultiAccessGridResultWriter implements RegionalResultWriter {
+public class MultiGridResultWriter implements RegionalResultWriter {
     /**
      * We create one GridResultWriter for each destination pointset and percentile.
      * Each of those output files contains data for all thresholds (time or cumulative access) at each origin.
      */
     private final GridResultWriter[][] gridResultWriters;
 
+    private final GridResultType gridResultType;
+
     /** Constructor */
-    public MultiAccessGridResultWriter (
-            RegionalAnalysis regionalAnalysis, RegionalTask task, int nThresholds, FileStorage fileStorage
+    public MultiGridResultWriter (
+        RegionalAnalysis regionalAnalysis, RegionalTask task, int nThresholds, FileStorage fileStorage, GridResultType gridResultType
     ) {
+        this.gridResultType = gridResultType;
         int nPercentiles = task.percentiles.length;
         int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
         WebMercatorExtents extents = WebMercatorExtents.forTask(task);
@@ -28,11 +31,13 @@ public class MultiAccessGridResultWriter implements RegionalResultWriter {
         gridResultWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
         for (int d = 0; d < nDestinationPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
+                String extension = gridResultType == GridResultType.ACCESS ? "access" : "dual.access";
                 String fileName = String.format(
-                        "%s_%s_P%d.access",
+                        "%s_%s_P%d.%s",
                         regionalAnalysis._id,
                         regionalAnalysis.destinationPointSetIds[d],
-                        task.percentiles[p]
+                        task.percentiles[p],
+                        extension
                 );
                 gridResultWriters[d][p] = new GridResultWriter(
                         extents,
@@ -46,12 +51,10 @@ public class MultiAccessGridResultWriter implements RegionalResultWriter {
 
     @Override
     public void writeOneWorkResult (RegionalWorkResult workResult) throws Exception {
+        int[][][] values = gridResultType == GridResultType.ACCESS ? workResult.accessibilityValues : workResult.dualAccessValues;  
         // Drop work results for this particular origin into a little-endian output file.
-        // TODO more efficient way to write little-endian integers
-        // TODO check monotonic increasing invariants here rather than in worker.
-        // Infer x and y cell indexes based on the template task
-        for (int d = 0; d < workResult.accessibilityValues.length; d++) {
-            int[][] percentilesForGrid = workResult.accessibilityValues[d];
+        for (int d = 0; d < values.length; d++) {
+            int[][] percentilesForGrid = values[d];
             for (int p = 0; p < percentilesForGrid.length; p++) {
                 GridResultWriter gridWriter = gridResultWriters[d][p];
                 gridWriter.writeOneOrigin(workResult.taskId, percentilesForGrid[p]);

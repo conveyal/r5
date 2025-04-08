@@ -286,7 +286,7 @@ public class RegionalAnalysisController implements HttpController {
         return "Building geotiff zip in background.";
     }
 
-    /** Fetch destination OpportunityDataset from database, followed by a check that it was present. */
+    /** Fetch destination OpportunityDataset from database from its ID. If it exists, return its human name, otherwise return the ID. */
     private static String getDestinationsName (String destinationPointSetId, UserPermissions userPermissions) {
         OpportunityDataset opportunityDataset = Persistence.opportunityDatasets.findByIdIfPermitted(destinationPointSetId, userPermissions);
         if (opportunityDataset != null) return opportunityDataset.humanName();
@@ -314,11 +314,8 @@ public class RegionalAnalysisController implements HttpController {
         // aren't any (only CSV, because origins are freeform). How should we determine whether this analysis is
         // expected to have no gridded results and cleanly return a 404?
         final String regionalAnalysisId = req.params("_id");
-        
-        // TODO allow selecting which grid type to retrieve
-        // final GridResultType accessType = GridResultType.valueOf(req.queryParamOrDefault("accessType", "ACCESS").toUpperCase());
-        
-        FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
+        final GridResultType accessType = GridResultType.valueOf(req.queryParamOrDefault("accessType", "ACCESS").toUpperCase());
+        final FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
         if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
             throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
         }

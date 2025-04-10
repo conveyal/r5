@@ -507,8 +507,11 @@ public class AnalysisWorker implements Component {
         // For most regional analyses, this is an accessibility indicator value for one of many origins,
         // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
         // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
+        // Create the `RegionalWorkResult` object here to avoid running final calculations performed in the constructor
+        // in the synchronized block below.
+        RegionalWorkResult workResult = new RegionalWorkResult(oneOriginResult, task);
         synchronized (workResults) {
-            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+            workResults.add(workResult);
         }
         throughputTracker.recordTaskCompletion(task.jobId);
     }

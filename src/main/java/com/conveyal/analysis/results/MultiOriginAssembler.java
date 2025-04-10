@@ -153,7 +153,6 @@ public class MultiOriginAssembler {
                     // Output includes temporal density of opportunities and optionally dual access.
                     resultWriters.add(new TemporalDensityCsvResultWriter(
                             job.templateTask,
-                            job.templateTask.dualAccessThresholds[0],
                             fileStorage
                     ));
                 }

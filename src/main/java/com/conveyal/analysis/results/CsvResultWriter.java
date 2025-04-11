@@ -63,9 +63,9 @@ public abstract class CsvResultWriter extends BaseResultWriter implements Region
         checkArgument(task.originPointSet != null, "CsvResultWriters require FreeFormPointSet origins.");
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
         csvWriter = new CsvWriter(bufferedWriter, ',');
-        setDataColumns(columnHeaders());
         this.resultType = resultType;
         this.task = task;
+        setDataColumns(columnHeaders());
         LOG.info("Created CSV file to hold {} results for regional job {}", resultType, task.jobId);
     }
 

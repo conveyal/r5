@@ -14,11 +14,8 @@ import java.util.List;
  * as well as "dual" accessibility (the amount of time needed to reach n opportunities).
  */
 public class TemporalDensityCsvResultWriter extends CsvResultWriter {
-    private final int[] dualAccessThresholds;
-
     public TemporalDensityCsvResultWriter(RegionalTask task, FileStorage fileStorage) throws IOException {
         super(task, CsvResultType.TDENSITY, fileStorage);
-        this.dualAccessThresholds = task.dualAccessThresholds == null ? new int[] {} : task.dualAccessThresholds;
     }
 
     @Override
@@ -28,9 +25,11 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
         headers.add("origin");
         headers.add("destinations");
         headers.add("percentile");
-        // The number of minutes needed to reach d destination opportunities
-        for (int t = 0; t < dualAccessThresholds.length; t++) {
-            headers.add(String.format("dual %d", dualAccessThresholds[t]));
+        if (task.dualAccessThresholds != null) {
+            // The number of minutes needed to reach d destination opportunities
+            for (int t = 0; t < task.dualAccessThresholds.length; t++) {
+                headers.add(String.format("dual %d", task.dualAccessThresholds[t]));
+            }
         }
         // The opportunity density during each of 120 minutes
         for (int m = 0; m < 120; m += 1) {
@@ -63,10 +62,13 @@ public class TemporalDensityCsvResultWriter extends CsvResultWriter {
                 row.add(originId);
                 row.add(task.destinationPointSetKeys[d]);
                 row.add(Integer.toString(task.percentiles[p]));
-                // One column for each of the dual access threshold values for this origin.
-                for (int t = 0; t < dualAccessThresholds.length; t++) {
-                    int dualAccess = workResult.dualAccessValues[d][p][t];
-                    row.add(Integer.toString(dualAccess));
+
+                if (workResult.dualAccessValues != null) {
+                    // One column for each of the dual access threshold values for this origin.
+                    for (int t = 0; t < workResult.dualAccessValues[d][p].length; t++) {
+                        int dualAccess = workResult.dualAccessValues[d][p][t];
+                        row.add(Integer.toString(dualAccess));
+                    }
                 }
                 // One density value for each one-minute bin.
                 // Column labeled 10 contains the number of opportunities reached between 9 and 10 minutes of travel.

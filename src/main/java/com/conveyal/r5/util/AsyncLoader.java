@@ -28,7 +28,7 @@ import java.util.concurrent.Executors;
  * "value is present in map".
  *
  * Potential problem: if we try to return immediately saying whether the needed data are available,
- * there are some cases where preparing the reqeusted object might take only a few hundred milliseconds or less.
+ * there are some cases where preparing the requested object might take only a few hundred milliseconds or less.
  * In that case then we don't want the caller to have to re-poll. In this case a Future.get() with timeout is good.
  *
  * Created by abyrd on 2018-09-14
@@ -98,9 +98,22 @@ public abstract class AsyncLoader<K,V> {
     }
 
     /**
+     * This has been factored out of the executor runnables so subclasses can force a blocking (non-async) load.
+     * Any exceptions that occur while building the value will escape this method, leaving the status as BUILDING.
+     */
+    protected V getBlocking (K key) {
+        V value = buildValue(key);
+        synchronized (map) {
+            map.put(key, new LoaderState(Status.PRESENT, "Loaded", 100, value));
+        }
+        return value;
+    }
+
+    /**
      * Attempt to fetch the value for the supplied key.
      * If the value is not yet present, and not yet being computed / fetched, enqueue a task to do so.
      * Return a response that reports status, and may or may not contain the value.
+     * Any exception that occurs while building the value is caught and associated with the key with a status of ERROR.
      */
     public LoaderState<V> get (K key) {
         LoaderState<V> state = null;
@@ -109,7 +122,7 @@ public abstract class AsyncLoader<K,V> {
             state = map.get(key);
             if (state == null) {
                 // Only enqueue a task to load the value for this key if another call hasn't already done it.
-                state = new LoaderState<V>(Status.WAITING, "Enqueued task...", 0, null);
+                state = new LoaderState<>(Status.WAITING, "Enqueued task...", 0, null);
                 map.put(key, state);
                 enqueueLoadTask = true;
             }
@@ -120,16 +133,16 @@ public abstract class AsyncLoader<K,V> {
         // Enqueue task outside the above block (synchronizing the fewest lines possible).
         if (enqueueLoadTask) {
             executor.execute(() -> {
-                setProgress(key, 0, "Starting...");
                 try {
-                    V value = buildValue(key);
-                    synchronized (map) {
-                        map.put(key, new LoaderState(Status.PRESENT, null, 100, value));
-                    }
+                    setProgress(key, 0, "Starting...");
+                    getBlocking(key);
                 } catch (Throwable t) {
                     // It's essential to trap Throwable rather than just Exception. Otherwise the executor
-                    // threads can be killed by any Error that happens, stalling the executor.
-                    setError(key, t);
+                    // threads can be killed by any Error that happens, stalling the executor. The below permanently
+                    // associates an error with the key. No further attempt will ever be made to create the value.
+                    synchronized (map) {
+                        map.put(key, new LoaderState(t));
+                    }
                     LOG.error("Async load failed: " + ExceptionUtils.stackTraceString(t));
                 }
             });
@@ -139,12 +152,13 @@ public abstract class AsyncLoader<K,V> {
 
     /**
      * Override this method in concrete subclasses to specify the logic to build/calculate/fetch a value.
-     * Implementations may call setProgress to report progress on long operations.
+     * Implementations may call setProgress to report progress on long operations; if they do so, any callers of this
+     * method are responsible for also calling setComplete() to ensure loaded objects are marked as PRESENT.
      * Throw an exception to indicate an error has occurred and the building process cannot complete.
      * It's not entirely clear this should return a value - might be better to call setValue within the overridden
      * method, just as we call setProgress or setError.
      */
-    protected abstract V buildValue(K key) throws Exception;
+    protected abstract V buildValue(K key);
 
     /**
      * Call this method inside the buildValue method to indicate progress.
@@ -155,13 +169,4 @@ public abstract class AsyncLoader<K,V> {
         }
     }
 
-    /**
-     * Call this method inside the buildValue method to indicate that an unrecoverable error has happened.
-     * FIXME this will permanently associate an error with the key. No further attempt will ever be made to create the value.
-     */
-    protected void setError (K key, Throwable throwable) {
-        synchronized (map) {
-            map.put(key, new LoaderState(throwable));
-        }
-    }
 }

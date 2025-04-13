@@ -9,18 +9,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
 
     public TimeCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, fileStorage);
-    }
-
-    @Override
-    public CsvResultType resultType () {
-        return CsvResultType.TIMES;
+        super(task, CsvResultType.TIMES, fileStorage);
     }
 
     @Override

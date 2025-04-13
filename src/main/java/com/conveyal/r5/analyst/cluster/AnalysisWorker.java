@@ -314,7 +314,7 @@ public class AnalysisWorker implements Component {
     protected byte[] handleAndSerializeOneSinglePointTask (TravelTimeSurfaceTask task) throws IOException {
         LOG.debug("Handling single-point task {}", task.toString());
         // Get all the data needed to run one analysis task, or at least begin preparing it.
-        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
+        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preload(task);
 
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
@@ -458,11 +458,16 @@ public class AnalysisWorker implements Component {
         }
 
         // Pull all necessary inputs into cache in a blocking fashion, unlike single-point tasks where prep is async.
-        // Avoids auto-shutdown while preloading. Must be done after loading destination pointsets to establish extents.
-        // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
-        // If those are ever removed, the async loader will need a synchronous mode with per-path blocking (kind of
-        // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-        TransportNetwork transportNetwork = networkPreloader.synchronousPreload(task);
+        // This is because single point tasks return fast to report progress, while regional tasks currently do not.
+        // Worker auto-shutdown time should remain very high during this blocking preload step. Destination point sets
+        // must already be loaded to establish extents before the preloading step begins. Note that we're still using
+        // the NetworkPreloader which is an AsyncLoader, but calling a method that intentionally skips all the async or
+        // background proccessing machinery. Usually, N RegionalTasks all try to preload at once, and all block on
+        // this method. Redundant slow calculation is not prevented by the AsyncLoader class itself, but by the other
+        // LoadingCaches behind it. Specifically, the TransportNetworkCache and LinkageCache enforce turn-taking and
+        // prevent redundant work. If those are ever removed, we would need either async regional task preparation, or
+        // a synchronous mode with per-key blocking on AsyncLoader (kind of reinventing the wheel of LoadingCache).
+        TransportNetwork transportNetwork = networkPreloader.preloadBlocking(task);
 
         // If we are generating a static site, there must be a single metadata file for an entire batch of results.
         // Arbitrarily we create this metadata as part of the first task in the job.
@@ -502,8 +507,11 @@ public class AnalysisWorker implements Component {
         // For most regional analyses, this is an accessibility indicator value for one of many origins,
         // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
         // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
+        // Create the `RegionalWorkResult` object here to avoid running final calculations performed in the constructor
+        // in the synchronized block below.
+        RegionalWorkResult workResult = new RegionalWorkResult(oneOriginResult, task);
         synchronized (workResults) {
-            workResults.add(new RegionalWorkResult(oneOriginResult, task));
+            workResults.add(workResult);
         }
         throughputTracker.recordTaskCompletion(task.jobId);
     }

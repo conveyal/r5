@@ -18,6 +18,7 @@ gradlew
 
 # IntelliJ IDEA
 .idea/
+.vscode/
 
 logs
 project/project

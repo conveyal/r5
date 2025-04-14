@@ -97,7 +97,7 @@ public class GridResultWriter extends BaseResultWriter {
                         task.percentiles[percentilesIndex]
                     );
                     writers.put(fileKey, new GridResultWriter(
-                            GridResultType.DUAL,
+                            GridResultType.DUAL_ACCESS,
                             extents,
                             destinationsIndex,
                             percentilesIndex,

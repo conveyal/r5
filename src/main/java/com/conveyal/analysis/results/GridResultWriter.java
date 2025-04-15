@@ -1,10 +1,7 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.analysis.models.RegionalAnalysis;
-import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorExtents;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
 import org.slf4j.Logger;
@@ -16,8 +13,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.HashMap;
-import java.util.Map;
 
 import static com.conveyal.r5.common.Util.human;
 
@@ -70,51 +65,12 @@ public class GridResultWriter extends BaseResultWriter {
 
     protected final int percentileIndex;
 
-    public static Map<FileStorageKey, GridResultWriter> createGridResultWritersForTask(RegionalTask task, RegionalAnalysis regionalAnalysis) {
-        WebMercatorExtents extents = task.getWebMercatorExtents();
-        Map<FileStorageKey, GridResultWriter> writers = new HashMap<>();
-        for (int destinationsIndex = 0; destinationsIndex < task.destinationPointSetKeys.length; destinationsIndex++) {
-            for (int percentilesIndex = 0; percentilesIndex < task.percentiles.length; percentilesIndex++) {
-                if (task.recordAccessibility) {
-                    FileStorageKey fileKey = RegionalAnalysis.getMultiOriginAccessFileKey(
-                        task.jobId,
-                        regionalAnalysis.destinationPointSetIds[destinationsIndex],
-                        task.percentiles[percentilesIndex]
-                    );
-                    writers.put(fileKey, new GridResultWriter(
-                            GridResultType.ACCESS,
-                            extents,
-                            destinationsIndex,
-                            percentilesIndex,
-                            task.cutoffsMinutes.length
-                    ));
-                } 
-
-                if (task.includeTemporalDensity) {
-                    FileStorageKey fileKey = RegionalAnalysis.getMultiOriginDualAccessFileKey(
-                        task.jobId,
-                        regionalAnalysis.destinationPointSetIds[destinationsIndex],
-                        task.percentiles[percentilesIndex]
-                    );
-                    writers.put(fileKey, new GridResultWriter(
-                            GridResultType.DUAL_ACCESS,
-                            extents,
-                            destinationsIndex,
-                            percentilesIndex,
-                            task.dualAccessThresholds.length
-                    ));
-                }
-            }
-        }
-        return writers;
-    }
-
     /**
      * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter(GridResultType gridResultType, WebMercatorExtents ext, int destinationIndex, int percentileIndex, int nThresholds) {
+    public GridResultWriter(GridResultType gridResultType, WebMercatorExtents ext, int destinationIndex, int percentileIndex, int nThresholds) {
         long bodyBytes = (long) ext.width * ext.height * nThresholds * Integer.BYTES;
         this.gridResultType = gridResultType;
         this.nThresholds = nThresholds;

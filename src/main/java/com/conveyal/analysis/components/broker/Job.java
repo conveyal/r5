@@ -38,6 +38,13 @@ public class Job {
 
     public static final int MAX_DELIVERY_PASSES = 5;
 
+    /**
+     * Used when auto-starting spot instances. Set to a smaller value to increase the number of
+     * workers requested automatically
+     */
+    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
+
     // In order to provide realistic estimates of job processing time, we don't want to deliver the tasks to
     // workers in row-by-row geographic order, because spatial patterns exist in the world that make some areas
     // much faster than others. Ideally rather than storing the entire sequence (which is O(n) in the number of
@@ -118,7 +125,6 @@ public class Job {
     /**
      * The graph and r5 commit on which tasks are to be run. All tasks contained in a job must
      * run on the same graph and r5 commit.
-     * TODO this field is kind of redundant - it's implied by the template request.
      */
     public final WorkerCategory workerCategory;
 
@@ -149,9 +155,9 @@ public class Job {
         WorkerTags workerTags,
         Map<FileStorageKey, BaseResultWriter> resultWriters
     ) {
+        this.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         this.jobId = task.jobId;
         this.templateTask = createTemplateTask(task);
-        this.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         this.nTasksCompleted = 0;
         this.nextTaskToDeliver = 0;
 
@@ -181,6 +187,32 @@ public class Job {
         templateTask.scenarioId = task.scenario.id;
         templateTask.scenario = null;
         return templateTask;
+    }
+
+    public int getTargetWorkerTotal () {
+        // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+        //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+        int targetWorkerTotal;
+        if (templateTask.hasTransit()) {
+            // Total computation for a task with transit depends on the number of stops and whether the
+            // network has frequency-based routes. The total computation for the job depends on these
+            // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+            // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+            // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+            // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+            //  this worth adding a field to Job or RegionalTask?
+            float transitScaleFactor = (9f / templateTask.zoom);
+            targetWorkerTotal = (int) ((nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+        } else {
+            // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+            // the job increases roughly with linearly with the number of origins.
+            targetWorkerTotal = nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+        }
+
+        // Guardrails until freeform pointsets are tested more thoroughly
+        if (templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
+        if (templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
+        return targetWorkerTotal;
     }
 
     public boolean markTaskCompleted(int taskId) {

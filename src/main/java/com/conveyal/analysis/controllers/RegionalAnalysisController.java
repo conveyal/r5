@@ -30,6 +30,7 @@ import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.progress.Task;
@@ -621,7 +622,40 @@ public class RegionalAnalysisController implements HttpController {
         // Create the result writers
         Map<FileStorageKey, BaseResultWriter> resultWriters = new HashMap<>();
         if (task.originPointSet == null) {
-            resultWriters.putAll(GridResultWriter.createGridResultWritersForTask(task, regionalAnalysis));
+            WebMercatorExtents extents = task.getWebMercatorExtents();
+            for (int destinationsIndex = 0; destinationsIndex < task.destinationPointSetKeys.length; destinationsIndex++) {
+                for (int percentilesIndex = 0; percentilesIndex < task.percentiles.length; percentilesIndex++) {
+                    if (task.recordAccessibility) {
+                        FileStorageKey fileKey = RegionalAnalysis.getMultiOriginAccessFileKey(
+                            task.jobId,
+                            regionalAnalysis.destinationPointSetIds[destinationsIndex],
+                            task.percentiles[percentilesIndex]
+                        );
+                        resultWriters.put(fileKey, new GridResultWriter(
+                                GridResultType.ACCESS,
+                                extents,
+                                destinationsIndex,
+                                percentilesIndex,
+                                task.cutoffsMinutes.length
+                        ));
+                    } 
+
+                    if (task.includeTemporalDensity) {
+                        FileStorageKey fileKey = RegionalAnalysis.getMultiOriginDualAccessFileKey(
+                            task.jobId,
+                            regionalAnalysis.destinationPointSetIds[destinationsIndex],
+                            task.percentiles[percentilesIndex]
+                        );
+                        resultWriters.put(fileKey, new GridResultWriter(
+                                GridResultType.DUAL_ACCESS,
+                                extents,
+                                destinationsIndex,
+                                percentilesIndex,
+                                task.dualAccessThresholds.length
+                        ));
+                    }
+                }
+            }
         } else {
             if (task.recordAccessibility) {
                 // Freeform origins - create CSV regional analysis results

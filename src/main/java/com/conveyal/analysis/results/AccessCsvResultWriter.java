@@ -8,14 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
-    public AccessCsvResultWriter(RegionalTask task) throws IOException {
-        super(task);
-    }
+    private static final String[] COLUMN_HEADERS = { "origin", "destinations", "percentile", "cutoff", "access" };
 
-    @Override
-    public String[] columnHeaders () {
-        // We could potentially make the percentile and cutoff columns optional, but it's unnecessary complexity.
-        return new String[] { "origin", "destinations", "percentile", "cutoff", "access" };
+    public AccessCsvResultWriter(RegionalTask task) throws IOException {
+        super(task, COLUMN_HEADERS);
     }
 
     /**

@@ -33,14 +33,6 @@ public abstract class CsvResultWriter extends BaseResultWriter {
      */
     protected final RegionalTask task;
 
-    /**
-     * Override to provide column names for this CSV writer.
-     * NOTE: Due to Java weirdness, subclass implementations of this method will be called by the CsvResultWriter
-     * constructor at a time when fields of the subclass remain initialized, but uninitialized final primitive
-     * fields are still readable! Do not read subclass fields in these implementations until/unless this is restructured.
-     */
-    protected abstract String[] columnHeaders ();
-
     /** Override to extract row values from a single origin result. */
     protected abstract Iterable<String[]> rowValues (RegionalWorkResult workResult);
 
@@ -51,21 +43,14 @@ public abstract class CsvResultWriter extends BaseResultWriter {
      * Construct a writer to record incoming results in a CSV file, with header row consisting of
      * "origin", "destination", and the supplied indicator.
      */
-    CsvResultWriter(RegionalTask task) throws IOException {
+    public CsvResultWriter(RegionalTask task, String[] columnHeaders) throws IOException {
         checkArgument(task.originPointSet != null, "CsvResultWriters require FreeFormPointSet origins.");
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(bufferFile));
         csvWriter = new CsvWriter(bufferedWriter, ',');
         this.task = task;
-        setDataColumns(columnHeaders());
+        this.nDataColumns = columnHeaders.length;
+        csvWriter.writeRecord(columnHeaders);
         LOG.info("Created CSV file to hold results for regional job {}", task.jobId);
-    }
-
-    /**
-     * Writes a header row containing the supplied data columns.
-     */
-    protected void setDataColumns(String... columns) throws IOException {
-        this.nDataColumns = columns.length;
-        csvWriter.writeRecord(columns);
     }
 
     /**

@@ -11,14 +11,10 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkState;
 
 public class TimeCsvResultWriter extends CsvResultWriter {
+    private static final String[] COLUMN_HEADERS = { "origin", "destination", "percentile", "time" };
 
     public TimeCsvResultWriter(RegionalTask task) throws IOException {
-        super(task);
-    }
-
-    @Override
-    public String[] columnHeaders () {
-        return new String[] { "origin", "destination", "percentile", "time" };
+        super(task, COLUMN_HEADERS);
     }
 
     /**

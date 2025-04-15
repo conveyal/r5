@@ -13,14 +13,10 @@ import java.util.List;
 import static com.google.common.base.Preconditions.checkState;
 
 public class PathCsvResultWriter extends CsvResultWriter {
+    private static final String[] COLUMN_HEADERS = ArrayUtils.addAll(new String[] {"origin", "destination"}, PathResult.DATA_COLUMNS);
 
     public PathCsvResultWriter(RegionalTask task) throws IOException {
-        super(task);
-    }
-
-    @Override
-    public String[] columnHeaders () {
-        return ArrayUtils.addAll(new String[] {"origin", "destination"}, PathResult.DATA_COLUMNS);
+        super(task, COLUMN_HEADERS);
     }
 
     @Override

@@ -24,7 +24,7 @@ public abstract class BaseResultWriter {
     /**
      * Close all buffers and temporary files.
      */
-    protected void terminate () throws IOException {
+    public void terminate () throws IOException {
         bufferFile.delete();
     }
 }

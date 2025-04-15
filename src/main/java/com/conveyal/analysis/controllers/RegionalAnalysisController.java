@@ -6,12 +6,19 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
+import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.results.AccessCsvResultWriter;
+import com.conveyal.analysis.results.BaseResultWriter;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.results.GridResultType;
+import com.conveyal.analysis.results.GridResultWriter;
+import com.conveyal.analysis.results.PathCsvResultWriter;
+import com.conveyal.analysis.results.TemporalDensityCsvResultWriter;
+import com.conveyal.analysis.results.TimeCsvResultWriter;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -26,6 +33,7 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.util.SemVer;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -59,6 +67,7 @@ import java.util.Set;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -606,8 +615,47 @@ public class RegionalAnalysisController implements HttpController {
         // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
 
+        // Set the job ID on the task, which is used by the MultiOriginAssembler and Broker.
+        task.jobId = regionalAnalysis._id;
+
+        // Create the result writers
+        Map<FileStorageKey, BaseResultWriter> resultWriters = new HashMap<>();
+        if (task.originPointSet == null) {
+            resultWriters.putAll(GridResultWriter.createGridResultWritersForTask(task, regionalAnalysis));
+        } else {
+            if (task.recordAccessibility) {
+                // Freeform origins - create CSV regional analysis results
+                FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.ACCESS);
+                resultWriters.put(fileKey, new AccessCsvResultWriter(task));
+                regionalAnalysis.resultStorage.put(CsvResultType.ACCESS, fileKey.path);
+            }
+
+            if (task.includeTemporalDensity) {
+                FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.TDENSITY);
+                resultWriters.put(fileKey, new TemporalDensityCsvResultWriter(task));
+                regionalAnalysis.resultStorage.put(CsvResultType.TDENSITY, fileKey.path);
+            }
+        }
+
+        if (task.recordTimes) {
+            FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.TIMES);
+            resultWriters.put(fileKey, new TimeCsvResultWriter(task));
+            regionalAnalysis.resultStorage.put(CsvResultType.TIMES, fileKey.path);
+        }
+
+        if (task.includePathResults) {
+            FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.PATHS);
+            resultWriters.put(fileKey, new PathCsvResultWriter(task));
+            regionalAnalysis.resultStorage.put(CsvResultType.PATHS, fileKey.path);
+        }
+
+        checkArgument(task.makeTauiSite || notNullOrEmpty(resultWriters),"A non-Taui regional analysis should always create at least one grid or CSV file.");
+
+        // Store the scenario JSON file.
+        storeScenarioJson(regionalAnalysis, task.scenario);
+
         // Register the regional job with the broker, which will distribute individual tasks to workers and track progress.
-        broker.enqueueTasksForRegionalJob(regionalAnalysis);
+        broker.enqueueTasksForRegionalJob(task, resultWriters, WorkerTags.fromRegionalAnalysis(regionalAnalysis));
 
         // Flush to the database any information added to the RegionalAnalysis object when it was enqueued.
         // This includes the paths of any CSV files that will be produced by this analysis.
@@ -620,6 +668,17 @@ public class RegionalAnalysisController implements HttpController {
     private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
         RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
         return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
+    }
+
+    private void storeScenarioJson (RegionalAnalysis regionalAnalysis, Scenario scenario) {
+        FileStorageKey fileStorageKey = RegionalAnalysis.getScenarioJsonFileKey(regionalAnalysis._id, scenario.id);
+        try {
+            File localScenario = FileUtils.createScratchFile("json");
+            JsonUtil.objectMapper.writeValue(localScenario, scenario);
+            fileStorage.moveIntoStorage(fileStorageKey, localScenario);
+        } catch (IOException e) {
+            LOG.error("Error storing scenario for retrieval by workers.", e);
+        }
     }
 
     /**

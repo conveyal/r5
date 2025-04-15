@@ -1,15 +1,23 @@
 package com.conveyal.analysis.components.broker;
 
+import com.conveyal.analysis.results.BaseResultWriter;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
@@ -68,6 +76,11 @@ public class Job {
      * once if it is redelivered.
      */
     protected int nTasksDelivered;
+
+    /**
+     * The result writers that will assemble the results from this job into files.
+     */
+    private final Map<FileStorageKey, BaseResultWriter> resultWriters;
 
     /** Every task in this job will be based on this template task, but have its origin coordinates changed. */
     public final RegionalTask templateTask;
@@ -129,25 +142,45 @@ public class Job {
      * There is some risk here of accumulating unbounded amounts of large error messages (see #919).
      * The field type could be changed to a single String instead of Set, but it's exposed on a UI-facing API as a Set.
      */
-    public final Set<String> errors = new HashSet();
+    public final Set<String> errors = new HashSet<>();
 
-    public Job (RegionalTask templateTask, WorkerTags workerTags) {
-        this.jobId = templateTask.jobId;
-        this.templateTask = templateTask;
-        this.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
+    public Job (
+        RegionalTask task, 
+        WorkerTags workerTags,
+        Map<FileStorageKey, BaseResultWriter> resultWriters
+    ) {
+        this.jobId = task.jobId;
+        this.templateTask = createTemplateTask(task);
+        this.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         this.nTasksCompleted = 0;
         this.nextTaskToDeliver = 0;
 
-        if (templateTask.originPointSetKey != null) {
-            checkNotNull(templateTask.originPointSet);
-            this.nTasksTotal = templateTask.originPointSet.featureCount();
+        if (task.originPointSetKey != null) {
+            checkNotNull(task.originPointSet);
+            this.nTasksTotal = task.originPointSet.featureCount();
         } else {
-            this.nTasksTotal = templateTask.width * templateTask.height;
+            this.nTasksTotal = task.width * task.height;
         }
 
         this.completedTasks = new BitSet(nTasksTotal);
         this.workerTags = workerTags;
+        this.resultWriters = resultWriters;
+    }
 
+    /**
+     * The single RegionalTask object represents a lot of individual accessibility tasks at many different origin
+     * points, typically on a grid. Before passing that RegionalTask on to the Broker (which distributes tasks to
+     * workers and tracks progress), we remove the details of the scenario, substituting the scenario's unique ID
+     * to save time and bandwidth. This avoids repeatedly sending the scenario details to the worker in every task,
+     * as they are often quite voluminous. The workers will fetch the scenario once from S3 and cache it based on
+     * its ID only. We protectively clone this task because we're going to null out its scenario field, and don't
+     * want to affect the original object which contains all the scenario details.
+     */
+    private RegionalTask createTemplateTask(RegionalTask task) {
+        RegionalTask templateTask = task.clone();
+        templateTask.scenarioId = task.scenario.id;
+        templateTask.scenario = null;
+        return templateTask;
     }
 
     public boolean markTaskCompleted(int taskId) {
@@ -229,6 +262,33 @@ public class Job {
         if (this.isComplete() && completedTasks.cardinality() != nTasksTotal) {
             LOG.error("Something is amiss in completed task tracking.");
         }
+    }
+
+    public void terminate() throws Exception {
+        for (BaseResultWriter writer : resultWriters.values()) {
+            synchronized (writer) {
+                writer.terminate();
+            }
+        }
+    }
+
+    public void handleMessage(RegionalWorkResult workResult) throws Exception {
+        for (BaseResultWriter writer : resultWriters.values()) {
+            synchronized (writer) {
+                writer.writeOneWorkResult(workResult);
+            }
+        }
+    }
+
+    public Map<FileStorageKey, File> finish() throws IOException {
+        Map<FileStorageKey, File> files = new HashMap<>();
+        for (Map.Entry<FileStorageKey, BaseResultWriter> entry : resultWriters.entrySet()) {
+            BaseResultWriter writer = entry.getValue();
+            synchronized (writer) {
+                files.put(entry.getKey(), writer.finish());
+            }
+        }
+        return files;
     }
 
     @Override

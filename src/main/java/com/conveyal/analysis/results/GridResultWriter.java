@@ -70,7 +70,7 @@ public class GridResultWriter extends BaseResultWriter {
 
     protected final int percentileIndex;
 
-    static Map<FileStorageKey, GridResultWriter> createGridResultWritersForTask(RegionalTask task, RegionalAnalysis regionalAnalysis) {
+    public static Map<FileStorageKey, GridResultWriter> createGridResultWritersForTask(RegionalTask task, RegionalAnalysis regionalAnalysis) {
         WebMercatorExtents extents = task.getWebMercatorExtents();
         Map<FileStorageKey, GridResultWriter> writers = new HashMap<>();
         for (int destinationsIndex = 0; destinationsIndex < task.destinationPointSetKeys.length; destinationsIndex++) {

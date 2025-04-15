@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.analysis.components.Component;
+import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
 import com.conveyal.analysis.components.eventbus.EventBus;
@@ -9,7 +10,6 @@ import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.BaseResultWriter;
-import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -17,10 +17,7 @@ import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.util.ExceptionUtils;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.MultimapBuilder;
 
 import gnu.trove.TCollections;
 import gnu.trove.map.TObjectIntMap;
@@ -35,6 +32,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -102,8 +100,8 @@ public class Broker implements Component {
     private final FileStorage fileStorage;
     private final EventBus eventBus;
     private final WorkerLauncher workerLauncher;
-
-    private final ListMultimap<WorkerCategory, Job> jobs = MultimapBuilder.hashKeys().arrayListValues().build();
+    private final TaskScheduler taskScheduler;
+    private final Map<String, Job> jobs = new HashMap<>();
 
     /**
      * The most tasks to deliver to a worker at a time. Workers may request less tasks than this, and the broker should
@@ -123,13 +121,6 @@ public class Broker implements Component {
      * disconnected origins or at least concisely signal large blocks of them in worker responses.    
      */
     public static final int MAX_TASKS_PER_WORKER = 40;
-
-    /**
-     * Used when auto-starting spot instances. Set to a smaller value to increase the number of
-     * workers requested automatically
-     */
-    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
-    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     /**
      * We want to request spot instances to "boost" regional analyses after a few regional task
@@ -157,11 +148,12 @@ public class Broker implements Component {
     public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
             TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
-    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
+    public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher, TaskScheduler taskScheduler) {
         this.config = config;
         this.fileStorage = fileStorage;
         this.eventBus = eventBus;
         this.workerLauncher = workerLauncher;
+        this.taskScheduler = taskScheduler;
     }
 
     /**
@@ -182,7 +174,7 @@ public class Broker implements Component {
         Job job = new Job(task, workerTags, resultWriters);
 
         // The Job object was successfully created. It's now safe to register and start the Job.
-        jobs.put(job.workerCategory, job);
+        jobs.put(job.jobId, job);
 
         // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
         if (config.testTaskRedelivery()) {
@@ -193,7 +185,7 @@ public class Broker implements Component {
             createOnDemandWorkerInCategory(job.workerCategory, workerTags);
         } else {
             // Workers exist in this category, clear out any record that we're waiting for one to start up.
-            recentlyRequestedWorkers.remove(job.workerCategory);
+            recentlyRequestedWorkers.remove(job);
         }
         eventBus.send(new RegionalAnalysisEvent(task.jobId, STARTED).forUser(workerTags.user, workerTags.group));
     }
@@ -287,7 +279,7 @@ public class Broker implements Component {
      */
     public synchronized List<RegionalTask> getSomeWork (WorkerCategory workerCategory, int maxTasksRequested) {
         if (maxTasksRequested <= 0) {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
         Job job;
         if (config.offline()) {
@@ -296,12 +288,13 @@ public class Broker implements Component {
                     .filter(j -> j.hasTasksToDeliver()).findFirst().orElse(null);
         } else {
             // This worker has a preferred network, get tasks from a job on that network.
-            job = jobs.get(workerCategory).stream()
-                    .filter(j -> j.hasTasksToDeliver()).findFirst().orElse(null);
+            job = jobs.values().stream()
+                    .filter(j -> j.workerCategory.equals(workerCategory) && j.hasTasksToDeliver())
+                    .findFirst().orElse(null);
         }
         if (job == null) {
             // No matching job was found.
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
         // Return up to N tasks that are waiting to be processed.
         if (maxTasksRequested > MAX_TASKS_PER_WORKER) {
@@ -330,7 +323,7 @@ public class Broker implements Component {
         // The caller should already have a reference to the result assembler so it can process the final results.
         if (job.isComplete()) {
             job.verifyComplete();
-            jobs.remove(job.workerCategory, job);
+            jobs.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
     }
@@ -370,10 +363,7 @@ public class Broker implements Component {
 
     /** Find the job for the given jobId, returning null if that job does not exist. */
     public synchronized Job findJob (String jobId) {
-        return jobs.values().stream()
-                .filter(job -> job.jobId.equals(jobId))
-                .findFirst()
-                .orElse(null);
+        return jobs.get(jobId);
     }
 
     /**
@@ -383,7 +373,7 @@ public class Broker implements Component {
         // Remove the job from the broker so we stop distributing its tasks to workers.
         Job job = findJob(jobId);
         if (job == null) return false;
-        boolean success = jobs.remove(job.workerCategory, job);
+        boolean success = jobs.remove(jobId) != null;
         // Shut down the object used for assembling results, removing its associated temporary disk file.
         try {
             job.terminate();
@@ -472,19 +462,26 @@ public class Broker implements Component {
 
             // If the assembler is finished receiving results, store the created files and mark the analysis complete.
             if (job.isComplete()) {
-                for (Map.Entry<FileStorageKey, File> entry : job.finish().entrySet()) {
-                    File file = entry.getValue();
-                    fileStorage.moveIntoStorage(
-                            entry.getKey(),
-                            FileUtils.gzipFile(file)
-                    );
-                    file.delete();
-                }
+                final Job completedJob = job;
+                taskScheduler.enqueueHeavyTask(() -> {
+                    try {
+                        for (Map.Entry<FileStorageKey, File> entry : completedJob.finish().entrySet()) {
+                            File file = entry.getValue();
+                            fileStorage.moveIntoStorage(
+                                entry.getKey(),
+                                FileUtils.gzipFile(file)
+                        );
+                        file.delete();
+                    }
 
-                // Mark the regional analysis as completed.
-                RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.get(workResult.jobId);
-                regionalAnalysis.complete = true;
-                Persistence.regionalAnalyses.put(regionalAnalysis);
+                        // Mark the regional analysis as completed.
+                        RegionalAnalysis regionalAnalysis = Persistence.regionalAnalyses.get(workResult.jobId);
+                        regionalAnalysis.complete = true;
+                        Persistence.regionalAnalyses.put(regionalAnalysis);
+                    } catch (IOException e) {
+                        LOG.error("Error finishing job {}.", workResult.jobId, e);
+                    }
+                });
             }
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
@@ -499,33 +496,13 @@ public class Broker implements Component {
     }
 
     private void requestExtraWorkersIfAppropriate(Job job) {
-        WorkerCategory workerCategory = job.workerCategory;
-        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
+        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(job.workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
             // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
             //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
-            int targetWorkerTotal;
-            if (job.templateTask.hasTransit()) {
-                // Total computation for a task with transit depends on the number of stops and whether the
-                // network has frequency-based routes. The total computation for the job depends on these
-                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
-                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
-                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
-                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
-                //  this worth adding a field to Job or RegionalTask?
-                float transitScaleFactor = (9f / job.templateTask.zoom);
-                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
-            } else {
-                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
-                // the job increases roughly with linearly with the number of origins.
-                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
-            }
-
+            int targetWorkerTotal = job.getTargetWorkerTotal();
             // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
             targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
-            // Guardrails until freeform pointsets are tested more thoroughly
-            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
-            if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
             int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
             createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
         }

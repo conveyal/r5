@@ -1,7 +1,6 @@
 package com.conveyal.analysis.components.broker;
 
 import com.conveyal.r5.analyst.WorkerCategory;
-import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;

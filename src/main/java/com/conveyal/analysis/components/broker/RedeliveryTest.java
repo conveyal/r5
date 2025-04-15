@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -66,7 +67,7 @@ public class RedeliveryTest {
         templateTask.scenarioId = "FAKE";
         RegionalAnalysis regionalAnalysis = new RegionalAnalysis();
         regionalAnalysis.request = templateTask;
-        broker.enqueueTasksForRegionalJob(regionalAnalysis);
+        broker.enqueueTasksForRegionalJob(templateTask, new HashMap<>(), WorkerTags.fromRegionalAnalysis(regionalAnalysis));
     }
 
     public static String compactUUID() {

@@ -8,7 +8,7 @@ import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.results.MultiOriginAssembler;
+import com.conveyal.analysis.results.BaseResultWriter;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -151,9 +150,6 @@ public class Broker implements Component {
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     private WorkerCatalog workerCatalog = new WorkerCatalog();
 
-    /** These objects piece together results received from workers into one regional analysis result file per job. */
-    private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
-
     /**
      * keep track of which graphs we have launched workers on and how long ago we launched them, so
      * that we don't re-request workers which have been requested.
@@ -172,29 +168,20 @@ public class Broker implements Component {
      * Enqueue a set of tasks for a regional analysis.
      * Only a single task is passed in, which the broker will expand into all the individual tasks for a regional job.
      */
-    public synchronized void enqueueTasksForRegionalJob (RegionalAnalysis regionalAnalysis) {
-
-        // Make a copy of the regional task inside the RegionalAnalysis, replacing the scenario with a scenario ID.
-        RegionalTask templateTask = templateTaskFromRegionalAnalysis(regionalAnalysis);
-
-        LOG.info("Enqueuing tasks for job {} using template task.", templateTask.jobId);
-        if (findJob(templateTask.jobId) != null) {
-            LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
-            throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
+    public synchronized void enqueueTasksForRegionalJob (
+        RegionalTask task,
+        Map<FileStorageKey, BaseResultWriter> resultWriters,
+        WorkerTags workerTags
+    ) {
+        LOG.info("Enqueuing tasks for job {} using template task.", task.jobId);
+        if (findJob(task.jobId) != null) {
+            LOG.error("Someone tried to enqueue job {} but it already exists.", task.jobId);
+            throw new RuntimeException("Enqueued duplicate job " + task.jobId);
         }
-        // Create the Job object to share with the MultiOriginAssembler, but defer adding this job to the Multimap of
-        // active jobs until we're sure the result assembler was constructed without any errors. Always add and remove
-        // the Job and corresponding MultiOriginAssembler as a unit in the same synchronized block of code (see #887).
-        WorkerTags workerTags = WorkerTags.fromRegionalAnalysis(regionalAnalysis);
-        Job job = new Job(templateTask, workerTags);
+        // Create the Job object. The Job handles the result assembly.
+        Job job = new Job(task, workerTags, resultWriters);
 
-        // Register the regional job so results received from multiple workers can be assembled into one file.
-        // If any parameters fail checks here, an exception may cause this method to exit early.
-        // TODO encapsulate MultiOriginAssemblers in a new Component
-        MultiOriginAssembler assembler = new MultiOriginAssembler(regionalAnalysis, job);
-        resultAssemblers.put(templateTask.jobId, assembler);
-
-        // A MultiOriginAssembler was successfully put in place. It's now safe to register and start the Job.
+        // The Job object was successfully created. It's now safe to register and start the Job.
         jobs.put(job.workerCategory, job);
 
         // If this is a fake job for testing, don't confuse the worker startup code below with its null graph ID.
@@ -208,50 +195,7 @@ public class Broker implements Component {
             // Workers exist in this category, clear out any record that we're waiting for one to start up.
             recentlyRequestedWorkers.remove(job.workerCategory);
         }
-        eventBus.send(new RegionalAnalysisEvent(templateTask.jobId, STARTED).forUser(workerTags.user, workerTags.group));
-    }
-
-    /**
-     * The single RegionalTask object represents a lot of individual accessibility tasks at many different origin
-     * points, typically on a grid. Before passing that RegionalTask on to the Broker (which distributes tasks to
-     * workers and tracks progress), we remove the details of the scenario, substituting the scenario's unique ID
-     * to save time and bandwidth. This avoids repeatedly sending the scenario details to the worker in every task,
-     * as they are often quite voluminous. The workers will fetch the scenario once from S3 and cache it based on
-     * its ID only. We protectively clone this task because we're going to null out its scenario field, and don't
-     * want to affect the original object which contains all the scenario details.
-     * TODO Why is all this detail added after the Persistence call?
-     *      We don't want to store all the details added below in Mongo?
-     */
-    private RegionalTask templateTaskFromRegionalAnalysis (RegionalAnalysis regionalAnalysis) {
-        RegionalTask templateTask = regionalAnalysis.request.clone();
-        // First replace the inline scenario with a scenario ID, storing the scenario for retrieval by workers.
-        Scenario scenario = templateTask.scenario;
-        templateTask.scenarioId = scenario.id;
-        // Null out the scenario in the template task, avoiding repeated serialization to the workers as massive JSON.
-        templateTask.scenario = null;
-        FileStorageKey fileStorageKey = RegionalAnalysis.getScenarioJsonFileKey(regionalAnalysis._id, scenario.id);
-        try {
-            File localScenario = FileUtils.createScratchFile("json");
-            JsonUtil.objectMapper.writeValue(localScenario, scenario);
-            // FIXME this is using a network service in a method called from a synchronized broker method.
-            //  Move file into storage before entering the synchronized block.
-            fileStorage.moveIntoStorage(fileStorageKey, localScenario);
-        } catch (IOException e) {
-            LOG.error("Error storing scenario for retrieval by workers.", e);
-        }
-        // Fill in all the fields in the template task that will remain the same across all tasks in a job.
-        // I am not sure why we are re-setting all these fields, it seems like they are already set when the task is
-        // initialized by AnalysisRequest.populateTask. But we'd want to thoroughly check that assumption before
-        // eliminating or moving these lines.
-        templateTask.jobId = regionalAnalysis._id;
-        templateTask.graphId = regionalAnalysis.bundleId;
-        templateTask.workerVersion = regionalAnalysis.workerVersion;
-        templateTask.height = regionalAnalysis.height;
-        templateTask.width = regionalAnalysis.width;
-        templateTask.north = regionalAnalysis.north;
-        templateTask.west = regionalAnalysis.west;
-        templateTask.zoom = regionalAnalysis.zoom;
-        return templateTask;
+        eventBus.send(new RegionalAnalysisEvent(task.jobId, STARTED).forUser(workerTags.user, workerTags.group));
     }
 
     /**
@@ -387,7 +331,6 @@ public class Broker implements Component {
         if (job.isComplete()) {
             job.verifyComplete();
             jobs.remove(job.workerCategory, job);
-            resultAssemblers.remove(job.jobId);
             eventBus.send(new RegionalAnalysisEvent(job.jobId, COMPLETED).forUser(job.workerTags.user, job.workerTags.group));
         }
     }
@@ -442,10 +385,8 @@ public class Broker implements Component {
         if (job == null) return false;
         boolean success = jobs.remove(job.workerCategory, job);
         // Shut down the object used for assembling results, removing its associated temporary disk file.
-        // TODO just put the assembler in the Job object
-        MultiOriginAssembler assembler = resultAssemblers.remove(jobId);
         try {
-            assembler.terminate();
+            job.terminate();
         } catch (Exception e) {
             LOG.error(
                 "Could not terminate grid result assembler, this may waste disk space. Reason: {}",
@@ -498,12 +439,11 @@ public class Broker implements Component {
      * @param workResult an object representing accessibility results for a single origin point, sent by a worker.
      */
     public void handleRegionalWorkResult(RegionalWorkResult workResult) {
-        // Retrieving the job and assembler from their maps is not thread safe, so we use synchronized block here.
+        // Retrieving the job from their map is not thread safe, so we use synchronized block here.
         // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
         // because that method only uses final fields of the job.
         Job job = null;
         try {
-            MultiOriginAssembler assembler;
             synchronized (this) {
                 job = findJob(workResult.jobId);
                 // Record any error reported by the worker and don't pass bad results on to regional result assembly.
@@ -513,8 +453,7 @@ public class Broker implements Component {
                     recordJobError(job, workResult.error);
                     return;
                 }
-                assembler = resultAssemblers.get(workResult.jobId);
-                if (job == null || assembler == null || !job.isActive()) {
+                if (job == null || !job.isActive()) {
                     // This will happen naturally for all delivered tasks after a job is deleted or it errors out.
                     LOG.debug("Ignoring result for unrecognized, deleted, or inactive job ID {}.", workResult.jobId);
                     return;
@@ -525,15 +464,15 @@ public class Broker implements Component {
                 markTaskCompleted(job, workResult.taskId);
             }
 
-            // Unlike everything above, result assembly (like starting workers below) does not synchronize on the broker.
+            // Unlike everything above, message handling (like starting workers below) does not synchronize on the broker.
             // It contains some slow nested operations to move completed results into storage. Really we should not do
             // these things synchronously in an HTTP handler called by the worker. We should probably synchronize this
             // entire method, then somehow enqueue slower async completion and cleanup tasks in the caller.
-            assembler.handleMessage(workResult);
+            job.handleMessage(workResult);
 
             // If the assembler is finished receiving results, store the created files and mark the analysis complete.
             if (job.isComplete()) {
-                for (Map.Entry<FileStorageKey, File> entry : assembler.finish().entrySet()) {
+                for (Map.Entry<FileStorageKey, File> entry : job.finish().entrySet()) {
                     File file = entry.getValue();
                     fileStorage.moveIntoStorage(
                             entry.getKey(),

@@ -14,11 +14,10 @@ import java.util.List;
  */
 public class TemporalDensityCsvResultWriter extends CsvResultWriter {
     public TemporalDensityCsvResultWriter(RegionalTask task) throws IOException {
-        super(task);
+        super(task, columnHeaders(task));
     }
 
-    @Override
-    public String[] columnHeaders () {
+    private static String[] columnHeaders (RegionalTask task) {
         List<String> headers = new ArrayList<>();
         // The ids of the freeform origin point and destination set
         headers.add("origin");

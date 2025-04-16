@@ -298,27 +298,20 @@ public class Job {
 
     public void terminate() throws Exception {
         for (BaseResultWriter writer : resultWriters.values()) {
-            synchronized (writer) {
-                writer.terminate();
-            }
+            writer.terminate();
         }
     }
 
     public void handleMessage(RegionalWorkResult workResult) throws Exception {
         for (BaseResultWriter writer : resultWriters.values()) {
-            synchronized (writer) {
-                writer.writeOneWorkResult(workResult);
-            }
+            writer.writeOneWorkResult(workResult);
         }
     }
 
-    public Map<FileStorageKey, File> finish() throws IOException {
+    public synchronized Map<FileStorageKey, File> finish() throws IOException {
         Map<FileStorageKey, File> files = new HashMap<>();
         for (Map.Entry<FileStorageKey, BaseResultWriter> entry : resultWriters.entrySet()) {
-            BaseResultWriter writer = entry.getValue();
-            synchronized (writer) {
-                files.put(entry.getKey(), writer.finish());
-            }
+            files.put(entry.getKey(), entry.getValue().finish());
         }
         return files;
     }

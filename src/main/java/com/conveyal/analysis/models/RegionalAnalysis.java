@@ -95,35 +95,47 @@ public class RegionalAnalysis extends Model implements Cloneable {
         }
     }
 
-    private static String getMultiOriginFileBaseName(String analysisId, String destinations, int percentile) {
-        return String.format("%s_%s_P%d", analysisId, destinations, percentile);
+    private String getMultiOriginFileBaseName(String prefix, String destinations, int percentile) {
+        return String.format("%s_%s_P%d", prefix, destinations, percentile);
     }
 
-    public static FileStorageKey getMultiOriginAccessFileKey(String analysisId, String destinations, int percentile) {
-        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(analysisId, destinations, percentile) + ".access");
+    private String getMultiOriginFileBaseName(String destinations, int percentile) {
+        return getMultiOriginFileBaseName(_id, destinations, percentile);
     }
 
-    public static FileStorageKey getSingleCutoffGridFileKey(String analysisId, String destinations, int percentile, int cutoff, FileStorageFormat format) {
+    public FileStorageKey getMultiOriginAccessFileKey(String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(destinations, percentile) + ".access");
+    }
+
+    public FileStorageKey getSingleCutoffGridFileKey(String name, String destinations, int percentile, int cutoff, FileStorageFormat format) {
         String extension = format.extension.toLowerCase(Locale.ROOT);
-        String path = String.format("%s_C%d.%s", getMultiOriginFileBaseName(analysisId, destinations, percentile), cutoff, extension);
+        String path = String.format("%s_C%d.%s", getMultiOriginFileBaseName(name, destinations, percentile), cutoff, extension);
         return new FileStorageKey(RESULTS, path);
     }
 
-    public static FileStorageKey getMultiOriginDualAccessFileKey(String analysisId, String destinations, int percentile) {
-        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(analysisId, destinations, percentile) + ".dual.access");
+    public FileStorageKey getSingleCutoffGridFileKey(String destinations, int percentile, int cutoff, FileStorageFormat format) {
+        return getSingleCutoffGridFileKey(_id, destinations, percentile, cutoff, format);
     }
 
-    public static FileStorageKey getSingleThresholdDualAccessGridFileKey(String analysisId, String destinations, int percentile, int threshold, FileStorageFormat format) {
+    public FileStorageKey getMultiOriginDualAccessFileKey(String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(destinations, percentile) + ".dual.access");
+    }
+
+    public FileStorageKey getSingleThresholdDualAccessGridFileKey(String name, String destinations, int percentile, int threshold, FileStorageFormat format) {
         String extension = format.extension.toLowerCase(Locale.ROOT);
-        String path = String.format("%s_T%d.%s", getMultiOriginFileBaseName(analysisId, destinations, percentile), threshold, extension);
+        String path = String.format("%s_T%d.%s", getMultiOriginFileBaseName(name, destinations, percentile), threshold, extension);
         return new FileStorageKey(RESULTS, path);
     }
 
-    public static FileStorageKey getCsvResultFileKey(String analysisId, CsvResultType resultType) {
-        return new FileStorageKey(RESULTS, analysisId + "_" + resultType + ".csv");
+    public FileStorageKey getSingleThresholdDualAccessGridFileKey(String destinations, int percentile, int threshold, FileStorageFormat format) {
+        return getSingleThresholdDualAccessGridFileKey(_id, destinations, percentile, threshold, format);
     }
 
-    public static FileStorageKey getScenarioJsonFileKey(String analysisId, String scenarioId) {
-        return new FileStorageKey(BUNDLES, analysisId + "_" + scenarioId + ".json");
+    public FileStorageKey getCsvResultFileKey(CsvResultType resultType) {
+        return new FileStorageKey(RESULTS, _id + "_" + resultType + ".csv");
+    }
+
+    public FileStorageKey getScenarioJsonFileKey(String scenarioId) {
+        return new FileStorageKey(BUNDLES, _id + "_" + scenarioId + ".json");
     }
 }

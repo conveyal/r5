@@ -258,14 +258,14 @@ public class RegionalAnalysisController implements HttpController {
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     String destinationsName = getDestinationsName(destinationPointSetId, userPermissions);
                     for (int percentile : analysis.travelTimePercentiles) {
-                        FileStorageKey multiKey = RegionalAnalysis.getMultiOriginAccessFileKey(regionalAnalysisId, destinationPointSetId, percentile);
+                        FileStorageKey multiKey = analysis.getMultiOriginAccessFileKey(destinationPointSetId, percentile);
                         File multiThresholdFile = fileStorage.getFile(multiKey);
                         for (int cutoffMinutes : analysis.cutoffsMinutes) {
-                            FileStorageKey singleCutoffKey = RegionalAnalysis.getSingleCutoffGridFileKey(regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes, FileStorageFormat.GEOTIFF);
+                            FileStorageKey singleCutoffKey = analysis.getSingleCutoffGridFileKey(destinationPointSetId, percentile, cutoffMinutes, FileStorageFormat.GEOTIFF);
                             if (!fileStorage.exists(singleCutoffKey)) {
                                 generateSingleThresholdResultsFile(multiThresholdFile, singleCutoffKey, cutoffMinutes, FileStorageFormat.GEOTIFF);
                             }
-                            String humanName = RegionalAnalysis.getSingleCutoffGridFileKey(analysis.humanName(), destinationsName, percentile, cutoffMinutes, FileStorageFormat.GEOTIFF).path;
+                            String humanName = analysis.getSingleCutoffGridFileKey(analysis.humanName(), destinationsName, percentile, cutoffMinutes, FileStorageFormat.GEOTIFF).path;
                             fileKeys.put(humanName, singleCutoffKey);
                             progressListener.increment();
                         }
@@ -375,9 +375,9 @@ public class RegionalAnalysisController implements HttpController {
                     "Dual access thresholds for this regional analysis must be taken from this list: (%s)",
                     Ints.join(", ", thresholds)
             );
-            singleThresholdKey = RegionalAnalysis.getSingleThresholdDualAccessGridFileKey(regionalAnalysisId, destinationPointSetId, percentile, threshold, format);
-            multiKey = RegionalAnalysis.getMultiOriginDualAccessFileKey(regionalAnalysisId, destinationPointSetId, percentile);
-            humanName = RegionalAnalysis.getSingleThresholdDualAccessGridFileKey(analysis.humanName(), destinationsName, percentile, threshold, format).path;
+            singleThresholdKey = analysis.getSingleThresholdDualAccessGridFileKey(destinationPointSetId, percentile, threshold, format);
+            multiKey = analysis.getMultiOriginDualAccessFileKey(destinationPointSetId, percentile);
+            humanName = analysis.getSingleThresholdDualAccessGridFileKey(analysis.humanName(), destinationsName, percentile, threshold, format).path;
         } else {
             // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
             checkState(analysis.cutoffsMinutes != null, "Regional analysis has no cutoffs.");
@@ -389,9 +389,9 @@ public class RegionalAnalysisController implements HttpController {
                     "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
                     Ints.join(", ", analysis.cutoffsMinutes)
             );
-            singleThresholdKey = RegionalAnalysis.getSingleCutoffGridFileKey(regionalAnalysisId, destinationPointSetId, percentile, threshold, format);
-            multiKey = RegionalAnalysis.getMultiOriginAccessFileKey(regionalAnalysisId, destinationPointSetId, percentile);
-            humanName = RegionalAnalysis.getSingleCutoffGridFileKey(analysis.humanName(), destinationsName, percentile, threshold, format).path;
+            singleThresholdKey = analysis.getSingleCutoffGridFileKey(destinationPointSetId, percentile, threshold, format);
+            multiKey = analysis.getMultiOriginAccessFileKey(destinationPointSetId, percentile);
+            humanName = analysis.getSingleCutoffGridFileKey(analysis.humanName(), destinationsName, percentile, threshold, format).path;
         }
 
         if (!fileStorage.exists(singleThresholdKey)) {
@@ -425,7 +425,7 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.notFound("This regional analysis does not contain CSV results of type " + resultType);
         }
 
-        FileStorageKey fileStorageKey = RegionalAnalysis.getCsvResultFileKey(analysis._id, resultType);
+        FileStorageKey fileStorageKey = analysis.getCsvResultFileKey(resultType);
 
         // TODO handle JSON with human name on UI side
         // res.type(APPLICATION_JSON.asString());
@@ -450,13 +450,6 @@ public class RegionalAnalysisController implements HttpController {
         if (analysisRequest.name.contains("STATIC_SITE")) {
             // Hidden feature: allows us to run static sites experimentally without exposing a checkbox to all users.
             analysisRequest.makeTauiSite = true;
-        }
-
-        if (analysisRequest.name.contains("MULTI_CUTOFF")) {
-            // Hidden feature: allows us to test multiple cutoffs and percentiles without modifying UI.
-            // These arrays could also be sent in the API payload. Either way, they will override any single cutoff.
-            analysisRequest.cutoffsMinutes = DEFAULT_CUTOFFS;
-            analysisRequest.percentiles = DEFAULT_REGIONAL_PERCENTILES;
         }
 
         // Create an internal RegionalTask and RegionalAnalysis from the AnalysisRequest sent by the client.
@@ -509,7 +502,6 @@ public class RegionalAnalysisController implements HttpController {
 
         // Set the origin pointset key if an ID is specified. Currently this will always be a freeform pointset.
         // Also load this freeform origin pointset instance itself, so broker can see point coordinates, ids etc.
-
         if (analysisRequest.originPointSetId != null) {
             task.originPointSetKey = Persistence.opportunityDatasets
                     .findByIdIfPermitted(analysisRequest.originPointSetId, userPermissions).storageLocation();
@@ -602,32 +594,25 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.workerVersion = analysisRequest.workerVersion;
         regionalAnalysis.zoom = task.zoom;
 
-        // Store the full array of multiple cutoffs.
-        checkNotNull(analysisRequest.cutoffsMinutes);
-        checkArgument(analysisRequest.cutoffsMinutes.length > 0);
+        // Store the full array of multiple cutoffs and percentiles.
         regionalAnalysis.cutoffsMinutes = analysisRequest.cutoffsMinutes;
-
-        // Same process as for cutoffsMinutes, but for percentiles.
-        checkNotNull(analysisRequest.percentiles);
-        checkArgument(analysisRequest.percentiles.length > 0);
         regionalAnalysis.travelTimePercentiles = analysisRequest.percentiles;
 
         // Persist this newly created RegionalAnalysis to Mongo.
-        // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.
+        // This assigns it creation/update time stamps and an ID, which is needed to name any output files.
         regionalAnalysis = Persistence.regionalAnalyses.create(regionalAnalysis);
 
         // Set the job ID on the task, which is used by the MultiOriginAssembler and Broker.
         task.jobId = regionalAnalysis._id;
 
-        // Create the result writers
+        // Create the result writers. The file names need the job ID.
         Map<FileStorageKey, BaseResultWriter> resultWriters = new HashMap<>();
         if (task.originPointSet == null) {
             WebMercatorExtents extents = task.getWebMercatorExtents();
             for (int destinationsIndex = 0; destinationsIndex < task.destinationPointSetKeys.length; destinationsIndex++) {
                 for (int percentilesIndex = 0; percentilesIndex < task.percentiles.length; percentilesIndex++) {
                     if (task.recordAccessibility) {
-                        FileStorageKey fileKey = RegionalAnalysis.getMultiOriginAccessFileKey(
-                            task.jobId,
+                        FileStorageKey fileKey = regionalAnalysis.getMultiOriginAccessFileKey(
                             regionalAnalysis.destinationPointSetIds[destinationsIndex],
                             task.percentiles[percentilesIndex]
                         );
@@ -641,8 +626,7 @@ public class RegionalAnalysisController implements HttpController {
                     } 
 
                     if (task.includeTemporalDensity) {
-                        FileStorageKey fileKey = RegionalAnalysis.getMultiOriginDualAccessFileKey(
-                            task.jobId,
+                        FileStorageKey fileKey = regionalAnalysis.getMultiOriginDualAccessFileKey(
                             regionalAnalysis.destinationPointSetIds[destinationsIndex],
                             task.percentiles[percentilesIndex]
                         );
@@ -659,26 +643,26 @@ public class RegionalAnalysisController implements HttpController {
         } else {
             if (task.recordAccessibility) {
                 // Freeform origins - create CSV regional analysis results
-                FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.ACCESS);
+                FileStorageKey fileKey = regionalAnalysis.getCsvResultFileKey(CsvResultType.ACCESS);
                 resultWriters.put(fileKey, new AccessCsvResultWriter(task));
                 regionalAnalysis.resultStorage.put(CsvResultType.ACCESS, fileKey.path);
             }
 
             if (task.includeTemporalDensity) {
-                FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.TDENSITY);
+                FileStorageKey fileKey = regionalAnalysis.getCsvResultFileKey(CsvResultType.TDENSITY);
                 resultWriters.put(fileKey, new TemporalDensityCsvResultWriter(task));
                 regionalAnalysis.resultStorage.put(CsvResultType.TDENSITY, fileKey.path);
             }
         }
 
         if (task.recordTimes) {
-            FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.TIMES);
+            FileStorageKey fileKey = regionalAnalysis.getCsvResultFileKey(CsvResultType.TIMES);
             resultWriters.put(fileKey, new TimeCsvResultWriter(task));
             regionalAnalysis.resultStorage.put(CsvResultType.TIMES, fileKey.path);
         }
 
         if (task.includePathResults) {
-            FileStorageKey fileKey = RegionalAnalysis.getCsvResultFileKey(task.jobId, CsvResultType.PATHS);
+            FileStorageKey fileKey = regionalAnalysis.getCsvResultFileKey(CsvResultType.PATHS);
             resultWriters.put(fileKey, new PathCsvResultWriter(task));
             regionalAnalysis.resultStorage.put(CsvResultType.PATHS, fileKey.path);
         }
@@ -705,7 +689,7 @@ public class RegionalAnalysisController implements HttpController {
     }
 
     private void storeScenarioJson (RegionalAnalysis regionalAnalysis, Scenario scenario) {
-        FileStorageKey fileStorageKey = RegionalAnalysis.getScenarioJsonFileKey(regionalAnalysis._id, scenario.id);
+        FileStorageKey fileStorageKey = regionalAnalysis.getScenarioJsonFileKey(scenario.id);
         try {
             File localScenario = FileUtils.createScratchFile("json");
             JsonUtil.objectMapper.writeValue(localScenario, scenario);

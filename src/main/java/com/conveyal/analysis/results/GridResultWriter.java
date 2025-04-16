@@ -1,11 +1,13 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorExtents;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -49,23 +51,31 @@ public class GridResultWriter extends BaseResultWriter {
     /** The offset to get to the data section of the access grid file. */
     private static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
+    private final GridResultType gridResultType;
+
     /**
      * The number of thresholds (time or cumulative access) stored in the grid and used for computing values per origin.
      *
      * Note: Only the number of thresholds is stored, not their values. Proper interpretation requires threshold values
      * from the regional analysis. Storing values would require a file format change.
      */
-    private final int nThresholds;
+    protected final int nThresholds;
+
+    protected final int destinationIndex;
+
+    protected final int percentileIndex;
 
     /**
      * Construct a writer for a single regional analysis result grid, using the proprietary
      * Conveyal grid format. This also creates the on-disk scratch buffer into which the results
      * from the workers will be accumulated.
      */
-    GridResultWriter(WebMercatorExtents ext, int nThresholds, String fileName, FileStorage fileStorage) {
-        super(fileName, fileStorage);
+    public GridResultWriter(GridResultType gridResultType, WebMercatorExtents ext, int destinationIndex, int percentileIndex, int nThresholds) {
         long bodyBytes = (long) ext.width * ext.height * nThresholds * Integer.BYTES;
+        this.gridResultType = gridResultType;
         this.nThresholds = nThresholds;
+        this.destinationIndex = destinationIndex;
+        this.percentileIndex = percentileIndex;
         LOG.info(
             "Expecting multi-origin results for grid with width {}, height {}, {} values per origin.",
                 ext.width,
@@ -107,11 +117,19 @@ public class GridResultWriter extends BaseResultWriter {
         }
     }
 
-    /** Gzip the access grid and upload it to file storage (such as AWS S3). */
     @Override
-    protected synchronized void finish() throws IOException {
-        super.finish();
+    public void writeOneWorkResult (RegionalWorkResult workResult) throws IOException {
+        if (gridResultType == GridResultType.ACCESS) {
+            writeOneOrigin(workResult.taskId, workResult.accessibilityValues[destinationIndex][percentileIndex]);
+        } else {
+            writeOneOrigin(workResult.taskId, workResult.dualAccessValues[destinationIndex][percentileIndex]);
+        }
+    }
+
+    /** Clean up the random access file and return the buffer file. */
+    public synchronized File finish() throws IOException {
         randomAccessFile.close();
+        return bufferFile;
     }
 
     /**
@@ -128,31 +146,27 @@ public class GridResultWriter extends BaseResultWriter {
 
     /**
      * Write all values at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
-     * coordinates. Flatten them to compute file offsets and for the origin checklist.
+     * coordinates. Flatten them to compute file offsets and for the origin checklist. 
+     * 
+     * RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
      */
-    synchronized void writeOneOrigin (int taskNumber, int[] values) throws IOException {
+    protected synchronized void writeOneOrigin (int taskNumber, int[] values) throws IOException {
         if (values.length != nThresholds) {
             throw new IllegalArgumentException("Number of thresholds to be written does not match this writer.");
         }
         long offset = HEADER_LENGTH_BYTES + ((long) taskNumber * nThresholds * Integer.BYTES);
-        // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
-        // TODO why is the method also synchronized then?
-        synchronized (this) {
-            randomAccessFile.seek(offset);
-            // FIXME should this be delta-coded? The Selecting grid reducer seems to expect it to be.
-            int lastValue = 0;
-            for (int value : values) {
-                int delta = value - lastValue;
-                randomAccessFile.write(intToLittleEndianByteArray(delta));
-                lastValue = value;
-            }
+        randomAccessFile.seek(offset);
+        int lastValue = 0;
+        for (int value : values) {
+            int delta = value - lastValue;
+            randomAccessFile.write(intToLittleEndianByteArray(delta));
+            lastValue = value;
         }
     }
 
     @Override
-    synchronized void terminate () throws IOException {
+    public synchronized void terminate () throws IOException {
         randomAccessFile.close();
         bufferFile.delete();
     }
-
 }

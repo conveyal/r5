@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileStorage;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
@@ -9,15 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class AccessCsvResultWriter extends CsvResultWriter {
+    private static final String[] COLUMN_HEADERS = { "origin", "destinations", "percentile", "cutoff", "access" };
 
-    public AccessCsvResultWriter (RegionalTask task, FileStorage fileStorage) throws IOException {
-        super(task, CsvResultType.ACCESS, fileStorage);
-    }
-
-    @Override
-    public String[] columnHeaders () {
-        // We could potentially make the percentile and cutoff columns optional, but it's unnecessary complexity.
-        return new String[] { "origin", "destinations", "percentile", "cutoff", "access" };
+    public AccessCsvResultWriter(RegionalTask task) throws IOException {
+        super(task, COLUMN_HEADERS);
     }
 
     /**

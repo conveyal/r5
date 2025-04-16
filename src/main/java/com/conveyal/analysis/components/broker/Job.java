@@ -1,15 +1,23 @@
 package com.conveyal.analysis.components.broker;
 
+import com.conveyal.analysis.results.BaseResultWriter;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
@@ -29,6 +37,13 @@ public class Job {
     public static final int REDELIVERY_WAIT_SEC = 2 * 60;
 
     public static final int MAX_DELIVERY_PASSES = 5;
+
+    /**
+     * Used when auto-starting spot instances. Set to a smaller value to increase the number of
+     * workers requested automatically
+     */
+    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
+    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
 
     // In order to provide realistic estimates of job processing time, we don't want to deliver the tasks to
     // workers in row-by-row geographic order, because spatial patterns exist in the world that make some areas
@@ -69,6 +84,11 @@ public class Job {
      */
     protected int nTasksDelivered;
 
+    /**
+     * The result writers that will assemble the results from this job into files.
+     */
+    private final Map<FileStorageKey, BaseResultWriter> resultWriters;
+
     /** Every task in this job will be based on this template task, but have its origin coordinates changed. */
     public final RegionalTask templateTask;
 
@@ -105,7 +125,6 @@ public class Job {
     /**
      * The graph and r5 commit on which tasks are to be run. All tasks contained in a job must
      * run on the same graph and r5 commit.
-     * TODO this field is kind of redundant - it's implied by the template request.
      */
     public final WorkerCategory workerCategory;
 
@@ -129,25 +148,71 @@ public class Job {
      * There is some risk here of accumulating unbounded amounts of large error messages (see #919).
      * The field type could be changed to a single String instead of Set, but it's exposed on a UI-facing API as a Set.
      */
-    public final Set<String> errors = new HashSet();
+    public final Set<String> errors = new HashSet<>();
 
-    public Job (RegionalTask templateTask, WorkerTags workerTags) {
-        this.jobId = templateTask.jobId;
-        this.templateTask = templateTask;
-        this.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
+    public Job (
+        RegionalTask task, 
+        WorkerTags workerTags,
+        Map<FileStorageKey, BaseResultWriter> resultWriters
+    ) {
+        this.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
+        this.jobId = task.jobId;
+        this.templateTask = createTemplateTask(task);
         this.nTasksCompleted = 0;
         this.nextTaskToDeliver = 0;
 
-        if (templateTask.originPointSetKey != null) {
-            checkNotNull(templateTask.originPointSet);
-            this.nTasksTotal = templateTask.originPointSet.featureCount();
+        if (task.originPointSetKey != null) {
+            checkNotNull(task.originPointSet);
+            this.nTasksTotal = task.originPointSet.featureCount();
         } else {
-            this.nTasksTotal = templateTask.width * templateTask.height;
+            this.nTasksTotal = task.width * task.height;
         }
 
         this.completedTasks = new BitSet(nTasksTotal);
         this.workerTags = workerTags;
+        this.resultWriters = resultWriters;
+    }
 
+    /**
+     * The single RegionalTask object represents a lot of individual accessibility tasks at many different origin
+     * points, typically on a grid. Before passing that RegionalTask on to the Broker (which distributes tasks to
+     * workers and tracks progress), we remove the details of the scenario, substituting the scenario's unique ID
+     * to save time and bandwidth. This avoids repeatedly sending the scenario details to the worker in every task,
+     * as they are often quite voluminous. The workers will fetch the scenario once from S3 and cache it based on
+     * its ID only. We protectively clone this task because we're going to null out its scenario field, and don't
+     * want to affect the original object which contains all the scenario details.
+     */
+    private RegionalTask createTemplateTask(RegionalTask task) {
+        RegionalTask templateTask = task.clone();
+        templateTask.scenarioId = task.scenario.id;
+        templateTask.scenario = null;
+        return templateTask;
+    }
+
+    public int getTargetWorkerTotal () {
+        // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+        //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+        int targetWorkerTotal;
+        if (templateTask.hasTransit()) {
+            // Total computation for a task with transit depends on the number of stops and whether the
+            // network has frequency-based routes. The total computation for the job depends on these
+            // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+            // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+            // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+            // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+            //  this worth adding a field to Job or RegionalTask?
+            float transitScaleFactor = (9f / templateTask.zoom);
+            targetWorkerTotal = (int) ((nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+        } else {
+            // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+            // the job increases roughly with linearly with the number of origins.
+            targetWorkerTotal = nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+        }
+
+        // Guardrails until freeform pointsets are tested more thoroughly
+        if (templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
+        if (templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
+        return targetWorkerTotal;
     }
 
     public boolean markTaskCompleted(int taskId) {
@@ -229,6 +294,26 @@ public class Job {
         if (this.isComplete() && completedTasks.cardinality() != nTasksTotal) {
             LOG.error("Something is amiss in completed task tracking.");
         }
+    }
+
+    public void terminate() throws Exception {
+        for (BaseResultWriter writer : resultWriters.values()) {
+            writer.terminate();
+        }
+    }
+
+    public void handleMessage(RegionalWorkResult workResult) throws Exception {
+        for (BaseResultWriter writer : resultWriters.values()) {
+            writer.writeOneWorkResult(workResult);
+        }
+    }
+
+    public synchronized Map<FileStorageKey, File> finish() throws IOException {
+        Map<FileStorageKey, File> files = new HashMap<>();
+        for (Map.Entry<FileStorageKey, BaseResultWriter> entry : resultWriters.entrySet()) {
+            files.put(entry.getKey(), entry.getValue().finish());
+        }
+        return files;
     }
 
     @Override

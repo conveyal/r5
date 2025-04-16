@@ -2,10 +2,16 @@ package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.results.CsvResultType;
+import com.conveyal.file.FileStorageFormat;
+import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import org.locationtech.jts.geom.Geometry;
 
+import static com.conveyal.file.FileCategory.BUNDLES;
+import static com.conveyal.file.FileCategory.RESULTS;
+
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -87,5 +93,49 @@ public class RegionalAnalysis extends Model implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw AnalysisServerException.unknown(e);
         }
+    }
+
+    private String getMultiOriginFileBaseName(String prefix, String destinations, int percentile) {
+        return String.format("%s_%s_P%d", prefix, destinations, percentile);
+    }
+
+    private String getMultiOriginFileBaseName(String destinations, int percentile) {
+        return getMultiOriginFileBaseName(_id, destinations, percentile);
+    }
+
+    public FileStorageKey getMultiOriginAccessFileKey(String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(destinations, percentile) + ".access");
+    }
+
+    public FileStorageKey getSingleCutoffGridFileKey(String name, String destinations, int percentile, int cutoff, FileStorageFormat format) {
+        String extension = format.extension.toLowerCase(Locale.ROOT);
+        String path = String.format("%s_C%d.%s", getMultiOriginFileBaseName(name, destinations, percentile), cutoff, extension);
+        return new FileStorageKey(RESULTS, path);
+    }
+
+    public FileStorageKey getSingleCutoffGridFileKey(String destinations, int percentile, int cutoff, FileStorageFormat format) {
+        return getSingleCutoffGridFileKey(_id, destinations, percentile, cutoff, format);
+    }
+
+    public FileStorageKey getMultiOriginDualAccessFileKey(String destinations, int percentile) {
+        return new FileStorageKey(RESULTS, getMultiOriginFileBaseName(destinations, percentile) + ".dual.access");
+    }
+
+    public FileStorageKey getSingleThresholdDualAccessGridFileKey(String name, String destinations, int percentile, int threshold, FileStorageFormat format) {
+        String extension = format.extension.toLowerCase(Locale.ROOT);
+        String path = String.format("%s_T%d.%s", getMultiOriginFileBaseName(name, destinations, percentile), threshold, extension);
+        return new FileStorageKey(RESULTS, path);
+    }
+
+    public FileStorageKey getSingleThresholdDualAccessGridFileKey(String destinations, int percentile, int threshold, FileStorageFormat format) {
+        return getSingleThresholdDualAccessGridFileKey(_id, destinations, percentile, threshold, format);
+    }
+
+    public FileStorageKey getCsvResultFileKey(CsvResultType resultType) {
+        return new FileStorageKey(RESULTS, _id + "_" + resultType + ".csv");
+    }
+
+    public FileStorageKey getScenarioJsonFileKey(String scenarioId) {
+        return new FileStorageKey(BUNDLES, _id + "_" + scenarioId + ".json");
     }
 }

@@ -146,24 +146,21 @@ public class GridResultWriter extends BaseResultWriter {
 
     /**
      * Write all values at once to the proper subregion of the buffer for this origin. The origins we receive have 2d
-     * coordinates. Flatten them to compute file offsets and for the origin checklist.
+     * coordinates. Flatten them to compute file offsets and for the origin checklist. 
+     * 
+     * RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
      */
     protected synchronized void writeOneOrigin (int taskNumber, int[] values) throws IOException {
         if (values.length != nThresholds) {
             throw new IllegalArgumentException("Number of thresholds to be written does not match this writer.");
         }
         long offset = HEADER_LENGTH_BYTES + ((long) taskNumber * nThresholds * Integer.BYTES);
-        // RandomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
-        // TODO why is the method also synchronized then?
-        synchronized (this) {
-            randomAccessFile.seek(offset);
-            // FIXME should this be delta-coded? The Selecting grid reducer seems to expect it to be.
-            int lastValue = 0;
-            for (int value : values) {
-                int delta = value - lastValue;
-                randomAccessFile.write(intToLittleEndianByteArray(delta));
-                lastValue = value;
-            }
+        randomAccessFile.seek(offset);
+        int lastValue = 0;
+        for (int value : values) {
+            int delta = value - lastValue;
+            randomAccessFile.write(intToLittleEndianByteArray(delta));
+            lastValue = value;
         }
     }
 

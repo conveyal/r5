@@ -57,4 +57,9 @@ public class TransportNetworkConfig {
      */
     public String traversalPermissionLabeler;
 
+    /** Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites or the Network Viewer). If false,
+     * straight line segments between stops will be used in visualizations.
+     */
+    public boolean saveShapes;
+
 }

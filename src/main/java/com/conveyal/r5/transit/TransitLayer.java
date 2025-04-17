@@ -10,6 +10,7 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
@@ -65,8 +66,6 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
-
-    public static final boolean SAVE_SHAPES = false;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
@@ -166,6 +165,11 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public Map<String, Fare> fares;
 
+    /** Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites). Unless the default false
+     * value is overwritten by a transportNetworkConfig file, straight line segments between stops will be used in
+     * visualiations.*/
+    public boolean saveShapes = false;
+
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
 
@@ -178,6 +182,12 @@ public class TransitLayer implements Serializable, Cloneable {
      * don't modify the transit network. (This never happens yet, but will when we allow street editing.)
      */
     public String scenarioId;
+
+    public TransitLayer (TransportNetworkConfig config) {
+        if (config != null) {
+            saveShapes = config.saveShapes;
+        }
+    }
 
     /**
      * Load a GTFS feed with full load level. The feed is not closed after being loaded.
@@ -307,7 +317,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
 
-                    if (trip.shape_id != null && SAVE_SHAPES) {
+                    if (trip.shape_id != null && saveShapes) {
                         Shape shape = gtfs.getShape(trip.shape_id);
                         if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
                         else {

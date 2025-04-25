@@ -197,7 +197,7 @@ public class TransportNetworkCache implements Component {
      * If we did not find a cached network, build one from the input files. Should throw an exception rather than
      * returning null if for any reason it can't finish building one.
      */
-    private @Nonnull TransportNetwork buildNetwork (String networkId) {
+    private @Nonnull TransportNetwork buildNetwork(String networkId) throws IOException {
         TransportNetwork network;
         TransportNetworkConfig networkConfig = loadNetworkConfig(networkId);
         if (networkConfig == null) {
@@ -225,14 +225,10 @@ public class TransportNetworkCache implements Component {
         network.rebuildLinkedGridPointSet(buildGridsForModes);
 
         // Cache the serialized network on the local filesystem and mirror it to any remote storage.
-        try {
-            File cacheLocation = FileUtils.createScratchFile();
-            KryoNetworkSerializer.write(network, cacheLocation);
-            fileStorage.moveIntoStorage(getR5NetworkFileStorageKey(networkId), cacheLocation);
-        } catch (Exception e) {
-            // Tolerate exceptions here as we do have a network to return, we just failed to cache it.
-            LOG.error("Error saving cached network, returning the object anyway.", e);
-        }
+        File cacheLocation = FileUtils.createScratchFile();
+        KryoNetworkSerializer.write(network, cacheLocation);
+        fileStorage.moveIntoStorage(getR5NetworkFileStorageKey(networkId), cacheLocation);
+
         return network;
     }
 

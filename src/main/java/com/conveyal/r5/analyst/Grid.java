@@ -1,8 +1,8 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.file.FileUtils;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
@@ -554,7 +554,7 @@ public class Grid extends PointSet {
      * @param ignoreFields if this is non-null, the fields with these names will not be considered when looking for
      *                     numeric opportunity count fields. Null strings in the collection are ignored.
      */
-    public static List<Grid> fromCsv(InputStreamProvider csvInputStreamProvider,
+    public static List<Grid> fromCsv(File csvFile,
                                      String latField,
                                      String lonField,
                                      Collection<String> ignoreFields,
@@ -563,7 +563,7 @@ public class Grid extends PointSet {
 
         // Read through the CSV file once to establish its structure (which fields are numeric).
         // TODO factor out this logic for all CSV loading, reuse for freeform and grids, set progress properly.
-        CsvReader reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
+        CsvReader reader = new CsvReader(FileUtils.getInputStream(csvFile), StandardCharsets.UTF_8);
         reader.readHeaders();
         List<String> headers = Arrays.asList(reader.getHeaders());
         if (!headers.contains(latField)) {
@@ -646,7 +646,7 @@ public class Grid extends PointSet {
 
         // The first read through the CSV just established its structure (e.g. which fields were numeric).
         // Now, re-read the CSV from the beginning to load the values and populate the grids.
-        reader = new CsvReader(csvInputStreamProvider.getInputStream(), StandardCharsets.UTF_8);
+        reader = new CsvReader(FileUtils.getInputStream(csvFile), StandardCharsets.UTF_8);
         reader.readHeaders();
 
         int i = 0;

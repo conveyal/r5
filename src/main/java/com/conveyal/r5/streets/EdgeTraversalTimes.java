@@ -44,12 +44,13 @@ public class EdgeTraversalTimes implements TraversalTimeCalculator {
 
     public void setEdgePair (int forwardEdge, Way way) {
         int backwardEdge = forwardEdge + 1;
-        LaDotCostTags forwardTags = new LaDotCostTags(way, FORWARD);
-        walkTraversalTimes.setOneEdge(forwardEdge, new LaDotWalkCostSupplier(forwardTags));
-        bikeTraversalTimes.setOneEdge(forwardEdge, new LaDotBikeCostSupplier(forwardTags));
-        LaDotCostTags backwardTags = new LaDotCostTags(way, BACKWARD);
-        walkTraversalTimes.setOneEdge(backwardEdge, new LaDotWalkCostSupplier(backwardTags));
-        bikeTraversalTimes.setOneEdge(backwardEdge, new LaDotBikeCostSupplier(backwardTags));
+        CustomCostTags tags = new CustomCostTags(way);
+        CustomWalkCostSupplier walkSupplier = new CustomWalkCostSupplier(tags);
+        CustomBikeCostSupplier bikeSupplier = new CustomBikeCostSupplier(tags);
+        walkTraversalTimes.setOneEdge(forwardEdge, walkSupplier);
+        bikeTraversalTimes.setOneEdge(forwardEdge, bikeSupplier);
+        walkTraversalTimes.setOneEdge(backwardEdge, walkSupplier);
+        bikeTraversalTimes.setOneEdge(backwardEdge, bikeSupplier);
     }
 
     public void summarize () {

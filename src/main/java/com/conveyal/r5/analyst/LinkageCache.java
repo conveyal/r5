@@ -16,35 +16,34 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Retains linkages between PointSets and the StreetLayers for specific StreetModes.
- * This used to be embedded in the PointSets themselves, now there should be one instance per TransportNetwork.
+ * Retains linkages between PointSets and the StreetLayers for specific StreetModes, including egress distance tables.
+ * LinkageCaches used to be associated with individual PointSets, but now there is a single cache per TransportNetwork.
  * There could instead be one instance per AnalystWorker or per JVM (static), but this would cause the mappings
  * including PointSets, StreetLayers, and Linkages (which hold references to the TransportNetwork) to stick around
- * even when we try to garbage collect a TransportNetwork. This is less of an issue now that we don't plan to have
- * workers migrate between TransportNetworks.
+ * even when we try to garbage collect a TransportNetwork. In cloud operation, this problem would not necessarily arise
+ * in practice since workers are permanently associated with a single base TransportNetwork.
  */
 public class LinkageCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkageCache.class);
 
     /**
-     * Maximum number of street network linkages to cache per PointSet. This is a crude way of limiting memory
-     * consumption, and should eventually be replaced with a WeighingCache. Since every Scenario including the
-     * baseline has its own StreetLayer instance now, this means we can hold walk, bike, and car linkages (with
-     * distance tables) for 2 scenarios plus the baseline at once.
-     * FIXME this used to be per-PointSet, now it's one single limit per TransportNetwork.
+     * Maximum number of street network linkages and associated egress tables to retain in this LinkageCache.
+     * This is a crude way of limiting memory consumption, and would ideally be replaced with a WeighingCache.
+     * However, the memory consumption of a particular linkage is difficult to quantify, as the bulk of the data
+     * is distance tables, and multiple linkages may share a large number of references to reused distance tables.
+     * Since every Scenario including the baseline has its own StreetLayer instance, we could for example hold linkages
+     * (with associated distance tables) for walk, bike, and car egress for 2 scenarios plus the baseline at once.
      */
     public static int LINKAGE_CACHE_SIZE = 9;
 
     /**
-     * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
-     * later reuse. Different linkages are produced for different street networks and for different on-street modes
-     * of travel. At first we were careful to key this cache on the StreetNetwork itself (rather than the
-     * TransportNetwork or Scenario) to ensure that linkages were re-used for multiple scenarios that have the same
-     * street network. However, selectively re-linking to the street network is now usually fast, and
-     * StreetNetworks must be copied for every scenario due to references to their containing TransportNetwork.
+     * For a particular TransportNetwork, a different linkage is produced for each unique combination of destination
+     * points, StreetLayer, and on-street mode of travel (see details of Key). A distinct StreetLayer instance exists
+     * for each scenario even when its contents remain unchanged by the scenario, because the StreetLayer references
+     * the enclosing TransportNetwork for the scenario.
      * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
-     * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
+     * cache instance and its settings, not the contents of the cache. This is the intended behavior.
      */
     protected transient LoadingCache<Key, LinkedPointSet> linkageCache;
 
@@ -59,24 +58,24 @@ public class LinkageCache {
     /**
      * The logic for lazy-loading linkages into the cache.
      *
-     // FIXME FIXME clean up these notes on sub-linkages.
-     // We know that pointSet is a WebMercatorGridPointSet, but if it's a new one we want to replicate its
-     // linkages based on the base scenarioNetwork.gridPointSet's linkages. We don't know if it's new, so such
-     // logic has to happen in the loop below over all streetModes, where we fetch and build the egress cost
-     // tables. We already know for sure this is a scenarioNetwork.
-     // So if we see a linkage for scenarioNetwork.gridPointSet, we need to add another linkage.
-     // When this mapping exists:
-     // (scenarioNetwork.gridPointSet, StreetLayer, StreetMode) -> linkageFor(scenarioNetwork.gridPointSet)
-     // We need to generate this mapping:
-     // (pointSet, StreetLayer, StreetMode) -> new LinkedPointSet(linkageFor(scenarioNetwork.gridPointSet), pointSet);
-     // Note that: ((WebMercatorGridPointSet)pointSet).base == scenarioNetwork.gridPointSet
-     // I'm afraid BaseLinkage means two different things here: we can subset bigger linkages that already
-     // exist, or we can redo subsets of linkages of the same size them them when applying scenarios.
-     // Yes: in one situation, the PointSet objects are identical when making the new linkage, but the
-     // streetLayer differs. In the other situation, the PointSet objects are different but the other aspects
-     // are the same. Again this is the difference between a PointSet and its linkage. We should call them
-     // PointSetLinkages instead of LinkedPointSets because they do not subclass PointSet.
-     // basePointSet vs. baseStreetLayer vs. baseLinkage.
+     * FIXME clean up these notes on sub-linkages, some of which may be obsolete.
+     * We know that pointSet is a WebMercatorGridPointSet, but if it's a new one we want to replicate its
+     * linkages based on the base scenarioNetwork.gridPointSet's linkages. We don't know if it's new, so such
+     * logic has to happen in the loop below over all streetModes, where we fetch and build the egress cost
+     * tables. We already know for sure this is a scenarioNetwork.
+     * So if we see a linkage for scenarioNetwork.gridPointSet, we need to add another linkage.
+     * When this mapping exists:
+     * (scenarioNetwork.gridPointSet, StreetLayer, StreetMode) -> linkageFor(scenarioNetwork.gridPointSet)
+     * We need to generate this mapping:
+     * (pointSet, StreetLayer, StreetMode) -> new LinkedPointSet(linkageFor(scenarioNetwork.gridPointSet), pointSet);
+     * Note that: ((WebMercatorGridPointSet)pointSet).base == scenarioNetwork.gridPointSet
+     * I'm afraid BaseLinkage means two different things here: we can subset bigger linkages that already
+     * exist, or we can redo subsets of linkages of the same size when applying scenarios.
+     * Yes: in one situation, the PointSet objects are identical when making the new linkage, but the
+     * streetLayer differs. In the other situation, the PointSet objects are different but the other aspects
+     * are the same. Again this is the difference between a PointSet and its linkage. We should call them
+     * PointSetLinkages instead of LinkedPointSets because they do not subclass PointSet.
+     * basePointSet vs. baseStreetLayer vs. baseLinkage.
      */
     private class LinkageCacheLoader extends CacheLoader<Key, LinkedPointSet> implements Serializable {
         @Override

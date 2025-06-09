@@ -86,7 +86,7 @@ public abstract class BackendComponents {
                 new GtfsController(gtfsCache),
                 new BundleController(this),
                 new OpportunityDatasetController(fileStorage, taskScheduler, censusExtractor, database),
-                new RegionalAnalysisController(broker, fileStorage),
+                new RegionalAnalysisController(broker, fileStorage, taskScheduler),
                 new AggregationAreaController(fileStorage, database, taskScheduler),
                 // This broker controller registers at least one handler at URL paths beginning with /internal, which
                 // is exempted from authentication and authorization, but should be hidden from the world

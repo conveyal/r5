@@ -2,12 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RasterCost;
-import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.profile.StreetMode;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import java.util.List;
 import java.util.Set;
@@ -53,5 +49,17 @@ public class TransportNetworkConfig {
      * a problem it is a candidate for future optimization.
      */
     public Set<StreetMode> buildGridsForModes;
+
+    /**
+     * Specifies which "labeler" to use when setting traversal mode permissions from OSM tags. For now, only
+     * implemented with "sidewalk" to use the SidewalkTraversalPermissionLayer. This should eventually be cleaned up
+     * (specifying different labelers, using enums).
+     */
+    public String traversalPermissionLabeler;
+
+    /** Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites or the Network Viewer). If false,
+     * straight line segments between stops will be used in visualizations.
+     */
+    public boolean saveShapes;
 
 }

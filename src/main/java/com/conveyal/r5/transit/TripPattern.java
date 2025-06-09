@@ -34,6 +34,7 @@ public class TripPattern implements Serializable, Cloneable {
      * ID in this transport network the ID would depend on the order of application of scenarios, and because this ID is
      * used to map results back to the original network.
      * TODO This concept of an "original" transport network may be obsolete, this field doesn't seem to be used anywhere.
+     *      These are set to sequential integers: the index of the pattern in the TransitLayer's list of patterns.
      */
     public int originalId;
 

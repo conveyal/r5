@@ -742,7 +742,7 @@ public class StreetRouter {
      * fragments from the vertices at either end of the edge up to the destination split point.
      * If no states can be produced return null.
      *
-     * Note that this is only used by the point to point street router, not by LinkedPointSets (which have equivalent
+     * NOTE that this is ONLY USED BY the point to point street router, NOT BY LinkedPointSets (which have equivalent
      * logic in their eval method). The PointSet implementation only needs to produce times, not States. But ideally
      * some common logic can be factored out.
      */

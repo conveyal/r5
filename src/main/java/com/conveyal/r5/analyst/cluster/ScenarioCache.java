@@ -26,14 +26,14 @@ import java.util.Map;
  * scenarios from the backend instead of from S3.
  *
  * TODO merge this with TransportNetworkCache#resolveScenario into a single multi-level mem/disk/s3 cache.
- * Note that this cache is going to just grow indefinitely in size as a worker receives many iterations of the same
- * scenario - that could be a memory leak. Again multi level caching could releive those worries.
- * It's debatable whether we should be hanging on to scenarios passed with single point requests becuase they may never
- * be used again.
+ * This cache grows in size without bound as a worker receives many iterations of the same scenario.
+ * This is technically a sort of memory leak for long-lived workers. Multi-level caching could relieve those worries.
+ * However, this cache stores only the Scenarios and Modifications, not any large egress tables or linkages.
+ *
+ * It's debatable whether we should be hanging on to scenarios passed with single point requests,
+ * because they may never be used again.
  * Should we just always require a single point task to be sent to the cluster before a regional?
  * That would not ensure the scenario was present on all workers though.
- *
- * Created by abyrd on 2018-10-29
  */
 public class ScenarioCache {
 
@@ -44,7 +44,7 @@ public class ScenarioCache {
     public synchronized void storeScenario (Scenario scenario) {
         Scenario existingScenario = scenariosById.put(scenario.id, scenario);
         if (existingScenario != null) {
-            LOG.debug("Scenario cache already contained a this scenario.");
+            LOG.debug("Scenario cache already contained this scenario.");
         }
     }
 

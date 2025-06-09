@@ -162,7 +162,7 @@ public class Task implements Runnable, ProgressListener {
     }
 
     /**
-     * Check that all necesary fields have been set before enqueueing for execution, and check any invariants.
+     * Check that all necessary fields have been set before enqueueing for execution, and check any invariants.
      */
     public void validate () {
         if (this.user == null) {

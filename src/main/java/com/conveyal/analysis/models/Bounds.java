@@ -35,4 +35,12 @@ public class Bounds {
         return bounds;
     }
 
+    public String toJsonString (double factor) {
+        return String.format("\"north\": %f, \"south\": %f, \"east\": %f, \"west\": %f",
+                north / factor,
+                south / factor,
+                east / factor,
+                west / factor);
+    }
+
 }

@@ -14,6 +14,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -153,6 +154,17 @@ public class Scenario implements Serializable {
                 copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.WALK_DISTANCE_LIMIT_METERS);
         copiedNetwork.transitLayer.buildDistanceTables(treeRebuildZone);
         
+        // Custom feature for Caltrans: applies mode-specific buffer distances around modifications (for now, only
+        // those that affect street layer)
+        if (this.affectsStreetLayer()) {
+            Map<String, Integer> buffersByMode = new HashMap<>();
+            buffersByMode.put("Walk", 7200);
+            buffersByMode.put("Bike", 24000);
+            buffersByMode.put("Transit", 50000);
+            buffersByMode.put("Car", 112000);
+            copiedNetwork.addScenarioBuffers(buffersByMode);
+        }
+
         // Find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
         new TransferFinder(copiedNetwork).findTransfers();

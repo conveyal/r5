@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.analysis.models.Bounds;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
@@ -7,6 +8,8 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.ModifyStreets;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
@@ -31,6 +34,8 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -374,6 +379,16 @@ public class TransportNetwork implements Serializable {
         copy.fareCalculator = this.fareCalculator;
         copy.linkageCache = this.linkageCache; // <-- weirdness, TODO get this out of the TransportNetwork
         return copy;
+    }
+
+    public void addScenarioBuffers(Map<String, Integer> buffersByMode) {
+        List<String> bufferInfo = new ArrayList<>();
+        bufferInfo.add("Buffers for all modifications tied to street layer:");
+        buffersByMode.forEach((mode, distance) -> {
+            Envelope customExtents = streetLayer.scenarioEdgesBoundingGeometry(distance).getEnvelopeInternal();
+            bufferInfo.add(mode +"\n " + Bounds.fromWgsEnvelope(customExtents).toJsonString(FIXED_FACTOR));
+        });
+        this.scenarioApplicationInfo.add(new TaskError(new ModifyStreets(), bufferInfo));
     }
 
     /**

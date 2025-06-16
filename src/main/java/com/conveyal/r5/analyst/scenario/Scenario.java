@@ -1,11 +1,13 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.analysis.models.Bounds;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
 
 /**
  * A scenario is an ordered sequence of modifications that will be applied non-destructively on top of a baseline graph.
@@ -162,7 +166,7 @@ public class Scenario implements Serializable {
             buffersByMode.put("Bike", 24000);
             buffersByMode.put("Transit", 50000);
             buffersByMode.put("Car", 112000);
-            copiedNetwork.addScenarioBuffers(buffersByMode);
+            addScenarioBuffers(buffersByMode, copiedNetwork);
         }
 
         // Find the transfers originating at or terminating at new stops.
@@ -181,6 +185,16 @@ public class Scenario implements Serializable {
             }
         }
         return copiedNetwork;
+    }
+
+    private void addScenarioBuffers(Map<String, Integer> buffersByMode, TransportNetwork network) {
+        List<String> bufferInfo = new ArrayList<>();
+        bufferInfo.add("Buffers for all modifications tied to street layer:");
+        buffersByMode.forEach((mode, distance) -> {
+            Envelope customExtents = network.streetLayer.scenarioEdgesBoundingGeometry(distance).getEnvelopeInternal();
+            bufferInfo.add(mode +"\n " + Bounds.fromWgsEnvelope(customExtents).toJsonString(FIXED_FACTOR));
+        });
+        network.scenarioApplicationInfo.add(new TaskError(new ModifyStreets(), bufferInfo));
     }
 
     /**

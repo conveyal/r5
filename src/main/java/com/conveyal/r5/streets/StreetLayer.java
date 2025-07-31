@@ -100,13 +100,26 @@ public class StreetLayer implements Serializable, Cloneable {
     private static final int SNAP_RADIUS_MM = 5 * 1000;
 
     /**
-     * The radius of a circle in meters within which to search for nearby streets.
-     * This should not necessarily be a constant, but even if it's made settable it should be stored in a field on this
-     * class to avoid cluttering method signatures. Generally you'd set this once at startup and always use the same
-     * value afterward.
-     * 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
+     * The radius of a circle in meters within which to search for nearby streets when linking stops/park and rides.
+     * 
+     * The default, 1.6km, is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final double LINK_RADIUS_METERS = 1600;
+    private double stopLinkRadiusMeters = 1600;
+
+    public double getStopLinkRadiusMeters() {
+        return stopLinkRadiusMeters;
+    }
+
+    /**
+     * The radius of a circle in meters within which to search for nearby streets when linking pointsets/origins/destinations.
+     * 
+     * The default, 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
+     */
+    private double pointsetLinkRadiusMeters = 1600;
+    
+    public double getPointsetLinkRadiusMeters() {
+        return pointsetLinkRadiusMeters;
+    }
 
     /**
      * Searching for streets takes a fair amount of computation, and the number of streets examined grows roughly as
@@ -229,7 +242,9 @@ public class StreetLayer implements Serializable, Cloneable {
             };
 
             stepFree = config.stepFree;
-            
+
+            if (config.pointsetLinkRadiusMeters != null) this.pointsetLinkRadiusMeters = config.pointsetLinkRadiusMeters;
+            if (config.stopLinkRadiusMeters != null) this.stopLinkRadiusMeters = config.stopLinkRadiusMeters;
         } else {
             permissionLabeler = new USTraversalPermissionLabeler(null);
         }
@@ -1313,7 +1328,7 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public int getOrCreateVertexNear(double lat, double lon, StreetMode streetMode) {
 
-        Split split = findSplit(lat, lon, LINK_RADIUS_METERS, streetMode);
+        Split split = findSplit(lat, lon, stopLinkRadiusMeters, streetMode);
         if (split == null) {
             // No linking site was found within range.
             return -1;
@@ -1514,6 +1529,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * between the two.
      */
     public void associateStops (TransitLayer transitLayer) {
+        LOG.info("Linking stops to streets within {} meters", stopLinkRadiusMeters);
         for (Stop stop : transitLayer.stopForIndex) {
             int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon);
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.

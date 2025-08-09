@@ -121,4 +121,9 @@ public class TransportNetworkConfig {
      * Specifies the distance to link to origins and destinations to streets, null to use default.
      */
     public Double pointsetLinkRadiusMeters = null;
+
+    /**
+     * Minimum subgraph (island) size to retain when building networks. 
+     */
+    public Integer minSubgraphSize = null;
 }

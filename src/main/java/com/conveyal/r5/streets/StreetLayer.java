@@ -83,6 +83,13 @@ public class StreetLayer implements Serializable, Cloneable {
     private static final Logger LOG = LoggerFactory.getLogger(StreetLayer.class);
 
     /**
+     * The radius below which we will not split a street, and will instead connect to an existing intersection.
+     * i.e. if the requested split point is less than this distance from an existing vertex (edge endpoint) we'll just
+     * return that existing endpoint.
+     */
+    private static final int SNAP_RADIUS_MM = 5 * 1000;
+
+    /**
      * Minimum allowable size (in number of vertices) for a disconnected subgraph; subgraphs smaller than these will be removed.
      * There are several reasons why one might have a disconnected subgraph. The most common is poor quality
      * OSM data. However, they also could be due to areas that really are disconnected in the street graph,
@@ -90,14 +97,11 @@ public class StreetLayer implements Serializable, Cloneable {
      * to mind), or islands that are isolated by infrastructure (for example, airport terminals reachable
      * only by transit or driving, for instance BWI or SFO).
      */
-    public static final int MIN_SUBGRAPH_SIZE = 40;
+    private int minSubgraphSize = 40;
 
-    /**
-     * The radius below which we will not split a street, and will instead connect to an existing intersection.
-     * i.e. if the requested split point is less than this distance from an existing vertex (edge endpoint) we'll just
-     * return that existing endpoint.
-     */
-    private static final int SNAP_RADIUS_MM = 5 * 1000;
+    public int getMinSubgraphSize() {
+        return minSubgraphSize;
+    }
 
     /**
      * The radius of a circle in meters within which to search for nearby streets when linking stops/park and rides.
@@ -245,6 +249,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
             if (config.pointsetLinkRadiusMeters != null) this.pointsetLinkRadiusMeters = config.pointsetLinkRadiusMeters;
             if (config.stopLinkRadiusMeters != null) this.stopLinkRadiusMeters = config.stopLinkRadiusMeters;
+            if (config.minSubgraphSize != null) this.minSubgraphSize = config.minSubgraphSize;
         } else {
             permissionLabeler = new USTraversalPermissionLabeler(null);
         }
@@ -406,10 +411,10 @@ public class StreetLayer implements Serializable, Cloneable {
         buildEdgeLists();
         stressLabeler.applyIntersectionCosts(this);
         if (removeIslands) {
-            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.CAR).run();
+            new TarjanIslandPruner(this, minSubgraphSize, StreetMode.CAR).run();
             // due to bike walking, walk must go before bike, see comment in TarjanIslandPruner javadoc
-            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.WALK).run();
-            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.BICYCLE).run();
+            new TarjanIslandPruner(this, minSubgraphSize, StreetMode.WALK).run();
+            new TarjanIslandPruner(this, minSubgraphSize, StreetMode.BICYCLE).run();
         }
 
         // index the streets, we need the index to connect things to them.
@@ -1318,6 +1323,9 @@ public class StreetLayer implements Serializable, Cloneable {
      *
      * This uses {@link #findSplit(double, double, double, StreetMode)} and {@link Split} which require the spatial
      * index to already be built. In other works {@link #indexStreets()} needs to be called before this is used.
+     * 
+     * This method is used to link stops and other similar things (both in base networks and
+     * modifications), so it uses stopLinkRadiusMeters rather than pointsetLinkRadiusMeters.
      *
      * TODO potential refactor: rename this method Split.perform(), and store a ref to streetLayer in Split.
      * @param lat latitude in floating point geographic (not fixed point) degrees.

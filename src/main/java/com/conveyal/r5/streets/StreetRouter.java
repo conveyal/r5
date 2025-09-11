@@ -325,7 +325,7 @@ public class StreetRouter {
      * @return true if an edge was found near the specified coordinate
      */
     public boolean setOrigin (double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, streetLayer.getPointsetLinkRadiusMeters(), streetMode);
+        Split split = streetLayer.findSplit(lat, lon, streetLayer.pointsetLinkRadiusMeters, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
@@ -435,7 +435,7 @@ public class StreetRouter {
      * @return true if edge was found near wanted coordinate
      */
     public boolean setDestination (double lat, double lon) {
-        this.destinationSplit = streetLayer.findSplit(lat, lon, streetLayer.getPointsetLinkRadiusMeters(), streetMode);
+        this.destinationSplit = streetLayer.findSplit(lat, lon, streetLayer.pointsetLinkRadiusMeters, streetMode);
         return this.destinationSplit != null;
     }
 
@@ -832,7 +832,7 @@ public class StreetRouter {
      * @return
      */
     public State getState(double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, streetLayer.getPointsetLinkRadiusMeters(), streetMode);
+        Split split = streetLayer.findSplit(lat, lon, streetLayer.pointsetLinkRadiusMeters, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return null;

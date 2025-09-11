@@ -97,33 +97,21 @@ public class StreetLayer implements Serializable, Cloneable {
      * to mind), or islands that are isolated by infrastructure (for example, airport terminals reachable
      * only by transit or driving, for instance BWI or SFO).
      */
-    private int minSubgraphSize = 40;
-
-    public int getMinSubgraphSize() {
-        return minSubgraphSize;
-    }
+    public int minSubgraphSize = 40;
 
     /**
      * The radius of a circle in meters within which to search for nearby streets when linking stops/park and rides.
      * 
      * The default, 1.6km, is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    private double stopLinkRadiusMeters = 1600;
-
-    public double getStopLinkRadiusMeters() {
-        return stopLinkRadiusMeters;
-    }
+    public double stopLinkRadiusMeters = 1600;
 
     /**
      * The radius of a circle in meters within which to search for nearby streets when linking pointsets/origins/destinations.
      * 
      * The default, 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    private double pointsetLinkRadiusMeters = 1600;
-    
-    public double getPointsetLinkRadiusMeters() {
-        return pointsetLinkRadiusMeters;
-    }
+    public double pointsetLinkRadiusMeters = 1600;
 
     /**
      * Searching for streets takes a fair amount of computation, and the number of streets examined grows roughly as

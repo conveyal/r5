@@ -450,9 +450,9 @@ public class StreetLayerTest {
             sl.buildEdgeLists();
             sl.indexStreets();
 
-            assertEquals(sl.getStopLinkRadiusMeters(), 50d * multiplier);
-            assertEquals(sl.getPointsetLinkRadiusMeters(), 100d * multiplier);
-            assertEquals(sl.getMinSubgraphSize(), 5 * multiplier);
+            assertEquals(sl.stopLinkRadiusMeters, 50d * multiplier);
+            assertEquals(sl.pointsetLinkRadiusMeters, 100d * multiplier);
+            assertEquals(sl.minSubgraphSize, 5 * multiplier);
 
             // This is an island with size 6: https://www.openstreetmap.org/way/140476882#map=19/39.409392/-76.642615&layers=D
             // Because it is at the edge of the PBF, West Joppa Road is not in the PBF, so Riderwood Stn and

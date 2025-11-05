@@ -254,7 +254,7 @@ public class TransportNetworkCache implements Component {
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
-        network.transitLayer = new TransitLayer();
+        network.transitLayer = new TransitLayer(config);
 
         config.gtfsIds.stream()
                 .map(gtfsCache::get)

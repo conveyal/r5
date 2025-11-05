@@ -13,7 +13,16 @@ import java.io.File;
 import java.util.List;
 
 /**
- * Subclasses or plugin functions will provide costs for hills, sun, noise, pollution etc.
+ * This models a field of traversal costs, in the sense of a cost that varies over geographic space having different
+ * effects on different edges. Subclasses serve as plugins that provide costs for hills, sun, noise, pollution etc.
+ *
+ * CostFields could in principle apply costs to any mode of travel, and might yield different costs for different modes,
+ * but currently they are not mode-aware. No existing implementations apply to cars, so for now CostFields are simply
+ * ignored for car routing. Ideally CostFields would know which modes they applied to, and the list of CostFields would
+ * be filtered before the street search happens. The logic currently in the StreetRouter constructor could be factored
+ * into a mode-aware factory method that would yield the correct TraversalTimeCalculator. StreetRouter is explicitly
+ * single-use with a single StreetMode. That mode could be specified up front and the TraversalTimeCalculator 
+ * chosen accordingly (avoiding the MultistageTraversalTimeCalculator construct entirely when no CostFields apply).
  *
  * Interface-wise, a CostField is like a TraversalTimeCalculator with no turn costs, which transforms an existing
  * traversal time rather than starting from scratch. So TraversalTimeCalculator is like a special case of CostField

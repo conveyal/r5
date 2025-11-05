@@ -161,7 +161,7 @@ public class Scenario implements Serializable {
             buffersByMode.put("Walk", 7200);
             buffersByMode.put("Bike", 24000);
             buffersByMode.put("Transit", 50000);
-            buffersByMode.put("Car", 112000);
+            buffersByMode.put("Car", 104607);
             copiedNetwork.addScenarioBuffers(buffersByMode);
         }
 

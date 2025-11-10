@@ -145,7 +145,7 @@ public abstract class TraversalPermissionLabeler {
      * @param tree
      * @param way
      */
-    protected void applyWheelchairPermissions(EnumMap<Node, Label> tree, Way way) {
+    private void applyWheelchairPermissions(EnumMap<Node, Label> tree, Way way) {
         if (way.hasTag("highway", "steps")) {
             applyLabel(Node.WHEELCHAIR, Label.NO, tree);
         }
@@ -167,7 +167,7 @@ public abstract class TraversalPermissionLabeler {
      * @param way
      * @param backward
      */
-    protected void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
+    private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
         String cyclewayTagValue = way.getTag("cycleway");
@@ -197,7 +197,7 @@ public abstract class TraversalPermissionLabeler {
      * @param forward
      * @param backward
      */
-    protected void applyDirectionalPermissions(Way way, EnumSet<EdgeStore.EdgeFlag> forward,
+    private void applyDirectionalPermissions(Way way, EnumSet<EdgeStore.EdgeFlag> forward,
         EnumSet<EdgeStore.EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
@@ -228,7 +228,7 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** returns whether this node is permitted traversal anywhere in the hierarchy */
-    protected Label walk (EnumMap<Node, Label> tree, Node node) {
+    private Label walk (EnumMap<Node, Label> tree, Node node) {
         do {
             //We need to return first labeled node not first yes node
             //Otherwise access=yes bicycle=no returns true for bicycle
@@ -242,7 +242,7 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** apply any specific permissions that may exist */
-    protected void applySpecificPermissions (EnumMap<Node, Label> tree, Way way) {
+    private void applySpecificPermissions (EnumMap<Node, Label> tree, Way way) {
         // start from the root of the tree
         if (way.hasTag("access")) applyLabel(Node.ACCESS, Label.fromTag(way.getTag("access")), tree);
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);
@@ -398,7 +398,7 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** Get a directional tree (for use when labeling one-way streets) where every node is labeled bidirectional */
-    protected EnumMap<Node, OneWay> getDirectionalTree (Way way) {
+    private EnumMap<Node, OneWay> getDirectionalTree (Way way) {
         EnumMap<Node, OneWay> tree = new EnumMap<>(Node.class);
 
         // label all nodes as unknown

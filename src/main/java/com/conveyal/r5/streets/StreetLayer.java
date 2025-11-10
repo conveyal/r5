@@ -224,7 +224,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 case "noSidewalkCycling" -> new NoSidewalkCyclingTraversalPermissionLabeler();
                 case "noSteepWays" -> new NoSteepInclinesTraversalPermissionLabeler();
                 case "stepFree" -> new StepFreeTraversalPermissionLabeler();
-                case null -> new StepFreeTraversalPermissionLabeler();
+                case null -> new USTraversalPermissionLabeler();
                 default -> throw new IllegalArgumentException(
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
                 );

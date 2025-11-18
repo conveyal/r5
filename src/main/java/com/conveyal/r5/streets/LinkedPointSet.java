@@ -449,11 +449,11 @@ public class LinkedPointSet implements Serializable {
             if (origin != null && origin.edge == edges[i]) {
                 // The target point lies along the same edge as the origin
                 int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
-                travelTimes[i] = // origin.distanceToEdge_mm / offStreetSpeed + TODO origin to origin split point
+                travelTimes[i] = origin.distanceToEdge_mm / offStreetSpeed +
                                 onStreetDistance_mm / onStreetSpeed + // along street
                                 distancesToEdge_mm[i] / offStreetSpeed; // from destination split point to destination
             } else {
-                travelTimes[i] = timeToPoint(timeToVertex, edge, i, onStreetSpeed);
+                travelTimes[i] = timeToPoint(timeToVertex, edge, i, onStreetSpeed, offStreetSpeed);
             }
         }
         return new PointSetTimes(pointSet, travelTimes);
@@ -526,7 +526,7 @@ public class LinkedPointSet implements Serializable {
                 // The routing variable is seconds only if we're doing a car search, so look up the car speed on the
                 // linked edge.
                 int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
-                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed);
+                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
             }
 
             if (cost != Integer.MAX_VALUE) {
@@ -607,13 +607,14 @@ public class LinkedPointSet implements Serializable {
      * @param onStreetSpeed speed at which the destination edge (to which the target is linked) is traversed
      * @return minimum time needed to reach point, or Integer.MAX_VALUE if point is not reachable.
      */
-    private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed) {
+    private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed,
+                            int offStreetSpeed) {
         int time0 = costToVertex.getCost(edge.getFromVertex());
         int time1 = costToVertex.getCost(edge.getToVertex());
         if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         } else {
-            int offStreetTime = distancesToEdge_mm[pointIndex] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+            int offStreetTime = distancesToEdge_mm[pointIndex] / offStreetSpeed;
             time0 += distances0_mm[pointIndex] / onStreetSpeed + offStreetTime;
             time1 += distances1_mm[pointIndex] / onStreetSpeed + offStreetTime;
             return Math.min(handleOverflow(time0), handleOverflow(time1));

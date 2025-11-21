@@ -25,13 +25,16 @@ import java.util.Set;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransportNetworkConfig {
 
-    /** ID of the OSM file, for use with OSMCache */
+    /** ID of the OSM file. Used as a key for fetching from OSMCache. */
     public String osmId;
 
-    /** IDs of the GTFS files, for use with GTFSCache */
+    /** IDs of the GTFS files. Used as keys for fetching from GTFSCache. */
     public List<String> gtfsIds;
 
-    /** The fare calculator for analysis, if any. TODO this is not yet wired up to TransportNetwork.setFareCalculator. */
+    /**
+     * The fare calculator for analysis, if any.
+     * TODO this is not yet wired up to TransportNetwork.setFareCalculator.
+     */
     public InRoutingFareCalculator analysisFareCalculator;
 
     /** A list of _R5_ modifications to apply during network build. May be null. */
@@ -57,9 +60,40 @@ public class TransportNetworkConfig {
      */
     public String traversalPermissionLabeler;
 
-    /** Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites or the Network Viewer). If false,
-     * straight line segments between stops will be used in visualizations.
+    /**
+     * Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites or the Network Viewer).
+     * If false, straight line segments between stops will be used in visualizations.
      */
     public boolean saveShapes;
 
+    /**
+     * How to handle stop-to-stop transfers in GTFS transfers.txt, and how to combine them with OSM-derived transfers.
+     * PER_STOP_PAIR is the default, and should only improve on the past behavior corresponding to OSM_ONLY.
+     * There may be edge cases, such as a complex with subway platforms separated by long times specified in GTFS,
+     * but no times specified for transfers between those platforms and nearby bus stops. In these cases, path results
+     * may be strange or incorrect, but the quality of travel times would be no worse than the current OSM_ONLY option.
+     *
+     * Currently we only handle stop-to-stop transfers in GTFS transfers.txt. Other more specific transfers types like
+     * route-to-route and trip-to-trip are not compatible with our current routing approach, so will be ignored with
+     * a warning. We also only import transfer type 2 ("minimum amount of time between arrival and departure to ensure
+     * a connection"). For any option except OSM_ONLY, these GTFS transfers override and replace any OSM street distance
+     * calculations. Although the GTFS spec text says "minimum amount of time", implying that other information like OSM
+     * routing could make times longer, we believe the proper interpretation is that transfers.txt provides a typical
+     * safe amount of time needed to walk between the two stops, which would only be made worse by comparing with OSM.
+     *
+     * FIXME: Strangely, BOARD_SLACK_SECONDS appears to only be used in classes for displaying paths, not for routing.
+     *
+     * TODO: We currently apply a hard lower limit of 60 seconds between alighting and boarding.
+     *   Should this be configurable or interact with the transfer entries?
+     *
+     */
+    public GtfsTransferConfig gtfsTransfers;
+
+    enum GtfsTransferConfig {
+        OSM_ONLY,  // Find all transfers by searching through the OSM street network
+        GTFS_ONLY, // Load transfers only from transfers.txt, do not use the street network
+        PER_STOP_PAIR, // Find transfers via streets for stop pairs not connected by GTFS transfers
+        PER_STOP, // Find transfers via streets only from and to stops not referenced by GTFS transfers
+        PER_FEED // GTFS_ONLY for feeds with transfers.txt, OSM_ONLY for those without
+    }
 }

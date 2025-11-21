@@ -29,7 +29,7 @@ public class SunCostField implements CostField, Serializable {
 
     /**
      * Number in the range 0...1 representing the proportion of each edge pair that is in the shade.
-     * Floating point numbers are densest in this range, so 32 bits are more than sufficent.
+     * Floating point numbers are densest in this range, so 32 bits are more than sufficient.
      * These could probably be made 2-4x smaller by storing them in shorts or bytes; we should measure this.
      */
     TFloatList sunProportions = new TFloatArrayList();

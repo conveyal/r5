@@ -1,16 +1,7 @@
 package com.conveyal.r5.rastercost;
 
-import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.TraversalTimeCalculator;
-import com.conveyal.r5.streets.VertexStore;
-import gnu.trove.list.TFloatList;
-import gnu.trove.list.TShortList;
-
-import java.io.File;
-import java.util.List;
 
 /**
  * This models a field of traversal costs, in the sense of a cost that varies over geographic space having different
@@ -21,7 +12,7 @@ import java.util.List;
  * ignored for car routing. Ideally CostFields would know which modes they applied to, and the list of CostFields would
  * be filtered before the street search happens. The logic currently in the StreetRouter constructor could be factored
  * into a mode-aware factory method that would yield the correct TraversalTimeCalculator. StreetRouter is explicitly
- * single-use with a single StreetMode. That mode could be specified up front and the TraversalTimeCalculator 
+ * single-use with a single StreetMode. That mode could be specified up front and the TraversalTimeCalculator
  * chosen accordingly (avoiding the MultistageTraversalTimeCalculator construct entirely when no CostFields apply).
  *
  * Interface-wise, a CostField is like a TraversalTimeCalculator with no turn costs, which transforms an existing

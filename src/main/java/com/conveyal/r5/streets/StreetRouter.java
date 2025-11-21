@@ -295,10 +295,12 @@ public class StreetRouter {
 
     public StreetRouter (StreetLayer streetLayer) {
         this.streetLayer = streetLayer;
+        // The street layer of the network may contain per-edge traversal times, e.g. from observed traffic data.
         this.timeCalculator = streetLayer.edgeStore.edgeTraversalTimes;
-        // If no per-edge timings were supplied in the network, fall back on simple default timings
+        // If the network has no per-edge timings, fall back on default timings, using OSM speed limits for cars.
         if (this.timeCalculator == null) {
-            // TODO either: 1) don't hardwire drive-on-right, or 2) global https://en.wikipedia.org/wiki/Dagen_H
+            // Constructor call is currently hard-coded to specify drive-on-right turn costs. We should
+            // either a) make this configurable or b) global https://en.wikipedia.org/wiki/Dagen_H
             this.timeCalculator = new BasicTraversalTimeCalculator(streetLayer, true);
         }
         // If any additional costs such as hills or sun are defined, add them on to the base traversal times.

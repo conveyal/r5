@@ -17,7 +17,6 @@ import com.conveyal.r5.labeling.NoSteepInclinesTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SidewalkTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.SpeedLabeler;
-import com.conveyal.r5.labeling.StepFreeTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.StreetClass;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
@@ -222,8 +221,7 @@ public class StreetLayer implements Serializable, Cloneable {
             permissionLabeler = switch (config.traversalPermissionLabeler) {
                 case "sidewalk" -> new SidewalkTraversalPermissionLabeler();
                 case "noSidewalkCycling" -> new NoSidewalkCyclingTraversalPermissionLabeler();
-                case "noSteepWays" -> new NoSteepInclinesTraversalPermissionLabeler(config.maxIncline);
-                case "stepFree" -> new StepFreeTraversalPermissionLabeler(config.maxIncline);
+                case "noSteepWays" -> new NoSteepInclinesTraversalPermissionLabeler(config);
                 case null -> new USTraversalPermissionLabeler();
                 default -> throw new IllegalArgumentException(
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
@@ -233,9 +231,8 @@ public class StreetLayer implements Serializable, Cloneable {
             permissionLabeler = new USTraversalPermissionLabeler();
         }
 
-        if (permissionLabeler instanceof StepFreeTraversalPermissionLabeler) {
-            stepFree = ((StepFreeTraversalPermissionLabeler) permissionLabeler).requireStepFree;
-        }
+        stepFree = config.stepFree;
+
     }
 
     /** Load street layer from an OSM-lib OSM DB */

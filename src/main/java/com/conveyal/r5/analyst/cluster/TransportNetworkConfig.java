@@ -69,4 +69,10 @@ public class TransportNetworkConfig {
      */
     public Double maxIncline;
 
+    /**
+     * When used with certain TraversalPermissionLabelers (NoSteepInclinesTraversalPermissionLabeler for now), whether
+     * to exclude pedestrian traversal of ways with highway=stairs tags and nodes with kerb=raised tags
+     */
+    public boolean stepFree;
+
 }

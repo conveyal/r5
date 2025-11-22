@@ -13,8 +13,10 @@ public class NoSteepInclinesTraversalPermissionLabeler extends USTraversalPermis
     Double maxIncline;
     boolean stepFree;
     public NoSteepInclinesTraversalPermissionLabeler (TransportNetworkConfig config) {
-        if (config.maxIncline != null) this.maxIncline = config.maxIncline;
-        this.stepFree = config.stepFree;
+        if (config != null) {
+            if (config.maxIncline != null) this.maxIncline = config.maxIncline;
+            this.stepFree = config.stepFree;
+        }
     }
     @Override
     public RoadPermission getPermissions(Way way) {

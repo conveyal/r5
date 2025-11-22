@@ -227,12 +227,12 @@ public class StreetLayer implements Serializable, Cloneable {
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
                 );
             };
+
+            stepFree = config.stepFree;
+            
         } else {
             permissionLabeler = new USTraversalPermissionLabeler();
         }
-
-        stepFree = config.stepFree;
-
     }
 
     /** Load street layer from an OSM-lib OSM DB */

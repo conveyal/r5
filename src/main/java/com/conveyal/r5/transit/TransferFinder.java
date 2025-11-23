@@ -107,7 +107,7 @@ public class TransferFinder {
         }
         // Look at the existing list of transfers (if any) and do enough iterations to make that transfer list as long
         // as the list of stops.
-        int firstStopToProcess = transitLayer.transfersForStop.size();
+        int firstStopToProcess = transitLayer.streetTransfers.size();
         int nStopsTotal = transitLayer.getStopCount();
         int nStopsToProcess = nStopsTotal - firstStopToProcess;
         LOG.info("Finding transfers through the street network from {} new transit stops...", nStopsToProcess);
@@ -122,7 +122,7 @@ public class TransferFinder {
 
         // Create transfers for all new stops, appending them to the list of transfers for any existing stops.
         // This handles both newly built networks and the case where a scenario adds stops to an existing network.
-        transitLayer.transfersForStop.addAll(
+        transitLayer.streetTransfers.addAll(
                 IntStream.range(firstStopToProcess, nStopsTotal).parallel().mapToObj(sourceStopIndex -> {
             stopCounter.increment();
             if (gtfsTransferLoader.shouldSkipFromStop(sourceStopIndex)) {
@@ -187,16 +187,16 @@ public class TransferFinder {
         if (firstStopToProcess > 0) {
             LOG.info("Appending inverse transfers for scenario application...", nStopsToProcess);
             for (int sourceStopIndex = firstStopToProcess; sourceStopIndex < nStopsTotal; sourceStopIndex++) {
-                TIntList distancesToTargetStops = transitLayer.transfersForStop.get(sourceStopIndex);
+                TIntList distancesToTargetStops = transitLayer.streetTransfers.get(sourceStopIndex);
                 for (int i = 0; i < distancesToTargetStops.size(); i += 2) {
                     int targetStopIndex = distancesToTargetStops.get(i);
                     int distance = distancesToTargetStops.get(i + 1);
                     // Only create inverted transfers when target is a pre-existing (non-scenario) stop
                     if (targetStopIndex < firstStopToProcess) {
-                        TIntList packedTransfersCopy = new TIntArrayList(transitLayer.transfersForStop.get(targetStopIndex));
+                        TIntList packedTransfersCopy = new TIntArrayList(transitLayer.streetTransfers.get(targetStopIndex));
                         packedTransfersCopy.add(sourceStopIndex);
                         packedTransfersCopy.add(distance);
-                        transitLayer.transfersForStop.set(targetStopIndex, packedTransfersCopy);
+                        transitLayer.streetTransfers.set(targetStopIndex, packedTransfersCopy);
                     }
                 }
             }

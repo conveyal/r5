@@ -24,8 +24,10 @@ import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -113,8 +115,13 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient TIntIntMap stopForStreetVertex;
 
     // For each stop, a packed list of transfers to other stops in the form (stopIndex, distance, stopIndex, distance...)
-    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
-    public List<TIntList> transfersForStop = new ArrayList<>();
+    // These are transfers found through the street network, as opposed to those loaded from GTFS (in a different field).
+    public List<TIntList> streetTransfers = new ArrayList<>();
+
+    // Transfers loaded from GTFS feeds rather than found by searching through the street network.
+    // These are expressed as minimum times in seconds rather than distances in millimeters.
+    // Map keys are from-stop indexes, and values are packed lists of (to-stop, timeSeconds) pairs.
+    public TIntObjectMap<TIntList> gtfsTransfers = new TIntObjectHashMap<>();
 
     /** Information about a route */
     public List<RouteInfo> routes = new ArrayList<>();
@@ -762,7 +769,7 @@ public class TransitLayer implements Serializable, Cloneable {
             copy.stopNames = new ArrayList<>(this.stopNames);
             copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
             copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
-            copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+            copy.streetTransfers = new ArrayList<>(this.streetTransfers);
             copy.routes = new ArrayList<>(this.routes);
             // To indicate that this layer is different than the one it was copied from, record the scenarioId of
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its

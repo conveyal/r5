@@ -854,11 +854,21 @@ public class FastRaptorWorker {
                  stop >= 0;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
-            TIntList transfersFromStop = transit.transfersForStop.get(stop);
-            if (transfersFromStop != null) {
-                for (int i = 0; i < transfersFromStop.size(); i += 2) {
-                    int targetStop = transfersFromStop.get(i);
-                    int distanceToTargetStopMillimeters = transfersFromStop.get(i + 1);
+            TIntList gtfsTransfersFromStop = transit.gtfsTransfers.get(stop);
+            if (gtfsTransfersFromStop != null) {
+                for (int i = 0; i < gtfsTransfersFromStop.size(); i += 2) {
+                    int targetStop = gtfsTransfersFromStop.get(i);
+                    int minTimeToTargetSeconds = gtfsTransfersFromStop.get(i + 1);
+                    // NOTE unlike street transfers, not filtering on distance because we don't know the distance.
+                    int timeAtTargetStop = state.bestNonTransferTimes[stop] + minTimeToTargetSeconds;
+                    state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
+                }
+            }
+            TIntList streetTransfersFromStop = transit.streetTransfers.get(stop);
+            if (streetTransfersFromStop != null) {
+                for (int i = 0; i < streetTransfersFromStop.size(); i += 2) {
+                    int targetStop = streetTransfersFromStop.get(i);
+                    int distanceToTargetStopMillimeters = streetTransfersFromStop.get(i + 1);
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
                         checkState(walkTimeToTargetStopSeconds >= 0, "Transfer walk time must be positive.");

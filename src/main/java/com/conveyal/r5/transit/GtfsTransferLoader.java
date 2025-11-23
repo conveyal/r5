@@ -55,12 +55,10 @@ public class GtfsTransferLoader {
 
     final BitSet stopsWithTransfers = new BitSet();
     final Set<StopPair> stopPairsWithTransfers = new HashSet<>();
-    // Transfer keys are from-stop indexes, values are packed lists of (to-stop, distance) pairs.
-    final TIntObjectMap<TIntList> transfers = new TIntObjectHashMap<>();
 
     public GtfsTransferLoader (TransitLayer transit, TransferConfig transferConfig) {
         this.transit = transit;
-        this.transferConfig = transferConfig;
+        this.transferConfig = transferConfig != null ? transferConfig : PER_STOP_PAIR;
     }
 
     public void loadTransfersTxt (GTFSFeed feed) {
@@ -74,10 +72,10 @@ public class GtfsTransferLoader {
             if (untrue(from < 0 || to < 0, "Transfer references stop that was not loaded.")) continue;
             if (untrue(transfer.min_transfer_time < 0, "Negative transfer times not allowed.")) continue;
             if (untrue(transfer.min_transfer_time > 3600, "Transfer time suspiciously high.")) continue;
-            TIntList packedTransfers = transfers.get(from);
+            TIntList packedTransfers = transit.gtfsTransfers.get(from);
             if (packedTransfers == null) {
                 packedTransfers = new TIntArrayList();
-                transfers.put(from, packedTransfers);
+                transit.gtfsTransfers.put(from, packedTransfers);
             }
             packedTransfers.add(to);
             packedTransfers.add(transfer.min_transfer_time);

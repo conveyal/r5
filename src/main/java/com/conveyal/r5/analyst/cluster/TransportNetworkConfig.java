@@ -87,13 +87,13 @@ public class TransportNetworkConfig {
      *   Should this be configurable or interact with the transfer entries?
      *
      */
-    public GtfsTransferConfig gtfsTransfers;
+    public TransferConfig transfers;
 
-    enum GtfsTransferConfig {
+    public enum TransferConfig {
         OSM_ONLY,  // Find all transfers by searching through the OSM street network
         GTFS_ONLY, // Load transfers only from transfers.txt, do not use the street network
         PER_STOP_PAIR, // Find transfers via streets for stop pairs not connected by GTFS transfers
         PER_STOP, // Find transfers via streets only from and to stops not referenced by GTFS transfers
-        PER_FEED // GTFS_ONLY for feeds with transfers.txt, OSM_ONLY for those without
+        PER_FEED // TODO: PER_FEED options, allowing different behavior for intra- and inter-feed transfers
     }
 }

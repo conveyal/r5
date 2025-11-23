@@ -62,6 +62,7 @@ import static spark.Spark.staticFileLocation;
  * It can build point to point TransportNetwork and start a server with API for point to point searches
  *
  */
+@Deprecated
 public class PointToPointRouterServer {
     private static final Logger LOG = LoggerFactory.getLogger(PointToPointRouterServer.class);
 

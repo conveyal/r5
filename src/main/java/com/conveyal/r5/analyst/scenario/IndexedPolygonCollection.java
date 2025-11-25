@@ -219,4 +219,15 @@ public class IndexedPolygonCollection {
         return winner;
     }
 
+    public List<ModificationPolygon> getIntersectingPolygons (Geometry geometry) {
+        List<ModificationPolygon> polygons = new ArrayList<ModificationPolygon>();
+        Envelope envelope = geometry.getEnvelopeInternal();
+        List<ModificationPolygon> candidatePolygons = polygonSpatialIndex.query(envelope);
+        for (ModificationPolygon candidate : candidatePolygons) {
+            if (candidate.polygonal.intersects(geometry)) {
+                polygons.add(candidate);
+            }
+        }
+        return polygons;
+    }
 }

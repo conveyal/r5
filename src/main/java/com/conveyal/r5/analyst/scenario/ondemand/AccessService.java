@@ -1,0 +1,43 @@
+package com.conveyal.r5.analyst.scenario.ondemand;
+
+import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.set.TIntSet;
+import org.locationtech.jts.geom.Geometry;
+
+/**
+ * Represents an on-demand service available at a particular departure location. This is the result of evaluating the
+ * PickupWaitTimes at a particular location.
+ * Passengers can ride this service from this location directly to destinations in serviceArea (without riding transit),
+ * and to specified stops (from which they can continue journeys via transit).
+ * If stops and serviceArea are null, passengers can ride from this location directly to any destination.
+ * Idea: instead of defining this data-holder class we could allow passing a travel time map
+ * (PointSetTimes?) into a method on this class, and have this class transform it.
+ */
+public class AccessService extends OnDemandService {
+
+    /**
+     * Map from stop indexes to wait times. See comment in parent class (OnDemandService) about using TIntIntMap
+     * instead of TIntSet stops. TODO pick one approach, rather than using separate implementation here.
+     */
+    public final TIntIntMap waitTimesForStops;
+
+    public AccessService (int waitTimeSeconds, TIntSet stopsReachable, Geometry directServiceArea) {
+        this.waitTimeSeconds = waitTimeSeconds;
+        this.stops = stopsReachable;
+        this.serviceArea = directServiceArea;
+        this.waitTimesForStops = new TIntIntHashMap();
+    }
+
+    // TODO consolidate constructors
+    public AccessService (TIntIntMap waitTimesForStops) {
+        this.waitTimesForStops = waitTimesForStops;
+    }
+
+    /** Special instance representing situations where a service is defined, but not available at this location. */
+    public static final AccessService NO_SERVICE_HERE = new AccessService(-1, null, null);
+
+    /** Special instance representing no on-demand service defined, so we can access all stops with no wait. */
+    public static final AccessService NO_WAIT_ALL_STOPS = new AccessService(0, null, null);
+
+}

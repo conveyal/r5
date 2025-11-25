@@ -75,7 +75,7 @@ public class FastRaptorWorker {
     // They may change results where our algorithm is not perfectly optimal, for example with respect to overtaking
     // (see discussion at #708).
 
-    public static final boolean ENABLE_OPTIMIZATION_RANGE_RAPTOR = true;
+    public static final boolean ENABLE_OPTIMIZATION_RANGE_RAPTOR = false;
     public static final boolean ENABLE_OPTIMIZATION_FREQ_UPPER_BOUND = true;
     public static final boolean ENABLE_OPTIMIZATION_UPDATED_STOPS = true;
     public static final boolean ENABLE_OPTIMIZATION_CLEAR_LONG_PATHS = true;

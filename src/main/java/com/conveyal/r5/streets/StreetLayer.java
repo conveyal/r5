@@ -212,17 +212,17 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public StreetLayer() {
         speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
-        permissionLabeler = new USTraversalPermissionLabeler();
+        permissionLabeler = new USTraversalPermissionLabeler(null);
     }
 
     public StreetLayer(TransportNetworkConfig config) {
         this();
         if (config != null) {
             permissionLabeler = switch (config.traversalPermissionLabeler) {
-                case "sidewalk" -> new SidewalkTraversalPermissionLabeler();
-                case "noSidewalkCycling" -> new NoSidewalkCyclingTraversalPermissionLabeler();
+                case "sidewalk" -> new SidewalkTraversalPermissionLabeler(config);
+                case "noSidewalkCycling" -> new NoSidewalkCyclingTraversalPermissionLabeler(config);
                 case "noSteepWays" -> new NoSteepInclinesTraversalPermissionLabeler(config);
-                case null -> new USTraversalPermissionLabeler();
+                case null -> new USTraversalPermissionLabeler(config);
                 default -> throw new IllegalArgumentException(
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
                 );
@@ -231,7 +231,7 @@ public class StreetLayer implements Serializable, Cloneable {
             stepFree = config.stepFree;
             
         } else {
-            permissionLabeler = new USTraversalPermissionLabeler();
+            permissionLabeler = new USTraversalPermissionLabeler(null);
         }
     }
 

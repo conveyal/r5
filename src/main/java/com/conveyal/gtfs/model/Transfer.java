@@ -34,7 +34,7 @@ public class Transfer extends Entity {
             tr.sourceFileLine    = row;
             tr.from_stop_id      = getStringField("from_stop_id", true);
             tr.to_stop_id        = getStringField("to_stop_id", true);
-            tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
+            tr.transfer_type     = getIntField("transfer_type", true, 0, 5);
             tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
             tr.from_route_id     = getStringField("from_route_id", false);
             tr.to_route_id       = getStringField("to_route_id", false);
@@ -43,10 +43,12 @@ public class Transfer extends Entity {
 
             getRefField("from_stop_id", true, feed.stops);
             getRefField("to_stop_id", true, feed.stops);
-            getRefField("from_route_id", false, feed.routes);
-            getRefField("to_route_id", false, feed.routes);
-            getRefField("from_trip_id", false, feed.trips);
-            getRefField("to_trip_id", false, feed.trips);
+            // We do not validate referential integrity of these fields because they are not
+            // consumed by R5, and some prominent feeds contain thousands of such errors.
+            // getRefField("from_route_id", false, feed.routes);
+            // getRefField("to_route_id", false, feed.routes);
+            // getRefField("from_trip_id", false, feed.trips);
+            // getRefField("to_trip_id", false, feed.trips);
 
             // row number used as an arbitrary unique string to give MapDB a key.
             feed.transfers.put(Long.toString(row), tr);

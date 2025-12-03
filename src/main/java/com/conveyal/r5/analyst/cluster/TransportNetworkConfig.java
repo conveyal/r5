@@ -68,10 +68,10 @@ public class TransportNetworkConfig {
 
     /**
      * How to handle stop-to-stop transfers in GTFS transfers.txt, and how to combine them with OSM-derived transfers.
-     * PER_STOP_PAIR is the default, and should only improve on the past behavior corresponding to OSM_ONLY.
+     * STOP_TO_PATTERN is the default, and is expected to only improve on the past behavior corresponding to OSM_ONLY.
      * There may be edge cases, such as a complex with subway platforms separated by long times specified in GTFS,
      * but no times specified for transfers between those platforms and nearby bus stops. In these cases, path results
-     * may be strange or incorrect, but the quality of travel times would be no worse than the current OSM_ONLY option.
+     * may be strange or incorrect, but the quality of travel times should be no worse than the current OSM_ONLY option.
      *
      * Currently we only handle stop-to-stop transfers in GTFS transfers.txt. Other more specific transfers types like
      * route-to-route and trip-to-trip are not compatible with our current routing approach, so will be ignored with
@@ -81,22 +81,22 @@ public class TransportNetworkConfig {
      * routing could make times longer, we believe the proper interpretation is that transfers.txt provides a typical
      * safe amount of time needed to walk between the two stops, which would only be made worse by comparing with OSM.
      *
-     * FIXME: Strangely, BOARD_SLACK_SECONDS appears to only be used in classes for displaying paths, not for routing.
-     *
-     * TODO: We currently apply a hard lower limit of 60 seconds between alighting and boarding.
-     *   Should this be configurable or interact with the transfer entries?
+     * Additional considerations:
+     * Strangely, BOARD_SLACK_SECONDS appears to only be used in classes for displaying paths, not for routing.
+     * We currently apply a hard lower limit of 60 seconds between alighting and boarding.
+     * Should this be configurable or interact with the transfer entries?
      *
      */
     public TransferConfig transfers;
 
     public enum TransferConfig {
-        /// Find all transfers by searching through the OSM street network
+        /// Find transfers only by searching through the OSM street network, ignore GTFS transfers
         OSM_ONLY,
-        /// Load transfers only from transfers.txt, do not use the street network
+        /// Load transfers only from GTFS transfers.txt, do not use the OSM street network
         GTFS_ONLY,
-        /// Find street transfers only where GTFS does not provide a transfer from the same stop to trip pattern pair
+        /// Use OSM where GTFS does not provide a transfer from a given stop to a given trip pattern
         STOP_TO_PATTERN,
-        /// Find transfers via streets for stop pairs not connected by GTFS transfers
+        /// Find transfers via streets for any pair of stops not connected by a GTFS transfer
         STOP_PAIR,
     }
 }

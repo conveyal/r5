@@ -4,12 +4,14 @@ import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.util.LambdaCounter;
+import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +39,7 @@ public class TransferFinder {
     TransitLayer transitLayer;
     StreetLayer streetLayer;
     GtfsTransferLoader gtfsTransferLoader;
+    LambdaCounter skippedPairCounter;
 
     /**
      * Eventually this should choose whether to search via the street network or straight line distance based on the
@@ -47,6 +50,8 @@ public class TransferFinder {
         this.transitLayer = network.transitLayer;
         this.streetLayer = network.streetLayer;
         this.gtfsTransferLoader = gtfsTransferLoader;
+        this.skippedPairCounter = new LambdaCounter(LOG, 1_000,
+              "Deferred to GTFS for {} stop pairs in mode: " + gtfsTransferLoader.transferConfig);
     }
 
     public void findParkRideTransfer() {
@@ -71,7 +76,7 @@ public class TransferFinder {
             streetRouter.route();
 
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
-            retainClosestStopsOnPatterns(distancesToReachedStops);
+            retainClosestStopsOnPatterns(distancesToReachedStops, null);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
@@ -115,20 +120,12 @@ public class TransferFinder {
               "Processed OSM street transfers from {} of {} new transit stops.");
         LambdaCounter unconnectedCounter = new LambdaCounter(LOG, nStopsToProcess, 1_000,
               "{} of {} new transit stops are not linked to the street network.");
-        LambdaCounter skippedFromStopCounter = new LambdaCounter(LOG, nStopsToProcess, 1_000,
-              "Deferred to GTFS transfers for {} of {} transfer source stops.");
-        LambdaCounter skippedPairCounter = new LambdaCounter(LOG, 1_000,
-              "Deferred to GTFS for {} stop pairs.");
 
         // Create transfers for all new stops, appending them to the list of transfers for any existing stops.
         // This handles both newly built networks and the case where a scenario adds stops to an existing network.
         transitLayer.streetTransfers.addAll(
                 IntStream.range(firstStopToProcess, nStopsTotal).parallel().mapToObj(sourceStopIndex -> {
             stopCounter.increment();
-            if (gtfsTransferLoader.shouldSkipFromStop(sourceStopIndex)) {
-                skippedFromStopCounter.increment();
-                return EMPTY_INT_LIST;
-            }
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(sourceStopIndex);
             if (originStreetVertex == -1) {
@@ -150,8 +147,8 @@ public class TransferFinder {
             // transfer distances. It's actually important to remove the source stop to handle certain cases with
             // loop routes (see CTA Brown Line to Purple Line example in discussion on #763).
             distancesToReachedStops.remove(sourceStopIndex);
-            // TODO consider how this interferes with deferring to GTFS-specified transfers on stop pairs
-            retainClosestStopsOnPatterns(distancesToReachedStops);
+            TIntCollection ignorePatterns = gtfsTransferLoader.patternsToSkipForSourceStop(sourceStopIndex);
+            retainClosestStopsOnPatterns(distancesToReachedStops, ignorePatterns);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
@@ -174,7 +171,6 @@ public class TransferFinder {
 
         stopCounter.done();
         unconnectedCounter.logIfNonZero();
-        skippedFromStopCounter.logIfNonZero();
         skippedPairCounter.logIfNonZero();
 
         // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
@@ -185,7 +181,7 @@ public class TransferFinder {
         // post-processing stage is much faster than performing the street searches and does not lend itself well to
         // a streaming approach.
         if (firstStopToProcess > 0) {
-            LOG.info("Appending inverse transfers for scenario application...", nStopsToProcess);
+            LOG.info("Appending {} inverse transfers for scenario application...", nStopsToProcess);
             for (int sourceStopIndex = firstStopToProcess; sourceStopIndex < nStopsTotal; sourceStopIndex++) {
                 TIntList distancesToTargetStops = transitLayer.streetTransfers.get(sourceStopIndex);
                 for (int i = 0; i < distancesToTargetStops.size(); i += 2) {
@@ -230,9 +226,11 @@ public class TransferFinder {
      * any continuous sequence of stops, retain only the closest.
      *
      * @param timesToReachedStops map from target stop index to distance (along the street network) to it. The method
-     *                           mutates this parameter.
+ *                           mutates this parameter.
+     * @param ignorePatterns used to filter out stop-pattern pairs that already have a transfer from GTFS. May be null
+     *                       or empty in other situations.
      */
-    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops) {
+    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, TIntCollection ignorePatterns) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
         // For every reached stop,
         timesToReachedStops.forEachEntry((stopIndex, distanceToStop) -> {
@@ -252,6 +250,17 @@ public class TransferFinder {
             });
             return true; // continue iteration
         });
+        // Removing patterns here (after they're found) may be slightly less efficient than skipping
+        // them before they're ever recorded. But it allows better debugging and logging.
+        if (ignorePatterns != null) {
+            ignorePatterns.forEach(patternIndex -> {
+                if (bestStopOnPattern.containsKey(patternIndex)) {
+                    bestStopOnPattern.remove(patternIndex);
+                    skippedPairCounter.increment();
+                }
+                return true;
+            });
+        }
         timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
     }
 

@@ -90,10 +90,13 @@ public class TransportNetworkConfig {
     public TransferConfig transfers;
 
     public enum TransferConfig {
-        OSM_ONLY,  // Find all transfers by searching through the OSM street network
-        GTFS_ONLY, // Load transfers only from transfers.txt, do not use the street network
-        PER_STOP_PAIR, // Find transfers via streets for stop pairs not connected by GTFS transfers
-        PER_STOP, // Find transfers via streets only from and to stops not referenced by GTFS transfers
-        PER_FEED // TODO: PER_FEED options, allowing different behavior for intra- and inter-feed transfers
+        /// Find all transfers by searching through the OSM street network
+        OSM_ONLY,
+        /// Load transfers only from transfers.txt, do not use the street network
+        GTFS_ONLY,
+        /// Find street transfers only where GTFS does not provide a transfer from the same stop to trip pattern pair
+        STOP_TO_PATTERN,
+        /// Find transfers via streets for stop pairs not connected by GTFS transfers
+        STOP_PAIR,
     }
 }

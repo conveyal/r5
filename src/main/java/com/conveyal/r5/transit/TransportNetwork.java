@@ -5,7 +5,6 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
-import com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -32,8 +31,6 @@ import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
-
-import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.PER_STOP_PAIR;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -89,9 +86,6 @@ public class TransportNetwork implements Serializable {
 
     /** Information about the effects of apparently correct scenario application, null on a base network */
     public transient List<TaskError> scenarioApplicationInfo;
-
-    /** How to combine transfers from GTFS transfers.txt with those found via the OSM street network */
-    public TransferConfig transferConfig;
 
     /**
      * Build some simple derived index tables that are not serialized with the network.
@@ -160,7 +154,6 @@ public class TransportNetwork implements Serializable {
     public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds, TransportNetworkConfig config) {
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
-        transportNetwork.transferConfig = config != null ? config.transfers : PER_STOP_PAIR;
 
         // Make street layer from OSM data in MapDB
         StreetLayer streetLayer = new StreetLayer(config);
@@ -197,7 +190,8 @@ public class TransportNetwork implements Serializable {
         // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 
-        // Create transfers
+        // Create transfers.
+        // Nulls below will cause NPEs, but this method is deprecated and kept for informational purposes only.
         new TransferFinder(transportNetwork, null).findTransfers();
         new TransferFinder(transportNetwork, null).findParkRideTransfer();
 

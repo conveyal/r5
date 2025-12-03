@@ -2,19 +2,23 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.r5.util.TIntIntHashSetMultimap;
+import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.BitSet;
+import java.lang.invoke.MethodHandles;
 import java.util.HashSet;
 import java.util.Set;
 
 import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig;
-import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.*;
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.OSM_ONLY;
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.STOP_PAIR;
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.STOP_TO_PATTERN;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 /**
@@ -43,27 +47,40 @@ import static com.google.common.base.Strings.isNullOrEmpty;
  */
 public class GtfsTransferLoader {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
     final TransitLayer transit;
     final TransferConfig transferConfig;
 
+    // These fields track different errors that can occur during transfer loading. This allows
+    // error recovery and more complete error reports rather than bailing on the first error.
     int nMissingStop = 0;
     int nUnsupportedSpecificity = 0;
     int nUnsupportedTransferType = 0;
     TObjectIntMap<String> otherErrors = new TObjectIntHashMap<>();
 
-    public record StopPair(int fromStop, int toStop) { }
+    /// May return null or empty collection.
+    public TIntCollection patternsToSkipForSourceStop (int sourceStopIndex) {
+        if (transferConfig == STOP_TO_PATTERN) {
+            return stopAndPatternPairsWithTransfers.get(sourceStopIndex);
+        }
+        return null;
+    }
 
-    final BitSet stopsWithTransfers = new BitSet();
+    // These fields track which transfers have been loaded to supersede OSM-based transfers.
+    public record StopPair(int fromStop, int toStop) { }
     final Set<StopPair> stopPairsWithTransfers = new HashSet<>();
+    final TIntIntHashSetMultimap stopAndPatternPairsWithTransfers = new TIntIntHashSetMultimap();
 
     public GtfsTransferLoader (TransitLayer transit, TransferConfig transferConfig) {
         this.transit = transit;
-        this.transferConfig = transferConfig != null ? transferConfig : PER_STOP_PAIR;
+        this.transferConfig = transferConfig != null ? transferConfig : STOP_TO_PATTERN;
     }
 
     public void loadTransfersTxt (GTFSFeed feed) {
         if (transferConfig == OSM_ONLY) return;
         if (feed.transfers == null || feed.transfers.isEmpty()) return;
+        LOG.info("GTFS {} contains transfers. Loading them in mode {}.", feed.feedId, transferConfig);
         // The keys of GtfsFeed.transfers are just arbitrary unique numbers (the input line numbers).
         for (Transfer transfer : feed.transfers.values()) {
             if (shouldSkipTransfer(transfer)) continue;
@@ -79,35 +96,23 @@ public class GtfsTransferLoader {
             }
             packedTransfers.add(to);
             packedTransfers.add(transfer.min_transfer_time);
-            stopsWithTransfers.set(from);
-            stopsWithTransfers.set(to);
             // Conditional to avoid excessive object instance bloat when unused.
-            if (transferConfig == PER_STOP_PAIR) {
+            if (transferConfig == STOP_PAIR) {
                 stopPairsWithTransfers.add(new StopPair(from, to));
+            } else if (transferConfig == STOP_TO_PATTERN) {
+                TIntList patterns = transit.patternsForStop.get(from);
+                stopAndPatternPairsWithTransfers.putAll(from, patterns);
             }
-        }
-        if (transferConfig == PER_FEED) {
-            throw new UnsupportedOperationException();
-            // Prevent later on-street transfer calculation for every stop in this feed.
-            // However, this behavior probably needs to be different for inter- and intra-feed transfers.
-            // And it may need to be manually set independently for each individual feed.
-            // for (String stopId : feed.stops.keySet()) {
-            //     int stopIndex = transit.indexForStopId.get(stopId);
-            //     if (stopIndex > 0) stopsWithTransfers.set(stopIndex);
-            // }
         }
     }
 
-    // TODO encapsulate and reuse elsewhere.
     private boolean untrue (boolean condition, String errorMessage) {
         if (condition) otherErrors.adjustOrPutValue(errorMessage, 1, 1);
         return !condition;
     }
 
-    /**
-     * Validate one transfer and decide whether it should be processed by this class, maintaining
-     * some counts and flags for debugging and status reporting.
-     */
+    /// Validate one GTFS transfer and decide whether it should be processed by this class,
+    /// maintaining some counts and flags for debugging and status reporting.
     private boolean shouldSkipTransfer (Transfer transfer) {
         boolean skip = false;
         if (!(isNullOrEmpty(transfer.from_route_id) && isNullOrEmpty(transfer.from_trip_id) &&
@@ -130,28 +135,12 @@ public class GtfsTransferLoader {
         return skip;
     }
 
-    /**
-     * This is an optimization to avoid a slow street search when every transfer it yields will be ignored (because
-     * every stop pair involving this source stop is slated to be skipped).
-     * @return whether the osm street transfer generation should skip producing any transfers from the given stop.
-     */
-    public boolean shouldSkipFromStop (int fromStopIndex) {
-        if (transferConfig == PER_STOP) {
-            return stopsWithTransfers.get(fromStopIndex);
-        }
-        return false;
-    }
-
-    /**
-     * A GTFS transfer between a specific pair of stops or involving particular stops may take priority over any
-     * transfer found by routing through the OSM street network.
-     * @return whether osm street transfer generation should skip making transfers between the given pair of stops.
-     */
+    /// A GTFS transfer between a specific pair of stops or involving particular stops may take
+    /// priority over any transfer found by routing through the OSM street network.
+    /// @return whether osm street transfer generation should skip making transfers between the given pair of stops.
     public boolean shouldSkipStopPair (int fromStopIndex, int toStopIndex) {
-        if (transferConfig == PER_STOP_PAIR) {
+        if (transferConfig == STOP_PAIR) {
             return stopPairsWithTransfers.contains(new StopPair(fromStopIndex, toStopIndex));
-        } else if (transferConfig == PER_STOP) {
-            return stopsWithTransfers.get(fromStopIndex) || stopsWithTransfers.get(toStopIndex);
         }
         return false;
     }

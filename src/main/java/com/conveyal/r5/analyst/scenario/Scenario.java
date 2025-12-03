@@ -1,8 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
+import com.conveyal.r5.transit.GtfsTransferLoader;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -16,6 +18,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.OSM_ONLY;
 
 /**
  * A scenario is an ordered sequence of modifications that will be applied non-destructively on top of a baseline graph.
@@ -155,7 +159,11 @@ public class Scenario implements Serializable {
         
         // Find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
-        new TransferFinder(copiedNetwork).findTransfers();
+        // The original GtfsTransferLoader is not retained after network build time. Here, for making transfers
+        // necessitated by scenario changes, we use a no-op instance that completely ignores anything from GTFS.
+        var osmOnlyLoader = new GtfsTransferLoader(copiedNetwork.transitLayer, OSM_ONLY);
+        var transferFinder = new TransferFinder(copiedNetwork, osmOnlyLoader);
+        transferFinder.findTransfers();
 
         // Any linkages to the new scenario street network will be built as needed based on the incoming request.
         // FIXME New routes drawn outside the original bounds cannot have an effect,

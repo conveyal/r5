@@ -53,6 +53,12 @@ public class LambdaCounter {
         }
     }
 
+    public synchronized void increment(int n) {
+        int nPastLog = count % logFrequency;
+        if (nPastLog + n >= logFrequency) log();
+        count += n;
+    }
+
     public synchronized int getCount() {
         return count;
     }

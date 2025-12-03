@@ -202,19 +202,11 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Load a GTFS feed with full load level. The feed is not closed after being loaded.
-     * TODO eliminate "load levels"
-     */
-    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
-        loadFromGtfs(gtfs, LoadLevel.FULL);
-    }
-
-    /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
      * The supplied feed is treated as read-only, and is not closed after being loaded.
      * This method requires findPatterns() to have been called on the feed before it's passed in.
      */
-    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
+    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
             throw new DuplicateFeedException(gtfs.feedId);
         }
@@ -239,9 +231,7 @@ public class TransitLayer implements Serializable, Cloneable {
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
             }
-            if (level == LoadLevel.FULL) {
-                stopNames.add(stop.stop_name);
-            }
+            stopNames.add(stop.stop_name);
         }
 
         // Load service periods, assigning integer codes which will be referenced by trips and patterns.
@@ -316,10 +306,8 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(String.format("%s:%s", gtfs.feedId, route.route_id), stopTimes, indexForUnscopedStopId);
-
-                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
-                // create it.
-                if (level == LoadLevel.FULL) {
+                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique) create it.
+                {
                     if (!routeIndexForRoute.containsKey(trip.route_id)) {
                         int routeIndex = routes.size();
                         RouteInfo ri = new RouteInfo(route, gtfs.agency.get(route.agency_id));
@@ -385,7 +373,6 @@ public class TransitLayer implements Serializable, Cloneable {
                         }
                     }
                 }
-
                 tripPatternForPatternId.put(patternId, tripPattern);
                 tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
@@ -478,19 +465,7 @@ public class TransitLayer implements Serializable, Cloneable {
                     "No agency in graph had valid timezone; API request times will be interpreted as GMT.");
             }
         }
-
-        if (level == LoadLevel.FULL) {
-            this.fares = new HashMap<>(gtfs.fares);
-        }
-
-        // Will be useful in naming patterns.
-//        LOG.info("Finding topology of each route/direction...");
-//        Multimap<T2<String, Integer>, TripPattern> patternsForRouteDirection = HashMultimap.create();
-//        tripPatterns.forEach(tp -> patternsForRouteDirection.put(new T2(tp.routeId, tp.directionId), tp));
-//        for (T2<String, Integer> routeAndDirection : patternsForRouteDirection.keySet()) {
-//            RouteTopology topology = new RouteTopology(routeAndDirection.first, routeAndDirection.second, patternsForRouteDirection.get(routeAndDirection));
-//        }
-
+        this.fares = new HashMap<>(gtfs.fares);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.
@@ -687,14 +662,6 @@ public class TransitLayer implements Serializable, Cloneable {
             System.out.println(String.join(",", routeId,
                     Integer.toString(nPatterns), Integer.toString(nTrips), Integer.toString(nStops)));
         }
-    }
-
-    /** How much information should we load/save? */
-    public enum LoadLevel {
-        /** Load only information required for analytics, leaving out route names, etc. */
-        BASIC,
-        /** Load enough information for customer facing trip planning */
-        FULL
     }
 
     public static TransitModes getTransitModes(int routeType) {

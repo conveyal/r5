@@ -62,4 +62,18 @@ public class TransportNetworkConfig {
      */
     public boolean saveShapes;
 
+    /**
+     * Steepest allowable slope for traversal. If a way has an "incline" tag  (e.g., from OSW or GATIS rather than
+     * a typical OSM source) with an absolute value that exceeds this limit, custom TraversalPermissionLabelers can
+     * remove permissions. Currently implemented only for pedestrians.
+     */
+    public Double maxIncline;
+
+    /**
+     * Whether to exclude pedestrian traversal of ways with highway=stairs tags and nodes with kerb=raised tags. This
+     * option should generally be used with detailed sidewalk networks and a TraversalPermissionLabeler that forces
+     * use of sidewalks (i.e., disallows walking on roadways).
+     */
+    public boolean stepFree;
+
 }

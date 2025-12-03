@@ -41,11 +41,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -55,6 +59,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -239,27 +244,30 @@ public class RegionalAnalysisController implements HttpController {
             String multiCutoffKey = String.format("%s.%s", multiCutoffName, multiCutoffExtension);
             FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
             LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
-
-            InputStream multiCutoffInputStream = FileUtils.getInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
-            Grid grid = new SelectingGridReducer(thresholdIndex).compute(multiCutoffInputStream);
-
-            File localFile = FileUtils.createScratchFile(fileFormat.toString());
-            OutputStream fos = FileUtils.getOutputStream(localFile);
-
-            switch (fileFormat) {
-                case GRID:
-                    grid.write(new GZIPOutputStream(fos));
-                    break;
-                case PNG:
-                    grid.writePng(fos);
-                    break;
-                case GEOTIFF:
-                    grid.writeGeotiff(fos);
-                    break;
+            File multiCutoffFile = fileStorage.getFile(multiCutoffFileStorageKey);
+            File tempOutFile = FileUtils.createScratchFile(fileFormat.toString());
+            try (
+                  FileChannel multiCutoffChannel = FileChannel.open(multiCutoffFile.toPath(), StandardOpenOption.READ);
+                  FileChannel localOutputChannel = FileChannel.open(tempOutFile.toPath(), StandardOpenOption.WRITE)
+            ) {
+                InputStream multiCutoffStream = Channels.newInputStream(multiCutoffChannel);
+                OutputStream tempOutStream = Channels.newOutputStream(localOutputChannel);
+                Grid grid = new SelectingGridReducer(thresholdIndex).compute(multiCutoffStream);
+                switch (fileFormat) {
+                    case GRID:
+                        grid.write(new GZIPOutputStream(tempOutStream));
+                        break;
+                    case PNG:
+                        grid.writePng(tempOutStream);
+                        break;
+                    case GEOTIFF:
+                        grid.writeGeotiff(tempOutStream);
+                        break;
+                }
+                LOG.debug("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);
+                fileStorage.moveIntoStorage(singleCutoffFileStorageKey, tempOutFile);
+                LOG.debug("Finished transferring single-cutoff grid {} to storage.", singleCutoffKey);
             }
-            LOG.debug("Finished deriving single-cutoff grid {}. Transferring to storage.", singleCutoffKey);
-            fileStorage.moveIntoStorage(singleCutoffFileStorageKey, localFile);
-            LOG.debug("Finished transferring single-cutoff grid {} to storage.", singleCutoffKey);
         }
         String analysisHumanName = humanNameForEntity(analysis);
         String destinationHumanName = humanNameForEntity(destinations);

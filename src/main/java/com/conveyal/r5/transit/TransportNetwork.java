@@ -32,6 +32,8 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.OSM_ONLY;
+
 /**
  * This is a completely new replacement for Graph, Router etc.
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
@@ -170,7 +172,9 @@ public class TransportNetwork implements Serializable {
         // Load transit data
         TransitLayer transitLayer = new TransitLayer(config);
         gtfsFeeds.forEach(gtfsFeed -> {
-            transitLayer.loadFromGtfs(gtfsFeed);
+            // GTFS transfers are being ignored here.
+            // However, the present method is deprecated, remaining only for informational purposes.
+            transitLayer.loadFromGtfs(gtfsFeed, new GtfsTransferLoader(transitLayer, OSM_ONLY));
             // Is there a reason we can't push this close call down into the loader method? Maybe exception handling?
             gtfsFeed.close();
         });
@@ -190,10 +194,12 @@ public class TransportNetwork implements Serializable {
         // transportNetwork.rebuildTransientIndexes();
         transitLayer.rebuildTransientIndexes();
 
-        // Create transfers.
-        // Nulls below will cause NPEs, but this method is deprecated and kept for informational purposes only.
-        new TransferFinder(transportNetwork, null).findTransfers();
-        new TransferFinder(transportNetwork, null).findParkRideTransfer();
+        // Create street transfers.
+        // GTFS transfers are being ignored here.
+        // However, the present method is deprecated, remaining only for informational purposes.
+        var noOpLoader = new GtfsTransferLoader(transitLayer, OSM_ONLY);
+        new TransferFinder(transportNetwork, noOpLoader).findTransfers();
+        new TransferFinder(transportNetwork, noOpLoader).findParkRideTransfer();
 
         return transportNetwork;
     }

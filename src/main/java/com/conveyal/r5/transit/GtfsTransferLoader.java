@@ -49,7 +49,9 @@ public class GtfsTransferLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+    // TransitLayer is written to as output. Specifically, only the transit.gtfsTransfers map.
     final TransitLayer transit;
+    // The way in which GTFS transfers override creation of OSM street transfers.
     final TransferConfig transferConfig;
 
     // These fields track different errors that can occur during transfer loading. This allows
@@ -77,15 +79,16 @@ public class GtfsTransferLoader {
         this.transferConfig = transferConfig != null ? transferConfig : STOP_TO_PATTERN;
     }
 
-    public void loadTransfersTxt (GTFSFeed feed) {
+    ///  @param indexForUnscopedStopId Map of stop IDs not yet scoped by feed ID, which exists only during GTFS loading
+    public void loadTransfersTxt (GTFSFeed feed, TObjectIntMap<String> indexForUnscopedStopId) {
         if (transferConfig == OSM_ONLY) return;
         if (feed.transfers == null || feed.transfers.isEmpty()) return;
         LOG.info("GTFS {} contains transfers. Loading them in mode {}.", feed.feedId, transferConfig);
         // The keys of GtfsFeed.transfers are just arbitrary unique numbers (the input line numbers).
         for (Transfer transfer : feed.transfers.values()) {
             if (shouldSkipTransfer(transfer)) continue;
-            int from = transit.indexForStopId.get(transfer.from_stop_id);
-            int to = transit.indexForStopId.get(transfer.to_stop_id);
+            int from = indexForUnscopedStopId.get(transfer.from_stop_id);
+            int to = indexForUnscopedStopId.get(transfer.to_stop_id);
             if (untrue(from < 0 || to < 0, "Transfer references stop that was not loaded.")) continue;
             if (untrue(transfer.min_transfer_time < 0, "Negative transfer times not allowed.")) continue;
             if (untrue(transfer.min_transfer_time > 3600, "Transfer time suspiciously high.")) continue;

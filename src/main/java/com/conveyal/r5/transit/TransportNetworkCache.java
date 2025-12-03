@@ -262,11 +262,9 @@ public class TransportNetworkCache implements Component {
         var gtfsTransferLoader = new GtfsTransferLoader(network.transitLayer, config.transfers);
         for (String gtfsId : config.gtfsIds) {
             GTFSFeed feed = gtfsCache.get(gtfsId);
-            network.transitLayer.loadFromGtfs(feed);
-            gtfsTransferLoader.loadTransfersTxt(feed);
+            network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
         }
         network.transitLayer.parentNetwork = network;
-
         network.streetLayer.associateStops(network.transitLayer);
         network.streetLayer.buildEdgeLists();
         network.rebuildTransientIndexes();

@@ -205,8 +205,10 @@ public class TransitLayer implements Serializable, Cloneable {
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
      * The supplied feed is treated as read-only, and is not closed after being loaded.
      * This method requires findPatterns() to have been called on the feed before it's passed in.
+     * Information about loaded transfers will be accumulated in the supplied GtfsTransferLoader
+     * instance, as it may influence choices later in OSM street transfer generation.
      */
-    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
+    public void loadFromGtfs (GTFSFeed gtfs, GtfsTransferLoader transferLoader) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
             throw new DuplicateFeedException(gtfs.feedId);
         }
@@ -466,6 +468,7 @@ public class TransitLayer implements Serializable, Cloneable {
             }
         }
         this.fares = new HashMap<>(gtfs.fares);
+        transferLoader.loadTransfersTxt(gtfs, indexForUnscopedStopId);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

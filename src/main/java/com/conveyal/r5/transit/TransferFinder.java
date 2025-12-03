@@ -50,7 +50,7 @@ public class TransferFinder {
         this.transitLayer = network.transitLayer;
         this.streetLayer = network.streetLayer;
         this.gtfsTransferLoader = gtfsTransferLoader;
-        this.skippedPairCounter = new LambdaCounter(LOG, 1_000,
+        this.skippedPairCounter = new LambdaCounter(LOG, 10_000,
               "Deferred to GTFS for {} stop pairs in mode: " + gtfsTransferLoader.transferConfig);
     }
 
@@ -118,8 +118,10 @@ public class TransferFinder {
         LOG.info("Finding transfers through the street network from {} new transit stops...", nStopsToProcess);
         LambdaCounter stopCounter = new LambdaCounter(LOG, nStopsToProcess, 10_000,
               "Processed OSM street transfers from {} of {} new transit stops.");
-        LambdaCounter unconnectedCounter = new LambdaCounter(LOG, nStopsToProcess, 1_000,
+        LambdaCounter unconnectedCounter = new LambdaCounter(LOG, nStopsToProcess, 10_000,
               "{} of {} new transit stops are not linked to the street network.");
+        LambdaCounter createdCounter = new LambdaCounter(LOG, 100_000,
+              "Created {} stop-to-stop transfers via the OSM street network.");
 
         // Create transfers for all new stops, appending them to the list of transfers for any existing stops.
         // This handles both newly built networks and the case where a scenario adds stops to an existing network.
@@ -158,20 +160,22 @@ public class TransferFinder {
                 } else {
                     packedTransfers.add(targetStopIndex);
                     packedTransfers.add(distance);
+                    createdCounter.increment();
                 }
                 return true;
             });
             // Record this list of transfers as leading out of the stop with index sourceStopIndex.
-            if (packedTransfers.size() > 0) {
-                return packedTransfers;
-            } else {
+            if (packedTransfers.isEmpty()) {
                 return EMPTY_INT_LIST;
+            } else {
+                return packedTransfers;
             }
-        }).collect(Collectors.toList()));
+        }).toList());
 
         stopCounter.done();
         unconnectedCounter.logIfNonZero();
         skippedPairCounter.logIfNonZero();
+        createdCounter.logIfNonZero();
 
         // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
         // all transfers out of a scenario stop into a base network stop we must also create the reverse transfer.

@@ -485,12 +485,7 @@ public class TransitLayer implements Serializable, Cloneable {
         centerLon = lonSum / stops.size();
     }
 
-    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
-    public void rebuildTransientIndexes () {
-        LOG.info("Rebuilding transient indices.");
-
-        // 1. Which patterns pass through each stop?
-        // We could store references to patterns rather than indexes.
+    public void rebuildPatternsForStop () {
         int nStops = stopIdForIndex.size();
         patternsForStop = new ArrayList<>(nStops);
         for (int i = 0; i < nStops; i++) {
@@ -505,6 +500,14 @@ public class TransitLayer implements Serializable, Cloneable {
             }
             p++;
         }
+    }
+
+    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
+    public void rebuildTransientIndexes () {
+        LOG.info("Rebuilding transient indices.");
+
+        // 1. Which patterns pass through each stop?
+        rebuildPatternsForStop();
 
         // 2. What street vertex represents each transit stop? Invert the serialized map.
         stopForStreetVertex = new TIntIntHashMap(streetVertexForStop.size(), 0.5f, -1, -1);

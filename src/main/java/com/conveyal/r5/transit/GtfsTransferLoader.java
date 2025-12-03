@@ -56,10 +56,12 @@ public class GtfsTransferLoader {
 
     // These fields track different errors that can occur during transfer loading. This allows
     // error recovery and more complete error reports rather than bailing on the first error.
+    int nProcessed = 0;
     int nMissingStop = 0;
     int nUnsupportedSpecificity = 0;
     int nUnsupportedTransferType = 0;
     TObjectIntMap<String> otherErrors = new TObjectIntHashMap<>();
+    int nValidAndLoaded = 0;
 
     /// May return null or empty collection.
     public TIntCollection patternsToSkipForSourceStop (int sourceStopIndex) {
@@ -83,15 +85,21 @@ public class GtfsTransferLoader {
     public void loadTransfersTxt (GTFSFeed feed, TObjectIntMap<String> indexForUnscopedStopId) {
         if (transferConfig == OSM_ONLY) return;
         if (feed.transfers == null || feed.transfers.isEmpty()) return;
+        if (transferConfig == STOP_TO_PATTERN) {
+            // Note this is rebuilding the index for every feed loaded up until now.
+            // This is excessive, but doing it one feed at a time involves more extensive refactoring.
+            transit.rebuildPatternsForStop();
+        }
         LOG.info("GTFS {} contains transfers. Loading them in mode {}.", feed.feedId, transferConfig);
         // The keys of GtfsFeed.transfers are just arbitrary unique numbers (the input line numbers).
         for (Transfer transfer : feed.transfers.values()) {
+            nProcessed += 1;
             if (shouldSkipTransfer(transfer)) continue;
             int from = indexForUnscopedStopId.get(transfer.from_stop_id);
             int to = indexForUnscopedStopId.get(transfer.to_stop_id);
-            if (untrue(from < 0 || to < 0, "Transfer references stop that was not loaded.")) continue;
-            if (untrue(transfer.min_transfer_time < 0, "Negative transfer times not allowed.")) continue;
-            if (untrue(transfer.min_transfer_time > 3600, "Transfer time suspiciously high.")) continue;
+            if (check(from < 0 || to < 0, "Transfer references stop that was not loaded.")) continue;
+            if (check(transfer.min_transfer_time < 0, "Negative transfer times not allowed.")) continue;
+            if (check(transfer.min_transfer_time > 3600, "Transfer time suspiciously high.")) continue;
             TIntList packedTransfers = transit.gtfsTransfers.get(from);
             if (packedTransfers == null) {
                 packedTransfers = new TIntArrayList();
@@ -106,12 +114,13 @@ public class GtfsTransferLoader {
                 TIntList patterns = transit.patternsForStop.get(from);
                 stopAndPatternPairsWithTransfers.putAll(from, patterns);
             }
+            nValidAndLoaded += 1;
         }
     }
 
-    private boolean untrue (boolean condition, String errorMessage) {
+    private boolean check (boolean condition, String errorMessage) {
         if (condition) otherErrors.adjustOrPutValue(errorMessage, 1, 1);
-        return !condition;
+        return condition;
     }
 
     /// Validate one GTFS transfer and decide whether it should be processed by this class,
@@ -133,6 +142,7 @@ public class GtfsTransferLoader {
         }
         if (transfer.transfer_type > 3) {
             // In-seat transfer information may be "supported", but not consumed by this class.
+            nUnsupportedTransferType += 1;
             skip = true;
         }
         return skip;
@@ -146,6 +156,18 @@ public class GtfsTransferLoader {
             return stopPairsWithTransfers.contains(new StopPair(fromStopIndex, toStopIndex));
         }
         return false;
+    }
+
+    public void logErrors () {
+        LOG.info("Total GTFS transfers processed from all feeds: {}", nProcessed);
+        LOG.info("Number with unsupported specificity values: {}", nUnsupportedSpecificity);
+        LOG.info("Number with unsupported transfer types: {}", nUnsupportedTransferType);
+        LOG.info("Number missing stop information: {}", nMissingStop);
+        otherErrors.forEachEntry((string, count) -> {
+            LOG.info("{} count={}", string, count);
+            return true;
+        });
+        LOG.info("Net number of GTFS transfers actually loaded: {}", nValidAndLoaded);
     }
 
 }

@@ -264,6 +264,7 @@ public class TransportNetworkCache implements Component {
             GTFSFeed feed = gtfsCache.get(gtfsId);
             network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
         }
+        gtfsTransferLoader.logErrors();
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);
         network.streetLayer.buildEdgeLists();

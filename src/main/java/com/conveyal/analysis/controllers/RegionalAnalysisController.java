@@ -37,6 +37,8 @@ import spark.Request;
 import spark.Response;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -247,11 +249,9 @@ public class RegionalAnalysisController implements HttpController {
             File multiCutoffFile = fileStorage.getFile(multiCutoffFileStorageKey);
             File tempOutFile = FileUtils.createScratchFile(fileFormat.toString());
             try (
-                  FileChannel multiCutoffChannel = FileChannel.open(multiCutoffFile.toPath(), StandardOpenOption.READ);
-                  FileChannel localOutputChannel = FileChannel.open(tempOutFile.toPath(), StandardOpenOption.WRITE)
+                InputStream multiCutoffStream = new FileInputStream(multiCutoffFile);
+                OutputStream tempOutStream = new FileOutputStream(tempOutFile);
             ) {
-                InputStream multiCutoffStream = Channels.newInputStream(multiCutoffChannel);
-                OutputStream tempOutStream = Channels.newOutputStream(localOutputChannel);
                 Grid grid = new SelectingGridReducer(thresholdIndex).compute(multiCutoffStream);
                 switch (fileFormat) {
                     case GRID:

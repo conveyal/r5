@@ -2,6 +2,7 @@ package com.conveyal.analysis;
 
 import com.conveyal.r5.analyst.Grid;
 
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +39,8 @@ public class SelectingGridReducer {
     }
 
     public Grid compute (InputStream rawInput) {
-        try (DataInputStream input = new DataInputStream(new GZIPInputStream(rawInput))) {
+        final int BUFSIZE = 64*1024;
+        try (DataInputStream input = new DataInputStream(new BufferedInputStream(new GZIPInputStream(rawInput, BUFSIZE), BUFSIZE))) {
             // Ideally, this access grid reading logic should not be embedded in this reduce operation.
             char[] header = new char[8];
             for (int i = 0; i < 8; i++) {

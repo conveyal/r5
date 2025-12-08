@@ -156,7 +156,7 @@ public class TransferFinder {
                 String fromStopName = transitLayer.stopNames.get(sourceStopIndex);
                 gtfsProvidedStops.forEach(targetStopIndex -> {
                     String toStopName = transitLayer.stopNames.get(targetStopIndex);
-                    LOG.info("Deferred to GTFS rather than OSM for transfer from {} to {}.", fromStopName, toStopName);
+                    System.out.printf("%s to %s\n", fromStopName, toStopName);
                     return true;
                 });
             }

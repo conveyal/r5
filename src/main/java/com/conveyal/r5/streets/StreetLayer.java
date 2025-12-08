@@ -1220,7 +1220,7 @@ public class StreetLayer implements Serializable, Cloneable {
             try {
                 edgeStore.edgeTraversalTimes.setEdgePair(newEdge.edgeIndex, way);
             } catch (Exception ex) {
-                LOG.error("Continuing to load but ignoring generalized costs due to exception: {}", ex.toString());
+                LOG.info("Continuing to load but ignoring generalized costs following exception: {}", ex.toString());
                 edgeStore.edgeTraversalTimes = null;
             }
         }

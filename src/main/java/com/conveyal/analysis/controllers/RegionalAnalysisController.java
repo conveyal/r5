@@ -270,10 +270,6 @@ public class RegionalAnalysisController implements HttpController {
         return new HumanKey(singleCutoffFileStorageKey, resultHumanFilename);
     }
 
-    // Prevent multiple requests from creating the same files in parallel.
-    // This could potentially be integrated into FileStorage with enum return values or an additional boolean method.
-    private Set<String> filesBeingPrepared = Collections.synchronizedSet(new HashSet<>());
-
     private Object getAllRegionalResults (Request req, Response res) throws IOException {
         final String regionalAnalysisId = req.params("_id");
         final UserPermissions userPermissions = UserPermissions.from(req);
@@ -282,62 +278,50 @@ public class RegionalAnalysisController implements HttpController {
             throw AnalysisServerException.badRequest("Batch result download only available for gridded origins.");
         }
         FileStorageKey zippedResultsKey = new FileStorageKey(RESULTS, analysis._id + "_ALL.zip");
-        if (fileStorage.exists(zippedResultsKey)) {
-            res.type(APPLICATION_JSON.asString());
-            String analysisHumanName = humanNameForEntity(analysis);
-            return fileStorage.getJsonUrl(zippedResultsKey, analysisHumanName, "zip");
-        }
-        if (filesBeingPrepared.contains(zippedResultsKey.path)) {
-            res.type(TEXT_PLAIN.asString());
-            res.status(HttpStatus.ACCEPTED_202);
-            return "Geotiff zip is already being prepared in the background.";
-        }
-        // File did not exist. Create it in the background and ask caller to request it later.
-        filesBeingPrepared.add(zippedResultsKey.path);
-        Task task = Task.create("Zip all geotiffs for regional analysis " + analysis.name)
-            .forUser(userPermissions)
-            .withAction(progressListener -> {
-                int nSteps = analysis.destinationPointSetIds.length * analysis.cutoffsMinutes.length *
-                        analysis.travelTimePercentiles.length * 2 + 1;
-                progressListener.beginTask("Creating and archiving geotiffs...", nSteps);
-                // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
-                List<HumanKey> humanKeys = new ArrayList<>();
-                for (String destinationPointSetId : analysis.destinationPointSetIds) {
-                    OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    // TODO handle dual access
-                    for (int cutoffMinutes : analysis.cutoffsMinutes) {
-                        for (int percentile : analysis.travelTimePercentiles) {
-                            HumanKey gridKey = getSingleCutoffGrid(
-                                    analysis, destinations, cutoffMinutes, percentile, GridResultType.ACCESS, FileStorageFormat.GEOTIFF
-                            );
-                            humanKeys.add(gridKey);
-                            progressListener.increment();
-                        }
+        if (!fileStorage.exists(zippedResultsKey)) {
+            // File did not exist, so create it. This endpoint blocks:
+            // it is no longer done in the background as it's reasonably fast after PR #986.
+            // Nothing prevents multiple requests from creating the same files in parallel.
+            // Other than wasted compute that should be harmless, with all actions taken idempotent.
+            // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
+            List<HumanKey> humanKeys = new ArrayList<>();
+            for (String destinationPointSetId : analysis.destinationPointSetIds) {
+                OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
+                // TODO handle dual access
+                for (int cutoffMinutes : analysis.cutoffsMinutes) {
+                    for (int percentile : analysis.travelTimePercentiles) {
+                        HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, cutoffMinutes,
+                              percentile, GridResultType.ACCESS, FileStorageFormat.GEOTIFF);
+                        humanKeys.add(gridKey);
                     }
                 }
-                File tempZipFile = File.createTempFile("regional", ".zip");
-                // Zipfs can't open existing empty files, the file has to not exist. FIXME: Non-dangerous race condition
-                // Examining ZipFileSystemProvider reveals a "useTempFile" env parameter, but this is for the individual
-                // entries. May be better to just use zipOutputStream which would also allow gzip - zip CSV conversion.
-                tempZipFile.delete();
-                Map<String, String> env = Map.of("create", "true");
-                URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
-                try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
-                    for (HumanKey key : humanKeys) {
-                        Path storagePath = fileStorage.getFile(key.storageKey).toPath();
-                        Path zipPath = zipFilesystem.getPath(key.humanName);
-                        Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
-                        progressListener.increment();
-                    }
+            }
+            File tempZipFile = File.createTempFile("regional", ".zip");
+            // Zipfs can't open existing empty files, the file has to not exist.
+            // Deleting the temp file and then immediately re-creating it is a race condition but apparently harmless.
+            // Examining ZipFileSystemProvider reveals a "useTempFile" env parameter, but this is for the individual
+            // entries. May be better to just use zipOutputStream which would also allow gzip - zip CSV conversion.
+            tempZipFile.delete();
+            URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
+            // GeoTiffs are already compressed.
+            // NoCompression reduces ZIP write time from 400 to 8 msec at a 1.5% cost in file size.
+            Map<String, String> env = Map.of("create", "true", "noCompression", "true");
+            LOG.info("Adding {} GeoTiffs to ZIP file {}...", humanKeys.size(), tempZipFile.getName());
+            try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
+                for (HumanKey key : humanKeys) {
+                    Path storagePath = fileStorage.getFile(key.storageKey).toPath();
+                    Path zipPath = zipFilesystem.getPath(key.humanName);
+                    Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
+                    LOG.info("Added GeoTiff for key {}", key.humanName);
                 }
-                fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
-                progressListener.increment();
-                filesBeingPrepared.remove(zippedResultsKey.path);
-            });
-        taskScheduler.enqueue(task);
-        res.type(TEXT_PLAIN.asString());
-        res.status(HttpStatus.ACCEPTED_202);
-        return "Building geotiff zip in background.";
+            }
+            LOG.info("Moving ZIP into storage...");
+            fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
+            LOG.info("Done moving ZIP into storage.");
+        }
+        res.type(APPLICATION_JSON.asString());
+        String analysisHumanName = humanNameForEntity(analysis);
+        return fileStorage.getJsonUrl(zippedResultsKey, analysisHumanName, "zip");
     }
 
     /**

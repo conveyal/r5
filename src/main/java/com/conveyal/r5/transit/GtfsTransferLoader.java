@@ -111,7 +111,7 @@ public class GtfsTransferLoader {
             if (transferConfig == STOP_PAIR) {
                 stopPairsWithTransfers.add(new StopPair(from, to));
             } else if (transferConfig == STOP_TO_PATTERN) {
-                TIntList patterns = transit.patternsForStop.get(from);
+                TIntList patterns = transit.patternsForStop.get(to);
                 stopAndPatternPairsWithTransfers.putAll(from, patterns);
             }
             nValidAndLoaded += 1;

@@ -12,6 +12,7 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +151,15 @@ public class TransferFinder {
             // loop routes (see CTA Brown Line to Purple Line example in discussion on #763).
             distancesToReachedStops.remove(sourceStopIndex);
             TIntCollection ignorePatterns = gtfsTransferLoader.patternsToSkipForSourceStop(sourceStopIndex);
-            retainClosestStopsOnPatterns(distancesToReachedStops, ignorePatterns);
+            TIntSet gtfsProvidedStops = retainClosestStopsOnPatterns(distancesToReachedStops, ignorePatterns);
+            {
+                String fromStopName = transitLayer.stopNames.get(sourceStopIndex);
+                gtfsProvidedStops.forEach(targetStopIndex -> {
+                    String toStopName = transitLayer.stopNames.get(targetStopIndex);
+                    LOG.info("Deferred to GTFS rather than OSM for transfer from {} to {}.", fromStopName, toStopName);
+                    return true;
+                });
+            }
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
@@ -234,8 +243,9 @@ public class TransferFinder {
      * @param ignorePatterns used to filter out stop-pattern pairs that already have a transfer from GTFS. May be null
      *                       or empty in other situations.
      */
-    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, TIntCollection ignorePatterns) {
+    private TIntSet retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, TIntCollection ignorePatterns) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
+        TIntSet gtfsProvidedStops = new TIntHashSet();
         // For every reached stop,
         timesToReachedStops.forEachEntry((stopIndex, distanceToStop) -> {
             // For every pattern passing through the reached stop,
@@ -259,13 +269,15 @@ public class TransferFinder {
         if (ignorePatterns != null) {
             ignorePatterns.forEach(patternIndex -> {
                 if (bestStopOnPattern.containsKey(patternIndex)) {
-                    bestStopOnPattern.remove(patternIndex);
+                    int removedStop = bestStopOnPattern.remove(patternIndex);
+                    gtfsProvidedStops.add(removedStop);
                     skippedPairCounter.increment();
                 }
                 return true;
             });
         }
         timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
+        return gtfsProvidedStops;
     }
 
 }

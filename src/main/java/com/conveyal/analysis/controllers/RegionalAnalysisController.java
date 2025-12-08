@@ -302,16 +302,22 @@ public class RegionalAnalysisController implements HttpController {
             // Examining ZipFileSystemProvider reveals a "useTempFile" env parameter, but this is for the individual
             // entries. May be better to just use zipOutputStream which would also allow gzip - zip CSV conversion.
             tempZipFile.delete();
-            Map<String, String> env = Map.of("create", "true");
             URI uri = URI.create("jar:file:" + tempZipFile.getAbsolutePath());
+            // GeoTiffs are already compressed.
+            // NoCompression reduces ZIP write time from 400 to 8 msec at a 1.5% cost in file size.
+            Map<String, String> env = Map.of("create", "true", "noCompression", "true");
+            LOG.info("Adding {} GeoTiffs to ZIP file {}...", humanKeys.size(), tempZipFile.getName());
             try (FileSystem zipFilesystem = FileSystems.newFileSystem(uri, env)) {
                 for (HumanKey key : humanKeys) {
                     Path storagePath = fileStorage.getFile(key.storageKey).toPath();
                     Path zipPath = zipFilesystem.getPath(key.humanName);
                     Files.copy(storagePath, zipPath, StandardCopyOption.REPLACE_EXISTING);
+                    LOG.info("Added GeoTiff for key {}", key.humanName);
                 }
             }
+            LOG.info("Moving ZIP into storage...");
             fileStorage.moveIntoStorage(zippedResultsKey, tempZipFile);
+            LOG.info("Done moving ZIP into storage.");
         }
         res.type(APPLICATION_JSON.asString());
         String analysisHumanName = humanNameForEntity(analysis);

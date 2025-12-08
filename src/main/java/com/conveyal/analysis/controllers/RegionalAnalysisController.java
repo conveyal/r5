@@ -302,13 +302,13 @@ public class RegionalAnalysisController implements HttpController {
                 progressListener.beginTask("Creating and archiving geotiffs...", nSteps);
                 // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
                 List<HumanKey> humanKeys = new ArrayList<>();
+                GridResultType gridResultType = determineGridResultType(analysis);
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    // TODO handle dual access
                     for (int cutoffMinutes : analysis.cutoffsMinutes) {
                         for (int percentile : analysis.travelTimePercentiles) {
                             HumanKey gridKey = getSingleCutoffGrid(
-                                    analysis, destinations, cutoffMinutes, percentile, GridResultType.ACCESS, FileStorageFormat.GEOTIFF
+                                analysis, destinations, cutoffMinutes, percentile, gridResultType, FileStorageFormat.GEOTIFF
                             );
                             humanKeys.add(gridKey);
                             progressListener.increment();
@@ -389,10 +389,7 @@ public class RegionalAnalysisController implements HttpController {
         }
         final UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
-
-        // TODO handle a regional analysis that includes both regular accessibility and dual access results.
-        GridResultType gridResultType = analysis.request.includeTemporalDensity ? GridResultType.DUAL_ACCESS : GridResultType.ACCESS;
-
+        GridResultType gridResultType = determineGridResultType(analysis);
         // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
         int threshold;
         if (gridResultType.equals(GridResultType.DUAL_ACCESS)) {
@@ -447,6 +444,12 @@ public class RegionalAnalysisController implements HttpController {
         HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, threshold, percentile, gridResultType, format);
         res.type(APPLICATION_JSON.asString());
         return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
+    }
+
+    // This assumes each set of regional analysis results has only primal or dual access, not both.
+    // TODO handle regional analyses that include both regular accessibility and dual access results.
+    private GridResultType determineGridResultType (RegionalAnalysis analysis) {
+        return analysis.request.includeTemporalDensity ? GridResultType.DUAL_ACCESS : GridResultType.ACCESS;
     }
 
     private Object getCsvResults (Request req, Response res) {

@@ -294,7 +294,7 @@ public class RegionalAnalysisController implements HttpController {
         }
         // File did not exist. Create it in the background and ask caller to request it later.
         filesBeingPrepared.add(zippedResultsKey.path);
-        Task task = Task.create("Zip all geotiffs for regional analysis " + analysis.name)
+        Task task = Task.create("Preparing regional results archive (hit download again when complete)")
             .forUser(userPermissions)
             .withAction(progressListener -> {
                 int nSteps = analysis.destinationPointSetIds.length * analysis.cutoffsMinutes.length *

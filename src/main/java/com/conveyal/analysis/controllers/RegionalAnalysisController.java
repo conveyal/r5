@@ -305,10 +305,13 @@ public class RegionalAnalysisController implements HttpController {
                 GridResultType gridResultType = determineGridResultType(analysis);
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    for (int cutoffMinutes : analysis.cutoffsMinutes) {
+                    int[] thresholds = gridResultType.equals(GridResultType.DUAL_ACCESS) 
+                        ? analysis.request.dualAccessThresholds 
+                        : analysis.cutoffsMinutes;
+                    for (int threshold : thresholds) {
                         for (int percentile : analysis.travelTimePercentiles) {
                             HumanKey gridKey = getSingleCutoffGrid(
-                                analysis, destinations, cutoffMinutes, percentile, gridResultType, FileStorageFormat.GEOTIFF
+                                analysis, destinations, threshold, percentile, gridResultType, FileStorageFormat.GEOTIFF
                             );
                             humanKeys.add(gridKey);
                             progressListener.increment();

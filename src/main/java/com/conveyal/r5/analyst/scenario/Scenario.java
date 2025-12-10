@@ -159,7 +159,7 @@ public class Scenario implements Serializable {
         
         // Find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
-        // The original GtfsTransferLoader is not retained after network build time. Here, for making transfers
+        // The GtfsTransferLoader instance is not retained after network build time. Here, for making transfers
         // necessitated by scenario changes, we use a no-op instance that completely ignores anything from GTFS.
         var osmOnlyLoader = new GtfsTransferLoader(copiedNetwork.transitLayer, OSM_ONLY);
         var transferFinder = new TransferFinder(copiedNetwork, osmOnlyLoader);

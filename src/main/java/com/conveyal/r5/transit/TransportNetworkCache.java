@@ -247,8 +247,8 @@ public class TransportNetworkCache implements Component {
         //  gtfs1, gtfs2...) (see various methods in TransportNetwork).
         TransportNetwork network = new TransportNetwork();
         network.streetLayer = new StreetLayer(config);
-        network.streetLayer.parentNetwork = network;
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
+        network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
         // The GTFS transfer loader persists across all loaded feeds so we can feed information about all the transfers

@@ -11,14 +11,12 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.*;
+import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.GTFS_ONLY;
 import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
 import static com.conveyal.r5.transit.TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
 import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
@@ -106,15 +104,19 @@ public class TransferFinder {
      * However, existing transfer lists will be extended if new stops are reachable from existing stops.
      */
     public void findTransfers () {
-        if (gtfsTransferLoader.transferConfig == TransferConfig.GTFS_ONLY) {
-            LOG.info("Not finding transfers through street network due to GTFS_ONLY in TransportNetworkConfig.");
-            return;
-        }
         // Look at the existing list of transfers (if any) and do enough iterations to make that transfer list as long
         // as the list of stops.
         int firstStopToProcess = transitLayer.streetTransfers.size();
         int nStopsTotal = transitLayer.getStopCount();
         int nStopsToProcess = nStopsTotal - firstStopToProcess;
+        if (gtfsTransferLoader.transferConfig == GTFS_ONLY) {
+            LOG.info("Not finding transfers through street network due to GTFS_ONLY in TransportNetworkConfig.");
+            // Unlike the GTFS transfers which are in a map (because they may be very sparse),
+            // street transfers are in a list because they are expected to exist at most stops.
+            // We must extend that list to avoid out of bounds index exceptions.
+            for (int i = 0; i < nStopsToProcess; i++) transitLayer.streetTransfers.add(null);
+            return; // Do not add any street transfers, leave them null for all new stops.
+        }
         LOG.info("Finding transfers through the street network from {} new transit stops...", nStopsToProcess);
         LambdaCounter stopCounter = new LambdaCounter(LOG, nStopsToProcess, 10_000,
               "Processed OSM street transfers from {} of {} new transit stops.");
@@ -229,10 +231,10 @@ public class TransferFinder {
      * street network. TODO we could check stop positions in the target pattern to help handle a case like this -- for
      * any continuous sequence of stops, retain only the closest.
      *
-     * @param timesToReachedStops map from target stop index to distance (along the street network) to it. The method
- *                           mutates this parameter.
-     * @param ignorePatterns used to filter out stop-pattern pairs that already have a transfer from GTFS. May be null
-     *                       or empty in other situations.
+     * @param timesToReachedStops map from target stop index to distance (along the street network) to it.
+     *                       The method mutates this parameter.
+     * @param ignorePatterns used to filter out stop-pattern pairs that already have a transfer from GTFS.
+     *                       May be null or empty in other situations.
      */
     private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops, TIntCollection ignorePatterns) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);

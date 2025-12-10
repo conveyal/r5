@@ -21,30 +21,28 @@ import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferCon
 import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.STOP_TO_PATTERN;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
-/**
- * Transfers between transit stops can come from two sources: transfers.txt in GTFS inputs and
- * routing through the OSM-derived street network. This class handles loading from transfers.txt and
- * retains enough information so the subsequent street routing approach can adopt the behavior
- * specified with TransportNetworkConfig.TransferConfig. The way in which GTFS transfers take
- * priority over transfers found through the street network can be configured.
- * <p>
- * There can be multiple GTFS feeds and they are loaded in a streaming fashion, with only one open
- * and consuming memory at a time. Therefore we lose a lot of context by the time the street routing
- * happens.
- * <p>
- * Use a single instance across all GTFS feeds. Call the load method once on each feed in turn. This
- * accumulates information from all feeds that will later be important for finding transfers through
- * the OSM street network.
- * <p>
- * The GTFS transfers we load are specified in terms of minimum time, while the street transfers are
- * stored as distances and resolved to time during searches based on the specified walk speed. On
- * the downside this requires two separate data structures, but on the upside it simplifies loading
- * because GTFS must be loaded one feed at a time, while on-street transfers must be found later
- * after all GTFS feeds are loaded and all stops linked (because street transfers are expected to
- * connect stops from different feeds).
- * <p>
- * TODO Further increase transfer time accuracy using GTFS pathways.txt
- */
+/// Transfers between transit stops can come from two sources: transfers.txt in GTFS inputs and
+/// routing through the OSM-derived street network. This class handles loading from transfers.txt
+/// and retains enough information so the subsequent street routing approach can adopt the behavior
+/// specified with TransportNetworkConfig.TransferConfig. The way in which GTFS transfers take
+/// priority over transfers found through the street network can be configured.
+///
+/// There can be multiple GTFS feeds and they are loaded in a streaming fashion, with only one open
+/// and consuming memory at a time. Therefore we lose a lot of context by the time the street routing
+/// happens.
+///
+/// Use a single instance across all GTFS feeds. Call the load method once on each feed in turn. This
+/// accumulates information from all feeds that will later be important for finding transfers through
+/// the OSM street network.
+///
+/// The GTFS transfers we load are specified in terms of minimum time, while the street transfers are
+/// stored as distances and resolved to time during searches based on the specified walk speed. On
+/// the downside this requires two separate data structures, but on the upside it simplifies loading
+/// because GTFS must be loaded one feed at a time, while on-street transfers must be found later
+/// after all GTFS feeds are loaded and all stops linked (because street transfers are expected to
+/// connect stops from different feeds).
+///
+/// TODO Further increase transfer time accuracy using GTFS pathways.txt
 public class GtfsTransferLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -78,7 +76,7 @@ public class GtfsTransferLoader {
 
     public GtfsTransferLoader (TransitLayer transit, TransferConfig transferConfig) {
         this.transit = transit;
-        this.transferConfig = transferConfig != null ? transferConfig : STOP_TO_PATTERN;
+        this.transferConfig = transferConfig != null ? transferConfig : OSM_ONLY;
     }
 
     ///  @param indexForUnscopedStopId Map of stop IDs not yet scoped by feed ID, which exists only during GTFS loading

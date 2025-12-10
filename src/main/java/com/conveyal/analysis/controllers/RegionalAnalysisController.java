@@ -161,10 +161,10 @@ public class RegionalAnalysisController implements HttpController {
         return analysis;
     }
 
-    private int getIntQueryParameter (Request req, String parameterName, int defaultValue) {
+    private int getIntQueryParameter (Request req, String parameterName) {
         String paramValue = req.queryParams(parameterName);
         if (paramValue == null) {
-            return defaultValue;
+            throw new IllegalArgumentException("Must provide query parameter " + parameterName);
         }
         try {
             return Integer.parseInt(paramValue);
@@ -305,10 +305,7 @@ public class RegionalAnalysisController implements HttpController {
                 GridResultType gridResultType = determineGridResultType(analysis);
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    int[] thresholds = gridResultType.equals(GridResultType.DUAL_ACCESS) 
-                        ? analysis.request.dualAccessThresholds 
-                        : analysis.cutoffsMinutes;
-                    for (int threshold : thresholds) {
+                    for (int threshold : getValidThresholds(analysis)) {
                         for (int percentile : analysis.travelTimePercentiles) {
                             HumanKey gridKey = getSingleCutoffGrid(
                                 analysis, destinations, threshold, percentile, gridResultType, FileStorageFormat.GEOTIFF
@@ -393,39 +390,21 @@ public class RegionalAnalysisController implements HttpController {
         final UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
         GridResultType gridResultType = determineGridResultType(analysis);
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        int threshold;
-        if (gridResultType.equals(GridResultType.DUAL_ACCESS)) {
-            int nThresholds = analysis.request.dualAccessThresholds.length;
-            int[] thresholds = analysis.request.dualAccessThresholds;
-            checkState(nThresholds > 0, "Regional analysis has no dual access thresholds.");
-            threshold = getIntQueryParameter(req, "threshold", thresholds[nThresholds / 2]);
-            checkArgument(new TIntArrayList(thresholds).contains(threshold),
-                    "Dual access thresholds for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", thresholds)
-            );
-        } else {
-            // Handle newer regional analyses with multiple cutoffs in an array.
-            // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
-            checkState(analysis.cutoffsMinutes != null, "Regional analysis has no cutoffs.");
-            int nCutoffs = analysis.cutoffsMinutes.length;
-            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            threshold = getIntQueryParameter(req, "threshold", analysis.cutoffsMinutes[nCutoffs / 2]);
-            checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(threshold),
-                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.cutoffsMinutes)
-            );
-        }
-
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        int nPercentiles = analysis.travelTimePercentiles.length;
-        checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-        int percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-        checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
+        // The threshold parameter holds the value in minutes, not the position in the array of thresholds.
+        int threshold = getIntQueryParameter(req, "threshold");
+        int[] thresholds = getValidThresholds(analysis);
+        checkState(thresholds != null && thresholds.length > 0, "Regional analysis lacks thresholds for " + gridResultType);
+        checkArgument(Ints.contains(thresholds, threshold),
+              "Threshold parameter for this regional analysis must be taken from this list: (%s)",
+              Ints.join(", ", thresholds)
+        );
+        int percentile = getIntQueryParameter(req, "percentile");
+        int [] percentiles = analysis.travelTimePercentiles;
+        checkState(percentiles != null && percentiles.length > 0, "Regional analysis lacks percentiles.");
+        checkArgument(Ints.contains(percentiles, percentile),
                 "Percentile for this regional analysis must be taken from this list: (%s)",
-                Ints.join(", ", analysis.travelTimePercentiles));
-
+                Ints.join(", ", percentiles)
+        );
         // Handle regional analyses with multiple destination pointsets per analysis.
         int nGrids = analysis.destinationPointSetIds.length;
         checkState(nGrids > 0, "Regional analysis has no grids.");
@@ -435,8 +414,8 @@ public class RegionalAnalysisController implements HttpController {
         }
         checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
                 "Destination gridId must be one of: %s",
-                String.join(",", analysis.destinationPointSetIds));
-
+                String.join(",", analysis.destinationPointSetIds)
+        );
         // We started implementing the ability to retrieve and display partially completed analyses.
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
         if (broker.findJob(regionalAnalysisId) != null) {
@@ -447,6 +426,13 @@ public class RegionalAnalysisController implements HttpController {
         HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, threshold, percentile, gridResultType, format);
         res.type(APPLICATION_JSON.asString());
         return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
+    }
+
+    private int[] getValidThresholds (RegionalAnalysis analysis) {
+        return switch (determineGridResultType(analysis)) {
+            case ACCESS -> analysis.cutoffsMinutes;
+            case DUAL_ACCESS -> analysis.request.dualAccessThresholds;
+        };
     }
 
     // This assumes each set of regional analysis results has only primal or dual access, not both.

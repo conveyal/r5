@@ -60,6 +60,9 @@ import java.util.zip.GZIPOutputStream;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.file.FileStorageFormat.GEOTIFF;
+import static com.conveyal.file.FileStorageFormat.GRID;
+import static com.conveyal.file.FileStorageFormat.PNG;
 import static com.conveyal.file.UrlWithHumanName.filenameCleanString;
 import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -161,10 +164,10 @@ public class RegionalAnalysisController implements HttpController {
         return analysis;
     }
 
-    private int getIntQueryParameter (Request req, String parameterName, int defaultValue) {
+    private int getIntQueryParameter (Request req, String parameterName) {
         String paramValue = req.queryParams(parameterName);
         if (paramValue == null) {
-            return defaultValue;
+            throw new IllegalArgumentException("Must provide query parameter " + parameterName);
         }
         try {
             return Integer.parseInt(paramValue);
@@ -302,13 +305,13 @@ public class RegionalAnalysisController implements HttpController {
                 progressListener.beginTask("Creating and archiving geotiffs...", nSteps);
                 // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
                 List<HumanKey> humanKeys = new ArrayList<>();
+                GridResultType gridResultType = determineGridResultType(analysis);
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    // TODO handle dual access
-                    for (int cutoffMinutes : analysis.cutoffsMinutes) {
+                    for (int threshold : getValidThresholds(analysis)) {
                         for (int percentile : analysis.travelTimePercentiles) {
                             HumanKey gridKey = getSingleCutoffGrid(
-                                    analysis, destinations, cutoffMinutes, percentile, GridResultType.ACCESS, FileStorageFormat.GEOTIFF
+                                analysis, destinations, threshold, percentile, gridResultType, GEOTIFF
                             );
                             humanKeys.add(gridKey);
                             progressListener.increment();
@@ -384,59 +387,17 @@ public class RegionalAnalysisController implements HttpController {
         // expected to have no gridded results and cleanly return a 404?
         final String regionalAnalysisId = req.params("_id");
         FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
-        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
+        if (!List.of(GRID, PNG, GEOTIFF).contains(format)) {
+            throw AnalysisServerException.badRequest("Parameter 'format' must be one of [grid, png, geotiff].");
         }
         final UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
-
-        // TODO handle a regional analysis that includes both regular accessibility and dual access results.
-        GridResultType gridResultType = analysis.request.includeTemporalDensity ? GridResultType.DUAL_ACCESS : GridResultType.ACCESS;
-
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        int threshold;
-        if (gridResultType.equals(GridResultType.DUAL_ACCESS)) {
-            int nThresholds = analysis.request.dualAccessThresholds.length;
-            int[] thresholds = analysis.request.dualAccessThresholds;
-            checkState(nThresholds > 0, "Regional analysis has no dual access thresholds.");
-            threshold = getIntQueryParameter(req, "threshold", thresholds[nThresholds / 2]);
-            checkArgument(new TIntArrayList(thresholds).contains(threshold),
-                    "Dual access thresholds for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", thresholds)
-            );
-        } else {
-            // Handle newer regional analyses with multiple cutoffs in an array.
-            // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
-            checkState(analysis.cutoffsMinutes != null, "Regional analysis has no cutoffs.");
-            int nCutoffs = analysis.cutoffsMinutes.length;
-            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            threshold = getIntQueryParameter(req, "threshold", analysis.cutoffsMinutes[nCutoffs / 2]);
-            checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(threshold),
-                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.cutoffsMinutes)
-            );
-        }
-
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        int nPercentiles = analysis.travelTimePercentiles.length;
-        checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-        int percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-        checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
-                "Percentile for this regional analysis must be taken from this list: (%s)",
-                Ints.join(", ", analysis.travelTimePercentiles));
-
-        // Handle regional analyses with multiple destination pointsets per analysis.
-        int nGrids = analysis.destinationPointSetIds.length;
-        checkState(nGrids > 0, "Regional analysis has no grids.");
-        String destinationPointSetId = req.queryParams("destinationPointSetId");
-        if (destinationPointSetId == null) {
-            destinationPointSetId = analysis.destinationPointSetIds[0];
-        }
-        checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
-                "Destination gridId must be one of: %s",
-                String.join(",", analysis.destinationPointSetIds));
-
+        GridResultType gridResultType = determineGridResultType(analysis);
+        // The threshold parameter holds the value in minutes, not the position in the array of thresholds.
+        int threshold = getAndValidateIntParameter(req, "threshold", getValidThresholds(analysis));
+        int percentile = getAndValidateIntParameter(req, "percentile", analysis.travelTimePercentiles);
+        String destinationPointSetId = getAndValidateStringParameter(
+              req, "destinationPointSetId", analysis.destinationPointSetIds);
         // We started implementing the ability to retrieve and display partially completed analyses.
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
         if (broker.findJob(regionalAnalysisId) != null) {
@@ -447,6 +408,41 @@ public class RegionalAnalysisController implements HttpController {
         HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, threshold, percentile, gridResultType, format);
         res.type(APPLICATION_JSON.asString());
         return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
+    }
+
+    private int[] getValidThresholds (RegionalAnalysis analysis) {
+        return switch (determineGridResultType(analysis)) {
+            case ACCESS -> analysis.cutoffsMinutes;
+            case DUAL_ACCESS -> analysis.request.dualAccessThresholds;
+        };
+    }
+
+    // This assumes each set of regional analysis results has only primal or dual access, not both.
+    // TODO handle regional analyses that include both regular accessibility and dual access results.
+    private GridResultType determineGridResultType (RegionalAnalysis analysis) {
+        return analysis.request.includeTemporalDensity ? GridResultType.DUAL_ACCESS : GridResultType.ACCESS;
+    }
+
+    /// Get the value for a given query parameter name, check that it's non-null and can be parsed
+    /// as an integer, and check that the value is present in an array of valid values.
+    private int getAndValidateIntParameter (Request req, String parameterName, int[] allowedValues) {
+        int value = getIntQueryParameter(req, parameterName);
+        checkState(allowedValues != null && allowedValues.length > 0, "Lacking values for " + parameterName);
+        checkArgument(Ints.contains(allowedValues, value), "Parameter '%s' must be one of: %s",
+              parameterName, Arrays.toString(allowedValues));
+        return value;
+    }
+
+    /// Should behave identically to getAndValidateIntParameter, but for Strings.
+    private String getAndValidateStringParameter (Request req, String parameterName, String[] allowedValues) {
+        checkState(allowedValues != null && allowedValues.length > 0, "Lacking values for " + parameterName);
+        String value = req.queryParams(parameterName);
+        if (value == null || value.isEmpty()) {
+            throw new IllegalArgumentException("Must provide query parameter " + parameterName);
+        }
+        checkArgument(List.of(allowedValues).contains(value), "Parameter '%s' must be one of: %s",
+              parameterName, Arrays.toString(allowedValues));
+        return value;
     }
 
     private Object getCsvResults (Request req, Response res) {

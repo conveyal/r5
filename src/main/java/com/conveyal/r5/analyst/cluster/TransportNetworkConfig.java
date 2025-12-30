@@ -68,10 +68,10 @@ public class TransportNetworkConfig {
 
     /**
      * How to handle stop-to-stop transfers in GTFS transfers.txt, and how to combine them with OSM-derived transfers.
-     * STOP_TO_PATTERN is the default, and is expected to only improve on the past behavior corresponding to OSM_ONLY.
-     * There may be edge cases, such as a complex with subway platforms separated by long times specified in GTFS,
-     * but no times specified for transfers between those platforms and nearby bus stops. In these cases, path results
-     * may be strange or incorrect, but the quality of travel times should be no worse than the current OSM_ONLY option.
+     * OSM_ONLY is the default, but STOP_TO_PATTERN should generally provide better results where GTFS data is good.
+     * In some cases path results may be strange or incorrect, but the quality of travel times should be no worse than
+     * the default OSM_ONLY option. For example: a large station in which subway platforms are separated by long walk
+     * times specified in GTFS but no times specified for transfers between those platforms and nearby bus stops.
      *
      * Currently we only handle stop-to-stop transfers in GTFS transfers.txt. Other more specific transfers types like
      * route-to-route and trip-to-trip are not compatible with our current routing approach, so will be ignored with
@@ -85,7 +85,6 @@ public class TransportNetworkConfig {
      * Strangely, BOARD_SLACK_SECONDS appears to only be used in classes for displaying paths, not for routing.
      * We currently apply a hard lower limit of 60 seconds between alighting and boarding.
      * Should this be configurable or interact with the transfer entries?
-     *
      */
     public TransferConfig transfers;
 

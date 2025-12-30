@@ -23,7 +23,7 @@ public class LambdaCounter {
 
     private int total;
 
-    private int logFrequency = 10000;
+    private int logFrequency;
 
     private String message;
 
@@ -39,8 +39,8 @@ public class LambdaCounter {
     }
 
     /**
-     * Create a counter that will log only the number of iterations with no total. It expects a message string with
-     * a single {} placeholder.
+     * Create a counter that will log only the number of iterations with no total.
+     * It expects a message string with a single {} placeholder.
      */
     public LambdaCounter(Logger logger, int logFrequency, String message) {
         this(logger, 0, logFrequency, message);
@@ -53,6 +53,12 @@ public class LambdaCounter {
         }
     }
 
+    public synchronized void increment(int n) {
+        int nPastLog = count % logFrequency;
+        if (nPastLog + n >= logFrequency) log();
+        count += n;
+    }
+
     public synchronized int getCount() {
         return count;
     }
@@ -63,6 +69,10 @@ public class LambdaCounter {
         } else {
             logger.info(message, human(count));
         }
+    }
+
+    public void logIfNonZero () {
+         if (count > 0) log();
     }
 
     public void done () {

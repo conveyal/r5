@@ -12,6 +12,8 @@ import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
+import com.conveyal.r5.labeling.NoSidewalkCyclingTraversalPermissionLabeler;
+import com.conveyal.r5.labeling.NoSteepInclinesTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SidewalkTraversalPermissionLabeler;
 import com.conveyal.r5.labeling.SpeedLabeler;
@@ -133,6 +135,7 @@ public class StreetLayer implements Serializable, Cloneable {
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
 
+    private boolean stepFree = false;
     // TODO these are only needed when building the network, should we really be keeping them here in the layer?
     //      We should instead have a network builder that holds references to this transient state. Note initial
     //      approach of specifying a TraversalPermissionLabeler in TransportNetworkConfig.
@@ -209,21 +212,26 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public StreetLayer() {
         speedLabeler = new SpeedLabeler(SpeedConfig.defaultConfig());
-        permissionLabeler = new USTraversalPermissionLabeler();
+        permissionLabeler = new USTraversalPermissionLabeler(null);
     }
 
     public StreetLayer(TransportNetworkConfig config) {
         this();
         if (config != null) {
             permissionLabeler = switch (config.traversalPermissionLabeler) {
-                case "sidewalk" -> new SidewalkTraversalPermissionLabeler();
-                case null -> new USTraversalPermissionLabeler();
+                case "sidewalk" -> new SidewalkTraversalPermissionLabeler(config);
+                case "noSidewalkCycling" -> new NoSidewalkCyclingTraversalPermissionLabeler(config);
+                case "noSteepWays" -> new NoSteepInclinesTraversalPermissionLabeler(config);
+                case null -> new USTraversalPermissionLabeler(config);
                 default -> throw new IllegalArgumentException(
                         "Unknown traversal permission labeler: " + config.traversalPermissionLabeler
                 );
             };
+
+            stepFree = config.stepFree;
+            
         } else {
-            permissionLabeler = new USTraversalPermissionLabeler();
+            permissionLabeler = new USTraversalPermissionLabeler(null);
         }
     }
 
@@ -334,7 +342,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
                 final boolean intersection = osm.intersectionNodes.contains(way.nodes[n]);
                 final boolean lastNode = (n == (way.nodes.length - 1));
-                if (intersection || lastNode || isImpassable(node)) {
+                if (intersection || lastNode || isImpassable(node, stepFree)) {
                     makeEdgePair(way, beginIdx, n, entry.getKey());
                     beginIdx = n;
                 }
@@ -1059,7 +1067,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 if (node.hasTag("highway", "traffic_signals")) {
                     vertexStore.setFlag(vertexIndex, TRAFFIC_SIGNAL);
                 }
-                if (isImpassable(node)) {
+                if (isImpassable(node, stepFree)) {
                     vertexStore.setFlag(vertexIndex, IMPASSABLE);
                 }
                 vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
@@ -1113,7 +1121,7 @@ public class StreetLayer implements Serializable, Cloneable {
      *
      * Ideally such areas would be treated as no-through-traffic but that would involve more tricky heuristics.
      */
-    private static boolean isImpassable (Node node) {
+    private static boolean isImpassable (Node node, boolean requireStepFree) {
         // This code is hit millions of times so we want to bypass it as much as possible.
         if (node.hasNoTags()) {
             return false;
@@ -1128,6 +1136,11 @@ public class StreetLayer implements Serializable, Cloneable {
             // Consider the node impassable only when all mode-specific exception tags are missing or clearly negative.
             return isNullOrNo(node.getTag("foot")) && isNullOrNo(node.getTag("bicycle"));
         }
+
+        if (requireStepFree && node.hasTag("kerb", "raised")) {
+            return true;
+        }
+
         // As a default, err on the side of returning false, which will maintain the preexisting code path.
         return false;
     }
@@ -1207,7 +1220,7 @@ public class StreetLayer implements Serializable, Cloneable {
             try {
                 edgeStore.edgeTraversalTimes.setEdgePair(newEdge.edgeIndex, way);
             } catch (Exception ex) {
-                LOG.error("Continuing to load but ignoring generalized costs due to exception: {}", ex.toString());
+                LOG.info("Continuing to load but ignoring generalized costs following exception: {}", ex.toString());
                 edgeStore.edgeTraversalTimes = null;
             }
         }

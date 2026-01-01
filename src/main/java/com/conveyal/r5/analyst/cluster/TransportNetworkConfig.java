@@ -113,6 +113,7 @@ public class TransportNetworkConfig {
      */
     public boolean stepFree;
 
+    /*
      * Specifies the distance to link to stops to streets, null to use default.
      */
     public Double stopLinkRadiusMeters = null;

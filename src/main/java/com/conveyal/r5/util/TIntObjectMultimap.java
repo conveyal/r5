@@ -5,7 +5,7 @@ import gnu.trove.procedure.TIntObjectProcedure;
 import java.util.Collection;
 
 /**
- * A primitive multimap
+ * A map from primitive int keys to object instances of a generic type.
  */
 public interface TIntObjectMultimap<V> {
     boolean put (int key, V value);

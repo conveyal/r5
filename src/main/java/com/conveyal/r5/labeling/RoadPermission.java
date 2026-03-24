@@ -18,4 +18,10 @@ public class RoadPermission {
         this.backward = backward;
 
     }
+
+    public void disallowPedestrians() {
+        this.forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        this.backward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+    }
+
 }

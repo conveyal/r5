@@ -25,13 +25,16 @@ import java.util.Set;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class TransportNetworkConfig {
 
-    /** ID of the OSM file, for use with OSMCache */
+    /** ID of the OSM file. Used as a key for fetching from OSMCache. */
     public String osmId;
 
-    /** IDs of the GTFS files, for use with GTFSCache */
+    /** IDs of the GTFS files. Used as keys for fetching from GTFSCache. */
     public List<String> gtfsIds;
 
-    /** The fare calculator for analysis, if any. TODO this is not yet wired up to TransportNetwork.setFareCalculator. */
+    /**
+     * The fare calculator for analysis, if any.
+     * TODO this is not yet wired up to TransportNetwork.setFareCalculator.
+     */
     public InRoutingFareCalculator analysisFareCalculator;
 
     /** A list of _R5_ modifications to apply during network build. May be null. */
@@ -56,5 +59,58 @@ public class TransportNetworkConfig {
      * (specifying different labelers, using enums).
      */
     public String traversalPermissionLabeler;
+
+    /**
+     * Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites or the Network Viewer).
+     * If false, straight line segments between stops will be used in visualizations.
+     */
+    public boolean saveShapes;
+
+    /**
+     * How to handle stop-to-stop transfers in GTFS transfers.txt, and how to combine them with OSM-derived transfers.
+     * OSM_ONLY is the default, but STOP_TO_PATTERN should generally provide better results where GTFS data is good.
+     * In some cases path results may be strange or incorrect, but the quality of travel times should be no worse than
+     * the default OSM_ONLY option. For example: a large station in which subway platforms are separated by long walk
+     * times specified in GTFS but no times specified for transfers between those platforms and nearby bus stops.
+     *
+     * Currently we only handle stop-to-stop transfers in GTFS transfers.txt. Other more specific transfers types like
+     * route-to-route and trip-to-trip are not compatible with our current routing approach, so will be ignored with
+     * a warning. We also only import transfer type 2 ("minimum amount of time between arrival and departure to ensure
+     * a connection"). For any option except OSM_ONLY, these GTFS transfers override and replace any OSM street distance
+     * calculations. Although the GTFS spec text says "minimum amount of time", implying that other information like OSM
+     * routing could make times longer, we believe the proper interpretation is that transfers.txt provides a typical
+     * safe amount of time needed to walk between the two stops, which would only be made worse by comparing with OSM.
+     *
+     * Additional considerations:
+     * Strangely, BOARD_SLACK_SECONDS appears to only be used in classes for displaying paths, not for routing.
+     * We currently apply a hard lower limit of 60 seconds between alighting and boarding.
+     * Should this be configurable or interact with the transfer entries?
+     */
+    public TransferConfig transfers;
+
+    public enum TransferConfig {
+        /// Find transfers only by searching through the OSM street network, ignore GTFS transfers
+        OSM_ONLY,
+        /// Load transfers only from GTFS transfers.txt, do not use the OSM street network
+        GTFS_ONLY,
+        /// Use OSM where GTFS does not provide a transfer from a given stop to a given trip pattern
+        STOP_TO_PATTERN,
+        /// Find transfers via streets for any pair of stops not connected by a GTFS transfer
+        STOP_PAIR,
+    }
+
+    /**
+     * Steepest allowable slope for traversal. If a way has an "incline" tag  (e.g., from OSW or GATIS rather than
+     * a typical OSM source) with an absolute value that exceeds this limit, custom TraversalPermissionLabelers can
+     * remove permissions. Currently implemented only for pedestrians.
+     */
+    public Double maxIncline;
+
+    /**
+     * Whether to exclude pedestrian traversal of ways with highway=stairs tags and nodes with kerb=raised tags. This
+     * option should generally be used with detailed sidewalk networks and a TraversalPermissionLabeler that forces
+     * use of sidewalks (i.e., disallows walking on roadways).
+     */
+    public boolean stepFree;
 
 }

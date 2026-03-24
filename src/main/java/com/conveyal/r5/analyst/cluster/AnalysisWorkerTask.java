@@ -103,17 +103,16 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
 
     /**
      * Whether to include the number of opportunities reached during each minute of travel in results sent back
-     * to the broker. Requires both an origin and destination pointset to be specified, and in the case of regional
-     * analyses the origins must be non-gridded, and results will be collated to CSV.
-     * It should be possible to enable regional results for gridded origins as well.
+     * to the broker. Requires a destination pointset to be specified. If an origin pointset is specified the results
+     * will be collated to CSV.
      */
     public boolean includeTemporalDensity = false;
 
     /**
-     * If this is set to a value above zero, report the amount of time needed to reach the given number of
-     * opportunities from this origin (known technically as "dual accessibility").
+     * If set, and if `includeTemporalDensity` is true, results will include the amount of time needed to reach each
+     * threshold number of opportunities (known technically as "dual access").
      */
-    public int dualAccessibilityThreshold = 0;
+    public int[] dualAccessThresholds;
 
     /** Whether to build a histogram of travel times to each destination, generally used in testing and debugging. */
     public boolean recordTravelTimeHistograms = false;
@@ -323,4 +322,15 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
         }
     }
 
+    public void validateDualAccessThresholds () {
+        checkNotNull(dualAccessThresholds);
+        final int nThresholds = dualAccessThresholds.length;
+        checkArgument(nThresholds >= 1, "At least one dual access threshold must be supplied.");
+        for (int t = 0; t < nThresholds; t++) {
+            checkArgument(dualAccessThresholds[t] >= 0, "Dual access thresholds must be non-negative integers.");
+            if (t > 0) {
+                checkArgument(dualAccessThresholds[t] >= dualAccessThresholds[t - 1], "Dual access thresholds must be in ascending order.");
+            }
+        }
+    }
 }

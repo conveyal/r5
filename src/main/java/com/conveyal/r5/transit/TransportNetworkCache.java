@@ -6,6 +6,7 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.Modification;
@@ -245,29 +246,33 @@ public class TransportNetworkCache implements Component {
     private TransportNetwork buildNetworkFromConfig (TransportNetworkConfig config) {
         // FIXME All internal building logic should be encapsulated in a method like TransportNetwork.build(osm,
         //  gtfs1, gtfs2...) (see various methods in TransportNetwork).
-
         TransportNetwork network = new TransportNetwork();
-
         network.streetLayer = new StreetLayer(config);
-
         network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
-
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
-        network.transitLayer = new TransitLayer();
+        // The GTFS transfer loader persists across all loaded feeds so we can feed information about all the transfers
+        // it created into the later OSM transfer generation step.
+        // The street network is loaded before the transit network, so at first it seems reasonable to create transfers
+        // feed-by-feed. However, stops need to be connected to streets before we find street transfers, and we want to
+        // create inter-feed transfers. So on-street transfers need to be discovered after all feeds have been loaded,
+        // while nonetheless giving priority to GTFS transfers from transfers.txt.
 
-        config.gtfsIds.stream()
-                .map(gtfsCache::get)
-                .forEach(network.transitLayer::loadFromGtfs);
-
+        network.transitLayer = new TransitLayer(config);
+        var gtfsTransferLoader = new GtfsTransferLoader(network.transitLayer, config.transfers);
+        for (String gtfsId : config.gtfsIds) {
+            GTFSFeed feed = gtfsCache.get(gtfsId);
+            network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
+        }
+        gtfsTransferLoader.logErrors();
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);
         network.streetLayer.buildEdgeLists();
-
         network.rebuildTransientIndexes();
 
-        TransferFinder transferFinder = new TransferFinder(network);
+        // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
+        TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);
         transferFinder.findTransfers();
         transferFinder.findParkRideTransfer();
 

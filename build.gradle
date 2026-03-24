@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'maven-publish'
     id 'com.palantir.git-version' version '2.0.0'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '9.0.1'
 }
 
 group = 'com.conveyal'
@@ -26,7 +26,7 @@ jar {
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.r5',
             'Main-Class': 'com.conveyal.analysis.BackendMain',
-            'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
+            'Build-Jdk-Spec': java.toolchain.languageVersion,
             'Implementation-Title': 'Conveyal Analysis Backend',
             'Implementation-Vendor': 'Conveyal LLC',
             'Implementation-Version': project.version
@@ -269,6 +269,10 @@ dependencies {
     // Chart drawing library for examining travel time distributions when crafting tests.
     // Although rarely used it should be low-impact: it is a test-only dependency with no transitive dependenices.
     testImplementation('org.jfree:jfreechart:1.5.1')
+
+    // Load the test launcher, no longer automatic in Gradle 9:
+    // https://github.com/gradle/gradle/issues/34512
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 
 }
 

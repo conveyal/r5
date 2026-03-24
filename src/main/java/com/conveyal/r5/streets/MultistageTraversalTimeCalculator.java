@@ -34,7 +34,8 @@ public class MultistageTraversalTimeCalculator implements TraversalTimeCalculato
     public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
         final int baseTraversalTimeSeconds = base.traversalTimeSeconds(currentEdge, streetMode, req);
         int t = baseTraversalTimeSeconds;
-        if (!StreetMode.CAR.equals(streetMode)) {
+        // Currently no CostField implementations apply to CAR. See Javadoc on CostField if costs need to vary by mode.
+        if (!streetMode.equals(StreetMode.CAR)) {
             for (CostField costField : costFields) {
                 t += costField.additionalTraversalTimeSeconds(currentEdge, baseTraversalTimeSeconds);
             }

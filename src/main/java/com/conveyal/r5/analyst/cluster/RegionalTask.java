@@ -10,23 +10,6 @@ import com.conveyal.r5.analyst.WebMercatorExtents;
 public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
 
     /**
-     * The storage key for the pointset we will compute access to (e.g. regionId/datasetId.grid).
-     * This is named grid instead of destinationPointSetId for backward compatibility, namely the ability to start
-     * regional jobs on old worker versions that expect the property "grid".
-     *
-     * Overloaded to specify a set of destination points which may or may not have densities attached.
-     * In fact this ID is taken from a field called "opportunityDatasetId" in the request coming from the UI. So we've
-     * got several slightly conflicting names and concepts.
-     *
-     * TODO revise and improve the below explanation:
-     * If this is not blank, the default TravelTimeSurfaceTask will be overridden; returnInVehicleTimes,
-     * returnWaitTimes, and returnPaths will be set to false; and the returned results will be an accessibility value
-     * per origin, rather than a grid of travel times from that origin.
-     */
-    @Deprecated
-    public String grid;
-
-    /**
      * Key for pointset (e.g. regionId/datasetId.pointset) from which to calculate travel times or accessibility
      */
     public String originPointSetKey;

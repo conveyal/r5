@@ -10,7 +10,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
-import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,7 +120,13 @@ public class MultiOriginAssembler {
                     resultWriters.add(new AccessCsvResultWriter(job.templateTask, fileStorage));
                 } else {
                     // Gridded origins - create gridded regional analysis results
-                    resultWriters.add(new MultiGridResultWriter(regionalAnalysis, job.templateTask, fileStorage));
+                    resultWriters.add(new MultiGridResultWriter(
+                            regionalAnalysis,
+                            job.templateTask,
+                            job.templateTask.cutoffsMinutes.length,
+                            fileStorage,
+                            GridResultType.ACCESS
+                    ));
                 }
             }
 
@@ -135,15 +140,21 @@ public class MultiOriginAssembler {
 
             if (job.templateTask.includeTemporalDensity) {
                 if (job.templateTask.originPointSet == null) {
-                    // Gridded origins. The full temporal density information is probably too voluminous to be useful.
-                    // We might want to record a grid of dual accessibility values, but this will require some serious
-                    // refactoring of the GridResultWriter.
-                    // if (job.templateTask.dualAccessibilityThreshold > 0) { ... }
-                    throw new IllegalArgumentException("Temporal density of opportunities cannot be recorded for gridded origin points.");
+                    // Gridded origins.
+                    resultWriters.add(new MultiGridResultWriter(
+                            regionalAnalysis,
+                            job.templateTask,
+                            job.templateTask.dualAccessThresholds.length,
+                            fileStorage,
+                            GridResultType.DUAL_ACCESS
+                    ));
                 } else {
                     // Freeform origins.
-                    // Output includes temporal density of opportunities and optionally dual accessibility.
-                    resultWriters.add(new TemporalDensityCsvResultWriter(job.templateTask, fileStorage));
+                    // Output includes temporal density of opportunities and optionally dual access.
+                    resultWriters.add(new TemporalDensityCsvResultWriter(
+                            job.templateTask,
+                            fileStorage
+                    ));
                 }
             }
 
@@ -157,7 +168,7 @@ public class MultiOriginAssembler {
                 // FIXME instanceof+cast is ugly, do this some other way or even record the Grids
                 if (writer instanceof CsvResultWriter) {
                     CsvResultWriter csvWriter = (CsvResultWriter) writer;
-                    regionalAnalysis.resultStorage.put(csvWriter.resultType(), csvWriter.fileName);
+                    regionalAnalysis.resultStorage.put(csvWriter.resultType, csvWriter.fileName);
                 }
             }
         } catch (AnalysisServerException e) {

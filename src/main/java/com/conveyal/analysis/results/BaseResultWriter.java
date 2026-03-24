@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -31,30 +30,20 @@ public abstract class BaseResultWriter {
 
     private static final Logger LOG = LoggerFactory.getLogger(BaseResultWriter.class);
 
+    public final String fileName;
     private final FileStorage fileStorage;
 
-    protected File bufferFile;
+    protected File bufferFile = FileUtils.createScratchFile();
 
-    public BaseResultWriter (FileStorage fileStorage) {
+    public BaseResultWriter(String fileName, FileStorage fileStorage) {
+        this.fileName = fileName;
         this.fileStorage = fileStorage;
-    }
-
-    // Can this be merged into the constructor?
-    protected void prepare (String jobId) {
-        try {
-            bufferFile = File.createTempFile(jobId + "_", ".results");
-            // On unexpected server shutdown, these files should be deleted.
-            // We could attempt to recover from shutdowns but that will take a lot of changes and persisted data.
-            bufferFile.deleteOnExit();
-        } catch (IOException e) {
-            LOG.error("Exception while creating buffer file for multi-origin assembler: " + e.toString());
-        }
     }
 
     /**
      * Gzip the access grid and store it.
      */
-    protected synchronized void finish (String fileName) throws IOException {
+    protected synchronized void finish() throws IOException {
         LOG.info("Compressing {} and moving into file storage.", fileName);
         FileStorageKey fileStorageKey = new FileStorageKey(RESULTS, fileName);
         File gzippedResultFile = FileUtils.createScratchFile();

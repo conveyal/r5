@@ -10,6 +10,7 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
@@ -23,8 +24,10 @@ import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -65,8 +68,6 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Maximum distance to record in distance tables, in meters. */
     public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
-
-    public static final boolean SAVE_SHAPES = false;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
@@ -113,9 +114,14 @@ public class TransitLayer implements Serializable, Cloneable {
     // Inverse map of streetVertexForStop, and reconstructed from that list.
     public transient TIntIntMap stopForStreetVertex;
 
-    // For each stop, a packed list of transfers to other stops
-    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
-    public List<TIntList> transfersForStop = new ArrayList<>();
+    // For each stop, a packed list of transfers to other stops in the form (stopIndex, distance, stopIndex, distance...)
+    // These are transfers found through the street network, as opposed to those loaded from GTFS (in a different field).
+    public List<TIntList> streetTransfers = new ArrayList<>();
+
+    // Transfers loaded from GTFS feeds rather than found by searching through the street network.
+    // These are expressed as minimum times in seconds rather than distances in millimeters.
+    // Map keys are from-stop indexes, and values are packed lists of (to-stop, timeSeconds) pairs.
+    public TIntObjectMap<TIntList> gtfsTransfers = new TIntObjectHashMap<>();
 
     /** Information about a route */
     public List<RouteInfo> routes = new ArrayList<>();
@@ -166,6 +172,11 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public Map<String, Fare> fares;
 
+    /** Whether to save detailed trip shapes from GTFS (e.g., for Conveyal Taui sites). Unless the default false
+     * value is overwritten by a transportNetworkConfig file, straight line segments between stops will be used in
+     * visualiations.*/
+    public boolean saveShapes = false;
+
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
 
@@ -179,20 +190,25 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public String scenarioId;
 
-    /**
-     * Load a GTFS feed with full load level. The feed is not closed after being loaded.
-     * TODO eliminate "load levels"
-     */
-    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
-        loadFromGtfs(gtfs, LoadLevel.FULL);
+    public TransitLayer () {
+        // Default constructor. Does not exist implicitly when one-arg constructor is present.
+        // Necessary to ensure fields with initializer expressions are initialized upon deserialization.
+    }
+
+    public TransitLayer (TransportNetworkConfig config) {
+        if (config != null) {
+            saveShapes = config.saveShapes;
+        }
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
      * The supplied feed is treated as read-only, and is not closed after being loaded.
      * This method requires findPatterns() to have been called on the feed before it's passed in.
+     * Information about loaded transfers will be accumulated in the supplied GtfsTransferLoader
+     * instance, as it may influence choices later in OSM street transfer generation.
      */
-    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
+    public void loadFromGtfs (GTFSFeed gtfs, GtfsTransferLoader transferLoader) throws DuplicateFeedException {
         if (feedChecksums.containsKey(gtfs.feedId)) {
             throw new DuplicateFeedException(gtfs.feedId);
         }
@@ -217,9 +233,7 @@ public class TransitLayer implements Serializable, Cloneable {
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
             }
-            if (level == LoadLevel.FULL) {
-                stopNames.add(stop.stop_name);
-            }
+            stopNames.add(stop.stop_name);
         }
 
         // Load service periods, assigning integer codes which will be referenced by trips and patterns.
@@ -294,10 +308,8 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(String.format("%s:%s", gtfs.feedId, route.route_id), stopTimes, indexForUnscopedStopId);
-
-                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
-                // create it.
-                if (level == LoadLevel.FULL) {
+                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique) create it.
+                {
                     if (!routeIndexForRoute.containsKey(trip.route_id)) {
                         int routeIndex = routes.size();
                         RouteInfo ri = new RouteInfo(route, gtfs.agency.get(route.agency_id));
@@ -307,7 +319,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
 
-                    if (trip.shape_id != null && SAVE_SHAPES) {
+                    if (trip.shape_id != null && saveShapes) {
                         Shape shape = gtfs.getShape(trip.shape_id);
                         if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
                         else {
@@ -363,7 +375,6 @@ public class TransitLayer implements Serializable, Cloneable {
                         }
                     }
                 }
-
                 tripPatternForPatternId.put(patternId, tripPattern);
                 tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
@@ -456,19 +467,8 @@ public class TransitLayer implements Serializable, Cloneable {
                     "No agency in graph had valid timezone; API request times will be interpreted as GMT.");
             }
         }
-
-        if (level == LoadLevel.FULL) {
-            this.fares = new HashMap<>(gtfs.fares);
-        }
-
-        // Will be useful in naming patterns.
-//        LOG.info("Finding topology of each route/direction...");
-//        Multimap<T2<String, Integer>, TripPattern> patternsForRouteDirection = HashMultimap.create();
-//        tripPatterns.forEach(tp -> patternsForRouteDirection.put(new T2(tp.routeId, tp.directionId), tp));
-//        for (T2<String, Integer> routeAndDirection : patternsForRouteDirection.keySet()) {
-//            RouteTopology topology = new RouteTopology(routeAndDirection.first, routeAndDirection.second, patternsForRouteDirection.get(routeAndDirection));
-//        }
-
+        this.fares = new HashMap<>(gtfs.fares);
+        transferLoader.loadTransfersTxt(gtfs, indexForUnscopedStopId);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.
@@ -485,12 +485,7 @@ public class TransitLayer implements Serializable, Cloneable {
         centerLon = lonSum / stops.size();
     }
 
-    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
-    public void rebuildTransientIndexes () {
-        LOG.info("Rebuilding transient indices.");
-
-        // 1. Which patterns pass through each stop?
-        // We could store references to patterns rather than indexes.
+    public void rebuildPatternsForStop () {
         int nStops = stopIdForIndex.size();
         patternsForStop = new ArrayList<>(nStops);
         for (int i = 0; i < nStops; i++) {
@@ -505,6 +500,14 @@ public class TransitLayer implements Serializable, Cloneable {
             }
             p++;
         }
+    }
+
+    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
+    public void rebuildTransientIndexes () {
+        LOG.info("Rebuilding transient indices.");
+
+        // 1. Which patterns pass through each stop?
+        rebuildPatternsForStop();
 
         // 2. What street vertex represents each transit stop? Invert the serialized map.
         stopForStreetVertex = new TIntIntHashMap(streetVertexForStop.size(), 0.5f, -1, -1);
@@ -667,14 +670,6 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
-    /** How much information should we load/save? */
-    public enum LoadLevel {
-        /** Load only information required for analytics, leaving out route names, etc. */
-        BASIC,
-        /** Load enough information for customer facing trip planning */
-        FULL
-    }
-
     public static TransitModes getTransitModes(int routeType) {
         /* TPEG Extension  https://groups.google.com/d/msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J */
         if (routeType >= 100 && routeType < 200) { // Railway Service
@@ -747,7 +742,7 @@ public class TransitLayer implements Serializable, Cloneable {
             copy.stopNames = new ArrayList<>(this.stopNames);
             copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
             copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
-            copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+            copy.streetTransfers = new ArrayList<>(this.streetTransfers);
             copy.routes = new ArrayList<>(this.routes);
             // To indicate that this layer is different than the one it was copied from, record the scenarioId of
             // the scenario that modified it. If the scenario will not affect the contents of the layer, its

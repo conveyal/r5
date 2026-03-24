@@ -22,12 +22,15 @@ import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
  * of simplicity and maintainability. See issue 884 for more comments on implementation trade-offs.
  */
 public class TemporalDensityResult {
+    private static final int TIME_LIMIT = 120;
 
     // Internal state fields
 
-    private final PointSet[] destinationPointSets;
+    private final int nPointSets;
     private final int nPercentiles;
-    private final int opportunityThreshold;
+    private final int nThresholds;
+    private final PointSet[] destinationPointSets;
+    private final int[] dualAccessThresholds;
 
     // Externally visible fields for accumulating results
 
@@ -41,56 +44,84 @@ public class TemporalDensityResult {
     public TemporalDensityResult(AnalysisWorkerTask task) {
         Preconditions.checkArgument(
             notNullOrEmpty(task.destinationPointSets),
-            "Dual accessibility requires at least one destination pointset."
+                "Temporal density requires at least one destination pointset."
         );
         this.destinationPointSets = task.destinationPointSets;
+        this.dualAccessThresholds = task.dualAccessThresholds;
         this.nPercentiles = task.percentiles.length;
-        this.opportunityThreshold = task.dualAccessibilityThreshold;
-        this.opportunitiesPerMinute = new double[destinationPointSets.length][nPercentiles][120];
+        this.nPointSets = this.destinationPointSets.length;
+        this.nThresholds = this.dualAccessThresholds == null ? 0 : this.dualAccessThresholds.length;
+        opportunitiesPerMinute = new double[this.nPointSets][this.nPercentiles][TIME_LIMIT];
     }
 
     public void recordOneTarget (int target, int[] travelTimePercentilesSeconds) {
         // Increment histogram bin for the number of minutes of travel by the number of opportunities at the target.
-        for (int d = 0; d < destinationPointSets.length; d++) {
-            PointSet dps = destinationPointSets[d];
-            for (int p = 0; p < nPercentiles; p++) {
-                if (travelTimePercentilesSeconds[p] == UNREACHED) {
+        for (int i = 0; i < nPointSets; i++) {
+            PointSet dps = destinationPointSets[i];
+            for (int j = 0; j < nPercentiles; j++) {
+                if (travelTimePercentilesSeconds[j] == UNREACHED) {
                     break; // If any percentile is unreached, all higher ones are also unreached.
                 }
-                int m = travelTimePercentilesSeconds[p] / 60;
-                if (m < 120) {
-                    opportunitiesPerMinute[d][p][m] += dps.getOpportunityCount(target);
+                int minutes = travelTimePercentilesSeconds[j] / 60;
+                if (minutes < TIME_LIMIT) {
+                    opportunitiesPerMinute[i][j][minutes] += dps.getOpportunityCount(target);
                 }
             }
         }
     }
 
     /**
-     * Calculate "dual" accessibility from the accumulated temporal opportunity density array.
-     * @param n the threshold quantity of opportunities
-     * @return the minimum whole number of minutes necessary to reach n opportunities,
-     *         for each destination set and percentile of travel time.
+     * Ensure that results have increasing accessibility while travel time increases and percentile decreases.
      */
-    public int[][] minutesToReachOpportunities(int n) {
-        int[][] result = new int[destinationPointSets.length][nPercentiles];
-        for (int d = 0; d < destinationPointSets.length; d++) {
-            for (int p = 0; p < nPercentiles; p++) {
-                result[d][p] = -1;
-                double count = 0;
-                for (int m = 0; m < 120; m++) {
-                    count += opportunitiesPerMinute[d][p][m];
-                    if (count >= n) {
-                        result[d][p] = m + 1;
-                        break;
+    private void checkInvariants() {
+        double[][][] sums = new double[nPointSets][nPercentiles][TIME_LIMIT];
+        for (int i = 0; i < nPointSets; i++) {
+            for (int j = 0; j < nPercentiles; j++) {
+                double totalSum = 0;
+                for (int m = 0; m < TIME_LIMIT; m++) {
+                    totalSum += opportunitiesPerMinute[i][j][m];
+                    sums[i][j][m] = totalSum;
+
+                    if (m > 0 && sums[i][j][m] < sums[i][j][m - 1]) {
+                        throw new AssertionError("Increasing travel time decreased accessibility.");
+                    }
+                    if (j > 0 && sums[i][j][m] > sums[i][j - 1][m]) {
+                        throw new AssertionError("Increasing percentile increased accessibility.");
                     }
                 }
             }
         }
-        return result;
     }
 
-    public int[][] minutesToReachOpportunities() {
-        return minutesToReachOpportunities(opportunityThreshold);
-    }
+    /**
+     * Calculate dual access values (in minutes) for an origin. The values are the number of minutes required to reach 
+     * a threshold number of opportunities (specified by task.dualAccessThresholds) in the specified destination layer 
+     * at a given percentile of travel time. If the threshold cannot be reached in less than 120 minutes, sets the value to 0.
+     */
+    public int[][][] calculateDualAccessForOrigin() {
+        checkInvariants();
 
+        int[][][] dualAccessGrid = new int[nPointSets][nPercentiles][nThresholds];
+        for (int i = 0; i < nPointSets; i++) {
+            for (int j = 0; j < nPercentiles; j++) {
+                for (int k = 0; k < nThresholds; k++) {
+                    int threshold = dualAccessThresholds[k];
+                    int minutes = 0;
+                    double sum = 0;
+                    while (sum < threshold && minutes < TIME_LIMIT) {
+                        sum += opportunitiesPerMinute[i][j][minutes];
+                        minutes += 1;
+                    }
+                    
+                    if (sum < threshold) {
+                        dualAccessGrid[i][j][k] = 0;
+                    } else {
+                        dualAccessGrid[i][j][k] = minutes;
+                    }
+                }
+            }
+        }
+
+        return dualAccessGrid;
+    }
 }

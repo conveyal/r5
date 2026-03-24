@@ -12,6 +12,7 @@ import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
+import com.conveyal.analysis.results.GridResultType;
 import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
@@ -25,6 +26,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.util.SemVer;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
 import gnu.trove.list.array.TIntArrayList;
@@ -35,8 +37,6 @@ import spark.Request;
 import spark.Response;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -60,6 +60,9 @@ import java.util.zip.GZIPOutputStream;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.RESULTS;
+import static com.conveyal.file.FileStorageFormat.GEOTIFF;
+import static com.conveyal.file.FileStorageFormat.GRID;
+import static com.conveyal.file.FileStorageFormat.PNG;
 import static com.conveyal.file.UrlWithHumanName.filenameCleanString;
 import static com.conveyal.r5.transit.TransportNetworkCache.getScenarioFilename;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -161,10 +164,10 @@ public class RegionalAnalysisController implements HttpController {
         return analysis;
     }
 
-    private int getIntQueryParameter (Request req, String parameterName, int defaultValue) {
+    private int getIntQueryParameter (Request req, String parameterName) {
         String paramValue = req.queryParams(parameterName);
         if (paramValue == null) {
-            return defaultValue;
+            throw new IllegalArgumentException("Must provide query parameter " + parameterName);
         }
         try {
             return Integer.parseInt(paramValue);
@@ -184,8 +187,19 @@ public class RegionalAnalysisController implements HttpController {
      */
     private record HumanKey(FileStorageKey storageKey, String humanName) { };
 
+    private String getFullExtension(GridResultType gridResultType, String extension) {
+        if (gridResultType.equals(GridResultType.DUAL_ACCESS)) {
+            return String.format("dual.%s", extension);
+        }
+        return extension;
+    }
+
+    private String getFullExtension(GridResultType gridResultType, FileStorageFormat fileFormat) {
+        return getFullExtension(gridResultType, fileFormat.extension.toLowerCase(Locale.ROOT));
+    }
+
     /**
-     * Get a regional analysis results raster for a single (percentile, cutoff, destination) combination, in one of
+     * Get a regional analysis results raster for a single combination of parameters, in one of
      * several image file formats. This method was factored out for use from two different API endpoints, one for
      * fetching a single grid, and another for fetching grids for all combinations of parameters at once.
      * It returns the unique FileStorageKey for those results, associated with a non-unique human-readable name.
@@ -193,65 +207,47 @@ public class RegionalAnalysisController implements HttpController {
     private HumanKey getSingleCutoffGrid (
             RegionalAnalysis analysis,
             OpportunityDataset destinations,
-            int cutoffMinutes,
+            int threshold,
             int percentile,
+            GridResultType gridResultType,
             FileStorageFormat fileFormat
     ) throws IOException {
         final String regionalAnalysisId = analysis._id;
         final String destinationPointSetId = destinations._id;
         // Selecting the zeroth cutoff still makes sense for older analyses that don't allow an array of N cutoffs.
-        int cutoffIndex = 0;
-        if (analysis.cutoffsMinutes != null) {
-            cutoffIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(cutoffMinutes);
-            checkState(cutoffIndex >= 0);
+        int thresholdIndex = 0;
+        if (gridResultType.equals(GridResultType.DUAL_ACCESS)) {
+            thresholdIndex = new TIntArrayList(analysis.request.dualAccessThresholds).indexOf(threshold);
+            checkState(thresholdIndex >= 0);
+        } else if (analysis.cutoffsMinutes != null) {
+            thresholdIndex = new TIntArrayList(analysis.cutoffsMinutes).indexOf(threshold);
+            checkState(thresholdIndex >= 0);
         }
         LOG.info(
             "Returning {} minute accessibility to pointset {} (percentile {}) for regional analysis {} in format {}.",
-            cutoffMinutes, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
+                threshold, destinationPointSetId, percentile, regionalAnalysisId, fileFormat
         );
         // Analysis grids now have the percentile and cutoff in their S3 key, because there can be many of each.
         // We do this even for results generated by older workers, so they will be re-extracted with the new name.
         // These grids are reasonably small, we may be able to just send all cutoffs to the UI instead of selecting.
-        String singleCutoffKey = String.format(
-            "%s_%s_P%d_C%d.%s",
-            regionalAnalysisId, destinationPointSetId, percentile, cutoffMinutes,
-            fileFormat.extension.toLowerCase(Locale.ROOT)
-        );
+        String singleCutoffExtension = getFullExtension(gridResultType, fileFormat);
+        String singleCutoffName = String.format("%s_%s_P%d_C%d", regionalAnalysisId, destinationPointSetId, percentile, threshold);
+        String singleCutoffKey = String.format("%s.%s", singleCutoffName, singleCutoffExtension);
         FileStorageKey singleCutoffFileStorageKey = new FileStorageKey(RESULTS, singleCutoffKey);
         if (!fileStorage.exists(singleCutoffFileStorageKey)) {
             // An accessibility grid for this particular cutoff has apparently never been extracted from the
-            // regional results file before. Extract one and save it for future reuse. Older regional analyses
-            // did not have arrays allowing multiple cutoffs, percentiles, or destination pointsets. The
-            // filenames of such regional accessibility results will not have a percentile or pointset ID.
-            // First try the newest form of regional results: multi-percentile, multi-destination-grid.
-            String multiCutoffKey = String.format("%s_%s_P%d.access", regionalAnalysisId, destinationPointSetId, percentile);
+            // regional results file before. Extract one and save it for future reuse.
+            String multiCutoffName = String.format("%s_%s_P%d", regionalAnalysisId, destinationPointSetId, percentile);
+            String multiCutoffExtension = getFullExtension(gridResultType, "access");
+            String multiCutoffKey = String.format("%s.%s", multiCutoffName, multiCutoffExtension);
             FileStorageKey multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-            if (!fileStorage.exists(multiCutoffFileStorageKey)) {
-                LOG.warn("Falling back to older file name formats for regional results file: " + multiCutoffKey);
-                // Fall back to second-oldest form: multi-percentile, single destination grid.
-                multiCutoffKey = String.format("%s_P%d.access", regionalAnalysisId, percentile);
-                multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                    checkArgument(analysis.destinationPointSetIds.length == 1);
-                } else {
-                    // Fall back on oldest form of results, single-percentile, single-destination-grid.
-                    multiCutoffKey = regionalAnalysisId + ".access";
-                    multiCutoffFileStorageKey = new FileStorageKey(RESULTS, multiCutoffKey);
-                    if (fileStorage.exists(multiCutoffFileStorageKey)) {
-                        checkArgument(analysis.travelTimePercentiles.length == 1);
-                        checkArgument(analysis.destinationPointSetIds.length == 1);
-                    } else {
-                        throw AnalysisServerException.notFound("Cannot find original source regional analysis output.");
-                    }
-                }
-            }
             LOG.debug("Single-cutoff grid {} not found on S3, deriving it from {}.", singleCutoffKey, multiCutoffKey);
 
-            InputStream multiCutoffInputStream = new FileInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
-            Grid grid = new SelectingGridReducer(cutoffIndex).compute(multiCutoffInputStream);
+            InputStream multiCutoffInputStream = FileUtils.getInputStream(fileStorage.getFile(multiCutoffFileStorageKey));
+            Grid grid = new SelectingGridReducer(thresholdIndex).compute(multiCutoffInputStream);
 
             File localFile = FileUtils.createScratchFile(fileFormat.toString());
-            FileOutputStream fos = new FileOutputStream(localFile);
+            OutputStream fos = FileUtils.getOutputStream(localFile);
 
             switch (fileFormat) {
                 case GRID:
@@ -271,8 +267,8 @@ public class RegionalAnalysisController implements HttpController {
         String analysisHumanName = humanNameForEntity(analysis);
         String destinationHumanName = humanNameForEntity(destinations);
         String resultHumanFilename = filenameCleanString(
-                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, cutoffMinutes)
-            ) + "." + fileFormat.extension.toLowerCase(Locale.ROOT);
+                String.format("%s_%s_P%d_C%d", analysisHumanName, destinationHumanName, percentile, threshold)
+            ) + "." + singleCutoffExtension;
         // Note that the returned human filename already contains the appropriate extension.
         return new HumanKey(singleCutoffFileStorageKey, resultHumanFilename);
     }
@@ -285,9 +281,6 @@ public class RegionalAnalysisController implements HttpController {
         final String regionalAnalysisId = req.params("_id");
         final UserPermissions userPermissions = UserPermissions.from(req);
         final RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
-        if (analysis.cutoffsMinutes == null || analysis.travelTimePercentiles == null || analysis.destinationPointSetIds == null) {
-            throw AnalysisServerException.badRequest("Batch result download is not available for legacy regional results.");
-        }
         if (analysis.request.originPointSetKey != null) {
             throw AnalysisServerException.badRequest("Batch result download only available for gridded origins.");
         }
@@ -304,7 +297,7 @@ public class RegionalAnalysisController implements HttpController {
         }
         // File did not exist. Create it in the background and ask caller to request it later.
         filesBeingPrepared.add(zippedResultsKey.path);
-        Task task = Task.create("Zip all geotiffs for regional analysis " + analysis.name)
+        Task task = Task.create("Preparing regional results archive (hit download again when complete)")
             .forUser(userPermissions)
             .withAction(progressListener -> {
                 int nSteps = analysis.destinationPointSetIds.length * analysis.cutoffsMinutes.length *
@@ -312,12 +305,13 @@ public class RegionalAnalysisController implements HttpController {
                 progressListener.beginTask("Creating and archiving geotiffs...", nSteps);
                 // Iterate over all dest, cutoff, percentile combinations and generate one geotiff for each combination.
                 List<HumanKey> humanKeys = new ArrayList<>();
+                GridResultType gridResultType = determineGridResultType(analysis);
                 for (String destinationPointSetId : analysis.destinationPointSetIds) {
                     OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-                    for (int cutoffMinutes : analysis.cutoffsMinutes) {
+                    for (int threshold : getValidThresholds(analysis)) {
                         for (int percentile : analysis.travelTimePercentiles) {
                             HumanKey gridKey = getSingleCutoffGrid(
-                                    analysis, destinations, cutoffMinutes, percentile, FileStorageFormat.GEOTIFF
+                                analysis, destinations, threshold, percentile, gridResultType, GEOTIFF
                             );
                             humanKeys.add(gridKey);
                             progressListener.increment();
@@ -393,59 +387,17 @@ public class RegionalAnalysisController implements HttpController {
         // expected to have no gridded results and cleanly return a 404?
         final String regionalAnalysisId = req.params("_id");
         FileStorageFormat format = FileStorageFormat.valueOf(req.params("format").toUpperCase());
-        if (!FileStorageFormat.GRID.equals(format) && !FileStorageFormat.PNG.equals(format) && !FileStorageFormat.GEOTIFF.equals(format)) {
-            throw AnalysisServerException.badRequest("Format \"" + format + "\" is invalid. Request format must be \"grid\", \"png\", or \"geotiff\".");
+        if (!List.of(GRID, PNG, GEOTIFF).contains(format)) {
+            throw AnalysisServerException.badRequest("Parameter 'format' must be one of [grid, png, geotiff].");
         }
         final UserPermissions userPermissions = UserPermissions.from(req);
         RegionalAnalysis analysis = getAnalysis(regionalAnalysisId, userPermissions);
-
-        // Which channel to extract from results with multiple values per origin (for different travel time cutoffs)
-        // and multiple output files per analysis (for different percentiles of travel time and/or different
-        // destination pointsets). These initial values are for older regional analysis results with only a single
-        // cutoff, and no percentile or destination gridId in the file name.
-        // For newer analyses that have multiple cutoffs, percentiles, or destination pointsets, these initial values
-        // are coming from deprecated fields, are not meaningful and will be overwritten below from query parameters.
-        int percentile = analysis.travelTimePercentile;
-        int cutoffMinutes = analysis.cutoffMinutes;
-        String destinationPointSetId = analysis.grid;
-
-        // Handle newer regional analyses with multiple cutoffs in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The cutoff variable holds the actual cutoff in minutes, not the position in the array of cutoffs.
-        if (analysis.cutoffsMinutes != null) {
-            int nCutoffs = analysis.cutoffsMinutes.length;
-            checkState(nCutoffs > 0, "Regional analysis has no cutoffs.");
-            cutoffMinutes = getIntQueryParameter(req, "cutoff", analysis.cutoffsMinutes[nCutoffs / 2]);
-            checkArgument(new TIntArrayList(analysis.cutoffsMinutes).contains(cutoffMinutes),
-                    "Travel time cutoff for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.cutoffsMinutes)
-            );
-        }
-
-        // Handle newer regional analyses with multiple percentiles in an array.
-        // If a query parameter is supplied, range check it, otherwise use the middle value in the list.
-        // The percentile variable holds the actual percentile (25, 50, 95) not the position in the array.
-        if (analysis.travelTimePercentiles != null) {
-            int nPercentiles = analysis.travelTimePercentiles.length;
-            checkState(nPercentiles > 0, "Regional analysis has no percentiles.");
-            percentile = getIntQueryParameter(req, "percentile", analysis.travelTimePercentiles[nPercentiles / 2]);
-            checkArgument(new TIntArrayList(analysis.travelTimePercentiles).contains(percentile),
-                    "Percentile for this regional analysis must be taken from this list: (%s)",
-                    Ints.join(", ", analysis.travelTimePercentiles));
-        }
-
-        // Handle even newer regional analyses with multiple destination pointsets per analysis.
-        if (analysis.destinationPointSetIds != null) {
-            int nGrids = analysis.destinationPointSetIds.length;
-            checkState(nGrids > 0, "Regional analysis has no grids.");
-            destinationPointSetId = req.queryParams("destinationPointSetId");
-            if (destinationPointSetId == null) {
-                destinationPointSetId = analysis.destinationPointSetIds[0];
-            }
-            checkArgument(Arrays.asList(analysis.destinationPointSetIds).contains(destinationPointSetId),
-                    "Destination gridId must be one of: %s",
-                    String.join(",", analysis.destinationPointSetIds));
-        }
+        GridResultType gridResultType = determineGridResultType(analysis);
+        // The threshold parameter holds the value in minutes, not the position in the array of thresholds.
+        int threshold = getAndValidateIntParameter(req, "threshold", getValidThresholds(analysis));
+        int percentile = getAndValidateIntParameter(req, "percentile", analysis.travelTimePercentiles);
+        String destinationPointSetId = getAndValidateStringParameter(
+              req, "destinationPointSetId", analysis.destinationPointSetIds);
         // We started implementing the ability to retrieve and display partially completed analyses.
         // We eventually decided these should not be available here at the same endpoint as complete, immutable results.
         if (broker.findJob(regionalAnalysisId) != null) {
@@ -453,9 +405,44 @@ public class RegionalAnalysisController implements HttpController {
         }
         // Significant overhead here: UI contacts backend, backend calls S3, backend responds to UI, UI contacts S3.
         OpportunityDataset destinations = getDestinations(destinationPointSetId, userPermissions);
-        HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, cutoffMinutes, percentile, format);
+        HumanKey gridKey = getSingleCutoffGrid(analysis, destinations, threshold, percentile, gridResultType, format);
         res.type(APPLICATION_JSON.asString());
         return fileStorage.getJsonUrl(gridKey.storageKey, gridKey.humanName);
+    }
+
+    private int[] getValidThresholds (RegionalAnalysis analysis) {
+        return switch (determineGridResultType(analysis)) {
+            case ACCESS -> analysis.cutoffsMinutes;
+            case DUAL_ACCESS -> analysis.request.dualAccessThresholds;
+        };
+    }
+
+    // This assumes each set of regional analysis results has only primal or dual access, not both.
+    // TODO handle regional analyses that include both regular accessibility and dual access results.
+    private GridResultType determineGridResultType (RegionalAnalysis analysis) {
+        return analysis.request.includeTemporalDensity ? GridResultType.DUAL_ACCESS : GridResultType.ACCESS;
+    }
+
+    /// Get the value for a given query parameter name, check that it's non-null and can be parsed
+    /// as an integer, and check that the value is present in an array of valid values.
+    private int getAndValidateIntParameter (Request req, String parameterName, int[] allowedValues) {
+        int value = getIntQueryParameter(req, parameterName);
+        checkState(allowedValues != null && allowedValues.length > 0, "Lacking values for " + parameterName);
+        checkArgument(Ints.contains(allowedValues, value), "Parameter '%s' must be one of: %s",
+              parameterName, Arrays.toString(allowedValues));
+        return value;
+    }
+
+    /// Should behave identically to getAndValidateIntParameter, but for Strings.
+    private String getAndValidateStringParameter (Request req, String parameterName, String[] allowedValues) {
+        checkState(allowedValues != null && allowedValues.length > 0, "Lacking values for " + parameterName);
+        String value = req.queryParams(parameterName);
+        if (value == null || value.isEmpty()) {
+            throw new IllegalArgumentException("Must provide query parameter " + parameterName);
+        }
+        checkArgument(List.of(allowedValues).contains(value), "Parameter '%s' must be one of: %s",
+              parameterName, Arrays.toString(allowedValues));
+        return value;
     }
 
     private Object getCsvResults (Request req, Response res) {
@@ -536,10 +523,7 @@ public class RegionalAnalysisController implements HttpController {
                 opportunityDatasets.add(opportunityDataset);
                 task.destinationPointSetKeys[i] = opportunityDataset.storageLocation();
             }
-            // For backward compatibility with old workers, communicate any single pointSet via the deprecated field.
-            if (nPointSets == 1) {
-                task.grid = task.destinationPointSetKeys[0];
-            }
+
             // Check that we have either a single freeform pointset, or only gridded pointsets at indentical zooms.
             // The worker will perform equivalent checks via the GridTransformWrapper constructor,
             // WebMercatorExtents.expandToInclude and WebMercatorExtents.forPointsets. Potential to share code.
@@ -599,6 +583,14 @@ public class RegionalAnalysisController implements HttpController {
                 "recordTimes can only be used with a single destination pointset, which must be freeform (non-grid)."
             );
         }
+        if (task.includeTemporalDensity) {
+            task.validateDualAccessThresholds();
+
+            checkArgument(
+                    SemVer.gte(task.workerVersion, "v7.4"),
+                    "Dual access results require a minimum worker version of v7.4"
+            );
+        }
 
         // TODO remove duplicate fields from RegionalAnalysis that are already in the nested task.
         // The RegionalAnalysis should just be a minimal wrapper around the template task, adding the origin point set.
@@ -624,34 +616,15 @@ public class RegionalAnalysisController implements HttpController {
         regionalAnalysis.workerVersion = analysisRequest.workerVersion;
         regionalAnalysis.zoom = task.zoom;
 
-        // Store the full array of multiple cutoffs which will be understood by newer workers and backends,
-        // rather then the older single cutoff value.
+        // Store the full array of multiple cutoffs.
         checkNotNull(analysisRequest.cutoffsMinutes);
         checkArgument(analysisRequest.cutoffsMinutes.length > 0);
         regionalAnalysis.cutoffsMinutes = analysisRequest.cutoffsMinutes;
-        if (analysisRequest.cutoffsMinutes.length == 1) {
-            // Ensure older workers expecting a single cutoff will still function.
-            regionalAnalysis.cutoffMinutes = analysisRequest.cutoffsMinutes[0];
-        } else {
-            // Store invalid value in deprecated field (-1 was already used) to make it clear it should not be used.
-            regionalAnalysis.cutoffMinutes = -2;
-        }
 
         // Same process as for cutoffsMinutes, but for percentiles.
         checkNotNull(analysisRequest.percentiles);
         checkArgument(analysisRequest.percentiles.length > 0);
         regionalAnalysis.travelTimePercentiles = analysisRequest.percentiles;
-        if (analysisRequest.percentiles.length == 1) {
-            regionalAnalysis.travelTimePercentile = analysisRequest.percentiles[0];
-        } else {
-            regionalAnalysis.travelTimePercentile = -2;
-        }
-
-        // Propagate any changes to the cutoff and percentiles arrays down into the nested RegionalTask.
-        // TODO propagate single (non-array) values for old workers
-        // TODO propagate the other direction, setting these values when initializing the task
-        task.cutoffsMinutes = regionalAnalysis.cutoffsMinutes;
-        task.percentiles = regionalAnalysis.travelTimePercentiles;
 
         // Persist this newly created RegionalAnalysis to Mongo.
         // This assigns it creation/update time stamps and an ID, which is needed to name any output CSV files.

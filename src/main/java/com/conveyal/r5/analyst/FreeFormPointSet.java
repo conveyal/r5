@@ -164,6 +164,8 @@ public class FreeFormPointSet extends PointSet {
      * Note that this does not save any opportunity magnitudes or densities. We do not use those yet.
      * Note also that if we ever intend to use these directly in the UI we should switch to a
      * fixed-width little-endian representation or JSON.
+     * Note: Conveyal's UI parses binary files produced with this format in
+     * `lib/opportunity-datasets/parse-freeform.worker.ts`
      */
     public void write (OutputStream outputStream) throws IOException {
         DataOutputStream out = new DataOutputStream(outputStream);

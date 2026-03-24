@@ -234,7 +234,7 @@ public class RerouteTest {
         assertTrue(distanceTable.size() > 20);
 
         // Does it have transfers?
-        TIntList transfers = mod.transitLayer.transfersForStop.get(sidx);
+        TIntList transfers = mod.transitLayer.streetTransfers.get(sidx);
         assertNotNull(transfers);
         // transfers is a jagged array, should have at least one stop
         assertTrue(transfers.size() >= 2);

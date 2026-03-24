@@ -2,6 +2,7 @@ package com.conveyal.analysis.results;
 
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.file.FileStorage;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 
@@ -10,61 +11,60 @@ import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
  * same interface as our CSV writers, so CSV and Grids can be processed similarly in MultiOriginAssembler.
  */
 public class MultiGridResultWriter implements RegionalResultWriter {
-
-    private final RegionalAnalysis regionalAnalysis;
-
-    private final RegionalTask task;
-
     /**
      * We create one GridResultWriter for each destination pointset and percentile.
-     * Each of those output files contains data for all travel time cutoffs at each origin.
+     * Each of those output files contains data for all thresholds (time or cumulative access) at each origin.
      */
-    private final GridResultWriter[][] accessibilityGridWriters;
+    private final GridResultWriter[][] gridResultWriters;
 
-    /** The number of different percentiles for which we're calculating accessibility on the workers. */
-    private final int nPercentiles;
-
-    /** The number of destination pointsets to which we're calculating accessibility */
-    private final int nDestinationPointSets;
+    private final GridResultType gridResultType;
 
     /** Constructor */
     public MultiGridResultWriter (
-            RegionalAnalysis regionalAnalysis, RegionalTask task, FileStorage fileStorage
+        RegionalAnalysis regionalAnalysis, RegionalTask task, int nThresholds, FileStorage fileStorage, GridResultType gridResultType
     ) {
-        // We are storing the regional analysis just to get its pointset IDs (not keys) and its own ID.
-        this.regionalAnalysis = regionalAnalysis;
-        this.task = task;
-        this.nPercentiles = task.percentiles.length;
-        this.nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
+        this.gridResultType = gridResultType;
+        int nPercentiles = task.percentiles.length;
+        int nDestinationPointSets = task.makeTauiSite ? 0 : task.destinationPointSetKeys.length;
+        WebMercatorExtents extents = WebMercatorExtents.forTask(task);
         // Create one grid writer per percentile and destination pointset.
-        accessibilityGridWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
+        gridResultWriters = new GridResultWriter[nDestinationPointSets][nPercentiles];
         for (int d = 0; d < nDestinationPointSets; d++) {
             for (int p = 0; p < nPercentiles; p++) {
-                accessibilityGridWriters[d][p] = new GridResultWriter(task, fileStorage);
+                String extension = gridResultType == GridResultType.ACCESS ? "access" : "dual.access";
+                String fileName = String.format(
+                        "%s_%s_P%d.%s",
+                        regionalAnalysis._id,
+                        regionalAnalysis.destinationPointSetIds[d],
+                        task.percentiles[p],
+                        extension
+                );
+                gridResultWriters[d][p] = new GridResultWriter(
+                        extents,
+                        nThresholds,
+                        fileName,
+                        fileStorage
+                );
             }
         }
     }
 
     @Override
     public void writeOneWorkResult (RegionalWorkResult workResult) throws Exception {
+        int[][][] values = gridResultType == GridResultType.ACCESS ? workResult.accessibilityValues : workResult.dualAccessValues;  
         // Drop work results for this particular origin into a little-endian output file.
-        // TODO more efficient way to write little-endian integers
-        // TODO check monotonic increasing invariants here rather than in worker.
-        // Infer x and y cell indexes based on the template task
-        int taskNumber = workResult.taskId;
-        for (int d = 0; d < workResult.accessibilityValues.length; d++) {
-            int[][] percentilesForGrid = workResult.accessibilityValues[d];
-            for (int p = 0; p < nPercentiles; p++) {
-                int[] cutoffsForPercentile = percentilesForGrid[p];
-                GridResultWriter gridWriter = accessibilityGridWriters[d][p];
-                gridWriter.writeOneOrigin(taskNumber, cutoffsForPercentile);
+        for (int d = 0; d < values.length; d++) {
+            int[][] percentilesForGrid = values[d];
+            for (int p = 0; p < percentilesForGrid.length; p++) {
+                GridResultWriter gridWriter = gridResultWriters[d][p];
+                gridWriter.writeOneOrigin(workResult.taskId, percentilesForGrid[p]);
             }
         }
     }
 
     @Override
     public void terminate () throws Exception {
-        for (GridResultWriter[] writers : accessibilityGridWriters) {
+        for (GridResultWriter[] writers : gridResultWriters) {
             for (GridResultWriter writer : writers) {
                 writer.terminate();
             }
@@ -73,14 +73,9 @@ public class MultiGridResultWriter implements RegionalResultWriter {
 
     @Override
     public void finish () throws Exception {
-        for (int d = 0; d < nDestinationPointSets; d++) {
-            for (int p = 0; p < nPercentiles; p++) {
-                int percentile = task.percentiles[p];
-                String destinationPointSetId = regionalAnalysis.destinationPointSetIds[d];
-                // TODO verify that regionalAnalysis._id is the same as job.jobId
-                String gridFileName =
-                        String.format("%s_%s_P%d.access", regionalAnalysis._id, destinationPointSetId, percentile);
-                accessibilityGridWriters[d][p].finish(gridFileName);
+        for (GridResultWriter[] gridResultWriterRow : gridResultWriters) {
+            for (GridResultWriter resultWriter : gridResultWriterRow) {
+                resultWriter.finish();
             }
         }
     }

@@ -307,7 +307,7 @@ public class AddTripsTest {
         assertFalse(distanceTable.isEmpty());
 
         // Make sure this stop has transfers.
-        TIntList transfers = mod.transitLayer.transfersForStop.get(pattern.stops[1]);
+        TIntList transfers = mod.transitLayer.streetTransfers.get(pattern.stops[1]);
         assertNotNull(transfers);
         // make sure that s2 is a target of a transfer
         boolean s2found = false;

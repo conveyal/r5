@@ -34,6 +34,9 @@ jar {
 }
 
 shadowJar {
+    filesMatching("META-INF/services/**") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
     mergeServiceFiles()
 }
 

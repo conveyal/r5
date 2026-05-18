@@ -1,8 +1,10 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
+import com.conveyal.r5.profile.ExecutionTimer;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -11,6 +13,7 @@ import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -18,6 +21,9 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +41,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import static com.conveyal.gtfs.geom.JTSConverter.pointAt;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+import static com.conveyal.r5.streets.VertexStore.envelopeToFixed;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
 import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
 
@@ -45,7 +52,7 @@ import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
  * It is a throw-away calculator object that retains routing state after the search is finished.
  * Additional functions are called to retrieve the routing results from that state.
  */
-public class StreetRouter {
+public class StreetRouter implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreetRouter.class);
 
@@ -152,9 +159,12 @@ public class StreetRouter {
      */
     TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
-    // The queue is prioritized by the specified optimization objective variable.
-    PriorityQueue<State> queue = new PriorityQueue<>(
-            Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic)));
+    // TODO verify closure capture in java - this is referencing the variable quantityToMinimize, not its value at initialization right?
+    Comparator<State> stateComparator =
+          Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic));
+
+    /// The queue is prioritized by the specified optimization objective variable.
+    PriorityQueue<State> queue = new PriorityQueue<>(stateComparator);
 
     /**
      * If you set this to a non-negative number, the search will end at the vertex with the given index,
@@ -253,6 +263,21 @@ public class StreetRouter {
             return true; // continue iteration
         });
         return result;
+    }
+
+    /// Return a JTS Envelope in FIXED-point WGS84 coordinates encompassing all vertices reached in a completed search.
+    public Envelope getReachedVerticesEnvelopeFixed () {
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        Envelope envelope = new Envelope();
+        // TODO check whether we ever record states when they have exceeded any search limits, filter as needed
+        bestStatesAtEdge.forEachKey(e -> {
+            edge.seek(e);
+            vertex.seek(edge.getToVertex());
+            envelope.expandToInclude(vertex.getFixedLon(), vertex.getFixedLat());
+            return true;
+        });
+        return envelope;
     }
 
     /**
@@ -538,17 +563,10 @@ public class StreetRouter {
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
-
-                double lat = v.getLat();
-                double lon = v.getLon();
-
                 if (s0.backEdge != -1) {
                     EdgeStore.Edge e = streetLayer.edgeStore.getCursor(s0.backEdge);
                     v.seek(e.getFromVertex());
-                    lat = (lat + v.getLat()) / 2;
-                    lon = (lon + v.getLon()) / 2;
                 }
-
                 debugPrintStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.durationSeconds));
             }
 
@@ -1175,7 +1193,6 @@ public class StreetRouter {
                     vertices.put(state.vertex, state);
                 }
             }
-
         }
 
         /**
@@ -1193,19 +1210,156 @@ public class StreetRouter {
         }
     }
 
-    /**
-     * Continue a search by walking (presumably after a car or bicycle search is complete).
-     * This allows accessing transit stops that are linked to edges that are only walkable, but not drivable or bikeable.
-     * This maintains the total travel time limit and other parameters.
-     * NOTE: this conflicts with the rule that a router should not be reused.
-     * This is a good example of why we may want to change that rule. Alternatively this could construct a new StreetRouter.
-     * Just allowing more than one mode doesn't give the desired effect - we really want a sequence of separate modes.
-     */
+    /// Continue a search by walking (presumably after a car or bicycle search is complete).
+    /// This allows accessing transit stops that are linked to edges that are only walkable, but not
+    /// drivable or bikable. This maintains the total travel time limit and other parameters.
+    /// Note that this conflicts with the rule that a router should not be reused.
+    /// We may want to change that rule, or this method could construct a new StreetRouter.
+    /// Allowing more than one mode to be set at the same time doesn't give the desired effect.
+    /// We need separate searches carried out using separate modes in a specific sequence.
     public void keepRoutingOnFoot() {
+        keepRoutingWithMode(StreetMode.WALK);
+    }
+
+    /// Continue a search by driving (presumably after a walk or bicycle search is complete).
+    /// This allows evaluating the reach of on-demand transit and ride-share services where the
+    /// origin point may be outside a pick-up zone and must be reached by walking or biking.
+    public void keepRoutingByCar() {
+        keepRoutingWithMode(StreetMode.CAR);
+    }
+
+    /// Internal method used by public methods for specific StreetModes.
+    private void keepRoutingWithMode (StreetMode mode) {
         queue.clear();
         bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
-        streetMode = StreetMode.WALK;
+        streetMode = mode;
         route();
+    }
+
+    /// Call after routing to filter this router's result states down to only those edges within
+    /// the specified OnDemand service's destination polygon or destination stops set, applying
+    /// the relevant duration offset and scaling factor to those travel times. Though it may seem
+    /// more efficient to restrict routing to edges within the polygon instead of filtering
+    /// afterward, that approach cannot deal with multiple disjoint polygons, destination polygons
+    /// that do not contain the origin point, or paths that exit a polygon and re-enter it.
+    ///
+    /// This implementation uses the spatial index and accesses only edges which may be within the
+    /// bounding box, making a new copy of the best states structure but not of the router itself.
+    /// This is useful when considering multiple on-demand services. Testing indicates that that
+    /// this approach is faster than naive non-indexed edge iteration, and faster than filtering
+    /// existing collections rather than copying. On Seattle MetroFlex, the indexed implementation
+    /// yields 60-70 msec in most cases.
+    public void clipAndScaleStates (OnDemand onDemand) {
+        // Reusable cursor objects to avoid excessive object creation / heap allocation in loops.
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        TIntObjectMultimap<State> filteredCopy = new TIntObjectHashMultimap<>();
+        if (onDemand.toPolygon != null) {
+            // Handle destination polygons, which are in FLOATING-point WGS84 coordinates.
+            Envelope fixedEnv = envelopeToFixed(onDemand.toPolygon.getEnvelopeInternal());
+            TIntSet candidateEdges = streetLayer.spatialIndex.query(fixedEnv);
+            // The only part of containment testing that is slow is the preparatory calculations.
+            // Caching and reusing those massively speeds up bulk containment tests.
+            PreparedPolygon preparedToPolygon = new PreparedPolygon(onDemand.toPolygon);
+            candidateEdges.forEach(eidx -> {
+                // The physical location of states is at the toVertex of an edge.
+                edge.seek(eidx);
+                vertex.seek(edge.getToVertex());
+                // Creating a ton of throwaway Point objects here, could eventually be optimized.
+                // BestStatesAtEdge.get() always returns a list.
+                if (preparedToPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
+                    copyAndScaleStates(bestStatesAtEdge.get(eidx), onDemand, filteredCopy);
+                }
+                return true;
+            });
+        }
+        if (onDemand.toStopIndexes != null) {
+            // Handle travel to specific stops, as opposed to a polygonal geographic area.
+            for (int carEdge : onDemand.toCarEdges) {
+                copyAndScaleStates(bestStatesAtEdge.get(carEdge), onDemand, filteredCopy);
+            }
+        }
+        // Replace the entire original best states collection with the new filtered copy.
+        bestStatesAtEdge = filteredCopy;
+    }
+
+    // Instead of factoring this out and calling it from multiple locations, we could create a new set of edges to
+    // process, or use a TIntIterator to remove elements from the existing TIntSet.
+    private static void copyAndScaleStates (Collection<State> states, OnDemand onDemand, TIntObjectMultimap<State> dest) {
+        for (State s : states) {
+            s = s.clone();
+            s.durationSeconds = (int) (s.durationSeconds * onDemand.durationFactor + onDemand.durationOffset);
+            s.durationFromOriginSeconds =
+                  (int) (s.durationFromOriginSeconds * onDemand.durationFactor + onDemand.durationOffset);
+            dest.put(s.backEdge, s);
+        }
+    }
+
+    /// Creates a new StreetRouter exactly like the current one, but with its reached edges cut
+    /// down to only those that are within the pick-up area of the specified OnDemand service.
+    /// This will consider pick-up both within a polygon and at a set of specific stops.
+    public StreetRouter copyAndRouteFor (OnDemand od) {
+        StreetRouter sr = this.shallowCopyForRouting();
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        if (od.fromPolygon != null) {
+            PreparedPolygon preparedFromPolygon = new PreparedPolygon(od.fromPolygon);
+            bestStatesAtEdge.forEachEntry((e, states) -> {
+                edge.seek(e);
+                vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.
+                if (preparedFromPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
+                    sr.queue.addAll(states);
+                    // States with a backEdge are expected to be found in the best states map.
+                    states.forEach(s -> sr.bestStatesAtEdge.put(s.backEdge, s));
+                }
+                return true;
+            });
+        }
+        // Note that both polygon and stops will be considered as pick-up locations.
+        // GTFS Flex only specifies one or the other per stop_time but we can handle both at once.
+        if (od.fromStopIndexes != null) {
+            // Convert from stop indexes to stop vertices, then to incoming link edges.
+            // TODO replace on-the-fly conversion with earlier conversion during network build.
+            // TODO ensure that link edges are traversable by car in next stage.
+            TIntList stopVertices = new TIntArrayList();
+            for (int s : od.fromStopIndexes) {
+                int v = streetLayer.parentNetwork.transitLayer.streetVertexForStop.get(s);
+                State state = this.getStateAtVertex(v);
+                if (state != null) {
+                    // Note that we're looking for states whose backEdge leads into the stop,
+                    // but when routing will need to drive on a different edge out of the stop.
+                    state = state.clone();
+                    state.backEdge = -1;
+                    sr.queue.add(state);
+                }
+            }
+        }
+        sr.streetMode = StreetMode.CAR;
+        sr.route();
+        return sr;
+    }
+
+    /// Add all states from the given StreetRouter that would not be dominated by states in the
+    /// this StreetRouter to this StreetRouter, ejecting dominated states from this StreetRouter.
+    public void mergeStatesFrom (StreetRouter odr) {
+        odr.bestStatesAtEdge.forEachEntry((e, states) -> {
+            for (State state : states) {
+                if (!isDominated(state)) bestStatesAtEdge.put(state.backEdge, state);
+            }
+            return true;
+        });
+    }
+
+    public StreetRouter shallowCopyForRouting () {
+        try {
+            StreetRouter copy = (StreetRouter) super.clone();
+            copy.queue = new PriorityQueue<>(stateComparator);
+            copy.bestStatesAtEdge = new TIntObjectHashMultimap<>();
+            // TODO verify whether we need to initialize or protectively copy any other fields.
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

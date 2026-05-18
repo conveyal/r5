@@ -163,7 +163,7 @@ public class StreetLayerTest {
 
          TIntList stopVertexIds = new TIntArrayList();
          for (Coordinate stopCoordinate : stopCoordinates) {
-             int stopVertexId = streetLayer.createAndLinkVertex(stopCoordinate.y, stopCoordinate.x);
+             int stopVertexId = streetLayer.createStopVertexAndLink(stopCoordinate.y, stopCoordinate.x);
              // Vertex IDs 0 and 1 should be taken by the beginning and end points of the single original edge.
              // Negative vertex ID would indicate a linking problem.
              assertTrue(stopVertexId > 1);

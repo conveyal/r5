@@ -50,19 +50,26 @@ public class IntHashGrid implements Serializable {
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(IntHashGrid.class);
 
-    /* Size of bin in X and Y direction, in coordinate units. */
+    /// Size of bin in X and Y direction, in coordinate units.
     private final int xBinSize, yBinSize;
 
-    /* The map of all bins. Please see visit() and xKey/yKey for details on the key. */
+    /// Holds per-bin storage for all non-empty bins. See visit() and xKey/yKey for details on the key.
     private final TLongObjectMap<TIntList> bins;
 
+    /// The number of bins that are non-empty and for which storage has been allocated because
+    /// the envelope of an inserted value intersected them.
     private int nBins = 0;
 
+    /// The number of values that have been inserted in the index. Inserting a value will only
+    /// increment nObjects by one, independent of how many bins the associated envelope touches.
+    /// If the caller inserts a value more than once, nObjects will be incremented more than once.
     private int nObjects = 0;
 
+    /// The total number of index entries across all the bins. If the envelope of an item touches
+    /// N bins, nEntries will increase by N when that item is inserted.
     private int nEntries = 0;
 
-    public IntHashGrid(double binSizeDegrees) {
+    public IntHashGrid (double binSizeDegrees) {
         yBinSize = VertexStore.floatingDegreesToFixed(binSizeDegrees);
         // FIXME Assuming about 45 degrees latitude for now, cos(45deg)
         xBinSize = (int)(yBinSize / 0.7);
@@ -81,14 +88,11 @@ public class IntHashGrid implements Serializable {
 
     // TODO check that the number of bins to is sane.
     public final void insert(Envelope envelope, final int item) {
+        // Note: here we can end-up having the same object in the same bin several times if the
+        // caller inserts the same object multiple times with different envelopes.
+        // However, we do filter duplicate items when querying, so apart from memory/performance
+        // reasons it should work. If this becomes a problem, we can use sets instead of lists.
         visit(envelope, true, (bin, mapKey) -> {
-            /*
-             * Note: here we can end-up having several time the same object in the same bin, if
-             * the client insert multiple times the same object with different envelopes.
-             * However we do filter duplicated when querying, so apart for memory/performance
-             * reasons it should work. If this becomes a problem, we can use a set instead of a
-             * list.
-             */
             bin.add(item);
             nEntries++;
             return false;
@@ -96,14 +100,13 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
-    /**
-     * Insert a linestring into the index. NB: the line string uses real-world float coordinates, not fixed coordinates.
-     * This function keeps long and angular line strings from winding up in many unnecessary cells by inserting each segment
-     * individually and splitting long segments into pieces.
-     *
-     * We could use a rasterization algorithm, but just splitting the line segments up into manageable pieces works as
-     * well and is easier to follow, at the expense of slower insert performance (which so far doesn't seem to be a problem).
-     */
+    /// Insert a JTS linestring into the index. The LineString is in floating-point WGS84 coordinates
+    /// and will be converted to fixed-point before it is inserted. This function keeps long and
+    /// non-axis-aligned line strings from occupying many unnecessary cells by inserting each segment
+    /// individually and splitting long segments into pieces. We could instead use a rasterization
+    /// algorithm, but just splitting the line segments up into manageable pieces works as well and
+    /// is easier to follow, at the expense of slower insert performance (which so far doesn't seem
+    /// to be a problem).
     public final void insert(LineString geom, final int item) {
         Coordinate[] coord = geom.getCoordinates();
         final TLongSet keys = new TLongHashSet(coord.length * 8);
@@ -231,9 +234,10 @@ public class IntHashGrid implements Serializable {
     }
 
     public String toString() {
-        return String
-                .format("IntHashGrid %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
-                        this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
-                        this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects);
+        return String.format(
+            "IntHashGrid %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
+            this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
+            this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects
+        );
     }
 }

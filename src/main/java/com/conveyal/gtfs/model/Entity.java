@@ -2,6 +2,7 @@ package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.error.MissingKeyError;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
@@ -116,6 +117,8 @@ public abstract class Entity implements Serializable {
          */
         private String getFieldCheckRequired(String column, boolean required) throws IOException {
             String str = reader.get(column);
+            // FIXME CsvReader.get seems to return empty string for missing columns, not null.
+            // missing column and empty field on one row are apparently indistinguishable here.
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
                     feed.errors.add(new MissingColumnError(tableName, column));
@@ -331,6 +334,16 @@ public abstract class Entity implements Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, keyField, key));
             }
         }
+
+        /// Call in a Loader subclass to conveniently register an error message.
+        protected void generalError (String field, String message) {
+            feed.errors.add(new GeneralError(tableName, row, field, message));
+        }
+
+        /// Call in a Loader subclass to conveniently register a referential integrity problem.
+        protected void referenceError (String field, String message) {
+            feed.errors.add(new ReferentialIntegrityError(tableName, row, field, message));
+        }
     }
 
     /**
@@ -416,7 +429,6 @@ public abstract class Entity implements Serializable {
                 if (++row % 500000 == 0) {
                     LOG.info("Record number {}", human(row));
                 }
-
                 writeOneRow(iter.next());
             }
 

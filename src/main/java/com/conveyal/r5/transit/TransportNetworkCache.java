@@ -270,6 +270,11 @@ public class TransportNetworkCache implements Component {
         network.streetLayer.buildEdgeLists();
         network.rebuildTransientIndexes();
 
+        if (network.transitLayer.onDemandIndex != null) {
+            // Complete indexing of on-demand services now that transit stops are associated with streets.
+            network.transitLayer.onDemandIndex.findCarRoads(network);
+        }
+
         // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
         TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);
         transferFinder.findTransfers();

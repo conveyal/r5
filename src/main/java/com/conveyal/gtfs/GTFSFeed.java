@@ -1,7 +1,10 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.error.ReferentialIntegrityError;
+import com.conveyal.gtfs.flex.FlexGroup;
+import com.conveyal.gtfs.flex.FlexGroupStop;
+import com.conveyal.gtfs.flex.FlexLocation;
+import com.conveyal.gtfs.flex.StreamingFlexLocationLoader;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -32,9 +35,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -44,7 +44,6 @@ import org.mapdb.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -77,7 +76,7 @@ import static com.conveyal.gtfs.util.Util.human;
  * This is a MapDB-backed representation of the data from a single GTFS feed.
  * All entities are expected to be from a single namespace, do not load several feeds into a single GTFSFeed.
  */
-public class GTFSFeed implements Cloneable, Closeable {
+public class GTFSFeed implements Cloneable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -107,9 +106,10 @@ public class GTFSFeed implements Cloneable, Closeable {
      */
     public final Map<String, FeedInfo> feedInfo;
 
-    // Sets of tuples are used to make multimaps in mapdb:
-    // https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
-    /** Multimap from ??? to Frequency entities. */
+    /// Tuples combining the trip_id of a frequency entry with the frequency entry object itself.
+    /// Sets of tuples are used to make multimaps in mapdb:
+    /// https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
+    /// So this can serve as a multimap from trip_ids to multiple frenquency entries for that trip.
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
 
     /** Map from route_id to Route entity. */
@@ -125,6 +125,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<String, Trip> trips;
 
     // FIXME this is this only thing that is a plain map, not in the MapDB
+    // And for what reason are we cacheing these column:value strings in an in-memory map?
     public final Set<String> transitIds = new HashSet<>();
 
     /**
@@ -165,6 +166,17 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /** Map from each trip_id to ID of trip pattern containing that trip. */
     public final Map<String, String> patternForTrip;
+
+    /// The trip_id of all trips that contain at least one stop_time that includes GTFS flex extensions such as
+    /// locations (areas) and pick-up / drop-off time windows instead of stop-by-stop schedules. Such flex trips are
+    /// handled separately from regular scheduled transit trips, and are excluded from Patterns.
+    public final Set<String> flexTripIds;
+
+    /// Map from location IDs to locations, which are polygonal pick-up / drop-off areas instead of point-like stops.
+    public final Map<String, FlexLocation> locations;
+
+    /// Map from location_group_id to a compound type grouping zero or more location_group_stops.
+    public final Map<String, FlexGroup> location_groups;
 
     /** Once a GTFSFeed has one feed loaded into it, we set this to true to block loading any additional feeds. */
     private boolean loaded = false;
@@ -222,14 +234,14 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         new Agency.Loader(this).loadTable(zip);
 
-        // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
+        // Calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
-        // we're done loading them
+        // we're done loading them.
         {
-            Map<String, Service> serviceTable = new HashMap<>();
-            new Calendar.Loader(this, serviceTable).loadTable(zip);
-            new CalendarDate.Loader(this, serviceTable).loadTable(zip);
-            this.services.putAll(serviceTable);
+            Map<String, Service> services = new HashMap<>();
+            new Calendar.Loader(this, services).loadTable(zip);
+            new CalendarDate.Loader(this, services).loadTable(zip);
+            this.services.putAll(services);
             // Joined Services have been persisted to MapDB. In-memory HashMap goes out of scope for garbage collection.
         }
 
@@ -250,6 +262,26 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip);
+
+        // If the feed contains a flex locations file, load the polygons and associated fields into the DB.
+        {
+            List<FlexLocation> flexLocations = StreamingFlexLocationLoader.loadLocationsJson(zip);
+            if (flexLocations != null) {
+                for (FlexLocation fl : flexLocations) {
+                    locations.put(fl.id, fl);
+                }
+            }
+        }
+
+        // Load Flex location groups, joining two tables as for services and fares above.
+        // Requires stops and locations to already be loaded.
+        {
+            Map<String, FlexGroup> groups = new HashMap<>();
+            new FlexGroup.Loader(this, groups).loadTable(zip);
+            new FlexGroupStop.Loader(this, groups).loadTable(zip);
+            this.location_groups.putAll(groups);
+        }
+
         zip.close();
 
         // There are conceivably cases where the extra step of identifying and naming patterns is not necessary.
@@ -306,9 +338,9 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /**
      * For the given trip ID, fetch all the stop times in order of increasing stop_sequence.
-     * This is an efficient iteration over a tree map.
+     * This Collection will iterate efficiently over (part of) the tree map.
      */
-    public Iterable<StopTime> getOrderedStopTimesForTrip (String trip_id) {
+    public Collection<StopTime> getOrderedStopTimesForTrip (String trip_id) {
         Map<Fun.Tuple2, StopTime> tripStopTimes =
                 stop_times.subMap(
                         Fun.t2(trip_id, null),
@@ -446,15 +478,13 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (++n % 100000 == 0) {
                 LOG.info("trip {}", human(n));
             }
-
+            // Flex trips are not handled by RAPTOR and do not have well-defined shapes, so are excluded from patterns.
+            if (flexTripIds.contains(trip_id)) continue;
             Trip trip = trips.get(trip_id);
-
             // no need to scope ID here, this is in the context of a single object
             TripPatternKey key = new TripPatternKey(trip.route_id);
-
             StreamSupport.stream(getOrderedStopTimesForTrip(trip_id).spliterator(), false)
                     .forEach(key::addStopTime);
-
             tripsForPattern.put(key, trip_id);
             if (progressListener != null) progressListener.increment();
         }
@@ -684,29 +714,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return serviceDates;
     }
 
-    // TODO: code review
-    public Geometry getMergedBuffers() {
-        if (this.mergedBuffers == null) {
-//            synchronized (this) {
-                Collection<Geometry> polygons = new ArrayList<>();
-                for (Stop stop : this.stops.values()) {
-                    if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
-                        continue;
-                    }
-                    Point stopPoint = geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
-                    Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
-                    polygons.add(stopBuffer);
-                }
-                Geometry multiGeometry = geometryFactory.buildGeometry(polygons);
-                this.mergedBuffers = multiGeometry.union();
-                if (polygons.size() > 100) {
-                    this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
-                }
-//            }
-        }
-        return this.mergedBuffers;
-    }
-
     /**
      * Cloning can be useful when you want to make only a few modifications to an existing feed.
      * Keep in mind that this is a shallow copy, so you'll have to create new maps in the clone for tables you want
@@ -721,6 +728,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    @Override
     protected void finalize() throws IOException {
         // Although everyone recommends against using finalizers to take actions, as far as I know they are a good place
         // to assert that cleanup actions were taken before an object went out of scope.
@@ -780,13 +788,23 @@ public class GTFSFeed implements Cloneable, Closeable {
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
 
-        // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
-        // nothing else contains JTS objects
+        // Use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
+        // Where we include JTS objects (locations and patterns) we should really use custom serializers. But all old
+        // gtfs-lib MapDBs have Java-serialized JTS linestrings in them.
+        // Is there some problem reopening a DB file that didn't have anything added to a collection?
+        // patterns = null;
         patterns = db.createTreeMap("patterns")
                 .valueSerializer(Serializer.JAVA)
                 .makeOrGet();
 
         patternForTrip = db.getTreeMap("patternForTrip");
+        flexTripIds = db.getTreeSet("flexTripIds");
+        // Using Externalizable interface of FlexLocation, even without polygons, causes "Read only" error from MapDB.
+        // Likewise when using my POJO serializer extension. What about a custom MapDB serializer for FlexLocation?
+        // Experimentation shows neither SerializerPojo nor Serializer.JAVA preserve shared references to
+        // GeometryFactor, they produce many instances.
+        locations = db.getTreeMap("locations");
+        location_groups = db.getTreeMap("location_groups");
 
         // Note that this is an in-memory Java HashSet instead of MapDB table (as it was in past versions).
         errors = new HashSet<>();
@@ -851,10 +869,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         if (gtfsFile == null || !gtfsFile.exists()) {
             throw new GtfsLibException("Cannot load from GTFS feed, file does not exist.");
         }
-        try {
-            GTFSFeed feed = newWritableFile(dbFile);
+        try (GTFSFeed feed = newWritableFile(dbFile)) {
             feed.loadFromFile(new ZipFile(gtfsFile), feedId);
-            feed.close();
         } catch (Exception e) {
             throw new GtfsLibException("Cannot load GTFS from feed ZIP.", e);
         }
@@ -908,4 +924,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         return new GTFSFeed(DBMaker.newMemoryDB().transactionDisable().make());
     }
 
+    /// @return whether this feed defines flex locations and/or has stop_times that use flex extensions.
+    public boolean hasFlex () {
+        return !(locations.isEmpty() && flexTripIds.isEmpty());
+    }
 }

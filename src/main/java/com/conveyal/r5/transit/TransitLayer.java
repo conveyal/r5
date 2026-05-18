@@ -1,6 +1,13 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.flex.FlexGroup;
+import com.conveyal.gtfs.flex.FlexLocation;
+import com.conveyal.gtfs.flex.FlexTrip;
+import com.conveyal.gtfs.flex.OnDemand;
+import com.conveyal.gtfs.flex.OnDemandIndex;
+import com.conveyal.gtfs.flex.FlexStopTime;
+import com.conveyal.gtfs.geom.JTSConverter;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Frequency;
@@ -35,6 +42,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.linearref.LinearLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,7 +157,8 @@ public class TransitLayer implements Serializable, Cloneable {
     /** does this TransitLayer have any frequency-based trips? */
     public boolean hasFrequencies = false;
 
-    /** Does this TransitLayer have any schedules */
+    /** Does this TransitLayer have any schedules
+     * TODO clarify whether this means schedule-based trips in contrast to above frequency-based? */
     public boolean hasSchedules = false;
 
     /**
@@ -179,6 +188,10 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
+
+    /// If any on-demand services of the types described by GTFS Flex extensions are present, this
+    /// field will be non-null.
+    public OnDemandIndex onDemandIndex;
 
     /**
      * A string uniquely identifying the contents of this TransitLayer among all TransitLayers.
@@ -469,6 +482,106 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         this.fares = new HashMap<>(gtfs.fares);
         transferLoader.loadTransfersTxt(gtfs, indexForUnscopedStopId);
+
+        if (gtfs.hasFlex()) {
+            // Load on-demand zone-oriented transit (GTFS-Flex extensions).
+            // Reuse any existing index to accumulate on-demand services from multiple GTFS feeds.
+            if (onDemandIndex == null) onDemandIndex = new OnDemandIndex();
+            for (String tripId : gtfs.flexTripIds) {
+                List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
+                if (stopTimes.size() != 2) {
+                    LOG.error(UNSUPPORTED_FLEX_ERROR);
+                    continue;
+                }
+                FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
+                FlexStopTime toStopTime = validateFlexStopTime(stopTimes.get(1));
+                Trip trip = gtfs.trips.get(tripId);
+                // It is not straightforward to move this whole code block into OnDemand constructor
+                // because we need serviceNumber lookup. R5 generally doesn't enforce immutability anyway.
+                OnDemand od = new OnDemand();
+                od.id = trip.trip_id;
+                od.name = trip.trip_short_name;
+                if (Strings.isNullOrEmpty(od.name)) od.name = od.id;
+                // Each stop_time must have only one of stop, location, or location_group specified.
+                // Note the "conditionally forbidden" notes on these fields in the gtfs reference.
+                // TODO location_groups as sets of stop vertex int IDs
+                // The indexForStopId is not yet built here but the unscoped one we need already is.
+                od.fromPolygon = extractLocationPolygon(fromStopTime, gtfs);
+                od.toPolygon = extractLocationPolygon(toStopTime, gtfs);
+                od.fromStopIndexes = extractStopIndexes(fromStopTime, gtfs, indexForUnscopedStopId);
+                od.toStopIndexes = extractStopIndexes(toStopTime, gtfs, indexForUnscopedStopId);
+                od.serviceId = trip.service_id;
+                od.serviceCode = serviceCodeNumber.get(trip.service_id);
+                if (trip instanceof FlexTrip flexTrip) {
+                    od.durationOffset = flexTrip.safe_duration_offset;
+                    od.durationFactor = flexTrip.safe_duration_factor;
+                } else {
+                    od.durationOffset = 0;
+                    od.durationFactor = 1;
+                }
+                // There should really be separate time windows for pick-up and drop-off locations.
+                // To support trips with more than two stops, those could be in a separate class.
+                od.timeWindowStart = fromStopTime.start_pickup_drop_off_window;
+                od.timeWindowEnd = fromStopTime.end_pickup_drop_off_window;
+                onDemandIndex.add(od);
+            }
+        }
+    }
+
+    /// Constraints in the GTFS reference documentation imply that it is not possible to reference
+    /// multiple location polygons as a single stop_time in a flex trip, nor is it possible to mix
+    /// polygonal locations with sets of pointlike stops in a single stop_time.
+    private static Polygon extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
+        // Referential integrity should already be validated on the GTFS feed. We can assume all
+        // non-optional ID lookups yield a non-null object or positive index and otherwise fail hard.
+        if (fst.location_id != null) {
+            FlexLocation location = gtfs.locations.get(fst.location_id);
+            return JTSConverter.toJts(location.geometry);
+        } else {
+            return null;
+        }
+    }
+
+    private static int[] extractStopIndexes (FlexStopTime fst, GTFSFeed gtfs, TObjectIntMap<String> indexForStopId) {
+        if (fst.location_group_id == null) return null;
+        FlexGroup group = gtfs.location_groups.get(fst.location_group_id);
+        TIntSet stopIndexes = new TIntHashSet();
+        for (String stopId : group.stop_ids) stopIndexes.add(indexForStopId.get(stopId));
+        return stopIndexes.toArray();
+    }
+
+    private static final String UNSUPPORTED_FLEX_ERROR =
+          "Only flex trips with two stops that are polygonal zones or location groups are supported.";
+
+    /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime.
+    /// Returns null if any checks fail.
+    private static FlexStopTime validateFlexStopTime (StopTime st) {
+        if (st instanceof FlexStopTime fst) {
+            boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
+            boolean hasLocation = !Strings.isNullOrEmpty(fst.location_id);
+            if (xor(hasGroup, hasLocation)) {
+                // TODO check that IDs references defined entities.
+                return fst;
+            }
+        }
+        throw new IllegalArgumentException(UNSUPPORTED_FLEX_ERROR);
+    }
+
+    /// Java has no logical XOR operator. Despite having && and || there is no ^^.
+    /// Not-equals has the same truth table as logical exclusive-or on boolean operands.
+    private static boolean xor (boolean a, boolean b) {
+        return a != b;
+    }
+
+    /// Returns null if no on-demand service is defined at all, and an empty list if on-demand
+    /// service is defined but none is available for the given parameters. Given that the envelope
+    /// is rectangular, this may overselect services that are outside the actually reachable area,
+    /// but it does not overselect on time and date. Envelope should be in fixed-point WGS84.
+    public List<OnDemand> findOnDemandService (Envelope envelope, int time, LocalDate date) {
+        if (onDemandIndex == null) return null;
+        BitSet servicesActive = getActiveServicesForDate(date);
+        onDemandIndex.indexIfNeeded(parentNetwork);
+        return onDemandIndex.find(envelope, time, servicesActive);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

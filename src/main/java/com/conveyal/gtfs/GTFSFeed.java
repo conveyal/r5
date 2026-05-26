@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.flex.FlexGroup;
 import com.conveyal.gtfs.flex.FlexGroupStop;
 import com.conveyal.gtfs.flex.FlexLocation;
+import com.conveyal.gtfs.flex.FlexLocationStreamer;
 import com.conveyal.gtfs.flex.StreamingFlexLocationLoader;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
@@ -264,14 +265,7 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
         new StopTime.Loader(this).loadTable(zip);
 
         // If the feed contains a flex locations file, load the polygons and associated fields into the DB.
-        {
-            List<FlexLocation> flexLocations = StreamingFlexLocationLoader.loadLocationsJson(zip);
-            if (flexLocations != null) {
-                for (FlexLocation fl : flexLocations) {
-                    locations.put(fl.id, fl);
-                }
-            }
-        }
+        FlexLocationStreamer.loadLocationsJson(zip, locations);
 
         // Load Flex location groups, joining two tables as for services and fares above.
         // Requires stops and locations to already be loaded.

@@ -21,7 +21,7 @@ public class BasicTraversalTimeCalculator implements TraversalTimeCalculator {
     // TODO re-express as "turn against traffic" and "turn with traffic" to make this less confusing.
 
     public static final int LEFT_TURN = 30;
-    public static final int STRAIGHT_ON = 0;
+    public static final int STRAIGHT_ON = 3;
     public static final int RIGHT_TURN = 10;
     public static final int U_TURN = 90; // penalize U turns extremely heavily
 

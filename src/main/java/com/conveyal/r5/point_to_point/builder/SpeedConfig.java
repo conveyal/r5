@@ -73,7 +73,7 @@ public class SpeedConfig {
         speedConfig.addCarSpeed("tertiary", 25);
         speedConfig.addCarSpeed("tertiary_link", 25);
         speedConfig.addCarSpeed("living_street", 5);
-        speedConfig.defaultSpeed = 25;
+        speedConfig.defaultSpeed = 20;
         return speedConfig;
     }
 

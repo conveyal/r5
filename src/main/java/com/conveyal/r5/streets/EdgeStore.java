@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.function.IntConsumer;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.*;
 
@@ -1299,6 +1300,12 @@ public class EdgeStore implements Serializable {
         copy.turnRestrictionsReverse = turnRestrictionsReverse;
         if (edgeTraversalTimes != null) {
             copy.edgeTraversalTimes = edgeTraversalTimes.extendOnlyCopy(copy);
+        }
+        // We don't expect to add/change elevation
+        if (costFields != null) {
+            copy.costFields = costFields.stream()
+                    .map(costField -> costField.extendOnlyCopy(copy))
+                    .collect(Collectors.toList());
         }
         return copy;
     }

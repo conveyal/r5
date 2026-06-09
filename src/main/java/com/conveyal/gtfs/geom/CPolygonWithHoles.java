@@ -3,6 +3,8 @@ package com.conveyal.gtfs.geom;
 /// A polygon with holes in it. Adds more linear rings punching holes in an outer shell.
 public class CPolygonWithHoles extends CPolygon {
 
+    /// Maybe these should just be double[] arrays.
+    /// Not sure the linear ring abstraction adds anything over polygon-without-holes.
     private final CLinearRing[] holes;
 
     public CPolygonWithHoles (double[] packedCoords, CLinearRing[] holes) {

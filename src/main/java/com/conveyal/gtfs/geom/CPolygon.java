@@ -34,7 +34,7 @@ public class CPolygon extends CLinearRing implements CPolygonal {
     }
 
     /// Throwaway conversion to JTS for through validation.
-    /// Validation at ring and polygon contruction looks only at closed rings and number of points,
+    /// Validation at ring and polygon construction looks only at closed rings and number of points,
     /// the same things we check. Is more validated here?
     public boolean validate () {
         return JTSConverter.toJts(this).isValid();

@@ -269,6 +269,17 @@ public class TransitLayer implements Serializable, Cloneable {
         int nTripsAdded = 0;
         int nZeroDurationHops = 0;
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
+            // On-demand (flex) trips are not associated with patterns, and may be lacking arrival
+            // and departure times. Such trips are handled completely separately in another loop below.
+            // TODO deviated-fixed routes or routes that are a sequence of locations/zones fit into patterns.
+            if (gtfs.flexTripIds.contains(tripId)) {
+                continue;
+            }
+            String patternId = gtfs.patternForTrip.get(tripId);
+            if (patternId == null) {
+                LOG.warn("Non-on-demand trip was not associated with any pattern.");
+                continue;
+            }
             Trip trip = gtfs.trips.get(tripId);
             Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip.
@@ -315,8 +326,6 @@ public class TransitLayer implements Serializable, Cloneable {
                 LOG.warn("Trip {} on route {} {} has no stops, it will not be used", trip.trip_id, trip.route_id, route.route_short_name);
                 continue;
             }
-
-            String patternId = gtfs.patternForTrip.get(tripId);
 
             TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
@@ -490,7 +499,8 @@ public class TransitLayer implements Serializable, Cloneable {
             for (String tripId : gtfs.flexTripIds) {
                 List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
                 if (stopTimes.size() != 2) {
-                    LOG.error(UNSUPPORTED_FLEX_ERROR);
+                    // We really should have a mechanism for recording warnings or errors during network build.
+                    LOG.error("On-demand trip {} from GTFS Flex: currently only exactly two stop_times are supported.", tripId);
                     continue;
                 }
                 FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
@@ -550,9 +560,6 @@ public class TransitLayer implements Serializable, Cloneable {
         return stopIndexes.toArray();
     }
 
-    private static final String UNSUPPORTED_FLEX_ERROR =
-          "Only flex trips with two stops that are polygonal zones or location groups are supported.";
-
     /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime.
     /// Returns null if any checks fail.
     private static FlexStopTime validateFlexStopTime (StopTime st) {
@@ -564,7 +571,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 return fst;
             }
         }
-        throw new IllegalArgumentException(UNSUPPORTED_FLEX_ERROR);
+        throw new IllegalArgumentException("stop_times in on-demand trips from GTFS Flex must refer to a polygonal zone or location group.");
     }
 
     /// Java has no logical XOR operator. Despite having && and || there is no ^^.

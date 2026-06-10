@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.analysis.util.JsonUtil.toJson;
@@ -193,64 +194,77 @@ public class BundleController implements HttpController {
 
                     for (FileItem fileItem : files.get("feedGroup")) {
                         File feedFile = ((DiskFileItem) fileItem).getStoreLocation();
-                        ZipFile zipFile = new ZipFile(feedFile);
+                        LOG.info("FEED FILE NAME {}", fileItem.getName());
+                        ZipFile zipFile;
+                        try {
+                            zipFile = new ZipFile(feedFile);
+                        } catch (ZipException ze) {
+                            LOG.info("FEED NOT VALID ZIP.");
+                            continue;
+                        }
                         File tempDbFile = FileUtils.createScratchFile("db");
                         File tempDbpFile = new File(tempDbFile.getAbsolutePath() + ".p");
                         File tempErrorJsonFile = new File(tempDbFile.getAbsolutePath() + ".error.json");
 
                         GTFSFeed feed = GTFSFeed.newWritableFile(tempDbFile);
                         feed.progressListener = progressListener;
-                        feed.loadFromFile(zipFile, new ObjectId().toString());
-
-                        // Perform any more complex validation that requires cross-table checks.
-                        new PostLoadValidator(feed).validate();
-
-                        // Find and validate the extents of the GTFS, defined by all stops in the feed.
-                        for (Stop s : feed.stops.values()) {
-                            bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
-                        }
                         try {
-                            checkWgsEnvelopeSize(bundleBounds, "GTFS data");
-                        } catch (IllegalArgumentException iae) {
-                            // Convert envelope size or antimeridian crossing exceptions to feed import errors.
-                            // Out of range lat/lon values will throw DataSourceException and bundle import will fail.
-                            // Envelope size or antimeridian crossing will throw IllegalArgumentException. We want to
-                            // soft-fail on these because some feeds contain small amounts of long-distance service
-                            // which may extend far beyond the analysis area without causing problems.
-                            feed.errors.add(new GeneralError("stops", -1, null, iae.getMessage()));
+                            feed.loadFromFile(zipFile, new ObjectId().toString());
+                            // Perform any more complex validation that requires cross-table checks.
+                            new PostLoadValidator(feed).validate();
+                            feed.setOriginalFileName(fileItem.getName());
+                            // Find and validate the extents of the GTFS, defined by all stops in the feed.
+                            for (Stop s : feed.stops.values()) {
+                                bundleBounds.expandToInclude(s.stop_lon, s.stop_lat);
+                            }
+                            try {
+                                checkWgsEnvelopeSize(bundleBounds, "GTFS data");
+                            } catch (IllegalArgumentException iae) {
+                                // Convert envelope size or antimeridian crossing exceptions to feed import errors.
+                                // Out of range lat/lon values will throw DataSourceException and bundle import will fail.
+                                // Envelope size or antimeridian crossing will throw IllegalArgumentException. We want to
+                                // soft-fail on these because some feeds contain small amounts of long-distance service
+                                // which may extend far beyond the analysis area without causing problems.
+                                feed.errors.add(new GeneralError("stops", -1, null, iae.getMessage()));
+                            }
+
+                            // Populate the metadata while the feed is still open.
+                            // This must be done after all errors have been added to the feed.
+                            // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
+                            // TODO also store original uploaded file name on FeedSummary.
+                            Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
+                            bundle.feeds.add(feedSummary);
+
+                            if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
+                                bundle.serviceStart = feedSummary.serviceStart;
+                            }
+
+                            if (bundle.serviceEnd.isBefore(feedSummary.serviceEnd)) {
+                                bundle.serviceEnd = feedSummary.serviceEnd;
+                            }
+
+                            // Save all errors to a file.
+                            try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
+                                JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                            // Release some memory after we've summarized the errors to Mongo and a JSON file.
+                            feed.errors.clear();
+
+                            // Flush db files to disk
+                            feed.close();
+
+                            // Ensure all files have been stored.
+                            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
+                            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
+                            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
+                            fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
+                        } catch (Exception e) {
+                            LOG.warn("FEED EXCEPTION {}", e.toString());
+                            feed.close();
+                            continue;
                         }
-
-                        // Populate the metadata while the feed is still open.
-                        // This must be done after all errors have been added to the feed.
-                        // TODO also get service range, hours per day etc. and error summary (and complete error JSON).
-                        Bundle.FeedSummary feedSummary = new Bundle.FeedSummary(feed, bundle.feedGroupId);
-                        bundle.feeds.add(feedSummary);
-
-                        if (bundle.serviceStart.isAfter(feedSummary.serviceStart)) {
-                            bundle.serviceStart = feedSummary.serviceStart;
-                        }
-
-                        if (bundle.serviceEnd.isBefore(feedSummary.serviceEnd)) {
-                            bundle.serviceEnd = feedSummary.serviceEnd;
-                        }
-
-                        // Save all errors to a file.
-                        try (Writer jsonWriter = new FileWriter(tempErrorJsonFile)) {
-                            JsonUtil.objectMapper.writeValue(jsonWriter, feed.errors);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                        // Release some memory after we've summarized the errors to Mongo and a JSON file.
-                        feed.errors.clear();
-
-                        // Flush db files to disk
-                        feed.close();
-
-                        // Ensure all files have been stored.
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db"), tempDbFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "db.p"), tempDbpFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "zip"), feedFile);
-                        fileStorage.moveIntoStorage(gtfsCache.getFileKey(feedSummary.bundleScopedFeedId, "error.json"), tempErrorJsonFile);
                     }
                     // Set legacy progress field to indicate that all feeds have been loaded.
                     bundle.feedsComplete = bundle.totalFeeds;
@@ -271,6 +285,7 @@ public class BundleController implements HttpController {
                 throw t;
               } finally {
                 // ID and create/update times are assigned here when we push into Mongo.
+                // TODO CLOSE FEED
                 Persistence.bundles.modifiyWithoutUpdatingLock(bundle);
               }
         }));

@@ -10,6 +10,7 @@ import com.conveyal.gtfs.flex.FlexStopTime;
 import com.conveyal.gtfs.geom.JTSConverter;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
@@ -60,6 +61,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
@@ -492,49 +494,60 @@ public class TransitLayer implements Serializable, Cloneable {
         this.fares = new HashMap<>(gtfs.fares);
         transferLoader.loadTransfersTxt(gtfs, indexForUnscopedStopId);
 
+        LOG.info("FEED file {}", gtfs.getOriginalFileName());
         if (gtfs.hasFlex()) {
+            int nTripsIndexed = 0;
             // Load on-demand zone-oriented transit (GTFS-Flex extensions).
             // Reuse any existing index to accumulate on-demand services from multiple GTFS feeds.
             if (onDemandIndex == null) onDemandIndex = new OnDemandIndex();
             for (String tripId : gtfs.flexTripIds) {
-                List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
-                if (stopTimes.size() != 2) {
-                    // We really should have a mechanism for recording warnings or errors during network build.
-                    LOG.error("On-demand trip {} from GTFS Flex: currently only exactly two stop_times are supported.", tripId);
-                    continue;
+                try {
+                    List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
+                    if (stopTimes.size() != 2) {
+                        // We really should have a mechanism for recording warnings or errors during network build.
+                        LOG.error("FEED On-demand trip {} from GTFS Flex has more than two stop_times (unsupported).", tripId);
+                        continue;
+                    }
+                    FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
+                    FlexStopTime toStopTime = validateFlexStopTime(stopTimes.get(1));
+                    Trip trip = gtfs.trips.get(tripId);
+                    // It is not straightforward to move this whole code block into OnDemand constructor
+                    // because we need serviceNumber lookup. R5 generally doesn't enforce immutability anyway.
+                    OnDemand od = new OnDemand();
+                    od.id = trip.trip_id;
+                    od.name = trip.trip_short_name;
+                    if (Strings.isNullOrEmpty(od.name)) od.name = od.id;
+                    // Each stop_time must have only one of stop, location, or location_group specified.
+                    // Note the "conditionally forbidden" notes on these fields in the gtfs reference.
+                    // TODO location_groups as sets of stop vertex int IDs
+                    // The indexForStopId is not yet built here but the unscoped one we need already is.
+                    od.fromPolygon = extractLocationPolygon(fromStopTime, gtfs);
+                    od.toPolygon = extractLocationPolygon(toStopTime, gtfs);
+                    od.fromStopIndexes = extractStopIndexes(fromStopTime, gtfs, indexForUnscopedStopId);
+                    od.toStopIndexes = extractStopIndexes(toStopTime, gtfs, indexForUnscopedStopId);
+                    od.serviceId = trip.service_id;
+                    od.serviceCode = serviceCodeNumber.get(trip.service_id);
+                    if (trip instanceof FlexTrip flexTrip) {
+                        od.durationOffset = flexTrip.safe_duration_offset;
+                        od.durationFactor = flexTrip.safe_duration_factor;
+                    } else {
+                        od.durationOffset = 0;
+                        od.durationFactor = 1;
+                    }
+                    // There should really be separate time windows for pick-up and drop-off locations.
+                    // To support trips with more than two stops, those could be in a separate class.
+                    od.timeWindowStart = fromStopTime.start_pickup_drop_off_window;
+                    od.timeWindowEnd = fromStopTime.end_pickup_drop_off_window;
+                    onDemandIndex.add(od);
+                    nTripsIndexed += 1;
+                } catch (Exception ex) {
+                    LOG.info("FEED NETWORK EXCEPTION {}", ex.toString());
                 }
-                FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
-                FlexStopTime toStopTime = validateFlexStopTime(stopTimes.get(1));
-                Trip trip = gtfs.trips.get(tripId);
-                // It is not straightforward to move this whole code block into OnDemand constructor
-                // because we need serviceNumber lookup. R5 generally doesn't enforce immutability anyway.
-                OnDemand od = new OnDemand();
-                od.id = trip.trip_id;
-                od.name = trip.trip_short_name;
-                if (Strings.isNullOrEmpty(od.name)) od.name = od.id;
-                // Each stop_time must have only one of stop, location, or location_group specified.
-                // Note the "conditionally forbidden" notes on these fields in the gtfs reference.
-                // TODO location_groups as sets of stop vertex int IDs
-                // The indexForStopId is not yet built here but the unscoped one we need already is.
-                od.fromPolygon = extractLocationPolygon(fromStopTime, gtfs);
-                od.toPolygon = extractLocationPolygon(toStopTime, gtfs);
-                od.fromStopIndexes = extractStopIndexes(fromStopTime, gtfs, indexForUnscopedStopId);
-                od.toStopIndexes = extractStopIndexes(toStopTime, gtfs, indexForUnscopedStopId);
-                od.serviceId = trip.service_id;
-                od.serviceCode = serviceCodeNumber.get(trip.service_id);
-                if (trip instanceof FlexTrip flexTrip) {
-                    od.durationOffset = flexTrip.safe_duration_offset;
-                    od.durationFactor = flexTrip.safe_duration_factor;
-                } else {
-                    od.durationOffset = 0;
-                    od.durationFactor = 1;
-                }
-                // There should really be separate time windows for pick-up and drop-off locations.
-                // To support trips with more than two stops, those could be in a separate class.
-                od.timeWindowStart = fromStopTime.start_pickup_drop_off_window;
-                od.timeWindowEnd = fromStopTime.end_pickup_drop_off_window;
-                onDemandIndex.add(od);
             }
+            Optional<FeedInfo> ofi = gtfs.feedInfo.values().stream().findFirst();
+            String declaredFeedId = ofi.isPresent() ? ofi.get().feed_id : "(unknown)";
+            LOG.info("FEED {} has {} flex trips, of which {} added to onDemandIndex.",
+                  declaredFeedId, gtfs.flexTripIds.size(), nTripsIndexed);
         }
     }
 

@@ -232,7 +232,6 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
         }
 
         db.getAtomicString("feed_id").set(feedId);
-
         new Agency.Loader(this).loadTable(zip);
 
         // Calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
@@ -275,7 +274,6 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
             new FlexGroupStop.Loader(this, groups).loadTable(zip);
             this.location_groups.putAll(groups);
         }
-
         zip.close();
 
         // There are conceivably cases where the extra step of identifying and naming patterns is not necessary.
@@ -290,10 +288,20 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
         } else {
             findPatterns();
         }
-
+        errors.forEach(e -> {
+            if (e.getPriority() == Priority.HIGH) LOG.warn("FEED ERROR {}", e.toString());
+        });
         // Prevent loading additional feeds into this MapDB.
         loaded = true;
         LOG.info("Detected {} errors in feed.", errors.size());
+    }
+
+    public void setOriginalFileName (String originalFileName) {
+        db.getAtomicString("originalFileName").set(originalFileName);
+    }
+
+    public String getOriginalFileName () {
+        return db.getAtomicString("originalFileName").get();
     }
 
     public void toFile (String file) {
@@ -920,6 +928,6 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
 
     /// @return whether this feed defines flex locations and/or has stop_times that use flex extensions.
     public boolean hasFlex () {
-        return !(locations.isEmpty() && flexTripIds.isEmpty());
+        return !(locations.isEmpty() && flexTripIds.isEmpty() && location_groups.isEmpty());
     }
 }

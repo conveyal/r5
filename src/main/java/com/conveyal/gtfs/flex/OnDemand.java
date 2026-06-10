@@ -71,10 +71,7 @@ public class OnDemand implements Serializable {
         VertexStore.Vertex vertex = network.streetLayer.vertexStore.getCursor();
         for (int s : toStopIndexes) {
             int v = network.transitLayer.streetVertexForStop.get(s);
-            if (v < 0) {
-                // Stop was not linked to streets
-                continue;
-            }
+            if (v < 0) continue; // Stop was not linked to streets
             vertex.seek(v);
             // This split method is non-destructive.
             Split split = network.streetLayer.findSplit(

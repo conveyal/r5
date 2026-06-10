@@ -45,6 +45,7 @@ public class OnDemandIndex implements Serializable {
                 VertexStore.Vertex vertex = network.streetLayer.vertexStore.getCursor();
                 for (int s : od.fromStopIndexes) {
                     int v = network.transitLayer.streetVertexForStop.get(s);
+                    if (v < 0) continue; // stop was not linked to street network
                     vertex.seek(v);
                     env.expandToInclude(vertex.getFixedLon(), vertex.getFixedLat());
                 }

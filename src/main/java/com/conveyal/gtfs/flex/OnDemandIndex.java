@@ -30,7 +30,9 @@ public class OnDemandIndex implements Serializable {
     /// As indicated in the IntHashGrid documentation, envelopes are inserted as fixed-precision.
     public void indexIfNeeded (TransportNetwork network) {
         if (spatialIndex != null) return;
-        spatialIndex = new IntHashGrid();
+        // double centerLat = network.getEnvelope().centre().y;
+        // spatialIndex = new IntHashGrid(400, centerLat);
+        spatialIndex = new IntHashGrid(0.004); // About 444m in latitude direction.
         for (int i = 0; i < services.size(); i++) {
             OnDemand od = services.get(i);
             Polygon fromPolygon = od.fromPolygon;
@@ -41,6 +43,8 @@ public class OnDemandIndex implements Serializable {
             if (od.fromStopIndexes != null) {
                 // TODO pre-convert stops to vertices instead of doing it on demand
                 // Then ideally remove the TransportNetwork parameter.
+                // Instead of a unified envelope, we could insert separately in the cell of each stop,
+                // but that requires cell-level value deduplication.
                 Envelope env = new Envelope();
                 VertexStore.Vertex vertex = network.streetLayer.vertexStore.getCursor();
                 for (int s : od.fromStopIndexes) {

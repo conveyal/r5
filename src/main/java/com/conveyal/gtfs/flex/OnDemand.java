@@ -74,8 +74,8 @@ public class OnDemand implements Serializable {
             if (v < 0) continue; // Stop was not linked to streets
             vertex.seek(v);
             // This split method is non-destructive.
-            Split split = network.streetLayer.findSplit(
-                  vertex.getLat(), vertex.getLon(), StreetLayer.INITIAL_LINK_RADIUS_METERS, StreetMode.CAR);
+            Split split = network.streetLayer.findSplit(vertex.getLat(), vertex.getLon(),
+                  StreetLayer.INITIAL_LINK_RADIUS_METERS, StreetMode.CAR);
             if (split != null) {
                 carEdges.add(split.edge);
             } else {

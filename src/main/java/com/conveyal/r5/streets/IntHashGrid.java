@@ -49,6 +49,7 @@ public class IntHashGrid implements Serializable {
 
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(IntHashGrid.class);
+    public static final int MAX_CELLS_TO_VISIT = 200_000;
 
     /// Size of bin in X and Y direction, in coordinate units.
     private final int xBinSize, yBinSize;
@@ -196,16 +197,19 @@ public class IntHashGrid implements Serializable {
     private void visit(Envelope envelope, boolean createIfEmpty, final BinVisitor binVisitor) {
         Coordinate min = new Coordinate(envelope.getMinX(), envelope.getMinY());
         Coordinate max = new Coordinate(envelope.getMaxX(), envelope.getMaxY());
+        // FIXME Shouldn't this be floor rather than rounding when binning?
         long minXKey = Math.round(min.x / xBinSize);
         long maxXKey = Math.round(max.x / xBinSize);
         long minYKey = Math.round(min.y / yBinSize);
         long maxYKey = Math.round(max.y / yBinSize);
-        // Check sanity before iterating
-        long dx = (maxXKey - minXKey);
-        long dy = (maxYKey - minYKey);
-        if (dx * dy > 100_000) {
-            LOG.error("Visiting too many spatial index cells.");
-            return;
+        { // Check number of cells that will be visited before iterating.
+            long dx = (maxXKey - minXKey) + 1;
+            long dy = (maxYKey - minYKey) + 1;
+            long nCells = dx * dy;
+            if (nCells > MAX_CELLS_TO_VISIT) {
+                LOG.error("Skipping request to visit {} spatial index cells (exceeds maximum of {}).", nCells, MAX_CELLS_TO_VISIT);
+                return;
+            }
         }
         for (long xKey = minXKey; xKey <= maxXKey; xKey++) {
             for (long yKey = minYKey; yKey <= maxYKey; yKey++) {

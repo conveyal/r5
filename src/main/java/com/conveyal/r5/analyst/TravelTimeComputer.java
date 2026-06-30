@@ -190,7 +190,7 @@ public class TravelTimeComputer {
                 // We could alternatively clip and delay the times to transit stops and destination points
                 // (instead of street vertices), but there's potential for wasted calculation when
                 // propagating to unreachable destinations.
-                if (!onDemandCandidates.isEmpty()) {
+                if (!isNullOrEmpty(onDemandCandidates)) {
                     for (OnDemand onDemand : onDemandCandidates) {
                         StreetRouter odr = sr.copyAndRouteFor(onDemand);
                         // Filter the result states down to the destination polygon and stop list.

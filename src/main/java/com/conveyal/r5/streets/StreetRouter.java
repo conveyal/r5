@@ -1234,19 +1234,28 @@ public class StreetRouter implements Cloneable {
         route();
     }
 
-    /// Call after routing to filter this router's result states down to only those edges within
-    /// the specified OnDemand service's destination polygon or destination stops set, applying
-    /// the relevant duration offset and scaling factor to those travel times. Though it may seem
-    /// more efficient to restrict routing to edges within the polygon instead of filtering
-    /// afterward, that approach cannot deal with multiple disjoint polygons, destination polygons
-    /// that do not contain the origin point, or paths that exit a polygon and re-enter it.
+    /// After routing, call this method to filter this router's result states down to only those
+    /// edges within the specified OnDemand service's destination polygon or destination stops set,
+    /// applying the relevant duration offset and scaling factor to those travel times.
     ///
-    /// This implementation uses the spatial index and accesses only edges which may be within the
+    /// It might seem more efficient to restrict routing to edges within the polygon instead of
+    /// filtering afterward, but that approach cannot deal with multiple disjoint polygons,
+    /// destination polygons that do not contain the origin point, or paths that exit a polygon and
+    /// re-enter it.
+    ///
+    /// This implementation uses the spatial index to examine only edges which may be within the
     /// bounding box, making a new copy of the best states structure but not of the router itself.
     /// This is useful when considering multiple on-demand services. Testing indicates that that
     /// this approach is faster than naive non-indexed edge iteration, and faster than filtering
     /// existing collections rather than copying. On Seattle MetroFlex, the indexed implementation
     /// yields 60-70 msec in most cases.
+    ///
+    /// Filtering with the spatial index is effective here because this method is typically
+    /// operating on the result of a car search which reaches a lot of vertices, an area as large
+    /// or larger than the drop-off polygon. This is in contrast to copyAndRouteFor which is
+    /// typically operating on the result of a walk search that reaches a small area. We may want
+    /// to make spatial index use here conditional on the size of the drop-off polygon, or its size
+    /// relative to the reached area, because it materializes a large TIntSet for large polygons.
     public void clipAndScaleStates (OnDemand onDemand) {
         // Reusable cursor objects to avoid excessive object creation / heap allocation in loops.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
@@ -1264,6 +1273,7 @@ public class StreetRouter implements Cloneable {
                 edge.seek(eidx);
                 vertex.seek(edge.getToVertex());
                 // Creating a ton of throwaway Point objects here, could eventually be optimized.
+                // Allocation is just bumping a pointer, but cache efficiency probably suffers.
                 // BestStatesAtEdge.get() always returns a list.
                 if (preparedToPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
                     copyAndScaleStates(bestStatesAtEdge.get(eidx), onDemand, filteredCopy);
@@ -1302,6 +1312,12 @@ public class StreetRouter implements Cloneable {
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         if (od.fromPolygon != null) {
             PreparedPolygon preparedFromPolygon = new PreparedPolygon(od.fromPolygon);
+            // People typically use on-demand service when they have no car at the origin. When
+            // walking (as opposed to driving) to on-demand, the set of reached vertices is small,
+            // while the pick-up area polygon can be metropolitan in scale. Therefore, we avoid
+            // using the spatial index to materialize a set of every edge inside the polygon (which
+            // is a potentially massive over-select) and instead simply iterate over the usually
+            // comparatively small set of reached vertices.
             bestStatesAtEdge.forEachEntry((e, states) -> {
                 edge.seek(e);
                 vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.

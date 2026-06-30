@@ -192,7 +192,6 @@ public class TravelTimeComputer {
                 // propagating to unreachable destinations.
                 if (!onDemandCandidates.isEmpty()) {
                     for (OnDemand onDemand : onDemandCandidates) {
-                        // if (onDemand.fromPolygon != null) continue; // TESTING only stop-group cases
                         StreetRouter odr = sr.copyAndRouteFor(onDemand);
                         // Filter the result states down to the destination polygon and stop list.
                         odr.clipAndScaleStates(onDemand);

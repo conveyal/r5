@@ -888,7 +888,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public Collection<com.conveyal.r5.api.util.Stop> findApiStopsInEnvelope (Envelope env) {
         List<com.conveyal.r5.api.util.Stop> stops = new ArrayList<>();
         EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
-        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(VertexStore.envelopeToFixed(env));
+        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(GeometryUtils.envelopeToFixed(env));
 
         nearbyEdges.forEach(eidx -> {
             e.seek(eidx);
@@ -912,7 +912,7 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public TIntSet findStopsInGeometry (Geometry geometry) {
         Envelope envelopeFloating = geometry.getEnvelopeInternal();
-        Envelope envelopeFixed = VertexStore.envelopeToFixed(envelopeFloating);
+        Envelope envelopeFixed = GeometryUtils.envelopeToFixed(envelopeFloating);
         // This should get all the edges including ones added by a scenario, minus those removed by a scenario.
         TIntSet nearbyEdges = this.parentNetwork.streetLayer.findEdgesInEnvelope(envelopeFixed);
         EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();

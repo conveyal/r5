@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 
 /// Groups together all OnDemand instances within the TransportNetwork and provides some related
 /// methods for indexing and searching them. The transient spatial index handles services is
@@ -40,7 +40,7 @@ public class OnDemandIndex implements Serializable {
             OnDemand od = services.get(i);
             Polygon fromPolygon = od.fromPolygon;
             if (fromPolygon != null) {
-                Envelope env = floatingWgsEnvelopeToFixed(fromPolygon.getEnvelopeInternal());
+                Envelope env = envelopeToFixed(fromPolygon.getEnvelopeInternal());
                 spatialIndex.insert(env, i);
             }
             if (od.fromStopIndexes != null) {

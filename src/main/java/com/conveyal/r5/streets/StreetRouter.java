@@ -4,7 +4,6 @@ import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
-import com.conveyal.r5.profile.ExecutionTimer;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -22,7 +21,6 @@ import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +41,7 @@ import java.util.PriorityQueue;
 
 import static com.conveyal.gtfs.geom.JTSConverter.pointAt;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.streets.VertexStore.envelopeToFixed;
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
 import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
 

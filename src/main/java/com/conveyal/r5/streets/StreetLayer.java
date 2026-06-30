@@ -541,7 +541,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
             // find nearby edges
             Envelope env = g.getEnvelopeInternal();
-            TIntSet nearbyEdges = this.spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = this.spatialIndex.query(GeometryUtils.envelopeToFixed(env));
 
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
@@ -1671,7 +1671,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (parkRideLocationsMap != null) {
             EdgeStore.Edge e = edgeStore.getCursor();
             VertexStore.Vertex v = vertexStore.getCursor();
-            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = spatialIndex.query(GeometryUtils.envelopeToFixed(env));
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
                 if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
@@ -1700,7 +1700,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (bikeRentalStationMap != null) {
             EdgeStore.Edge e = edgeStore.getCursor();
             VertexStore.Vertex v = vertexStore.getCursor();
-            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = spatialIndex.query(GeometryUtils.envelopeToFixed(env));
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
                 //TODO: for now bikeshares aren't connected with link edges to the graph

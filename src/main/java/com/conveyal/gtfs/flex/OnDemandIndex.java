@@ -28,8 +28,9 @@ public class OnDemandIndex implements Serializable {
     /// Potentially merge with findCarRoads, creating and storing a fromEnvelope for polygon + stops.
     /// Then to buildSpatialIndexAsNeeded or rebuildTransientIndex.
     /// As indicated in the IntHashGrid documentation, envelopes are inserted as fixed-precision.
-    /// This lazy-init method is synchronized because it will be called in parallel on workers.
-    /// TODO Consider manually call this method in a single thread while loading the network.
+    /// This lazy-init method is synchronized in case it is called in parallel on workers.
+    /// In practice we aim to call it once when loading the network and block usage until it's done.
+    /// In scenario copies, the reference to a built index will be cloned so rebuild will be skipped.
     public synchronized void indexIfNeeded (TransportNetwork network) {
         if (spatialIndex != null) return;
         // double centerLat = network.getEnvelope().centre().y;

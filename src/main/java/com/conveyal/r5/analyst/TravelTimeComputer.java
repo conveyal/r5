@@ -187,20 +187,23 @@ public class TravelTimeComputer {
                 // Maintain walk limits and time limits across all these searches by keeping states.
                 // Spatial filtering and scaling is handled by the StreetRouter because we need to look
                 // up the location of every vertex, and StreetRouter has a reference to VertexStore.
-                // Could alternatively clip and delay the times to transit stops and destination points
-                // (instead of street vertices), but there's potential for wasted calculation propagating
-                // to unreachable destinations.
-                for (OnDemand onDemand : onDemandCandidates) {
-                    // if (onDemand.fromPolygon != null) continue; // TESTING only stop-group cases
-                    StreetRouter odr = sr.copyAndRouteFor(onDemand);
-                    // Filter the result states down to the destination polygon and stop list.
-                    odr.clipAndScaleStates(onDemand);
-                    sr.mergeStatesFrom(odr);
+                // We could alternatively clip and delay the times to transit stops and destination points
+                // (instead of street vertices), but there's potential for wasted calculation when
+                // propagating to unreachable destinations.
+                if (!onDemandCandidates.isEmpty()) {
+                    for (OnDemand onDemand : onDemandCandidates) {
+                        // if (onDemand.fromPolygon != null) continue; // TESTING only stop-group cases
+                        StreetRouter odr = sr.copyAndRouteFor(onDemand);
+                        // Filter the result states down to the destination polygon and stop list.
+                        odr.clipAndScaleStates(onDemand);
+                        sr.mergeStatesFrom(odr);
+                    }
+                    // After riding on-demand services, we want to reach any adjacent pedestrian-only areas that
+                    // include transit stops. In a separate block below, this is done for transit searches when
+                    // access mode is not walk. When on-demand services exist, ensure this additional search
+                    // happens exactly once, even in cases where transit does not follow.
+                    if (accessMode == StreetMode.WALK) sr.keepRoutingOnFoot();
                 }
-                // After riding on-demand services, we want to reach any adjacent pedestrian-only
-                // areas including transit stops. We do this below, but only for transit searches
-                // when access mode is not walk. Here we always want to do it.
-                if (accessMode == StreetMode.WALK) sr.keepRoutingOnFoot();
             }
 
             if (request.hasTransit()) {

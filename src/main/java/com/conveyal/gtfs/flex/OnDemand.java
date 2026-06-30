@@ -1,22 +1,19 @@
 package com.conveyal.gtfs.flex;
 
-import com.conveyal.gtfs.geom.JTSConverter;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.esotericsoftware.minlog.Log;
-import gnu.trove.list.TIntList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.lang.invoke.MethodHandles;
 import java.util.BitSet;
-import java.util.List;
 
 /// Our internal TransportNetwork representation of an on-demand transit service.
 /// Currently these connect a polygonal zone or set of pointlike stops to another such zone or set.
@@ -25,6 +22,8 @@ import java.util.List;
 /// But all the JTS geometries will have been constructed from a single factory during network
 /// alleviating the factory-instance-reference problem a bit.
 public class OnDemand implements Serializable {
+    private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
     public String id;
     public String name;
     // The GeoTools Polygonal interface does not extend Geometry so doesn't have basic predicates
@@ -79,7 +78,8 @@ public class OnDemand implements Serializable {
             if (split != null) {
                 carEdges.add(split.edge);
             } else {
-                Log.warn("On-demand stop {} was not near any roads permitting CAR.");
+                LOG.warn("On-demand stop {} was not near any roads permitting CAR.",
+                      network.transitLayer.stopIdForIndex.get(s));
             }
         }
         this.toCarEdges = carEdges.toArray();

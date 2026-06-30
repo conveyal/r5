@@ -231,7 +231,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
-        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>(gtfs.stops.size(), 0.5F, -1);
         stopsWheelchair = new BitSet(gtfs.stops.size());
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
@@ -587,7 +587,6 @@ public class TransitLayer implements Serializable, Cloneable {
     public List<OnDemand> findOnDemandService (Envelope envelope, int time, LocalDate date) {
         if (onDemandIndex == null) return null;
         BitSet servicesActive = getActiveServicesForDate(date);
-        onDemandIndex.indexIfNeeded(parentNetwork);
         return onDemandIndex.find(envelope, time, servicesActive);
     }
 
@@ -656,6 +655,9 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
             }
         }
+
+        // 5. Build a spatial index of any on-demand services serving areas rather than points.
+        if (onDemandIndex != null) onDemandIndex.indexIfNeeded(parentNetwork);
 
         LOG.info("Done rebuilding transient indices.");
     }

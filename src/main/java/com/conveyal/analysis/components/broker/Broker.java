@@ -135,7 +135,13 @@ public class Broker implements Component {
      * results are received for a given workerCategory. Do so after receiving results for an
      * arbitrary task toward the beginning of the job
      */
-    public static final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
+    public static final int START_INSTANCES_TASK = 42;
+
+    /**
+     * We also want to consider starting instances occasionally as a regional analysis is running, in case previously
+     * created instances have been terminated.
+     */
+    public static final int RESTART_INSTANCES_TASKS = 4000;
 
     /** The maximum number of spot instances allowable in an automatic request */
     public static final int MAX_WORKERS_PER_CATEGORY = 250;
@@ -535,7 +541,7 @@ public class Broker implements Component {
         }
         // When non-error results are received for several tasks we assume the regional analysis is running smoothly.
         // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
-        if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
+        if (workResult.taskId == START_INSTANCES_TASK || (workResult.taskId + 1) % RESTART_INSTANCES_TASKS == 0) {
             requestExtraWorkersIfAppropriate(job);
         }
     }

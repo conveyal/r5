@@ -51,7 +51,7 @@ public class PostLoadValidator {
      */
     private void validateCalendarServices () {
         if (feed.services.isEmpty()) {
-            feed.errors.add(new GeneralError("calendar.txt", 0, "service_id",
+            feed.errors.add(new GeneralError("calendar", 0, "service_id",
                     "Feed does not define any services in calendar or calendar_dates."));
         }
     }
@@ -83,7 +83,7 @@ public class PostLoadValidator {
         }
     }
 
-    private static final String FILE = "stops.txt";
+    private static final String FILE = "stops";
     private static final String FIELD = "parent_station";
 
     /** GTFS location_type codes. */
@@ -182,13 +182,13 @@ public class PostLoadValidator {
             if (stopTimes.size() != 2) {
                 Trip trip = feed.trips.get(tripId);
                 long tripLine = (trip == null) ? -1 : trip.sourceFileLine;
-                feed.errors.add(new UnsupportedFlexError("trips.txt", tripLine, "trip_id", String.format(
+                feed.errors.add(new UnsupportedFlexError("trips", tripLine, "trip_id", String.format(
                       "Flex trip %s has %d stop_times. Only trips with exactly two stop_times can currently be " +
                             "imported for routing.", tripId, stopTimes.size())));
             }
             for (StopTime st : stopTimes) {
                 if (!Strings.isNullOrEmpty(st.stop_id )) {
-                    feed.errors.add(new UnsupportedFlexError("stop_times.txt", st.sourceFileLine,
+                    feed.errors.add(new UnsupportedFlexError("stop_times", st.sourceFileLine,
                           "stop_id", "Referencing pointlike stops in Flex trips is not supported."));
                 }
             }

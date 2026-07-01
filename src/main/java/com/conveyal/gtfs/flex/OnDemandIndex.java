@@ -25,6 +25,12 @@ public class OnDemandIndex implements Serializable {
         services.add(onDemand);
     }
 
+    /// Returns the number of on-demand services in this index (one per GTFS Flex trip).
+    /// Primarily used for assertions in tests.
+    public int size () {
+        return services.size();
+    }
+
     /// Potentially merge with findCarRoads, creating and storing a fromEnvelope for polygon + stops.
     /// Then to buildSpatialIndexAsNeeded or rebuildTransientIndex.
     /// As indicated in the IntHashGrid documentation, envelopes are inserted as fixed-precision.

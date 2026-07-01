@@ -60,13 +60,16 @@ public class Trip extends Entity {
             getRefField("route_id", true, feed.routes);
         }
 
-        /// Check if any special fields are present that are used only for flex trips, and are
-        /// optional even for those trips. If they are present create and return a specialized
-        /// instance, otherwise return an instance of the simpler base class.
+        /// Check if any special GTFS Flex extension fields are present. If they are present create and return a
+        /// specialized instance, otherwise return an instance of the simpler base class. Such fields are optional
+        /// even for trips containing stop_times that make use of Flex extensions, and we cannot know while
+        /// loading the trip rows table whether each trip will contain flex-specific stop_times. If this trip turns out
+        /// to contain flex-specific stop_times, default (identity) values must be inferred later during routing.
         private Trip checkAndLoadFlexFields () throws IOException {
             double factor = getDoubleField("safe_duration_factor", false, 1, 10);
             double offset = getDoubleField("safe_duration_offset", false, 0, 60*60);
-            if ((Double.isNaN(factor) && Double.isNaN(offset)) || (factor == 1 && offset == 0)) {
+            // Return simpler base class when both values are missing.
+            if ((Double.isNaN(factor) && Double.isNaN(offset))) {
                 return new Trip();
             }
             FlexTrip result = new FlexTrip();

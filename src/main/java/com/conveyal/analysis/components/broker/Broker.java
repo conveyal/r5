@@ -539,14 +539,13 @@ public class Broker implements Component {
             eventBus.send(new ErrorEvent(t));
             return;
         }
-        // When non-error results are received for several tasks we assume the regional analysis is running smoothly.
         // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
-        if (workResult.taskId == START_INSTANCES_TASK || (workResult.taskId + 1) % RESTART_INSTANCES_TASKS == 0) {
-            requestExtraWorkersIfAppropriate(job);
-        }
+        requestExtraWorkersIfAppropriate(job, workResult.taskId);
     }
 
-    private void requestExtraWorkersIfAppropriate(Job job) {
+    // At certain task numbers, check various conditions about the worker pool then start spot or on-demand instances
+    private void requestExtraWorkersIfAppropriate(Job job, int taskId) {
+        if (taskId == START_INSTANCES_TASK || (taskId + 1) % RESTART_INSTANCES_TASKS == 0) {
         WorkerCategory workerCategory = job.workerCategory;
         int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
@@ -574,8 +573,16 @@ public class Broker implements Component {
             // Guardrails until freeform pointsets are tested more thoroughly
             if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
             if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
-            int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
-            createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
+            int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
+            if (taskId == START_INSTANCES_TASK) {
+                // After a few tasks are completed successfully, try to start spot instances
+                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nWorkers);
+            } else {
+                // If the number of workers is below the target later in a job, it is likely that spot instances were
+                // terminated due to capacity limits. So request on-demand instances instead.
+                createWorkersInCategory(job.workerCategory, job.workerTags, nWorkers, 0);
+            }
+            }
         }
     }
 

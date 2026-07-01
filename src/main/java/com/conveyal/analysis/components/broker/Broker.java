@@ -546,42 +546,42 @@ public class Broker implements Component {
     // At certain task numbers, check various conditions about the worker pool then start spot or on-demand instances
     private void requestExtraWorkersIfAppropriate(Job job, int taskId) {
         if (taskId == START_INSTANCES_TASK || (taskId + 1) % RESTART_INSTANCES_TASKS == 0) {
-        WorkerCategory workerCategory = job.workerCategory;
-        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
-        if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
-            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
-            int targetWorkerTotal;
-            if (job.templateTask.hasTransit()) {
-                // Total computation for a task with transit depends on the number of stops and whether the
-                // network has frequency-based routes. The total computation for the job depends on these
-                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
-                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
-                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
-                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
-                //  this worth adding a field to Job or RegionalTask?
-                float transitScaleFactor = (9f / job.templateTask.zoom);
-                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
-            } else {
-                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
-                // the job increases roughly with linearly with the number of origins.
-                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
-            }
+            WorkerCategory workerCategory = job.workerCategory;
+            int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
+            if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
+                // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
+                //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
+                int targetWorkerTotal;
+                if (job.templateTask.hasTransit()) {
+                    // Total computation for a task with transit depends on the number of stops and whether the
+                    // network has frequency-based routes. The total computation for the job depends on these
+                    // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
+                    // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
+                    // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
+                    // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
+                    //  this worth adding a field to Job or RegionalTask?
+                    float transitScaleFactor = (9f / job.templateTask.zoom);
+                    targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
+                } else {
+                    // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
+                    // the job increases roughly with linearly with the number of origins.
+                    targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
+                }
 
-            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
-            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
-            // Guardrails until freeform pointsets are tested more thoroughly
-            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
-            if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
-            int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
-            if (taskId == START_INSTANCES_TASK) {
-                // After a few tasks are completed successfully, try to start spot instances
-                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nWorkers);
-            } else {
-                // If the number of workers is below the target later in a job, it is likely that spot instances were
-                // terminated due to capacity limits. So request on-demand instances instead.
-                createWorkersInCategory(job.workerCategory, job.workerTags, nWorkers, 0);
-            }
+                // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
+                targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
+                // Guardrails until freeform pointsets are tested more thoroughly
+                if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
+                if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
+                int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
+                if (taskId == START_INSTANCES_TASK) {
+                    // After a few tasks are completed successfully, try to start spot instances
+                    createWorkersInCategory(job.workerCategory, job.workerTags, 0, nWorkers);
+                } else {
+                    // If the number of workers is below the target later in a job, it is likely that spot instances were
+                    // terminated due to capacity limits. So request on-demand instances instead.
+                    createWorkersInCategory(job.workerCategory, job.workerTags, nWorkers, 0);
+                }
             }
         }
     }

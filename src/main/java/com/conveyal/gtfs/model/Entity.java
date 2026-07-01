@@ -232,17 +232,20 @@ public abstract class Entity implements Serializable {
             return val;
         }
 
-        /**
-         * Used to check referential integrity.
-         * Return value is not used, but could allow entities to point to each other directly rather than
-         * using indirection through string-keyed maps.
-         */
+        /// Check referential integrity: verify that an ID found in the given column is present as
+        /// a key in another table.
+        ///
+        /// Returns the value for that key in the other table. This originally allowed direct references between
+        /// entities. That did not align with storing the entities in a database or MapDB table, so these days we
+        /// never use the return value. We could instead return the ID itself to allow combining this check with
+        /// the initial field read.
         protected <K, V> V getRefField(String column, boolean required, Map<K, V> target) throws IOException {
             String str = getFieldCheckRequired(column, required);
             V val = null;
             if (str != null) {
                 val = target.get(str);
                 String transitId = column + ":" + str;
+                // FIXME This should not use a non-transient field on the feed object. It should be a Loader-local Set<Tuple2<String, String>>.
                 if (!feed.transitIds.contains(transitId)) {
                     feed.transitIds.add(transitId);
                     if (val == null) {

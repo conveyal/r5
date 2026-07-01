@@ -1,13 +1,6 @@
 package com.conveyal.gtfs.flex;
 
-import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.StopTime;
-import org.mapdb.Fun;
-
-import java.io.IOException;
-
-import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 
 /// Although on-demand ("flex") services are expressed as extended GTFS stop_times rows, they are
 /// quite different from scheduled transit rows, especially where polygonal zones ("locations") are

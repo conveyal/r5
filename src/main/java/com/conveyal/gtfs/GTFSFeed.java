@@ -125,8 +125,9 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
     /** Map from trip_id to Trip entity. */
     public final BTreeMap<String, Trip> trips;
 
-    // FIXME this is this only thing that is a plain map, not in the MapDB
-    // And for what reason are we cacheing these column:value strings in an in-memory map?
+    // FIXME this is this only thing that is a plain map, not in the MapDB.
+    // For what reason are we cacheing these column:value strings in an in-memory map?
+    // Apparently, this is being used only to deduplicate error messages. Should be elsewhere.
     public final Set<String> transitIds = new HashSet<>();
 
     /**
@@ -262,19 +263,18 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
         new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
-        new StopTime.Loader(this).loadTable(zip);
 
-        // If the feed contains a flex locations file, load the polygons and associated fields into the DB.
-        FlexLocationStreamer.loadLocationsJson(zip, locations);
-
-        // Load Flex location groups, joining two tables as for services and fares above.
-        // Requires stops and locations to already be loaded.
         {
+            FlexLocationStreamer.loadLocationsJson(zip, this);
+            // Load Flex location groups, joining two tables as for services and fares above.
             Map<String, FlexGroup> groups = new HashMap<>();
             new FlexGroup.Loader(this, groups).loadTable(zip);
             new FlexGroupStop.Loader(this, groups).loadTable(zip);
             this.location_groups.putAll(groups);
         }
+
+        // Load stop_times after stops, Flex locations, and location_groups to allow referential integrity checks.
+        new StopTime.Loader(this).loadTable(zip);
 
         zip.close();
 

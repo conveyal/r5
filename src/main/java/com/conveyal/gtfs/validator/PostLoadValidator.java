@@ -7,23 +7,29 @@ import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.error.RangeError;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.error.SuspectStopLocationError;
+import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.BooleanAsciiGrid;
+import com.google.common.base.Strings;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Currently we perform a lot of validation while we're loading the rows out of the input GTFS feed.
- * This can only catch certain categories of problems. Other problems must be found after tables are fully loaded.
- * These include self-referential tables like stops (which reference other stops as parent_stations).
- * This could also be expressed as a postLoadValidation method on Entity.Loader.
- *
- * In the original RDBMS-enabled gtfs-lib we had a lot of validation classes that would perform checks after loading.
- * This included more complex semantic checks of the kind we do in r5 while building networks. We might want to
- * re-import those gtfs-lib validators and adapt them to operate on MapDB only for the purposes of r5.
- * However, validating a feed takes a lot of sorting and grouping of stop_times that will need to be repeated when we
- * build a network. It's debatable whether we should make the user wait twice for this, as it's one of the slower steps.
- */
+/// We perform a lot of validation in Loader implementations while we're loading the rows out of the input GTFS feed.
+/// Tables are loaded in an order that allows resolving inter-table references, and those Loaders are the preferred
+/// place for any concise structural checks against the GTFS spec.
+///
+/// Some other checks are deferred until after all tables are fully loaded. This includes table self-references
+/// or reference loops between tables, which simply can't happen until all rows are loaded. But it also includes
+/// checks that are less about spec-defined GTFS structure and more about what we currently support in R5. We may
+/// want to introduce a post-load hook in Loader to handle the simple but special case of table self-reference.
+/// In the older RDBMS-enabled gtfs-lib we had a lot of validation classes that would perform checks after loading.
+/// This included more complex semantic checks of the kind we do in r5 while building networks. We might want to
+/// re-import those gtfs-lib validators and adapt them to operate on MapDB only for the purposes of r5. However,
+/// validating a feed takes a lot of sorting and grouping of stop_times that will need to be repeated when we build
+/// a network. It's debatable whether we should make the user wait twice for this, as it's one of the slower steps.
 public class PostLoadValidator {
 
     private GTFSFeed feed;
@@ -36,6 +42,7 @@ public class PostLoadValidator {
         validateCalendarServices();
         validateParentStations();
         validateStopPopulationDensity();
+        validateFlex();
     }
 
     /**
@@ -165,5 +172,27 @@ public class PostLoadValidator {
             new ParentStationRule(LocationType.GENERIC,  Requirement.REQUIRED,  LocationType.STATION),
             new ParentStationRule(LocationType.BOARDING, Requirement.REQUIRED,  LocationType.STOP)
     );
+
+    /// Iterate over all trips containing at least one StopTime that had a defined value for a Flex extension field.
+    /// Perform checks that require knowledge of this full set of flex trips, including checks on whether each trip is
+    /// of a type we currently support.
+    private void validateFlex () {
+        for (String tripId : feed.flexTripIds) {
+            List<StopTime> stopTimes = new ArrayList<>(feed.getOrderedStopTimesForTrip(tripId));
+            if (stopTimes.size() != 2) {
+                Trip trip = feed.trips.get(tripId);
+                long tripLine = (trip == null) ? -1 : trip.sourceFileLine;
+                feed.errors.add(new UnsupportedFlexError("trips.txt", tripLine, "trip_id", String.format(
+                      "Flex trip %s has %d stop_times. Only trips with exactly two stop_times can currently be " +
+                            "imported for routing.", tripId, stopTimes.size())));
+            }
+            for (StopTime st : stopTimes) {
+                if (!Strings.isNullOrEmpty(st.stop_id )) {
+                    feed.errors.add(new UnsupportedFlexError("stop_times.txt", st.sourceFileLine,
+                          "stop_id", "Referencing pointlike stops in Flex trips is not supported."));
+                }
+            }
+        }
+    }
 
 }

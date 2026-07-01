@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.flex.FlexStopTime;
 import com.google.common.base.Strings;
 import org.mapdb.Fun;
@@ -10,6 +11,8 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Set;
+
+import static com.conveyal.gtfs.util.Util.xor;
 
 /// Represents one row of the GTFS stop_times table. Note that once created and saved in a feed,
 /// StopTimes are by convention immutable because they are in a MapDB. We perform some referential
@@ -102,7 +105,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             return false;
         }
 
-        /// Load the fields present only in FlexStopTime but not in the base StopTime
+        /// Load and validate the fields present only in FlexStopTime but not in the base StopTime.
         private FlexStopTime loadFlexFields () throws IOException {
             FlexStopTime fst = new FlexStopTime();
             fst.start_pickup_drop_off_window = getTimeField("start_pickup_drop_off_window", false);
@@ -111,7 +114,42 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             fst.location_group_id = getStringField("location_group_id", false);
             fst.pickup_booking_rule_id = getStringField("pickup_booking_rule_id", false);
             fst.drop_off_booking_rule_id = getStringField("drop_off_booking_rule_id", false);
+            validateFlexFields(fst);
             return fst;
+        }
+
+        /// Note that a FlexStopTime is a subtype used where any of the supplemental fields has a
+        /// value. Base StopTimes and FlexStopTimes could be mixed on a single trip, and we don't
+        /// know which trips reference what mix of StopTime types until all StopTimes are loaded.
+        /// Additional trip-level validation should be performed later in PostLoadValidator.
+        private void validateFlexFields (FlexStopTime fst) throws IOException {
+            // A flex stop_time references at most one of these two, so neither is required, but we
+            // still want to check that references are valid on any that are present.
+            getRefField("location_id", false, feed.locations);
+            getRefField("location_group_id", false, feed.location_groups);
+            // Must reference exactly one polygonal zone (location) or group of stops (location_group).
+            boolean hasLocation = !Strings.isNullOrEmpty(fst.location_id);
+            boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
+            if (!xor(hasLocation, hasGroup)) {
+                unsupportedFlex("A flex stop_time must reference exactly one of location_id or location_group_id.");
+            }
+            // According to the spec, start_pickup_drop_off_window / end_pickup_drop_off_window:
+            // - Are required if stop_times.location_group_id or stop_times.location_id is defined
+            // - Are forbidden if arrival_time or departure_time is defined
+            // - If one of the two is specified, the other must also be specified
+            // We don't currently allow pointlike stops with specific arrival/departure times in flex trips.
+            // Therefore, both of these fields must be present required.
+            if (fst.start_pickup_drop_off_window == INT_MISSING || fst.end_pickup_drop_off_window == INT_MISSING) {
+                unsupportedFlex("Flex stop_times must provide both start_ and end_pickup_drop_off_window.");
+            }
+            if (!(Strings.isNullOrEmpty(fst.pickup_booking_rule_id)
+                 && Strings.isNullOrEmpty(fst.drop_off_booking_rule_id))) {
+                unsupportedFlex("Flex stop_time references a booking rule, which is not currently supported.");
+            }
+        }
+
+        private void unsupportedFlex (String message) {
+            feed.errors.add(new UnsupportedFlexError(tableName, row, null, message));
         }
     }
 

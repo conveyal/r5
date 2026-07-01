@@ -17,6 +17,7 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
@@ -65,6 +66,7 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
+import static com.conveyal.gtfs.util.Util.xor;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_ONLY;
 
@@ -567,17 +569,10 @@ public class TransitLayer implements Serializable, Cloneable {
             boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
             boolean hasLocation = !Strings.isNullOrEmpty(fst.location_id);
             if (xor(hasGroup, hasLocation)) {
-                // TODO check that IDs references defined entities.
                 return fst;
             }
         }
         throw new IllegalArgumentException("stop_times in on-demand trips from GTFS Flex must refer to a polygonal zone or location group.");
-    }
-
-    /// Java has no logical XOR operator. Despite having && and || there is no ^^.
-    /// Not-equals has the same truth table as logical exclusive-or on boolean operands.
-    private static boolean xor (boolean a, boolean b) {
-        return a != b;
     }
 
     /// Returns null if no on-demand service is defined at all, and an empty list if on-demand

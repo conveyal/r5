@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.flex;
 
+import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.geom.CPolygon;
 import com.fasterxml.jackson.core.JsonToken;
 import org.slf4j.Logger;
@@ -52,24 +54,31 @@ public class FlexLocationStreamer extends GeoJsonStreamer {
         targetMap.put(id, new FlexLocation(id, name, null, cPolygon));
     }
 
-    public static void loadLocationsJson (ZipFile zip, Map<String, FlexLocation> map) throws Exception {
+    public static void loadLocationsJson (ZipFile zip, GTFSFeed feed) throws Exception {
         ZipEntry entry = zip.getEntry("locations.geojson");
         if (entry == null) {
             LOG.info("GTFS feed does not have locations.geojson specifying flex zones.");
             return;
         }
         InputStream inStream = zip.getInputStream(entry);
-        // GTFS reference says pick-up and drop-off zones in locations.geojson are always polygonal.
-        // The features are allowed to be a mix of Polygon and MultiPolygon types.
+        // The GTFS reference docs say pick-up and drop-off zones in locations.geojson are always
+        // polygonal. The features are allowed to be a mix of Polygon and MultiPolygon types.
         // The top level must be a FeatureCollection and every feature must have a string ID.
         // GTFS allows the UTF byte order mark in files, so we need to handle it.
         // JSON allows only UTF-8/16/32, which the Jackson streaming JsonParser auto-detects:
         // ByteSourceJsonBootstrapper.constructParser calls detectEncoding which has BOM handling.
-        // The Jackson streaming JSON API sacrifices readability for speed and memory so is not
-        // always ideal. Here the JSON structure is simple enough that it works cleanly.
-        // When reading into the tree model instead of streaming, objectMapper.readTree calls
-        // createParser which calls constructParser indirectly benefitting from its BOM handling.
-        new FlexLocationStreamer(inStream, map).stream();
+        // The Jackson streaming (as opposed to tree) JSON API sacrifices readability for speed and
+        // memory so is not always ideal. Here the JSON structure is simple enough that it works
+        // cleanly. When reading into the tree model instead of streaming, objectMapper.readTree
+        // calls createParser which calls constructParser indirectly benefitting from its BOM handling.
+        try {
+            new FlexLocationStreamer(inStream, feed.locations).stream();
+        } catch (UnsupportedGeometryException e) {
+            // Presence of any unsupported geometry (including MultiPolygon) should leave the GTFSFeed usable but
+            // not import flex service. Discard any locations already streamed in and record one error.
+            feed.locations.clear();
+            feed.errors.add(new UnsupportedFlexError("locations.geojson", -1, "geometry", e.getMessage()));
+        }
     }
 
 }

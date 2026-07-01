@@ -29,7 +29,11 @@ public abstract class GeoJsonStreamer extends JsonStreamer {
                     }
                 }
             }
+        } catch (UnsupportedGeometryException e) {
+            // Let callers handle the specific case of unsupported geometries.
+            throw e;
         } catch (Exception e) {
+            // Generic exception for all other problems we may encounter.
             throw new RuntimeException("Failed to parse GeoJSON.", e);
         }
     }
@@ -43,16 +47,21 @@ public abstract class GeoJsonStreamer extends JsonStreamer {
     }
 
     /// Consumes one entire JSON array of GeoJSON positions (array of two-element arrays) from the
-    /// supplied parser. Begins consuming at the curren (not next) token for use in loops.
+    /// supplied parser. Begins consuming at the current (not next) token for use in loops.
     /// Returns it as a packed array of doubles in (x, y) i.e. (lon, lat) order.
     double[] streamOnePositionArray () throws IOException {
         TDoubleList packedCoords = new TDoubleArrayList();
         expectCurrent(JsonToken.START_ARRAY);
         while (jp.nextToken() != JsonToken.END_ARRAY) {
-            expectCurrent(JsonToken.START_ARRAY);
-            packedCoords.add(expectNextDouble());
-            packedCoords.add(expectNextDouble());
-            expectNext(JsonToken.END_ARRAY);
+            try {
+                // It should be possible here to dynamically detect nesting depth for different geometry types.
+                expectCurrent(JsonToken.START_ARRAY);
+                packedCoords.add(expectNextDouble());
+                packedCoords.add(expectNextDouble());
+                expectNext(JsonToken.END_ARRAY);
+            } catch (IllegalArgumentException e) {
+                throw new UnsupportedGeometryException("Unexpected GeoJSON coordinates for Polygon.");
+            }
         }
         return packedCoords.toArray();
     }
@@ -73,13 +82,22 @@ public abstract class GeoJsonStreamer extends JsonStreamer {
     /// arrays. For Polygons with more than one of these rings, the first MUST be the exterior ring,
     /// and any others MUST be interior rings. The exterior ring bounds the surface, and the
     /// interior rings (if present) bound holes within the surface.
+    ///
+    /// Parse optimistically as if the geometry is a Polygon and throw an UnsupportedGeometryException
+    /// on the first evidence to the contrary, thus tolerating cases where coordinates are seen before
+    /// type in the input.
     CPolygon streamOnePolygon () throws IOException {
         CPolygon polygon = null;
         expectNext(JsonToken.START_OBJECT);
         while (jp.nextToken() != JsonToken.END_OBJECT) {
             switch (expectCurrentFieldName()) {
                 case "coordinates" -> polygon = CPolygon.fromRings(streamPositionArrays());
-                case "type" -> expectNextString("Polygon");
+                case "type" -> {
+                    String type = expectNextString();
+                    if (!"Polygon".equals(type)) {
+                        throw new UnsupportedGeometryException("Unsupported GeoJSON geometry type " + type);
+                    }
+                }
                 default -> throw new IllegalArgumentException("Unrecognized field in GeoJSON polygon.");
             }
         }

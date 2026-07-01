@@ -500,13 +500,18 @@ public class TransitLayer implements Serializable, Cloneable {
             if (onDemandIndex == null) onDemandIndex = new OnDemandIndex();
             for (String tripId : gtfs.flexTripIds) {
                 List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
+                // This replicates some checks in the GTFS loader that report incorrect or unsupported flex trips to
+                // the user. Here we skip over such trips, in case the user builds a network from the feed anyway.
                 if (stopTimes.size() != 2) {
-                    // We really should have a mechanism for recording warnings or errors during network build.
-                    LOG.error("On-demand trip {} from GTFS Flex: currently only exactly two stop_times are supported.", tripId);
+                    LOG.warn("Skipping on-demand trip {} from GTFS Flex: only trips with exactly two stop_times are supported.", tripId);
                     continue;
                 }
                 FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
                 FlexStopTime toStopTime = validateFlexStopTime(stopTimes.get(1));
+                if (fromStopTime == null || toStopTime == null) {
+                    LOG.warn("Skipping on-demand trip {} from GTFS Flex: each stop_time must reference exactly one polygonal zone or location group.", tripId);
+                    continue;
+                }
                 Trip trip = gtfs.trips.get(tripId);
                 // It is not straightforward to move this whole code block into OnDemand constructor
                 // because we need serviceNumber lookup. R5 generally doesn't enforce immutability anyway.
@@ -562,8 +567,9 @@ public class TransitLayer implements Serializable, Cloneable {
         return stopIndexes.toArray();
     }
 
-    /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime.
-    /// Returns null if any checks fail.
+    /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime referencing either a
+    /// polygonal zone (location) or a location_group but not both.
+    /// Returns null if any check fails so we can skip problematic/unsupported trips.
     private static FlexStopTime validateFlexStopTime (StopTime st) {
         if (st instanceof FlexStopTime fst) {
             boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
@@ -572,7 +578,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 return fst;
             }
         }
-        throw new IllegalArgumentException("stop_times in on-demand trips from GTFS Flex must refer to a polygonal zone or location group.");
+        return null;
     }
 
     /// Returns null if no on-demand service is defined at all, and an empty list if on-demand

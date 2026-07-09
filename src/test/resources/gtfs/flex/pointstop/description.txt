@@ -1,0 +1,6 @@
+This feed contains a flex trip T with two stop_times using the flex pickup/drop-off times
+extension. Those stop_times reference pointlike stops instead of polygonal zones or location_groups
+and there is no locations.geojson.
+
+It also contains a minimal scheduled (non-flex) trip SCHED running from stop X to stop Y, to
+confirm that skipping the unsupported flex trip does not prevent ordinary trips from loading.

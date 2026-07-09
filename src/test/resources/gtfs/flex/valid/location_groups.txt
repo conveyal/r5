@@ -1,0 +1,3 @@
+location_group_id,location_group_name
+LG1,Group One
+LG2,Group Two

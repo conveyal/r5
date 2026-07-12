@@ -432,6 +432,8 @@ public class StreetRouter implements Cloneable {
             // subtract 1 from -vertexIdx because -0 == 0
             State state = new State(vertexIdx, previousState.backEdge, streetMode);
             state.durationSeconds = previousState.durationSeconds;
+            // This state begins a new leg; the mode switch time falls within that new leg.
+            state.durationBeforeLegSeconds = previousState.durationSeconds;
             state.incrementTimeInSeconds(switchTime);
             if (legMode == LegMode.BICYCLE_RENT) {
                 state.isBikeShare = true;
@@ -862,12 +864,14 @@ public class StreetRouter implements Cloneable {
         public int vertex;
         public int backEdge;
 
-        //In simple search both those variables have same values
-        //But in complex search (P+R, Bike share) first variable have duration of all the legs
-        //and second, duration only in this leg
-        //this is used for limiting search time in VertexFlagVisitor
+        /// Cumulative duration of the trip so far, across all legs.
         protected int durationSeconds;
-        protected int durationFromOriginSeconds;
+
+        /// Cumulative duration of all legs before this one (the durationSeconds of the leg seed
+        /// state this state descends from). Storing this requires less math and is less prone to
+        /// errors and omissions than incrementing both the current leg duration and total duration.
+        protected int durationBeforeLegSeconds;
+
         //Distance in mm
         public int distance;
         public int idx;
@@ -893,7 +897,7 @@ public class StreetRouter implements Cloneable {
             this.backState = backState;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
-            this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
+            this.durationBeforeLegSeconds = backState.durationBeforeLegSeconds;
             this.idx = backState.idx+1;
         }
 
@@ -904,7 +908,7 @@ public class StreetRouter implements Cloneable {
             this.distance = 0;
             this.streetMode = streetMode;
             this.durationSeconds = 0;
-            this.durationFromOriginSeconds = 0;
+            this.durationBeforeLegSeconds = 0;
             this.idx = 0;
         }
 
@@ -983,16 +987,19 @@ public class StreetRouter implements Cloneable {
             //TODO: decrease time
             if (false) {
                 durationSeconds-=seconds;
-                durationFromOriginSeconds -= seconds;
             } else {
                 durationSeconds += (int) seconds;
-                durationFromOriginSeconds += (int) seconds;
             }
 
         }
 
         public int getDurationSeconds() {
             return durationSeconds;
+        }
+
+        /// Duration of the current leg alone, e.g. for enforcing per-leg travel time limits.
+        public int getLegDurationSeconds() {
+            return durationSeconds - durationBeforeLegSeconds;
         }
 
         public String dump() {
@@ -1172,13 +1179,13 @@ public class StreetRouter implements Cloneable {
             if (state.vertex < 0 ||
                 //skips origin states for bikeShare (since in cycle search for bikeShare origin states
                 //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
-                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds ||
+                state.backState == null || state.getLegDurationSeconds() < minTravelTimeSeconds ||
                 skippedVertices.contains(state.vertex)
                 ) {
                 // Make sure that vertex to which you can come sooner then minTravelTimeSeconds won't be used
                 // if a path which uses more then minTravelTimeSeconds is found
                 // since this means we need to walk/cycle/drive longer then required
-                if (state.vertex > 0 && state.durationFromOriginSeconds < minTravelTimeSeconds) {
+                if (state.vertex > 0 && state.getLegDurationSeconds() < minTravelTimeSeconds) {
                     skippedVertices.add(state.vertex);
                 }
                 return;
@@ -1297,8 +1304,6 @@ public class StreetRouter implements Cloneable {
         for (State s : states) {
             s = s.clone();
             s.durationSeconds = (int) (s.durationSeconds * onDemand.durationFactor + onDemand.durationOffset);
-            s.durationFromOriginSeconds =
-                  (int) (s.durationFromOriginSeconds * onDemand.durationFactor + onDemand.durationOffset);
             dest.put(s.backEdge, s);
         }
     }
@@ -1322,9 +1327,13 @@ public class StreetRouter implements Cloneable {
                 edge.seek(e);
                 vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.
                 if (preparedFromPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
-                    sr.queue.addAll(states);
-                    // States with a backEdge are expected to be found in the best states map.
-                    states.forEach(s -> sr.bestStatesAtEdge.put(s.backEdge, s));
+                    for (State s : states) {
+                        s = s.clone();
+                        s.durationBeforeLegSeconds = s.durationSeconds;
+                        sr.queue.add(s);
+                        // States with a backEdge are expected to be found in the best states map.
+                        sr.bestStatesAtEdge.put(s.backEdge, s);
+                    }
                 }
                 return true;
             });
@@ -1344,6 +1353,7 @@ public class StreetRouter implements Cloneable {
                     // but when routing will need to drive on a different edge out of the stop.
                     state = state.clone();
                     state.backEdge = -1;
+                    state.durationBeforeLegSeconds = state.durationSeconds;
                     sr.queue.add(state);
                 }
             }

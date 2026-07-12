@@ -64,6 +64,9 @@ public class OnDemand implements Serializable {
     /// only guaranteed to be walkable, not driveable or bikable. In further work we may want to
     /// allow multiple linkage, potentially connecting a stop via separate edges to both walk and
     /// car roads. For now we will do mini-searches and store closest car edges to each stop.
+    ///
+    /// TODO explore whether this genuinely always allows access to on-demand stops
+    /// Passing from drive to walk mode at the nearest road may assume the car road is also walkable.
     void findCarEdges (TransportNetwork network) {
         if (toStopIndexes == null) return;
         TIntSet carEdges = new TIntHashSet();
@@ -73,6 +76,9 @@ public class OnDemand implements Serializable {
             if (v < 0) continue; // Stop was not linked to streets
             vertex.seek(v);
             // This split method is non-destructive.
+            // These edges come from Split.find, which searches the spatial index containing
+            // only the even (forward) edge of each pair.
+            // TODO verify and document that even-edge behavior on all relevant method Javadoc.
             Split split = network.streetLayer.findSplit(vertex.getLat(), vertex.getLon(),
                   StreetLayer.INITIAL_LINK_RADIUS_METERS, StreetMode.CAR);
             if (split != null) {

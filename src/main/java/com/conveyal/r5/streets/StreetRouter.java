@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.gtfs.flex.OnDemand;
+import com.conveyal.gtfs.geom.PointInPolygonTester;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
@@ -21,7 +22,6 @@ import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.prep.PreparedPolygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,7 +39,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
-import static com.conveyal.gtfs.geom.JTSConverter.pointAt;
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
@@ -1274,16 +1273,23 @@ public class StreetRouter implements Cloneable {
             TIntSet candidateEdges = streetLayer.spatialIndex.query(fixedEnv);
             // The only part of containment testing that is slow is the preparatory calculations.
             // Caching and reusing those massively speeds up bulk containment tests.
-            PreparedPolygon preparedToPolygon = new PreparedPolygon(onDemand.toPolygon);
+            PointInPolygonTester toPolygonTester = new PointInPolygonTester(onDemand.toPolygon);
             candidateEdges.forEach(eidx -> {
-                // The physical location of states is at the toVertex of an edge.
+                // The spatial index contains only the even (forward) edge of each pair, but
+                // states may have arrived via either edge of the pair. States are physically
+                // located at the toVertex of the edge they arrived on, and the toVertex of the
+                // odd (backward) edge is the even edge's fromVertex. So test containment of the
+                // two endpoints separately, each gating the states keyed on the edge arriving
+                // at that endpoint.
                 edge.seek(eidx);
                 vertex.seek(edge.getToVertex());
-                // Creating a ton of throwaway Point objects here, could eventually be optimized.
-                // Allocation is just bumping a pointer, but cache efficiency probably suffers.
-                // BestStatesAtEdge.get() always returns a list.
-                if (preparedToPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
+                if (toPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
+                    // BestStatesAtEdge.get() always returns a list (empty for missing keys).
                     copyAndScaleStates(bestStatesAtEdge.get(eidx), onDemand, filteredCopy);
+                }
+                vertex.seek(edge.getFromVertex());
+                if (toPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
+                    copyAndScaleStates(bestStatesAtEdge.get(eidx + 1), onDemand, filteredCopy);
                 }
                 return true;
             });
@@ -1291,7 +1297,11 @@ public class StreetRouter implements Cloneable {
         if (onDemand.toStopIndexes != null) {
             // Handle travel to specific stops, as opposed to a polygonal geographic area.
             for (int carEdge : onDemand.toCarEdges) {
+                // XOR with 1 yields the pair's other edge whatever the parity of the stored one.
+                // In practice the edge numbers are the even (forward) ones,
+                // but Split.find() does not currently guarantee this.
                 copyAndScaleStates(bestStatesAtEdge.get(carEdge), onDemand, filteredCopy);
+                copyAndScaleStates(bestStatesAtEdge.get(carEdge ^ 1), onDemand, filteredCopy);
             }
         }
         // Replace the entire original best states collection with the new filtered copy.
@@ -1316,7 +1326,7 @@ public class StreetRouter implements Cloneable {
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         if (od.fromPolygon != null) {
-            PreparedPolygon preparedFromPolygon = new PreparedPolygon(od.fromPolygon);
+            PointInPolygonTester fromPolygonTester = new PointInPolygonTester(od.fromPolygon);
             // People typically use on-demand service when they have no car at the origin. When
             // walking (as opposed to driving) to on-demand, the set of reached vertices is small,
             // while the pick-up area polygon can be metropolitan in scale. Therefore, we avoid
@@ -1326,7 +1336,7 @@ public class StreetRouter implements Cloneable {
             bestStatesAtEdge.forEachEntry((e, states) -> {
                 edge.seek(e);
                 vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.
-                if (preparedFromPolygon.contains(pointAt(vertex.getLon(), vertex.getLat()))) {
+                if (fromPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
                     for (State s : states) {
                         s = s.clone();
                         s.durationBeforeLegSeconds = s.durationSeconds;

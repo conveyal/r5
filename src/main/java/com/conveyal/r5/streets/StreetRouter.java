@@ -1368,6 +1368,11 @@ public class StreetRouter implements Cloneable {
                 }
             }
         }
+        // This copied router inherits a street mode time limit such as maxWalkTime. We consider
+        // the on-demand ride to be transit usage, so street mode limits (even car) do not apply.
+        // The only cap on walk-plus-on-demand-ride is the total trip duration. In any case,
+        // imposing another limit leads to resource constraint and algorithmic validity problems.
+        sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;
         sr.streetMode = StreetMode.CAR;
         sr.route();
         return sr;

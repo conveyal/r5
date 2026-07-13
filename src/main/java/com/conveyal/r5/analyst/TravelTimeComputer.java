@@ -175,32 +175,36 @@ public class TravelTimeComputer {
 
             if (enableOnDemand) {
                 // See what on-demand services are available within the street area reached above.
-                // We need one specific time at which to evaluate service availability.
-                // This doesn't really cooperate with range-raptor.
+                // We choose one specific time at which to evaluate service availability.
+                // This is an intentional choice to lessen complexity, but doesn't mesh well with range-raptor.
                 int midTime = (request.fromTime + request.toTime) / 2;
-                // Adjust this to search for intersecting a polygon or bbox, not a point.
-                // Returning services that _might_ apply, not ones that definitely apply (overselection).
+                // Search for services that _might_ apply, not ones that definitely apply (overselection).
                 Envelope reachedEnvelope = sr.getReachedVerticesEnvelopeFixed();
                 List<OnDemand> onDemandCandidates =
                       network.transitLayer.findOnDemandService(reachedEnvelope, midTime, request.date);
                 LOG.info("Found {} potentially relevant on-demand service(s).", onDemandCandidates.size());
-                // Maintain walk limits and time limits across all these searches by keeping states.
-                // Spatial filtering and scaling is handled by the StreetRouter because we need to look
-                // up the location of every vertex, and StreetRouter has a reference to VertexStore.
-                // We could alternatively clip and delay the times to transit stops and destination points
-                // (instead of street vertices), but there's potential for wasted calculation when
-                // propagating to unreachable destinations.
+                // Spatial filtering of results is handled by the StreetRouter because we need to look up the location
+                // of every vertex, and StreetRouter has a reference to VertexStore.
+                // The alternative of clipping and adjusting travel times to transit stops and destination points rather
+                // than street vertices would probably waste more calculation propagating to unreachable destinations.
                 if (!isNullOrEmpty(onDemandCandidates)) {
+                    // Initialize routing for each candidate service from the same original walk search, accumulating
+                    // clipped results in a temporary buffer, then merge into the walk search only after the loop.
+                    // Accumulating into the source would instead chain on-demand rides in an arbitrary order.
+                    // The temporary buffer lets each sub-search become garbage before the next one is initialized.
+                    // Per-on-demand station access times could be captured here for exact time-dependent availability.
+                    StreetRouter onDemandResults = sr.shallowCopyForRouting();
                     for (OnDemand onDemand : onDemandCandidates) {
                         StreetRouter odr = sr.copyAndRouteFor(onDemand);
-                        // Filter the result states down to the destination polygon and stop list.
-                        odr.clipAndScaleStates(onDemand);
-                        sr.mergeStatesFrom(odr);
+                        odr.clipStates(onDemand);
+                        onDemandResults.mergeStatesFrom(odr);
                     }
+                    sr.mergeStatesFrom(onDemandResults);
                     // After riding on-demand services, we want to reach any adjacent pedestrian-only areas that
-                    // include transit stops. In a separate block below, this is done for transit searches when
-                    // access mode is not walk. When on-demand services exist, ensure this additional search
-                    // happens exactly once, even in cases where transit does not follow.
+                    // include transit stops. In the transit block below, this is done when access mode is not walk.
+                    // When on-demand services exist, ensure this additional search happens exactly once, even in
+                    // cases where transit does not follow.
+                    // FIXME walk limits are not applied here, and car roads may not be attached to pedestrian network
                     if (accessMode == StreetMode.WALK) sr.keepRoutingOnFoot();
                 }
             }

@@ -1241,8 +1241,10 @@ public class StreetRouter implements Cloneable {
     }
 
     /// After routing, call this method to filter this router's result states down to only those
-    /// edges within the specified OnDemand service's destination polygon or destination stops set,
-    /// applying the relevant duration offset and scaling factor to those travel times.
+    /// edges within the specified OnDemand service's destination polygon or destination stops set.
+    /// This is a pure spatial filter with no arithmetic: the duration factor is applied inside
+    /// the search and the pickup wait at its seeds (see copyAndRouteFor), so states already hold
+    /// true travel times here.
     ///
     /// It might seem more efficient to restrict routing to edges within the polygon instead of
     /// filtering afterward, but that approach cannot deal with multiple disjoint polygons,
@@ -1262,7 +1264,7 @@ public class StreetRouter implements Cloneable {
     /// typically operating on the result of a walk search that reaches a small area. We may want
     /// to make spatial index use here conditional on the size of the drop-off polygon, or its size
     /// relative to the reached area, because it materializes a large TIntSet for large polygons.
-    public void clipAndScaleStates (OnDemand onDemand) {
+    public void clipStates (OnDemand onDemand) {
         // Reusable cursor objects to avoid excessive object creation / heap allocation in loops.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
@@ -1285,11 +1287,11 @@ public class StreetRouter implements Cloneable {
                 vertex.seek(edge.getToVertex());
                 if (toPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
                     // BestStatesAtEdge.get() always returns a list (empty for missing keys).
-                    copyAndScaleStates(bestStatesAtEdge.get(eidx), onDemand, filteredCopy);
+                    copyStates(bestStatesAtEdge.get(eidx), filteredCopy);
                 }
                 vertex.seek(edge.getFromVertex());
                 if (toPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
-                    copyAndScaleStates(bestStatesAtEdge.get(eidx + 1), onDemand, filteredCopy);
+                    copyStates(bestStatesAtEdge.get(eidx + 1), filteredCopy);
                 }
                 return true;
             });
@@ -1300,8 +1302,8 @@ public class StreetRouter implements Cloneable {
                 // XOR with 1 yields the pair's other edge whatever the parity of the stored one.
                 // In practice the edge numbers are the even (forward) ones,
                 // but Split.find() does not currently guarantee this.
-                copyAndScaleStates(bestStatesAtEdge.get(carEdge), onDemand, filteredCopy);
-                copyAndScaleStates(bestStatesAtEdge.get(carEdge ^ 1), onDemand, filteredCopy);
+                copyStates(bestStatesAtEdge.get(carEdge), filteredCopy);
+                copyStates(bestStatesAtEdge.get(carEdge ^ 1), filteredCopy);
             }
         }
         // Replace the entire original best states collection with the new filtered copy.
@@ -1310,19 +1312,25 @@ public class StreetRouter implements Cloneable {
 
     // Instead of factoring this out and calling it from multiple locations, we could create a new set of edges to
     // process, or use a TIntIterator to remove elements from the existing TIntSet.
-    private static void copyAndScaleStates (Collection<State> states, OnDemand onDemand, TIntObjectMultimap<State> dest) {
+    private static void copyStates (Collection<State> states, TIntObjectMultimap<State> dest) {
+        // No clone: these states are never modified. The duration factor is applied during the
+        // search by the wrapped time calculator and the offset at the seeds (see copyAndRouteFor),
+        // so states already hold true travel times when they arrive here.
         for (State s : states) {
-            s = s.clone();
-            s.durationSeconds = (int) (s.durationSeconds * onDemand.durationFactor + onDemand.durationOffset);
             dest.put(s.backEdge, s);
         }
     }
 
     /// Creates a new StreetRouter exactly like the current one, but with its reached edges cut
-    /// down to only those that are within the pick-up area of the specified OnDemand service.
-    /// This will consider pick-up both within a polygon and at a set of specific stops.
+    /// down to only those that are within the pick-up area of the specified OnDemand service,
+    /// whether that is a polygon or a set of specific stops or both. Any non-unity ride time
+    /// scaling factor for the on-demand service is applied as a wrapper TraversalTimeCalculator,
+    /// and any on-demand pick-up wait time is applied to the seed states.
     public StreetRouter copyAndRouteFor (OnDemand od) {
         StreetRouter sr = this.shallowCopyForRouting();
+        if (od.durationFactor != 1) {
+            sr.timeCalculator = new OnDemandTraversalTimeCalculator(this.timeCalculator, od.durationFactor);
+        }
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         if (od.fromPolygon != null) {
@@ -1337,34 +1345,25 @@ public class StreetRouter implements Cloneable {
                 edge.seek(e);
                 vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.
                 if (fromPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
-                    for (State s : states) {
-                        s = s.clone();
-                        s.durationBeforeLegSeconds = s.durationSeconds;
-                        sr.queue.add(s);
-                        // States with a backEdge are expected to be found in the best states map.
-                        sr.bestStatesAtEdge.put(s.backEdge, s);
+                    for (State state : states) {
+                        cloneAndSeedOnDemand(state, od, sr, false);
                     }
                 }
                 return true;
             });
         }
-        // Note that both polygon and stops will be considered as pick-up locations.
-        // GTFS Flex only specifies one or the other per stop_time but we can handle both at once.
+        // Both polygon and stops will be considered as pick-up locations if both are present.
+        // GTFS Flex only allows one or the other per stop_time, but we could handle both at once.
         if (od.fromStopIndexes != null) {
             // Convert from stop indexes to stop vertices, then to incoming link edges.
-            // TODO replace on-the-fly conversion with earlier conversion during network build.
-            // TODO ensure that link edges are traversable by car in next stage.
-            TIntList stopVertices = new TIntArrayList();
+            // TODO replace on-the-fly conversion with earlier conversion during network build,
+            //      and ensure that link edges are traversable by car in the next leg search.
             for (int s : od.fromStopIndexes) {
                 int v = streetLayer.parentNetwork.transitLayer.streetVertexForStop.get(s);
                 State state = this.getStateAtVertex(v);
                 if (state != null) {
-                    // Note that we're looking for states whose backEdge leads into the stop,
-                    // but when routing will need to drive on a different edge out of the stop.
-                    state = state.clone();
-                    state.backEdge = -1;
-                    state.durationBeforeLegSeconds = state.durationSeconds;
-                    sr.queue.add(state);
+                    // Enqueue States whose backEdge is a link edge into the stop.
+                    cloneAndSeedOnDemand(state, od, sr, true);
                 }
             }
         }
@@ -1376,6 +1375,31 @@ public class StreetRouter implements Cloneable {
         sr.streetMode = StreetMode.CAR;
         sr.route();
         return sr;
+    }
+
+    /// Transfer a State from one StreetRouter instance into another instance to seed a subsequent
+    /// on-demand leg search. Clones the state so the parent router is unaffected by the subsequent
+    /// search. Records the duration of the previous leg so it applies to all descendant states.
+    /// Adds the pickup wait time from the given on-demand service, and adds the state to the queue.
+    /// hideBackEdge erases information on which edge was used to reach the state, allowing double
+    /// link-edge traversal at stops. Two links in a row is normally an illegal shortcut through a
+    /// stop, but here it's a legitimate mode switch. Blanking the backEdge prevents the shortcut
+    /// rule from rejecting this move. The backState chain stays intact, so path reconstruction is
+    /// still possible through the stop. States with a backEdge are registered in the best-states
+    /// map, as the StreetRouter expects to find them there.
+    private static void cloneAndSeedOnDemand (State s, OnDemand od, StreetRouter sr, boolean hideBackEdge) {
+        s = s.clone();
+        assert s.durationBeforeLegSeconds == 0 : "Seed state already used on-demand.";
+        // Record the duration of the previous leg for all descendant states.
+        s.durationBeforeLegSeconds = s.durationSeconds;
+        // Include pre-boarding wait as part of this new leg.
+        s.incrementTimeInSeconds(Math.round(od.durationOffset));
+        if (hideBackEdge) {
+            s.backEdge = -1;
+        } else {
+            sr.bestStatesAtEdge.put(s.backEdge, s);
+        }
+        sr.queue.add(s);
     }
 
     /// Add all states from the given StreetRouter that would not be dominated by states in the

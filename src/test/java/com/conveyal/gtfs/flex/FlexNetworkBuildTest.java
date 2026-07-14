@@ -76,6 +76,35 @@ public class FlexNetworkBuildTest {
         assertEquals(4, onDemandCount(network), "Each supported flex trip variant should yield one service.");
         assertEquals(1, network.transitLayer.tripPatterns.size(),
                 "A scheduled trip in the same feed should also load, alongside the flex services.");
+        for (OnDemand od : network.transitLayer.onDemandIndex.allServices()) {
+            assertEquals(8 * 3600, od.fromWindowStart, "Pickup window start should be loaded.");
+            assertEquals(12 * 3600, od.fromWindowEnd, "Pickup window end should be loaded.");
+            assertEquals(12 * 3600, od.toWindowEnd,
+                    "The drop-off window end should be loaded from the trip's second stop_time.");
+        }
+    }
+
+    /// Check that a flex trip declaring no pickup/drop-off time window is flagged at feed load
+    /// (the spec requires the windows) but still builds as an always-available service, with
+    /// its missing bounds treated as unlimited. This is the same internal representation that
+    /// PickupDelay-derived services (which have no windows) will use once merged into OnDemand.
+    @Test
+    void flexTripWithoutTimeWindowIsAlwaysAvailable () throws Exception {
+        loadFixture("gtfs/flex/nowindow");
+        assertTrue(hasFlexErrorContaining(feed, "window"),
+                "Missing windows should be flagged as an error at feed load time.");
+        TransportNetwork network = buildNetwork();
+        assertEquals(4, onDemandCount(network),
+                "The windowless flex trip should build alongside its three windowed siblings.");
+        assertEquals(1, network.transitLayer.tripPatterns.size(),
+                "The scheduled non-flex trip should also load.");
+        OnDemand windowless = network.transitLayer.onDemandIndex.allServices().stream()
+                .filter(od -> od.id.equals("T1")).findFirst().orElseThrow();
+        assertEquals(0, windowless.fromWindowStart, "A missing window start should become 0.");
+        assertEquals(Integer.MAX_VALUE, windowless.fromWindowEnd,
+                "A missing pickup window end should become unlimited.");
+        assertEquals(Integer.MAX_VALUE, windowless.toWindowEnd,
+                "A missing drop-off window end should become unlimited.");
     }
 
     /// Check that the threestops fixture has one rejected unsupported flex trip (with three

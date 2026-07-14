@@ -1324,10 +1324,19 @@ public class StreetRouter implements Cloneable {
     /// Creates a new StreetRouter exactly like the current one, but with its reached edges cut
     /// down to only those that are within the pick-up area of the specified OnDemand service,
     /// whether that is a polygon or a set of specific stops or both. Any non-unity ride time
-    /// scaling factor for the on-demand service is applied as a wrapper TraversalTimeCalculator,
-    /// and any on-demand pick-up wait time is applied to the seed states.
-    public StreetRouter copyAndRouteFor (OnDemand od) {
+    /// scaling factor for the on-demand service is applied as a wrapper TraversalTimeCalculator.
+    /// The pick-up wait, as well as any wait for the pick-up window to begin, are applied to the
+    /// seed states, such that any retained boarding times fall within the service's pickup window.
+    /// The supplied midTime is a representative point in the departure window at the origin. It
+    /// is advanced by each state's durationSeconds before testing on-demand service availability.
+    public StreetRouter copyAndRouteFor (OnDemand od, int midTime) {
         StreetRouter sr = this.shallowCopyForRouting();
+        // The end of the arrival time window caps ride duration along with the full trip limit.
+        // Guard against non-positive limits because they have a special meaning to the router.
+        int rideTimeLimit = Math.min(profileRequest.maxTripDurationMinutes * 60, od.toWindowEnd - midTime);
+        if (rideTimeLimit <= 0) {
+            return sr; // Return router with empty results. No drop-off could fall within the window.
+        }
         if (od.durationFactor != 1) {
             sr.timeCalculator = new OnDemandTraversalTimeCalculator(this.timeCalculator, od.durationFactor);
         }
@@ -1346,7 +1355,7 @@ public class StreetRouter implements Cloneable {
                 vertex.seek(edge.getToVertex()); // States are located at the toVertex of edges.
                 if (fromPolygonTester.contains(vertex.getLon(), vertex.getLat())) {
                     for (State state : states) {
-                        cloneAndSeedOnDemand(state, od, sr, false);
+                        cloneAndSeedOnDemand(state, od, sr, midTime, false);
                     }
                 }
                 return true;
@@ -1363,15 +1372,16 @@ public class StreetRouter implements Cloneable {
                 State state = this.getStateAtVertex(v);
                 if (state != null) {
                     // Enqueue States whose backEdge is a link edge into the stop.
-                    cloneAndSeedOnDemand(state, od, sr, true);
+                    cloneAndSeedOnDemand(state, od, sr, midTime, true);
                 }
             }
         }
         // This copied router inherits a street mode time limit such as maxWalkTime. We consider
         // the on-demand ride to be transit usage, so street mode limits (even car) do not apply.
-        // The only cap on walk-plus-on-demand-ride is the total trip duration. In any case,
-        // imposing another limit leads to resource constraint and algorithmic validity problems.
-        sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;
+        // The caps on walk-plus-on-demand-ride are the total trip duration and the drop-off
+        // window end, combined above. In any case, imposing any other kind of limit leads to
+        // resource constraint and algorithmic validity problems.
+        sr.timeLimitSeconds = rideTimeLimit;
         sr.streetMode = StreetMode.CAR;
         sr.route();
         return sr;
@@ -1380,20 +1390,36 @@ public class StreetRouter implements Cloneable {
     /// Transfer a State from one StreetRouter instance into another instance to seed a subsequent
     /// on-demand leg search. Clones the state so the parent router is unaffected by the subsequent
     /// search. Records the duration of the previous leg so it applies to all descendant states.
-    /// Adds the pickup wait time from the given on-demand service, and adds the state to the queue.
-    /// hideBackEdge erases information on which edge was used to reach the state, allowing double
+    /// If the rider is ready before the service becomes available, the rider will wait. Assuming
+    /// that vehicle deviation for passenger pick-up must begin within the service availability
+    /// window, pick-up delay is incurred within the window (not before it). Both kinds of wait are
+    /// included as part of this leg's duration. States which, given the provided midTime at the
+    /// origin, are past the end of the drop-off window are not enqueued at all.
+    ///
+    /// `hideBackEdge` erases information on which edge was used to reach the state, allowing double
     /// link-edge traversal at stops. Two links in a row is normally an illegal shortcut through a
     /// stop, but here it's a legitimate mode switch. Blanking the backEdge prevents the shortcut
     /// rule from rejecting this move. The backState chain stays intact, so path reconstruction is
     /// still possible through the stop. States with a backEdge are registered in the best-states
     /// map, as the StreetRouter expects to find them there.
-    private static void cloneAndSeedOnDemand (State s, OnDemand od, StreetRouter sr, boolean hideBackEdge) {
+    private static void cloneAndSeedOnDemand (State s, OnDemand od, StreetRouter sr, int midTime, boolean hideBackEdge) {
         s = s.clone();
         assert s.durationBeforeLegSeconds == 0 : "Seed state already used on-demand.";
         // Record the duration of the previous leg for all descendant states.
         s.durationBeforeLegSeconds = s.durationSeconds;
+        // If the rider is ready before the pick-up window begins, wait. Waiting, as opposed to
+        // discarding the state, keeps earlier arrivals weakly dominant, so walk time pruning in
+        // the preceding leg remains valid.
+        int readyTime = midTime + s.durationSeconds;
+        if (readyTime < od.fromWindowStart) {
+            s.incrementTimeInSeconds(od.fromWindowStart - readyTime);
+        }
         // Include pre-boarding wait as part of this new leg.
         s.incrementTimeInSeconds(Math.round(od.durationOffset));
+        // Discard seeds that would board after the pick-up window ends.
+        if (midTime + s.durationSeconds >= od.fromWindowEnd) {
+            return;
+        }
         if (hideBackEdge) {
             s.backEdge = -1;
         } else {

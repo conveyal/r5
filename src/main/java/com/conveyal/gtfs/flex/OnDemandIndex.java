@@ -9,6 +9,7 @@ import org.locationtech.jts.geom.Polygon;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.List;
 
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
@@ -29,6 +30,11 @@ public class OnDemandIndex implements Serializable {
     /// Primarily used for assertions in tests.
     public int size () {
         return services.size();
+    }
+
+    /// Read-only view of all on-demand services in this index, primarily for tests and reporting.
+    public List<OnDemand> allServices () {
+        return Collections.unmodifiableList(services);
     }
 
     /// Potentially merge with findCarRoads, creating and storing a fromEnvelope for polygon + stops.
@@ -67,15 +73,17 @@ public class OnDemandIndex implements Serializable {
         }
     }
 
-    /// Returns a List containing all on-demand services that can be used given the parameters.
-    /// May return an empty list, but not null. Elsewhere, null means no service is defined at all.
-    /// Envelope should be in fixed-point WGS84. May overselect from the spatial index, filter.
-    /// We need to find multiple services available at the same location and try to use them all.
-    public List<OnDemand> find (Envelope envelope, int time, BitSet serviceCodes) {
+    /// Returns a List containing all on-demand services usable by a rider departing the origin at
+    /// beginTime whose whole trip must end by endTime, inexpensively overselecting (see
+    /// canPickUpDuring). May return an empty list, but never null. In caller, null means no service
+    /// is defined at all. Envelope should be in fixed-point WGS84.
+    /// Selection on serviceCodes is exact, but both spatial and temporal overselection will occur
+    /// (inherited from the spatial index and inexact temporal bounds) so perform further filtering.
+    public List<OnDemand> find (Envelope envelope, int beginTime, int endTime, BitSet serviceCodes) {
         final List<OnDemand> available = new ArrayList<>();
         spatialIndex.query(envelope).forEach(s -> {
             OnDemand od = services.get(s);
-            if (od.canPickUpAt(time, serviceCodes)) available.add(od);
+            if (od.canPickUpDuring(beginTime, endTime, serviceCodes)) available.add(od);
             return true;
         });
         return available;

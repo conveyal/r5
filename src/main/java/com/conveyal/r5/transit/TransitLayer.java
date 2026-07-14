@@ -66,6 +66,7 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
+import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 import static com.conveyal.gtfs.util.Util.xor;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_ONLY;
@@ -536,10 +537,20 @@ public class TransitLayer implements Serializable, Cloneable {
                     od.durationOffset = 0;
                     od.durationFactor = 1;
                 }
-                // There should really be separate time windows for pick-up and drop-off locations.
-                // To support trips with more than two stops, those could be in a separate class.
-                od.timeWindowStart = fromStopTime.start_pickup_drop_off_window;
-                od.timeWindowEnd = fromStopTime.end_pickup_drop_off_window;
+                // To support trips with more than two stops, windows could move to a separate
+                // class. Only the end of drop-off windows is required (see OnDemand).
+                // Missing time window bounds are flagged with a feed error at load time, as the
+                // spec requires them, but are tolerated and treated as unbounded, making the
+                // service always available. PickupDelay-derived on-demand services will use this
+                // always-available representation when merged into OnDemand.
+                if (fromStopTime.start_pickup_drop_off_window == INT_MISSING ||
+                    fromStopTime.end_pickup_drop_off_window == INT_MISSING ||
+                    toStopTime.end_pickup_drop_off_window == INT_MISSING) {
+                    LOG.warn("On-demand trip {} lacks time window fields; treating missing bounds as unlimited.", tripId);
+                }
+                od.fromWindowStart = orIfMissing(fromStopTime.start_pickup_drop_off_window, 0);
+                od.fromWindowEnd = orIfMissing(fromStopTime.end_pickup_drop_off_window, Integer.MAX_VALUE);
+                od.toWindowEnd = orIfMissing(toStopTime.end_pickup_drop_off_window, Integer.MAX_VALUE);
                 onDemandIndex.add(od);
             }
         }
@@ -570,6 +581,7 @@ public class TransitLayer implements Serializable, Cloneable {
     /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime referencing either a
     /// polygonal zone (location) or a location_group but not both.
     /// Returns null if any check fails so we can skip problematic/unsupported trips.
+    /// Missing time windows do not fail validation; they are treated as unbounded (see caller).
     private static FlexStopTime validateFlexStopTime (StopTime st) {
         if (st instanceof FlexStopTime fst) {
             boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
@@ -581,14 +593,20 @@ public class TransitLayer implements Serializable, Cloneable {
         return null;
     }
 
+    /// Substitute a fallback for GTFS integer fields whose value is missing.
+    private static int orIfMissing (int value, int fallback) {
+        return value == INT_MISSING ? fallback : value;
+    }
+
+    /// Find candidate on-demand services available within the given envelope and time window.
     /// Returns null if no on-demand service is defined at all, and an empty list if on-demand
-    /// service is defined but none is available for the given parameters. Given that the envelope
-    /// is rectangular, this may overselect services that are outside the actually reachable area,
-    /// but it does not overselect on time and date. Envelope should be in fixed-point WGS84.
-    public List<OnDemand> findOnDemandService (Envelope envelope, int time, LocalDate date) {
+    /// service is defined but none is available within the given geographic and temporal bounds.
+    /// The search is exact on date but overselects on space and time. See OnDemandIndex#find and
+    /// OnDemand.canPickUpDuring for detailed explanation. Envelope should be in fixed-point WGS84.
+    public List<OnDemand> findOnDemandService (Envelope envelope, int beginTime, int endTime, LocalDate date) {
         if (onDemandIndex == null) return null;
         BitSet servicesActive = getActiveServicesForDate(date);
-        return onDemandIndex.find(envelope, time, servicesActive);
+        return onDemandIndex.find(envelope, beginTime, endTime, servicesActive);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.

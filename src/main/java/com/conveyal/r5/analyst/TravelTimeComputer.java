@@ -174,14 +174,14 @@ public class TravelTimeComputer {
             sr.route();
 
             if (enableOnDemand) {
-                // See what on-demand services are available within the street area reached above.
-                // We choose one specific time at which to evaluate service availability.
-                // This is an intentional choice to lessen complexity, but doesn't mesh well with range-raptor.
+                // Find on-demand that may be available within the street area reached above. Service availability is
+                // evaluated for one representative rider departing at the midpoint of the departure time window.
+                // This is an initial pre-filter, with definitive time window tests applied later.
                 int midTime = (request.fromTime + request.toTime) / 2;
-                // Search for services that _might_ apply, not ones that definitely apply (overselection).
+                int latestTime = midTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
                 Envelope reachedEnvelope = sr.getReachedVerticesEnvelopeFixed();
-                List<OnDemand> onDemandCandidates =
-                      network.transitLayer.findOnDemandService(reachedEnvelope, midTime, request.date);
+                List<OnDemand> onDemandCandidates = network.transitLayer
+                      .findOnDemandService(reachedEnvelope, midTime, latestTime, request.date);
                 LOG.info("Found {} potentially relevant on-demand service(s).", onDemandCandidates.size());
                 // Spatial filtering of results is handled by the StreetRouter because we need to look up the location
                 // of every vertex, and StreetRouter has a reference to VertexStore.
@@ -195,7 +195,7 @@ public class TravelTimeComputer {
                     // Per-on-demand station access times could be captured here for exact time-dependent availability.
                     StreetRouter onDemandResults = sr.shallowCopyForRouting();
                     for (OnDemand onDemand : onDemandCandidates) {
-                        StreetRouter odr = sr.copyAndRouteFor(onDemand);
+                        StreetRouter odr = sr.copyAndRouteFor(onDemand, midTime);
                         odr.clipStates(onDemand);
                         onDemandResults.mergeStatesFrom(odr);
                     }

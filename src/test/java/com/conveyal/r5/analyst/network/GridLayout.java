@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
@@ -11,7 +10,6 @@ import org.locationtech.jts.geom.Envelope;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
@@ -107,16 +105,9 @@ public class GridLayout {
     public TransportNetwork generateNetwork () {
         OSM osm = new GridOsmGenerator(this).generate();
         GTFSFeed gtfs = new GridGtfsGenerator(this).generate();
-        TransportNetwork network = TransportNetwork.fromInputs(osm, Stream.of(gtfs));
         // The usual analysis code path always applies a scenario, even an empty one to baseline cases.
         // We are not doing that here.
-        // The steps below are taken when the TNCache loads or builds a network, but not in the network build methods.
-        // Presumably this is to save time and space when we make a network not used in analysis. Should we change that?
-        network.transitLayer.buildDistanceTables(null);
-        network.rebuildLinkedGridPointSet(StreetMode.WALK);
-        // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.scenarioId = UUID.randomUUID().toString();
-        return network;
+        return TransportNetwork.build(null, osm, Stream.of(gtfs), true);
     }
 
     /**

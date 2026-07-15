@@ -7,11 +7,15 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetLayer;
+import com.google.common.collect.Sets;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
@@ -72,13 +76,11 @@ public class TransportNetwork implements Serializable {
      */
     public WebMercatorGridPointSet fullExtentGridPointSet;
 
-    /**
-     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
-     * When no scenario has been applied, this field will contain the original base networkId.
-     * When a scenario has modified a base network to produce this network, this field will be changed to the
-     * scenario ID. This allows proper caching of downstream data and results: we need a way to know what information
-     * is in the network independent of object identity, and after a round trip through serialization.
-     */
+    /// A string uniquely identifying the contents of this TransportNetwork across all base and scenario networks.
+    /// When no scenario has been applied, this field will be set to the original base networkId.
+    /// When a scenario has modified a base network to produce this network, this field will be set to the scenario ID.
+    /// This allows proper caching of downstream data and results. It allows us to know what information is in the
+    /// network independent of object identity, and after a round trip through serialization.
     public String scenarioId = null;
 
     public InRoutingFareCalculator fareCalculator;
@@ -97,6 +99,109 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
+    }
+
+    /// Build a TransportNetwork from already-loaded MapDB-backed OSM and GTFS objects. As of 2026-07 this single
+    /// shared network building code path is shared by both the production TransportNetworkCache and various test
+    /// cases providing temporary test fixture OSM and GTFS inputs.
+    ///
+    /// Intersections must already be detected on the supplied OSM object.
+    /// GTFS feeds are supplied as a stream, allowing them to be opened and closed one at a time.
+    ///
+    /// The body of this method is the network building logic formerly in TransportNetworkCache.buildNetworkFromConfig
+    /// followed by the distance table and grid linkage steps formerly in TransportNetworkCache.buildNetwork. Two
+    /// additional options allow adopting behavior more suited to tests or preserving the existing TransportNetworkCache
+    /// behavior. The config allows enabling or disabling disconnected component (island) pruning, and a paremeter
+    /// allows closing inputs or leaving them open.
+    ///
+    ///  A null TransportNetworkConfig yields all-default options, as defined by a new instance of the config class.
+    ///
+    /// The resulting network's scenarioId is left null. Nothing reads or relies on scenarioId during the build, and in
+    /// non-test environments it should be set to the networkId or scenarioId by the caller (TransportNetworkCache).
+    public static TransportNetwork build (
+            TransportNetworkConfig config,
+            OSM osm,
+            Stream<GTFSFeed> gtfsFeeds,
+            boolean closeInputs
+    ) {
+        if (config == null) {
+            config = new TransportNetworkConfig();
+        }
+        TransportNetwork network = new TransportNetwork();
+        network.streetLayer = new StreetLayer(config);
+        network.streetLayer.loadFromOsm(osm, config.pruneIslands, false);
+        if (closeInputs) {
+            osm.close();
+        }
+        network.streetLayer.parentNetwork = network;
+        network.streetLayer.indexStreets();
+
+        // The GTFS transfer loader persists across all loaded feeds so we can feed information about all the transfers
+        // it created into the later OSM transfer generation step.
+        // The street network is loaded before the transit network, so at first it seems reasonable to create transfers
+        // feed-by-feed. However, stops need to be connected to streets before we find street transfers, and we want to
+        // create inter-feed transfers. So on-street transfers need to be discovered after all feeds have been loaded,
+        // while nonetheless giving priority to GTFS transfers from transfers.txt.
+        network.transitLayer = new TransitLayer(config);
+        GtfsTransferLoader gtfsTransferLoader = new GtfsTransferLoader(network.transitLayer, config.transfers);
+        gtfsFeeds.forEach(feed -> {
+            network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
+            if (closeInputs) {
+                feed.close();
+            }
+        });
+        gtfsTransferLoader.logErrors();
+        network.transitLayer.parentNetwork = network;
+        network.streetLayer.associateStops(network.transitLayer);
+        network.streetLayer.buildEdgeLists();
+        network.rebuildTransientIndexes();
+
+        if (network.transitLayer.onDemandIndex != null) {
+            // Complete indexing of on-demand services now that transit stops are associated with streets.
+            network.transitLayer.onDemandIndex.findCarRoads(network);
+        }
+
+        // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
+        TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);
+        transferFinder.findTransfers();
+        transferFinder.findParkRideTransfer();
+
+        // Apply modifications embedded in the TransportNetworkConfig JSON
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
+                RasterCost.class, ShapefileLts.class
+        );
+        if (config.modifications != null) {
+            // Scenario scenario = new Scenario();
+            // scenario.modifications = config.modifications;
+            // scenario.applyToTransportNetwork(network);
+            // This is applying the modifications _without creating a scenario copy_.
+            // This will destructively edit the network and will only work for certain modifications.
+            for (Modification modification : config.modifications) {
+                if (!ACCEPT_MODIFICATIONS.contains(modification.getClass())) {
+                    throw new UnsupportedOperationException(
+                        "Modification type has not been evaluated for application at network build time:" +
+                        modification.getClass().toString()
+                    );
+                }
+                modification.resolve(network);
+                modification.apply(network);
+            }
+        }
+
+        // Pre-compute distance tables from stops out to street vertices, then pre-build a linked grid pointset for the
+        // whole region covered by the street network. These tables and linkages will be serialized along with the
+        // network, which avoids building them when every analysis worker starts. The linkage we create here will never
+        // be used directly, but serves as a basis for scenario linkages, making analyses much faster to start up.
+        // Note, this retains stop-to-vertex distances for the WALK MODE ONLY, even when they are produced as
+        // intermediate results while building linkages for other modes.
+        // This is a candidate for optimization if car or bicycle scenarios are slow to apply.
+        network.transitLayer.buildDistanceTables(null);
+        Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
+        if (config.buildGridsForModes != null) {
+            buildGridsForModes.addAll(config.buildGridsForModes);
+        }
+        network.rebuildLinkedGridPointSet(buildGridsForModes);
+        return network;
     }
 
     @Deprecated

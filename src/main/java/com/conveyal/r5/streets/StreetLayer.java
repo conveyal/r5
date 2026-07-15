@@ -306,8 +306,9 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
 
-    /** Load OSM, optionally removing floating subgraphs (recommended) */
-    void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
+    /// Load OSM, optionally removing floating islands (disconnected subgraphs). Synthetic test networks smaller than
+    /// MIN_SUBGRAPH_SIZE must disable this, or the entire network will be removed as a small island.
+    public void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
         if (!osm.intersectionDetection) {
             throw new IllegalArgumentException("Intersection detection not enabled on OSM source");
         }

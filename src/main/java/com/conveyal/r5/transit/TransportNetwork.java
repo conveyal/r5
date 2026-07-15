@@ -99,6 +99,7 @@ public class TransportNetwork implements Serializable {
         transitLayer.rebuildTransientIndexes();
     }
 
+    @Deprecated
     public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles) {
         return fromFiles(osmSourceFile, gtfsSourceFiles, null);
     }
@@ -116,6 +117,7 @@ public class TransportNetwork implements Serializable {
      * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
      * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
      */
+    @Deprecated
     public static TransportNetwork fromFiles (
             String osmSourceFile,
             List<String> gtfsSourceFiles,
@@ -141,6 +143,7 @@ public class TransportNetwork implements Serializable {
         }
     }
 
+    @Deprecated
     public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
         return fromInputs(osm, gtfsFeeds, null);
     }

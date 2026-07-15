@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.EdgeTraversalTimes;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
@@ -39,6 +40,9 @@ public class AddStreets extends Modification {
      * An increase in traversal time can be seen as more clock time or perceived time (generalized cost).
      * Values less than one imply it's faster (or more pleasant) to traverse, e.g. a slight downhill slope
      * with trees.
+     *
+     * See Javadoc in ModifyStreets (or R5 pull #838) for how this is applied to networks built without special
+     * generalized cost values.
      */
     public Double walkTimeFactor;
 
@@ -96,17 +100,11 @@ public class AddStreets extends Modification {
             }
         }
         if (walkTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && walkTimeFactor != 1) {
-                addError("walkGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (walkTimeFactor <= 0 || walkTimeFactor > 10) {
                 addError("walkGenCostFactor must be in the range (0...10].");
             }
         }
         if (bikeTimeFactor != null) {
-            if (network.streetLayer.edgeStore.edgeTraversalTimes == null && bikeTimeFactor != 1) {
-                addError("bikeGenCostFactor can only be set to values other than 1 on networks that support per-edge factors.");
-            }
             if (bikeTimeFactor <= 0 || bikeTimeFactor > 10) {
                 addError("bikeGenCostFactor must be in the range (0...10].");
             }
@@ -116,6 +114,12 @@ public class AddStreets extends Modification {
 
     @Override
     public boolean apply (TransportNetwork network) {
+        if (network.streetLayer.edgeStore.edgeTraversalTimes == null) {
+            if ((walkTimeFactor != null && walkTimeFactor != 1) || (bikeTimeFactor != null && bikeTimeFactor != 1)) {
+                info.add("Added table of per-edge factors because base network doesn't have one.");
+                network.streetLayer.edgeStore.edgeTraversalTimes = EdgeTraversalTimes.createNeutral(network.streetLayer.edgeStore);
+            }
+        }
         // FIXME linking only looks for one streetMode, but we can have multiple allowed modes
         StreetMode linkMode = allowedModes.stream().findFirst().get();
         for (double[][] lineString : lineStrings) {

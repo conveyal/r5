@@ -434,11 +434,10 @@ public class StreetLayer implements Serializable, Cloneable {
         return prValue != null && ! prValue.equalsIgnoreCase("NO");
     }
 
-    /**
-     * TODO Javadoc. What is this for?
-     */
+    /// Apparently only used by point-to-point router
+    @Deprecated
     public void openOSM(File file) {
-        osm = new OSM(file.getPath());
+        osm = OSM.openOrCreateFile(file, null);
         LOG.info("Read OSM");
     }
 

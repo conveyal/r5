@@ -48,7 +48,7 @@ public class MakeFreeFormTestCSV {
     private static void bikepark () throws Exception {
         Writer writer = new FileWriter("pdx_bikepark.csv");
         Random random = new Random();
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableTempFile();
         osm.readFromFile("pdxnodes.pbf");
         writer.write("lat,lon,junk,capacity\n");
         for (Node node : osm.nodes.values()) {

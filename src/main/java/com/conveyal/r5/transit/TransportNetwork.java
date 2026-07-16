@@ -229,10 +229,8 @@ public class TransportNetwork implements Serializable {
             List<String> gtfsSourceFiles,
             String configFile
     ) throws DuplicateFeedException {
-        // Load OSM data into MapDB to pass into network builder.
-        OSM osm = new OSM(osmSourceFile + ".mapdb");
-        osm.intersectionDetection = true;
-        osm.readFromFile(osmSourceFile);
+        // Load OSM data into MapDB to pass into network builder, reusing any previously parsed data.
+        OSM osm = OSM.openOrCreateFile(new File(osmSourceFile + ".mapdb"), osmSourceFile);
         // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
         Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
         if (configFile == null) {
@@ -308,13 +306,12 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Opens OSM MapDB database if it exists
-     * Otherwise it prints a warning
-     *
-     * OSM MapDB is used for names of streets. Since they are needed only in display of paths.
+     * Opens OSM MapDB database if it exists, otherwise prints a warning. In the point-to-point
+     * router OSM MapDB is used for names of streets. Since they are needed only in display of paths.
      * They aren't saved in street layer.
      * @param file
      */
+    @Deprecated
     public void readOSM(File file) {
         if (file.exists()) {
             streetLayer.openOSM(file);

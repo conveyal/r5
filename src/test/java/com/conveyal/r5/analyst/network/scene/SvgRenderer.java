@@ -16,11 +16,19 @@ class SvgRenderer {
     /// Length of the scale bar drawn at the bottom left of the diagram.
     private static final int SCALE_BAR_METERS = 100;
 
+    /// How far along a way its name label is placed, as a fraction of total length. Off-center
+    /// placement avoids the midpoint, where one-way arrows are drawn and where a junction often
+    /// sits on symmetric ways, while staying clear of the junctions typically at the endpoints.
+    private static final double WAY_NAME_FRACTION = 0.35;
+
     static String render (Scene scene) {
         Bounds b = computeBounds(scene);
         double width = b.maxX - b.minX + 2 * PADDING_METERS;
         double height = b.maxY - b.minY + 2 * PADDING_METERS;
         StringBuilder svg = new StringBuilder();
+        // SVG has no z-ordering, only document order. Labels are collected separately and
+        // appended after all other elements, so text is never hidden behind roads or symbols.
+        StringBuilder labels = new StringBuilder();
         svg.append(String.format(Locale.ROOT,
             "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %.0f %.0f\" " +
             "width=\"%.0f\" height=\"%.0f\" font-family=\"sans-serif\">\n", width, height, width, height));
@@ -37,7 +45,7 @@ class SvgRenderer {
                 "<polygon points=\"%s\" fill=\"#2563eb\" fill-opacity=\"0.10\" stroke=\"#2563eb\" " +
                 "stroke-opacity=\"0.5\" stroke-width=\"1.5\" stroke-dasharray=\"8,6\"/>\n", pts.toString().trim()));
             // Label at the ring's first vertex, nudged inward.
-            svg.append(text(b.toSvgX(polygon.ringXY[0]) + 6, b.toSvgY(polygon.ringXY[1]) - 6, polygon.id, "#2563eb", 12));
+            labels.append(text(b.toSvgX(polygon.ringXY[0]) + 6, b.toSvgY(polygon.ringXY[1]) - 6, polygon.id, "#2563eb", 12));
         }
 
         for (SceneWay way : scene.ways) {
@@ -50,18 +58,18 @@ class SvgRenderer {
                 "<polyline points=\"%s\" fill=\"none\" stroke=\"%s\" stroke-width=\"%.1f\"%s " +
                 "stroke-linecap=\"round\" stroke-linejoin=\"round\"/>\n",
                 pts.toString().trim(), color(way.preset), strokeWidth(way.preset), dashArray(way.preset)));
-            double[] mid = midpointAndAngle(way.points);
             if (way.oneWay) {
+                double[] mid = pointAndAngle(way.points, 0.5);
                 svg.append(String.format(Locale.ROOT,
                     "<g transform=\"translate(%.1f,%.1f) rotate(%.1f)\">" +
                     "<path d=\"M -6 -5 L 8 0 L -6 5 Z\" fill=\"%s\"/></g>\n",
                     b.toSvgX(mid[0]), b.toSvgY(mid[1]), -Math.toDegrees(mid[2]), color(way.preset)));
             }
-            // Way names go below and right of the midpoint, while junction labels go above and
-            // right. A name therefore does not collide with the label of a junction that happens
-            // to sit at the way's midpoint, which is common for symmetric ways.
+            // Way names sit directly on the road line, but off-center along their length.
+            // A white halo keeps them readable against the line.
             if (way.name != null) {
-                svg.append(text(b.toSvgX(mid[0]) + 6, b.toSvgY(mid[1]) + 18, way.name, "#666666", 11));
+                double[] at = pointAndAngle(way.points, WAY_NAME_FRACTION);
+                labels.append(centeredText(b.toSvgX(at[0]), b.toSvgY(at[1]), way.name, "#666666", 11));
             }
         }
 
@@ -69,14 +77,14 @@ class SvgRenderer {
             svg.append(String.format(Locale.ROOT,
                 "<circle cx=\"%.1f\" cy=\"%.1f\" r=\"5\" fill=\"white\" stroke=\"#111111\" stroke-width=\"2\"/>\n",
                 b.toSvgX(junction.x), b.toSvgY(junction.y)));
-            svg.append(text(b.toSvgX(junction.x) + 8, b.toSvgY(junction.y) - 8, junction.name, "#111111", 12));
+            labels.append(junctionText(b.toSvgX(junction.x) + 6, b.toSvgY(junction.y) - 6, junction.name));
         }
 
         for (SceneStop stop : scene.stops) {
             svg.append(String.format(Locale.ROOT,
                 "<rect x=\"%.1f\" y=\"%.1f\" width=\"12\" height=\"12\" fill=\"#dc2626\" " +
                 "stroke=\"white\" stroke-width=\"2\"/>\n", b.toSvgX(stop.x) - 6, b.toSvgY(stop.y) - 6));
-            svg.append(text(b.toSvgX(stop.x) + 10, b.toSvgY(stop.y) + 4, stop.id, "#dc2626", 12));
+            labels.append(text(b.toSvgX(stop.x) + 10, b.toSvgY(stop.y) + 4, stop.id, "#dc2626", 12));
         }
 
         // Draw the scale bar at bottom left.
@@ -84,8 +92,9 @@ class SvgRenderer {
         svg.append(String.format(Locale.ROOT,
             "<line x1=\"20\" y1=\"%.0f\" x2=\"%d\" y2=\"%.0f\" stroke=\"#111111\" stroke-width=\"2\"/>\n",
             barY, 20 + SCALE_BAR_METERS, barY));
-        svg.append(text(30 + SCALE_BAR_METERS, barY + 4, SCALE_BAR_METERS + " m", "#111111", 12));
+        labels.append(text(30 + SCALE_BAR_METERS, barY + 4, SCALE_BAR_METERS + " m", "#111111", 12));
 
+        svg.append(labels);
         svg.append("</svg>\n");
         return svg.toString();
     }
@@ -120,9 +129,30 @@ class SvgRenderer {
         };
     }
 
+    /// Render one junction label, running diagonally toward the northeast from a point just
+    /// above and right of the junction marker, with "jct." appended.
+    private static String junctionText (double x, double y, String name) {
+        return String.format(Locale.ROOT,
+            "<g transform=\"translate(%.1f,%.1f) rotate(-45)\">" +
+            "<text fill=\"#111111\" font-size=\"12\" font-weight=\"bold\" " +
+            "paint-order=\"stroke\" stroke=\"white\" stroke-width=\"3\" stroke-linejoin=\"round\">%s</text></g>\n",
+            x, y, escapeXml(name + " jct."));
+    }
+
+    /// Render one label centered on the given point in both axes.
+    private static String centeredText (double x, double y, String content, String fill, int size) {
+        return String.format(Locale.ROOT,
+            "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%d\" " +
+            "text-anchor=\"middle\" dominant-baseline=\"central\" " +
+            "paint-order=\"stroke\" stroke=\"white\" stroke-width=\"3\" stroke-linejoin=\"round\">%s</text>\n",
+            x, y, fill, size, escapeXml(content));
+    }
+
+    /// Render one label with a white halo, ensuring readability over roads and other geometries.
     private static String text (double x, double y, String content, String fill, int size) {
         return String.format(Locale.ROOT,
-            "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%d\">%s</text>\n",
+            "<text x=\"%.1f\" y=\"%.1f\" fill=\"%s\" font-size=\"%d\" " +
+            "paint-order=\"stroke\" stroke=\"white\" stroke-width=\"3\" stroke-linejoin=\"round\">%s</text>\n",
             x, y, fill, size, escapeXml(content));
     }
 
@@ -131,10 +161,10 @@ class SvgRenderer {
     }
 
     /// Used to place one-way arrows and name labels.
-    /// @return {x, y, angle} where (x, y) is the point at half the polyline's total length and
-    ///  angle is the direction of the segment containing that point, in radians counterclockwise
-    ///  from east.
-    private static double[] midpointAndAngle (List<SceneWay.Point> points) {
+    /// @return {x, y, angle} where (x, y) is the point at the given fraction of the polyline's
+    ///  total length and angle is the direction of the segment containing that point, in radians
+    ///  counterclockwise from east.
+    private static double[] pointAndAngle (List<SceneWay.Point> points, double fraction) {
         double total = 0;
         List<Double> lengths = new ArrayList<>();
         for (int i = 0; i < points.size() - 1; i++) {
@@ -142,7 +172,7 @@ class SvgRenderer {
             lengths.add(len);
             total += len;
         }
-        double remaining = total / 2;
+        double remaining = total * fraction;
         for (int i = 0; i < lengths.size(); i++) {
             if (remaining <= lengths.get(i) || i == lengths.size() - 1) {
                 SceneWay.Point a = points.get(i);

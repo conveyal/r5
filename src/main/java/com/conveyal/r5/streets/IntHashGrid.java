@@ -30,21 +30,22 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * A spatial index using a 2D fast long hashtable from the Trove library.
- * This is a modified version of laurentg's original hashgrid class,
- * using primitive int values instead of Object lists, as well as some Java 8 functional syntax.
- * It is also intended to store fixed-precision integer geographic coordinates rather than double-precision.
- * 
- * Objects to index are placed in all grid bins touching the bounding envelope. We *do not store*
- * any bounding envelope for each object: we will therefore return false positives when querying,
- * and it's up to the caller to filter them out (with whatever knowledge it has on the location of the object).
- * 
- * Note: For performance reasons, write operations are not synchronized, synchronization must be handled by the caller.
- * Read-only operations are thread-safe though.
- * 
- * @author laurentg, abyrd
- */
+/// A spatial index using a fast long hashtable from the Trove library. This is a modified version
+/// of laurentg's original hashgrid class, using primitive int values instead of Object lists, as
+/// well as some Java 8 functional syntax. It is also intended to store fixed-precision integer
+/// geographic coordinates rather than double-precision.
+///
+/// Objects inserted by envelope are placed in all grid bins touching that envelope. Line strings
+/// are placed in all grid bins touching the bounding envelope of each of their segments, with
+/// long segments subdivided so those envelopes stay close to the line. We do not store any
+/// bounding envelope for each object, so queries return false positives and the caller must filter
+/// them using its own knowledge of object locations. False positives are always "near" the query
+/// envelope. See query() for the exact notion of locality.
+///
+/// For performance reasons, write operations are NOT synchronized.
+/// Synchronization must be handled by the caller. Read-only operations are thread-safe though.
+///
+/// @author laurentg, abyrd
 public class IntHashGrid implements Serializable {
 
     @SuppressWarnings("unused")
@@ -112,29 +113,28 @@ public class IntHashGrid implements Serializable {
         Coordinate[] coord = geom.getCoordinates();
         final TLongSet keys = new TLongHashSet(coord.length * 8);
         for (int i = 0; i < coord.length - 1; i++) {
-            // Cut the segment if longer than bin size to reduce the number of wrong bins
-            double dX = coord[i].x - coord[i + 1].x;
-            double dY = coord[i].y - coord[i + 1].y;
-            int segments = (int) Math.max(Math.abs(dX) / xBinSize, Math.abs(dY) / yBinSize);
-
-            if (segments > 1000 || segments < 0)
+            // Subdivide the segment if it is longer than the bin size to reduce spurious bins.
+            double dX = coord[i + 1].x - coord[i].x;
+            double dY = coord[i + 1].y - coord[i].y;
+            // Deltas are in floating degrees but the bin sizes are in fixed-point degrees, convert.
+            double fixedDX = VertexStore.floatingDegreesToFixed(Math.abs(dX));
+            double fixedDY = VertexStore.floatingDegreesToFixed(Math.abs(dY));
+            int segments = (int) Math.max(fixedDX / xBinSize, fixedDY / yBinSize);
+            if (segments > 1000 || segments < 0) {
                 LOG.warn("Huge number of segments ({}) for edge, or possible int overflow)", segments);
-
+            }
             segments = Math.max(segments, 1);
             double segFrac = 1D / segments;
-
             for (int s = 0; s < segments; s++) {
                 // interpolate the coordinates
                 Coordinate c0 = new Coordinate(
                         VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * s),
                         VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * s)
                 );
-
                 Coordinate c1 = new Coordinate(
                         VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * (s + 1)),
                         VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * (s + 1))
                 );
-
                 Envelope env = new Envelope(c0, c1);
                 visit(env, true, (bin, mapKey) -> {
                     keys.add(mapKey);
@@ -151,11 +151,14 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
-    /**
-     * The spatial index can and will return false positives, but should not produce false negatives.
-     * We return the unfiltered results including false positives. That is, this overselects and MUST BE FILTERED.
-     * @return all indexed objects within the envelope, and then some.
-     */
+    /// Find all objects that may intersect a query envelope. The result has no false negatives:
+    /// every object whose inserted envelope or line geometry intersects the query envelope is
+    /// present. The result will contain false _positives_, so callers must filter it using the
+    /// true object locations. However, false positives are guaranteed to be spatially local: every
+    /// returned object lies within a few grid bins of the query envelope, which is a few hundred
+    /// meters at the default bin size, and callers may rely on this locality. This is because the
+    /// hashing mechanism does not involve nonlocal bin collisions or bin aliasing.
+    /// @return the identifiers of all objects near the query envelope, including false positives.
     public final TIntSet query(Envelope envelope) {
         final TIntSet ret = new TIntHashSet();
         visit(envelope, false, (bin, mapKey) -> {

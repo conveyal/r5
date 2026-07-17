@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 220" width="1220" height="220" font-family="sans-serif">
+<rect x="0" y="0" width="1220" height="220" fill="white"/>
+<polygon points="960.0,160.0 1160.0,160.0 1160.0,60.0 960.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="60.0,110.0 1060.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="554.0" y="94.0" width="12" height="12" fill="#dc2626" stroke="white" stroke-width="2"/>
+<line x1="20" y1="200" x2="120" y2="200" stroke="#111111" stroke-width="2"/>
+<text x="966.0" y="154.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">zone</text>
+<text x="410.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Main St</text>
+<text x="570.0" y="104.0" fill="#dc2626" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">curb</text>
+<text x="130.0" y="204.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

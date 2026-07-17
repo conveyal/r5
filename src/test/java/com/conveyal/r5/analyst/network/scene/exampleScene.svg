@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1020 520" width="1020" height="520" font-family="sans-serif">
+<rect x="0" y="0" width="1020" height="520" fill="white"/>
+<polygon points="360.0,460.0 960.0,460.0 960.0,210.0 360.0,210.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="60.0,360.0 460.0,360.0 660.0,360.0 860.0,360.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="460.0,360.0 460.0,60.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="660.0,360.0 660.0,160.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="460.0" cy="360.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="660.0" cy="360.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<rect x="654.0" y="144.0" width="12" height="12" fill="#dc2626" stroke="white" stroke-width="2"/>
+<line x1="20" y1="500" x2="120" y2="500" stroke="#111111" stroke-width="2"/>
+<text x="366.0" y="454.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">pickup</text>
+<text x="340.0" y="360.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Main St</text>
+<text x="460.0" y="255.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Cross St</text>
+<text x="660.0" y="290.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Station Path</text>
+<g transform="translate(466.0,354.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">cross jct.</text></g>
+<g transform="translate(666.0,354.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">path jct.</text></g>
+<text x="670.0" y="154.0" fill="#dc2626" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">station</text>
+<text x="130.0" y="504.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

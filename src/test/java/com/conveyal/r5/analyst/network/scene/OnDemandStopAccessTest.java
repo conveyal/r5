@@ -1,10 +1,10 @@
 package com.conveyal.r5.analyst.network.scene;
 
+import com.conveyal.gtfs.flex.MeetingAreas;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static com.conveyal.r5.analyst.network.scene.SceneRouting.WALK_SPEED;
@@ -17,13 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Tests of on-demand (flex) service at transit stops, covering combinations of driving and
-/// walking in stop access. A stop is walk-linked to the nearest walkable street, which need not
-/// permit cars. The vehicle providing on-demand service may have to drop the rider off at a
-/// different street than the one the stop is linked to.
-///
-/// Some methods are disabled because they require a rider to walk from a car-based service to a
-/// transit stop. They should be enabled when the mechanism for handling that is finalized.
+/// Tests of on-demand (flex) service at transit stops, covering combinations of flex vehicle and
+/// walking to access those stops. A stop is walk-linked to the nearest walkable street, which need
+/// not permit cars. A service that picks people up or drops them off at stops acts through the
+/// stops' [MeetingAreas]. The vehicle meets the rider anywhere in the walkable area around the stop
+/// that touches drivable streets, so it may pick up or drop off on a different street than the one
+/// the stop is linked to. This is necessary to accommodate on-demand services that pick people up
+/// at a larger stop complex of some kind, not physically right at the stop ID given in the feed.
 public class OnDemandStopAccessTest {
 
     private static final int WINDOW_START = 6 * 3600;
@@ -43,8 +43,8 @@ public class OnDemandStopAccessTest {
         return scene.buildNetwork();
     }
 
-    /// A stop whose walk link already reaches a car-permitting street needs no separate
-    /// car connector for on-demand pick-up. Walking from the origin to the zone would take over
+    /// A stop right beside a car-permitting street has a meeting area that starts at the curb,
+    /// so on-demand pick-up works directly. Walking from the origin to the zone would take over
     /// 400 seconds, so a time under 300 proves the transit option was used.
     @Test
     void onDemandPickupOnDrivableStreet () {
@@ -60,21 +60,25 @@ public class OnDemandStopAccessTest {
                 + timeToZone + " seconds.");
     }
 
-    /// The rider physically walks the gap between the street and the platform, so that
-    /// hop should be priced at walking pace in both directions. An on-demand ride out of a stop
-    /// should traverse the link edge in about 150 seconds on foot, not 14 seconds at the default
-    /// car speed of 50 km/h.
+    /// The rider should never transit the stop itself. Boarding happens wherever the rider's own
+    /// walk first reaches that stop's meeting area, so a stop placed 200 meters from the street
+    /// imposes no detour via the stop on a rider already standing at the curb. The walk link
+    /// is unchanged, so the stop itself is still reached in 200 meters of walking at the right pace.
     @Test
-    @Disabled("Needs car connectors with walk costs between stops and drivable streets.")
-    void walkToPickupStopAtWalkingPace () {
+    void pickupAtSetBackStop () {
         Scene scene = new Scene();
         TransportNetwork network = drivableStreetNetwork(scene, 200);
         StreetRouter router = routeWithOnDemand(network, scene, 500, 0, onDemand(network, "flexOut"));
         int timeToStop = router.getReachedStops().get(stopIndex(network, "curb"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 1000, 0));
-        assertTrue(timeToZone - timeToStop >= 200 / WALK_SPEED,
-            "Leaving the stop should charge the 200 meter platform walk at walking pace, but "
-                + "the zone was reached only " + (timeToZone - timeToStop) + " seconds after the stop.");
+        double linkWalkSeconds = 200 / WALK_SPEED;
+        assertEquals(linkWalkSeconds, timeToStop, linkWalkSeconds * 0.1,
+            "Reaching the stop itself should still be the 200 meter link walk at walking pace.");
+        assertTrue(timeToZone < 100,
+            "A rider at the curb should board there and ride straight out, but the zone took "
+                + timeToZone + " seconds.");
+        assertTrue(timeToZone < timeToStop,
+            "The ride out should not detour through the stop point at all.");
     }
 
     /// A stop on a pedestrian plaza that connects to a drivable street only on foot.
@@ -115,18 +119,20 @@ public class OnDemandStopAccessTest {
                 + timeToPlazaEnd + " seconds.");
     }
 
-    /// On-demand pickup at a stop whose walk link attaches to a car-free plaza must allow the
-    /// vehicle to leave from the closest drivable street the pedestrian can walk to.
+    /// On-demand pickup for a rider on a car-free plaza. The vehicle cannot enter the plaza,
+    /// so it meets the rider at the nearest point of the stop's meeting area. Here the origin
+    /// itself is accepted by the boarding predicate (the street below the plaza is in the boarding
+    /// area), so origin is injected. The gap from the rider to the street is priced at walking
+    /// pace, the same treatment every car search gives its origin point.
     @Test
-    @Disabled("Needs car connectors incurring walk times between stops and drivable streets.")
-    void pickupAtStopOnCarHostileStreetRidesOut () {
+    void pickUpOnCarfreePlaza () {
         Scene scene = new Scene();
         TransportNetwork network = plazaNetwork(scene);
         StreetRouter router = routeWithOnDemand(network, scene, 550, 50, onDemand(network, "fromStop"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 1000, 0));
-        assertTrue(timeToZone >= 150 && timeToZone <= 450,
-            "Riding out from the plaza stop should include the walk to the drivable street "
-                + "plus the drive to the zone, but took " + timeToZone + " seconds.");
+        assertTrue(timeToZone >= 50 && timeToZone <= 450,
+            "Riding on-demand should include the priced gap to the street and the drive to the zone, "
+                + "but took " + timeToZone + " seconds.");
     }
 
     /// A stop on a walking island with no drivable street anywhere near it, plus a distant
@@ -221,21 +227,22 @@ public class OnDemandStopAccessTest {
             "The walk link should attach to the plaza, not the motorway or the frontage road.");
     }
 
-    /// Car access to the station must involve a drop-off at the best street a pedestrian can
-    /// actually walk to, which is Access Road 310 meters away through the plaza and footpath.
-    /// That walk should take the correct amount of time for walking pace. The frontage road 20
-    /// meters away across a barrier should not be used. The lower bound excludes the frontage
+    /// Riding on-demand services out of a stop complex must board at the best street a pedestrian
+    /// can actually walk to, which is Access Road, 310 meters away through the plaza and footpath.
+    /// The cost of that walk is determined by the rider's own access search at walking pace. The
+    /// frontage road 20 meters away across a barrier is not in the stop's meeting area, which
+    /// blocks injection of the origin point. The nearest drivable edge to the rider is the frontage
+    /// road, and its endpoints fail the boarding predicate. The lower bound excludes the frontage
     /// road shortcut, which would reach the zone in about 200 seconds. The upper bound excludes
     /// walking all the way, which takes about 1740 seconds.
     @Test
-    @Disabled("Needs car connectors that incur walk time between stops and drivable streets.")
     void riderWalksFromCarToStation () {
         Scene scene = new Scene();
         TransportNetwork network = stationNetwork(scene);
         StreetRouter router = routeWithOnDemand(network, scene, 550, 110, onDemand(network, "taxiOut"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 2000, 0));
         assertTrue(timeToZone >= 380 && timeToZone <= 800,
-            "The taxi ride should start at Access Rd after a 310 meter priced walk and drive "
+            "The on-demand ride should start at Access Rd after a 310 meter priced walk and drive "
                 + "around via Main St, but the zone was reached in " + timeToZone + " seconds.");
     }
 

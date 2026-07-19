@@ -35,6 +35,10 @@ class SceneDiagramWriter {
         Scene station = new Scene();
         OnDemandStopAccessTest.stationNetwork(station);
         write(station, outputDir, "stationNetwork");
+
+        Scene villages = new Scene();
+        OnDemandZoneAccessTest.twoVillagesNetwork(villages);
+        write(villages, outputDir, "twoVillagesNetwork");
     }
 
     private static void write (Scene scene, Path outputDir, String baseName) {

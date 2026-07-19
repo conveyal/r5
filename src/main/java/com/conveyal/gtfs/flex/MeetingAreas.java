@@ -49,8 +49,16 @@ public class MeetingAreas {
 
     /// How far the discovery search walks outward from each stop in meters. This defines how
     /// liberally "at stop S" is interpreted in source data, since boarding and alighting on-demand
-    /// services are allowed anywhere in the area.
+    /// services are allowed anywhere in the area. This budget applies to stops whose geographic
+    /// position is far away from a curb on the drivable network, like a train station.
     public static final int MEETING_AREA_RADIUS_METERS = 500;
+
+    /// This much smaller discovery budget is used for stops whose walk link is short and lands
+    /// immediately on a drivable street. Such stops are positioned expressly for on-demand service,
+    /// and "at stop S" is interpreted narrowly. The area is still discovered by a search rather
+    /// than taken to be the single linked vertex, because that link can attach to the wrong car
+    /// street or have poor reachability among one-way streets.
+    public static final int CURB_STOP_RADIUS_METERS = 100;
 
     private final TransportNetwork network;
 
@@ -91,10 +99,11 @@ public class MeetingAreas {
                 "and on-demand service cannot serve it.", network.transitLayer.stopIdForIndex.get(stop));
             return area;
         }
+        int radiusMeters = discoveryRadiusMeters(stopVertex);
         StreetRouter router = new StreetRouter(network.streetLayer);
         router.streetMode = StreetMode.WALK;
         router.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-        router.distanceLimitMeters = MEETING_AREA_RADIUS_METERS;
+        router.distanceLimitMeters = radiusMeters;
         router.setOrigin(stopVertex);
         router.route();
         router.getReachedVertices().forEachEntry((vertex, distanceMm) -> {
@@ -106,9 +115,24 @@ public class MeetingAreas {
         if (area.isEmpty()) {
             LOG.warn("No drivable street within {} meters walking distance of stop {}. " +
                 "On-demand service cannot serve it.",
-                MEETING_AREA_RADIUS_METERS, network.transitLayer.stopIdForIndex.get(stop));
+                radiusMeters, network.transitLayer.stopIdForIndex.get(stop));
         }
         return area;
+    }
+
+    /// Returns the walk budget for discovering the given stop's meeting area. Stops whose walk
+    /// link is short and lands directly on a drivable street get the smaller budget. The link
+    /// length condition matters in cases where the link is longer than the smaller budget.
+    private int discoveryRadiusMeters (int stopVertex) {
+        EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor();
+        for (TIntIterator it = network.streetLayer.outgoingEdges.get(stopVertex).iterator(); it.hasNext(); ) {
+            edge.seek(it.next());
+            if (edge.getLengthMm() <= CURB_STOP_RADIUS_METERS * 1000
+                && touchesCarStreet(edge.getToVertex())) {
+                return CURB_STOP_RADIUS_METERS;
+            }
+        }
+        return MEETING_AREA_RADIUS_METERS;
     }
 
     /// Returns true when any non-link street edge at the given vertex permits cars. Link edges

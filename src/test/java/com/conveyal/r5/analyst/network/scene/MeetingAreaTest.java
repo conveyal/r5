@@ -66,8 +66,9 @@ public class MeetingAreaTest {
     }
 
     /// For a stop on the curb, intended specifically for on-demand service, the meeting area should
-    /// be exact (the curb is the stop). The vertex where the stop's walk link meets the street is
-    /// within the meeting area.
+    /// be exact and identified via the smaller discovery budget. It should contain the street
+    /// splitter vertex for the stop, but not the side street junction 260 meters away, which the
+    /// full budget would include.
     @Test
     void curbStop () {
         Scene scene = new Scene();
@@ -77,6 +78,27 @@ public class MeetingAreaTest {
         assertTrue(area.containsKey(curb), "The street vertex below the stop should be in the area.");
         assertEquals(10_000, area.get(curb), 3_000,
             "The curb vertex should be priced at the 10 meter link walk.");
+        assertFalse(area.containsKey(vertexAt(network, scene, 750, 0)),
+            "The side street junction is a 260 meter walk, outside the "
+                + MeetingAreas.CURB_STOP_RADIUS_METERS + " meter curb budget.");
+        assertEquals(1, area.size(),
+            "A curb stop's area should contain only the curb vertex in this scene.");
+    }
+
+    /// For a stop which links to a drivable street with a link edge that is quite long, the meeting
+    /// area is discovered with the larger walk budget. The budget should be measured starting from
+    /// the stop vertex, with the link alone consuming twice the smaller discovery budget.
+    @Test
+    void stopFarFromRoad () {
+        Scene scene = new Scene();
+        TransportNetwork network = OnDemandStopAccessTest.drivableStreetNetwork(scene, 200);
+        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "curb"));
+        assertTrue(area.containsKey(vertexAt(network, scene, 500, 0)),
+            "The linked street vertex, a 200 meter walk, should be in the area.");
+        assertTrue(area.containsKey(vertexAt(network, scene, 750, 0)),
+            "The side street junction, a 450 meter walk, fits within the full budget.");
+        assertFalse(area.containsKey(vertexAt(network, scene, 0, 0)),
+            "The west street end is a 700 meter walk, past the full budget.");
     }
 
     /// The place filters constructed for a service must agree with the kind of pick-up and drop-off

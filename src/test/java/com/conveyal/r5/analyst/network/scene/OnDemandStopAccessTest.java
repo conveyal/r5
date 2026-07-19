@@ -30,11 +30,16 @@ public class OnDemandStopAccessTest {
 
     private static final int WINDOW_END = 22 * 3600;
 
-    /// One street, one stop beside it, and a drop-off polygon at the street's east end. The two
-    /// variants of this scene are illustrated in drivableStreetNetwork10m.svg and
-    /// drivableStreetNetwork200m.svg alongside this source file (see SceneDiagramWriter).
+    /// One street with one stop beside it, a side street branching off that main street, and a
+    /// drop-off polygon at the main street's east end. The side street junction lies 250 meters
+    /// along the street from the stop's link point, between the smaller and larger meeting area
+    /// discovery budgets, so tests can observe which budget was applied. The side street is placed
+    /// so that it is always farther from the stop than Main St, ensuring the stop is linked to
+    /// Main Street.
     static TransportNetwork drivableStreetNetwork (Scene scene, int stopDistance) {
-        scene.way(WayPreset.STREET).named("Main St").from(0, 0).east(1000);
+        SceneJunction side = scene.junction("side", 750, 0);
+        scene.way(WayPreset.STREET).named("Main St").from(0, 0).via(side).east(250);
+        scene.way(WayPreset.STREET).named("Side St").from(side).north(200);
         SceneStop stop = scene.stop("curb", 500, stopDistance);
         ScenePolygon zone = scene.rectPolygon("zone", 900, -50, 1100, 50);
         scene.onDemand("flexOut")

@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.flex.MeetingAreas;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
@@ -84,6 +85,20 @@ public class TransportNetwork implements Serializable {
 
     public InRoutingFareCalculator fareCalculator;
 
+    /// Per-stop "meeting areas" for on-demand service. These are built lazily and never serialized.
+    /// Each TransportNetwork has its own instance of this, with scenarioCopy networks discovering
+    /// new meeting areas using their own street layer and scenario-created stops through the standard mechanism.
+    private transient MeetingAreas meetingAreas;
+
+    /// Returns this network's meeting area cache, creating it on first use. Synchronized
+    /// because worker threads race to first use on a freshly loaded network.
+    public synchronized MeetingAreas meetingAreas () {
+        if (meetingAreas == null) {
+            meetingAreas = new MeetingAreas(this);
+        }
+        return meetingAreas;
+    }
+
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public transient List<TaskError> scenarioApplicationWarnings;
 
@@ -154,11 +169,6 @@ public class TransportNetwork implements Serializable {
         network.streetLayer.associateStops(network.transitLayer);
         network.streetLayer.buildEdgeLists();
         network.rebuildTransientIndexes();
-
-        if (network.transitLayer.onDemandIndex != null) {
-            // Complete indexing of on-demand services now that transit stops are associated with streets.
-            network.transitLayer.onDemandIndex.findCarRoads(network);
-        }
 
         // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
         TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);

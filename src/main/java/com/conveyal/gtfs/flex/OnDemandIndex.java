@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
+import static com.conveyal.r5.common.GeometryUtils.expandEnvelopeFixed;
 
 /// Groups together all OnDemand instances within the TransportNetwork and provides some related
 /// methods for indexing and searching them. The transient spatial index handles services is
@@ -37,7 +38,7 @@ public class OnDemandIndex implements Serializable {
         return Collections.unmodifiableList(services);
     }
 
-    /// Potentially merge with findCarRoads, creating and storing a fromEnvelope for polygon + stops.
+    /// Potentially create and store a fromEnvelope for polygon + stops.
     /// Then to buildSpatialIndexAsNeeded or rebuildTransientIndex.
     /// As indicated in the IntHashGrid documentation, envelopes are inserted as fixed-precision.
     /// This lazy-init method is synchronized in case it is called in parallel on workers.
@@ -68,6 +69,13 @@ public class OnDemandIndex implements Serializable {
                     vertex.seek(v);
                     env.expandToInclude(vertex.getFixedLon(), vertex.getFixedLat());
                 }
+                if (!env.isNull()) {
+                    // Boarding a stop-based service can happen anywhere in a stop's meeting
+                    // area, so the pre-filter envelope covers the areas' full possible extent
+                    // rather than just the stop points. The expansion slightly overselects,
+                    // which this pre-filter tolerates by design.
+                    expandEnvelopeFixed(env, MeetingAreas.MEETING_AREA_RADIUS_METERS);
+                }
                 spatialIndex.insert(env, i);
             }
         }
@@ -87,14 +95,6 @@ public class OnDemandIndex implements Serializable {
             return true;
         });
         return available;
-    }
-
-    /// Call after the street and transit layers are linked and derived indexes are built.
-    /// Works around the fact that transit stops may not be directly connected to drivable roads.
-    public void findCarRoads (TransportNetwork network) {
-        for (OnDemand onDemand : services) {
-            onDemand.findCarEdges(network);
-        }
     }
 
 }

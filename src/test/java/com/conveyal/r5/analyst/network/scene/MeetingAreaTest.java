@@ -104,7 +104,7 @@ public class MeetingAreaTest {
     /// The place filters constructed for a service must agree with the kind of pick-up and drop-off
     /// endpoints the service specifies. Pick-up at location_groups (sets of stops) is subject to
     /// vertices being members of a certain set, and drop-off at a polygon is subject to geometric
-    /// point containment in a polygon. The polygon side can pre-select candidate edges from the spatial index.
+    /// point containment in a polygon. The polygon side can produce candidate edges from the spatial index.
     @Test
     void serviceEndpointFilters () {
         Scene scene = new Scene();
@@ -112,18 +112,18 @@ public class MeetingAreaTest {
         OnDemand od = onDemand(network, "taxiOut");
         OnDemandPlaceFilter pickUp = OnDemandPlaceFilter.pickUp(od, network);
         assertTrue(pickUp.containsVertex(vertexAt(network, scene, 200, 110)),
-            "The pick-up filter should accept states at meeting area vertices.");
+            "The pick-up filter should accept states at vertices in the stop's meeting area.");
         assertFalse(pickUp.containsVertex(vertexAt(network, scene, 0, 80)),
             "The pick-up filter should reject states on the barrier-separated frontage road.");
-        assertNull(pickUp.clipCandidateEdges(),
-            "Meeting areas scan states directly rather than pre-selecting candidate edges.");
+        assertNull(pickUp.candidateEdges(),
+            "Meeting areas scan states directly rather than producing candidate edges.");
         OnDemandPlaceFilter dropOff = OnDemandPlaceFilter.dropOff(od, network);
         assertTrue(dropOff.containsVertex(vertexAt(network, scene, 2000, 0)),
             "The drop-off filter should accept states inside the zone polygon.");
         assertFalse(dropOff.containsVertex(vertexAt(network, scene, 1000, 0)),
             "The drop-off filter should reject states outside the zone polygon.");
-        assertNotNull(dropOff.clipCandidateEdges(),
-            "The polygon clip should pre-select candidate edges from the spatial index.");
+        assertNotNull(dropOff.candidateEdges(),
+            "The polygon filter should produce candidate edges from the spatial index.");
     }
 
     /// A point filter for a meeting area tests the split connecting an off-road point
@@ -131,7 +131,7 @@ public class MeetingAreaTest {
     /// while a point beside the barrier-separated frontage road should not, even though it is
     /// closer to the stop as the crow flies.
     @Test
-    void pointGateAtBarrier () {
+    void pointFilterAtBarrier () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.stationNetwork(scene);
         OnDemandPlaceFilter pickUp = OnDemandPlaceFilter.pickUp(onDemand(network, "taxiOut"), network);
@@ -140,13 +140,13 @@ public class MeetingAreaTest {
         Split accessSplit = network.streetLayer.findSplit(accessLat, accessLon, 100, StreetMode.CAR);
         assertNotNull(accessSplit, "A point beside Access Road should split a drivable edge.");
         assertTrue(pickUp.containsPoint(accessLat, accessLon, accessSplit),
-            "A point on an Access Road edge between area vertices should pass the gate.");
+            "A point on an Access Road edge between vertices in the area should be accepted.");
         double frontageLat = scene.latForY(79);
         double frontageLon = scene.lonForXY(500, 79);
         Split frontageSplit = network.streetLayer.findSplit(frontageLat, frontageLon, 100, StreetMode.CAR);
         assertNotNull(frontageSplit, "A point beside the frontage road should split a drivable edge.");
         assertFalse(pickUp.containsPoint(frontageLat, frontageLon, frontageSplit),
-            "A point on the frontage road should fail the gate despite being near the stop.");
+            "A point on the frontage road should be rejected despite being near the stop.");
     }
 
     /// The radius specified for meeting areas must be large enough to encompass the stop complex

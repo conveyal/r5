@@ -1,12 +1,14 @@
 package com.conveyal.r5.analyst.network.scene;
 
 import com.conveyal.gtfs.flex.OnDemand;
+import com.conveyal.r5.analyst.OnDemandAccess;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
+import gnu.trove.map.TIntIntMap;
 
 import java.util.List;
 
@@ -65,19 +67,41 @@ class SceneRouting {
         return router;
     }
 
-    /// Run a walk search from the given scene coordinates, then extend it with one on-demand
-    /// ride and a final walk continuation. This is the sequence TravelTimeComputer performs for
-    /// the access leg when the ON_DEMAND flag is set: ride results are clipped to the service's
-    /// drop-off area, merged into the walk search, and walking resumes from every merged state.
-    /// The returned router therefore holds the best times reachable by any combination of
-    /// walking and one ride on the given service.
-    static StreetRouter routeWithOnDemand (TransportNetwork network, Scene scene, double x, double y, OnDemand od) {
+    /// Run a walk search from the given scene coordinates, then extend it with on-demand rides and
+    /// a final post-on-demand walk. This invokes the same [OnDemandAccess] method that
+    /// TravelTimeComputer uses for the access leg when the ON_DEMAND flag is set, ensuring tests
+    /// use exactly the same sequence of actions as production, but, without the surrounding travel
+    /// time surface and propagation machinery.
+    static WalkAndFlexResults routeWithOnDemand (TransportNetwork network, Scene scene, double x, double y, OnDemand od) {
         StreetRouter walk = route(network, scene, x, y, StreetMode.WALK);
-        StreetRouter ride = walk.copyAndRouteFor(od, NOON);
-        ride.clipStates(od);
-        walk.mergeStatesFrom(ride);
-        walk.keepRoutingOnFoot();
-        return walk;
+        OnDemandAccess oda = OnDemandAccess.route(walk, List.of(od), NOON, null);
+        return new WalkAndFlexResults(walk, oda);
+    }
+
+    /// The paired results of an access walk search and the on-demand search based on it,
+    /// providing results to tests analogous to what TravelTimeComputer does with min-merge.
+    /// The final walk search begins at the final states of the flex ride search, so that final
+    /// walk router alone can provide all post-flex state.
+    record WalkAndFlexResults(StreetRouter access, OnDemandAccess flex) {
+
+        /// The best travel time to the given vertex on foot, by flex, or by a combination of the two.
+        int getTravelTimeToVertex (int vertexIndex) {
+            return Math.min(
+                access.getTravelTimeToVertex(vertexIndex),
+                flex.egressRouter.getTravelTimeToVertex(vertexIndex));
+        }
+
+        /// Travel times to all reached transit stops, by walking directly or after a flex ride.
+        TIntIntMap getReachedStops () {
+            TIntIntMap merged = access.getReachedStops();
+            flex.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+                if (!merged.containsKey(stop) || merged.get(stop) > seconds) {
+                    merged.put(stop, seconds);
+                }
+                return true;
+            });
+            return merged;
+        }
     }
 
     /// Find the built on-demand service rendered from the SceneOnDemand with the given id.

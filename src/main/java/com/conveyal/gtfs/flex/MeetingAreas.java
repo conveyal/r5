@@ -77,8 +77,8 @@ public class MeetingAreas {
         return areaForStop.computeIfAbsent(stop, this::discover);
     }
 
-    /// Returns the union of the given stops' meeting area vertex sets. This is the set of vertices
-    /// where one can board/alight from one location_group endpoint of an on-demand service.
+    /// Returns the union of the given stops' meeting areas as one set of vertices. These are the
+    /// vertices where a rider can board/alight from one location_group endpoint of an on-demand service.
     public TIntSet unionForStops (int[] stops) {
         TIntSet union = new TIntHashSet();
         for (int stop : stops) {

@@ -173,6 +173,9 @@ public class TravelTimeComputer {
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
 
+            // When on-demand services can extend this access leg, this holds their results: an
+            // egress walk search onward from all rides, and direct times to destination points.
+            OnDemandAccess onDemandAccess = null;
             if (enableOnDemand) {
                 // Find on-demand that may be available within the street area reached above. Service availability is
                 // evaluated for one representative rider departing at the midpoint of the departure time window.
@@ -183,29 +186,10 @@ public class TravelTimeComputer {
                 List<OnDemand> onDemandCandidates = network.transitLayer
                       .findOnDemandService(reachedEnvelope, midTime, latestTime, request.date);
                 LOG.info("Found {} potentially relevant on-demand service(s).", onDemandCandidates.size());
-                // Spatial filtering of results is handled by the StreetRouter because we need to look up the location
-                // of every vertex, and StreetRouter has a reference to VertexStore.
-                // The alternative of clipping and adjusting travel times to transit stops and destination points rather
-                // than street vertices would probably waste more calculation propagating to unreachable destinations.
                 if (!isNullOrEmpty(onDemandCandidates)) {
-                    // Initialize routing for each candidate service from the same original walk search, accumulating
-                    // clipped results in a temporary buffer, then merge into the walk search only after the loop.
-                    // Accumulating into the source would instead chain on-demand rides in an arbitrary order.
-                    // The temporary buffer lets each sub-search become garbage before the next one is initialized.
-                    // Per-on-demand station access times could be captured here for exact time-dependent availability.
-                    StreetRouter onDemandResults = sr.shallowCopyForRouting();
-                    for (OnDemand onDemand : onDemandCandidates) {
-                        StreetRouter odr = sr.copyAndRouteFor(onDemand, midTime);
-                        odr.clipStates(onDemand);
-                        onDemandResults.mergeStatesFrom(odr);
-                    }
-                    sr.mergeStatesFrom(onDemandResults);
-                    // After riding on-demand services, we want to reach any adjacent pedestrian-only areas that
-                    // include transit stops. In the transit block below, this is done when access mode is not walk.
-                    // When on-demand services exist, ensure this additional search happens exactly once, even in
-                    // cases where transit does not follow.
-                    // FIXME walk limits are not applied here, and car roads may not be attached to pedestrian network
-                    if (accessMode == StreetMode.WALK) sr.keepRoutingOnFoot();
+                    // The access router itself is never modified: on-demand results are held separately in
+                    // onDemandAccess and min-merged into stop and destination times below.
+                    onDemandAccess = OnDemandAccess.route(sr, onDemandCandidates, midTime, destinations);
                 }
             }
 
@@ -223,6 +207,16 @@ public class TravelTimeComputer {
                 // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
                 // LOG.info("Stop reached times: {}", travelTimesToStopsSeconds);
+                if (onDemandAccess != null) {
+                    // Stops reached by walking onward from on-demand rides are min-merged with the
+                    // access mode's own stop arrivals. This is how a flex ride leads into transit.
+                    onDemandAccess.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+                        if (!travelTimesToStopsSeconds.containsKey(stop) || travelTimesToStopsSeconds.get(stop) > seconds) {
+                            travelTimesToStopsSeconds.put(stop, seconds);
+                        }
+                        return true;
+                    });
+                }
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
                             accessService.waitTimeSeconds, accessMode);
@@ -265,6 +259,12 @@ public class TravelTimeComputer {
                         walkSpeedMillimetersPerSecond,
                         origin
                 );
+
+                if (onDemandAccess != null) {
+                    // Destinations are also reached using on-demand services.
+                    // Riders are dropped off directly at a destination or walk onward from any service.
+                    pointSetTimes = PointSetTimes.minMerge(pointSetTimes, onDemandAccess.directTimes);
+                }
 
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",

@@ -39,6 +39,14 @@ class SceneDiagramWriter {
         Scene villages = new Scene();
         OnDemandZoneAccessTest.twoVillagesNetwork(villages);
         write(villages, outputDir, "twoVillagesNetwork");
+
+        Scene park = new Scene();
+        OnDemandZoneAccessTest.parkNetwork(park);
+        write(park, outputDir, "parkNetwork");
+
+        Scene converging = new Scene();
+        OnDemandEgressTest.convergingEgressNetwork(converging);
+        write(converging, outputDir, "convergingEgressNetwork");
     }
 
     private static void write (Scene scene, Path outputDir, String baseName) {

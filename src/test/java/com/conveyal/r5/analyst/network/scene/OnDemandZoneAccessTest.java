@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.network.scene;
 
-import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 
@@ -16,9 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// have to walk to a vertex at the end of an edge to be picked up. When the origin lies outside
 /// the zone, boarding happens at zone vertices reached by the rider's own walk search.
 ///
-/// All tests share one scene, twoVillagesNetwork: Long Rd runs between two villages, each a
-/// square of small streets — village A on the west, village B on the east. Several services
-/// are layered on this network, differing in their zones and delays to serve different tests.
+/// All tests but the park scenario share one scene, twoVillagesNetwork: Long Rd runs between
+/// two villages, each a square of small streets — village A on the west, village B on the east.
+/// Several services are layered on this network, differing in their zones and delays to serve
+/// different tests. The park scenario needs a pedestrian-only shortcut so has its own scene.
 ///
 /// The "village" service's pick-up zone covers the eastern half of village A plus
 /// a western chunk of Long Rd, so it contains ordinary boarding vertices. The "mid-edge"
@@ -90,7 +90,7 @@ public class OnDemandZoneAccessTest {
     void midEdgeBetweenVillages () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "village"));
+        var router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "village"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         assertTrue(timeToDropOff < 300,
             "Boarding at the origin and riding 1400 meters should beat walking to any in-zone "
@@ -110,7 +110,7 @@ public class OnDemandZoneAccessTest {
     void walkIntoPickupZone () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 20, 200, onDemand(network, "village"));
+        var router = routeWithOnDemand(network, scene, 20, 200, onDemand(network, "village"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         assertTrue(timeToDropOff >= 350 && timeToDropOff <= 800,
             "The trip should include a 420 meter walk into the zone before riding, but the "
@@ -124,7 +124,7 @@ public class OnDemandZoneAccessTest {
     void shortStreetOrigin () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 260, 350, onDemand(network, "village"));
+        var router = routeWithOnDemand(network, scene, 260, 350, onDemand(network, "village"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         assertTrue(timeToDropOff > 30 && timeToDropOff < 400,
             "The ride out through the village should be priced as riding from the rider's own "
@@ -139,7 +139,7 @@ public class OnDemandZoneAccessTest {
     void dropOffInVillage () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "village"));
+        var router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "village"));
         int timeToCrossSt = router.getTravelTimeToVertex(vertexAt(network, scene, 2600, 0));
         int timeToEastSide = router.getTravelTimeToVertex(vertexAt(network, scene, 2800, 0));
         assertTrue(timeToCrossSt < 300,
@@ -158,7 +158,7 @@ public class OnDemandZoneAccessTest {
     void midEdgeOrigin () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "mid-edge"));
+        var router = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "mid-edge"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         assertTrue(timeToDropOff < 300,
             "Boarding at the origin and riding 1400 meters should beat any walk to a junction, "
@@ -176,12 +176,52 @@ public class OnDemandZoneAccessTest {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
         int dropOffVertex = vertexAt(network, scene, 2400, 0);
-        StreetRouter plain = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "mid-edge"));
-        StreetRouter delayed = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "delayed"));
+        var plain = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "mid-edge"));
+        var delayed = routeWithOnDemand(network, scene, 1000, 30, onDemand(network, "delayed"));
         int plainSeconds = plain.getTravelTimeToVertex(dropOffVertex);
         int delayedSeconds = delayed.getTravelTimeToVertex(dropOffVertex);
         assertEquals(300, delayedSeconds - plainSeconds, 2,
             "A five minute pick-up delay should be the only difference between the two rides.");
+    }
+
+    /// The drivable edge of a pick-up zone is separated from an ideal boarding point inside the
+    /// zone by a pedestrian-only shortcut. One road enters the zone at F. A 400 meter
+    /// footpath crosses the park from F to interior junction P. Cars reach P only by a 5000
+    /// meter loop. Onward Rd continues 2000 meters from P to the drop-off zone.
+    static TransportNetwork parkNetwork (Scene scene) {
+        SceneJunction f = scene.junction("f", 0, 0);
+        SceneJunction p = scene.junction("p", 400, 0);
+        scene.way(WayPreset.STREET).named("Approach Rd").from(-500, 0).to(f);
+        scene.way(WayPreset.FOOTPATH).named("Park Path").from(f).to(p);
+        scene.way(WayPreset.STREET).named("Loop Rd").from(f).south(2300).east(400).to(p);
+        scene.way(WayPreset.STREET).named("Onward Rd").from(p).east(2000);
+        ScenePolygon pickup = scene.rectPolygon("park-pickup", -50, -50, 450, 50);
+        ScenePolygon dropOff = scene.rectPolygon("park-dropoff", 2350, -50, 2450, 50);
+        scene.onDemand("park")
+            .fromPolygon(pickup).pickupWindow(WINDOW_START, WINDOW_END)
+            .toPolygon(dropOff).dropOffWindow(WINDOW_START, WINDOW_END)
+            .durationFactor(1.5);
+        return scene.buildNetwork();
+    }
+
+    /// On-demand transit should be boarded at every vertex reached by the rider's initial walk that
+    /// is within a pick-up zone, not only at vertices where a road crosses into the zone. A rider
+    /// at F walks the park path and boards at P, skipping the vehicle's 5000 meter loop. The ride
+    /// would take over 900 seconds if boarding were possible only at F. Initializing on-demand
+    /// searches at frontier vertices only can never produce this trip, because the walk-only park
+    /// shortcut is closed to the vehicle.
+    @Test
+    void boardingAcrossPark () {
+        Scene scene = new Scene();
+        TransportNetwork network = parkNetwork(scene);
+        var router = routeWithOnDemand(network, scene, 10, 10, onDemand(network, "park"));
+        int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
+        assertTrue(timeToDropOff < 700,
+            "Walking across the park to board at P should beat riding the loop from F, but the "
+                + "drop-off zone was reached in " + timeToDropOff + " seconds.");
+        assertTrue(timeToDropOff > 450,
+            "The park walk and the scaled 2000 meter ride still take real time, but the "
+                + "drop-off zone was reached in only " + timeToDropOff + " seconds.");
     }
 
     /// An origin point along the same long edge but outside the "mid-edge" pick-up zone should
@@ -195,7 +235,7 @@ public class OnDemandZoneAccessTest {
     void originOutsidePickupZone () {
         Scene scene = new Scene();
         TransportNetwork network = twoVillagesNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 600, 30, onDemand(network, "mid-edge"));
+        var router = routeWithOnDemand(network, scene, 600, 30, onDemand(network, "mid-edge"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         double pureWalkSeconds = (30 + 1800) / SceneRouting.WALK_SPEED;
         assertEquals(pureWalkSeconds, timeToDropOff, pureWalkSeconds * 0.1,

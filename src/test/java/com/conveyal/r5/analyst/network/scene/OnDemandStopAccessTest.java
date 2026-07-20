@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.network.scene;
 
 import com.conveyal.gtfs.flex.MeetingAreas;
 import com.conveyal.r5.streets.EdgeStore;
-import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import org.junit.jupiter.api.Test;
@@ -45,6 +44,9 @@ public class OnDemandStopAccessTest {
         scene.onDemand("flexOut")
             .fromStops(stop).pickupWindow(WINDOW_START, WINDOW_END)
             .toPolygon(zone).dropOffWindow(WINDOW_START, WINDOW_END);
+        scene.onDemand("flexIn")
+            .fromPolygon(zone).pickupWindow(WINDOW_START, WINDOW_END)
+            .toStops(stop).dropOffWindow(WINDOW_START, WINDOW_END);
         return scene.buildNetwork();
     }
 
@@ -55,7 +57,7 @@ public class OnDemandStopAccessTest {
     void onDemandPickupOnDrivableStreet () {
         Scene scene = new Scene();
         TransportNetwork network = drivableStreetNetwork(scene, 10);
-        StreetRouter router = routeWithOnDemand(network, scene, 450, 0, onDemand(network, "flexOut"));
+        var router = routeWithOnDemand(network, scene, 450, 0, onDemand(network, "flexOut"));
         double expectedToStop = (50 + 10) / WALK_SPEED;
         assertEquals(expectedToStop, router.getReachedStops().get(stopIndex(network, "curb")), 5,
             "The stop should be reached by walking 50 meters of street and the 10 meter link.");
@@ -73,7 +75,7 @@ public class OnDemandStopAccessTest {
     void pickupAtSetBackStop () {
         Scene scene = new Scene();
         TransportNetwork network = drivableStreetNetwork(scene, 200);
-        StreetRouter router = routeWithOnDemand(network, scene, 500, 0, onDemand(network, "flexOut"));
+        var router = routeWithOnDemand(network, scene, 500, 0, onDemand(network, "flexOut"));
         int timeToStop = router.getReachedStops().get(stopIndex(network, "curb"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 1000, 0));
         double linkWalkSeconds = 200 / WALK_SPEED;
@@ -113,7 +115,7 @@ public class OnDemandStopAccessTest {
     void dropOffOnCarfreePlaza () {
         Scene scene = new Scene();
         TransportNetwork network = plazaNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 950, 0, onDemand(network, "toStop"));
+        var router = routeWithOnDemand(network, scene, 950, 0, onDemand(network, "toStop"));
         int timeToStop = router.getReachedStops().get(stopIndex(network, "plaza-stop"));
         assertTrue(timeToStop > 0 && timeToStop < 400,
             "The ride and a 160 meter walk should reach the stop well before a pure walk, but took "
@@ -133,7 +135,7 @@ public class OnDemandStopAccessTest {
     void pickUpOnCarfreePlaza () {
         Scene scene = new Scene();
         TransportNetwork network = plazaNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 550, 50, onDemand(network, "fromStop"));
+        var router = routeWithOnDemand(network, scene, 550, 50, onDemand(network, "fromStop"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 1000, 0));
         assertTrue(timeToZone >= 50 && timeToZone <= 450,
             "Riding on-demand should include the priced gap to the street and the drive to the zone, "
@@ -165,7 +167,7 @@ public class OnDemandStopAccessTest {
         TransportNetwork network = islandNetwork(scene);
         assertTrue(stopVertex(network, "island") >= 0,
             "The stop should still be walk-linked to its island.");
-        StreetRouter router = routeWithOnDemand(network, scene, 950, 0, onDemand(network, "toIsland"));
+        var router = routeWithOnDemand(network, scene, 950, 0, onDemand(network, "toIsland"));
         assertFalse(router.getReachedStops().containsKey(stopIndex(network, "island")),
             "No ride should deliver riders to a stop with no drivable street in reach.");
         assertEquals(Integer.MAX_VALUE, router.getTravelTimeToVertex(vertexAt(network, scene, 1200, 1100)),
@@ -178,7 +180,7 @@ public class OnDemandStopAccessTest {
     void noOnDemandFromIsolatedStop () {
         Scene scene = new Scene();
         TransportNetwork network = islandNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 1150, 1100, onDemand(network, "fromIsland"));
+        var router = routeWithOnDemand(network, scene, 1150, 1100, onDemand(network, "fromIsland"));
         double expectedToStop = (50 + 10) / WALK_SPEED;
         assertEquals(expectedToStop, router.getReachedStops().get(stopIndex(network, "island")), 5,
             "The walk link should still allow riders to reach the stop.");
@@ -244,7 +246,7 @@ public class OnDemandStopAccessTest {
     void riderWalksFromCarToStation () {
         Scene scene = new Scene();
         TransportNetwork network = stationNetwork(scene);
-        StreetRouter router = routeWithOnDemand(network, scene, 550, 110, onDemand(network, "taxiOut"));
+        var router = routeWithOnDemand(network, scene, 550, 110, onDemand(network, "taxiOut"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 2000, 0));
         assertTrue(timeToZone >= 380 && timeToZone <= 800,
             "The on-demand ride should start at Access Rd after a 310 meter priced walk and drive "

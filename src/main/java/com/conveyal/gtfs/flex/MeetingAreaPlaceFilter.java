@@ -23,18 +23,17 @@ public class MeetingAreaPlaceFilter implements OnDemandPlaceFilter {
         return vertices.contains(vertexIndex);
     }
 
-    /// A vertex set has no interior that could contain an off-network point, so a point is
-    /// within the area when the edge it splits ends at an area vertex. This reflects how such
-    /// points are considered to be located relative to the network.
+    /// A vertex set is not a geometry and has no "interior" that could contain off-network points,
+    /// so a point is within the area when the edge it splits ends at a vertex in the area. This
+    /// reflects how origin points are considered to be located relative to the network.
     @Override
     public boolean containsPoint (double lat, double lon, Split split) {
         return vertices.contains(split.vertex0) || vertices.contains(split.vertex1);
     }
 
-    /// Meeting areas are small sets of vertex IDs. Scanning the full set should be inexpensive
-    /// requiring no candidate-edge pre-selection.
+    /// Meeting areas are small sets of vertex IDs. Scanning the full set should be inexpensive.
     @Override
-    public TIntSet clipCandidateEdges () {
+    public TIntSet candidateEdges () {
         return null;
     }
 

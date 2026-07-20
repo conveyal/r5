@@ -45,7 +45,7 @@ public class PolygonPlaceFilter implements OnDemandPlaceFilter {
     /// The polygon is in floating-point WGS84 while the street spatial index holds fixed-point
     /// envelopes. The index contains only the even (forward) edge of each pair.
     @Override
-    public TIntSet clipCandidateEdges () {
+    public TIntSet candidateEdges () {
         return streetLayer.spatialIndex.query(envelopeToFixed(polygon.getEnvelopeInternal()));
     }
 

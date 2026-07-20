@@ -104,6 +104,15 @@ public class StreetRouter implements Cloneable {
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
+    /// When nonzero, limits the duration of the current leg rather than the whole path. This
+    /// exists for the walk leg after on-demand rides, where initial states all start at different
+    /// accumulated times. This leg limit constrains a quantity the search does not minimize.
+    /// This "resource limiting" is not strictly correct because states with a lower total time but
+    /// an excessive current leg time may evict states with a higher total time that can continue
+    /// the current leg. Exatcness would require enabling Pareto dominance over pairs of
+    /// (total duration, leg duration).
+    public int legTimeLimitSeconds = 0;
+
     /**
      * What routing variable (time or distance) should be used to decide when a path is better than another.
      * Only one such variable is optimized in a given search. It's algorithmically invalid to prune or otherwise discard
@@ -533,6 +542,9 @@ public class StreetRouter implements Cloneable {
             tmpTimeLimitSeconds = Integer.MAX_VALUE;
         }
 
+        // A zero leg time limit means no limit, see comments on the field declaration.
+        final int tmpLegTimeLimitSeconds = (legTimeLimitSeconds > 0) ? legTimeLimitSeconds : Integer.MAX_VALUE;
+
         if (timeLimitSeconds > 0 && distanceLimitMeters > 0) {
             LOG.warn("Both distance limit of {}m and time limit of {}s are set in StreetRouter", distanceLimitMeters, timeLimitSeconds);
         } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
@@ -625,7 +637,8 @@ public class StreetRouter implements Cloneable {
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
                 State s1 = edge.traverse(s0, streetMode, profileRequest, timeCalculator);
-                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
+                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds
+                        && s1.getLegDurationSeconds() < tmpLegTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
                         s1.heuristic = calcHeuristic(s1);
@@ -1250,14 +1263,9 @@ public class StreetRouter implements Cloneable {
         route();
     }
 
-    /// After routing, call this method to filter this router's result states down to only those
-    /// within the specified OnDemand service's drop-off place (polygon or location_group meeting areas).
-    public void clipStates (OnDemand onDemand) {
-        clipStates(OnDemandPlaceFilter.dropOff(onDemand, streetLayer.parentNetwork));
-    }
-
     /// After routing, filter this router's result states down to only those accepted by the given
-    /// filter. This is a pure filter with no side effects on the states (no changes to travel times).
+    /// filter, typically one for an OnDemand service's drop-off place (polygon or location_group
+    /// meeting areas). This is a pure filter with no side effects on the states (no changes to travel times).
     /// The on-demand service's duration factor should already have been applied within the search,
     /// and its offset (wait time) should already have been applied to the initial states of the
     /// search
@@ -1282,7 +1290,7 @@ public class StreetRouter implements Cloneable {
     /// set membership directly.
     public void clipStates (OnDemandPlaceFilter place) {
         TIntObjectMultimap<State> filteredCopy = new TIntObjectHashMultimap<>();
-        TIntSet candidateEdges = place.clipCandidateEdges();
+        TIntSet candidateEdges = place.candidateEdges();
         if (candidateEdges != null) {
             EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
             candidateEdges.forEach(eidx -> {
@@ -1462,6 +1470,39 @@ public class StreetRouter implements Cloneable {
         if (!pickUpPlace.containsPoint(originLat, originLon, split)) return;
         int walkSeconds = (int) (split.distanceToEdge_mm / (profileRequest.walkSpeed * 1000));
         seedOnDemand(split, walkSeconds, od, midTime);
+    }
+
+    /// Interpreting the current router instance as the merged, clipped results of on-demand ride
+    /// searches, returns a new StreetRouter that has completed a walk search onward from every ride
+    /// state. This one search feeds into all post-flex steps, including boarding scheduled transit,
+    /// and walking to destination points in pedestrian-only areas. The walk is capped by both the
+    /// maximum total trip duration and a best-effort walking leg limit. NOTE: The new router will
+    /// inherit the time calculator of the current router. Call this on merged results holding an
+    /// unwrapped time calculator, not on a single ride search whose calculator often scales times
+    /// by a duration factor.
+    public StreetRouter copyAndRouteEgressWalk () {
+        StreetRouter sr = shallowCopyForRouting();
+        sr.streetMode = StreetMode.WALK;
+        sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;
+        sr.legTimeLimitSeconds = profileRequest.getMaxTimeSeconds(StreetMode.WALK);
+        bestStatesAtEdge.forEachEntry((eidx, states) -> {
+            for (State state : states) {
+                // A fresh state rather than a clone: the new leg is on foot, so turn restriction
+                // state accumulated in the vehicle does not carry over to the walking rider.
+                State seed = new State(state.vertex, state.backEdge, StreetMode.WALK);
+                seed.durationSeconds = state.durationSeconds;
+                seed.durationBeforeLegSeconds = state.durationSeconds;
+                seed.distance = state.distance;
+                sr.bestStatesAtEdge.put(seed.backEdge, seed);
+                sr.queue.add(seed);
+            }
+            return true;
+        });
+        // Routing with no initial states at all logs a spurious warning about a missing origin.
+        if (!sr.queue.isEmpty()) {
+            sr.route();
+        }
+        return sr;
     }
 
     /// Duration of riding a partial edge, as the traversed fraction of the whole-edge

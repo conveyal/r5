@@ -1,25 +1,22 @@
 package com.conveyal.gtfs.flex;
 
-import org.locationtech.jts.geom.Polygon;
+import com.conveyal.gtfs.geom.CPolygon;
 
 import java.io.Serializable;
 import java.util.BitSet;
 
-/// Our internal TransportNetwork representation of an on-demand transit service.
-/// Currently these connect a polygonal zone or set of pointlike stops to another such zone or set.
-/// Instances of this class will be serialized into the TransportNetwork. Therefore it's probably
-/// better to switch to our CPolygons or register custom serialization code in network serialization.
-/// But all the JTS geometries will have been constructed from a single factory during network
-/// alleviating the factory-instance-reference problem a bit.
+/// Our internal TransportNetwork representation of an on-demand transit service. Currently these
+/// connect one polygonal zone or set of pointlike stops to one other such zone or set. Instances of
+/// this class are serialized into the TransportNetwork, so polygons are stored as our own CPolygon
+/// which serializes as plain coordinate arrays without the shared GeometryFactory/PrecisionModel
+/// references found in JTS objects.
 public class OnDemand implements Serializable {
 
     public String id;
     public String name;
 
-    // The GeoTools Polygonal interface does not extend Geometry so doesn't have basic predicates
-    // like "contains". This is something we need to improve upon in our own geometry types.
-    public Polygon fromPolygon;
-    public Polygon toPolygon;
+    public CPolygon fromPolygon;
+    public CPolygon toPolygon;
 
     // TIntSet forces use of nonstandard bool lambda functions and final variables for iteration.
     // We demote them to arrays before use. These will be null if the service does not specify them.

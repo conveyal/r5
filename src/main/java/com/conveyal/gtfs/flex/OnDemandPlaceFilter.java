@@ -1,10 +1,10 @@
 package com.conveyal.gtfs.flex;
 
+import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.locationtech.jts.geom.Polygon;
 
 /// This is an interface for predicates that filter street search states, retaining only those
 /// where a particular on-demand service will pick riders up or drop them off. We have separate
@@ -48,7 +48,7 @@ public interface OnDemandPlaceFilter {
     /// GTFS validation ensures every endpoint of every flex trip references exactly one
     /// polygonal zone or location group. If a polygon is present it takes precedence. If
     /// neither kind is present, return a filter containing nothing, making the service unusable.
-    private static OnDemandPlaceFilter of (Polygon polygon, int[] stopIndexes, TransportNetwork network) {
+    private static OnDemandPlaceFilter of (CPolygon polygon, int[] stopIndexes, TransportNetwork network) {
         if (polygon != null) {
             return new PolygonPlaceFilter(polygon, network.streetLayer);
         }

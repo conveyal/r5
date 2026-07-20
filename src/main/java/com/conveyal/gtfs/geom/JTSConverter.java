@@ -3,6 +3,7 @@ package com.conveyal.gtfs.geom;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.CoordinateSequenceFactory;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.MultiPolygon;
@@ -84,6 +85,11 @@ public abstract class JTSConverter {
         } else {
             return GEOMETRY_FACTORY.createPolygon(shellRing);
         }
+    }
+
+    /// Convert a compact bounding box to a floating-point WGS84 JTS Envelope.
+    public static Envelope toJts (CBox box) {
+        return new Envelope(box.minLon, box.maxLon, box.minLat, box.maxLat);
     }
 
     private static LinearRing jtsRingFromPackedCoords (double[] packedCoords) {

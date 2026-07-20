@@ -7,7 +7,7 @@ import com.conveyal.gtfs.flex.FlexTrip;
 import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.gtfs.flex.OnDemandIndex;
 import com.conveyal.gtfs.flex.FlexStopTime;
-import com.conveyal.gtfs.geom.JTSConverter;
+import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Frequency;
@@ -43,7 +43,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.linearref.LinearLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -559,12 +558,12 @@ public class TransitLayer implements Serializable, Cloneable {
     /// Constraints in the GTFS reference documentation imply that it is not possible to reference
     /// multiple location polygons as a single stop_time in a flex trip, nor is it possible to mix
     /// polygonal locations with sets of pointlike stops in a single stop_time.
-    private static Polygon extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
+    private static CPolygon extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
         // Referential integrity should already be validated on the GTFS feed. We can assume all
         // non-optional ID lookups yield a non-null object or positive index and otherwise fail hard.
         if (fst.location_id != null) {
             FlexLocation location = gtfs.locations.get(fst.location_id);
-            return JTSConverter.toJts(location.geometry);
+            return location.geometry;
         } else {
             return null;
         }

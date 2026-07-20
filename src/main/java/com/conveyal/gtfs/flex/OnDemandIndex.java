@@ -1,10 +1,11 @@
 package com.conveyal.gtfs.flex;
 
+import com.conveyal.gtfs.geom.CPolygon;
+import com.conveyal.gtfs.geom.JTSConverter;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Polygon;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -51,9 +52,8 @@ public class OnDemandIndex implements Serializable {
         spatialIndex = new IntHashGrid(0.004); // About 444m in latitude direction.
         for (int i = 0; i < services.size(); i++) {
             OnDemand od = services.get(i);
-            Polygon fromPolygon = od.fromPolygon;
-            if (fromPolygon != null) {
-                Envelope env = envelopeToFixed(fromPolygon.getEnvelopeInternal());
+            if (od.fromPolygon != null) {
+                Envelope env = envelopeToFixed(JTSConverter.toJts(od.fromPolygon.toBox()));
                 spatialIndex.insert(env, i);
             }
             if (od.fromStopIndexes != null) {

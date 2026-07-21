@@ -135,7 +135,13 @@ public class Broker implements Component {
      * results are received for a given workerCategory. Do so after receiving results for an
      * arbitrary task toward the beginning of the job
      */
-    public static final int AUTO_START_SPOT_INSTANCES_AT_TASK = 42;
+    public static final int START_INSTANCES_TASK = 42;
+
+    /**
+     * We also want to consider starting instances occasionally as a regional analysis is running, in case previously
+     * created instances have been terminated.
+     */
+    public static final int RESTART_INSTANCES_TASKS = 4000;
 
     /** The maximum number of spot instances allowable in an automatic request */
     public static final int MAX_WORKERS_PER_CATEGORY = 250;
@@ -533,14 +539,13 @@ public class Broker implements Component {
             eventBus.send(new ErrorEvent(t));
             return;
         }
-        // When non-error results are received for several tasks we assume the regional analysis is running smoothly.
         // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
-        if (workResult.taskId == AUTO_START_SPOT_INSTANCES_AT_TASK) {
-            requestExtraWorkersIfAppropriate(job);
-        }
+        requestExtraWorkersIfAppropriate(job, workResult.taskId);
     }
 
-    private void requestExtraWorkersIfAppropriate(Job job) {
+    // At certain task numbers, check various conditions about the worker pool then start spot or on-demand instances
+    private void requestExtraWorkersIfAppropriate(Job job, int taskId) {
+        if (!(taskId == START_INSTANCES_TASK || (taskId + 1) % RESTART_INSTANCES_TASKS == 0)) return;
         WorkerCategory workerCategory = job.workerCategory;
         int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
         if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
@@ -568,8 +573,15 @@ public class Broker implements Component {
             // Guardrails until freeform pointsets are tested more thoroughly
             if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
             if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
-            int nSpot =  targetWorkerTotal - categoryWorkersAlreadyRunning;
-            createWorkersInCategory(job.workerCategory, job.workerTags, 0, nSpot);
+            int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
+            if (taskId == START_INSTANCES_TASK) {
+                // After a few tasks are completed successfully, try to start spot instances
+                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nWorkers);
+            } else {
+                // If the number of workers is below the target later in a job, it is likely that spot instances were
+                // terminated due to capacity limits. So request on-demand instances instead.
+                createWorkersInCategory(job.workerCategory, job.workerTags, nWorkers, 0);
+            }
         }
     }
 

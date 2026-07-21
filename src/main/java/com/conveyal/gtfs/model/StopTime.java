@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.RestrictedBookingError;
 import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.flex.FlexStopTime;
 import com.google.common.base.Strings;
@@ -143,8 +144,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
                 unsupportedFlex("Flex stop_times must provide both start_ and end_pickup_drop_off_window.");
             }
             if (!(Strings.isNullOrEmpty(fst.pickup_booking_rule_id)
-                 && Strings.isNullOrEmpty(fst.drop_off_booking_rule_id))) {
-                unsupportedFlex("Flex stop_time references a booking rule, which is not currently supported.");
+                  && Strings.isNullOrEmpty(fst.drop_off_booking_rule_id))) {
+                feed.errors.add(new RestrictedBookingError(tableName, row));
             }
         }
 

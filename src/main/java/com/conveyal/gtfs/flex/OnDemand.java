@@ -22,10 +22,14 @@ public class OnDemand implements Serializable {
     // We demote them to arrays before use. These will be null if the service does not specify them.
     // At routing time these stop sets act through their meeting areas (see MeetingAreas and
     // OnDemandPlaceFilter), which are derived lazily per network rather than stored here.
+
     public int[] fromStopIndexes;
     public int[] toStopIndexes;
     public String serviceId;
     public int serviceCode;
+
+    /// Constant added to travel time to represent waiting for and boarding a vehicle,
+    /// loaded from GTFS safe_duration_offset. Units are seconds.
     public double durationOffset;
     public double durationFactor;
 
@@ -38,6 +42,7 @@ public class OnDemand implements Serializable {
     // window's start, as intentionally delaying arrival would serve no purpose.
     // A service that is always available (derived from GTFS lacking windows, or eventually a pick
     // up delay modification) is represented with a start time of 0 and an end time of MAX_VALUE.
+
     public int fromWindowStart;
     public int fromWindowEnd;
     public int toWindowEnd;

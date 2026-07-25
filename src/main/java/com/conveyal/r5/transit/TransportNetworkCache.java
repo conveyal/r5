@@ -144,6 +144,10 @@ public class TransportNetworkCache implements Component {
      * Javadoc on the Caffeine LoadingCache indicates that it will throw exceptions when the cache loader method throws
      * them, without establishing a mapping in the cache. So exceptions occurring during scenario application are
      * expected to bubble up unimpeded.
+     *
+     * Because all analyses run against scenario copies produced here (baseline analyses apply an empty scenario), base
+     * networks themselves are never analyzed, and the egress cost tables for their linkages remain in their original
+     * stop-major form, suitable for copying when different scenarios are applied to the same base. See EgressCostTable.
      */
     public TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
         TransportNetwork scenarioNetwork = scenarioNetworkCache.get(new BaseAndScenarioId(networkId, scenarioId));

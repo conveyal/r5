@@ -18,8 +18,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.StringJoiner;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
+import static com.conveyal.r5.common.Util.secondsToHhMm;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -64,6 +64,7 @@ public class PathResult {
             "transferTime",
             "waitTimes",
             "totalTime",
+            "departureTime",
             "nIterations",
             "group"
     };
@@ -95,63 +96,87 @@ public class PathResult {
         iterationsForPathTemplates[targetIndex] = routes;
     }
 
-    /**
-     * Summary of iterations for each destination, suitable for writing to a CSV. Conversion to strings happens here
-     * (on distributed workers) to minimize pressure on the central Broker's assembler.
-     *
-     * @param stat whether the reported per-leg wait times should correspond to the iteration with the minimum or mean
-     *             total waiting time.
-     * @return For each destination, a list of String[]s summarizing path templates. For each path template, details
-     *          of the itinerary with waiting time closest to the requested stat are included.
-     */
+    /// Summary of iterations for each destination, suitable for writing to a CSV. Conversion to strings happens here
+    /// (on distributed workers) to minimize pressure on the central Broker's assembler.
+    ///
+    /// For each destination, a row is produced for each distinct route-based path template, summarizing all the
+    /// iterations (departure minutes and Monte Carlo schedules) in which that template was optimal. The fixed
+    /// components of a template (access, egress, ride, and transfer times) are identical in all its iterations.
+    /// Only the waiting times and the total travel time vary. The requested Stat determines how those varying
+    /// quantities are summarized:
+    ///
+    /// - MINIMUM reports the single fastest iteration. The row describes an itinerary a rider could actually follow,
+    ///   and its columns sum exactly. Total time equals access + egress + rides + transfers + waits.
+    ///
+    /// - MEAN reports each leg's waiting time averaged over all iterations and the average total time. Because the
+    ///   other components do not vary, these averages also sum exactly. The mean total time equals access + egress +
+    ///   rides + transfers + mean waits. No single iteration necessarily matches, so departure time is left empty.
     public ArrayList<String[]>[] summarizeIterations(Stat stat) {
         ArrayList<String[]>[] summary = new ArrayList[nDestinations];
         for (int d = 0; d < nDestinations; d++) {
             summary[d] = new ArrayList<>();
             Multimap<RouteSequence, Iteration> iterationMap = iterationsForPathTemplates[d];
-            if (iterationMap != null) {
-                for (RouteSequence routeSequence: iterationMap.keySet()) {
-                    Collection<Iteration> iterations = iterationMap.get(routeSequence);
-                    int nIterations = iterations.size();
-                    checkState(nIterations > 0, "A path was stored without any iterations");
-                    String waits = null, transfer = null, totalTime = null;
-                    String[] path = routeSequence.detailsWithGtfsIds(transitLayer, csvOptions);
-                    double targetValue;
-                    IntStream totalWaits = iterations.stream().mapToInt(i -> i.waitTimes.sum());
-                    if (stat == Stat.MINIMUM) {
-                        targetValue = totalWaits.min().orElse(-1);
-                    } else if (stat == Stat.MEAN){
-                        targetValue = totalWaits.average().orElse(-1);
-                    } else {
-                        throw new RuntimeException("Unrecognized statistic for path summary");
-                    }
-                    double score = Double.MAX_VALUE;
-                    for (Iteration iteration: iterations) {
-                        // TODO clean up, maybe re-using approaches from PathScore?
-                        double thisScore = Math.abs(targetValue - iteration.waitTimes.sum());
-                        if (thisScore < score) {
-                            StringJoiner waitTimes = new StringJoiner("|");
-                            iteration.waitTimes.forEach(w -> {
-                                    waitTimes.add(String.format("%.1f", w / 60f));
-                                    return true;
-                            });
-                            waits = waitTimes.toString();
-                            transfer =  String.format("%.1f", routeSequence.stopSequence.transferTime(iteration) / 60f);
-                            totalTime = String.format("%.1f", iteration.totalTime / 60f);
-                            if (thisScore == 0) break;
-                            score = thisScore;
+            if (iterationMap == null) continue;
+            for (RouteSequence routeSequence : iterationMap.keySet()) {
+                Collection<Iteration> iterations = iterationMap.get(routeSequence);
+                int nIterations = iterations.size();
+                checkState(nIterations > 0, "A path was stored without any iterations");
+                int nLegs = routeSequence.routes.size();
+                String[] path = routeSequence.detailsWithGtfsIds(transitLayer, csvOptions);
+                String transfer = formatMinutes(routeSequence.stopSequence.totalTransferTimeSeconds());
+                String waits, totalTime, departureTime;
+                if (stat == Stat.MINIMUM) {
+                    // Report the fastest single iteration, an itinerary the rider could actually follow.
+                    // The secondary comparison on departure time makes the choice among ties deterministic.
+                    Iteration fastest = iterations.stream()
+                            .min(Comparator.comparingInt((Iteration i) -> i.totalTime)
+                                    .thenComparingInt(i -> i.departureTime))
+                            .get();
+                    StringJoiner waitJoiner = new StringJoiner("|");
+                    fastest.waitTimes.forEach(w -> {
+                        waitJoiner.add(formatMinutes(w));
+                        return true;
+                    });
+                    waits = waitJoiner.toString();
+                    totalTime = formatMinutes(fastest.totalTime);
+                    // A departure time is only meaningful when transit is ridden.
+                    // The total time of a walk-only trip does not depend on when it starts.
+                    departureTime = (nLegs > 0) ? secondsToHhMm(fastest.departureTime) : "";
+                } else if (stat == Stat.MEAN) {
+                    // Report each leg's wait averaged over all iterations. The number of legs
+                    // determined by grouping, so the wait lists of all iterations are parallel.
+                    double[] waitSums = new double[nLegs];
+                    double totalTimeSum = 0;
+                    for (Iteration iteration : iterations) {
+                        totalTimeSum += iteration.totalTime;
+                        for (int leg = 0; leg < nLegs; leg++) {
+                            waitSums[leg] += iteration.waitTimes.get(leg);
                         }
                     }
-                    String group = ""; // Reserved for future use
-                    String[] row = ArrayUtils.addAll(
-                            path, transfer, waits, totalTime, String.valueOf(nIterations), group
-                    );
-                    checkState(row.length == DATA_COLUMNS.length);
-                    summary[d].add(row);
+                    StringJoiner waitJoiner = new StringJoiner("|");
+                    for (int leg = 0; leg < nLegs; leg++) {
+                        waitJoiner.add(formatMinutes(waitSums[leg] / nIterations));
+                    }
+                    waits = waitJoiner.toString();
+                    totalTime = formatMinutes(totalTimeSum / nIterations);
+                    departureTime = "";
+                } else {
+                    throw new IllegalArgumentException("Unrecognized statistic for path summary");
                 }
+                String group = ""; // Reserved for future use
+                String[] row = ArrayUtils.addAll(
+                        path, transfer, waits, totalTime, departureTime, String.valueOf(nIterations), group
+                );
+                checkState(row.length == DATA_COLUMNS.length);
+                summary[d].add(row);
             }
         }
         return summary;
+    }
+
+    /// Format a duration in seconds as fractional minutes with one decimal place, as used in the result CSV.
+    private static String formatMinutes(double seconds) {
+        return String.format("%.1f", seconds / 60d);
     }
 
     public enum Stat {
@@ -204,16 +229,17 @@ public class PathResult {
         public TIntList waitTimes;
         public int totalTime;
 
-        public Iteration(Path path, int totalTime) {
-            this.departureTime = path.departureTime;
-            this.waitTimes = path.waitTimes;
+        public Iteration(Path path, int departureTime, int totalTime) {
+            this.departureTime = departureTime;
+            this.waitTimes = path.computeWaitTimes(departureTime);
             this.totalTime = totalTime;
         }
 
         /**
-         * Constructor for paths with no transit boardings (and therefore no wait times).
+         * Constructor for iterations that ride no transit (and therefore have no wait times).
          */
-        public Iteration(int totalTime) {
+        public Iteration(int departureTime, int totalTime) {
+            this.departureTime = departureTime;
             this.waitTimes = new TIntArrayList();
             this.totalTime = totalTime;
         }

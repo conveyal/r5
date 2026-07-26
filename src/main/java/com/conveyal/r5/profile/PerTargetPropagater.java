@@ -91,6 +91,14 @@ public class PerTargetPropagater {
     public List<Path[]> pathsToStopsForIteration = null;
 
     /**
+     * For each iteration of the raptor algorithm, the clock time at which the rider departs the origin. Needed to
+     * derive per-iteration waiting times from the clock times recorded in paths. Set by the caller together with
+     * pathsToStopsForIteration. When null (e.g. paths were requested but the router in use cannot supply them),
+     * departure times of zero are substituted.
+     */
+    public int[] departureTimeForIteration = null;
+
+    /**
      * Different options for retaining and reporting paths. In default analyses, paths are not retained.
      * For Taui sites, workers write directly to file storage.
      * For regional analyses with freeform pointsets, workers return paths to all destinations to the broker for
@@ -172,14 +180,7 @@ public class PerTargetPropagater {
         maxTravelTimeSeconds = task.maxTripDurationMinutes * SECONDS_PER_MINUTE;
 
         if (savePaths == SavePaths.ONE_DESTINATION){
-            if (targets instanceof WebMercatorGridPointSet) {
-                destinationIndexForPaths = ((WebMercatorGridPointSet) targets).getPointIndexContaining(
-                    task.toLon,
-                    task.toLat
-                );
-            } else if (targets instanceof FreeFormPointSet) {
-                destinationIndexForPaths = task.taskId;
-            }
+            destinationIndexForPaths = singlePathDestinationIndex(task, targets);
         }
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -206,6 +207,20 @@ public class PerTargetPropagater {
     }
 
     /**
+     * Return the index of a single destination within the target pointset. This is the point containing the
+     * destination coordinates of a single-point task, or the point paired with the origin by a one-to-one regional
+     * task. Tasks recording paths to all destinations have no such single index.
+     */
+    public static int singlePathDestinationIndex (AnalysisWorkerTask task, PointSet targets) {
+        if (targets instanceof WebMercatorGridPointSet) {
+            return ((WebMercatorGridPointSet) targets).getPointIndexContaining(task.toLon, task.toLat);
+        } else if (targets instanceof FreeFormPointSet) {
+            return task.taskId;
+        }
+        return -1;
+    }
+
+    /**
      * After constructing a propagator and setting any additional options or optional fields,
      * call this method to actually perform the travel time propagation.
      */
@@ -220,6 +235,9 @@ public class PerTargetPropagater {
         if (savePaths != SavePaths.NONE) {
             perIterationPaths = new Path[nIterations];
             perIterationEgress = new StreetTimesAndModes.StreetTimeAndMode[nIterations];
+            if (departureTimeForIteration == null) {
+                departureTimeForIteration = new int[nIterations];
+            }
         }
 
         // In most tasks, we want to propagate travel times for each origin out to all the destinations.
@@ -239,11 +257,12 @@ public class PerTargetPropagater {
             // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
             Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
 
-            // Clear out the Path array if we're building one. These are transit solution details, so they remain
-            // null until we find a good transit solution.
+            // Clear out the path and egress arrays if we're building them. These are transit solution details, so
+            // they remain null until we find a good transit solution.
             if (savePaths == SavePaths.WRITE_TAUI || savePaths == SavePaths.ALL_DESTINATIONS
                     || (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths)) {
                 Arrays.fill(perIterationPaths, null);
+                Arrays.fill(perIterationEgress, null);
             }
 
             // Improve upon these non-transit travel times based on transit travel times to nearby stops.
@@ -263,12 +282,12 @@ public class PerTargetPropagater {
                 // For regional tasks, return paths to all targets.
                 // Typically used with freeform destinations fewer in number than gridded destinations.
                 travelTimeReducer.recordPathsForTarget(targetIdx, perIterationTravelTimes, perIterationPaths,
-                        perIterationEgress);
+                        perIterationEgress, departureTimeForIteration);
             } else if (savePaths == SavePaths.ONE_DESTINATION && targetIdx == destinationIndexForPaths) {
                 // Return paths to the single target destination specified (by toLat/toLon in a single-point
                 // analysis, or by the origin-destination pairing implied by a oneToOne regional analysis).
                 travelTimeReducer.recordPathsForTarget(0, perIterationTravelTimes, perIterationPaths,
-                        perIterationEgress);
+                        perIterationEgress, departureTimeForIteration);
             }
 
             // Extract the requested percentiles and save them (and/or the resulting accessibility indicator values)

@@ -16,9 +16,10 @@ public class PatternSequence {
     /**
      * Create a PatternSequence from transit leg characteristics.
      */
-    public PatternSequence(TIntList patterns, TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds) {
+    public PatternSequence(TIntList patterns, TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds,
+                           TIntList transferTimesSeconds) {
         this.patterns = patterns;
-        this.stopSequence = new StopSequence(boardStops, alightStops, rideTimesSeconds);
+        this.stopSequence = new StopSequence(boardStops, alightStops, rideTimesSeconds, transferTimesSeconds);
     }
 
     /**
@@ -28,7 +29,8 @@ public class PatternSequence {
     public PatternSequence(PatternSequence source, StreetTimesAndModes.StreetTimeAndMode egress) {
         this.patterns = source.patterns;
         StopSequence sequence = source.stopSequence;
-        this.stopSequence = new StopSequence(sequence.boardStops, sequence.alightStops, sequence.rideTimesSeconds);
+        this.stopSequence = new StopSequence(sequence.boardStops, sequence.alightStops, sequence.rideTimesSeconds,
+                sequence.transferTimesSeconds);
         this.stopSequence.access = source.stopSequence.access;
         this.stopSequence.egress = egress;
     }

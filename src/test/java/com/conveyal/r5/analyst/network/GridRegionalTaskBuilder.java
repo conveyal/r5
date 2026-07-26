@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.network;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
@@ -111,6 +112,15 @@ public class GridRegionalTaskBuilder {
      */
     public GridRegionalTaskBuilder monteCarloDraws (int draws) {
         task.monteCarloDraws = draws;
+        return this;
+    }
+
+    /**
+     * Record detailed path information at each destination, as returned to the broker for CSV path results.
+     */
+    public GridRegionalTaskBuilder includePathResults () {
+        task.includePathResults = true;
+        task.csvResultOptions = new CsvResultOptions();
         return this;
     }
 

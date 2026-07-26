@@ -1,0 +1,4 @@
+route_id,trip_id,trip_short_name,direction_id,service_id
+R,T,Three Stop Flex Trip,0,S
+R,TVALID,Valid Two Stop Flex Trip,0,S
+R,SCHED,Scheduled Trip,0,S

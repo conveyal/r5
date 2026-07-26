@@ -95,8 +95,4 @@ public class RegionalTask extends AnalysisWorkerTask implements Cloneable {
         }
     }
 
-    public boolean hasFlag (String flag) {
-        return this.flags != null && this.flags.contains(flag);
-    }
-
 }

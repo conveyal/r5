@@ -306,8 +306,9 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
 
-    /** Load OSM, optionally removing floating subgraphs (recommended) */
-    void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
+    /// Load OSM, optionally removing floating islands (disconnected subgraphs). Synthetic test networks smaller than
+    /// MIN_SUBGRAPH_SIZE must disable this, or the entire network will be removed as a small island.
+    public void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
         if (!osm.intersectionDetection) {
             throw new IllegalArgumentException("Intersection detection not enabled on OSM source");
         }
@@ -433,11 +434,10 @@ public class StreetLayer implements Serializable, Cloneable {
         return prValue != null && ! prValue.equalsIgnoreCase("NO");
     }
 
-    /**
-     * TODO Javadoc. What is this for?
-     */
+    /// Apparently only used by point-to-point router
+    @Deprecated
     public void openOSM(File file) {
-        osm = new OSM(file.getPath());
+        osm = OSM.openOrCreateFile(file, null);
         LOG.info("Read OSM");
     }
 
@@ -541,7 +541,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
             // find nearby edges
             Envelope env = g.getEnvelopeInternal();
-            TIntSet nearbyEdges = this.spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = this.spatialIndex.query(GeometryUtils.envelopeToFixed(env));
 
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
@@ -1447,38 +1447,39 @@ public class StreetLayer implements Serializable, Cloneable {
         // TODO store street-to-stop distance in a table in TransitLayer. This also allows adjusting for subway entrances etc.
     }
 
-    /**
-     * Create a street-layer vertex representing a transit stop, and connect that new vertex to the street network if
-     * possible. The vertex will be created and assigned an index whether or not it is successfully linked to the streets.
-     * This is intended for transit stop linking. It always creates a new vertex in the street layer exactly at the
-     * coordinates provided. You can be sure to receive a unique vertex index each time it's called on the same street layer.
-     * Once it has created this new vertex, it will look for the nearest edge in the street network and link the newly
-     * created vertex to the closest point on that nearby edge.
-     * The process of linking to that edge may or may not create a second new splitter vertex along that edge.
-     * If the newly created vertex is near an intersection or another splitter vertex, the existing vertex will be
-     * reused. So in sum, this will create one or two new vertices, and all necessary edge pairs to properly connect
-     * these new vertices.
-     * TODO store street-to-stop distance in a table in TransitLayer, or change the link edge length. This also allows adjusting for subway entrances etc.
-     * @return the vertex of the newly created vertex at the supplied coordinates.
-     */
-    public int createAndLinkVertex (double lat, double lon) {
+    /// Create a street-layer vertex representing a transit stop, and connect that new vertex to the street network if
+    /// possible. A new vertex will always be created at exactly the coordinates provided, and assigned an index whether
+    /// or not it is successfully linked to the street network by an edge. It is guaranteed that you will receive a
+    /// unique vertex index each this is called on the same StreetLayer.
+    ///
+    /// Once the stop vertex is created, we look for the nearest edge in the street network and create a link edge from
+    /// the newly created stop vertex to the closest point on that nearby edge. The process of linking to that edge may
+    /// or may not create a new splitter vertex along that edge. If the new stop vertex is near an intersection or
+    /// another splitter vertex, that existing street vertex will be reused.
+    ///
+    /// So in sum, calling this method will always create one or two new vertices, one of which always represents a
+    /// stop at the given coordinates, and will create all necessary edge pairs to connect it to the streets. Those
+    /// link edges permit traversal by all modes. HOWEVER, the nearest street is always one that allows WALK, and there
+    /// is no guarantee it allows CAR. TODO This needs to be carefully rethought for on-demand stops.
+    ///
+    /// TODO store street-to-stop distance in a table in TransitLayer, or change the link edge length. This also allows adjusting for subway entrances etc.
+    /// @return the vertex of the newly created vertex at the supplied coordinates.
+    public int createStopVertexAndLink (double lat, double lon) {
         int stopVertex = vertexStore.addVertex(lat, lon);
         int streetVertexIndex = getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         if (streetVertexIndex == -1) {
-            return -1; // Unlinked
+            return -1; // Stop was created but not linked by edges to the street network.
         }
-
         VertexStore.Vertex streetVertex = vertexStore.getCursor(streetVertexIndex);
-        int length_mm = (int) (GeometryUtils.distance(lat,lon, streetVertex.getLat(), streetVertex.getLon())*1000);
-        // Set OSM way ID is -1 because this edge is not derived from any OSM way.
+        int length_mm = (int) (GeometryUtils.distance(lat,lon, streetVertex.getLat(), streetVertex.getLon()) * 1000);
+        // OSM way ID is set to -1 because this edge is not derived from any OSM way.
         Edge e = edgeStore.addStreetPair(stopVertex, streetVertexIndex, length_mm, -1);
-
         // Allow all modes to traverse street-to-transit link edges.
         // In practice, mode permissions will be controlled by whatever street edges lead up to these link edges.
-        e.allowAllModes(); // forward edge
+        e.allowAllModes(); // Forward edge from stop to street.
         e.setFlag(EdgeStore.EdgeFlag.LINK);
         e.advance();
-        e.allowAllModes(); // backward edge
+        e.allowAllModes(); // Backward edge from street to stop.
         e.setFlag(EdgeStore.EdgeFlag.LINK);
         return stopVertex;
     }
@@ -1509,13 +1510,12 @@ public class StreetLayer implements Serializable, Cloneable {
         return split;
     }
 
-    /**
-     * For every stop in a TransitLayer, find or create a nearby vertex in the street layer and record the connection
-     * between the two.
-     */
+    /// For every stop in a TransitLayer, find or create a nearby vertex in the street layer and
+    /// record the connection between the two. This is often referred to as linking transit stops
+    /// to the street layer. ("Linking" is mentioned to facilitate text searches for this method.)
     public void associateStops (TransitLayer transitLayer) {
         for (Stop stop : transitLayer.stopForIndex) {
-            int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon);
+            int stopVertex = createStopVertexAndLink(stop.stop_lat, stop.stop_lon);
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.
             // The inverse stopForStreetVertex map is a transient, derived index and will be built later.
         }
@@ -1671,7 +1671,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (parkRideLocationsMap != null) {
             EdgeStore.Edge e = edgeStore.getCursor();
             VertexStore.Vertex v = vertexStore.getCursor();
-            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = spatialIndex.query(GeometryUtils.envelopeToFixed(env));
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
                 if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
@@ -1700,7 +1700,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (bikeRentalStationMap != null) {
             EdgeStore.Edge e = edgeStore.getCursor();
             VertexStore.Vertex v = vertexStore.getCursor();
-            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            TIntSet nearbyEdges = spatialIndex.query(GeometryUtils.envelopeToFixed(env));
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
                 //TODO: for now bikeshares aren't connected with link edges to the graph

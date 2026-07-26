@@ -103,7 +103,8 @@ public class GeometryUtils {
         return geometry.contains(geometryFactory.createPoint(new Coordinate(x, y)));
     }
 
-    public static Envelope floatingWgsEnvelopeToFixed (Envelope floatingWgsEnvelope) {
+    /// Convert a JTS envelope in WGS84 floating point degrees to fixed-point degrees
+    public static Envelope envelopeToFixed (Envelope floatingWgsEnvelope) {
         double fixedMinX = floatingDegreesToFixed(floatingWgsEnvelope.getMinX());
         double fixedMaxX = floatingDegreesToFixed(floatingWgsEnvelope.getMaxX());
         double fixedMinY = floatingDegreesToFixed(floatingWgsEnvelope.getMinY());

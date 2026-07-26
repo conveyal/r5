@@ -1,17 +1,22 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.flex.MeetingAreas;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.StreetLayer;
+import com.google.common.collect.Sets;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
@@ -32,7 +37,6 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.r5.analyst.cluster.TransportNetworkConfig.TransferConfig.OSM_ONLY;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -72,16 +76,28 @@ public class TransportNetwork implements Serializable {
      */
     public WebMercatorGridPointSet fullExtentGridPointSet;
 
-    /**
-     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
-     * When no scenario has been applied, this field will contain the original base networkId.
-     * When a scenario has modified a base network to produce this network, this field will be changed to the
-     * scenario ID. This allows proper caching of downstream data and results: we need a way to know what information
-     * is in the network independent of object identity, and after a round trip through serialization.
-     */
+    /// A string uniquely identifying the contents of this TransportNetwork across all base and scenario networks.
+    /// When no scenario has been applied, this field will be set to the original base networkId.
+    /// When a scenario has modified a base network to produce this network, this field will be set to the scenario ID.
+    /// This allows proper caching of downstream data and results. It allows us to know what information is in the
+    /// network independent of object identity, and after a round trip through serialization.
     public String scenarioId = null;
 
     public InRoutingFareCalculator fareCalculator;
+
+    /// Per-stop "meeting areas" for on-demand service. These are built lazily and never serialized.
+    /// Each TransportNetwork has its own instance of this, with scenarioCopy networks discovering
+    /// new meeting areas using their own street layer and scenario-created stops through the standard mechanism.
+    private transient MeetingAreas meetingAreas;
+
+    /// Returns this network's meeting area cache, creating it on first use. Synchronized
+    /// because worker threads race to first use on a freshly loaded network.
+    public synchronized MeetingAreas meetingAreas () {
+        if (meetingAreas == null) {
+            meetingAreas = new MeetingAreas(this);
+        }
+        return meetingAreas;
+    }
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public transient List<TaskError> scenarioApplicationWarnings;
@@ -99,110 +115,151 @@ public class TransportNetwork implements Serializable {
         transitLayer.rebuildTransientIndexes();
     }
 
+    /// Build a TransportNetwork from already-loaded MapDB-backed OSM and GTFS objects. As of 2026-07 this single
+    /// shared network building code path is shared by both the production TransportNetworkCache and various test
+    /// cases providing temporary test fixture OSM and GTFS inputs.
+    ///
+    /// Intersections must already be detected on the supplied OSM object.
+    /// GTFS feeds are supplied as a stream, allowing them to be opened and closed one at a time.
+    ///
+    /// The body of this method is the network building logic formerly in TransportNetworkCache.buildNetworkFromConfig
+    /// followed by the distance table and grid linkage steps formerly in TransportNetworkCache.buildNetwork. Two
+    /// additional options allow adopting behavior more suited to tests or preserving the existing TransportNetworkCache
+    /// behavior. The config allows enabling or disabling disconnected component (island) pruning, and a parameter
+    /// allows closing inputs or leaving them open.
+    ///
+    ///  A null TransportNetworkConfig yields all-default options, as defined by a new instance of the config class.
+    ///
+    /// The resulting network's scenarioId is left null. Nothing reads or relies on scenarioId during the build, and in
+    /// non-test environments it should be set to the networkId or scenarioId by the caller (TransportNetworkCache).
+    public static TransportNetwork build (
+            TransportNetworkConfig config,
+            OSM osm,
+            Stream<GTFSFeed> gtfsFeeds,
+            boolean closeInputs
+    ) {
+        if (config == null) {
+            config = new TransportNetworkConfig();
+        }
+        TransportNetwork network = new TransportNetwork();
+        network.streetLayer = new StreetLayer(config);
+        network.streetLayer.loadFromOsm(osm, config.pruneIslands, false);
+        if (closeInputs) {
+            osm.close();
+        }
+        network.streetLayer.parentNetwork = network;
+        network.streetLayer.indexStreets();
+
+        // The GTFS transfer loader persists across all loaded feeds so we can feed information about all the transfers
+        // it created into the later OSM transfer generation step.
+        // The street network is loaded before the transit network, so at first it seems reasonable to create transfers
+        // feed-by-feed. However, stops need to be connected to streets before we find street transfers, and we want to
+        // create inter-feed transfers. So on-street transfers need to be discovered after all feeds have been loaded,
+        // while nonetheless giving priority to GTFS transfers from transfers.txt.
+        network.transitLayer = new TransitLayer(config);
+        GtfsTransferLoader gtfsTransferLoader = new GtfsTransferLoader(network.transitLayer, config.transfers);
+        gtfsFeeds.forEach(feed -> {
+            network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
+            if (closeInputs) {
+                feed.close();
+            }
+        });
+        gtfsTransferLoader.logErrors();
+        network.transitLayer.parentNetwork = network;
+        network.streetLayer.associateStops(network.transitLayer);
+        network.streetLayer.buildEdgeLists();
+        network.rebuildTransientIndexes();
+
+        // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
+        TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);
+        transferFinder.findTransfers();
+        transferFinder.findParkRideTransfer();
+
+        // Apply modifications embedded in the TransportNetworkConfig JSON
+        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
+                RasterCost.class, ShapefileLts.class
+        );
+        if (config.modifications != null) {
+            // Scenario scenario = new Scenario();
+            // scenario.modifications = config.modifications;
+            // scenario.applyToTransportNetwork(network);
+            // This is applying the modifications _without creating a scenario copy_.
+            // This will destructively edit the network and will only work for certain modifications.
+            for (Modification modification : config.modifications) {
+                if (!ACCEPT_MODIFICATIONS.contains(modification.getClass())) {
+                    throw new UnsupportedOperationException(
+                        "Modification type has not been evaluated for application at network build time:" +
+                        modification.getClass().toString()
+                    );
+                }
+                modification.resolve(network);
+                modification.apply(network);
+            }
+        }
+
+        // Pre-compute distance tables from stops out to street vertices, then pre-build a linked grid pointset for the
+        // whole region covered by the street network. These tables and linkages will be serialized along with the
+        // network, which avoids building them when every analysis worker starts. The linkage we create here will never
+        // be used directly, but serves as a basis for scenario linkages, making analyses much faster to start up.
+        // Note, this retains stop-to-vertex distances for the WALK MODE ONLY, even when they are produced as
+        // intermediate results while building linkages for other modes.
+        // This is a candidate for optimization if car or bicycle scenarios are slow to apply.
+        // TODO These two precomputation steps could be made optional if test callers need to build many large networks.
+        //  If skipped, only access indicator tests and scenario modification tests fail. Total test suite time did not
+        //  decrease, but that could change in the future.
+        network.transitLayer.buildDistanceTables(null);
+        Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
+        if (config.buildGridsForModes != null) {
+            buildGridsForModes.addAll(config.buildGridsForModes);
+        }
+        network.rebuildLinkedGridPointSet(buildGridsForModes);
+        return network;
+    }
+
     public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles) {
         return fromFiles(osmSourceFile, gtfsSourceFiles, null);
     }
 
-    /**
-     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
-     * more than one PBF file into a single OSM storage object. However they might be from different points in time, so
-     * we have decided to allow only one OSM input file, loaded into a single OSM object.
-     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
-     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
-     * doesn't really matter, particularly for analytics. Loading all he feeds into memory simulataneously shouldn't be
-     * so bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap allocations etc.)
-     * Therefore we create the feeds within a stream which loads them one by one on demand.
-     *
-     * NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
-     * This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
-     */
+    /// Read OSM and GTFS inputs (and optionally TransportNetworkConfig JSON) from files, then pass them to the
+    /// standard shared network build method. This allows loading from test fixture files.
+    ///
+    /// OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
+    /// more than one PBF file into a single OSM storage object. However they might be from different points in time, so
+    /// we have decided to allow only one OSM input file, loaded into a single OSM object.
+    /// On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
+    /// distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
+    /// doesn't really matter, particularly for analytics. Loading all he feeds into memory simultaneously shouldn't be
+    /// so bad with mapdb-based feeds, but it's still not great (due to instance caching, off heap allocations etc.)
+    /// Therefore we create the feeds within a stream which loads them one by one on demand.
+    ///
+    /// NOTE the feedId of the gtfs feeds loaded here will be the ones declared by the feeds or based on their filenames.
+    /// This method makes no effort to impose the more unique feed IDs created by the Analysis backend.
     public static TransportNetwork fromFiles (
             String osmSourceFile,
             List<String> gtfsSourceFiles,
             String configFile
     ) throws DuplicateFeedException {
-        // Load OSM data into MapDB to pass into network builder.
-        OSM osm = new OSM(osmSourceFile + ".mapdb");
-        osm.intersectionDetection = true;
-        osm.readFromFile(osmSourceFile);
+        // Load OSM data into MapDB to pass into network builder, reusing any previously parsed data.
+        OSM osm = OSM.openOrCreateFile(new File(osmSourceFile + ".mapdb"), osmSourceFile);
         // Supply feeds with a stream so they do not sit open in memory while other feeds are being processed.
         Stream<GTFSFeed> feeds = gtfsSourceFiles.stream().map(GTFSFeed::readOnlyTempFileFromGtfs);
         if (configFile == null) {
-            return fromInputs(osm, feeds);
+            return build(null, osm, feeds, true);
         } else {
             try {
                 // Use lenient mapper to mimic behavior in objectFromRequestBody.
                 TransportNetworkConfig config = JsonUtilities.lenientObjectMapper.readValue(
                       configFile, TransportNetworkConfig.class);
-                return fromInputs(osm, feeds, config);
+                return build(config, osm, feeds, true);
             } catch (IOException e) {
                 throw new RuntimeException("Error reading TransportNetworkConfig. Does it contain new unrecognized fields?", e);
             }
         }
     }
 
-    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds) {
-        return fromInputs(osm, gtfsFeeds, null);
-    }
+    
 
-    /**
-     * This is the method for building a street and transit network locally (in PointToPointRouterServer as opposed to
-     * TransportNetworkCache#buildNetworkfromConfig, which is used in cluster builds). This method takes osm-lib,
-     * gtfs-lib, and config objects as parameters. It is wrapped in various other methods that create those OSM and
-     * GTFS objects from filenames, input directories etc. The supplied OSM object must have intersections already
-     * detected. The GTFS feeds are supplied as a stream so that they can be loaded one by one on demand.
-     */
-    @Deprecated
-    public static TransportNetwork fromInputs (OSM osm, Stream<GTFSFeed> gtfsFeeds, TransportNetworkConfig config) {
-        // Create a transport network to hold the street and transit layers
-        TransportNetwork transportNetwork = new TransportNetwork();
-
-        // Make street layer from OSM data in MapDB
-        StreetLayer streetLayer = new StreetLayer(config);
-        transportNetwork.streetLayer = streetLayer;
-        streetLayer.parentNetwork = transportNetwork;
-        streetLayer.loadFromOsm(osm);
-        // Note that if load fails, the OSM mapdb might not be closed leaving a corrupted file.
-        // We should probably try to delete the file when exceptions occur, or at least close it properly.
-        osm.close();
-
-        // Build a street index to help associate transit stops and bike share stations with the street network.
-        streetLayer.indexStreets();
-
-        // Load transit data
-        TransitLayer transitLayer = new TransitLayer(config);
-        gtfsFeeds.forEach(gtfsFeed -> {
-            // GTFS transfers are being ignored here.
-            // However, the present method is deprecated, remaining only for informational purposes.
-            transitLayer.loadFromGtfs(gtfsFeed, new GtfsTransferLoader(transitLayer, OSM_ONLY));
-            // Is there a reason we can't push this close call down into the loader method? Maybe exception handling?
-            gtfsFeed.close();
-        });
-        transportNetwork.transitLayer = transitLayer;
-        transitLayer.parentNetwork = transportNetwork;
-        // transitLayer.summarizeRoutesAndPatterns();
-
-        // The street index is needed for associating transit stops with the street network.
-        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here.
-        streetLayer.indexStreets();
-        streetLayer.associateStops(transitLayer);
-        // Edge lists must be built after all inter-layer linking has occurred.
-        streetLayer.buildEdgeLists();
-
-        // This would re-build the street index and edge list, so we only rebuild indexes on the transit layer.
-        // However TransportNetworkCache#buildNetworkFromConfig does seem to call rebuild on the whole network.
-        // transportNetwork.rebuildTransientIndexes();
-        transitLayer.rebuildTransientIndexes();
-
-        // Create street transfers.
-        // GTFS transfers are being ignored here.
-        // However, the present method is deprecated, remaining only for informational purposes.
-        var noOpLoader = new GtfsTransferLoader(transitLayer, OSM_ONLY);
-        new TransferFinder(transportNetwork, noOpLoader).findTransfers();
-        new TransferFinder(transportNetwork, noOpLoader).findParkRideTransfer();
-
-        return transportNetwork;
-    }
+    
 
     /**
      * Scan a directory detecting all the files that are network inputs, then build a network from those files.
@@ -259,13 +316,12 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Opens OSM MapDB database if it exists
-     * Otherwise it prints a warning
-     *
-     * OSM MapDB is used for names of streets. Since they are needed only in display of paths.
+     * Opens OSM MapDB database if it exists, otherwise prints a warning. In the point-to-point
+     * router OSM MapDB is used for names of streets. Since they are needed only in display of paths.
      * They aren't saved in street layer.
      * @param file
      */
+    @Deprecated
     public void readOSM(File file) {
         if (file.exists()) {
             streetLayer.openOSM(file);

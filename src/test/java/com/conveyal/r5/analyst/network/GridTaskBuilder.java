@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.network;
 
+import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
@@ -138,6 +139,13 @@ public class GridTaskBuilder {
     /// making the tests run slower). In the future, seeding the random number generator could avoid these problems.
     public GridTaskBuilder monteCarloDraws (int draws) {
         task.monteCarloDraws = draws;
+        return this;
+    }
+
+    /// Record detailed path information at each destination, as returned to the broker for CSV path results.
+    public GridTaskBuilder includePathResults () {
+        task.includePathResults = true;
+        task.csvResultOptions = new CsvResultOptions();
         return this;
     }
 

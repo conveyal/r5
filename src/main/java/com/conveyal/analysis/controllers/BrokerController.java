@@ -183,7 +183,7 @@ public class BrokerController implements HttpController {
         if (address == null) {
             // There are no workers that can handle this request. Request some.
             WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.regionId);
-            broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
+            broker.createSingleWorker(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
             return jsonResponse(response, HttpStatus.ACCEPTED_202, "Starting routing server. Expect status updates within a few minutes.");

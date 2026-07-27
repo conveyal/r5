@@ -102,8 +102,6 @@ public class PathResultTests {
     /// Check the CSV summary rows against the recorded iterations: correct column count, minimum rows reporting the
     /// fastest iteration with its departure time, and mean rows reporting the average total time.
     private static void checkSummaryStatistics (PathResult pathResult) {
-        // Tolerance for comparing quantities that were formatted as fractional minutes with one decimal place.
-        final double roundingTolerance = 0.05;
         ArrayList<String[]>[] minSummary = pathResult.summarizeIterations(PathResult.Stat.MINIMUM);
         ArrayList<String[]>[] meanSummary = pathResult.summarizeIterations(PathResult.Stat.MEAN);
         for (int d = 0; d < minSummary.length; d++) {
@@ -111,11 +109,11 @@ public class PathResultTests {
             assertEquals(iterationMap.keySet().size(), minSummary[d].size());
             assertEquals(iterationMap.keySet().size(), meanSummary[d].size());
             // Rows for one destination are not in a guaranteed order, so check them against aggregate expectations.
-            double expectedFastest = iterationMap.asMap().values().stream()
+            int expectedFastestSeconds = iterationMap.asMap().values().stream()
                     .flatMap(Collection::stream)
-                    .mapToDouble(i -> i.totalTime / 60d)
-                    .min().getAsDouble();
-            double observedFastest = Double.MAX_VALUE;
+                    .mapToInt(i -> i.totalTime)
+                    .min().getAsInt();
+            long observedFastestSeconds = Long.MAX_VALUE;
             for (String[] row : minSummary[d]) {
                 assertEquals(PathResult.DATA_COLUMNS.length, row.length);
                 boolean transitRidden = !row[0].isEmpty();
@@ -125,9 +123,12 @@ public class PathResultTests {
                 } else {
                     assertTrue(departureTime.isEmpty());
                 }
-                observedFastest = Math.min(observedFastest, Double.parseDouble(row[9]));
+                // CSV times are fractional minutes with two decimal places. That rounding has a maximum error of
+                // 0.3 seconds, so the exact whole seconds of the underlying iteration are recoverable and the
+                // comparison below is exact, with no tolerance needed.
+                observedFastestSeconds = Math.min(observedFastestSeconds, Math.round(Double.parseDouble(row[9]) * 60));
             }
-            assertEquals(expectedFastest, observedFastest, roundingTolerance,
+            assertEquals(expectedFastestSeconds, observedFastestSeconds,
                     "The fastest of all minimum-stat rows should be the fastest iteration overall.");
             for (String[] row : meanSummary[d]) {
                 assertEquals(PathResult.DATA_COLUMNS.length, row.length);

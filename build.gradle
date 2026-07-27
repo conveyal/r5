@@ -81,8 +81,11 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
-// A task to copy all dependency JARs needed at runtime into a single directory
-task copyDependencies(type: Copy) {
+// A task to put all dependency JARs needed at runtime into a single directory. This is a Sync
+// rather than a Copy, to prevent accumulation of different JAR versions in the directory. If
+// multiple versions are accidentally deployed together, the JVM will load a version based only on
+// classpath enumeration order.
+task copyDependencies(type: Sync) {
     from(sourceSets.main.runtimeClasspath) {
         include '*.jar'
     }
@@ -173,9 +176,15 @@ dependencies {
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
     implementation 'org.mongojack:mongojack:2.10.1'
 
-    // JSON serialization and deserialization from and to Java objects
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
+    // JSON serialization and deserialization from and to Java objects.
+    // The enforcedPlatform BOM holds every com.fasterxml.jackson module at one version.
+    // This overrides version requests from transitive dependencies, which may silently raise the Jackson version.
+    // This version may be increased or the cap removed only when mongojack and bson4jackson are removed.
+    // Under Jackson 2.15 or newer, bson4jackson corrupts numbers buffered during polymorphic deserialization,
+    // seeing empty strings or zeros. An AWS SDK upgrade triggered this problem.
+    implementation enforcedPlatform('com.fasterxml.jackson:jackson-bom:2.10.5.20201202')
+    implementation 'com.fasterxml.jackson.core:jackson-core'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 
     // Parses CSV. GTFS is a set of zipped CSV files, and some of our other inputs are CSV files.
     implementation 'net.sourceforge.javacsv:javacsv:2.0'

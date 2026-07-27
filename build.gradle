@@ -158,6 +158,21 @@ configurations.all {
     exclude group: "junit", module: "junit"
 }
 
+// Hold all com.fasterxml.jackson modules at one version, overriding requests from transitive dependencies.
+// Under Jackson 2.15 or newer, bson4jackson corrupts numbers buffered during polymorphic deserialization,
+// yielding empty strings or zeros. An AWS SDK upgrade triggered this problem.
+// The cap may be raised or removed only when mongojack and bson4jackson are removed.
+// This is not an enforcedPlatform because that would force versions on downstream projects and is disallowed.
+// The group prefix ends with a dot to cover all Jackson modules while excluding the jackson-bom platform itself.
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group.startsWith('com.fasterxml.jackson.')) {
+            details.useVersion(details.requested.name == 'jackson-databind' ? '2.10.5.1' : '2.10.5')
+            details.because('bson4jackson and mongojack corrupt MongoDB reads under Jackson 2.15 or newer')
+        }
+    }
+}
+
 dependencies {
     // Provides our logging API
     implementation 'org.slf4j:slf4j-api:2.0.7'
@@ -176,13 +191,10 @@ dependencies {
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
     implementation 'org.mongojack:mongojack:2.10.1'
 
-    // JSON serialization and deserialization from and to Java objects.
-    // The enforcedPlatform BOM holds every com.fasterxml.jackson module at one version.
-    // This overrides version requests from transitive dependencies, which may silently raise the Jackson version.
-    // This version may be increased or the cap removed only when mongojack and bson4jackson are removed.
-    // Under Jackson 2.15 or newer, bson4jackson corrupts numbers buffered during polymorphic deserialization,
-    // seeing empty strings or zeros. An AWS SDK upgrade triggered this problem.
-    implementation enforcedPlatform('com.fasterxml.jackson:jackson-bom:2.10.5.20201202')
+    // JSON serialization and deserialization from and to Java objects. The BOM aligns all
+    // com.fasterxml.jackson modules on one version but is published only as an advisory import.
+    // The resolution rule above this dependencies block provides a hard cap on version numbers.
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.10.5.20201202')
     implementation 'com.fasterxml.jackson.core:jackson-core'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
 

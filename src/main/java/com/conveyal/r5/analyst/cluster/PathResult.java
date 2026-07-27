@@ -174,9 +174,13 @@ public class PathResult {
         return summary;
     }
 
-    /// Format a duration in seconds as fractional minutes with one decimal place, as used in the result CSV.
-    private static String formatMinutes(double seconds) {
-        return String.format("%.1f", seconds / 60d);
+    /// Format a duration in seconds as fractional minutes with two decimal places for use in result CSV.
+    /// Two decimal places is the coarsest fractional-minute format that loses no information.
+    /// Rounding error is at most 0.005 minutes (0.3 seconds) so an exact number of seconds is recoverable
+    /// by rounding (minutes * 60). Averages of durations in whole seconds can take on fractional values
+    /// that can't be recovered exactly, but are reported in the same format for consistency.
+    public static String formatMinutes (double seconds) {
+        return String.format("%.2f", seconds / 60d);
     }
 
     public enum Stat {

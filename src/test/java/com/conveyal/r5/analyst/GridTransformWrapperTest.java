@@ -74,6 +74,48 @@ class GridTransformWrapperTest {
         assertThrows(IllegalArgumentException.class, () -> new GridTransformWrapper(webMercatorExtents, grid));
     }
 
+    /// Stack two grids of different heights as we do in regional analyses, wrapping them to match
+    /// the minimum bounding extents found with forPointsets. This detects a bug where
+    /// WebMercatorExtents.expandToInclude truncated the height of the grid, zeroing out
+    /// opportunities in the southern rows of taller grids.
+    @Test
+    void testUnequalHeights () {
+
+        // The vertically short grid is the same width as the tall grid,
+        // and overlaps the northeast part of the tall grid.
+        Grid tallGrid = new Grid(2000, 1000, 100, 300, 10);
+        Grid shortGrid = new Grid(2050, 1100, 100, 50, 10);
+
+        // Put one full-height column and one full-width row of opportunities in each grid.
+        // This should catch truncation of the combined grid in either dimension.
+        List<Grid.PixelWeight> tallWeights = new ArrayList<>();
+        for (int y = 0; y < 300; y++) {
+            tallWeights.add(new Grid.PixelWeight(50, y, 1));
+        }
+        for (int x = 0; x < 100; x++) {
+            tallWeights.add(new Grid.PixelWeight(x, 150, 1));
+        }
+        List<Grid.PixelWeight> shortWeights = new ArrayList<>();
+        for (int y = 0; y < 50; y++) {
+            shortWeights.add(new Grid.PixelWeight(50, y, 1));
+        }
+        for (int x = 0; x < 100; x++) {
+            shortWeights.add(new Grid.PixelWeight(x, 25, 1));
+        }
+        tallGrid.incrementFromPixelWeights(tallWeights, 1);
+        shortGrid.incrementFromPixelWeights(shortWeights, 1);
+
+        WebMercatorExtents unionExtents = WebMercatorExtents.forPointsets(new PointSet[] {tallGrid, shortGrid});
+        assertEquals(new WebMercatorExtents(2000, 1000, 150, 300, 10), unionExtents,
+                "Union extents should be the minimum bounding extents of the two grids.");
+
+        for (Grid grid : List.of(tallGrid, shortGrid)) {
+            GridTransformWrapper wrapper = new GridTransformWrapper(unionExtents, grid);
+            assertEquals(grid.sumTotalOpportunities(), wrapper.sumTotalOpportunities(),
+                    "Wrapping a grid to the union extents of a stack should preserve all its opportunities.");
+        }
+    }
+
     /*
      * TODO lat/lon based testing
      * Given a set of points at latitudes and longitudes, write the same points into overlapping grids of different

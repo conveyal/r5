@@ -13,25 +13,42 @@ import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 import static com.google.common.base.Preconditions.checkArgument;
 
-/**
- * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
- * Also contains reusable methods for validating WGS84 envelopes and latitude and longitude values.
- */
+/// Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
+/// Also contains reusable methods for validating WGS84 envelopes and latitude and longitude values.
 public class GeometryUtils {
     public static final GeometryFactory geometryFactory = new GeometryFactory();
 
-    /** Average of polar and equatorial radii, https://en.wikipedia.org/wiki/Earth */
+    /// The radius of a spherical approximation of Earth.
+    /// The average of the polar and equatorial radii, https://en.wikipedia.org/wiki/Earth
+    /// Changing this value will change the traversal times of every street network edge.
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
 
-    /** Maximum area allowed for the bounding box of uploaded files -- large enough for California.  */
+    /// The `earthRadius` constant used by the Turf JS library. Its meaning is identical to
+    /// RADIUS_OF_EARTH_M (spherical Earth radius) but a different estimate (IUGG mean radius R1).
+    /// Used to exactly replicate distances computed by frontend code. Results differ by 0.056%
+    /// relative to RADIUS_OF_EARTH_M which is a slightly better estimate at mid-latitudes.
+    public static final double TURF_RADIUS_OF_EARTH_M = 6_371_008.8;
+
+    /// Maximum area allowed for the bounding box of uploaded files -- large enough for California.
     private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 975_000;
 
-    /**
-     * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this
-     * quickly, but I'm not convinced we actually need it.
-     * @return distance in meters
-     */
+    /// Estimate distance between points on Earth using a spherical approximation (haversine
+    /// formula). In the past, we had a fastDistance function that would estimate this quickly, but
+    /// that optimization was deemed unnecessary.
+    /// @return distance in meters between the given lat/lon points
     public static double distance (double lat0, double lon0, double lat1, double lon1) {
+        return haversineMeters(lat0, lon0, lat1, lon1, RADIUS_OF_EARTH_M);
+    }
+
+    /// Estimate distance between points on Earth with the same spherical approximation used by the
+    /// Turf JS library. Used to exactly replicate distances computed by frontend code.
+    /// The Turf formulation is slightly different but results are within a few ULPs.
+    public static double turfDistance (double lat0, double lon0, double lat1, double lon1) {
+        return haversineMeters(lat0, lon0, lat1, lon1, TURF_RADIUS_OF_EARTH_M);
+    }
+
+    /// Haversine formula for distance in meters on a sphere with the given radius.
+    private static double haversineMeters (double lat0, double lon0, double lat1, double lon1, double radiusMeters) {
         double theta0 = FastMath.toRadians(lat0);
         double theta1 = FastMath.toRadians(lat1);
         double lambda0 = FastMath.toRadians(lon0);
@@ -43,7 +60,7 @@ public class GeometryUtils {
         double sin2lambda = FastMath.pow(FastMath.sin(lambdaComb), 2);
 
         double underRadical = sin2theta + FastMath.cos(theta0) * FastMath.cos(theta1) * sin2lambda;
-        return 2 * RADIUS_OF_EARTH_M * FastMath.asin(FastMath.sqrt(underRadical));
+        return 2 * radiusMeters * FastMath.asin(FastMath.sqrt(underRadical));
     }
 
     /**

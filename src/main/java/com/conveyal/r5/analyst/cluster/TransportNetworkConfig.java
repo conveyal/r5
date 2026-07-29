@@ -67,6 +67,18 @@ public class TransportNetworkConfig {
     public boolean saveShapes;
 
     /**
+     * Whether to remove disconnected fragments ("islands") of the street network after loading OSM data. Islands
+     * smaller than a fixed threshold (StreetLayer.MIN_SUBGRAPH_SIZE vertices, evaluated separately per street mode)
+     * are stripped of their traversal permissions. The default is true, which is recommended for real-world data.
+     * Synthetic test networks far smaller than the threshold must set this to false or be pruned away entirely.
+     * The default value is defined only here; all build code reads this field rather than supplying its own default.
+     * NON_DEFAULT serialization keeps the field out of configs that don't use it, so those configs remain readable
+     * by older workers that parse with a strict object mapper (see class javadoc).
+     */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public boolean pruneIslands = true;
+
+    /**
      * How to handle stop-to-stop transfers in GTFS transfers.txt, and how to combine them with OSM-derived transfers.
      * OSM_ONLY is the default, but STOP_TO_PATTERN should generally provide better results where GTFS data is good.
      * In some cases path results may be strange or incorrect, but the quality of travel times should be no worse than

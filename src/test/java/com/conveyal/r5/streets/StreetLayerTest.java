@@ -25,7 +25,7 @@ public class StreetLayerTest {
     /** Test that subgraphs are removed as expected */
     @Test
     public void testSubgraphRemoval () {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("subgraph.pbf").toString());
 
@@ -62,7 +62,7 @@ public class StreetLayerTest {
      */
     @Test
     public void testSplits() throws Exception {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("speedFlagsTest.pbf").toString());
 
@@ -134,7 +134,7 @@ public class StreetLayerTest {
      */
      @Test
     public void testSplitsForStops () {
-         OSM osm = new OSM(null);
+         OSM osm = OSM.newWritableInMemory();
          osm.intersectionDetection = true;
 
          // One winding road from Oakland, CA that will yield one edge in our street graph
@@ -163,7 +163,7 @@ public class StreetLayerTest {
 
          TIntList stopVertexIds = new TIntArrayList();
          for (Coordinate stopCoordinate : stopCoordinates) {
-             int stopVertexId = streetLayer.createAndLinkVertex(stopCoordinate.y, stopCoordinate.x);
+             int stopVertexId = streetLayer.createStopVertexAndLink(stopCoordinate.y, stopCoordinate.x);
              // Vertex IDs 0 and 1 should be taken by the beginning and end points of the single original edge.
              // Negative vertex ID would indicate a linking problem.
              assertTrue(stopVertexId > 1);
@@ -244,7 +244,7 @@ public class StreetLayerTest {
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
     @Test
     public void testSimpleTurnRestriction () {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("cathedral-no-left.pbf").toString());
 
@@ -288,7 +288,7 @@ public class StreetLayerTest {
     /** Test that complex turn restrictions (via ways) are read properly, using http://www.openstreetmap.org/relation/555630 */
     @Test
     public void testComplexTurnRestriction () {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("reisterstown-via-restriction.pbf").toString());
 
@@ -358,7 +358,7 @@ public class StreetLayerTest {
      */
     @Test
     public void testBarrierFiltering () {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("delft-station.pbf").toString());
 
@@ -410,7 +410,7 @@ public class StreetLayerTest {
      */
     @Test
     public void testMissingNodes () {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableInMemory();
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("missing-nodes.pbf").toString());
         assertDoesNotThrow(() -> {

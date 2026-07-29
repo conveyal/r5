@@ -33,14 +33,17 @@ public class CropGTFS {
     // Logger is not super useful because as a library, gtfs-lib has no logger implementation defined by default.
     private static final Logger LOG = LoggerFactory.getLogger(CropGTFS.class);
 
-    private static final String inputFile = "/Users/abyrd/test-est/gtfs_fr-cha_pourOAD.zip";
-    private static final String outputFile = ""; //"/Users/abyrd/geodata/nl/NL-2016-08-23-noplatforms-noshapes.gtfs.zip";
+    private static final String inputFile = "/Users/abyrd/data/switzerland/CH_20260512_oneday.gtfs.zip";
+    private static final String outputFile = "/Users/abyrd/data/switzerland/CH_20260512_oneday_merged_noshapes_neuchatel.gtfs.zip";
 
     // Replace all stops with their parent stations to simplify trip patterns.
     private static final boolean MERGE_STATIONS = true;
 
     // Remove all shapes from the GTFS to make it simpler to render in a web UI
     private static final boolean REMOVE_SHAPES = true;
+
+    // The geometry within which we will keep all stops
+    private static final Geometry bounds = Geometries.forBoundingBox(6.414515, 46.416727, 7.693993, 47.511720);
 
     public static void main (String[] args) {
 
@@ -50,9 +53,6 @@ public class CropGTFS {
         // A TObjectIntMap would be good for this as well, but we don't currently depend on Trove.
         Set<String> referencedTripIds = new HashSet<>();
         Set<String> retainedTripIds = new HashSet<>();
-
-        // The geometry within which we will keep all stops
-        Geometry bounds = Geometries.getNetherlandsWithoutTexel();
 
         System.out.println("Removing stops outside bounding box...");
         Map<String, String> stopIdReplacements = new HashMap<>(); // Used when collapsing stops into stations.

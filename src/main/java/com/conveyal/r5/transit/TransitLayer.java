@@ -1,6 +1,13 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.flex.FlexGroup;
+import com.conveyal.gtfs.flex.FlexLocation;
+import com.conveyal.gtfs.flex.FlexTrip;
+import com.conveyal.gtfs.flex.OnDemand;
+import com.conveyal.gtfs.flex.OnDemandIndex;
+import com.conveyal.gtfs.flex.FlexStopTime;
+import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Frequency;
@@ -10,6 +17,7 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
@@ -57,6 +65,8 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
+import static com.conveyal.gtfs.model.Entity.INT_MISSING;
+import static com.conveyal.gtfs.util.Util.xor;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.ID_ONLY;
 import static com.conveyal.r5.transit.TransitLayer.EntityRepresentation.NAME_ONLY;
 
@@ -149,7 +159,8 @@ public class TransitLayer implements Serializable, Cloneable {
     /** does this TransitLayer have any frequency-based trips? */
     public boolean hasFrequencies = false;
 
-    /** Does this TransitLayer have any schedules */
+    /** Does this TransitLayer have any schedules
+     * TODO clarify whether this means schedule-based trips in contrast to above frequency-based? */
     public boolean hasSchedules = false;
 
     /**
@@ -179,6 +190,10 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
+
+    /// If any on-demand services of the types described by GTFS Flex extensions are present, this
+    /// field will be non-null.
+    public OnDemandIndex onDemandIndex;
 
     /**
      * A string uniquely identifying the contents of this TransitLayer among all TransitLayers.
@@ -218,7 +233,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
-        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>(gtfs.stops.size(), 0.5F, -1);
         stopsWheelchair = new BitSet(gtfs.stops.size());
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
@@ -256,6 +271,17 @@ public class TransitLayer implements Serializable, Cloneable {
         int nTripsAdded = 0;
         int nZeroDurationHops = 0;
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
+            // On-demand (flex) trips are not associated with patterns, and may be lacking arrival
+            // and departure times. Such trips are handled completely separately in another loop below.
+            // TODO deviated-fixed routes or routes that are a sequence of locations/zones fit into patterns.
+            if (gtfs.flexTripIds.contains(tripId)) {
+                continue;
+            }
+            String patternId = gtfs.patternForTrip.get(tripId);
+            if (patternId == null) {
+                LOG.warn("Non-on-demand trip was not associated with any pattern.");
+                continue;
+            }
             Trip trip = gtfs.trips.get(tripId);
             Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip.
@@ -302,8 +328,6 @@ public class TransitLayer implements Serializable, Cloneable {
                 LOG.warn("Trip {} on route {} {} has no stops, it will not be used", trip.trip_id, trip.route_id, route.route_short_name);
                 continue;
             }
-
-            String patternId = gtfs.patternForTrip.get(tripId);
 
             TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
@@ -469,6 +493,119 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         this.fares = new HashMap<>(gtfs.fares);
         transferLoader.loadTransfersTxt(gtfs, indexForUnscopedStopId);
+
+        if (gtfs.hasFlex()) {
+            // Load on-demand zone-oriented transit (GTFS-Flex extensions).
+            // Reuse any existing index to accumulate on-demand services from multiple GTFS feeds.
+            if (onDemandIndex == null) onDemandIndex = new OnDemandIndex();
+            for (String tripId : gtfs.flexTripIds) {
+                List<StopTime> stopTimes = gtfs.getOrderedStopTimesForTrip(tripId).stream().collect(Collectors.toList());
+                // This replicates some checks in the GTFS loader that report incorrect or unsupported flex trips to
+                // the user. Here we skip over such trips, in case the user builds a network from the feed anyway.
+                if (stopTimes.size() != 2) {
+                    LOG.warn("Skipping on-demand trip {} from GTFS Flex: only trips with exactly two stop_times are supported.", tripId);
+                    continue;
+                }
+                FlexStopTime fromStopTime = validateFlexStopTime(stopTimes.get(0));
+                FlexStopTime toStopTime = validateFlexStopTime(stopTimes.get(1));
+                if (fromStopTime == null || toStopTime == null) {
+                    LOG.warn("Skipping on-demand trip {} from GTFS Flex: each stop_time must reference exactly one polygonal zone or location group.", tripId);
+                    continue;
+                }
+                Trip trip = gtfs.trips.get(tripId);
+                // It is not straightforward to move this whole code block into OnDemand constructor
+                // because we need serviceNumber lookup. R5 generally doesn't enforce immutability anyway.
+                OnDemand od = new OnDemand();
+                od.id = trip.trip_id;
+                od.name = trip.trip_short_name;
+                if (Strings.isNullOrEmpty(od.name)) od.name = od.id;
+                // Each stop_time must have only one of stop, location, or location_group specified.
+                // Note the "conditionally forbidden" notes on these fields in the gtfs reference.
+                // TODO location_groups as sets of stop vertex int IDs
+                // The indexForStopId is not yet built here but the unscoped one we need already is.
+                od.fromPolygon = extractLocationPolygon(fromStopTime, gtfs);
+                od.toPolygon = extractLocationPolygon(toStopTime, gtfs);
+                od.fromStopIndexes = extractStopIndexes(fromStopTime, gtfs, indexForUnscopedStopId);
+                od.toStopIndexes = extractStopIndexes(toStopTime, gtfs, indexForUnscopedStopId);
+                od.serviceId = trip.service_id;
+                od.serviceCode = serviceCodeNumber.get(trip.service_id);
+                if (trip instanceof FlexTrip flexTrip) {
+                    od.durationOffset = flexTrip.safe_duration_offset;
+                    od.durationFactor = flexTrip.safe_duration_factor;
+                } else {
+                    od.durationOffset = 0;
+                    od.durationFactor = 1;
+                }
+                // To support trips with more than two stops, windows could move to a separate
+                // class. Only the end of drop-off windows is required (see OnDemand).
+                // Missing time window bounds are flagged with a feed error at load time, as the
+                // spec requires them, but are tolerated and treated as unbounded, making the
+                // service always available. PickupDelay-derived on-demand services will use this
+                // always-available representation when merged into OnDemand.
+                if (fromStopTime.start_pickup_drop_off_window == INT_MISSING ||
+                    fromStopTime.end_pickup_drop_off_window == INT_MISSING ||
+                    toStopTime.end_pickup_drop_off_window == INT_MISSING) {
+                    LOG.warn("On-demand trip {} lacks time window fields; treating missing bounds as unlimited.", tripId);
+                }
+                od.fromWindowStart = orIfMissing(fromStopTime.start_pickup_drop_off_window, 0);
+                od.fromWindowEnd = orIfMissing(fromStopTime.end_pickup_drop_off_window, Integer.MAX_VALUE);
+                od.toWindowEnd = orIfMissing(toStopTime.end_pickup_drop_off_window, Integer.MAX_VALUE);
+                onDemandIndex.add(od);
+            }
+        }
+    }
+
+    /// Constraints in the GTFS reference documentation imply that it is not possible to reference
+    /// multiple location polygons as a single stop_time in a flex trip, nor is it possible to mix
+    /// polygonal locations with sets of pointlike stops in a single stop_time.
+    private static CPolygon extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
+        // Referential integrity should already be validated on the GTFS feed. We can assume all
+        // non-optional ID lookups yield a non-null object or positive index and otherwise fail hard.
+        if (fst.location_id != null) {
+            FlexLocation location = gtfs.locations.get(fst.location_id);
+            return location.geometry;
+        } else {
+            return null;
+        }
+    }
+
+    private static int[] extractStopIndexes (FlexStopTime fst, GTFSFeed gtfs, TObjectIntMap<String> indexForStopId) {
+        if (fst.location_group_id == null) return null;
+        FlexGroup group = gtfs.location_groups.get(fst.location_group_id);
+        TIntSet stopIndexes = new TIntHashSet();
+        for (String stopId : group.stop_ids) stopIndexes.add(indexForStopId.get(stopId));
+        return stopIndexes.toArray();
+    }
+
+    /// Validate a StopTime to ensure it's a zone-oriented FlexStopTime referencing either a
+    /// polygonal zone (location) or a location_group but not both.
+    /// Returns null if any check fails so we can skip problematic/unsupported trips.
+    /// Missing time windows do not fail validation; they are treated as unbounded (see caller).
+    private static FlexStopTime validateFlexStopTime (StopTime st) {
+        if (st instanceof FlexStopTime fst) {
+            boolean hasGroup = !Strings.isNullOrEmpty(fst.location_group_id);
+            boolean hasLocation = !Strings.isNullOrEmpty(fst.location_id);
+            if (xor(hasGroup, hasLocation)) {
+                return fst;
+            }
+        }
+        return null;
+    }
+
+    /// Substitute a fallback for GTFS integer fields whose value is missing.
+    private static int orIfMissing (int value, int fallback) {
+        return value == INT_MISSING ? fallback : value;
+    }
+
+    /// Find candidate on-demand services available within the given envelope and time window.
+    /// Returns null if no on-demand service is defined at all, and an empty list if on-demand
+    /// service is defined but none is available within the given geographic and temporal bounds.
+    /// The search is exact on date but overselects on space and time. See OnDemandIndex#find and
+    /// OnDemand.canPickUpDuring for detailed explanation. Envelope should be in fixed-point WGS84.
+    public List<OnDemand> findOnDemandService (Envelope envelope, int beginTime, int endTime, LocalDate date) {
+        if (onDemandIndex == null) return null;
+        BitSet servicesActive = getActiveServicesForDate(date);
+        return onDemandIndex.find(envelope, beginTime, endTime, servicesActive);
     }
 
     // The median of all stopTimes would be best but that involves sorting a huge list of numbers.
@@ -536,6 +673,9 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
             }
         }
+
+        // 5. Build a spatial index of any on-demand services serving areas rather than points.
+        if (onDemandIndex != null) onDemandIndex.indexIfNeeded(parentNetwork);
 
         LOG.info("Done rebuilding transient indices.");
     }
@@ -766,7 +906,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public Collection<com.conveyal.r5.api.util.Stop> findApiStopsInEnvelope (Envelope env) {
         List<com.conveyal.r5.api.util.Stop> stops = new ArrayList<>();
         EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
-        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(VertexStore.envelopeToFixed(env));
+        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(GeometryUtils.envelopeToFixed(env));
 
         nearbyEdges.forEach(eidx -> {
             e.seek(eidx);
@@ -790,7 +930,7 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public TIntSet findStopsInGeometry (Geometry geometry) {
         Envelope envelopeFloating = geometry.getEnvelopeInternal();
-        Envelope envelopeFixed = VertexStore.envelopeToFixed(envelopeFloating);
+        Envelope envelopeFixed = GeometryUtils.envelopeToFixed(envelopeFloating);
         // This should get all the edges including ones added by a scenario, minus those removed by a scenario.
         TIntSet nearbyEdges = this.parentNetwork.streetLayer.findEdgesInEnvelope(envelopeFixed);
         EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();

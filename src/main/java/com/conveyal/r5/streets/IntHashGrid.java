@@ -30,39 +30,48 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * A spatial index using a 2D fast long hashtable from the Trove library.
- * This is a modified version of laurentg's original hashgrid class,
- * using primitive int values instead of Object lists, as well as some Java 8 functional syntax.
- * It is also intended to store fixed-precision integer geographic coordinates rather than double-precision.
- * 
- * Objects to index are placed in all grid bins touching the bounding envelope. We *do not store*
- * any bounding envelope for each object: we will therefore return false positives when querying,
- * and it's up to the caller to filter them out (with whatever knowledge it has on the location of the object).
- * 
- * Note: For performance reasons, write operations are not synchronized, synchronization must be handled by the caller.
- * Read-only operations are thread-safe though.
- * 
- * @author laurentg, abyrd
- */
+/// A spatial index using a fast long hashtable from the Trove library. This is a modified version
+/// of laurentg's original hashgrid class, using primitive int values instead of Object lists, as
+/// well as some Java 8 functional syntax. It is also intended to store fixed-precision integer
+/// geographic coordinates rather than double-precision.
+///
+/// Objects inserted by envelope are placed in all grid bins touching that envelope. Line strings
+/// are placed in all grid bins touching the bounding envelope of each of their segments, with
+/// long segments subdivided so those envelopes stay close to the line. We do not store any
+/// bounding envelope for each object, so queries return false positives and the caller must filter
+/// them using its own knowledge of object locations. False positives are always "near" the query
+/// envelope. See query() for the exact notion of locality.
+///
+/// For performance reasons, write operations are NOT synchronized.
+/// Synchronization must be handled by the caller. Read-only operations are thread-safe though.
+///
+/// @author laurentg, abyrd
 public class IntHashGrid implements Serializable {
 
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(IntHashGrid.class);
+    public static final int MAX_CELLS_TO_VISIT = 200_000;
 
-    /* Size of bin in X and Y direction, in coordinate units. */
+    /// Size of bin in X and Y direction, in coordinate units.
     private final int xBinSize, yBinSize;
 
-    /* The map of all bins. Please see visit() and xKey/yKey for details on the key. */
+    /// Holds per-bin storage for all non-empty bins. See visit() and xKey/yKey for details on the key.
     private final TLongObjectMap<TIntList> bins;
 
+    /// The number of bins that are non-empty and for which storage has been allocated because
+    /// the envelope of an inserted value intersected them.
     private int nBins = 0;
 
+    /// The number of values that have been inserted in the index. Inserting a value will only
+    /// increment nObjects by one, independent of how many bins the associated envelope touches.
+    /// If the caller inserts a value more than once, nObjects will be incremented more than once.
     private int nObjects = 0;
 
+    /// The total number of index entries across all the bins. If the envelope of an item touches
+    /// N bins, nEntries will increase by N when that item is inserted.
     private int nEntries = 0;
 
-    public IntHashGrid(double binSizeDegrees) {
+    public IntHashGrid (double binSizeDegrees) {
         yBinSize = VertexStore.floatingDegreesToFixed(binSizeDegrees);
         // FIXME Assuming about 45 degrees latitude for now, cos(45deg)
         xBinSize = (int)(yBinSize / 0.7);
@@ -81,14 +90,11 @@ public class IntHashGrid implements Serializable {
 
     // TODO check that the number of bins to is sane.
     public final void insert(Envelope envelope, final int item) {
+        // Note: here we can end-up having the same object in the same bin several times if the
+        // caller inserts the same object multiple times with different envelopes.
+        // However, we do filter duplicate items when querying, so apart from memory/performance
+        // reasons it should work. If this becomes a problem, we can use sets instead of lists.
         visit(envelope, true, (bin, mapKey) -> {
-            /*
-             * Note: here we can end-up having several time the same object in the same bin, if
-             * the client insert multiple times the same object with different envelopes.
-             * However we do filter duplicated when querying, so apart for memory/performance
-             * reasons it should work. If this becomes a problem, we can use a set instead of a
-             * list.
-             */
             bin.add(item);
             nEntries++;
             return false;
@@ -96,41 +102,39 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
-    /**
-     * Insert a linestring into the index. NB: the line string uses real-world float coordinates, not fixed coordinates.
-     * This function keeps long and angular line strings from winding up in many unnecessary cells by inserting each segment
-     * individually and splitting long segments into pieces.
-     *
-     * We could use a rasterization algorithm, but just splitting the line segments up into manageable pieces works as
-     * well and is easier to follow, at the expense of slower insert performance (which so far doesn't seem to be a problem).
-     */
+    /// Insert a JTS linestring into the index. The LineString is in floating-point WGS84 coordinates
+    /// and will be converted to fixed-point before it is inserted. This function keeps long and
+    /// non-axis-aligned line strings from occupying many unnecessary cells by inserting each segment
+    /// individually and splitting long segments into pieces. We could instead use a rasterization
+    /// algorithm, but just splitting the line segments up into manageable pieces works as well and
+    /// is easier to follow, at the expense of slower insert performance (which so far doesn't seem
+    /// to be a problem).
     public final void insert(LineString geom, final int item) {
         Coordinate[] coord = geom.getCoordinates();
         final TLongSet keys = new TLongHashSet(coord.length * 8);
         for (int i = 0; i < coord.length - 1; i++) {
-            // Cut the segment if longer than bin size to reduce the number of wrong bins
-            double dX = coord[i].x - coord[i + 1].x;
-            double dY = coord[i].y - coord[i + 1].y;
-            int segments = (int) Math.max(Math.abs(dX) / xBinSize, Math.abs(dY) / yBinSize);
-
-            if (segments > 1000 || segments < 0)
+            // Subdivide the segment if it is longer than the bin size to reduce spurious bins.
+            double dX = coord[i + 1].x - coord[i].x;
+            double dY = coord[i + 1].y - coord[i].y;
+            // Deltas are in floating degrees but the bin sizes are in fixed-point degrees, convert.
+            double fixedDX = VertexStore.floatingDegreesToFixed(Math.abs(dX));
+            double fixedDY = VertexStore.floatingDegreesToFixed(Math.abs(dY));
+            int segments = (int) Math.max(fixedDX / xBinSize, fixedDY / yBinSize);
+            if (segments > 1000 || segments < 0) {
                 LOG.warn("Huge number of segments ({}) for edge, or possible int overflow)", segments);
-
+            }
             segments = Math.max(segments, 1);
             double segFrac = 1D / segments;
-
             for (int s = 0; s < segments; s++) {
                 // interpolate the coordinates
                 Coordinate c0 = new Coordinate(
                         VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * s),
                         VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * s)
                 );
-
                 Coordinate c1 = new Coordinate(
                         VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * (s + 1)),
                         VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * (s + 1))
                 );
-
                 Envelope env = new Envelope(c0, c1);
                 visit(env, true, (bin, mapKey) -> {
                     keys.add(mapKey);
@@ -147,11 +151,14 @@ public class IntHashGrid implements Serializable {
         nObjects++;
     }
 
-    /**
-     * The spatial index can and will return false positives, but should not produce false negatives.
-     * We return the unfiltered results including false positives. That is, this overselects and MUST BE FILTERED.
-     * @return all indexed objects within the envelope, and then some.
-     */
+    /// Find all objects that may intersect a query envelope. The result has no false negatives:
+    /// every object whose inserted envelope or line geometry intersects the query envelope is
+    /// present. The result will contain false _positives_, so callers must filter it using the
+    /// true object locations. However, false positives are guaranteed to be spatially local: every
+    /// returned object lies within a few grid bins of the query envelope, which is a few hundred
+    /// meters at the default bin size, and callers may rely on this locality. This is because the
+    /// hashing mechanism does not involve nonlocal bin collisions or bin aliasing.
+    /// @return the identifiers of all objects near the query envelope, including false positives.
     public final TIntSet query(Envelope envelope) {
         final TIntSet ret = new TIntHashSet();
         visit(envelope, false, (bin, mapKey) -> {
@@ -193,16 +200,19 @@ public class IntHashGrid implements Serializable {
     private void visit(Envelope envelope, boolean createIfEmpty, final BinVisitor binVisitor) {
         Coordinate min = new Coordinate(envelope.getMinX(), envelope.getMinY());
         Coordinate max = new Coordinate(envelope.getMaxX(), envelope.getMaxY());
+        // FIXME Shouldn't this be floor rather than rounding when binning?
         long minXKey = Math.round(min.x / xBinSize);
         long maxXKey = Math.round(max.x / xBinSize);
         long minYKey = Math.round(min.y / yBinSize);
         long maxYKey = Math.round(max.y / yBinSize);
-        // Check sanity before iterating
-        long dx = (maxXKey - minXKey);
-        long dy = (maxYKey - minYKey);
-        if (dx * dy > 100_000) {
-            LOG.error("Visiting too many spatial index cells.");
-            return;
+        { // Check number of cells that will be visited before iterating.
+            long dx = (maxXKey - minXKey) + 1;
+            long dy = (maxYKey - minYKey) + 1;
+            long nCells = dx * dy;
+            if (nCells > MAX_CELLS_TO_VISIT) {
+                LOG.error("Skipping request to visit {} spatial index cells (exceeds maximum of {}).", nCells, MAX_CELLS_TO_VISIT);
+                return;
+            }
         }
         for (long xKey = minXKey; xKey <= maxXKey; xKey++) {
             for (long yKey = minYKey; yKey <= maxYKey; yKey++) {
@@ -231,9 +241,10 @@ public class IntHashGrid implements Serializable {
     }
 
     public String toString() {
-        return String
-                .format("IntHashGrid %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
-                        this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
-                        this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects);
+        return String.format(
+            "IntHashGrid %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
+            this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
+            this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects
+        );
     }
 }

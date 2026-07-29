@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DatabindContext;
 import com.fasterxml.jackson.databind.JavaType;

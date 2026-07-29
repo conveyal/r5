@@ -18,6 +18,30 @@ import java.util.zip.ZipFile;
 /// Though this loads a GTFS table, it does not use Entity.Loader because that assumes files are
 /// CSV and their file names end in .txt. Rather than buffer all the objects in memory, we store
 /// them one by one as they are decoded.
+///
+/// Background for this mechanism:
+///
+/// R5 IndexedPolygonCollection and ModificationPolygon, parts of our on-demand "pickup delay
+/// modification" system, use the JTS Polygonal interface (which is oddly not a Geometry).
+///
+/// GeoTools has some fairly heavy abstractions and poses serialization difficulties. Specifically,
+/// GeoTools is generic across different coordinate storage schemes, spatial reference systems, and
+/// precision models, and will attempt to store object graphs capturing this information for every
+/// single geometry instance. We can sidestep some of the heavier by using our own lightweight
+/// geometry classes. This requires us to replicate a lot of GeoTools GeoJSON loading capabilities,
+/// but we take that opportunity to parse in an entirely streaming manner instead of buffering in
+/// memory and using the tree model.
+///
+/// ModificationPolygon associates a Polygonal with a unique ID and a rider-facing name.
+/// Consider that there are typically only a few zones per file and all coordinates must be
+/// loaded in memory for conversion to a JTS geometry, so streaming is not a critical optimization.
+/// But a streaming loader is still efficient and relevant here, and should be heavily reusable for
+/// other data sources (including demographic or destination layers).
+///
+/// Initially we were calling into GeoJsonModule (the Jackson parsing module from BeDataDriven)
+/// which calls GeometryDeserializer.parseGeometry() and is registered with JsonUtil.objectMapper.
+/// But that tree-parses one geometry at a time, not a FeatureCollection, so we needed to stream
+/// parse the outer structure anyway and read fragments with with JsonUtil.objectMapper.readValue();
 public class FlexLocationStreamer extends GeoJsonStreamer {
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

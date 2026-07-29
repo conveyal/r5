@@ -5,7 +5,6 @@ import com.conveyal.gtfs.flex.FlexGroup;
 import com.conveyal.gtfs.flex.FlexGroupStop;
 import com.conveyal.gtfs.flex.FlexLocation;
 import com.conveyal.gtfs.flex.FlexLocationStreamer;
-import com.conveyal.gtfs.flex.StreamingFlexLocationLoader;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -110,7 +109,7 @@ public class GTFSFeed implements Cloneable, AutoCloseable {
     /// Tuples combining the trip_id of a frequency entry with the frequency entry object itself.
     /// Sets of tuples are used to make multimaps in mapdb:
     /// https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
-    /// So this can serve as a multimap from trip_ids to multiple frenquency entries for that trip.
+    /// So this can serve as a multimap from trip_ids to multiple frequency entries for that trip.
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
 
     /** Map from route_id to Route entity. */

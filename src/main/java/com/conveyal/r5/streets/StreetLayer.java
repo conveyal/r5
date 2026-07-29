@@ -1460,7 +1460,7 @@ public class StreetLayer implements Serializable, Cloneable {
     /// So in sum, calling this method will always create one or two new vertices, one of which always represents a
     /// stop at the given coordinates, and will create all necessary edge pairs to connect it to the streets. Those
     /// link edges permit traversal by all modes. HOWEVER, the nearest street is always one that allows WALK, and there
-    /// is no guarantee it allows CAR. TODO This needs to be carefully rethought for on-demand stops.
+    /// is no guarantee it allows CAR. For on-demand services, this problem is handled by MeetingAreas.
     ///
     /// TODO store street-to-stop distance in a table in TransitLayer, or change the link edge length. This also allows adjusting for subway entrances etc.
     /// @return the vertex of the newly created vertex at the supplied coordinates.

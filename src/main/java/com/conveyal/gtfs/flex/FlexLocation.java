@@ -7,7 +7,6 @@ import java.io.Serializable;
 
 /// Model object corresponding to features in the GTFS locations.geojson file:
 /// "zones where riders can request either pickup or drop off by on-demand services".
-/// There may be problems serializing JTS Geometries to MapDB as they reference GeometryFactory.
 /// See the gtfs-lib Shape model class for an alternative approach of construction on the fly.
 public class FlexLocation implements Serializable {
 
@@ -20,8 +19,10 @@ public class FlexLocation implements Serializable {
     /// A description of the location to help orient riders.
     public String stopDesc;
 
-    /// Constrained to be Polygon or MultiPolygon by the GTFS Flex spec.
-    /// Currently only supporting Polygon until our geometry class hierarchy is more complete.
+    /// Constrained to be Polygon or MultiPolygon by the GTFS Flex spec. Currently only supporting
+    /// Polygon until we can evaluate the mix of geometry types in real world fees. Using our own
+    /// CGeometry types to avoid complexities around serializing JTS Geometries to MapDB (they
+    /// reference context like GeometryFactory, coordinate reference systems, and precision models).
     public CPolygon geometry;
 
     public FlexLocation (String id, String stopName, String stopDesc, CPolygon geometry) {

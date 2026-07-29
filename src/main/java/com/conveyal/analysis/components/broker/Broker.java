@@ -141,9 +141,13 @@ public class Broker implements Component {
      * We also want to consider starting instances occasionally as a regional analysis is running, in case previously
      * created instances have been terminated.
      */
-    public static final int RESTART_INSTANCES_TASKS = 4000;
+    public static final int RESTART_INSTANCES_TASKS = 12_000;
 
-    /** The maximum number of spot instances allowable in an automatic request */
+    /**
+     * The maximum number of instances allowable for a given transport network and worker version. Other limits may
+     * further constrain the number of workers, including the available subnet addresses (which we typically set lower
+     * on staging) and max-workers in the backend config.
+     */
     public static final int MAX_WORKERS_PER_CATEGORY = 250;
 
     /**
@@ -207,7 +211,7 @@ public class Broker implements Component {
         }
 
         if (workerCatalog.noWorkersAvailable(job.workerCategory, config.offline())) {
-            createOnDemandWorkerInCategory(job.workerCategory, workerTags);
+            createSingleWorker(job.workerCategory, workerTags);
         } else {
             // Workers exist in this category, clear out any record that we're waiting for one to start up.
             recentlyRequestedWorkers.remove(job.workerCategory);
@@ -260,37 +264,63 @@ public class Broker implements Component {
     }
 
     /**
-     * Create on-demand worker for a given job.
+     * Create one on-demand worker for a given category.
      */
-    public void createOnDemandWorkerInCategory(WorkerCategory category, WorkerTags workerTags){
-        createWorkersInCategory(category, workerTags, 1, 0);
+    public void createSingleWorker(WorkerCategory category, WorkerTags workerTags) {
+        int requested = createWorkersInCategory(category, workerTags, 1, 0);
+        if (requested > 0) {
+            eventBus.send(new WorkerEvent(SINGLE_POINT, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
+            // Record the fact that we've requested an on-demand worker so we don't do it repeatedly.
+            recentlyRequestedWorkers.put(category, System.currentTimeMillis());
+        }
     }
 
     /**
-     * Create on-demand/spot workers for a given job, after certain checks
-     * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot Target number of EC2 spot instances to request. The actual number requested may be lower if the
-     *              total number of workers running is approaching the maximum specified in the Broker config.
+     * Create on-demand or spot workers for a regional job.
      */
-    public void createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
+
+    public void createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
+        // TODO better way to avoid repeated startup requests for regional workers (similar to use of
+        //  recentlyRequestedWorkers for single worker requests); for now we rely on RESTART_INSTANCES_TASKS being
+        //  sufficiently large, but that may not work well if workers are very slow to start (e.g., when building egress
+        //  tables for different modes or zoom levels) or if previous requests did not achieve the target number of
+        //  workers (e.g., due to worker pool capacity limits below).
+        int requested = createWorkersInCategory(category, workerTags, nOnDemand, nSpot);
+        eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
+    }
+
+    /**
+     * Create on-demand/spot workers for a given job, after certain checks. The actual number requested may be lower if
+     * the total number of workers running is approaching the maximum specified in the Broker config.
+     * @param nOnDemand EC2 on-demand instances to request
+     * @param nSpot EC2 spot instances to request
+     * @return the total number actually requested
+     */
+    int createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
+        final int initialRequest = nOnDemand + nSpot;
+
+        // If workers have already been started up, don't repeat the operation.
+        if (recentlyRequestedWorkers.containsKey(category)
+                && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
+            LOG.debug("Workers still starting on {}, not starting more", category);
+            return 0;
+        }
 
         // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
         // Throwing an exception there would not report any useful information to anyone.
-
         if (config.offline()) {
             LOG.info("Work offline enabled, not creating workers for {}.", category);
-            return;
+            return 0;
         }
 
         if (nOnDemand < 0 || nSpot < 0) {
             LOG.error("Negative number of workers requested, not starting any.");
-            return;
+            return 0;
         }
 
-        final int nRequested = nOnDemand + nSpot;
-        if (nRequested <= 0) {
+        if (initialRequest <= 0) {
             LOG.error("No workers requested, not starting any.");
-            return;
+            return 0;
         }
 
         // Zeno's worker pool management: never start more than half the remaining capacity.
@@ -298,13 +328,13 @@ public class Broker implements Component {
         final int maxToStart = remainingCapacity / 2;
         if (maxToStart <= 0) {
             LOG.error("Due to capacity limiting, not starting any workers.");
-            return;
+            return 0;
         }
 
-        if (nRequested > maxToStart) {
-            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", nRequested);
-            nSpot = maxToStart;
-            nOnDemand = 0;
+        if (initialRequest > maxToStart) {
+            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", initialRequest);
+            nOnDemand = Math.min(nOnDemand, maxToStart);
+            nSpot = Math.min(nSpot, maxToStart);
             LOG.warn("Lowered to {} on-demand and {} spot workers.", nOnDemand, nSpot);
         }
 
@@ -316,29 +346,12 @@ public class Broker implements Component {
                 config.maxWorkers(),
                 category
             );
-            return;
-        }
-
-        // If workers have already been started up, don't repeat the operation.
-        if (recentlyRequestedWorkers.containsKey(category)
-                && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
-            LOG.debug("Workers still starting on {}, not starting more", category);
-            return;
+            return 0;
         }
 
         workerLauncher.launch(category, workerTags, nOnDemand, nSpot);
-
-        // Record the fact that we've requested an on-demand worker so we don't do it repeatedly.
-        if (nOnDemand > 0) {
-            recentlyRequestedWorkers.put(category, System.currentTimeMillis());
-        }
-        if (nSpot > 0) {
-            eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, nSpot).forUser(workerTags.user, workerTags.group));
-        }
-        if (nOnDemand > 0) {
-            eventBus.send(new WorkerEvent(SINGLE_POINT, category, REQUESTED, nOnDemand).forUser(workerTags.user, workerTags.group));
-        }
         LOG.info("Requested {} on-demand and {} spot workers on {}", nOnDemand, nSpot, category);
+        return nOnDemand + nSpot;
     }
 
     /**
@@ -576,11 +589,11 @@ public class Broker implements Component {
             int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
             if (taskId == START_INSTANCES_TASK) {
                 // After a few tasks are completed successfully, try to start spot instances
-                createWorkersInCategory(job.workerCategory, job.workerTags, 0, nWorkers);
+                createRegionalWorkers(job.workerCategory, job.workerTags, 0, nWorkers);
             } else {
                 // If the number of workers is below the target later in a job, it is likely that spot instances were
                 // terminated due to capacity limits. So request on-demand instances instead.
-                createWorkersInCategory(job.workerCategory, job.workerTags, nWorkers, 0);
+                createRegionalWorkers(job.workerCategory, job.workerTags, nWorkers, 0);
             }
         }
     }

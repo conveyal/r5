@@ -78,8 +78,8 @@ class ModificationStop {
         double previousSegmentSpeedKph = segmentSpeedsKph.length > 0 ? segmentSpeedsKph[0] : DEFAULT_SEGMENT_SPEED_KPH;
         Coordinate previousSegmentFinalCoordinate = null;
 
-        // Iterate over segments, which are real stops defined by control points
-        // (i.e. not auto-generated at a requested spacing)
+        // Iterate over segments, whose endpoints are either control points or stops defined at
+        // exact coordinates (i.e. not auto-generated at a requested spacing).
         for (int i = 0; i < segments.size(); i++) {
             Segment segment = segments.get(i);
 

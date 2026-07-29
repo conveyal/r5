@@ -1,13 +1,5 @@
 package com.conveyal.gtfs.geom;
 
-/// See flex design document for rationale.
-/// Reimplementation of to streamline memory use and serialization.
-/// The prefix C maintains distinction from JTS geometries. It stands for Conveyal and Compact.
-/// They are designed to work well with built-in and generic serialization systems.
-/// They should contain as few references as is reasonably possible, favoring packed arrays of
-/// primitive types. Object graphs should be tree-like and contain no shared references.
-/// It only supports 2D coordinates which are assumed to be in WGS84 degrees.
-/// Using double-precision floats for simplicity now but could conceivably use fixed ints.
 public class CLineString implements CGeometry {
     /// A packed array of N double-precision coordinates (x, y) that is (lon, lat)
     /// Should always have an even number of elements.

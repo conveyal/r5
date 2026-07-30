@@ -20,10 +20,7 @@ import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
-import gnu.trove.TCollections;
 import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.TObjectLongMap;
-import gnu.trove.map.hash.TObjectLongHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,51 +120,11 @@ public class Broker implements Component {
      */
     public static final int MAX_TASKS_PER_WORKER = 40;
 
-    /**
-     * Used when auto-starting spot instances. Set to a smaller value to increase the number of
-     * workers requested automatically
-     */
-    public static final int TARGET_TASKS_PER_WORKER_TRANSIT = 800;
-    public static final int TARGET_TASKS_PER_WORKER_NONTRANSIT = 4_000;
-
-    /**
-     * We want to request spot instances to "boost" regional analyses after a few regional task
-     * results are received for a given workerCategory. Do so after receiving results for an
-     * arbitrary task toward the beginning of the job
-     */
-    public static final int START_INSTANCES_TASK = 42;
-
-    /**
-     * We also want to consider starting instances occasionally as a regional analysis is running, in case previously
-     * created instances have been terminated.
-     */
-    public static final int RESTART_INSTANCES_TASKS = 12_000;
-
-    /**
-     * The maximum number of instances allowable for a given transport network and worker version. Other limits may
-     * further constrain the number of workers, including the available subnet addresses (which we typically set lower
-     * on staging) and max-workers in the backend config.
-     */
-    public static final int MAX_WORKERS_PER_CATEGORY = 250;
-
-    /**
-     * How long to give workers to start up (in ms) before assuming that they have started (and
-     * starting more on a given graph if they haven't.
-     */
-    public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
-
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     private WorkerCatalog workerCatalog = new WorkerCatalog();
 
     /** These objects piece together results received from workers into one regional analysis result file per job. */
     private Map<String, MultiOriginAssembler> resultAssemblers = new HashMap<>();
-
-    /**
-     * keep track of which graphs we have launched workers on and how long ago we launched them, so
-     * that we don't re-request workers which have been requested.
-     */
-    public TObjectLongMap<WorkerCategory> recentlyRequestedWorkers =
-            TCollections.synchronizedMap(new TObjectLongHashMap<>());
 
     public Broker (Config config, FileStorage fileStorage, EventBus eventBus, WorkerLauncher workerLauncher) {
         this.config = config;
@@ -212,9 +169,6 @@ public class Broker implements Component {
 
         if (workerCatalog.noWorkersAvailable(job.workerCategory, config.offline())) {
             createSingleWorker(job.workerCategory, workerTags);
-        } else {
-            // Workers exist in this category, clear out any record that we're waiting for one to start up.
-            recentlyRequestedWorkers.remove(job.workerCategory);
         }
         eventBus.send(new RegionalAnalysisEvent(templateTask.jobId, STARTED).forUser(workerTags.user, workerTags.group));
     }
@@ -267,24 +221,22 @@ public class Broker implements Component {
      * Create one on-demand worker for a given category.
      */
     public void createSingleWorker(WorkerCategory category, WorkerTags workerTags) {
+        // A single-point request may arrive every few seconds while the relevant worker starts up.
+        // Don't request another worker while one appears to still be starting.
+        if (workerLauncher.pendingWorkersInCategory(category) > 0) {
+            LOG.debug("Not requesting a worker on {}, a recently requested one should start soon.", category);
+            return;
+        }
         int requested = createWorkersInCategory(category, workerTags, 1, 0);
         if (requested > 0) {
             eventBus.send(new WorkerEvent(SINGLE_POINT, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
-            // Record the fact that we've requested an on-demand worker so we don't do it repeatedly.
-            recentlyRequestedWorkers.put(category, System.currentTimeMillis());
         }
     }
 
     /**
      * Create on-demand or spot workers for a regional job.
      */
-
     public void createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
-        // TODO better way to avoid repeated startup requests for regional workers (similar to use of
-        //  recentlyRequestedWorkers for single worker requests); for now we rely on RESTART_INSTANCES_TASKS being
-        //  sufficiently large, but that may not work well if workers are very slow to start (e.g., when building egress
-        //  tables for different modes or zoom levels) or if previous requests did not achieve the target number of
-        //  workers (e.g., due to worker pool capacity limits below).
         int requested = createWorkersInCategory(category, workerTags, nOnDemand, nSpot);
         eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
     }
@@ -298,13 +250,6 @@ public class Broker implements Component {
      */
     int createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
         final int initialRequest = nOnDemand + nSpot;
-
-        // If workers have already been started up, don't repeat the operation.
-        if (recentlyRequestedWorkers.containsKey(category)
-                && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME) {
-            LOG.debug("Workers still starting on {}, not starting more", category);
-            return 0;
-        }
 
         // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
         // Throwing an exception there would not report any useful information to anyone.
@@ -512,13 +457,11 @@ public class Broker implements Component {
 
     /**
      * Slots a single regional work result received from a worker into the appropriate position in the appropriate
-     * files. Also considers requesting extra spot instances after a few results have been received.
+     * files.
      * @param workResult an object representing accessibility results for a single origin point, sent by a worker.
      */
     public void handleRegionalWorkResult(RegionalWorkResult workResult) {
         // Retrieving the job and assembler from their maps is not thread safe, so we use synchronized block here.
-        // Once the job is retrieved, it can be used below to requestExtraWorkersIfAppropriate without synchronization,
-        // because that method only uses final fields of the job.
         Job job = null;
         try {
             MultiOriginAssembler assembler;
@@ -550,52 +493,21 @@ public class Broker implements Component {
         } catch (Throwable t) {
             recordJobError(job, ExceptionUtils.stackTraceString(t));
             eventBus.send(new ErrorEvent(t));
-            return;
         }
-        // Consider accelerating the job by starting an appropriate number of EC2 spot instances.
-        requestExtraWorkersIfAppropriate(job, workResult.taskId);
     }
 
-    // At certain task numbers, check various conditions about the worker pool then start spot or on-demand instances
-    private void requestExtraWorkersIfAppropriate(Job job, int taskId) {
-        if (!(taskId == START_INSTANCES_TASK || (taskId + 1) % RESTART_INSTANCES_TASKS == 0)) return;
-        WorkerCategory workerCategory = job.workerCategory;
-        int categoryWorkersAlreadyRunning = workerCatalog.countWorkersInCategory(workerCategory);
-        if (categoryWorkersAlreadyRunning < MAX_WORKERS_PER_CATEGORY) {
-            // TODO more refined determination of number of workers to start (e.g. using observed tasks per minute
-            //  for recently completed tasks -- but what about when initial origins are in a desert/ocean?)
-            int targetWorkerTotal;
-            if (job.templateTask.hasTransit()) {
-                // Total computation for a task with transit depends on the number of stops and whether the
-                // network has frequency-based routes. The total computation for the job depends on these
-                // factors as well as the number of tasks (origins). Zoom levels add a complication: the number of
-                // origins becomes an even poorer proxy for the number of stops. We use a scale factor to compensate
-                // -- all else equal, high zoom levels imply fewer stops per origin (task) and a lower ideal target
-                // for number of workers. TODO reduce scale factor further when there are no frequency routes. But is
-                //  this worth adding a field to Job or RegionalTask?
-                float transitScaleFactor = (9f / job.templateTask.zoom);
-                targetWorkerTotal = (int) ((job.nTasksTotal / TARGET_TASKS_PER_WORKER_TRANSIT) * transitScaleFactor);
-            } else {
-                // Tasks without transit are simpler. They complete relatively quickly, and the total computation for
-                // the job increases roughly with linearly with the number of origins.
-                targetWorkerTotal = job.nTasksTotal / TARGET_TASKS_PER_WORKER_NONTRANSIT;
-            }
-
-            // Do not exceed the limit on workers per category TODO add similar limit per accessGroup or user
-            targetWorkerTotal = Math.min(targetWorkerTotal, MAX_WORKERS_PER_CATEGORY);
-            // Guardrails until freeform pointsets are tested more thoroughly
-            if (job.templateTask.originPointSet != null) targetWorkerTotal = Math.min(targetWorkerTotal, 80);
-            if (job.templateTask.includePathResults) targetWorkerTotal = Math.min(targetWorkerTotal, 20);
-            int nWorkers = targetWorkerTotal - categoryWorkersAlreadyRunning;
-            if (taskId == START_INSTANCES_TASK) {
-                // After a few tasks are completed successfully, try to start spot instances
-                createRegionalWorkers(job.workerCategory, job.workerTags, 0, nWorkers);
-            } else {
-                // If the number of workers is below the target later in a job, it is likely that spot instances were
-                // terminated due to capacity limits. So request on-demand instances instead.
-                createRegionalWorkers(job.workerCategory, job.workerTags, nWorkers, 0);
-            }
+    /// Report facts about each worker category referenced across all active regional jobs.
+    /// This includes how many workers are currently polling for work on that category, as well as
+    /// how many tasks are finished and unfinished on those jobs. All information in the return
+    /// object is assembled within this one synchronized method block so it is consistent.
+    public synchronized List<WorkerDemand> getWorkerDemand () {
+        List<WorkerDemand> demand = new ArrayList<>();
+        for (WorkerCategory category : jobs.keySet()) {
+            List<Job> activeJobs = jobs.get(category).stream().filter(Job::isActive).toList();
+            if (activeJobs.isEmpty()) continue;
+            demand.add(new WorkerDemand(category, workerCatalog.countWorkersInCategory(category), activeJobs));
         }
+        return demand;
     }
 
     public synchronized boolean anyJobsActive () {

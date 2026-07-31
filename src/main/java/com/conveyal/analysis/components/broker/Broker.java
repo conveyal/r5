@@ -235,10 +235,14 @@ public class Broker implements Component {
 
     /**
      * Create on-demand or spot workers for a regional job.
+     * Return the number actually requested after limits were imposed.
+     * TODO lift all the limits out of createWorkersInCategory into FleetManager so callers
+     *      don't need to check if their request was reduced or zeroed
      */
-    public void createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
-        int requested = createWorkersInCategory(category, workerTags, nOnDemand, nSpot);
-        eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
+    public int createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
+        int n = createWorkersInCategory(category, workerTags, nOnDemand, nSpot);
+        eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, n).forUser(workerTags.user, workerTags.group));
+        return n;
     }
 
     /**
@@ -246,7 +250,7 @@ public class Broker implements Component {
      * the total number of workers running is approaching the maximum specified in the Broker config.
      * @param nOnDemand EC2 on-demand instances to request
      * @param nSpot EC2 spot instances to request
-     * @return the total number actually requested
+     * @return the total number actually requested after limits were imposed
      */
     int createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
         final int initialRequest = nOnDemand + nSpot;

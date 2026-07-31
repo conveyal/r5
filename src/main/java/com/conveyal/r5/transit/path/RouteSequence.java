@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit.path;
 
 import com.conveyal.analysis.models.CsvResultOptions;
+import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
 import gnu.trove.list.TIntList;
@@ -54,10 +55,10 @@ public class RouteSequence {
             if (csvOptions.feedRepresentation != null) {
                 feedJoiner.add(transitLayer.feedFromStop(stopSequence.boardStops.get(i)));
             }
-            rideTimeJoiner.add(String.format("%.1f", stopSequence.rideTimesSeconds.get(i) / 60f));
+            rideTimeJoiner.add(PathResult.formatMinutes(stopSequence.rideTimesSeconds.get(i)));
         }
-        String accessTime = stopSequence.access == null ? null : String.format("%.1f", stopSequence.access.time / 60f);
-        String egressTime = stopSequence.egress == null ? null : String.format("%.1f", stopSequence.egress.time / 60f);
+        String accessTime = stopSequence.access == null ? null : PathResult.formatMinutes(stopSequence.access.time);
+        String egressTime = stopSequence.egress == null ? null : PathResult.formatMinutes(stopSequence.egress.time);
         return new String[]{
                 routeJoiner.toString(),
                 boardStopJoiner.toString(),

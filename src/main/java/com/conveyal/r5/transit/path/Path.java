@@ -1,44 +1,44 @@
 package com.conveyal.r5.transit.path;
 
-import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.profile.RaptorState;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import static com.google.common.base.Preconditions.checkState;
 
-/**
- * Fully specified door-to-door itinerary (at a specific departure time and with specific wait times, which may be
- * derived from random frequency offsets). These itineraries are an optional result from Raptor searches, and they
- * can be reduced/summarized in different ways (e.g. de-duplicating repeated PatternSequences or RouteSequences)
- * TODO rename to Itinerary, compare to PathWithTimes?
- */
-public class Path implements Cloneable {
+/// A door-to-door transit itinerary as a sequence of specific vehicles boarded at specific clock times.
+/// All times describing the transit legs are clock times rather than durations relative to a departure time.
+/// This means one Path instance can describe the itinerary of a rider departing the origin at any minute for which
+/// the itinerary remains optimal. Waiting times, including the initial wait implied by a particular departure time,
+/// are derived on demand (see computeWaitTimes). These are optional results from Raptor searches.
+public class Path {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
     public final PatternSequence patternSequence;
-    public final int departureTime;
-    // One wait time for each transit leg boarded. This is tracked outside the pathTemplate, because initial wait
-    // will depends on the specific departure time (and subsequent waits may depend on random frequency offsets used
-    // in the Monte Carlo approach).
-    public final TIntList waitTimes;
 
-    /**
-     * Extract the path leading up to a specified stop in a given raptor state.
-     */
+    /// For each transit leg, the clock time at which the vehicle departs its boarding stop. Together with the fixed
+    /// quantities in the patternSequence (ride times and transfer walk times), these determine all the itinerary's
+    /// time components except the initial wait, which additionally depends on the departure time.
+    public final TIntList boardTimes;
+
+    /// Extract the path leading up to a specified stop in a given raptor state. All time components are derived from
+    /// clock times recorded in the chain of raptor states. Subtraction of clock times observed in the same chain of
+    /// states keeps the components consistent, even when range raptor has retained a ride recorded at a later departure
+    /// minute (at an earlier departure minute, with a longer wait before boarding).
     public Path(RaptorState state, int stop) {
 
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
-        TIntList waitTimes = new TIntArrayList();
-        TIntList inVehicleTimes = new TIntArrayList();
+        TIntList boardTimes = new TIntArrayList();
+        TIntList rideTimes = new TIntArrayList();
 
-        this.departureTime = state.departureTime;
+        // The on-street time spent transferring boarding each leg. This is zero for a leg boarded at the same
+        // place the previous leg alighted, and for the first leg (the access leg is recorded separately).
+        TIntList transferTimes = new TIntArrayList();
 
         while (state.previous != null) {
             // We copy the state at each stop from one round to the next. If a stop is not updated in a particular
@@ -50,12 +50,14 @@ public class Path implements Cloneable {
             }
             checkState(state.previous.bestNonTransferTimes[stop] >= state.bestNonTransferTimes[stop],
                     "Earlier raptor rounds must have later arrival times at a given stop.");
-            patterns.add(state.previousPatterns[stop]);
 
-            // Set details of the transit leg just ridden.
+            // Record details of the transit leg just ridden.
+            int alightTime = state.bestNonTransferTimes[stop];
+            int boardTime = state.previousBoardTime[stop];
+            patterns.add(state.previousPatterns[stop]);
             alightStops.add(stop);
-            waitTimes.add(state.previousWaitTime[stop]);
-            inVehicleTimes.add(state.previousInVehicleTravelTime[stop]);
+            boardTimes.add(boardTime);
+            rideTimes.add(alightTime - boardTime);
 
             // Step back to boarding stop
             stop = state.previousStop[stop];
@@ -64,9 +66,13 @@ public class Path implements Cloneable {
             // Step back to previous state before handling transfers, as transfers are done at the end of a round
             state = state.previous;
 
-            // handle transfers
+            // Record the duration of any transfer to reach the boarding just recorded
             if (state.transferStop[stop] != -1) {
-                stop = state.transferStop[stop];
+                int transferOrigin = state.transferStop[stop];
+                transferTimes.add(state.bestTimes[stop] - state.bestNonTransferTimes[transferOrigin]);
+                stop = transferOrigin;
+            } else {
+                transferTimes.add(0);
             }
         }
 
@@ -79,19 +85,31 @@ public class Path implements Cloneable {
         patterns.reverse();
         boardStops.reverse();
         alightStops.reverse();
-        waitTimes.reverse();
-        inVehicleTimes.reverse();
+        boardTimes.reverse();
+        rideTimes.reverse();
+        transferTimes.reverse();
 
-        this.waitTimes = waitTimes;
-        patternSequence = new PatternSequence(patterns, boardStops, alightStops, inVehicleTimes);
+        this.boardTimes = boardTimes;
+        patternSequence = new PatternSequence(patterns, boardStops, alightStops, rideTimes, transferTimes);
     }
 
-    @Override
-    public Path clone() {
-        try {
-            return (Path) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
+    /// Derive the wait before boarding each transit leg, for a rider leaving the origin at the given departure time.
+    /// The rider is ready to board the first vehicle after finishing the access leg, and ready to board each later
+    /// vehicle after alighting from the previous one and finishing any transfer walk. The wait is the time between
+    /// being ready to board a vehicle and its recorded departure. The access leg must already be set on this path's
+    /// stop sequence (see StopSequence#setAccess).
+    public TIntList computeWaitTimes (int departureTime) {
+        StopSequence stopSequence = patternSequence.stopSequence;
+        checkState(stopSequence.access != null, "Waiting times can only be derived once the access leg is set.");
+        TIntList waitTimes = new TIntArrayList(boardTimes.size());
+        int readyToBoard = departureTime + stopSequence.access.time;
+        for (int leg = 0; leg < boardTimes.size(); leg++) {
+            readyToBoard += stopSequence.transferTimesSeconds.get(leg);
+            int waitTime = boardTimes.get(leg) - readyToBoard;
+            checkState(waitTime >= 0, "Derived a negative wait time, which indicates an infeasible itinerary.");
+            waitTimes.add(waitTime);
+            readyToBoard = boardTimes.get(leg) + stopSequence.rideTimesSeconds.get(leg);
         }
+        return waitTimes;
     }
 }

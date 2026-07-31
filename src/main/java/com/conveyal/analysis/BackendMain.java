@@ -3,6 +3,7 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -37,8 +38,10 @@ public abstract class BackendMain {
 
     private static void startServerInternal (BackendComponents components, TaskAction... postStartupTasks) {
         LOG.info("Starting Conveyal analysis backend version {}", SoftwareVersion.instance.version);
-        LOG.info("Connecting to database...");
+        // Refuse to start when using Jackson versions that would corrupt reads from MongoDB.
+        JsonUtil.verifyJacksonVersions();
 
+        LOG.info("Connecting to database...");
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
         // passing in non-static components we've already created.
         // TODO migrate to non-static Components.

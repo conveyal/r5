@@ -38,7 +38,7 @@ public class PathResultTests {
                 .setOrigin(20, 20)
                 .singleFreeformDestination(40, 40)
                 .includePathResults()
-                .build();
+                .buildRegional();
 
         OneOriginResult result = new TravelTimeComputer(task, network).computeTravelTimes();
         checkIterationInvariants(result.paths);
@@ -58,7 +58,7 @@ public class PathResultTests {
                 .singleFreeformDestination(40, 40)
                 .monteCarloDraws(1200)
                 .includePathResults()
-                .build();
+                .buildRegional();
 
         OneOriginResult result = new TravelTimeComputer(task, network).computeTravelTimes();
         checkIterationInvariants(result.paths);

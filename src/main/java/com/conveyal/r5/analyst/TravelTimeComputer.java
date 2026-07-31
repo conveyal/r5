@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
@@ -23,11 +24,13 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.BitSet;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
@@ -156,11 +159,13 @@ public class TravelTimeComputer {
             // Note: Access searches (which minimize travel time) are asymmetric with the egress cost tables (which
             // often minimize distance to allow reuse at different speeds).
 
+
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
+            boolean enableOnDemand = request.hasFlag("ON_DEMAND");
             {
                 int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit()) {
+                if (request.hasTransit() || enableOnDemand) {
                     limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
                 }
                 sr.timeLimitSeconds = limitSeconds;
@@ -170,6 +175,26 @@ public class TravelTimeComputer {
             // The generalized cost calculations currently increment time and weight by the same amount.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
+
+            // When on-demand services can extend this access leg, this holds their results: an
+            // egress walk search onward from all rides, and direct times to destination points.
+            OnDemandAccess onDemandAccess = null;
+            if (enableOnDemand) {
+                // Find on-demand that may be available within the street area reached above. Service availability is
+                // evaluated for one representative rider departing at the midpoint of the departure time window.
+                // This is an initial pre-filter, with definitive time window tests applied later.
+                int midTime = (request.fromTime + request.toTime) / 2;
+                int latestTime = midTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+                Envelope reachedEnvelope = sr.getReachedVerticesEnvelopeFixed();
+                List<OnDemand> onDemandCandidates = network.transitLayer
+                      .findOnDemandService(reachedEnvelope, midTime, latestTime, request.date);
+                LOG.info("Found {} potentially relevant on-demand service(s).", onDemandCandidates.size());
+                if (!isNullOrEmpty(onDemandCandidates)) {
+                    // The access router itself is never modified: on-demand results are held separately in
+                    // onDemandAccess and min-merged into stop and destination times below.
+                    onDemandAccess = OnDemandAccess.route(sr, onDemandCandidates, midTime, destinations);
+                }
+            }
 
             if (request.hasTransit()) {
                 // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
@@ -184,6 +209,17 @@ public class TravelTimeComputer {
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
+                // LOG.info("Stop reached times: {}", travelTimesToStopsSeconds);
+                if (onDemandAccess != null) {
+                    // Stops reached by walking onward from on-demand rides are min-merged with the
+                    // access mode's own stop arrivals. This is how a flex ride leads into transit.
+                    onDemandAccess.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+                        if (!travelTimesToStopsSeconds.containsKey(stop) || travelTimesToStopsSeconds.get(stop) > seconds) {
+                            travelTimesToStopsSeconds.put(stop, seconds);
+                        }
+                        return true;
+                    });
+                }
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
                             accessService.waitTimeSeconds, accessMode);
@@ -226,6 +262,12 @@ public class TravelTimeComputer {
                         walkSpeedMillimetersPerSecond,
                         origin
                 );
+
+                if (onDemandAccess != null) {
+                    // Destinations are also reached using on-demand services.
+                    // Riders are dropped off directly at a destination or walk onward from any service.
+                    pointSetTimes = PointSetTimes.minMerge(pointSetTimes, onDemandAccess.directTimes);
+                }
 
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",

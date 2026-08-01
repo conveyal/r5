@@ -1,9 +1,11 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.LegMode;
@@ -14,6 +16,7 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
@@ -21,10 +24,13 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.path.Path;
 import gnu.trove.map.TIntIntMap;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.BitSet;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
@@ -153,11 +159,13 @@ public class TravelTimeComputer {
             // Note: Access searches (which minimize travel time) are asymmetric with the egress cost tables (which
             // often minimize distance to allow reuse at different speeds).
 
+
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
+            boolean enableOnDemand = request.hasFlag("ON_DEMAND");
             {
                 int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit()) {
+                if (request.hasTransit() || enableOnDemand) {
                     limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
                 }
                 sr.timeLimitSeconds = limitSeconds;
@@ -167,6 +175,26 @@ public class TravelTimeComputer {
             // The generalized cost calculations currently increment time and weight by the same amount.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
+
+            // When on-demand services can extend this access leg, this holds their results: an
+            // egress walk search onward from all rides, and direct times to destination points.
+            OnDemandAccess onDemandAccess = null;
+            if (enableOnDemand) {
+                // Find on-demand that may be available within the street area reached above. Service availability is
+                // evaluated for one representative rider departing at the midpoint of the departure time window.
+                // This is an initial pre-filter, with definitive time window tests applied later.
+                int midTime = (request.fromTime + request.toTime) / 2;
+                int latestTime = midTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+                Envelope reachedEnvelope = sr.getReachedVerticesEnvelopeFixed();
+                List<OnDemand> onDemandCandidates = network.transitLayer
+                      .findOnDemandService(reachedEnvelope, midTime, latestTime, request.date);
+                LOG.info("Found {} potentially relevant on-demand service(s).", onDemandCandidates.size());
+                if (!isNullOrEmpty(onDemandCandidates)) {
+                    // The access router itself is never modified: on-demand results are held separately in
+                    // onDemandAccess and min-merged into stop and destination times below.
+                    onDemandAccess = OnDemandAccess.route(sr, onDemandCandidates, midTime, destinations);
+                }
+            }
 
             if (request.hasTransit()) {
                 // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
@@ -181,6 +209,17 @@ public class TravelTimeComputer {
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
                 // TODO add logic here if linkedStops are specified in pickupDelay?
                 TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
+                // LOG.info("Stop reached times: {}", travelTimesToStopsSeconds);
+                if (onDemandAccess != null) {
+                    // Stops reached by walking onward from on-demand rides are min-merged with the
+                    // access mode's own stop arrivals. This is how a flex ride leads into transit.
+                    onDemandAccess.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+                        if (!travelTimesToStopsSeconds.containsKey(stop) || travelTimesToStopsSeconds.get(stop) > seconds) {
+                            travelTimesToStopsSeconds.put(stop, seconds);
+                        }
+                        return true;
+                    });
+                }
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
                             accessService.waitTimeSeconds, accessMode);
@@ -223,6 +262,12 @@ public class TravelTimeComputer {
                         walkSpeedMillimetersPerSecond,
                         origin
                 );
+
+                if (onDemandAccess != null) {
+                    // Destinations are also reached using on-demand services.
+                    // Riders are dropped off directly at a destination or walk onward from any service.
+                    pointSetTimes = PointSetTimes.minMerge(pointSetTimes, onDemandAccess.directTimes);
+                }
 
                 if (accessService != NO_WAIT_ALL_STOPS) {
                     LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
@@ -295,8 +340,12 @@ public class TravelTimeComputer {
             worker = new FastRaptorWorker(network.transitLayer, request, bestAccessOptions.getTimes());
             if (request.includePathResults || request.makeTauiSite) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
-                // TODO do we really need to save all states just to get the travel time breakdown?
                 worker.retainPaths = true;
+                // Taui sites record paths to every destination cell so we retain paths to every transit stop.
+                // For all other path results, we only ever need paths to stops within egress range of the destinations.
+                if (!request.makeTauiSite) {
+                    worker.retainPathsToStops = stopsWithEgressToDestinations(destinations);
+                }
             }
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
             // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
@@ -339,6 +388,7 @@ public class TravelTimeComputer {
         // annotating with the access mode, then use the annotated paths to initialize the appropriate field in the
         // propagater. Not supported for fare requests, which use the McRaptor router and path style.
         if ((request.includePathResults || request.makeTauiSite) && worker != null) {
+            perTargetPropagater.departureTimeForIteration = worker.departureTimeForIteration;
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration.stream().peek(paths -> {
                 for (Path path : paths) {
                     if (path != null) {
@@ -355,6 +405,42 @@ public class TravelTimeComputer {
 
         return perTargetPropagater.propagate();
 
+    }
+
+    /// Determine the set of stops from which any of this task's destinations can be reached by an egress leg. When
+    /// recording path results only paths to stops in this set can appear in the output, and the router need not
+    /// reconstruct any others. For tasks that record paths to a single destination (notably single-point tasks) the
+    /// set covers only that one destination. This requires the same egress cost tables the propagator will use, so
+    /// it builds and transposes them slightly earlier than the propagator otherwise would.
+    private BitSet stopsWithEgressToDestinations (PointSet destinations) {
+        BitSet stops = new BitSet();
+        int firstTarget = 0;
+        int lastTargetExclusive = destinations.featureCount();
+        boolean oneDestination = (request instanceof TravelTimeSurfaceTask)
+                || (request instanceof RegionalTask && ((RegionalTask) request).oneToOne);
+        if (oneDestination) {
+            firstTarget = PerTargetPropagater.singlePathDestinationIndex(request, destinations);
+            if (firstTarget < 0) {
+                // The specified destination is outside the destination pointset, so no paths will be recorded.
+                return stops;
+            }
+            lastTargetExclusive = firstTarget + 1;
+        }
+        for (StreetMode streetMode : LegMode.toStreetModeSet(request.egressModes)) {
+            LinkedPointSet linkage = network.linkageCache.getLinkage(destinations, network.streetLayer, streetMode);
+            EgressCostTable egressCostTable = linkage.getEgressCostTable();
+            egressCostTable.destructivelyTransposeForPropagationAsNeeded();
+            for (int target = firstTarget; target < lastTargetExclusive; target++) {
+                TIntIntMap costTable = egressCostTable.getCostTableForPoint(target);
+                if (costTable != null) {
+                    costTable.forEachKey(stop -> {
+                        stops.set(stop);
+                        return true;
+                    });
+                }
+            }
+        }
+        return stops;
     }
 
 }

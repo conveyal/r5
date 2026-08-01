@@ -1,0 +1,2 @@
+Identical to the "valid" fixture, except that the stop_times for flex trip T1 do not declare any
+pick-up / drop-off window.

@@ -1,0 +1,3 @@
+stop_id,stop_name,stop_lat,stop_lon
+X,The X,45.473425,-122.671284
+Y,The Y,45.435707,-122.653541

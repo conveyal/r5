@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.gtfs.flex.OnDemandPlaceFilter;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
@@ -410,50 +411,87 @@ public class LinkedPointSet implements Serializable {
         return eval(travelTimeForVertex, 1000, 1000, null);
     }
 
-    /**
-     * Calculate the total time needed to reach every point in this pointset (e.g. from an origin when evaluating
-     * direct, non-transit travel times). The total time includes time from origin split to vertices of destination
-     * edge, vertex of destination edge to destination split, and destination split to destination.
-     *
-     * @param timeToVertex function returning the time required to reach a vertex, in seconds
-     * @param onStreetSpeed speed at which the first/last edge is traversed, in millimeters per second. If this
-     *                      linkage is for CAR, the destination edge's car speed will override the supplied
-     *                      onStreetSpeed.
-     * @param offStreetSpeed travel speed between the first/last edge and origin/target, in millimeters per
-     *                       second. Generally walking (we don't account for off-street parking not specified in OSM)
-     * @return wrapped int[] of travel times (in seconds) to reach the pointset points, with Integer.MAX_VALUE for
-     * unreached points.
-     */
-
+    /// Calculate the total time needed to reach every point in this pointset (e.g. from an origin
+    /// when evaluating direct, non-transit travel times). The total time includes time from origin
+    /// split to vertices of destination edge, vertex of destination edge to destination split, and
+    /// destination split to destination.
+    ///
+    /// @param timeToVertex   function returning the time required to reach a vertex, in seconds
+    /// @param onStreetSpeed  speed at which the first/last edge is traversed, in millimeters per
+    ///                       second. If this linkage is for CAR, the destination edge's car speed
+    ///                       will override the supplied onStreetSpeed.
+    /// @param offStreetSpeed travel speed between the first/last edge and origin/target, in
+    ///                       millimeters per second. Generally walking (we don't account for
+    ///                       off-street parking not specified in OSM)
+    /// @return wrapped int[] of travel times (in seconds) to reach the pointset points, with
+    /// Integer.MAX_VALUE for unreached points.
     public PointSetTimes eval (
-                CostToVertexFunction timeToVertex,
-                Integer onStreetSpeed,
-                int offStreetSpeed,
-                Split origin
-            ) {
+          CostToVertexFunction timeToVertex,
+          int onStreetSpeed,
+          int offStreetSpeed,
+          Split origin
+    ) {
+        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, origin, null);
+    }
+
+    /// Like the four-argument [#eval], but clipped by the given place filter. It yields a time only
+    /// at points the filter accepts, leaving all other points unreached. Used for direct drop-off
+    /// by on-demand vehicles. Without clipping, vehicles would drive up to one block outside the
+    /// boundary. Every point is tested, so filter implementations are expected to reject quickly
+    /// (e.g. an envelope check before any real geometric work).
+    public PointSetTimes evalClipped (
+          CostToVertexFunction timeToVertex,
+          int onStreetSpeed,
+          int offStreetSpeed,
+          OnDemandPlaceFilter place
+    ) {
+        return eval(timeToVertex, onStreetSpeed, offStreetSpeed, null, place);
+    }
+
+    /// Shared implementation for [#eval] and [#evalClipped]. Either or both of origin and place may
+    /// be null. Origin handles travel on the same edge as the origin, and is irrelevant for post-
+    /// flex searches which are multiply seeded. Place supplies a destination-clipping predicate
+    /// for on-demand drop-off and is irrelevant for ordinary access/egress evaluation.
+    private PointSetTimes eval (
+          CostToVertexFunction timeToVertex,
+          int onStreetSpeed,
+          int offStreetSpeed,
+          Split origin,
+          OnDemandPlaceFilter place
+    ) {
         int[] travelTimes = new int[edges.length];
+        Arrays.fill(travelTimes, Integer.MAX_VALUE);
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        // Reused across iterations only when a place filter is supplied, to reconstruct enough
+        // of each point's linkage Split for the filter's containment test.
+        Split placeSplit = (place == null) ? null : new Split();
         for (int i = 0; i < edges.length; i++) {
             if (edges[i] < 0) {
-                // Target point is unlinked.
-                travelTimes[i] = Integer.MAX_VALUE;
-                continue;
+                continue; // Target point is unlinked; leave it at Integer.MAX_VALUE.
             }
-
             edge.seek(edges[i]);
-
-            if (streetMode == StreetMode.CAR) {
-                onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            int edgeOnStreetSpeed = (streetMode == StreetMode.CAR)
+                  ? (int) (edge.getCarSpeedMetersPerSecond() * 1000)
+                  : onStreetSpeed;
+            if (place != null) {
+                placeSplit.edge = edges[i];
+                placeSplit.vertex0 = edge.getFromVertex();
+                placeSplit.vertex1 = edge.getToVertex();
+                placeSplit.distance0_mm = distances0_mm[i];
+                placeSplit.distance1_mm = distances1_mm[i];
+                placeSplit.distanceToEdge_mm = distancesToEdge_mm[i];
+                if (!place.containsPoint(pointSet.getLat(i), pointSet.getLon(i), placeSplit)) {
+                    continue;
+                }
             }
-
             if (origin != null && origin.edge == edges[i]) {
                 // The target point lies along the same edge as the origin
                 int onStreetDistance_mm = Math.abs(origin.distance0_mm - distances0_mm[i]);
-                travelTimes[i] = // origin.distanceToEdge_mm / offStreetSpeed + TODO origin to origin split point
-                                onStreetDistance_mm / onStreetSpeed + // along street
-                                distancesToEdge_mm[i] / offStreetSpeed; // from destination split point to destination
+                travelTimes[i] = origin.distanceToEdge_mm / offStreetSpeed +
+                      onStreetDistance_mm / edgeOnStreetSpeed + // along street
+                      distancesToEdge_mm[i] / offStreetSpeed; // from destination split point to destination
             } else {
-                travelTimes[i] = timeToPoint(timeToVertex, edge, i, onStreetSpeed);
+                travelTimes[i] = timeToPoint(timeToVertex, edge, i, edgeOnStreetSpeed, offStreetSpeed);
             }
         }
         return new PointSetTimes(pointSet, travelTimes);
@@ -526,7 +564,7 @@ public class LinkedPointSet implements Serializable {
                 // The routing variable is seconds only if we're doing a car search, so look up the car speed on the
                 // linked edge.
                 int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
-                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed);
+                cost = timeToPoint(costToVertex, edge, p, onStreetSpeed, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
             }
 
             if (cost != Integer.MAX_VALUE) {
@@ -607,13 +645,14 @@ public class LinkedPointSet implements Serializable {
      * @param onStreetSpeed speed at which the destination edge (to which the target is linked) is traversed
      * @return minimum time needed to reach point, or Integer.MAX_VALUE if point is not reachable.
      */
-    private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed) {
+    private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed,
+                            int offStreetSpeed) {
         int time0 = costToVertex.getCost(edge.getFromVertex());
         int time1 = costToVertex.getCost(edge.getToVertex());
         if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         } else {
-            int offStreetTime = distancesToEdge_mm[pointIndex] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+            int offStreetTime = distancesToEdge_mm[pointIndex] / offStreetSpeed;
             time0 += distances0_mm[pointIndex] / onStreetSpeed + offStreetTime;
             time1 += distances1_mm[pointIndex] / onStreetSpeed + offStreetTime;
             return Math.min(handleOverflow(time0), handleOverflow(time1));

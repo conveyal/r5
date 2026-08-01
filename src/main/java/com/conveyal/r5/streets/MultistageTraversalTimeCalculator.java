@@ -1,14 +1,8 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.rastercost.CostField;
-import com.conveyal.r5.rastercost.SunLoader;
-import org.apache.commons.math3.util.FastMath;
-import org.locationtech.jts.algorithm.Angle;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,12 +34,15 @@ public class MultistageTraversalTimeCalculator implements TraversalTimeCalculato
     public int traversalTimeSeconds (EdgeStore.Edge currentEdge, StreetMode streetMode, ProfileRequest req) {
         final int baseTraversalTimeSeconds = base.traversalTimeSeconds(currentEdge, streetMode, req);
         int t = baseTraversalTimeSeconds;
-        for (CostField costField : costFields) {
-            t += costField.additionalTraversalTimeSeconds(currentEdge, baseTraversalTimeSeconds);
-        }
-        if (t < 1) {
-            LOG.warn("Cost was negative or zero. Clamping to 1 second.");
-            t = 1;
+        // Currently no CostField implementations apply to CAR. See Javadoc on CostField if costs need to vary by mode.
+        if (!streetMode.equals(StreetMode.CAR)) {
+            for (CostField costField : costFields) {
+                t += costField.additionalTraversalTimeSeconds(currentEdge, baseTraversalTimeSeconds);
+            }
+            if (t < 1) {
+                LOG.warn("Cost was negative or zero. Clamping to 1 second.");
+                t = 1;
+            }
         }
         return t;
     }

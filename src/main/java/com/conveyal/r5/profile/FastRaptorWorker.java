@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
+import static com.conveyal.r5.common.Util.newIntArray;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.HALF_HEADWAY;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.MONTE_CARLO;
 import static com.conveyal.r5.profile.FastRaptorWorker.FrequencyBoardingMode.UPPER_BOUND;
@@ -128,8 +129,33 @@ public class FastRaptorWorker {
     /** Set to true to save path details for all optimal paths. */
     public boolean retainPaths = false;
 
+    /**
+     * When retainPaths is true, path reconstruction is restricted to this set of stops. Typically this should be the
+     * set of stops within egress range of the destinations, because paths to any other stop will never be seen during
+     * propagation. Null means paths are reconstructed for every stop (as needed for Taui sites).
+     */
+    public BitSet retainPathsToStops = null;
+
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
+
+    /**
+     * For each iteration of the search, the clock time at which the rider departs from the origin. Needed to derive
+     * the initial wait of any specific iteration in paths. Small, so filled in even when paths are not retained.
+     */
+    public int[] departureTimeForIteration;
+
+    /**
+     * Paths already reconstructed at previously processed (later) departure minutes of the scheduled search, with the
+     * arrival times they produce. This allows reuse of identical paths across departure minutes. When using range
+     * raptor, the optimal rides for most stops do not change from one minute to the next. An unchanged arrival time at
+     * a stop implies the retained itinerary is still valid and still optimal, even if an earlier leg of the trip could
+     * now be reached in a faster way, so the whole Path object can be shared between iterations. Reuse is not attempted
+     * across Monte Carlo draws, because equal arrival times under different randomized schedules do not imply that the
+     * same vehicles exist in both draws.
+     */
+    private Path[] retainedPaths;
+    private int[] retainedPathArrivals;
 
     /**
      * Only fast initialization steps are performed in the constructor.
@@ -173,7 +199,12 @@ public class FastRaptorWorker {
         LOG.info("Performing {} total iterations ({} per minute); boarding {}; frequencies {}",
                 nIterations, iterationsPerMinute, boardingMode, transit.hasFrequencies);
         int[][] travelTimesToStopsPerIteration = new int[nIterations][];
-        if (retainPaths) pathsPerIteration = new ArrayList<>();
+        departureTimeForIteration = new int[nIterations];
+        if (retainPaths) {
+            pathsPerIteration = new ArrayList<>();
+            retainedPaths = new Path[nStops];
+            retainedPathArrivals = newIntArray(nStops, -1);
+        }
 
         // This main outer loop iterates backward over all minutes in the departure times window.
         // TODO revise this loop so seconds are derived from minute numbers
@@ -198,6 +229,7 @@ public class FastRaptorWorker {
                 }
                 // Accumulate the duration-transformed Monte Carlo iterations for the current minute
                 // into one big flattened array representing all iterations at all minutes.
+                departureTimeForIteration[currentIteration] = departureTime;
                 travelTimesToStopsPerIteration[currentIteration++] = travelTimesToStops;
             }
         }
@@ -252,7 +284,7 @@ public class FastRaptorWorker {
         // Add initial stops reached by the access mode (pre-transit)
         RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, 0, 0, true);
+            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, -1, true);
             return true; // continue iteration
         });
     }
@@ -274,7 +306,7 @@ public class FastRaptorWorker {
         // The new departure time is earlier than the old time, so all these stops will be flagged as updated.
         final RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            boolean updated = initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, 0, 0, true);
+            boolean updated = initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, -1, true);
             // This assertion holds with constant access mode speeds. Adding variable speeds will break this assumption.
             checkState(updated, "Stepping departure time back one minute should always update access stops.");
             return true; // continue iteration
@@ -389,7 +421,7 @@ public class FastRaptorWorker {
                 RaptorState finalRoundState = frequencyState[request.maxRides];
                 result[iteration] = finalRoundState.bestNonTransferTimes;
                 if (retainPaths) {
-                    pathsPerIteration.add(pathToEachStop(finalRoundState));
+                    pathsPerIteration.add(pathToEachStop(finalRoundState, false));
                 }
             }
             raptorTimer.frequencySearch.stop();
@@ -407,7 +439,7 @@ public class FastRaptorWorker {
             // protective copies of any information we want to retain.
             result[0] = finalRoundState.bestNonTransferTimes;
             if (retainPaths) {
-                Path[] paths = pathToEachStop(finalRoundState);
+                Path[] paths = pathToEachStop(finalRoundState, true);
                 pathsPerIteration.add(paths);
             }
             return result;
@@ -430,16 +462,32 @@ public class FastRaptorWorker {
     }
 
     /**
-     * Create the optimal path to each stop in the transit network, based on the given RaptorState.
+     * Find the optimal path to each stop in the transit network based on the given RaptorState.
+     * If retainPathsToStops is non-null, paths are reconstructed only for the stops it contains.
+     *
+     * @param reuseAcrossMinutes if true, reuse a path reconstructed at a previously processed departure minute
+     *                           whenever the arrival time at its stop is unchanged. Only valid for the scheduled
+     *                           search, where an unchanged arrival means the same vehicles are ridden.
      */
-    private static Path[] pathToEachStop(RaptorState state) {
+    private Path[] pathToEachStop (RaptorState state, boolean reuseAcrossMinutes) {
         int nStops = state.bestNonTransferTimes.length;
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
-            if (state.bestNonTransferTimes[s] == UNREACHED) {
-                paths[s] = null;
+            if (retainPathsToStops != null && !retainPathsToStops.get(s)) {
+                continue;
+            }
+            int arrival = state.bestNonTransferTimes[s];
+            if (arrival == UNREACHED) {
+                continue;
+            }
+            if (reuseAcrossMinutes && retainedPathArrivals[s] == arrival) {
+                paths[s] = retainedPaths[s];
             } else {
                 paths[s] = new Path(state, s);
+                if (reuseAcrossMinutes) {
+                    retainedPaths[s] = paths[s];
+                    retainedPathArrivals[s] = arrival;
+                }
             }
         }
         return paths;
@@ -520,7 +568,6 @@ public class FastRaptorWorker {
             // As we scan down the stops of the pattern, we may board a trip, and possibly re-board a different trip.
             // Keep track of the index of the currently boarded trip within the list of filtered TripSchedules.
             int onTrip = NONE;
-            int waitTime = 0;
             int boardTime = NONE;
             int boardStop = NONE;
             TripSchedule schedule = null;
@@ -531,10 +578,7 @@ public class FastRaptorWorker {
                 // This block is above the boarding search so that we don't alight from the same stop where we boarded.
                 if (onTrip != NONE && pattern.dropoffs[stopInPattern] != PickDropType.NONE) {
                     int alightTime = schedule.arrivals[stopInPattern];
-                    int inVehicleTime = alightTime - boardTime;
-                    checkState (alightTime == inputState.bestTimes[boardStop] + waitTime + inVehicleTime,
-                                "Components of travel time are larger than travel time!");
-                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, inVehicleTime, false);
+                    outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, boardTime, false);
                 }
                 // If the current stop was reached in the previous round and allows pick-up, board or re-board a trip.
                 // Second parameter is true to only look at changes within this departure minute, enabling range-raptor.
@@ -568,7 +612,6 @@ public class FastRaptorWorker {
                         onTrip = newTrip;
                         schedule = filteredPattern.runningScheduledTrips.get(newTrip);
                         boardTime = schedule.departures[stopInPattern];
-                        waitTime = boardTime - inputState.bestTimes[stop];
                         boardStop = stop;
                     }
                 }
@@ -627,7 +670,6 @@ public class FastRaptorWorker {
                 ) {
                     int boardTime = -1;
                     int boardStopPositionInPattern = -1;
-                    int waitTime = -1;
 
                     // Scan down the stops in the pattern, boarding trips in the pattern when possible.
                     // TODO factor out some of this scanning loop body into a method for clarity.
@@ -644,7 +686,7 @@ public class FastRaptorWorker {
                             int travelTime = relativeAlightTime - relativeBoardTime;
                             int alightTime = boardTime + travelTime;
                             int boardStop = pattern.stops[boardStopPositionInPattern];
-                            outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, waitTime, travelTime, false);
+                            outputState.setTimeAtStop(stop, alightTime, patternIndex, boardStop, boardTime, false);
                         }
 
                         // If this stop was updated in the previous round and pickup is allowed at this stop, see if
@@ -707,8 +749,6 @@ public class FastRaptorWorker {
                                 newBoardingDepartureTimeAtStop < remainOnBoardDepartureTimeAtStop
                             ) {
                                 boardTime = newBoardingDepartureTimeAtStop;
-                                // TODO is this wait time calculation right?
-                                waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStopPositionInPattern = stopPositionInPattern;
                             }
                         }
@@ -854,16 +894,26 @@ public class FastRaptorWorker {
                  stop >= 0;
                  stop = state.nonTransferStopsUpdated.nextSetBit(stop + 1)
         ) {
-            TIntList transfersFromStop = transit.transfersForStop.get(stop);
-            if (transfersFromStop != null) {
-                for (int i = 0; i < transfersFromStop.size(); i += 2) {
-                    int targetStop = transfersFromStop.get(i);
-                    int distanceToTargetStopMillimeters = transfersFromStop.get(i + 1);
+            TIntList gtfsTransfersFromStop = transit.gtfsTransfers.get(stop);
+            if (gtfsTransfersFromStop != null) {
+                for (int i = 0; i < gtfsTransfersFromStop.size(); i += 2) {
+                    int targetStop = gtfsTransfersFromStop.get(i);
+                    int minTimeToTargetSeconds = gtfsTransfersFromStop.get(i + 1);
+                    // NOTE unlike street transfers, not filtering on distance because we don't know the distance.
+                    int timeAtTargetStop = state.bestNonTransferTimes[stop] + minTimeToTargetSeconds;
+                    state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, -1, true);
+                }
+            }
+            TIntList streetTransfersFromStop = transit.streetTransfers.get(stop);
+            if (streetTransfersFromStop != null) {
+                for (int i = 0; i < streetTransfersFromStop.size(); i += 2) {
+                    int targetStop = streetTransfersFromStop.get(i);
+                    int distanceToTargetStopMillimeters = streetTransfersFromStop.get(i + 1);
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
                         checkState(walkTimeToTargetStopSeconds >= 0, "Transfer walk time must be positive.");
                         int timeAtTargetStop = state.bestNonTransferTimes[stop] + walkTimeToTargetStopSeconds;
-                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
+                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, -1, true);
                     }
                 }
             }

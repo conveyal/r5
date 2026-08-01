@@ -62,11 +62,7 @@ public class WorkerProxyController implements HttpController {
         if (address == null) {
             // There are no workers that can handle this request. Request one and ask the UI to retry later.
             WorkerTags workerTags = new WorkerTags(userPermissions, bundle.regionId);
-            broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
-        } else {
-            // Workers exist in this category, clear out any record that we're waiting for one to start up.
-            // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
-            broker.recentlyRequestedWorkers.remove(workerCategory);
+            broker.createSingleWorker(workerCategory, workerTags);
         }
         return address;
     }

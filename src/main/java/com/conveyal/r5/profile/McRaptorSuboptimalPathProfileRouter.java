@@ -484,7 +484,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         BitSet stopsTouchedByTransfer = new BitSet(network.transitLayer.getStopCount());
         double walkSpeedMillimetersPerSecond = request.walkSpeed * 1000;
         for (int stop = touchedStops.nextSetBit(0); stop >= 0; stop = touchedStops.nextSetBit(stop + 1)) {
-            TIntList transfers = network.transitLayer.transfersForStop.get(stop);
+            TIntList transfers = network.transitLayer.streetTransfers.get(stop);
 
             // okay to use bestStates directly here, it doesn't allow the router to ride two transit vehicles in one round.
             // because doTransfers only creates transfer states, it does not affect nonTransfer states.

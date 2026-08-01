@@ -1,33 +1,31 @@
 package com.conveyal.r5.transit.path;
 
 import com.conveyal.r5.analyst.StreetTimesAndModes;
-import com.conveyal.r5.analyst.cluster.PathResult;
 import gnu.trove.list.TIntList;
 
 import java.util.Objects;
 
-import static com.google.common.base.Preconditions.checkState;
-
-/**
- * A door-to-door path, i.e. access/egress characteristics and transit legs (keyed on characteristics including per-leg
- * in-vehicle times but not specific trips/patterns/routes), which may be repeated at different departure times.
- *
- * Instances are constructed initially from transit legs, with access and egress set in successive operations.
- */
+/// A door-to-door path, i.e. access/egress characteristics and transit legs (keyed on characteristics including per-leg
+/// in-vehicle times but not specific trips/patterns/routes), which may be repeated at different departure times.
+/// Instances are constructed initially from transit legs, with access and egress set in successive operations.
 public class StopSequence {
     public final TIntList boardStops;
     public final TIntList alightStops;
     public final TIntList rideTimesSeconds;
+
+    /// The time spent on the street network transferring to each transit leg. This is zero for the
+    /// first leg, which is preceded by the access leg rather than a transfer. These are fully
+    /// determined by the stops boarded and alighted, so excluded from equality checks and hash codes.
+    public final TIntList transferTimesSeconds;
     public StreetTimesAndModes.StreetTimeAndMode access;
     public StreetTimesAndModes.StreetTimeAndMode egress;
 
-    /**
-     * Populate the basic transit path characteristics
-     */
-    StopSequence(TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds) {
+    /// Populate the basic transit path characteristics
+    StopSequence(TIntList boardStops, TIntList alightStops, TIntList rideTimesSeconds, TIntList transferTimesSeconds) {
         this.boardStops = boardStops;
         this.alightStops = alightStops;
         this.rideTimesSeconds = rideTimesSeconds;
+        this.transferTimesSeconds = transferTimesSeconds;
     }
 
     @Override
@@ -47,10 +45,8 @@ public class StopSequence {
         return Objects.hash(boardStops, alightStops, rideTimesSeconds, access, egress);
     }
 
-    /**
-     * Set access to the first boarding stop,
-     * @param bestAccessOptions map with the optimal access time/mode to reach each stop in the network
-     */
+    /// Set access to the first boarding stop,
+    /// @param bestAccessOptions map with the optimal access time/mode to reach each stop in the network
     public void setAccess(StreetTimesAndModes bestAccessOptions) {
         access = bestAccessOptions.streetTimesAndModes.get(boardStops.get(0));
     }
@@ -59,20 +55,12 @@ public class StopSequence {
         this.egress = egress;
     }
 
-    /**
-     * Set the time spent transferring between stops, which is not stored in our Raptor implementation but can be
-     * calculated by  subtracting the other components of travel time from the total travel time
-     */
-    public int transferTime(PathResult.Iteration iteration) {
-        if (access == null && egress == null && iteration.waitTimes.size() == 0 && rideTimesSeconds == null) {
-            // No transit ridden, so transfer time is 0.
-            return 0;
-        } else {
-            int transferTimeSeconds =
-                    iteration.totalTime - access.time - egress.time - iteration.waitTimes.sum() - rideTimesSeconds.sum();
-            checkState(transferTimeSeconds >= 0);
-            return transferTimeSeconds;
-        }
+    /// Return the total time spent transferring between stops over all legs of this StopSequence,
+    /// as recorded when the path was reconstructed from the router's internal state. Unlike
+    /// waiting times, transfer times do not vary with departure time or randomized schedules.
+    public int totalTransferTimeSeconds() {
+        // Paths that ride no transit have no stop lists at all, and therefore no transfers.
+        return (transferTimesSeconds == null) ? 0 : transferTimesSeconds.sum();
     }
 
 }

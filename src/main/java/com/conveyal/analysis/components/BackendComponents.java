@@ -7,6 +7,7 @@ import com.conveyal.analysis.controllers.AggregationAreaController;
 import com.conveyal.analysis.controllers.BrokerController;
 import com.conveyal.analysis.controllers.BundleController;
 import com.conveyal.analysis.controllers.DataSourceController;
+import com.conveyal.analysis.controllers.DatabaseController;
 import com.conveyal.analysis.controllers.GtfsController;
 import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.controllers.OpportunityDatasetController;
@@ -96,6 +97,7 @@ public abstract class BackendComponents {
                 new BrokerController(broker, eventBus),
                 new UserActivityController(taskScheduler),
                 new DataSourceController(fileStorage, database, taskScheduler, censusExtractor),
+                new DatabaseController(database),
                 new WorkerProxyController(broker)
         );
     }

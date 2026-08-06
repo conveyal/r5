@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Conveyal Login</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif}
+        #panel {
+            display: flex; flex-direction: column; width: 20%; padding: 20px; margin: auto;
+        }
+    </style>
+</head>
+<body>
+<div id="panel">
+    <label for="email">Email:</label>
+    <input type="email" id="email"></input>
+    <label for="password">Password:</label>
+    <input type="password" id="password"></input>
+    <button name="login" id="login">Log In</button>
+</div>
+<script>
+
+let emailField = document.getElementById("email");
+let passwordField = document.getElementById("password");
+let loginButton = document.getElementById("login");
+loginButton.onclick = function (e) {
+    // TODO validate/sanitize
+    let email = emailField.value;
+    let password = passwordField.value;
+    let url = `http://localhost:7070/token?email=${email}&password=${password}`
+    fetch(url)
+        .then(response => response.json())
+        .then(response => {
+            console.log(response.token);
+            window.location.href = `index.html?token=${response.token}`;
+        });
+};
+
+</script>
+</body>
+</html>

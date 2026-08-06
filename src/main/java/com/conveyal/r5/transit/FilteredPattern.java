@@ -56,6 +56,18 @@ public class FilteredPattern {
     }
 
     private static boolean overtakes (TripSchedule a, TripSchedule b) {
+        if (a.departures.length != b.departures.length) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Trip %s and %s have %d and %d stops, respectively, but appear in the same pattern!",
+                    a.tripId,
+                    b.tripId,
+                    a.departures.length,
+                    b.departures.length
+                )
+            );
+        }
+        
         for (int s = 0; s < a.departures.length; s++) {
             if (a.departures[s] > b.departures[s]) return true;
         }

@@ -153,6 +153,9 @@ public class AnalysisCollection<T extends BaseModel> {
     public T findPermittedByRequestParamId (Request req) {
         UserPermissions user = UserPermissions.from(req);
         T value = findById(req.params("_id"));
+        if (value == null) {
+            throw AnalysisServerException.notFound("No item exists with the specified ID.");
+        }
         // Throw if or does not have permission
         if (!value.accessGroup.equals(user.accessGroup)) {
             throw invalidAccessGroup();

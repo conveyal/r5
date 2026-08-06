@@ -69,7 +69,7 @@ public class FrequencyRandomOffsetsTest {
         layer.tripPatterns.add(pattern2);
         layer.rebuildTransientIndexes();
 
-        FrequencyRandomOffsets fro = new FrequencyRandomOffsets(layer);
+        FrequencyRandomOffsets fro = new FrequencyRandomOffsets(layer, null);
         fro.randomize();
 
         // check that phasing is correct
@@ -136,7 +136,7 @@ public class FrequencyRandomOffsetsTest {
         layer.tripPatterns.add(pattern2);
         layer.rebuildTransientIndexes();
 
-        FrequencyRandomOffsets fro = new FrequencyRandomOffsets(layer);
+        FrequencyRandomOffsets fro = new FrequencyRandomOffsets(layer, null);
         fro.randomize();
 
         // check that phasing is correct

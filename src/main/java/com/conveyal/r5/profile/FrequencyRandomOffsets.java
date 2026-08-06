@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -12,8 +13,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkElementIndex;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -44,12 +43,18 @@ public class FrequencyRandomOffsets {
     private final Map<TripSchedule, int[]> offsetsForTripSchedule = new HashMap<>();
 
     /** The mersenne twister is a higher quality random number generator than the one included with Java */
-    private MersenneTwister mt = new MersenneTwister();
+    private MersenneTwister mt;
 
-    public FrequencyRandomOffsets(TransitLayer data) {
+    public FrequencyRandomOffsets(TransitLayer data, ProfileRequest request) {
         this.data = data;
         if (!data.hasFrequencies) {
             return;
+        }
+        if (request == null || !request.lockSchedules) {
+            this.mt = new MersenneTwister();
+        } else {
+            // Use a fixed seed for each origin
+            this.mt = new MersenneTwister((int) (request.fromLat * 1e9));
         }
         // Create skeleton empty data structure with slots for all offsets that will be generated.
         for (int pattIdx = 0; pattIdx < data.tripPatterns.size(); pattIdx++) {

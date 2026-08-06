@@ -113,7 +113,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
         this.servicesActive = network.transitLayer.getActiveServicesForDate(req.date);
-        this.offsets = new FrequencyRandomOffsets(network.transitLayer);
+        this.offsets = new FrequencyRandomOffsets(network.transitLayer, request);
         this.saveFinalStates = saveFinalStates;
         if (saveFinalStates) this.finalStatesByDepartureTime = new TIntObjectHashMap<>();
 
@@ -150,7 +150,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // We start at end of time window and work backwards (which is what range-RAPTOR does, in case we
         // re-implement that here). We use a constrained random walk to choose which departure minutes to sample as we
-        // work backward through the time window.  According to others (Owen and Jiang?), this is a good way to reduce
+        // work backward through the time window.  According to Owen and Murphy (2019)
+        // https://www.jtlu.org/index.php/jtlu/article/view/1379), this is a good way to reduce
         // the number of samples without causing an issue with variance in results.  This value is the constraint
         // (upper limit) on the walk.
         // multiply by two because E[random] = 1/2 * max.
@@ -535,7 +536,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     private ArrayList<Integer> generateDepartureTimesToSample (ProfileRequest request) {
-        // See Owen and Jiang 2016 (unfortunately no longer available online), add between f / 2 and
+        // See Owen and Murphy 2019 (https://www.jtlu.org/index.php/jtlu/article/view/1379), add between f / 2 and
         // f + f / 2, where f is the mean step.
         int randomWalkStepMean = (request.toTime - request.fromTime) / request.monteCarloDraws;
         int randomWalkStepWidthOneSided = randomWalkStepMean / 2;

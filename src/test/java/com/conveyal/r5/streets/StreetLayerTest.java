@@ -1,7 +1,11 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore.Edge;
+import com.conveyal.r5.streets.EdgeStore.EdgeFlag;
 import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
@@ -16,6 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -420,4 +425,69 @@ public class StreetLayerTest {
         });
     }
 
+    /**
+     * Make sure that the stop linking and split distance calculations are affected by their configuration options.
+     */
+    @Test
+    public void testConfigurableSplitDistancesAndIslandRemoval() {
+        int[] exponents = {0, 1, 2};
+        // to test different options, do this three times with values doubling each time
+        for (int exponent : exponents) {
+            int multiplier = (int) Math.pow(2, exponent);
+
+            OSM osm = new OSM(null);
+            osm.intersectionDetection = true;
+            // re-use one of our existing resources, rather than bloating the repo with a new one just for this test
+            osm.readFromUrl(StreetLayerTest.class.getResource("reisterstown-via-restriction.pbf").toString());
+
+            TransportNetworkConfig cfg = new TransportNetworkConfig();
+            cfg.stopLinkRadiusMeters = 50d * multiplier;
+            cfg.pointsetLinkRadiusMeters = 100d * multiplier;
+            cfg.minSubgraphSize = 5 * multiplier;
+
+            StreetLayer sl = new StreetLayer(cfg);
+            sl.loadFromOsm(osm, true, true);
+            sl.buildEdgeLists();
+            sl.indexStreets();
+
+            assertEquals(sl.stopLinkRadiusMeters, 50d * multiplier);
+            assertEquals(sl.pointsetLinkRadiusMeters, 100d * multiplier);
+            assertEquals(sl.minSubgraphSize, 5 * multiplier);
+
+            // This is an island with size 6: https://www.openstreetmap.org/way/140476882#map=19/39.409392/-76.642615&layers=D
+            // Because it is at the edge of the PBF, West Joppa Road is not in the PBF, so Riderwood Stn and
+            // connected driveways form an island. Because the driveways are marked access=private and thus No Thru Traffic,
+            // they are not considered part of the island, and the nodes at the ends of them are separate islands, so the
+            // only nodes are the end of the street, where it intersects itself, and where it intersects each driveway.
+            // there should still be permissions around it
+            int eid = sl.edgeStore.osmids.indexOf(140476882L);
+            // seek to the forward edge (edge pair * 2)
+            Edge e = sl.edgeStore.getCursor(eid * 2);
+            // this island should be removed if exponent equals 1 or 2 (min subgraph size equals 10 or 20)
+            // island removal is done by removing permissions
+            assertEquals(e.allowsStreetMode(StreetMode.WALK), exponent == 0);
+            // make sure we are looking at the correct edge
+            assertEquals(e.getOSMID(), 140476882L);
+
+            // this location is about 150 m from road
+            double lat = 39.408907;
+            double lon = -76.736807;
+
+            // getOrCreateVertexNear is used to link stops, so when exponent is 0 or 1 (stop distance is 50 or 100),
+            // should not link
+            if (exponent == 0 || exponent == 1) assertEquals(sl.getOrCreateVertexNear(lat, lon, StreetMode.WALK), -1);
+            else assertNotEquals(sl.getOrCreateVertexNear(lat, lon, StreetMode.WALK), -1);
+
+            FreeFormPointSet ps = new FreeFormPointSet(new Coordinate(lon, lat));
+            LinkedPointSet lps = new LinkedPointSet(ps, sl, StreetMode.WALK, null);
+            // linked point sets should only be unlinked when exponent is 0 (pointset distance is 100)
+            if (exponent == 0) assertEquals(lps.edges[0], -1);
+            else assertNotEquals(lps.edges[0], -1);
+
+            // street router linking should behave same way
+            StreetRouter r = new StreetRouter(sl);
+            assertEquals(r.setOrigin(lat, lon), exponent != 0);
+            assertEquals(r.setDestination(lat, lon), exponent != 0);
+        }
+    }
 }

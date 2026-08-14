@@ -1,8 +1,5 @@
 package com.conveyal.data.census;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
 import org.locationtech.jts.geom.Envelope;
@@ -13,19 +10,22 @@ import org.mapdb.DBMaker;
 import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
@@ -128,21 +128,28 @@ public class ShapeDataStore {
 
     /** Write GeoBuf tiles to S3 */
     public void writeTilesToS3 (String bucketName) throws IOException {
-        // For the duration of this multiple-tile upload operation, manage a single upload thread for the S3 uploads.
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        // Upload on a single separate thread, overlapping the upload of one tile with the encoding of the next.
+        // The queue of one task and the caller-runs policy limit memory usage to three tile buffers: one uploading,
+        // one queued, and one being produced (either encoded or uploaded by the caller when the queue is full).
+        ExecutorService executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(1), new ThreadPoolExecutor.CallerRunsPolicy());
 
         // initialize an S3 client
-        AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+        S3Client s3 = S3Client.create();
         try {
-            writeTilesInternal((x, y) -> {
-                PipedInputStream is = new PipedInputStream();
-                PipedOutputStream os = new PipedOutputStream(is);
-                ObjectMetadata metadata = new ObjectMetadata();
-                metadata.setContentType("application/gzip");
-
-                // perform the upload in its own thread so it doesn't deadlock
-                executor.execute(() -> s3.putObject(bucketName, String.format("%d/%d.pbf.gz", x, y), is, metadata));
-                return os;
+            writeTilesInternal((x, y) -> new ByteArrayOutputStream() {
+                // The AWS S3 SDK requires the content length before uploading. We buffer each
+                // gzipped tile in a BAOS and override the close method to upload it when closed.
+                @Override
+                public void close () {
+                    PutObjectRequest request = PutObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(String.format("%d/%d.pbf.gz", x, y))
+                            .contentType("application/gzip")
+                            .build();
+                    byte[] tile = toByteArray();
+                    executor.execute(() -> s3.putObject(request, RequestBody.fromBytes(tile)));
+                }
             });
         } finally {
             // allow the JVM to exit

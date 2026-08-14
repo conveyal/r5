@@ -21,14 +21,15 @@ import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpException;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,11 +83,20 @@ public class AnalysisWorker implements Component {
     private static final int QUEUE_SLOTS_PER_PROCESSOR = 8;
 
     /**
-     * This timeout should be longer than the longest expected worker calculation for a single-point request.
-     * Preparing networks or linking grids will take longer, but those cases are now handled with
-     * WorkerNotReadyException.
+     * This timeout should be longer than the longest expected worker calculation for a single-point
+     * request. Preparing networks or linking grids will take longer, but those cases are handled
+     * with WorkerNotReadyException.
      */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 55;
+    private static final int SOCKET_TIMEOUT_SEC = 55;
+
+    /**
+     * This timeout should be longer than the longest expected time to establish a connection to a
+     * single-point worker. These connections are typically over a private network and take only
+     * milliseconds to set up. Failure to establish a connection is usually due to a known
+     * single-point worker shutting down. If this timeout is not set, the OS will retry which can
+     * take over a minute. We want to detect and correct the situation much faster than that.
+     */
+    private static final int CONNECT_TIMEOUT_SEC = 5;
 
     // STATIC FIELDS
 
@@ -118,7 +128,7 @@ public class AnalysisWorker implements Component {
     protected final String brokerBaseUrl;
 
     /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
-    private final HttpClient httpClient = makeHttpClient();
+    private final CloseableHttpClient httpClient = makeHttpClient();
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
@@ -136,15 +146,23 @@ public class AnalysisWorker implements Component {
     /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
     private final ThroughputTracker throughputTracker = new ThroughputTracker();
 
-    /** Convenience method allowing the backend broker and the worker to make similar HTTP clients. */
-    public static HttpClient makeHttpClient () {
+    /**
+     * Convenience method allowing the backend broker and the worker to make similar HTTP clients.
+     * The connect timeout quickly detects when peers disappear (usually worker shutdown). The
+     * socket timeout cuts connections when the peer goes silent mid-response (usually from settings
+     * causing slow calculations). The maxPerRoute limits the number of concurrent requests that
+     * will be sent to a single peer. We chose not to use Java's built-in HTTP client because it
+     * does not support all these limits.
+     */
+    public static CloseableHttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-        int timeoutMilliseconds = HTTP_CLIENT_TIMEOUT_SEC * 1000;
-        SocketConfig cfg = SocketConfig.custom()
-                .setSoTimeout(timeoutMilliseconds)
-                .build();
-        mgr.setDefaultSocketConfig(cfg);
+        mgr.setDefaultConnectionConfig(ConnectionConfig.custom()
+                .setConnectTimeout(Timeout.ofSeconds(CONNECT_TIMEOUT_SEC))
+                .build());
+        mgr.setDefaultSocketConfig(SocketConfig.custom()
+                .setSoTimeout(Timeout.ofSeconds(SOCKET_TIMEOUT_SEC))
+                .build());
         return HttpClients.custom().disableAutomaticRetries()
                 .setConnectionManager(mgr)
                 .build();
@@ -621,30 +639,31 @@ public class AnalysisWorker implements Component {
         lastPollingTime = timeNow;
 
         httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
-        HttpEntity responseEntity = null;
         try {
-            HttpResponse response = httpClient.execute(httpPost);
-            responseEntity = response.getEntity();
-            if (response.getStatusLine().getStatusCode() == 204) {
-                // Broker said there's no work to do.
-                return null;
-            }
-            if (response.getStatusLine().getStatusCode() == 200 && responseEntity != null) {
-                // Broker returned some work. Use the lenient object mapper to decode it in case the broker is a
-                // newer version so sending unrecognizable fields.
-                // ReadValue closes the stream, releasing the HTTP connection.
-                return JsonUtilities.lenientObjectMapper.readValue(
-                        responseEntity.getContent(),
-                        new TypeReference<List<RegionalTask>>() {}
-                );
-            }
-            // Non-200 response code or a null entity. Something is weird.
-            LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());
+            // The response handler is run while the response is still open. Its return value is
+            // passed up via the execute method to become this method's return value. The httpClient
+            // is responsible for releasing the connection back to the (finite) pool on all code
+            // paths including unexpected errors in the middle of receiving the response.
+            return httpClient.execute(httpPost, response -> {
+                if (response.getCode() == 204) {
+                    // Broker said there's no work to do.
+                    return null;
+                }
+                HttpEntity responseEntity = response.getEntity();
+                if (response.getCode() == 200 && responseEntity != null) {
+                    // Broker returned some work. Use the lenient object mapper to decode it in case
+                    // the broker is a newer version that sends fields not known to this worker.
+                    return JsonUtilities.lenientObjectMapper.readValue(
+                            responseEntity.getContent(),
+                            new TypeReference<List<RegionalTask>>() {}
+                    );
+                }
+                // Non-200 response code or a null entity. Something is weird. Throwing rather than returning null
+                // distinguishes this from the no-work case, so the accumulated results are re-queued below.
+                throw new HttpException("Unsuccessful polling. HTTP response code: " + response.getCode());
+            });
         } catch (Exception e) {
             LOG.error("Exception while polling backend for work: {}",ExceptionUtils.stackTraceString(e));
-        } finally {
-            // We have to properly close any streams so the HTTP connection is released back to the (finite) pool.
-            EntityUtils.consumeQuietly(responseEntity);
         }
         // If we did not return yet, something went wrong and the results were not delivered. Put them back on the list
         // for later re-delivery, safely interleaving with new results that may be coming from other worker threads.

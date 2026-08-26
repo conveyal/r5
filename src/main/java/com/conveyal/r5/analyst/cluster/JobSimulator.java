@@ -2,10 +2,12 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -30,7 +32,7 @@ public class JobSimulator {
     public String workerVersion = "12345";
     public int nOrigins = 4;
 
-    DefaultHttpClient httpClient = new DefaultHttpClient();
+    CloseableHttpClient httpClient = HttpClients.createDefault();
 
     public static void main(String[] args) {
 
@@ -88,10 +90,11 @@ public class JobSimulator {
                 Thread.sleep(2000);
                 mapper.writeValue(out, requests);
                 // System.out.println(out.toString());
-                httpPost.setEntity(new ByteArrayEntity(out.toByteArray()));
-                StatusLine statusLine = httpClient.execute(httpPost).getStatusLine();
-                System.out.println(statusLine.getStatusCode());
-                System.out.println(statusLine.getReasonPhrase());
+                httpPost.setEntity(new ByteArrayEntity(out.toByteArray(), ContentType.APPLICATION_JSON));
+                try (ClassicHttpResponse response = httpClient.executeOpen(null, httpPost, null)) {
+                    System.out.println(response.getCode());
+                    System.out.println(response.getReasonPhrase());
+                }
                 break;
             } catch (IOException e) {
                 System.out.println("Failed to enqueue job, retrying.");

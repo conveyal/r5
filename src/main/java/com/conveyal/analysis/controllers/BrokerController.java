@@ -28,14 +28,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.math3.analysis.function.Exp;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.ConnectTimeoutException;
+import org.apache.hc.client5.http.HttpHostConnectException;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 import org.bson.types.ObjectId;
 import org.mongojack.DBCursor;
 import org.mongojack.DBProjection;
@@ -59,9 +59,9 @@ import static com.conveyal.r5.common.Util.notNullOrEmpty;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * This is a Spark HTTP controller to handle connections from workers reporting their status and requesting work.
- * It also handles connections from the front end for single-point requests.
- * This API replaces what used to be a separate broker process running outside the Analysis backend.
+ * This is a Spark HTTP controller to handle connections from workers reporting their status and
+ * requesting work. It also handles connections from the front end for single-point requests.
+ * This replaces what used to be a separate broker process running outside the Analysis backend.
  * The core task queueing and distribution logic is supplied by an instance of the Broker object.
  * The present class should just wrap that functionality with an HTTP API.
  *
@@ -91,11 +91,8 @@ public class BrokerController implements HttpController {
         this.eventBus = eventBus;
     }
 
-    /**
-     * This HTTP client contacts workers to send them single-point tasks for immediate processing.
-     * TODO we should eventually switch to the new Java standard HttpClient.
-     */
-    private static HttpClient httpClient = AnalysisWorker.makeHttpClient();
+    /** This HTTP client contacts workers to send them single-point tasks for immediate processing. */
+    private static CloseableHttpClient httpClient = AnalysisWorker.makeHttpClient();
 
     /**
      * Spark handler functions return Objects.
@@ -195,22 +192,25 @@ public class BrokerController implements HttpController {
         // httpPost.setHeader("Accept", "application/x-analysis-time-grid");
         // TODO Explore: is this unzipping and re-zipping the result from the worker?
         httpPost.setHeader("Accept-Encoding", "gzip");
-        HttpEntity entity = null;
         try {
-            // Serialize and send the R5-specific task (not the original one the broker received from the UI)
-            httpPost.setEntity(new ByteArrayEntity(JsonUtil.objectMapper.writeValueAsBytes(task)));
-            HttpResponse workerResponse = httpClient.execute(httpPost);
+            // Serialize and send the R5 task (not the original one the broker received from the UI)
+            byte[] taskBytes = JsonUtil.objectMapper.writeValueAsBytes(task);
+            httpPost.setEntity(new ByteArrayEntity(taskBytes, ContentType.APPLICATION_JSON));
+        } catch (JsonProcessingException e) {
+            throw AnalysisServerException.unknown(e);
+        }
+        // Try-with-resources releases the connection to the pool independent of how we leave the block.
+        try (ClassicHttpResponse workerResponse = httpClient.executeOpen(null, httpPost, null)) {
             // Mimic the status code sent by the worker.
-            response.status(workerResponse.getStatusLine().getStatusCode());
+            response.status(workerResponse.getCode());
             // Mimic headers sent by the worker. We're mostly interested in Content-Type, maybe Content-Encoding.
             // We do not want to mimic all headers like Date, Server etc.
             Header contentTypeHeader = workerResponse.getFirstHeader("Content-Type");
             response.header(contentTypeHeader.getName(), contentTypeHeader.getValue());
             LOG.debug("Returning worker response to UI with status code {} and content type {}",
-                    workerResponse.getStatusLine(), contentTypeHeader.getValue());
+                    workerResponse.getCode(), contentTypeHeader.getValue());
             // This header will cause the Spark Framework to gzip the data automatically if requested by the client.
             response.header("Content-Encoding", "gzip");
-            entity = workerResponse.getEntity();
             // Only record activity on successful requests, to avoid polling noise.
             // All other eventbus usage is in Broker, a sign that most of this method should be factored out of the controller.
             if (response.status() == 200) {
@@ -228,8 +228,30 @@ public class BrokerController implements HttpController {
             // connection to the pool. In order to be able to close the stream in code we control, we buffer the
             // response in a byte buffer before resending it. NOTE: The fact that we're buffering before re-sending
             // probably degrades the perceived responsiveness of single-point requests.
-            return ByteStreams.toByteArray(entity.getContent());
+            return ByteStreams.toByteArray(workerResponse.getEntity().getContent());
+        } catch (NoRouteToHostException | HttpHostConnectException | ConnectTimeoutException e) {
+            // If the single-point worker can't be reached at all, it has probably shut down due to inactivity. These
+            // exceptions should arise only in the short window between a worker shutting down and its removal from the
+            // catalog. The WorkerCatalog drops any worker that has been silent for about twenty seconds, and this
+            // window could be narrowed even further by workers announcing their own shutdown.
+            // The three exception types can be attributed to successive stages of worker shutdown.
+            // HttpHostConnectException occurs after the worker process has exited but the instance is still shutting
+            // down. The address is reachable but nothing is listening on the port (connection refused).
+            // After the instance terminates and its address is unassigned, connection attempts are silently dropped,
+            // ending in ConnectTimeoutException. NoRouteToHostException occurs when the missing instance causes
+            // problems with address resolution at a lower level.
+            // In HttpClient 5, ConnectTimeoutException is a subclass of SocketTimeoutException, so this clause must
+            // come before the SocketTimeoutException clause below.
+            LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
+                    "user made a single-point request in the short window between worker shutdown and removal from " +
+                    "the catalog.", workerCategory);
+            httpPost.abort();
+            broker.unregisterSinglePointWorker(workerCategory);
+            return jsonResponse(response, HttpStatus.ACCEPTED_202, "Switching routing server");
         } catch (SocketTimeoutException ste) {
+            // The connection was established but the worker went silent before completing its response. This means the
+            // single-point worker existed and was reachable but was very slow to reply, or possibly shut down while
+            // processing the request (unlikely with non-spot). Report the delay to the user rather than switching workers.
             LOG.warn("Timeout waiting for response from worker.");
             // Aborting the request might help release resources - we had problems with exhausting connection pools here.
             httpPost.abort();
@@ -237,26 +259,8 @@ public class BrokerController implements HttpController {
                     "complexity of this scenario, your request may have too many simulated schedules. If you are " +
                     "using Routing Engine version < 4.5.1, your scenario may still be in preparation and you should " +
                     "try again in a few minutes.");
-        } catch (NoRouteToHostException | HttpHostConnectException e) {
-            // NoRouteToHostException occurs when a single-point worker shuts down (normally due to inactivity) but is
-            // not yet removed from the worker catalog.
-            // HttpHostConnectException has also been observed, presumably after a worker shuts down and a new one
-            // starts up but claims the same IP address as the defunct single point worker.
-            // Yet another even rarer case is possible, where a single point worker starts for a different network and
-            // is assigned the same IP as the defunct worker.
-            // All these cases could be avoided by more rapidly removing workers from the catalog via frequent regular
-            // polling with backpressure, potentially including an "I'm shutting down" flag.
-            LOG.warn("Worker in category {} was previously cataloged but is not reachable now. This is expected if a " +
-                    "user made a single-point request within WORKER_RECORD_DURATION_MSEC after shutdown.", workerCategory);
-            httpPost.abort();
-            broker.unregisterSinglePointWorker(workerCategory);
-            return jsonResponse(response, HttpStatus.ACCEPTED_202, "Switching routing server");
         } catch (Exception e) {
             throw AnalysisServerException.unknown(e);
-        } finally {
-            // If the HTTP response entity is non-null close the associated input stream, which causes the HttpClient
-            // to release the TCP connection back to its pool. This is critical to avoid exhausting the pool.
-            EntityUtils.consumeQuietly(entity);
         }
     }
 

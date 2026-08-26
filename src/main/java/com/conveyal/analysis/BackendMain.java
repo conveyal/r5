@@ -55,7 +55,7 @@ public abstract class BackendMain {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");
             // WorkerCategory(null, null) means a worker is not on any network, and is waiting to be assigned one.
-            components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, 0);
+            components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, false);
         }
 
         LOG.info("Conveyal Analysis server is ready.");

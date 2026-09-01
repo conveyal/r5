@@ -47,6 +47,14 @@ class SceneDiagramWriter {
         Scene converging = new Scene();
         OnDemandEgressTest.convergingEgressNetwork(converging);
         write(converging, outputDir, "convergingEgressNetwork");
+
+        Scene feeder = new Scene();
+        AddOnDemandTest.feederNetwork(feeder);
+        write(feeder, outputDir, "feederNetwork");
+
+        Scene feederTransit = new Scene();
+        OnDemandTransitTest.feederTransitNetwork(feederTransit);
+        write(feederTransit, outputDir, "feederTransitNetwork");
     }
 
     private static void write (Scene scene, Path outputDir, String baseName) {

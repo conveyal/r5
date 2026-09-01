@@ -513,8 +513,8 @@ public class LinkedPointSet implements Serializable {
     public int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         return extendCostsToPoints(distanceTableToVertices::get,
                 RoutingVariable.DISTANCE_MILLIMETERS,
-                distanceTableZone,
-                null);
+                distanceTableZone);
+
     }
 
     /**
@@ -528,15 +528,13 @@ public class LinkedPointSet implements Serializable {
      * @param costToVertex method to get the travel time or distance for a given vertex id
      * @param routingVariable whether the costToVertex method returns distances (millimeters) or times (seconds)
      * @param envelopeAroundStop the envelope in FIXED POINT DEGREES within which we want to find all points.
-     * @param egressArea area served by on-demand service from this stop. If null, there are no restrictions on which
-     *                  points can be reached in the egress leg from this stop.
      * @return A packed array of (pointIndex, cost), or null if there are no reachable points. Cost units match
      * supplied sr.routingVariable
      */
     public int[] extendCostsToPoints(CostToVertexFunction costToVertex,
                                      RoutingVariable routingVariable,
-                                     Envelope envelopeAroundStop,
-                                     Geometry egressArea) {
+                                     Envelope envelopeAroundStop) {
+
         int nPoints = this.size();
         TIntIntMap costToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
@@ -548,10 +546,6 @@ public class LinkedPointSet implements Serializable {
             // An edge index of -1 for a particular point indicates that this point is unlinked.
             if (edges[p] == -1) {
                 return true; // Continue to next iteration.
-            }
-
-            if (egressArea != null && !GeometryUtils.containsPoint(egressArea, pointSet.getLon(p), pointSet.getLat(p))) {
-                return true; // Point is outside supplied area, continue to next iteration.
             }
 
             edge.seek(edges[p]);

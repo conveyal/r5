@@ -193,7 +193,12 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // transit is used). See code in TravelTimeComputer for when each is used.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
             this.allModes.addAll(this.egressModes);
-
+            // On-demand services use a car-like vehicle, then riders walk onward from the drop-off.
+            // We will need the CAR and WALK linkages whatever the other modes in the request are.
+            if (task.accessModes.contains(LegMode.ON_DEMAND)) {
+                this.allModes.add(StreetMode.CAR);
+                this.allModes.add(StreetMode.WALK);
+            }
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 

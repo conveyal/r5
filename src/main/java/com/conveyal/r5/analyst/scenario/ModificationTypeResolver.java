@@ -40,7 +40,7 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
             .put("adjust-frequency", AdjustFrequency.class)
             .put("adjust-speed", AdjustSpeed.class)
             .put("modify-streets", ModifyStreets.class)
-            .put("pickup-delay", PickupDelay.class)
+            .put("add-on-demand", AddOnDemand.class)
             .put("remove-stops", RemoveStops.class)
             .put("remove-trips", RemoveTrips.class)
             .put("reroute", Reroute.class)

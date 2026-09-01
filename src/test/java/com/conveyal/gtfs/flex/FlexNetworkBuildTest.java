@@ -2,6 +2,13 @@ package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.geom.CMultiPolygon;
+import com.conveyal.gtfs.geom.CPolygon;
+import com.conveyal.gtfs.geom.PointInPolygonTester;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
+import org.locationtech.jts.geom.Envelope;
+import java.time.LocalDate;
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.validator.PostLoadValidator;
@@ -25,6 +32,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// This set of tests loads small GTFS-Flex feeds and builds TransportNetworks from them.
@@ -86,8 +94,8 @@ public class FlexNetworkBuildTest {
 
     /// Check that a flex trip declaring no pickup/drop-off time window is flagged at feed load
     /// (the spec requires the windows) but still builds as an always-available service, with
-    /// its missing bounds treated as unlimited. This is the same internal representation that
-    /// PickupDelay-derived services (which have no windows) will use once merged into OnDemand.
+    /// its missing bounds treated as unlimited. This is the same internal representation used by
+    /// services added by the AddOnDemand modification, which have no windows.
     @Test
     void flexTripWithoutTimeWindowIsAlwaysAvailable () throws Exception {
         loadFixture("gtfs/flex/nowindow");
@@ -134,22 +142,43 @@ public class FlexNetworkBuildTest {
                 "The scheduled non-flex trip should still load even though the flex trip was skipped.");
     }
 
+    /// The GTFS reference allows MultiPolygons, apparently even mixed with Polygons.
+    /// A zone declared as a MultiPolygon should be loaded into the network as the corresponding type.
+    @Test
+    void multiPolygonZoneBuilds () throws Exception {
+        loadFixture("gtfs/flex/multipolygon");
+        assertEquals(0, countErrors(feed, UnsupportedFlexError.class), "MultiPolygon zones are supported.");
+        assertEquals(0, countErrors(feed, ReferentialIntegrityError.class), "No bad references expected.");
+        TransportNetwork network = buildNetwork();
+        assertEquals(1, onDemandCount(network), "The trip between the two zones should yield one service.");
+        OnDemand od = network.transitLayer.onDemandIndex.allServices().get(0);
+        assertTrue(od.fromPolygon instanceof CMultiPolygon, "The pick-up zone should keep its multipolygon form.");
+        assertTrue(od.toPolygon instanceof CPolygon, "The drop-off zone should be a plain polygon.");
+    }
+
+    /// A multipolygon flex location in a network should survive a serialization round trip unscathed.
+    @Test
+    void multiPolygonZoneSurvivesSerialization () throws Exception {
+        loadFixture("gtfs/flex/multipolygon");
+        TransportNetwork built = buildNetwork();
+        File file = tempDir.resolve("network.dat").toFile();
+        KryoNetworkSerializer.write(built, file);
+        TransportNetwork read = KryoNetworkSerializer.read(file);
+        assertEquals(1, onDemandCount(read));
+        OnDemand od = read.transitLayer.onDemandIndex.allServices().get(0);
+        assertTrue(od.fromPolygon instanceof CMultiPolygon, "The multipolygon zone should have the corresponding type.");
+        PointInPolygonTester tester = new PointInPolygonTester(od.fromPolygon);
+        assertTrue(tester.contains(-83.02, 40.0), "The eastern polygon should contain its center after deserialization.");
+        assertTrue(tester.contains(-83.043, 40.0), "The western polygon should contain its center after deserialization.");
+        assertFalse(tester.contains(-83.03, 40.0), "A point in between the two polygons should not be contained by the multipolygon.");
+
+        Envelope everywhere = envelopeToFixed(read.streetLayer.envelope);
+        List<OnDemand> found = read.transitLayer.findOnDemandService(everywhere, 9 * 3600, 11 * 3600, LocalDate.of(2026, 6, 1));
+        assertEquals(1, found.size(), "The rebuilt spatial index should find the service on a service day.");
+    }
+
     // --- Tests that only load GTFS but do not build networks due to HIGH severity errors ---
 
-    /// The presence of any geometry of an unsupported type should cause the GeoJSON file to be
-    /// rejected. Trips referencing those geometries are then expected to have broken references.
-    /// This is currently triggered by a multipolygon, but if and when multipolygons are supported
-    /// (if found in GTFS feeds in the wild) this test will shift to another type like linestring.
-    @Test
-    void unsupportedGeometryDropsLocations () throws Exception {
-        loadFixture("gtfs/flex/multipolygon");
-        assertTrue(feed.locations.isEmpty(),
-                "Any unsupported geometry should make the whole locations.geojson unusable.");
-        assertTrue(hasFlexErrorContaining(feed, "MultiPolygon"),
-                "The unsupported geometry type should be recorded.");
-        assertTrue(hasHighPriorityError(feed, ReferentialIntegrityError.class),
-                "Trips referencing the now-absent locations now contain bad references.");
-    }
 
     @Test
     void badReferenceDetected () throws Exception {

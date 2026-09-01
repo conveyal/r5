@@ -7,7 +7,6 @@ import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
-import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.DominatingList;
@@ -34,8 +33,6 @@ import java.util.List;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
-import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_SERVICE_HERE;
-import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.Util.isNullOrEmpty;
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
@@ -70,6 +67,13 @@ public class TravelTimeComputer {
         // 0. Preliminary range checking and setup =====================================================================
         if (!request.directModes.equals(request.accessModes)) {
             throw new IllegalArgumentException("Direct mode may not be different than access mode in Analysis.");
+        }
+        boolean onDemandRequested = request.accessModes.contains(LegMode.ON_DEMAND);
+        if (onDemandRequested && !(request.accessModes.contains(LegMode.WALK) || request.accessModes.contains(LegMode.BICYCLE))) {
+            throw new IllegalArgumentException("ON_DEMAND access requires WALK or BICYCLE access to reach the pick-up place.");
+        }
+        if (request.egressModes != null && request.egressModes.contains(LegMode.ON_DEMAND)) {
+            throw new IllegalArgumentException("ON_DEMAND egress is not yet supported.");
         }
 
         // If this request includes a fare calculator, inject the transport network's transit layer into it.
@@ -107,8 +111,7 @@ public class TravelTimeComputer {
         // Use one or more modes to access transit stops, retaining the reached transit stops as well as the travel
         // times to the destination points using those access modes.
 
-        // A map from transit stop vertex indices to the travel time (in seconds) and mode used to reach those
-        // vertices.
+        // A map from transit stop vertices to the travel time and mode used to reach those vertices.
         StreetTimesAndModes bestAccessOptions = new StreetTimesAndModes();
 
         // Travel times in seconds to each destination point (or MAX_INT for unreachable points?)
@@ -127,18 +130,8 @@ public class TravelTimeComputer {
         for (StreetMode accessMode : accessModes) {
             LOG.info("Performing street search for mode: {}", accessMode);
 
-            // Look up pick-up service for an access leg.
-            PickupWaitTimes.AccessService accessService =
-                    network.streetLayer.getAccessService(request.fromLat, request.fromLon, accessMode);
-
-            // When an on-demand mobility service is defined, it may not be available at this particular location.
-            if (accessService == NO_SERVICE_HERE) {
-                LOG.info("On-demand {} service is not available at this location, " +
-                        "continuing to next access mode (if any).", accessMode);
-                continue;
-            }
-
             // Attempt to set the origin point before progressing any further.
+
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
             // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
             // The request must be provided to the StreetRouter before setting the origin point.
@@ -159,11 +152,13 @@ public class TravelTimeComputer {
             // Note: Access searches (which minimize travel time) are asymmetric with the egress cost tables (which
             // often minimize distance to allow reuse at different speeds).
 
+            boolean enableOnDemand = onDemandRequested
+                  && (accessMode == StreetMode.WALK || accessMode == StreetMode.BICYCLE);
 
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
-            boolean enableOnDemand = request.hasFlag("ON_DEMAND");
             {
+
                 int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
                 if (request.hasTransit() || enableOnDemand) {
                     limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
@@ -207,28 +202,11 @@ public class TravelTimeComputer {
                 }
                 // Find access times to transit stops, keeping the minimum across all access street modes.
                 // Note that getReachedStops() returns the routing variable units, not necessarily seconds.
-                // TODO add logic here if linkedStops are specified in pickupDelay?
-                TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
-                // LOG.info("Stop reached times: {}", travelTimesToStopsSeconds);
+                bestAccessOptions.update(sr.getReachedStops(), accessMode, false);
                 if (onDemandAccess != null) {
-                    // Stops reached by walking onward from on-demand rides are min-merged with the
-                    // access mode's own stop arrivals. This is how a flex ride leads into transit.
-                    onDemandAccess.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
-                        if (!travelTimesToStopsSeconds.containsKey(stop) || travelTimesToStopsSeconds.get(stop) > seconds) {
-                            travelTimesToStopsSeconds.put(stop, seconds);
-                        }
-                        return true;
-                    });
+                    // Merge times from walking after on-demand service into times from the initial access mode.
+                    bestAccessOptions.update(onDemandAccess.egressRouter.getReachedStops(), accessMode, true);
                 }
-                if (accessService != NO_WAIT_ALL_STOPS) {
-                    LOG.info("Delaying transit access times by {} seconds (to wait for {} pick-up).",
-                            accessService.waitTimeSeconds, accessMode);
-                    if (accessService.stopsReachable != null) {
-                        travelTimesToStopsSeconds.retainEntries((k, v) -> accessService.stopsReachable.contains(k));
-                    }
-                    travelTimesToStopsSeconds.transformValues(i -> i + accessService.waitTimeSeconds);
-                }
-               bestAccessOptions.update(travelTimesToStopsSeconds, accessMode);
             }
 
             // Calculate times to reach destinations directly by this street mode, without using transit.
@@ -269,18 +247,8 @@ public class TravelTimeComputer {
                     pointSetTimes = PointSetTimes.minMerge(pointSetTimes, onDemandAccess.directTimes);
                 }
 
-                if (accessService != NO_WAIT_ALL_STOPS) {
-                    LOG.info("Delaying direct travel times by {} seconds (to wait for {} pick-up).",
-                            accessService.waitTimeSeconds, accessMode);
-                    if (accessService.stopsReachable != null) {
-                        // Disallow direct travel to destination if pickupDelay zones are associated with stops.
-                        pointSetTimes = PointSetTimes.allUnreached(destinations);
-                    } else {
-                        // Allow direct travel to destination using services not associated with specific stops.
-                        pointSetTimes.incrementAllReachable(accessService.waitTimeSeconds);
-                    }
-                }
                 nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
+
             }
         }
 
@@ -302,7 +270,7 @@ public class TravelTimeComputer {
                 // Origin not found. Signal this using the same flag as the other modes do.
                 foundAnyOriginPoint = false;
             } else {
-                bestAccessOptions.update(sr.getReachedStops(), StreetMode.CAR);
+                bestAccessOptions.update(sr.getReachedStops(), StreetMode.CAR, false);
                 foundAnyOriginPoint = true;
             }
             // Disallow non-transit access.

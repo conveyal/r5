@@ -69,7 +69,8 @@ class SceneRouting {
 
     /// Run a walk search from the given scene coordinates, then extend it with on-demand rides and
     /// a final post-on-demand walk. This invokes the same [OnDemandAccess] method that
-    /// TravelTimeComputer uses for the access leg when the ON_DEMAND flag is set, ensuring tests
+    /// TravelTimeComputer uses for the access leg when ON_DEMAND is among the access leg modes, ensuring tests
+
     /// use exactly the same sequence of actions as production, but, without the surrounding travel
     /// time surface and propagation machinery.
     static WalkAndFlexResults routeWithOnDemand (TransportNetwork network, Scene scene, double x, double y, OnDemand od) {

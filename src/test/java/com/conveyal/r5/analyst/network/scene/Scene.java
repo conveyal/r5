@@ -60,6 +60,8 @@ public class Scene {
 
     final List<SceneOnDemand> onDemands = new ArrayList<>();
 
+    final List<SceneRoute> routes = new ArrayList<>();
+
     public Scene () {
         this(DEFAULT_ORIGIN);
     }
@@ -114,8 +116,20 @@ public class Scene {
         return polygon(id, minX, minY, maxX, minY, maxX, maxY, minX, maxY);
     }
 
+    /// Declare a scheduled transit route with the given ID.
+    /// Its stops and timetable are set with fluent [SceneRoute] methods.
+    public SceneRoute route (String id) {
+        if (routes.stream().anyMatch(r -> r.id.equals(id))) {
+            throw new IllegalArgumentException("Duplicate route id: " + id);
+        }
+        SceneRoute route = new SceneRoute(id);
+        routes.add(route);
+        return route;
+    }
+
     /// Declare an on-demand trip with the given ID.
     /// Its pick-up and drop-off locations or stops are added with fluent [SceneOnDemand] methods.
+
     public SceneOnDemand onDemand (String id) {
         if (onDemands.stream().anyMatch(t -> t.id.equals(id))) {
             throw new IllegalArgumentException("Duplicate on-demand trip id: " + id);
@@ -191,6 +205,15 @@ public class Scene {
                     "On-demand trip '%s' must have exactly one polygon or stop group on each end.", spec.id));
             }
         }
+        for (SceneRoute route : routes) {
+            if (route.stops.size() < 2) {
+                errors.add(String.format("Route '%s' must serve at least two stops.", route.id));
+            }
+            if (route.headwaySeconds <= 0 || route.hopSeconds <= 0 || route.lastDeparture < route.firstDeparture) {
+                errors.add(String.format("Route '%s' has an invalid timetable.", route.id));
+            }
+        }
+
         if (!errors.isEmpty()) {
             throw new IllegalStateException("Scene is invalid:\n  " + String.join("\n  ", errors));
         }

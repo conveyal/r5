@@ -2,7 +2,6 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -112,13 +111,6 @@ public class EgressCostTable implements Serializable {
      */
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
-    /**
-     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomous vehicle,
-     * scooter pickup, etc.). We track this separately so the egress time limit can exclude waiting time.
-     *
-     * Should remain null if there is not a pickup delay modification applied for this streetmode.
-     */
-    public int[] egressStopDelaysSeconds;
 
     /**
      * Build an EgressCostTable for the given LinkedPointSet.
@@ -160,13 +152,6 @@ public class EgressCostTable implements Serializable {
 
         TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
-        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
-        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
-
-        if (pickupWaitTimes != null && streetMode == pickupWaitTimes.streetMode) {
-            egressStopDelaysSeconds = new int[nStops];
-            Arrays.fill(egressStopDelaysSeconds, pickupWaitTimes.getDefaultWaitInSeconds());
-        }
 
         if (streetMode == StreetMode.CAR) {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
@@ -263,7 +248,8 @@ public class EgressCostTable implements Serializable {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
-            if (rebuildZone != null && !rebuildZone.contains(stopPoint) && egressStopDelaysSeconds == null) {
+            if (rebuildZone != null && !rebuildZone.contains(stopPoint)) {
+
                 // This cannot be affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so
                 // all stops outside the relink zone should already have a distance table entry.
@@ -291,29 +277,8 @@ public class EgressCostTable implements Serializable {
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
                 // For non-walk modes perform a search from each stop, as stop-to-vertex tables are not precomputed.
-                Geometry egressArea = null;
-
-                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
-                // initialized and filled with the default value in the constructor. Here, we override the default
-                // values with any stop-specific values.
-                if (egressStopDelaysSeconds != null) {
-                    // TODO handle case where stopsForZone is not specified in the modification, implying the main
-                    //  polygon can be used for both access and egress service.
-                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
-                    if (egressService == null) {
-                        if (pickupWaitTimes.getDefaultWaitInSeconds() < 0) {
-                            // Bail out early if egress from this stop is not specified and the default is no available
-                            // on-demand mode
-                            LOG.debug("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
-                            return null;
-                        }
-                    } else {
-                        egressArea = egressService.serviceArea;
-                        egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
-                    }
-                }
-
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
+
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
                 if (vertexId < 0) {
@@ -344,8 +309,8 @@ public class EgressCostTable implements Serializable {
                 sr.route();
                 return linkedPointSet.extendCostsToPoints(sr.getReachedVertices()::get,
                         sr.quantityToMinimize,
-                        envelopeAroundStop,
-                        egressArea);
+                        envelopeAroundStop);
+
             }
         }).collect(Collectors.toList());
         computeCounter.done();
@@ -361,7 +326,7 @@ public class EgressCostTable implements Serializable {
         this.linkedPointSet = linkedPointSet;
         this.linkageCostUnit = superCostTable.linkageCostUnit;
         this.stopToPointLinkageCostTables = stopToPointLinkageCostTables;
-        this.egressStopDelaysSeconds = superCostTable.egressStopDelaysSeconds;
+
     }
 
     /**

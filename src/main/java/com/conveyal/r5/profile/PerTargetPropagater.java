@@ -400,19 +400,8 @@ public class PerTargetPropagater {
                     throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                 }
                 if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
-                    // Account for any additional delay waiting for pickup at the egress stop.
-                    if (egressCostTable.egressStopDelaysSeconds != null) {
-                        int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
-                        if (delayAtEgress < 0) {
-                            // Pickup for this mode not allowed at this stop, so trove iteration should
-                            // continue
-                            return true;
-                        } else {
-                            secondsFromStopToTarget += delayAtEgress;
-                        }
-                    }
-
                     StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
+
                             secondsFromStopToTarget,
                             linkedTargets.streetMode
                     );

@@ -89,13 +89,13 @@ class SceneRouting {
         int getTravelTimeToVertex (int vertexIndex) {
             return Math.min(
                 access.getTravelTimeToVertex(vertexIndex),
-                flex.egressRouter.getTravelTimeToVertex(vertexIndex));
+                flex.onwardWalkRouter.getTravelTimeToVertex(vertexIndex));
         }
 
         /// Travel times to all reached transit stops, by walking directly or after a flex ride.
         TIntIntMap getReachedStops () {
             TIntIntMap merged = access.getReachedStops();
-            flex.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+            flex.onwardWalkRouter.getReachedStops().forEachEntry((stop, seconds) -> {
                 if (!merged.containsKey(stop) || merged.get(stop) > seconds) {
                     merged.put(stop, seconds);
                 }

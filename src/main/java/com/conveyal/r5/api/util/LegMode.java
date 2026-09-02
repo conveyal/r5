@@ -13,8 +13,8 @@ public enum LegMode {
     /// Park & Ride
     CAR_PARK,
     /// On-demand ride (taxi, van, or minibus ride-hailing service).
-    /// This leg mode is unique in that it extends other leg modes present (walk and/or bicycle).
-    /// On-demand egress after scheduled transit is not yet supported.
+    /// As an access or direct mode, this extends other leg modes present (walk and/or bicycle).
+    /// As an egress mode, it carries riders to services' drop-off zones without walking onward.
     ON_DEMAND;
 
     /// Return the heaviest/fastest StreetMode for use in stop finding

@@ -45,8 +45,8 @@ class SceneDiagramWriter {
         write(park, outputDir, "parkNetwork");
 
         Scene converging = new Scene();
-        OnDemandEgressTest.convergingEgressNetwork(converging);
-        write(converging, outputDir, "convergingEgressNetwork");
+        OnDemandWalkLimitTest.convergingWalkNetwork(converging);
+        write(converging, outputDir, "convergingWalkNetwork");
 
         Scene feeder = new Scene();
         AddOnDemandTest.feederNetwork(feeder);
@@ -55,6 +55,18 @@ class SceneDiagramWriter {
         Scene feederTransit = new Scene();
         OnDemandTransitTest.feederTransitNetwork(feederTransit);
         write(feederTransit, outputDir, "feederTransitNetwork");
+
+        Scene feederEgress = new Scene();
+        OnDemandTransitEgressTest.feederEgressNetwork(feederEgress);
+        write(feederEgress, outputDir, "feederEgressNetwork");
+
+        Scene setBackStop = new Scene();
+        OnDemandTransitEgressTest.setBackStopNetwork(setBackStop);
+        write(setBackStop, outputDir, "setBackStopNetwork");
+
+        Scene impreciseStop = new Scene();
+        MeetingAreaTest.impreciseStopNetwork(impreciseStop);
+        write(impreciseStop, outputDir, "impreciseStopNetwork");
     }
 
     private static void write (Scene scene, Path outputDir, String baseName) {

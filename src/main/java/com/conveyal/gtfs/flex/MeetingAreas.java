@@ -2,8 +2,10 @@ package com.conveyal.gtfs.flex;
 
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -30,9 +32,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /// includes things like rail platforms. To identify truly reachable car-boarding points, a walk
 /// search is performed outward from the stop vertex, leaving over the stop's walk link.
 ///
-/// The discovery search minimizes distance so the area is independent of any request walk speed.
-/// Its costs are discarded or ignored and only set membership survives. The rider walks from their
-/// origin directly to wherever the vehicle can meet them, in time determined by their own search.
+/// The street search that discovers a meeting area minimizes distance, making it independent of
+/// walk speed. On the egress leg there is no per-request walk search, so the distance of the walk
+/// from stop to meeting vertex is converted to a duration at the request-specified walk speed.
+///
+/// The discovery search is supplemented by one straight-line lookup of the nearest drivable edge to
+/// the stop. When that edge is about as close as the stop's walk-linked edge, it is also used.
+/// This corrects for imprecise stop placement which might make it ambiguous which road to use.
 ///
 /// A stop with no drivable street within the budget gets an empty area, logged as a data
 /// quality warning, and on-demand service is unusable at that stop. Its walk link continues to
@@ -60,6 +66,10 @@ public class MeetingAreas {
     /// street or have poor reachability among one-way streets.
     public static final int CURB_STOP_RADIUS_METERS = 100;
 
+    /// Straight-line distance tolerance for also attaching to the drivable edge nearest a stop.
+    /// A stop beside a true barrier may wrongly acquire meeting points across the barrier.
+    public static final int NEARBY_DRIVABLE_EDGE_TOLERANCE_METERS = 5;
+
     private final TransportNetwork network;
 
     /// For each relevant stop index, a map defining that stop's meeting area. These values map
@@ -71,8 +81,8 @@ public class MeetingAreas {
         this.network = network;
     }
 
-    /// Return the meeting area map for the given stop index. This map is computed and cached on
-    /// first use. Distances (the map values) should not be used at this point (see class comment).
+    /// Return the meeting area map for the given stop index.
+    /// This map is computed and cached on first use.
     public TIntIntMap areaWithDistances (int stop) {
         return areaForStop.computeIfAbsent(stop, this::discover);
     }
@@ -112,12 +122,52 @@ public class MeetingAreas {
             }
             return true;
         });
+        addNearbyDrivableEdge(stopVertex, radiusMeters, area);
         if (area.isEmpty()) {
             LOG.warn("No drivable street within {} meters walking distance of stop {}. " +
                 "On-demand service cannot serve it.",
                 radiusMeters, network.transitLayer.stopIdForIndex.get(stop));
         }
         return area;
+    }
+
+    private void addNearbyDrivableEdge (int stopVertex, int radiusMeters, TIntIntMap area) {
+        VertexStore.Vertex vertex = network.streetLayer.vertexStore.getCursor(stopVertex);
+        Split split = network.streetLayer.findSplit(vertex.getLat(), vertex.getLon(),
+            StreetLayer.LINK_RADIUS_METERS, StreetMode.CAR);
+        if (split == null) {
+            return; // No drivable edge anywhere near the stop.
+        }
+        long thresholdMm = (long) walkLinkLengthMm(stopVertex)
+            + NEARBY_DRIVABLE_EDGE_TOLERANCE_METERS * 1000;
+        if (split.distanceToEdge_mm > thresholdMm) {
+            return; // The drivable edge is clearly farther away than the walk link's street.
+        }
+        long budgetMm = (long) radiusMeters * 1000;
+        addIfCloser(area, split.vertex0, split.distanceToEdge_mm + split.distance0_mm, budgetMm);
+        addIfCloser(area, split.vertex1, split.distanceToEdge_mm + split.distance1_mm, budgetMm);
+    }
+
+    /// The distance from the given stop to the street it is linked to. That is, the length of its
+    /// walk link edge. Current code creates exactly one link edge per stop. The shortest is used so
+    /// this stays correct if stop vertices ever acquire additional links.
+    private int walkLinkLengthMm (int stopVertex) {
+        EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor();
+        int min = Integer.MAX_VALUE;
+        for (TIntIterator it = network.streetLayer.outgoingEdges.get(stopVertex).iterator(); it.hasNext(); ) {
+            edge.seek(it.next());
+            min = Math.min(min, edge.getLengthMm());
+        }
+        return min;
+    }
+
+    private static void addIfCloser (TIntIntMap area, int vertex, int distanceMm, long budgetMm) {
+        if (distanceMm > budgetMm) {
+            return;
+        }
+        if (!area.containsKey(vertex) || area.get(vertex) > distanceMm) {
+            area.put(vertex, distanceMm);
+        }
     }
 
     /// Returns the walk budget for discovering the given stop's meeting area. Stops whose walk

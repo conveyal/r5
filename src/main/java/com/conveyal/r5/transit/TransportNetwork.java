@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.flex.MeetingAreas;
+import com.conveyal.gtfs.flex.OnDemandEgressIndex;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.LinkageCache;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
@@ -97,6 +98,16 @@ public class TransportNetwork implements Serializable {
             meetingAreas = new MeetingAreas(this);
         }
         return meetingAreas;
+    }
+
+    /// Which on-demand services can pick up a rider alighting at each transit stop.
+    private transient OnDemandEgressIndex onDemandEgressIndex;
+
+    public synchronized OnDemandEgressIndex onDemandEgressIndex () {
+        if (onDemandEgressIndex == null) {
+            onDemandEgressIndex = new OnDemandEgressIndex(this);
+        }
+        return onDemandEgressIndex;
     }
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */

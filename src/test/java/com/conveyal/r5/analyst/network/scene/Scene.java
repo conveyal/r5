@@ -83,6 +83,16 @@ public class Scene {
         return junction;
     }
 
+    /// Return the previously declared junction with the given name. This allows scene fragments
+    /// shared between test classes to be extended with ways attached to their junctions.
+    public SceneJunction junction (String name) {
+        SceneJunction junction = junctions.get(name);
+        if (junction == null) {
+            throw new IllegalArgumentException("No junction named: " + name);
+        }
+        return junction;
+    }
+
     /// Begins constructing a new way with the specified `highway=` tags.
     /// Nodes and further details are added with the fluent [SceneWay] methods.
     public SceneWay way (WayPreset preset) {

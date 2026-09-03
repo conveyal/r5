@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.gtfs.flex.OnDemandEgressIndex;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -118,6 +119,9 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // The null destinationGridExtents are created by the WebMercatorExtents#forPointsets else clause.
             // FIXME there is no grid to link, but there are points and egress tables to make!
             //  see com.conveyal.r5.analyst.cluster.AnalysisWorkerTask.loadAndValidateDestinationPointSets
+            // The linkages, egress tables, and on-demand egress tables skipped here are instead built lazily at
+            // request time. Freeform destinations are rejected for single-point requests, so this only ever
+            // happens inside a regional task, where nothing interactive is blocked while the work runs.
             return scenarioNetwork;
         }
 
@@ -141,6 +145,20 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                 linkedPointSet.getEgressCostTable(progressListener);
             }
         }
+
+        // Build an egress cost table for on-demand services. This is one car search per stop where
+        // any on-demand service picks up riders. Rows are built for all stops in the egress index,
+        // a date-independent superset of any single request's candidate stops.
+        if (key.onDemandEgress) {
+            OnDemandEgressIndex egressIndex = scenarioNetwork.onDemandEgressIndex();
+            if (!egressIndex.isEmpty()) {
+                setProgress(key, 0, "Building on-demand egress tables...");
+                LinkedPointSet carLinkage = scenarioNetwork.linkageCache
+                        .getLinkage(pointSet, scenarioNetwork.streetLayer, StreetMode.CAR);
+                ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
+                carLinkage.getOnDemandEgressTable().ensureStops(egressIndex.stops(), progressListener);
+            }
+        }
         // Finished building all needed inputs for analysis, return the completed network
         return scenarioNetwork;
     }
@@ -157,6 +175,10 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final WebMercatorExtents destinationGridExtents;
         public final EnumSet<StreetMode> allModes;
         public final EnumSet<StreetMode> egressModes;
+
+        /// Whether the task uses on-demand services as egress legs after transit. Tracked separate
+        /// from egressModes because ON_DEMAND is not a street mode and its table is not a full EgressCostTable.
+        public final boolean onDemandEgress;
 
         /**
          * If a destination opportunity grid is present in the request - not a grid ID but the actual grid object,
@@ -199,6 +221,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                 this.allModes.add(StreetMode.CAR);
                 this.allModes.add(StreetMode.WALK);
             }
+            // On-demand egress determines ride durations over the CAR linkage of the destinations.
+            // Its sparse cost table is built in buildValue alongside the full egress tables
+            // (toStreetModeSet above drops ON_DEMAND, so no full CAR egress table is built for it).
+            this.onDemandEgress = !task.transitModes.isEmpty() && task.egressModes.contains(LegMode.ON_DEMAND);
+            if (this.onDemandEgress) {
+                this.allModes.add(StreetMode.CAR);
+            }
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 
@@ -215,12 +244,13 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                     Objects.equals(scenarioId, other.scenarioId) &&
                     Objects.equals(destinationGridExtents, other.destinationGridExtents) &&
                     Objects.equals(allModes, other.allModes) &&
-                    Objects.equals(egressModes, other.egressModes);
+                    Objects.equals(egressModes, other.egressModes) &&
+                    onDemandEgress == other.onDemandEgress;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(networkId, scenarioId, destinationGridExtents, allModes, egressModes);
+            return Objects.hash(networkId, scenarioId, destinationGridExtents, allModes, egressModes, onDemandEgress);
         }
     }
 

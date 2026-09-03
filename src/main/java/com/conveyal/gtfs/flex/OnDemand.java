@@ -75,5 +75,25 @@ public class OnDemand implements Serializable {
                 && earliestBoarding < toWindowEnd;
     }
 
+    /// Returns the duration in seconds of an egress leg on this service, for a rider who alights
+    /// from scheduled transit at the given clock time, walks the given number of seconds to a
+    /// vehicle, then rides for the given number of seconds. Includes everything between alighting
+    /// from transit and alighting from the on-demand vehicle Returns -1 when the service's time
+    /// windows do not allow the trip.
+    ///
+    /// Access availability is evaluated for one representative rider departing at the middle of the
+    /// departure window because the access search runs before any departure time is chosen. On the
+    /// other hand, egress evaluation runs during propagation where the true arrival time at the
+    /// stop is known for each departure time and Monte Carlo draw, so this test is exact per
+    /// iteration.
+    public int egressLegSeconds (int alightingClockTime, int walkSeconds, int rideSeconds) {
+        int readyTime = alightingClockTime + walkSeconds;
+        int boarding = (int) (Math.max(readyTime, fromWindowStart) + Math.round(durationOffset));
+        if (boarding >= fromWindowEnd) return -1;
+        int dropOff = boarding + rideSeconds;
+        if (dropOff >= toWindowEnd) return -1;
+        return dropOff - alightingClockTime;
+    }
+
 }
 

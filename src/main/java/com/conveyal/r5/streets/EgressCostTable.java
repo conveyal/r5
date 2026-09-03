@@ -404,6 +404,8 @@ public class EgressCostTable implements Serializable {
      * calling the method that lazily transposed the tables.
      * TODO really we should have separate EgressCostTable and PropagationEgressCostTable classes, one copied from the other.
      * One should represent the region, or read-through crops of the whole region, and the other should be per-scenario.
+     * Under that split, OnDemandEgressTable would become a second builder feeding the shared propagation-side
+     * structure, instead of a parallel table duplicating the transposition and point-major lookup.
      */
     public synchronized void destructivelyTransposeForPropagationAsNeeded() {
         if (pointToStopLinkageCostTables == null) {

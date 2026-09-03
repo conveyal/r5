@@ -28,7 +28,7 @@ public class MeetingAreaTest {
     /// The station scene puts an elevated stop directly above a motorway with a frontage road
     /// 20 meters away across a barrier, while the legitimate access point is Access Road, a
     /// 310 meter walk through the station plaza and a footpath. The meeting area must be found
-    /// by walking, so it contains the Access Road vertices, prices them at walked distance,
+    /// by walking, so it contains the Access Road vertices at their walked distances,
     /// and excludes the frontage road that a straight-line association would wrongly choose.
     @Test
     void barrierSeparatedStation () {
@@ -77,7 +77,7 @@ public class MeetingAreaTest {
         int curb = vertexAt(network, scene, 500, 0);
         assertTrue(area.containsKey(curb), "The street vertex below the stop should be in the area.");
         assertEquals(10_000, area.get(curb), 3_000,
-            "The curb vertex should be priced at the 10 meter link walk.");
+            "The curb vertex should be recorded at the 10 meter link walk distance.");
         assertFalse(area.containsKey(vertexAt(network, scene, 750, 0)),
             "The side street junction is a 260 meter walk, outside the "
                 + MeetingAreas.CURB_STOP_RADIUS_METERS + " meter curb budget.");
@@ -147,6 +147,46 @@ public class MeetingAreaTest {
         assertNotNull(frontageSplit, "A point beside the frontage road should split a drivable edge.");
         assertFalse(pickUp.containsPoint(frontageLat, frontageLon, frontageSplit),
             "A point on the frontage road should be rejected despite being near the stop.");
+    }
+
+    /// Create a network with a street and a disconnected parallel footpath and a stop between the
+    /// two that is marginally closer to the footpath. The stop walk-links to the footpath (8 meters
+    /// versus 12) and the footpath never connects to a drivable street, so discovery by walking
+    /// alone would find no meeting area at all. A flex service carries riders from the stop to a
+    /// zone at the west end of the street.
+    static TransportNetwork impreciseStopNetwork (Scene scene) {
+        scene.way(WayPreset.STREET).named("Real Rd").from(0, 0).east(400);
+        scene.way(WayPreset.FOOTPATH).named("Stray Path").from(0, 20).east(400);
+        SceneStop stop = scene.stop("gate", 200, 12);
+        ScenePolygon zone = scene.rectPolygon("zone", -50, -50, 50, 50);
+        scene.onDemand("out")
+            .fromStops(stop).pickupWindow(WINDOW_START, WINDOW_END)
+            .toPolygon(zone).dropOffWindow(WINDOW_START, WINDOW_END);
+        return scene.buildNetwork();
+    }
+
+    private static final int WINDOW_START = 6 * 3600;
+
+    private static final int WINDOW_END = 22 * 3600;
+
+    /// Test on a stop that walk-links to a disconnected path instead of the road its vehicle
+    /// actually operates on. The drivable edge is at a comparable distance so it should also be
+    /// added as a backup, allowing the stop to be used for on-demand service.
+    @Test
+    void impreciseStopCoordinates () {
+        Scene scene = new Scene();
+        TransportNetwork network = impreciseStopNetwork(scene);
+        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "gate"));
+        assertFalse(area.isEmpty(),
+            "The road 12 meters from the stop should rescue the meeting area.");
+        int westEnd = vertexAt(network, scene, 0, 0);
+        int eastEnd = vertexAt(network, scene, 400, 0);
+        assertTrue(area.containsKey(westEnd), "The area should contain the road's west end.");
+        assertTrue(area.containsKey(eastEnd), "The area should contain the road's east end.");
+        assertEquals(212_000, area.get(westEnd), 10_000,
+            "The west end should be recorded at the 12 meter gap plus 200 meters along the road.");
+        assertEquals(2, area.size(),
+            "Footpath vertices touch no drivable edge and should not be meeting points.");
     }
 
     /// The radius specified for meeting areas must be large enough to encompass the stop complex

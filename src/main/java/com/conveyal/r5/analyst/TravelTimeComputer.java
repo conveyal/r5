@@ -17,6 +17,7 @@ import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.OnDemandEgressTable;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
@@ -72,8 +73,12 @@ public class TravelTimeComputer {
         if (onDemandRequested && !(request.accessModes.contains(LegMode.WALK) || request.accessModes.contains(LegMode.BICYCLE))) {
             throw new IllegalArgumentException("ON_DEMAND access requires WALK or BICYCLE access to reach the pick-up place.");
         }
-        if (request.egressModes != null && request.egressModes.contains(LegMode.ON_DEMAND)) {
-            throw new IllegalArgumentException("ON_DEMAND egress is not yet supported.");
+        boolean onDemandEgressRequested = (request.egressModes != null)
+              && (request.egressModes.contains(LegMode.ON_DEMAND));
+        if (onDemandEgressRequested && request.inRoutingFareCalculator != null) {
+            // Egress availability is evaluated against real clock times per iteration,
+            // which the fare-based router does not report.
+            throw new IllegalArgumentException("ON_DEMAND egress is not supported with fare-based routing.");
         }
 
         // If this request includes a fare calculator, inject the transport network's transit layer into it.
@@ -171,8 +176,6 @@ public class TravelTimeComputer {
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
 
-            // When on-demand services can extend this access leg, this holds their results: an
-            // egress walk search onward from all rides, and direct times to destination points.
             OnDemandAccess onDemandAccess = null;
             if (enableOnDemand) {
                 // Find on-demand that may be available within the street area reached above. Service availability is
@@ -205,7 +208,7 @@ public class TravelTimeComputer {
                 bestAccessOptions.update(sr.getReachedStops(), accessMode, false);
                 if (onDemandAccess != null) {
                     // Merge times from walking after on-demand service into times from the initial access mode.
-                    bestAccessOptions.update(onDemandAccess.egressRouter.getReachedStops(), accessMode, true);
+                    bestAccessOptions.update(onDemandAccess.onwardWalkRouter.getReachedStops(), accessMode, true);
                 }
             }
 
@@ -302,6 +305,12 @@ public class TravelTimeComputer {
         // II. Transit Routing ========================================================================================
         // Transit stops were reached. Perform transit routing from those stops to all other reachable stops. The result
         // is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
+
+        OnDemandEgress onDemandEgress = null;
+        if (onDemandEgressRequested) {
+            onDemandEgress = OnDemandEgress.prepare(network, request, destinations);
+        }
+
         int[][] transitTravelTimesToStops;
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
@@ -312,7 +321,7 @@ public class TravelTimeComputer {
                 // Taui sites record paths to every destination cell so we retain paths to every transit stop.
                 // For all other path results, we only ever need paths to stops within egress range of the destinations.
                 if (!request.makeTauiSite) {
-                    worker.retainPathsToStops = stopsWithEgressToDestinations(destinations);
+                    worker.retainPathsToStops = stopsWithEgressToDestinations(destinations, onDemandEgress);
                 }
             }
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
@@ -352,6 +361,13 @@ public class TravelTimeComputer {
         // because in the non-transit case we call the reducer directly (see above).
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
+        if (onDemandEgress != null) {
+            // The propagator tests service availability against per-iteration clock times,
+            // so it needs the departure times alongside the durations.
+            perTargetPropagater.onDemandEgress = onDemandEgress;
+            perTargetPropagater.departureTimeForIteration = worker.departureTimeForIteration;
+        }
+
         // When path results are needed (directly requested, or for a Taui site), read them from the worker,
         // annotating with the access mode, then use the annotated paths to initialize the appropriate field in the
         // propagater. Not supported for fare requests, which use the McRaptor router and path style.
@@ -380,7 +396,9 @@ public class TravelTimeComputer {
     /// reconstruct any others. For tasks that record paths to a single destination (notably single-point tasks) the
     /// set covers only that one destination. This requires the same egress cost tables the propagator will use, so
     /// it builds and transposes them slightly earlier than the propagator otherwise would.
-    private BitSet stopsWithEgressToDestinations (PointSet destinations) {
+    /// When on-demand egress is non-null, stops whose on-demand services can carry an alighting rider toward the
+    /// destinations are included as well, slightly overselecting.
+    private BitSet stopsWithEgressToDestinations (PointSet destinations, OnDemandEgress onDemandEgress) {
         BitSet stops = new BitSet();
         int firstTarget = 0;
         int lastTargetExclusive = destinations.featureCount();
@@ -405,6 +423,19 @@ public class TravelTimeComputer {
                         stops.set(stop);
                         return true;
                     });
+                }
+            }
+        }
+        if (onDemandEgress != null) {
+            for (int target = firstTarget; target < lastTargetExclusive; target++) {
+                int[] rides = onDemandEgress.ridesForTarget(target);
+                if (rides != null) {
+                    for (int entry = 0; entry < rides.length; entry += OnDemandEgressTable.INTS_PER_RIDE) {
+                        int stop = rides[entry];
+                        if (onDemandEgress.servicesForStop(stop) != null) {
+                            stops.set(stop);
+                        }
+                    }
                 }
             }
         }

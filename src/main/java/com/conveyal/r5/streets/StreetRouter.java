@@ -426,6 +426,29 @@ public class StreetRouter implements Cloneable {
         queue.add(startState);
     }
 
+    /// Sets several vertices as origins of this search, each with an initial cost equal to the
+    /// time needed to walk the given distance at the given speed. Used for on-demand egress.
+    public void setOrigins (TIntIntMap distanceMillimetersToVertices, int walkSpeedMillimetersPerSecond) {
+        originLat = Double.NaN;
+        originLon = Double.NaN;
+        bestStatesAtEdge.clear();
+        queue.clear();
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        final int[] maxAbsLat = { Integer.MIN_VALUE };
+        distanceMillimetersToVertices.forEachEntry((fromVertex, distanceMm) -> {
+            vertex.seek(fromVertex);
+            maxAbsLat[0] = Math.max(maxAbsLat[0], Math.abs(vertex.getFixedLat()));
+            // As in single-vertex setOrigin, backEdge of -1 bypasses dominance check when dequeued.
+            State state = new State(fromVertex, -1, streetMode);
+            state.durationSeconds = distanceMm / walkSpeedMillimetersPerSecond;
+            state.durationBeforeLegSeconds = state.durationSeconds;
+            state.distance = distanceMm;
+            queue.add(state);
+            return true;
+        });
+        maxAbsOriginLat = maxAbsLat[0];
+    }
+
     /**
      * Adds multiple origins.
      *
@@ -1480,7 +1503,7 @@ public class StreetRouter implements Cloneable {
     /// inherit the time calculator of the current router. Call this on merged results holding an
     /// unwrapped time calculator, not on a single ride search whose calculator often scales times
     /// by a duration factor.
-    public StreetRouter copyAndRouteEgressWalk () {
+    public StreetRouter copyAndRouteOnwardWalk () {
         StreetRouter sr = shallowCopyForRouting();
         sr.streetMode = StreetMode.WALK;
         sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;

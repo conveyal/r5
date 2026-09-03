@@ -145,7 +145,15 @@ class SceneModifications {
     /// Departures are spread over a one-hour window, so travel times vary. We return the median.
     static int[] minutesByTransit (
           TransportNetwork network, Scene scene, double x, double y, EnumSet<LegMode> accessModes, double[]... xy) {
-        return minutes(network, scene, x, y, accessModes, EnumSet.of(LegMode.WALK), true, xy);
+        return minutesByTransit(network, scene, x, y, accessModes, EnumSet.of(LegMode.WALK), xy);
+    }
+
+    /// Like the walk-egress [#minutesByTransit] but with the given egress modes, for tests of
+    /// on-demand egress legs after scheduled transit.
+    static int[] minutesByTransit (
+          TransportNetwork network, Scene scene, double x, double y,
+          EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, double[]... xy) {
+        return minutes(network, scene, x, y, accessModes, egressModes, true, xy);
     }
 
     /// The common core of minutesTo and minutesByTransit above, which set the egress modes and

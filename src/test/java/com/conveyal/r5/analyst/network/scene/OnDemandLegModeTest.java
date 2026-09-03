@@ -16,6 +16,7 @@ import static com.conveyal.r5.api.util.LegMode.BICYCLE;
 import static com.conveyal.r5.api.util.LegMode.CAR;
 import static com.conveyal.r5.api.util.LegMode.ON_DEMAND;
 import static com.conveyal.r5.api.util.LegMode.WALK;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,12 +88,17 @@ public class OnDemandLegModeTest {
         assertTrue(minutes <= 6, "Driving or riding to the hub should take a few minutes, not " + minutes);
     }
 
+    /// ON_DEMAND among the egress modes is accepted and has no effect on a request without
+    /// scheduled transit, since egress legs only follow transit rides. Egress rides after
+    /// transit are tested in OnDemandTransitEgressTest.
     @Test
-    void onDemandEgressNotYetSupported () {
+    void egressModeWithoutTransit () {
         Scene scene = new Scene();
         TransportNetwork network = scenario(scene);
-        assertThrows(IllegalArgumentException.class, () ->
-            minutesTo(network, scene, 500, 20, EnumSet.of(WALK, ON_DEMAND), EnumSet.of(WALK, ON_DEMAND), HUB));
+        int without = minutesTo(network, scene, 500, 20, EnumSet.of(WALK, ON_DEMAND), HUB)[0];
+        int with = minutesTo(network, scene, 500, 20,
+            EnumSet.of(WALK, ON_DEMAND), EnumSet.of(WALK, ON_DEMAND), HUB)[0];
+        assertEquals(without, with);
     }
 
 }

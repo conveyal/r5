@@ -22,7 +22,7 @@ public class OnDemandAccess {
 
     /// Performs a walk search onward from the clipped final states of all candidate services.
     /// Transit stop arrival times for on-demand access are read from this router.
-    public final StreetRouter egressRouter;
+    public final StreetRouter onwardWalkRouter;
 
     /// Direct on-demand travel times to the supplied destination points, which are the cell-wise
     /// minimum of the car and walk searches (for on-demand and the following walk), or null when
@@ -30,8 +30,8 @@ public class OnDemandAccess {
     /// mode alone, which the caller determines using its own access router.
     public final PointSetTimes directTimes;
 
-    private OnDemandAccess (StreetRouter egressRouter, PointSetTimes directTimes) {
-        this.egressRouter = egressRouter;
+    private OnDemandAccess (StreetRouter onwardWalkRouter, PointSetTimes directTimes) {
+        this.onwardWalkRouter = onwardWalkRouter;
         this.directTimes = directTimes;
     }
 
@@ -92,14 +92,14 @@ public class OnDemandAccess {
             }
             rides.mergeStatesFrom(ride);
         }
-        StreetRouter egressRouter = rides.copyAndRouteEgressWalk();
+        StreetRouter onwardWalkRouter = rides.copyAndRouteOnwardWalk();
         PointSetTimes directTimes = carArmTimes;
         if (walkLinkage != null) {
             PointSetTimes walked = walkLinkage.eval(
-                    egressRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null);
+                    onwardWalkRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null);
             directTimes = PointSetTimes.minMerge(directTimes, walked);
         }
-        return new OnDemandAccess(egressRouter, directTimes);
+        return new OnDemandAccess(onwardWalkRouter, directTimes);
     }
 
 }

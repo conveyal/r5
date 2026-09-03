@@ -1,7 +1,9 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.OnDemandEgress;
 import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.StreetTimesAndModes;
@@ -13,6 +15,7 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.streets.EgressCostTable;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.OnDemandEgressTable;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.path.Path;
@@ -71,6 +74,9 @@ public class PerTargetPropagater {
 
     /** If non-null, methods will be called on this object to select and write out paths for a static site.*/
     public PathWriter pathWriter;
+
+    /// When non-null, alighting riders can also reach targets using on-demand services from stops.
+    public OnDemandEgress onDemandEgress;
 
     /** Times at targets using the street network */
     private final int[] nonTransitTravelTimesToTargets;
@@ -228,6 +234,10 @@ public class PerTargetPropagater {
 
         timer.fullPropagation.start();
 
+        if (onDemandEgress != null && departureTimeForIteration == null) {
+            throw new IllegalStateException("On-demand egress requires per-iteration departure times.");
+        }
+
         // perIterationTravelTimes and perIterationDetails are reused when processing each target.
         perIterationTravelTimes = new int[nIterations];
 
@@ -359,6 +369,63 @@ public class PerTargetPropagater {
         // All linked pointsets are known to be for the same StreetLayer and PointSet, just different modes.
         for (LinkedPointSet linkedPointSet : linkedTargets) {
             propagateTransit(targetIndex, linkedPointSet);
+        }
+        if (onDemandEgress != null) {
+            propagateOnDemand(targetIndex);
+        }
+    }
+
+    /// Improve the travel times at the given target with egress legs riding on-demand services
+    /// from alighting stops. For each stop that reaches the target and for each candidate service
+    /// picking up at that stop, the target must lie in the service's drop-off place. The service's
+    /// time windows are tested per iteration against the clock time the rider alights from transit.
+    /// The duration of the stored on-demand ride is recomputed for this request. Its walk portion
+    /// uses the request's walk speed, and its car portion is scaled by the service's duration factor.
+    /// The ride is bounded by the maximum trip duration and the service's drop-off window, but not
+    /// by the rider's street leg time limit (an on-demand ride is treated as transit).
+    /// Iterations where we find an improved travel time record CAR egress marked as on-demand.
+    private void propagateOnDemand (int targetIndex) {
+        int[] rides = onDemandEgress.ridesForTarget(targetIndex);
+        if (rides == null) {
+            return;
+        }
+        for (int entry = 0; entry < rides.length; entry += OnDemandEgressTable.INTS_PER_RIDE) {
+            int stop = rides[entry];
+            List<OnDemand> services = onDemandEgress.servicesForStop(stop);
+            if (services == null) {
+                continue; // The table can hold rows for stops other requests needed.
+            }
+            int walkSeconds = onDemandEgress.walkSeconds(rides[entry + 1]);
+            int unscaledCarSeconds = rides[entry + 2];
+            for (OnDemand od : services) {
+                if (!onDemandEgress.dropOffAccepts(od, targetIndex)) {
+                    continue;
+                }
+                int rideSeconds = onDemandEgress.rideSeconds(od, unscaledCarSeconds);
+                for (int iteration = 0; iteration < nIterations; iteration++) {
+                    int timeToReachStop = travelTimesToStop[stop][iteration];
+                    if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
+                        continue;
+                    }
+                    int alightingClockTime = departureTimeForIteration[iteration] + timeToReachStop;
+                    int egressSeconds = od.egressLegSeconds(alightingClockTime, walkSeconds, rideSeconds);
+                    if (egressSeconds < 0) {
+                        continue; // The service's time windows preclude this ride.
+                    }
+                    int timeToReachTarget = timeToReachStop + egressSeconds;
+                    if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
+                        perIterationTravelTimes[iteration] = timeToReachTarget;
+                        if (pathsToStopsForIteration != null) {
+                            Path path = pathsToStopsForIteration.get(iteration)[stop];
+                            if (path != null) {
+                                perIterationPaths[iteration] = path;
+                                perIterationEgress[iteration] = new StreetTimesAndModes.StreetTimeAndMode(
+                                    egressSeconds, StreetMode.CAR, true);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

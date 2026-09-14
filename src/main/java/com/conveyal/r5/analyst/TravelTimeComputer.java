@@ -123,6 +123,9 @@ public class TravelTimeComputer {
         // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
         EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
 
+        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
         for (StreetMode accessMode : accessModes) {
             LOG.info("Performing street search for mode: {}", accessMode);
@@ -250,9 +253,6 @@ public class TravelTimeComputer {
                 if (streetSpeedMillimetersPerSecond <= 0) {
                     throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
-
-                // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
 
                 Split origin = sr.getOriginSplit();
 

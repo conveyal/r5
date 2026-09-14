@@ -48,6 +48,14 @@ public class PointSetTimes {
         }
     }
 
+    public void applyLimit (int limitSeconds) {
+        for (int i = 0; i < travelTimes.length; i++) {
+            if (travelTimes[i] != UNREACHED && travelTimes[i] > limitSeconds) {
+                travelTimes[i] = UNREACHED;
+            }
+        }
+    }
+
     /**
      * Merge the two PointSetTimes, returning a new PointSetTimes containing the minimum value at each point.
      * The first operand may be null, which allows iteratively accumulating into an uninitialized PointSet variable.

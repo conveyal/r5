@@ -166,13 +166,12 @@ public class TravelTimeComputer {
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
             boolean enableOnDemand = request.hasFlag("ON_DEMAND");
-            {
-                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit() || enableOnDemand) {
-                    limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
-                }
-                sr.timeLimitSeconds = limitSeconds;
+
+            int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+            if (request.hasTransit() || enableOnDemand) {
+                limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
             }
+            sr.timeLimitSeconds = limitSeconds;
 
             // Even if generalized cost tags were present on the input data, we always minimize travel time.
             // The generalized cost calculations currently increment time and weight by the same amount.
@@ -262,6 +261,10 @@ public class TravelTimeComputer {
                         walkSpeedMillimetersPerSecond,
                         origin
                 );
+
+                // Time along street network is limited by sr.timeLimitSeconds; but additional off-street time (from
+                // edges to points can lead to travel times that exceed requested limits.
+                pointSetTimes.applyLimit(limitSeconds);
 
                 if (onDemandAccess != null) {
                     // Destinations are also reached using on-demand services.

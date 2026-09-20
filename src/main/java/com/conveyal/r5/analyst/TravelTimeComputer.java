@@ -262,8 +262,10 @@ public class TravelTimeComputer {
                         origin
                 );
 
-                // Time along street network is limited by sr.timeLimitSeconds; but additional off-street time (from
-                // edges to points can lead to travel times that exceed requested limits.
+                // Time up to the vertices of the destination edge are constrained by sr.timeLimitSeconds; 
+                // but additional (from those vertices along the final edge, and from that edge to the 
+                // destination point) can lead to travel times that exceed requested limits. So apply the
+                // relevant leg time limit to total times at points here.
                 pointSetTimes.applyLimit(limitSeconds);
 
                 if (onDemandAccess != null) {

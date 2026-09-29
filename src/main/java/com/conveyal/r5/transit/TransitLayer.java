@@ -810,7 +810,31 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
+    /**
+     * @return the TransitModes corresponding to the given GTFS route_type (including TPEG extended route types).
+     * @throws IllegalArgumentException if R5 has no TransitModes for this route_type, e.g. taxi services.
+     */
     public static TransitModes getTransitModes(int routeType) {
+        TransitModes mode = getTransitModesOrNull(routeType);
+        if (mode == null) {
+            if (routeType >= 1500 && routeType < 1600) {
+                throw new IllegalArgumentException("Taxi route_type code not supported: " + routeType);
+            } else if (routeType >= 1600) {
+                throw new IllegalArgumentException("Car or other route_type code above 1600 not supported: " + routeType);
+            } else {
+                throw new IllegalArgumentException("Unknown GTFS route_type code: " + routeType);
+            }
+        }
+        return mode;
+    }
+
+    /**
+     * Like getTransitModes, but returns null instead of throwing an exception when R5 has no TransitModes for the
+     * given route_type. Routes with such types (e.g. taxi services 1500-1599, which appear in some feeds using
+     * extended route types) can never match the transit modes of a routing request. This allows them to be skipped
+     * when filtering patterns for routing, rather than making every search on the network fail.
+     */
+    public static TransitModes getTransitModesOrNull(int routeType) {
         /* TPEG Extension  https://groups.google.com/d/msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J */
         if (routeType >= 100 && routeType < 200) { // Railway Service
             return TransitModes.RAIL;
@@ -835,9 +859,9 @@ public class TransitLayer implements Serializable, Cloneable {
         } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
             return TransitModes.FUNICULAR;
         } else if (routeType >= 1500 && routeType < 1600) { //Taxi Service
-            throw new IllegalArgumentException("Taxi route_type code not supported: " + routeType);
-        } else if (routeType >= 1600) {
-            throw new IllegalArgumentException("Car or other route_type code above 1600 not supported: " + routeType);
+            return null;
+        } else if (routeType >= 1600) { // Car and other services
+            return null;
         }
         /* Original GTFS route types. Should these be checked before TPEG types? */
         switch (routeType) {
@@ -864,7 +888,7 @@ public class TransitLayer implements Serializable, Cloneable {
         case 12:
             return TransitModes.TRAM; // Monorail
         default:
-            throw new IllegalArgumentException("Unknown GTFS route_type code: " + routeType);
+            return null; // Unknown GTFS route_type code
         }
     }
 

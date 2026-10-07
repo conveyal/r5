@@ -209,6 +209,7 @@ public class TransportNetwork implements Serializable {
         //  decrease, but that could change in the future.
         network.transitLayer.buildDistanceTables(null);
         Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
+        buildGridsForModes.add(StreetMode.CAR);
         if (config.buildGridsForModes != null) {
             buildGridsForModes.addAll(config.buildGridsForModes);
         }

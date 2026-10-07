@@ -1,0 +1,2 @@
+This feed has a locations.geojson that declares zone Z1 as a MultiPolygon, while
+Z2 is a plain Polygon.

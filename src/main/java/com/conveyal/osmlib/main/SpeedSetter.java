@@ -14,7 +14,7 @@ import java.io.FileReader;
 public class SpeedSetter {
 
     public static void main (String[] args) throws Exception {
-        OSM osm = new OSM(null);
+        OSM osm = OSM.newWritableTempFile();
         osm.readFromFile("/Users/abyrd/predicted_speeds_2015_for_conveyal.pbf");
 
         System.out.println("Setting maxspeed:motorcar tags...");

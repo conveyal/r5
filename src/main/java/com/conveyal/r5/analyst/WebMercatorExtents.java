@@ -119,7 +119,7 @@ public class WebMercatorExtents implements Serializable {
         checkState(this.zoom == other.zoom, "All grids supplied must be at the same zoom level.");
         final int thisEast = this.west + this.width;
         final int otherEast = other.west + other.width;
-        final int thisSouth = this.north + other.height;
+        final int thisSouth = this.north + this.height;
         final int otherSouth = other.north + other.height;
         final int outWest = Math.min(other.west, this.west);
         final int outEast = Math.max(otherEast, thisEast);

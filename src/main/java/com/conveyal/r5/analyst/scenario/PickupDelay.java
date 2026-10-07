@@ -65,9 +65,10 @@ public class PickupDelay extends Modification {
     public String idAttribute = "id";
 
     /**
-     * A JSON map from polygon IDs to lists of polygon IDs. If any stop_id is specified for a polygon, service is
-     * only allowed between the polygon and the stops (i.e. no direct trips). If no stop_ids are specified,
-     * passengers boarding an on-demand service in a pick-up zone should be able to alight anywhere.
+     * A JSON map from polygon IDs to lists of polygon IDs. For polygons appearing in this map as keys, service is
+     * only allowed between that polygon and transit stops inside the polygons listed as its values (i.e. no direct
+     * trips to destinations other than those stops). If no destination polygons are specified for a given origin
+     * polygon, passengers boarding the on-demand service in that pick-up zone should be able to alight anywhere.
      */
     public Map<String, Set<String>> stopsForZone;
 

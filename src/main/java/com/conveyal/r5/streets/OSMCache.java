@@ -48,7 +48,7 @@ public class OSMCache implements Component {
         try {
             return osmCache.get(id, () -> {
                 File osmFile = fileStorage.getFile(getKey(id));
-                OSM ret = new OSM(null);
+                OSM ret = OSM.newWritableTempFile();
                 ret.intersectionDetection = true;
                 ret.readFromFile(osmFile.getAbsolutePath());
                 return ret;

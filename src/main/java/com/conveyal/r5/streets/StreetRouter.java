@@ -1,5 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.gtfs.flex.OnDemand;
+import com.conveyal.gtfs.flex.OnDemandPlaceFilter;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
@@ -18,6 +20,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
+import org.locationtech.jts.geom.Envelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +39,6 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import static com.conveyal.r5.common.Util.notNullOrEmpty;
-import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
 import static gnu.trove.impl.Constants.DEFAULT_CAPACITY;
 import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
 
@@ -45,7 +47,7 @@ import static gnu.trove.impl.Constants.DEFAULT_LOAD_FACTOR;
  * It is a throw-away calculator object that retains routing state after the search is finished.
  * Additional functions are called to retrieve the routing results from that state.
  */
-public class StreetRouter {
+public class StreetRouter implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreetRouter.class);
 
@@ -102,6 +104,15 @@ public class StreetRouter {
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
+    /// When nonzero, limits the duration of the current leg rather than the whole path. This
+    /// exists for the walk leg after on-demand rides, where initial states all start at different
+    /// accumulated times. This leg limit constrains a quantity the search does not minimize.
+    /// This "resource limiting" is not strictly correct because states with a lower total time but
+    /// an excessive current leg time may evict states with a higher total time that can continue
+    /// the current leg. Exatcness would require enabling Pareto dominance over pairs of
+    /// (total duration, leg duration).
+    public int legTimeLimitSeconds = 0;
+
     /**
      * What routing variable (time or distance) should be used to decide when a path is better than another.
      * Only one such variable is optimized in a given search. It's algorithmically invalid to prune or otherwise discard
@@ -152,9 +163,12 @@ public class StreetRouter {
      */
     TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
-    // The queue is prioritized by the specified optimization objective variable.
-    PriorityQueue<State> queue = new PriorityQueue<>(
-            Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic)));
+    // TODO verify closure capture in java - this is referencing the variable quantityToMinimize, not its value at initialization right?
+    Comparator<State> stateComparator =
+          Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic));
+
+    /// The queue is prioritized by the specified optimization objective variable.
+    PriorityQueue<State> queue = new PriorityQueue<>(stateComparator);
 
     /**
      * If you set this to a non-negative number, the search will end at the vertex with the given index,
@@ -175,6 +189,12 @@ public class StreetRouter {
     private RoutingVisitor routingVisitor;
 
     private Split originSplit;
+
+    /// The exact origin point supplied to setOrigin in floating-point WGS84, or NaN when the
+    /// search was initialized from existing vertices or states rather than a point. Allows boarding
+    /// subsequent on-demand services at exactly this point rather than surrounding junctions.
+    private double originLat = Double.NaN;
+    private double originLon = Double.NaN;
 
     private Split destinationSplit;
 
@@ -255,6 +275,21 @@ public class StreetRouter {
         return result;
     }
 
+    /// Return a JTS Envelope in FIXED-point WGS84 coordinates encompassing all vertices reached in a completed search.
+    public Envelope getReachedVerticesEnvelopeFixed () {
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+        Envelope envelope = new Envelope();
+        // TODO check whether we ever record states when they have exceeded any search limits, filter as needed
+        bestStatesAtEdge.forEachKey(e -> {
+            edge.seek(e);
+            vertex.seek(edge.getToVertex());
+            envelope.expandToInclude(vertex.getFixedLon(), vertex.getFixedLat());
+            return true;
+        });
+        return envelope;
+    }
+
     /**
      * After a search has been run, calling this method will returns a map from vertex indexes to the value of
      * the objective variable for the optimal path to that vertex, but only for vertices with a certain flag set.
@@ -332,6 +367,8 @@ public class StreetRouter {
         }
 
         originSplit = split;
+        originLat = lat;
+        originLon = lon;
         bestStatesAtEdge.clear();
         queue.clear();
         // The states are located at the end of edges. Vertex0 is at the end of the reverse edge (split.edge + 1).
@@ -375,6 +412,8 @@ public class StreetRouter {
     }
 
     public void setOrigin (int fromVertex) {
+        originLat = Double.NaN;
+        originLon = Double.NaN;
         bestStatesAtEdge.clear();
         queue.clear();
 
@@ -399,6 +438,8 @@ public class StreetRouter {
      * @param legMode What origin search is this bike share or P+R
      */
     public void setOrigin(TIntObjectMap<State> previousStates, int switchTime, int switchCost, LegMode legMode) {
+        originLat = Double.NaN;
+        originLon = Double.NaN;
         bestStatesAtEdge.clear();
         queue.clear();
         //Maximal origin latitude is used in goal direction heuristic.
@@ -409,6 +450,8 @@ public class StreetRouter {
             // subtract 1 from -vertexIdx because -0 == 0
             State state = new State(vertexIdx, previousState.backEdge, streetMode);
             state.durationSeconds = previousState.durationSeconds;
+            // This state begins a new leg; the mode switch time falls within that new leg.
+            state.durationBeforeLegSeconds = previousState.durationSeconds;
             state.incrementTimeInSeconds(switchTime);
             if (legMode == LegMode.BICYCLE_RENT) {
                 state.isBikeShare = true;
@@ -499,6 +542,9 @@ public class StreetRouter {
             tmpTimeLimitSeconds = Integer.MAX_VALUE;
         }
 
+        // A zero leg time limit means no limit, see comments on the field declaration.
+        final int tmpLegTimeLimitSeconds = (legTimeLimitSeconds > 0) ? legTimeLimitSeconds : Integer.MAX_VALUE;
+
         if (timeLimitSeconds > 0 && distanceLimitMeters > 0) {
             LOG.warn("Both distance limit of {}m and time limit of {}s are set in StreetRouter", distanceLimitMeters, timeLimitSeconds);
         } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
@@ -538,17 +584,10 @@ public class StreetRouter {
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
-
-                double lat = v.getLat();
-                double lon = v.getLon();
-
                 if (s0.backEdge != -1) {
                     EdgeStore.Edge e = streetLayer.edgeStore.getCursor(s0.backEdge);
                     v.seek(e.getFromVertex());
-                    lat = (lat + v.getLat()) / 2;
-                    lon = (lon + v.getLon()) / 2;
                 }
-
                 debugPrintStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.durationSeconds));
             }
 
@@ -598,7 +637,8 @@ public class StreetRouter {
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
                 State s1 = edge.traverse(s0, streetMode, profileRequest, timeCalculator);
-                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
+                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds
+                        && s1.getLegDurationSeconds() < tmpLegTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
                         s1.heuristic = calcHeuristic(s1);
@@ -846,12 +886,14 @@ public class StreetRouter {
         public int vertex;
         public int backEdge;
 
-        //In simple search both those variables have same values
-        //But in complex search (P+R, Bike share) first variable have duration of all the legs
-        //and second, duration only in this leg
-        //this is used for limiting search time in VertexFlagVisitor
+        /// Cumulative duration of the trip so far, across all legs.
         protected int durationSeconds;
-        protected int durationFromOriginSeconds;
+
+        /// Cumulative duration of all legs before this one (the durationSeconds of the leg seed
+        /// state this state descends from). Storing this requires less math and is less prone to
+        /// errors and omissions than incrementing both the current leg duration and total duration.
+        protected int durationBeforeLegSeconds;
+
         //Distance in mm
         public int distance;
         public int idx;
@@ -877,7 +919,7 @@ public class StreetRouter {
             this.backState = backState;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
-            this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
+            this.durationBeforeLegSeconds = backState.durationBeforeLegSeconds;
             this.idx = backState.idx+1;
         }
 
@@ -888,7 +930,7 @@ public class StreetRouter {
             this.distance = 0;
             this.streetMode = streetMode;
             this.durationSeconds = 0;
-            this.durationFromOriginSeconds = 0;
+            this.durationBeforeLegSeconds = 0;
             this.idx = 0;
         }
 
@@ -967,16 +1009,19 @@ public class StreetRouter {
             //TODO: decrease time
             if (false) {
                 durationSeconds-=seconds;
-                durationFromOriginSeconds -= seconds;
             } else {
                 durationSeconds += (int) seconds;
-                durationFromOriginSeconds += (int) seconds;
             }
 
         }
 
         public int getDurationSeconds() {
             return durationSeconds;
+        }
+
+        /// Duration of the current leg alone, e.g. for enforcing per-leg travel time limits.
+        public int getLegDurationSeconds() {
+            return durationSeconds - durationBeforeLegSeconds;
         }
 
         public String dump() {
@@ -1156,13 +1201,13 @@ public class StreetRouter {
             if (state.vertex < 0 ||
                 //skips origin states for bikeShare (since in cycle search for bikeShare origin states
                 //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
-                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds ||
+                state.backState == null || state.getLegDurationSeconds() < minTravelTimeSeconds ||
                 skippedVertices.contains(state.vertex)
                 ) {
                 // Make sure that vertex to which you can come sooner then minTravelTimeSeconds won't be used
                 // if a path which uses more then minTravelTimeSeconds is found
                 // since this means we need to walk/cycle/drive longer then required
-                if (state.vertex > 0 && state.durationFromOriginSeconds < minTravelTimeSeconds) {
+                if (state.vertex > 0 && state.getLegDurationSeconds() < minTravelTimeSeconds) {
                     skippedVertices.add(state.vertex);
                 }
                 return;
@@ -1175,7 +1220,6 @@ public class StreetRouter {
                     vertices.put(state.vertex, state);
                 }
             }
-
         }
 
         /**
@@ -1193,19 +1237,304 @@ public class StreetRouter {
         }
     }
 
-    /**
-     * Continue a search by walking (presumably after a car or bicycle search is complete).
-     * This allows accessing transit stops that are linked to edges that are only walkable, but not drivable or bikeable.
-     * This maintains the total travel time limit and other parameters.
-     * NOTE: this conflicts with the rule that a router should not be reused.
-     * This is a good example of why we may want to change that rule. Alternatively this could construct a new StreetRouter.
-     * Just allowing more than one mode doesn't give the desired effect - we really want a sequence of separate modes.
-     */
+    /// Continue a search by walking (presumably after a car or bicycle search is complete).
+    /// This allows accessing transit stops that are linked to edges that are only walkable, but not
+    /// drivable or bikable. This maintains the total travel time limit and other parameters.
+    /// Note that this conflicts with the rule that a router should not be reused.
+    /// We may want to change that rule, or this method could construct a new StreetRouter.
+    /// Allowing more than one mode to be set at the same time doesn't give the desired effect.
+    /// We need separate searches carried out using separate modes in a specific sequence.
     public void keepRoutingOnFoot() {
+        keepRoutingWithMode(StreetMode.WALK);
+    }
+
+    /// Continue a search by driving (presumably after a walk or bicycle search is complete).
+    /// This allows evaluating the reach of on-demand transit and ride-share services where the
+    /// origin point may be outside a pick-up zone and must be reached by walking or biking.
+    public void keepRoutingByCar() {
+        keepRoutingWithMode(StreetMode.CAR);
+    }
+
+    /// Internal method used by public methods for specific StreetModes.
+    private void keepRoutingWithMode (StreetMode mode) {
         queue.clear();
         bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
-        streetMode = StreetMode.WALK;
+        streetMode = mode;
         route();
+    }
+
+    /// After routing, filter this router's result states down to only those accepted by the given
+    /// filter, typically one for an OnDemand service's drop-off place (polygon or location_group
+    /// meeting areas). This is a pure filter with no side effects on the states (no changes to travel times).
+    /// The on-demand service's duration factor should already have been applied within the search,
+    /// and its offset (wait time) should already have been applied to the initial states of the
+    /// search
+    ///
+    /// It might seem more efficient to restrict routing to edges within polygons instead of
+    /// filtering afterward, but that approach cannot deal with multiple disjoint polygons,
+    /// destination polygons that do not contain the origin point, or paths that exit a polygon
+    /// and re-enter it.
+    ///
+    /// When the filter restricts candidate edges based on a spatial index (done only for polygons),
+    /// only those edges are examined, yielding a new copy of the best states structure but not of
+    /// the router itself. Testing indicates that this approach is faster than naive non-indexed
+    /// edge iteration, and faster than filtering existing collections rather than copying. On
+    /// Seattle MetroFlex, the indexed implementation yields 60-70 msec in most cases. The spatial
+    /// index restriction is effective because this method typically operates on the result of a car
+    /// search which reaches a lot of vertices, an area as large or larger than the drop-off
+    /// polygon. This is in contrast to the boarding scan in copyAndRouteFor, which typically
+    /// operates on the result of a walk search that reaches a small area. We may want to make
+    /// candidate pre-selection conditional on the size of the polygon relative to the reached
+    /// area, because it materializes a large TIntSet for large polygons. Meeting area filters
+    /// return no candidate edges: they are small vertex sets, so all states are scanned against
+    /// set membership directly.
+    public void clipStates (OnDemandPlaceFilter place) {
+        TIntObjectMultimap<State> filteredCopy = new TIntObjectHashMultimap<>();
+        TIntSet candidateEdges = place.candidateEdges();
+        if (candidateEdges != null) {
+            EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+            candidateEdges.forEach(eidx -> {
+                // The spatial index contains only the even (forward) edge of each pair, but
+                // states may have arrived via either edge of the pair. States are physically
+                // located at the toVertex of the edge they arrived on, and the toVertex of the
+                // odd (backward) edge is the even edge's fromVertex.
+                edge.seek(eidx);
+                if (place.containsVertex(edge.getToVertex())) {
+                    // BestStatesAtEdge.get() always returns a list (empty for missing keys).
+                    copyStates(bestStatesAtEdge.get(eidx), filteredCopy);
+                }
+                if (place.containsVertex(edge.getFromVertex())) {
+                    copyStates(bestStatesAtEdge.get(eidx + 1), filteredCopy);
+                }
+                return true;
+            });
+        } else {
+            bestStatesAtEdge.forEachEntry((eidx, states) -> {
+                for (State state : states) {
+                    if (place.containsVertex(state.vertex)) {
+                        filteredCopy.put(state.backEdge, state);
+                    }
+                }
+                return true;
+            });
+        }
+        // Replace the entire original best states collection with the new filtered copy.
+        bestStatesAtEdge = filteredCopy;
+    }
+
+    // Instead of factoring this out and calling it from multiple locations, we could create a new set of edges to
+    // process, or use a TIntIterator to remove elements from the existing TIntSet.
+    private static void copyStates (Collection<State> states, TIntObjectMultimap<State> dest) {
+        // No clone: these states are never modified. The duration factor is applied during the
+        // search by the wrapped time calculator and the offset at the seeds (see copyAndRouteFor),
+        // so states already hold true travel times when they arrive here.
+        for (State s : states) {
+            dest.put(s.backEdge, s);
+        }
+    }
+
+    /// Interpreting the current router instance as a completed access search on a street mode,
+    /// returns a new StreetRouter instance initialized to represent one ride on the specified
+    /// OnDemand service. The new instance is configured to route by car (standing in for taxi,
+    /// van, or minibus). The queue is initialized with every result state from the current router
+    /// that is accepted by a filter for the supplied service's pick-up area. If the exact origin
+    /// point is accepted by the filter it is also injected as a search start state.
+    ///
+    /// Any non-unity ride time scaling factor for the on-demand service is applied as a wrapper
+    /// TraversalTimeCalculator, inside the search so the router minimizes the quantity it reports.
+    /// The pick-up wait, as well as any wait for the pick-up window to begin, are applied to the
+    /// initial states, such that any retained boarding times fall within the service's pickup
+    /// window. The supplied midTime is a representative point in the departure window at the origin.
+    /// It is advanced by each state's durationSeconds before testing on-demand service availability.
+    public StreetRouter copyAndRouteFor (OnDemand od, int midTime) {
+        StreetRouter sr = this.shallowCopyForRouting();
+        // The end of the arrival time window caps ride duration along with the full trip limit.
+        // Guard against non-positive limits because they have a special meaning to the router.
+        int rideTimeLimit = Math.min(profileRequest.maxTripDurationMinutes * 60, od.toWindowEnd - midTime);
+        if (rideTimeLimit <= 0) {
+            return sr; // Return router with empty results. No drop-off could fall within the window.
+        }
+        if (od.durationFactor != 1) {
+            sr.timeCalculator = new OnDemandTraversalTimeCalculator(this.timeCalculator, od.durationFactor);
+        }
+        sr.streetMode = StreetMode.CAR;
+        OnDemandPlaceFilter pickUpPlace = OnDemandPlaceFilter.pickUp(od, streetLayer.parentNetwork);
+        // People typically use on-demand service when they have no car at the origin. When
+        // walking (as opposed to driving) to on-demand, the set of reached vertices is small,
+        // while the pick-up place can be metropolitan in scale. Therefore, we avoid
+        // materializing a set of every edge inside the place (a potentially massive
+        // over-select) and instead scan the usually comparatively small set of reached states.
+        bestStatesAtEdge.forEachEntry((e, states) -> {
+            for (State state : states) {
+                if (pickUpPlace.containsVertex(state.vertex)) {
+                    sr.seedOnDemand(state, od, midTime);
+                }
+            }
+            return true;
+        });
+        sr.injectOriginSeed(pickUpPlace, od, midTime);
+        // This copied router inherits a street mode time limit such as maxWalkTime. We consider
+        // the on-demand ride to be transit usage, so street mode limits (even car) do not apply.
+        // The caps on walk-plus-on-demand-ride are the total trip duration and the drop-off
+        // window end, combined above. In any case, imposing any other kind of limit leads to
+        // resource constraint and algorithmic validity problems.
+        sr.timeLimitSeconds = rideTimeLimit;
+        sr.route();
+        return sr;
+    }
+
+    /// Add one State from a previous access search to the current StreetRouter instance to
+    /// initialize it for a search representing an on-demand ride. Clones the state so the access
+    /// router is unaffected by the on-demand leg search.
+    /// Seeds should be drawn only from access searches, never from other on-demand ride or egress
+    /// results, preventing on-demand legs from being chained. An assertion checks this.
+    private void seedOnDemand (State accessState, OnDemand od, int midTime) {
+        State s = accessState.clone();
+        assert s.durationBeforeLegSeconds == 0 : "Seed state downstream of another on-demand leg.";
+        if (!applyBoarding(s, od, midTime)) return;
+        bestStatesAtEdge.put(s.backEdge, s);
+        queue.add(s);
+    }
+
+    /// Insert an initial state into this on-demand ride search representing a position along an
+    /// edge rather than at a vertex, including a walk duration to reach that position. The standard
+    /// on-demand boarding steps are applied at the given position after the walk. Partial-edge
+    /// traversal from the position to the two endpoint vertices is calculated as part of the
+    /// on-demand ride, and any on-demand travel time scaling factor should be applied by this
+    /// router's calculator. The setOrigin method was not reused for this purpose because it bakes
+    /// the partial-edge cost in before the time window can be applied, without applying the time-scaling calculator.
+    /// TODO It should be possible to merge the two by slightly changing requirements or behavior.
+    /// Any future treatment of points where roads enter pick-up zones would probably be here.
+    private void seedOnDemand (Split split, int walkSeconds, OnDemand od, int midTime) {
+        // Use a throwaway state to apply the standard boarding procedure.
+        State atPosition = new State(-1, -1, StreetMode.CAR);
+        atPosition.durationSeconds = walkSeconds;
+        atPosition.distance = split.distanceToEdge_mm;
+        if (!applyBoarding(atPosition, od, midTime)) return;
+        // The states are located at the ends of edges. Vertex1 is at the end of the forward
+        // edge and vertex0 at the end of the backward edge, as in setOrigin.
+        EdgeStore.Edge edge = streetLayer.edgeStore.getCursor(split.edge);
+        State toVertex1 = new State(split.vertex1, split.edge, StreetMode.CAR);
+        toVertex1.durationSeconds = atPosition.durationSeconds + partialRideSeconds(edge, split.distance1_mm);
+        toVertex1.durationBeforeLegSeconds = atPosition.durationBeforeLegSeconds;
+        toVertex1.distance = atPosition.distance + split.distance1_mm;
+        edge.advance();
+        State toVertex0 = new State(split.vertex0, split.edge + 1, StreetMode.CAR);
+        toVertex0.durationSeconds = atPosition.durationSeconds + partialRideSeconds(edge, split.distance0_mm);
+        toVertex0.durationBeforeLegSeconds = atPosition.durationBeforeLegSeconds;
+        toVertex0.distance = atPosition.distance + split.distance0_mm;
+        // If there is a turn restriction on this edge, the search must know it begins inside one.
+        streetLayer.edgeStore.startTurnRestriction(StreetMode.CAR, profileRequest.reverseSearch, toVertex0);
+        streetLayer.edgeStore.startTurnRestriction(StreetMode.CAR, profileRequest.reverseSearch, toVertex1);
+        bestStatesAtEdge.put(toVertex1.backEdge, toVertex1);
+        queue.add(toVertex1);
+        bestStatesAtEdge.put(toVertex0.backEdge, toVertex0);
+        queue.add(toVertex0);
+    }
+
+    /// Applies on-demand boarding steps to a seed state in a fixed order. The rider is considered
+    /// to be ready at the specified midTime plus the access duration already on the state. If the
+    /// rider is ready before the OnDemand service's pick-up window begins, the rider waits. Waiting,
+    /// as opposed to discarding the state, keeps earlier arrivals weakly dominant, so walk time
+    /// pruning in the preceding leg remains valid. Assuming that the vehicle must begin its
+    /// deviation to pick up the passenger within the service availability window, the pick-up delay
+    /// is incurred within the window (not before it). Initial states whose boarding falls at or
+    /// past the end of the pick-up window are discarded (returning false). Finally, the State's
+    /// durationBeforeLegSeconds is updated, including the pre-boarding walk and both waits in the
+    /// previous access leg.
+    private static boolean applyBoarding (State s, OnDemand od, int midTime) {
+        int readyTime = midTime + s.durationSeconds;
+        if (readyTime < od.fromWindowStart) {
+            s.incrementTimeInSeconds(od.fromWindowStart - readyTime);
+        }
+        s.incrementTimeInSeconds(Math.round(od.durationOffset));
+        if (midTime + s.durationSeconds >= od.fromWindowEnd) {
+            return false;
+        }
+        s.durationBeforeLegSeconds = s.durationSeconds;
+        return true;
+    }
+
+    /// When the origin point is accepted by an on-demand service's pick-up place filter,
+    /// initialize the ride search from a CAR-mode split for that point. This additional state
+    /// better models a rider standing mid-edge on a long drivable road, who would otherwise walk
+    /// to a junction before boarding the on-demand service. The space between the origin point and
+    /// the split on the edge is traversed at walk speed, as setOrigin does for every origin.
+    /// If edge allowing cars is within the linking radius, or if the nearest such edge is not
+    /// accepted by the place filter, the states from vertices in the access search should provide
+    /// a reasonable fallback.
+    private void injectOriginSeed (OnDemandPlaceFilter pickUpPlace, OnDemand od, int midTime) {
+        if (Double.isNaN(originLat)) return; // The search was seeded from vertices, not a point.
+        Split split = streetLayer.findSplit(originLat, originLon, StreetLayer.LINK_RADIUS_METERS, StreetMode.CAR);
+        if (split == null) return;
+        if (!pickUpPlace.containsPoint(originLat, originLon, split)) return;
+        int walkSeconds = (int) (split.distanceToEdge_mm / (profileRequest.walkSpeed * 1000));
+        seedOnDemand(split, walkSeconds, od, midTime);
+    }
+
+    /// Interpreting the current router instance as the merged, clipped results of on-demand ride
+    /// searches, returns a new StreetRouter that has completed a walk search onward from every ride
+    /// state. This one search feeds into all post-flex steps, including boarding scheduled transit,
+    /// and walking to destination points in pedestrian-only areas. The walk is capped by both the
+    /// maximum total trip duration and a best-effort walking leg limit. NOTE: The new router will
+    /// inherit the time calculator of the current router. Call this on merged results holding an
+    /// unwrapped time calculator, not on a single ride search whose calculator often scales times
+    /// by a duration factor.
+    public StreetRouter copyAndRouteEgressWalk () {
+        StreetRouter sr = shallowCopyForRouting();
+        sr.streetMode = StreetMode.WALK;
+        sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;
+        sr.legTimeLimitSeconds = profileRequest.getMaxTimeSeconds(StreetMode.WALK);
+        bestStatesAtEdge.forEachEntry((eidx, states) -> {
+            for (State state : states) {
+                // A fresh state rather than a clone: the new leg is on foot, so turn restriction
+                // state accumulated in the vehicle does not carry over to the walking rider.
+                State seed = new State(state.vertex, state.backEdge, StreetMode.WALK);
+                seed.durationSeconds = state.durationSeconds;
+                seed.durationBeforeLegSeconds = state.durationSeconds;
+                seed.distance = state.distance;
+                sr.bestStatesAtEdge.put(seed.backEdge, seed);
+                sr.queue.add(seed);
+            }
+            return true;
+        });
+        // Routing with no initial states at all logs a spurious warning about a missing origin.
+        if (!sr.queue.isEmpty()) {
+            sr.route();
+        }
+        return sr;
+    }
+
+    /// Duration of riding a partial edge, as the traversed fraction of the whole-edge
+    /// traversal time produced by this router's calculator.
+    private int partialRideSeconds (EdgeStore.Edge edge, int partialLengthMm) {
+        int lengthMm = edge.getLengthMm();
+        if (lengthMm <= 0) return 0;
+        int wholeEdgeSeconds = timeCalculator.traversalTimeSeconds(edge, StreetMode.CAR, profileRequest);
+        return (int) Math.round(wholeEdgeSeconds * ((double) partialLengthMm / lengthMm));
+    }
+
+    /// Add all states from the given StreetRouter that would not be dominated by states in the
+    /// this StreetRouter to this StreetRouter, ejecting dominated states from this StreetRouter.
+    public void mergeStatesFrom (StreetRouter odr) {
+        odr.bestStatesAtEdge.forEachEntry((e, states) -> {
+            for (State state : states) {
+                if (!isDominated(state)) bestStatesAtEdge.put(state.backEdge, state);
+            }
+            return true;
+        });
+    }
+
+    public StreetRouter shallowCopyForRouting () {
+        try {
+            StreetRouter copy = (StreetRouter) super.clone();
+            copy.queue = new PriorityQueue<>(stateComparator);
+            copy.bestStatesAtEdge = new TIntObjectHashMultimap<>();
+            // TODO verify whether we need to initialize or protectively copy any other fields.
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 }

@@ -20,7 +20,7 @@ import java.util.List;
 
 import static com.conveyal.analysis.util.HttpStatus.OK_200;
 import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
-import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -91,7 +91,7 @@ public class NetworkTileController implements HttpController {
     private List<Geometry> getClippedAndProjectedEdgeGeometries (TransportNetwork network, VectorMapTile vectorMapTile) {
         List<Geometry> edgeGeoms = new ArrayList<>(64);
 
-        TIntSet edges = network.streetLayer.spatialIndex.query(floatingWgsEnvelopeToFixed(vectorMapTile.envelope));
+        TIntSet edges = network.streetLayer.spatialIndex.query(envelopeToFixed(vectorMapTile.envelope));
         edges.forEach(e -> {
             EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor(e);
             // TODO at low zoom levels, include only edge pairs. At high, include different directions in pair.

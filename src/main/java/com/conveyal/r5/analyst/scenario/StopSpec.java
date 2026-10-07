@@ -4,7 +4,6 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 
 import java.io.Serializable;
-import java.util.Set;
 
 /**
  * This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
@@ -84,7 +83,7 @@ public class StopSpec implements Serializable {
      *  @return the integer ID of the newly created stop
      */
     private int materializeOne (TransportNetwork network) {
-        int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon);
+        int stopVertex = network.streetLayer.createStopVertexAndLink(lat, lon);
         TransitLayer transitLayer = network.transitLayer;
         int newStopId = transitLayer.getStopCount();
         transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this

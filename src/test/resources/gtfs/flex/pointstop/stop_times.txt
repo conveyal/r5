@@ -1,0 +1,5 @@
+trip_id,stop_sequence,stop_id,start_pickup_drop_off_window,end_pickup_drop_off_window,arrival_time,departure_time
+T,1,X,08:00:00,12:00:00,,
+T,2,Y,08:00:00,12:00:00,,
+SCHED,1,X,,,08:00:00,08:00:00
+SCHED,2,Y,,,08:30:00,08:30:00

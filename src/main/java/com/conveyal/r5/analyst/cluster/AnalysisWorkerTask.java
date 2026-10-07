@@ -333,4 +333,8 @@ public abstract class AnalysisWorkerTask extends ProfileRequest {
             }
         }
     }
+
+    public boolean hasFlag (String flag) {
+        return (flags != null) && flags.contains(flag);
+    }
 }

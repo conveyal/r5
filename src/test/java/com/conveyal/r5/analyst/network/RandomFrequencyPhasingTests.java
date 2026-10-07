@@ -2,7 +2,7 @@ package com.conveyal.r5.analyst.network;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
-import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
 
@@ -48,12 +48,12 @@ public class RandomFrequencyPhasingTests {
                 .pureFrequency()
         );
         TransportNetwork network = gridLayout.generateNetwork();
-        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+        RegionalTask task = gridLayout.newTaskBuilder()
                 .weekendMorningPeak()
                 .setOrigin(20, 20)
                 .monteCarloDraws(1000)
                 .singleFreeformDestination(0, 0)
-                .build();
+                .buildRegional();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();

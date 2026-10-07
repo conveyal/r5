@@ -183,14 +183,10 @@ public class BrokerController implements HttpController {
         if (address == null) {
             // There are no workers that can handle this request. Request some.
             WorkerTags workerTags = new WorkerTags(userPermissions, analysisRequest.regionId);
-            broker.createOnDemandWorkerInCategory(workerCategory, workerTags);
+            broker.createSingleWorker(workerCategory, workerTags);
             // No workers exist. Kick one off and return "service unavailable".
             response.header("Retry-After", "30");
             return jsonResponse(response, HttpStatus.ACCEPTED_202, "Starting routing server. Expect status updates within a few minutes.");
-        } else {
-            // Workers exist in this category, clear out any record that we're waiting for one to start up.
-            // FIXME the tracking of which workers are starting up should really be encapsulated using a "start up if needed" method.
-            broker.recentlyRequestedWorkers.remove(workerCategory);
         }
         // Port number is hard-coded until we have a good reason to make it configurable.
         String workerUrl = "http://" + address + ":7080/single";

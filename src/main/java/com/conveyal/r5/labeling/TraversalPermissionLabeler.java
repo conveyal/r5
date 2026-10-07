@@ -1,6 +1,7 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.streets.EdgeStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,8 @@ public abstract class TraversalPermissionLabeler {
 
     //This is immutable map of highway tag and boolean which is true if this tag has same road with _link
     static final Map<String, Boolean> validHighwayTags;
+
+    boolean stepFree;
 
     static {
 
@@ -61,6 +64,12 @@ public abstract class TraversalPermissionLabeler {
         addPermissions("bridleway", "access=no"); //horse=yes but we don't support horse
         addPermissions("cycleway", "access=no;bicycle=yes");
         addPermissions("footway|steps|platform|public_transport=platform|railway=platform|corridor", "access=no;foot=yes");
+    }
+
+    public TraversalPermissionLabeler (TransportNetworkConfig config) {
+        if (config != null) {
+            this.stepFree = config.stepFree;
+        }
     }
 
     public RoadPermission getPermissions(Way way) {
@@ -132,6 +141,10 @@ public abstract class TraversalPermissionLabeler {
             applyOppositeBicyclePermissions(way, backward);
         }
 
+        if (stepFree && way.hasTag("highway", "steps")) {
+            forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            backward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        }
 
         return new RoadPermission(forward, backward);
     }

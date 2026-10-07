@@ -3,6 +3,7 @@ package com.conveyal.analysis;
 import com.conveyal.r5.analyst.Grid;
 import com.google.common.io.LittleEndianDataInputStream;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
@@ -33,8 +34,10 @@ public class SelectingGridReducer {
         this.index = index;
     }
 
+    private static final int BUFSIZE = 32 * 1024;
+
     public Grid compute (InputStream rawInput) throws IOException {
-        LittleEndianDataInputStream input = new LittleEndianDataInputStream(new GZIPInputStream(rawInput));
+        LittleEndianDataInputStream input = new LittleEndianDataInputStream(new BufferedInputStream(new GZIPInputStream(rawInput, BUFSIZE), BUFSIZE));
 
         char[] header = new char[8];
         for (int i = 0; i < 8; i++) {

@@ -122,7 +122,7 @@ public class PathWithTimes extends Path {
 
                 if (patIdx < this.length - 1) {
                     // find the transfer time
-                    TIntList transfers = network.transitLayer.transfersForStop.get(this.alightStops[patIdx]);
+                    TIntList transfers = network.transitLayer.streetTransfers.get(this.alightStops[patIdx]);
 
                     int transferTime;
 

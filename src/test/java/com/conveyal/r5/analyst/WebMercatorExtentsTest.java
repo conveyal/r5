@@ -44,6 +44,24 @@ class WebMercatorExtentsTest {
         }
     }
 
+    /// Check that expandToInclude produces the minimum bounding extents when the two extents have
+    /// different heights, in both operand orders.
+    @Test
+    void expandUnequalHeights () {
+        // The outer extents fully contain the inner ones, so union should equal the outer extents.
+        WebMercatorExtents outer = new WebMercatorExtents(100, 100, 20, 50, 10);
+        WebMercatorExtents inner = new WebMercatorExtents(105, 110, 10, 10, 10);
+        Assertions.assertEquals(outer, outer.expandToInclude(inner));
+        Assertions.assertEquals(outer, inner.expandToInclude(outer));
+
+        // Partially overlapping extents of different heights, with the union derived by hand.
+        WebMercatorExtents a = new WebMercatorExtents(100, 100, 20, 50, 10);
+        WebMercatorExtents b = new WebMercatorExtents(110, 130, 30, 40, 10);
+        WebMercatorExtents union = new WebMercatorExtents(100, 100, 40, 70, 10);
+        Assertions.assertEquals(union, a.expandToInclude(b));
+        Assertions.assertEquals(union, b.expandToInclude(a));
+    }
+
     /**
      * Check that a zero-size envelope (around a single point for example) will yield an extents object containing
      * one cell (rather than zero cells). Also check an envelope with a tiny nonzero envelope away from cell edges.

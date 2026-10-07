@@ -20,7 +20,7 @@ public class RoundTripTest {
     public void testVexFile() throws Exception {
 
         // Load OSM data from PBF
-        OSM osmOriginal = new OSM(null);
+        OSM osmOriginal = OSM.newWritableInMemory();
         osmOriginal.readFromFile(TEST_FILE);
         assertTrue(osmOriginal.nodes.size() > 1);
         assertTrue(osmOriginal.ways.size() > 1);
@@ -31,7 +31,7 @@ public class RoundTripTest {
         osmOriginal.writeToFile(vexFile.getPath());
 
         // Read OSM data back in from VEX file
-        OSM osmCopy = new OSM(null);
+        OSM osmCopy = OSM.newWritableInMemory();
         osmCopy.readFromFile(vexFile.getPath());
 
         // Compare PBF data to VEX data
@@ -43,7 +43,7 @@ public class RoundTripTest {
     public void testPbfFile() throws Exception {
 
         // Load OSM data from PBF
-        OSM osmOriginal = new OSM(null);
+        OSM osmOriginal = OSM.newWritableInMemory();
         osmOriginal.readFromFile(TEST_FILE);
         assertTrue(osmOriginal.nodes.size() > 1);
         assertTrue(osmOriginal.ways.size() > 1);
@@ -54,7 +54,7 @@ public class RoundTripTest {
         osmOriginal.writeToFile(ourPbfFile.getPath());
 
         // Read OSM data back in from VEX file
-        OSM osmCopy = new OSM(null);
+        OSM osmCopy = OSM.newWritableInMemory();
         osmCopy.readFromFile(ourPbfFile.getPath());
 
         // Compare PBF data to VEX data
@@ -86,11 +86,11 @@ public class RoundTripTest {
         ).start();
 
         // Stream VEX data in from the thread and put it in a MapDB
-        OSM osmCopy = new OSM(null);
+        OSM osmCopy = OSM.newWritableInMemory();
         osmCopy.readVex(inStream);
 
         // Load up the original PBF file for comparison
-        OSM osmOriginal = new OSM(null);
+        OSM osmOriginal = OSM.newWritableInMemory();
         osmOriginal.readFromFile(TEST_FILE);
 
         // Compare PBF data to VEX stream

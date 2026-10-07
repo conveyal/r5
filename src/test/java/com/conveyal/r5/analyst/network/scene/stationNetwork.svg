@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2220 470" width="2220" height="470" font-family="sans-serif">
+<rect x="0" y="0" width="2220" height="470" fill="white"/>
+<polygon points="1960.0,410.0 2160.0,410.0 2160.0,310.0 1960.0,310.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="60.0,360.0 260.0,360.0 1060.0,360.0 2060.0,360.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="260.0,60.0 260.0,250.0 260.0,360.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="260.0,250.0 460.0,250.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="460.0,250.0 660.0,250.0" fill="none" stroke="#7c3aed" stroke-width="4.0" stroke-dasharray="2,6" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="60.0,280.0 1060.0,280.0 1060.0,360.0" fill="none" stroke="#9ca3af" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="60.0,260.0 2060.0,260.0" fill="none" stroke="#b45309" stroke-width="10.0" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="260.0" cy="360.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="1060.0" cy="360.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="260.0" cy="250.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="460.0" cy="250.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<rect x="554.0" y="254.0" width="12" height="12" fill="#dc2626" stroke="white" stroke-width="2"/>
+<line x1="20" y1="450" x2="120" y2="450" stroke="#111111" stroke-width="2"/>
+<text x="1966.0" y="404.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">zone</text>
+<text x="760.0" y="360.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Main St</text>
+<text x="260.0" y="165.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Access Rd</text>
+<text x="330.0" y="250.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Station Approach</text>
+<text x="530.0" y="250.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Plaza</text>
+<text x="438.0" y="280.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Frontage Rd</text>
+<text x="760.0" y="260.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Motorway</text>
+<g transform="translate(266.0,354.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">access-main jct.</text></g>
+<g transform="translate(1066.0,354.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">front-main jct.</text></g>
+<g transform="translate(266.0,244.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">access-path jct.</text></g>
+<g transform="translate(466.0,244.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">plaza-path jct.</text></g>
+<text x="570.0" y="264.0" fill="#dc2626" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">elevated</text>
+<text x="130.0" y="454.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

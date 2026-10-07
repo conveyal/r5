@@ -1,6 +1,7 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.streets.EdgeStore;
 
 /**
@@ -16,6 +17,10 @@ public class SidewalkTraversalPermissionLabeler extends TraversalPermissionLabel
                 "access=yes");
     }
 
+    public SidewalkTraversalPermissionLabeler (TransportNetworkConfig config) {
+        super(config);
+    }
+
     @Override
     public RoadPermission getPermissions(Way way) {
         RoadPermission rp = super.getPermissions(way);
@@ -24,10 +29,7 @@ public class SidewalkTraversalPermissionLabeler extends TraversalPermissionLabel
             rp.backward.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) ||
             rp.backward.contains(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR)
         ) {
-            rp.forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            rp.forward.remove(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
-            rp.backward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            rp.backward.remove(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
+            rp.disallowPedestrians();
         }
         return rp;
     }

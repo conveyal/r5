@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2920 620" width="2920" height="620" font-family="sans-serif">
+<rect x="0" y="0" width="2920" height="620" fill="white"/>
+<polygon points="210.0,560.0 1260.0,560.0 1260.0,60.0 210.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polygon points="860.0,560.0 1260.0,560.0 1260.0,460.0 860.0,460.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polygon points="1660.0,560.0 2710.0,560.0 2710.0,60.0 1660.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="60.0,510.0 260.0,510.0 460.0,510.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="60.0,110.0 260.0,110.0 460.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="60.0,510.0 60.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="460.0,510.0 460.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="260.0,510.0 260.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2460.0,510.0 2660.0,510.0 2860.0,510.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2460.0,110.0 2660.0,110.0 2860.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2460.0,510.0 2460.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2860.0,510.0 2860.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2660.0,510.0 2660.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="460.0,510.0 2460.0,510.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="60.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="260.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="460.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="60.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="260.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="460.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2460.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2660.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2860.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2460.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2660.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2860.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<line x1="20" y1="600" x2="120" y2="600" stroke="#111111" stroke-width="2"/>
+<text x="216.0" y="554.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">village-pickup</text>
+<text x="866.0" y="554.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">mid-edge-pickup</text>
+<text x="1666.0" y="554.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">dropoff</text>
+<text x="200.0" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A South St</text>
+<text x="200.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A North St</text>
+<text x="60.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A West St</text>
+<text x="460.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A East St</text>
+<text x="260.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A Cross St</text>
+<text x="2600.0" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B South St</text>
+<text x="2600.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B North St</text>
+<text x="2460.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B West St</text>
+<text x="2860.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B East St</text>
+<text x="2660.0" y="370.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B Cross St</text>
+<text x="1160.0" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Long Rd</text>
+<g transform="translate(66.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-sw jct.</text></g>
+<g transform="translate(266.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-s jct.</text></g>
+<g transform="translate(466.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-se jct.</text></g>
+<g transform="translate(66.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-nw jct.</text></g>
+<g transform="translate(266.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-n jct.</text></g>
+<g transform="translate(466.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">A-ne jct.</text></g>
+<g transform="translate(2466.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-sw jct.</text></g>
+<g transform="translate(2666.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-s jct.</text></g>
+<g transform="translate(2866.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-se jct.</text></g>
+<g transform="translate(2466.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-nw jct.</text></g>
+<g transform="translate(2666.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-n jct.</text></g>
+<g transform="translate(2866.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">B-ne jct.</text></g>
+<text x="130.0" y="604.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

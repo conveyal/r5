@@ -2,15 +2,14 @@ package com.conveyal.analysis.models;
 
 import java.util.List;
 
-/**
- * Created by matthewc on 3/28/16.
- */
+/// Model object for a modification that alters the course of an existing route,
+/// as represented by the UI.
 public class Reroute extends Modification {
     public String getType() {
         return "reroute";
     }
 
-    /** The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification. */
+    /// The _id of the gtfs feed, providing a scope for any unscoped identifiers in this Modification.
     public String feed;
     public String[] routes;
     public String[] trips;
@@ -20,14 +19,15 @@ public class Reroute extends Modification {
 
     public List<Segment> segments;
 
-    /** speed of the adjusted segment, km/h, per segment */
-    public int[] segmentSpeeds;
+    /// Speed of the adjusted segment in km/h, per segment.
+    /// Fractional because the UI derives them by floating point division from travel times.
+    public double[] segmentSpeeds;
 
-    /** Default dwell time, seconds */
+    /// Default dwell time, seconds
     public int dwellTime;
 
-    /** Dwell times at adjusted stops, seconds */
-    // using Integer not int because Integers can be null
+    /// Dwell times at adjusted stops, seconds
+    /// using Integer not int because Integers can be null
     public Integer[] dwellTimes;
 
     public com.conveyal.r5.analyst.scenario.Reroute toR5 () {

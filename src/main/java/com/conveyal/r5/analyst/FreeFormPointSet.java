@@ -20,6 +20,7 @@ import java.util.Arrays;
 
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  * These are points serving as origins or destinations in an accessibility analysis which are not constrained to
@@ -164,6 +165,8 @@ public class FreeFormPointSet extends PointSet {
      * Note that this does not save any opportunity magnitudes or densities. We do not use those yet.
      * Note also that if we ever intend to use these directly in the UI we should switch to a
      * fixed-width little-endian representation or JSON.
+     * Note: Conveyal's UI parses binary files produced with this format in
+     * `lib/opportunity-datasets/parse-freeform.worker.ts`
      */
     public void write (OutputStream outputStream) throws IOException {
         DataOutputStream out = new DataOutputStream(outputStream);
@@ -264,6 +267,22 @@ public class FreeFormPointSet extends PointSet {
             lats[i] = coordinate.y;
             counts[i] = 1;
             i++;
+        }
+    }
+
+    /**
+     * Construct a freeform point set with the specified number of opportunities at each specified geographic
+     * coordinate. The two arrays must be of equal length.
+     */
+    public FreeFormPointSet (Coordinate[] coordinates, double[] opportunityCounts) {
+        this(coordinates.length);
+        checkArgument(coordinates.length == opportunityCounts.length,
+                "There must be exactly one opportunity count per coordinate.");
+        for (int i = 0; i < coordinates.length; i++) {
+            ids[i] = Integer.toString(i);
+            lons[i] = coordinates[i].x;
+            lats[i] = coordinates[i].y;
+            counts[i] = opportunityCounts[i];
         }
     }
 }

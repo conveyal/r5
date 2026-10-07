@@ -10,7 +10,7 @@ import java.util.List;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.INSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.OUTSIDE;
 import static com.conveyal.r5.analyst.WebMercatorGridPointSetTest.TestEnvelope.Category.PARTIAL;
-import static com.conveyal.r5.common.GeometryUtils.floatingWgsEnvelopeToFixed;
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,7 +54,7 @@ public class WebMercatorGridPointSetTest {
         // Also check that our envelopes actually had the intended characteristics (according to JTS predicates).
         for (TestEnvelope testEnvelope : envelopes) {
             Envelope envelope = testEnvelope.envelope;
-            TIntList points = gridPointSet.getPointsInEnvelope(floatingWgsEnvelopeToFixed(envelope));
+            TIntList points = gridPointSet.getPointsInEnvelope(envelopeToFixed(envelope));
             if (testEnvelope.category == OUTSIDE) {
                 assertFalse(gridEnvelope.intersects(envelope));
                 assertTrue(points.isEmpty());

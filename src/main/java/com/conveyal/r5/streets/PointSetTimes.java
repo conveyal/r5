@@ -7,15 +7,11 @@ import java.util.Arrays;
 
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
-/**
- * The travel time to every point in a PointSet.
- *
- * This class is not really necessary.
- * Everywhere PointSetTimes is used, we always only read its travelTimes field. So this class should be deleted
- * and replaced with int[] travelTimes.
- * However it does serve to provide type context to a raw array of travel times, and to associate those travel times
- * with a specific PointSet to catch mistakes where a set of travel times is used with the wrong PointSet.
- */
+/// The travel time to every point in a PointSet (single values, not multiple values for different departure times).
+/// This class is not strictly necessary, because everywhere PointSetTimes is used, we always only read its travelTimes
+/// field. So this class could be replaced with int[] travelTimes. However it does serve to provide type context to a
+/// raw array of travel times, and to associate those travel times with a specific PointSet to catch mistakes where a
+/// set of travel times is used with the wrong PointSet.
 public class PointSetTimes {
 
     public final PointSet pointSet;

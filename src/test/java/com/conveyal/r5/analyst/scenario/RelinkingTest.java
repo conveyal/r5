@@ -77,7 +77,7 @@ public class RelinkingTest {
         // Unfortunately new stops don't have string IDs so we have to couple this strongly to the implementation
         // and assume that these new stops will be added in the order they are specified in the modification.
         TIntSet foundStops = new TIntHashSet();
-        int[] transfers = mod.transitLayer.transfersForStop.get(6).toArray();
+        int[] transfers = mod.transitLayer.streetTransfers.get(6).toArray();
         for (int i = 0; i < transfers.length; i += 2) {
             int stop = transfers[i];
             int distance = transfers[i+1];
@@ -89,7 +89,7 @@ public class RelinkingTest {
 
         // Check that stop stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
         // is in the transfers for existing stop s4
-        transfers = mod.transitLayer.transfersForStop.get(s4StopIndex).toArray();
+        transfers = mod.transitLayer.streetTransfers.get(s4StopIndex).toArray();
         foundStops.clear();
         for (int i = 0; i < transfers.length; i += 2) {
             int stop = transfers[i];

@@ -79,7 +79,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         this.transportNetworkCache = transportNetworkCache;
     }
 
-    public LoaderState<TransportNetwork> preloadData (AnalysisWorkerTask task) {
+    public LoaderState<TransportNetwork> preload (AnalysisWorkerTask task) {
         if (task.scenario != null) {
             transportNetworkCache.rememberScenario(task.scenario);
         }
@@ -94,10 +94,11 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
      * similar tasks will make interleaved calls to setProgress (with superficial map synchronization). Other than
      * causing a value to briefly revert from PRESENT to BUILDING this doesn't seem deeply problematic.
      * This is provided specifically for regional tasks, to ensure that they remain in preloading mode while all this
-     * data is prepared. 
+     * data is prepared.
+     * Any exceptions that occur while building the network will escape this method, leaving the status as BUILDING.
      */
-    public TransportNetwork synchronousPreload (AnalysisWorkerTask task) {
-        return buildValue(Key.forTask(task));
+    public TransportNetwork preloadBlocking (AnalysisWorkerTask task) {
+        return getBlocking(Key.forTask(task));
     }
 
     @Override
@@ -140,7 +141,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                 linkedPointSet.getEgressCostTable(progressListener);
             }
         }
-        // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.
+        // Finished building all needed inputs for analysis, return the completed network
         return scenarioNetwork;
     }
 

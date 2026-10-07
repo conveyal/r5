@@ -6,13 +6,11 @@ import com.conveyal.r5.analyst.scenario.AddTrips;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Add a trip pattern.
- * Note that this is the only modification type that does not contain a feed field. This is because many added trip
- * patterns do not reference any entities from a feed, so could be added on top of any feed. Some added trip patterns
- * do reference and reuse existing stops, in which case each referenced stop has its own feed ID already prepended.
- * This is because when editing the trip pattern and optionally reusing stops, the user can see stops from all feeds.
- */
+/// Add a trip pattern.
+/// Note that this is the only modification type that does not contain a feed field. This is because many added trip
+/// patterns do not reference any entities from a feed, so could be added on top of any feed. Some added trip patterns
+/// do reference and reuse existing stops, in which case each referenced stop has its own feed ID already prepended.
+/// This is because when editing the trip pattern and optionally reusing stops, the user can see stops from all feeds.
 public class AddTripPattern extends Modification {
 
     public static final String type = "add-trip-pattern";
@@ -21,13 +19,11 @@ public class AddTripPattern extends Modification {
         return type;
     }
 
-    /**
-     * Older AddTripPattern modifications did not have a transitMode field. To maintain compatibility and allow null
-     * values when we deserialize those old modifications, we use Integer rather than primitive int.
-     */
+    /// Older AddTripPattern modifications did not have a transitMode field. To maintain compatibility and allow null
+    /// values when we deserialize those old modifications, we use Integer rather than primitive int.
     public Integer transitMode;
 
-    /** The Route color, for display purposes. */
+    /// The Route color, for display purposes.
     public String color;
 
     public Integer directionId;
@@ -42,11 +38,12 @@ public class AddTripPattern extends Modification {
         /** Default dwell time, seconds */
         public int dwellTime;
 
-        /** Speed, kilometers per hour, for each segment */
-        public int[] segmentSpeeds;
+        /// Speed in kilometers per hour, for each segment. These are fractional because the UI
+        /// derives them by floating point division from segment travel times.
+        public double[] segmentSpeeds;
 
-        /** Dwell times at adjusted stops, seconds */
-        // using Integer not int because dwell times can be null
+        /// Dwell times at adjusted stops, seconds
+        /// using Integer not int because dwell times can be null
         public Integer[] dwellTimes;
 
         public AddTrips.PatternTimetable toR5 (List<ModificationStop> stops) {
@@ -92,7 +89,7 @@ public class AddTripPattern extends Modification {
         }
 
         // Values for stop spec are not affected by time table segment speeds or dwell times
-        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new int[0]));
+        at.stops = ModificationStop.toStopSpecs(ModificationStop.getStopsFromSegments(segments, null, 0, new double[0]));
 
         return at;
     }

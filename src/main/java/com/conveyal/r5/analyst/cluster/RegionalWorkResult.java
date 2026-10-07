@@ -38,6 +38,11 @@ public class RegionalWorkResult {
     public int[][][] accessibilityValues;
 
     /**
+     * These are the minutes required to reach a threshold number of opportunities for each [destinationGrid, percentile, threshold].
+     */
+    public int[][][] dualAccessValues;
+
+    /**
      * The temporal density of opportunities - how many are reached during each minute of travel.
      * Quantities of opportunities for each [destinationGrid, percentile, minute].
      */
@@ -65,7 +70,12 @@ public class RegionalWorkResult {
         this.travelTimeValues = result.travelTimes == null ? null : result.travelTimes.values;
         this.accessibilityValues = result.accessibility == null ? null : result.accessibility.getIntValues();
         this.pathResult = result.paths == null ? null : result.paths.summarizeIterations(PathResult.Stat.MINIMUM);
-        this.opportunitiesPerMinute = result.density == null ? null : result.density.opportunitiesPerMinute;
+        if (result.density != null) {
+            this.opportunitiesPerMinute = result.density.opportunitiesPerMinute;
+            if (task.originPointSet == null && task.dualAccessThresholds != null) {
+                this.dualAccessValues = result.density.calculateDualAccessForOrigin();
+            }
+        }
         // TODO checkTravelTimeInvariants, checkAccessibilityInvariants to verify that values are monotonically increasing
     }
 

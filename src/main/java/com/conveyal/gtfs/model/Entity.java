@@ -2,6 +2,7 @@ package com.conveyal.gtfs.model;
 
 import com.beust.jcommander.internal.Sets;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.error.GeneralError;
 import com.conveyal.gtfs.error.MissingKeyError;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.gtfs.GTFSFeed;
@@ -116,6 +117,8 @@ public abstract class Entity implements Serializable {
          */
         private String getFieldCheckRequired(String column, boolean required) throws IOException {
             String str = reader.get(column);
+            // FIXME CsvReader.get seems to return empty string for missing columns, not null.
+            // missing column and empty field on one row are apparently indistinguishable here.
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
                     feed.errors.add(new MissingColumnError(tableName, column));
@@ -229,17 +232,20 @@ public abstract class Entity implements Serializable {
             return val;
         }
 
-        /**
-         * Used to check referential integrity.
-         * Return value is not used, but could allow entities to point to each other directly rather than
-         * using indirection through string-keyed maps.
-         */
+        /// Check referential integrity: verify that an ID found in the given column is present as
+        /// a key in another table.
+        ///
+        /// Returns the value for that key in the other table. This originally allowed direct references between
+        /// entities. That did not align with storing the entities in a database or MapDB table, so these days we
+        /// never use the return value. We could instead return the ID itself to allow combining this check with
+        /// the initial field read.
         protected <K, V> V getRefField(String column, boolean required, Map<K, V> target) throws IOException {
             String str = getFieldCheckRequired(column, required);
             V val = null;
             if (str != null) {
                 val = target.get(str);
                 String transitId = column + ":" + str;
+                // FIXME This should not use a non-transient field on the feed object. It should be a Loader-local Set<Tuple2<String, String>>.
                 if (!feed.transitIds.contains(transitId)) {
                     feed.transitIds.add(transitId);
                     if (val == null) {
@@ -331,6 +337,16 @@ public abstract class Entity implements Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, keyField, key));
             }
         }
+
+        /// Call in a Loader subclass to conveniently register an error message.
+        protected void generalError (String field, String message) {
+            feed.errors.add(new GeneralError(tableName, row, field, message));
+        }
+
+        /// Call in a Loader subclass to conveniently register a referential integrity problem.
+        protected void referenceError (String field, String message) {
+            feed.errors.add(new ReferentialIntegrityError(tableName, row, field, message));
+        }
     }
 
     /**
@@ -416,7 +432,6 @@ public abstract class Entity implements Serializable {
                 if (++row % 500000 == 0) {
                     LOG.info("Record number {}", human(row));
                 }
-
                 writeOneRow(iter.next());
             }
 

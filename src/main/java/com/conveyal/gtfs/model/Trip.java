@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.flex.FlexTrip;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -38,8 +39,7 @@ public class Trip extends Entity {
 
         @Override
         public void loadOneRow() throws IOException {
-            Trip t = new Trip();
-
+            Trip t = checkAndLoadFlexFields();
             t.sourceFileLine  = row;
             t.route_id        = getStringField("route_id", true);
             t.service_id      = getStringField("service_id", true);
@@ -53,16 +53,30 @@ public class Trip extends Entity {
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed_id = feed.feedId;
             insertCheckingDuplicateKey(feed.trips, t, "trip_id");
-
-            /*
-              Check referential integrity without storing references. Trip cannot directly reference Services or
-              Routes because they would be serialized into the MapDB.
-             */
+            // Check referential integrity without storing references. Trip cannot directly reference Services or
+            // Routes because they would be serialized into the MapDB.
             // TODO confirm existence of shape ID
             getRefField("service_id", true, feed.services);
             getRefField("route_id", true, feed.routes);
         }
 
+        /// Check if any special GTFS Flex extension fields are present. If they are present create and return a
+        /// specialized instance, otherwise return an instance of the simpler base class. Such fields are optional
+        /// even for trips containing stop_times that make use of Flex extensions, and we cannot know while
+        /// loading the trip rows table whether each trip will contain flex-specific stop_times. If this trip turns out
+        /// to contain flex-specific stop_times, default (identity) values must be inferred later during routing.
+        private Trip checkAndLoadFlexFields () throws IOException {
+            double factor = getDoubleField("safe_duration_factor", false, 1, 10);
+            double offset = getDoubleField("safe_duration_offset", false, 0, 60*60);
+            // Return simpler base class when both values are missing.
+            if ((Double.isNaN(factor) && Double.isNaN(offset))) {
+                return new Trip();
+            }
+            FlexTrip result = new FlexTrip();
+            result.safe_duration_factor = factor;
+            result.safe_duration_offset = offset;
+            return result;
+        }
     }
 
     public static class Writer extends Entity.Writer<Trip> {
@@ -96,8 +110,6 @@ public class Trip extends Entity {
         protected Iterator<Trip> iterator() {
             return feed.trips.values().iterator();
         }
-
-
     }
 
 }

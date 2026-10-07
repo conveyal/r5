@@ -3,7 +3,6 @@ package com.conveyal.r5.kryo;
 import ch.qos.logback.classic.Logger;
 import com.conveyal.object_differ.ObjectDiffer;
 import com.conveyal.r5.analyst.scenario.FakeGraph;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,6 @@ public class KryoNetworkSerializerTest {
 
         // Build a network, including distance tables and a linked grid point set for Analysis.
         TransportNetwork originalNetwork = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
-        originalNetwork.rebuildLinkedGridPointSet(StreetMode.WALK);
 
         // Test that the network is identical to itself. This is a test that the ObjectDiffer works and is configured
         // properly, and enables a special option of that class.

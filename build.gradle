@@ -3,7 +3,7 @@ plugins {
     id 'application'
     id 'maven-publish'
     id 'com.palantir.git-version' version '2.0.0'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '9.0.1'
 }
 
 group = 'com.conveyal'
@@ -26,7 +26,7 @@ jar {
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.r5',
             'Main-Class': 'com.conveyal.analysis.BackendMain',
-            'Build-Jdk-Spec': targetCompatibility.getMajorVersion(),
+            'Build-Jdk-Spec': java.toolchain.languageVersion,
             'Implementation-Title': 'Conveyal Analysis Backend',
             'Implementation-Vendor': 'Conveyal LLC',
             'Implementation-Version': project.version
@@ -34,6 +34,9 @@ jar {
 }
 
 shadowJar {
+    filesMatching("META-INF/services/**") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
     mergeServiceFiles()
 }
 
@@ -78,8 +81,11 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
-// A task to copy all dependency JARs needed at runtime into a single directory
-task copyDependencies(type: Copy) {
+// A task to put all dependency JARs needed at runtime into a single directory. This is a Sync
+// rather than a Copy, to prevent accumulation of different JAR versions in the directory. If
+// multiple versions are accidentally deployed together, the JVM will load a version based only on
+// classpath enumeration order.
+task copyDependencies(type: Sync) {
     from(sourceSets.main.runtimeClasspath) {
         include '*.jar'
     }
@@ -152,6 +158,21 @@ configurations.all {
     exclude group: "junit", module: "junit"
 }
 
+// Hold all com.fasterxml.jackson modules at one version, overriding requests from transitive dependencies.
+// Under Jackson 2.15 or newer, bson4jackson corrupts numbers buffered during polymorphic deserialization,
+// yielding empty strings or zeros. An AWS SDK upgrade triggered this problem.
+// The cap may be raised or removed only when mongojack and bson4jackson are removed.
+// This is not an enforcedPlatform because that would force versions on downstream projects and is disallowed.
+// The group prefix ends with a dot to cover all Jackson modules while excluding the jackson-bom platform itself.
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group.startsWith('com.fasterxml.jackson.')) {
+            details.useVersion(details.requested.name == 'jackson-databind' ? '2.10.5.1' : '2.10.5')
+            details.because('bson4jackson and mongojack corrupt MongoDB reads under Jackson 2.15 or newer')
+        }
+    }
+}
+
 dependencies {
     // Provides our logging API
     implementation 'org.slf4j:slf4j-api:2.0.7'
@@ -170,9 +191,12 @@ dependencies {
     // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
     implementation 'org.mongojack:mongojack:2.10.1'
 
-    // JSON serialization and deserialization from and to Java objects
-    implementation 'com.fasterxml.jackson.core:jackson-core:2.10.3'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
+    // JSON serialization and deserialization from and to Java objects. The BOM aligns all
+    // com.fasterxml.jackson modules on one version but is published only as an advisory import.
+    // The resolution rule above this dependencies block provides a hard cap on version numbers.
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.10.5.20201202')
+    implementation 'com.fasterxml.jackson.core:jackson-core'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 
     // Parses CSV. GTFS is a set of zipped CSV files, and some of our other inputs are CSV files.
     implementation 'net.sourceforge.javacsv:javacsv:2.0'
@@ -217,14 +241,14 @@ dependencies {
     // capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's.
     implementation 'com.github.ben-manes.caffeine:caffeine:2.8.1'
 
-    implementation ('org.apache.httpcomponents:httpclient:4.5.6') {
+    implementation ('org.apache.httpcomponents:httpclient:4.5.13') {
         because 'Force use of version used by AWS SDK instead of other versions used by our transitive dependencies.'
         // TODO eventually migrate over to Java's built-in HTTP client.
     }
 
     // Persistent storage of files / objects on Amazon S3.
     // Now used only for Seamless Census TODO eliminate this final AWS dependency
-    implementation 'com.amazonaws:aws-java-sdk-s3:1.11.341'
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.797'
 
     // Commons Math gives us FastMath, MersenneTwister, and low-discrepancy vector generators.
     implementation 'org.apache.commons:commons-math3:3.0'
@@ -269,6 +293,10 @@ dependencies {
     // Chart drawing library for examining travel time distributions when crafting tests.
     // Although rarely used it should be low-impact: it is a test-only dependency with no transitive dependenices.
     testImplementation('org.jfree:jfreechart:1.5.1')
+
+    // Load the test launcher, no longer automatic in Gradle 9:
+    // https://github.com/gradle/gradle/issues/34512
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 
 }
 

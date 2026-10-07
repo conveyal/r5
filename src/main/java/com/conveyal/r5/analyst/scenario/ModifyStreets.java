@@ -21,8 +21,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.conveyal.r5.streets.EdgeStore.intToLts;
-
 /**
  * <p>
  * This modification selects all edges inside a given set of polygons and changes their characteristics.
@@ -128,7 +126,7 @@ public class ModifyStreets extends Modification {
         // and network.streetLayer.edgeStore is already an extend-only copy.
         // TODO convert to fixed point
         edgesInPolygon = new TIntHashSet();
-        Envelope fixedEnvelope = GeometryUtils.floatingWgsEnvelopeToFixed(multiPolygon.getEnvelopeInternal());
+        Envelope fixedEnvelope = GeometryUtils.envelopeToFixed(multiPolygon.getEnvelopeInternal());
         TIntSet candidateEdges = network.streetLayer.findEdgesInEnvelope(fixedEnvelope);
         EdgeStore.Edge edge = network.streetLayer.edgeStore.getCursor();
         candidateEdges.forEach(e -> {

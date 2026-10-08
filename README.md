@@ -52,6 +52,12 @@ In order to do development on the frontend or backend, you'll need to set up a l
 
 By default, IntelliJ will follow common Gradle practice and build R5 using the "Gradle wrapper" approach, in which operating-system specific scripts are run that download and install a specific version of Gradle in the projet directory. We have encountered problems with this approach where IntelliJ seems to have insufficient control over the build/run/debug cycle. IntelliJ has its own internal implementation of the Gradle build process, and in our experience this works quite smoothly and is better integrated with the debug cycle. To switch to this appraoch, in the Gradle section of the IntelliJ settings, choose "Build and run using IntelliJ IDEA" and "Run tests using IntelliJ IDEA". Below that you may also want to choose "Use Gradle from specified location" to use your local system-wide copy.
 
+## Contributing
+
+Before contributing, sign the [Conveyal Contributor License Agreement](https://github.com/conveyal/CLA-Ledger/blob/main/CLA.md).
+The automated check requires current CLA coverage for every human commit author.
+For details, see [CLA.md](CLA.md).
+
 ## Structured Commit Messages
 
 We use structured commit messages to help generate changelogs.

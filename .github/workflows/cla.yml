@@ -1,0 +1,33 @@
+name: CLA
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to evaluate afresh
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  check:
+    name: Check contributor coverage
+    uses: conveyal/CLA-Ledger/.github/workflows/check-contributors.yml@v0.0.1
+    with:
+      ledger_repository: conveyal/CLA-Ledger
+      ledger_data_ref: main
+      implementation_repository: conveyal/CLA-Ledger
+      implementation_ref: v0.0.1
+      signing_url: https://github.com/conveyal/CLA-Ledger/blob/main/CLA.md
+      pr_number: ${{ inputs.pr_number || github.event.pull_request.number }}
+      personalized_signing_links: true
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write

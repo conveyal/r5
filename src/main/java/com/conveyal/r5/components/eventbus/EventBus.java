@@ -1,7 +1,7 @@
-package com.conveyal.analysis.components.eventbus;
+package com.conveyal.r5.components.eventbus;
 
-import com.conveyal.analysis.components.Component;
-import com.conveyal.analysis.components.TaskScheduler;
+import com.conveyal.r5.components.Component;
+import com.conveyal.r5.components.TaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

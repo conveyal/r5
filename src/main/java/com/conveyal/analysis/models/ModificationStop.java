@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.scenario.StopSpec;
+import com.conveyal.r5.common.AnalysisServerException;
 import com.conveyal.r5.common.GeometryUtils;
 import org.locationtech.jts.geom.Coordinate;
 

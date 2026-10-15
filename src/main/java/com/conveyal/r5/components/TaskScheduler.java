@@ -1,16 +1,13 @@
-package com.conveyal.analysis.components;
+package com.conveyal.r5.components;
 
-import com.conveyal.analysis.UserPermissions;
 import com.conveyal.r5.analyst.progress.ApiTask;
 import com.conveyal.r5.analyst.progress.Task;
-import com.conveyal.r5.analyst.progress.TaskAction;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.SetMultimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +19,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 
 /**
  * This provides application-wide queues of one-off or repeating tasks. It ensures that some tasks repeat regularly
@@ -201,15 +199,6 @@ public class TaskScheduler implements Component {
         }
     }
 
-    // Q: Should the caller ever create its own Tasks, or if are tasks created here inside the TaskScheduler from
-    // other raw information? Having the caller creating a Task seems like a good way to configure execution details
-    // like heavy/light/periodic, and submit user information without passing it in. That task request could be separate
-    // from the internal Task object it creates, but that seems like overkill for an internal mechanism.
-    public void newTaskForUser (UserPermissions user, TaskAction taskAction) {
-        Task task = Task.create("TITLE").forUser(user).withAction(taskAction);
-        enqueue(task);
-    }
-
     public void enqueue (Task task) {
         task.validate();
         tasksForUser.put(task.user, task);
@@ -223,7 +212,7 @@ public class TaskScheduler implements Component {
 
     /** Just demonstrating how this can be used. */
     public void example () {
-        this.enqueue(Task.create("Example").forUser(new UserPermissions("abyrd@conveyal.com", true, "conveyal"))
+        this.enqueue(Task.create("Example").forUser("abyrd@conveyal.com").inGroup("conveyal")
             .withAction((progressListener -> {
                 progressListener.beginTask("Processing complicated things...", 1024);
                 double sum = 0;

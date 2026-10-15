@@ -1,5 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
+import com.conveyal.r5.components.eventbus.Event;
+
 /**
  * Signals that a request has been processed over the HTTP API.
  * This no longer includes some database actions, as the UI is now capable of contacting the Mongo database directly.

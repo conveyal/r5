@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.UserPermissions;
+import com.conveyal.r5.components.Component;
 import spark.Request;
 
 /**

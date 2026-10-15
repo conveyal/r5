@@ -1,7 +1,7 @@
 package com.conveyal.r5.util;
 
-import com.conveyal.analysis.datasource.DataSourceException;
-import com.conveyal.analysis.datasource.SpatialAttribute;
+import com.conveyal.r5.datasource.DataSourceException;
+import com.conveyal.r5.datasource.SpatialAttribute;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;

@@ -1,8 +1,8 @@
 package com.conveyal.file;
 
-import com.conveyal.analysis.components.Component;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.components.Component;
 
 import java.io.BufferedInputStream;
 import java.io.File;

@@ -1,4 +1,4 @@
-package com.conveyal.analysis.components;
+package com.conveyal.r5.components;
 
 /**
  * These are the top-level modules of our analysis backend that are instantiated and wired up to one another when the

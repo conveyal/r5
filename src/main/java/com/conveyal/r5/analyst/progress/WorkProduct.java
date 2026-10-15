@@ -1,8 +1,5 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.models.BaseModel;
-import com.conveyal.analysis.models.DataGroup;
-
 /**
  * A unique identifier for the final product of a single TaskAction. Currently this serves as both an internal data
  * structure and an API model class, which should be harmless as it's an immutable data class. The id is unique within
@@ -25,14 +22,5 @@ public class WorkProduct {
         this.id = id;
         this.regionId = regionId;
         this.isGroup = isGroup;
-    }
-
-    // FIXME Not all Models have a regionId. Rather than pass that in as a String, refine the programming API.
-    public static WorkProduct forModel (BaseModel model) {
-        return new WorkProduct(WorkProductType.forModel(model), model._id.toString(), null);
-    }
-
-    public static WorkProduct forDataGroup (WorkProductType type, DataGroup dataGroup, String regionId) {
-        return new WorkProduct(type, dataGroup._id.toString(), regionId, true);
     }
 }

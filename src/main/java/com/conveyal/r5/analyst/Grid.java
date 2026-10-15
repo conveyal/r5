@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
 import com.conveyal.r5.util.ShapefileReader;
@@ -41,7 +41,6 @@ import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
@@ -60,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.imageio.ImageIO;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;

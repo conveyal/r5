@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.common.AnalysisServerException;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Coordinate;

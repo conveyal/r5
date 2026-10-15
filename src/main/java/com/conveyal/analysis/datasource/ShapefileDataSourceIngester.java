@@ -5,6 +5,7 @@ import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.conveyal.r5.util.ShapefileReader;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Envelope;

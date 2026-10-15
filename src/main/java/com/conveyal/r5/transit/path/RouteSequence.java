@@ -1,9 +1,9 @@
 package com.conveyal.r5.transit.path;
 
-import com.conveyal.analysis.models.CsvResultOptions;
+import com.conveyal.r5.analyst.cluster.CsvResultOptions;
 import com.conveyal.r5.analyst.cluster.PathResult;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
+import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 

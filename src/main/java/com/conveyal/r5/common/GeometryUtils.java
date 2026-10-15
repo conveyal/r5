@@ -1,6 +1,6 @@
 package com.conveyal.r5.common;
 
-import com.conveyal.analysis.datasource.DataSourceException;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.conveyal.r5.streets.VertexStore;
 import org.apache.commons.math3.util.FastMath;
 import org.locationtech.jts.geom.Coordinate;

@@ -1,7 +1,5 @@
 package com.conveyal.r5.analyst.progress;
 
-import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import java.time.Duration;
@@ -243,28 +241,14 @@ public class Task implements Runnable, ProgressListener {
         return this;
     }
 
-    public Task forUser (UserPermissions userPermissions) {
-        return this.forUser(userPermissions.email).inGroup(userPermissions.accessGroup);
-    }
-
     public Task withAction (TaskAction action) {
         this.action = action;
         return this;
     }
 
-    // We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
-    // It is also awkward to make a method to set it on ProgressListener - it's not really progress.
-    // So we set it directly on the task before submitting it. Requires pre-setting (not necessarily storing) Model._id.
-    // Update: I've started setting it via progressListener, it's just more encapsulated to create inside the TaskAction.
-    // But this then requires the TaskAction to hold a UserPermissions instance.
-    public Task withWorkProduct (BaseModel model) {
-        this.workProduct = WorkProduct.forModel(model);
-        return this;
-    }
-
     /**
-     * Ideally we'd just pass in a Model, but currently we have two base classes, also see WorkProduct.forModel().
-     * This can now be reported via ProgressListener interface for better encapsulation, potentially only revealing the
+     * We can't return the WorkProduct from TaskAction, that would be disrupted by throwing exceptions.
+     * So we set it directly on the task before submitting it. This can now be reported via ProgressListener interface for better encapsulation, potentially only revealing the
      * work product when it's acutally in the database.
      */
     public Task withWorkProduct (WorkProductType type, String id, String region) {

@@ -1,11 +1,14 @@
 package com.conveyal.analysis.components;
 
-import com.conveyal.analysis.WorkerConfig;
-import com.conveyal.analysis.components.eventbus.EventBus;
-import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerController;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.components.WorkerComponents;
+import com.conveyal.r5.components.WorkerConfig;
+import com.conveyal.r5.components.WorkerHttpApi;
+import com.conveyal.r5.components.eventbus.EventBus;
+import com.conveyal.r5.controllers.NetworkTileController;
 import com.conveyal.r5.transit.TransportNetworkCache;
 
 import java.util.List;

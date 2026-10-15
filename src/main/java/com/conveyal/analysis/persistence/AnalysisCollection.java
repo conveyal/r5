@@ -1,9 +1,9 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.models.BaseModel;
 import com.conveyal.analysis.util.JsonUtil;
+import com.conveyal.r5.common.AnalysisServerException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.DeleteResult;

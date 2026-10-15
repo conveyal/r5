@@ -3,7 +3,6 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.HttpApi;
 import com.conveyal.analysis.components.LocalWorkerLauncher;
 import com.conveyal.analysis.components.broker.Broker;
-import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.r5.components.ConfigBase;
@@ -19,7 +18,6 @@ public class BackendConfig extends ConfigBase implements
         AnalysisDB.Config,
         Broker.Config,
         HttpApi.Config,
-        SeamlessCensusGridExtractor.Config,
         LocalWorkerLauncher.Config,
         LocalFileStorage.Config
 {
@@ -84,11 +82,13 @@ public class BackendConfig extends ConfigBase implements
     @Override public String  localCacheDirectory()  { return localCacheDirectory;}
     @Override public boolean testTaskRedelivery()   { return testTaskRedelivery; }
     @Override public String  allowOrigin()          { return allowOrigin; }
-    @Override public String  seamlessCensusRegion() { return seamlessCensusRegion; }
-    @Override public String  seamlessCensusBucket() { return seamlessCensusBucket; }
     @Override public int     serverPort()           { return serverPort; }
     @Override public boolean offline()              { return offline; }
     @Override public int     maxWorkers()           { return maxWorkers; }
+
+    // Used by the cluster backend to read seamless census data from S3.
+    public String seamlessCensusRegion() { return seamlessCensusRegion; }
+    public String seamlessCensusBucket() { return seamlessCensusBucket; }
 
     // STATIC FACTORY METHODS
     // Always use these to construct BackendConfig objects for readability.

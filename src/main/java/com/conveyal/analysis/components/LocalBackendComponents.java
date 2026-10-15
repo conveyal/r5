@@ -6,6 +6,7 @@ import com.conveyal.analysis.components.eventbus.ErrorLogger;
 import com.conveyal.analysis.controllers.LocalFilesController;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.data.census.SeamlessSource;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.components.TaskScheduler;
@@ -13,6 +14,7 @@ import com.conveyal.r5.components.eventbus.EventBus;
 import com.conveyal.r5.controllers.HttpController;
 import com.conveyal.r5.streets.OSMCache;
 
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -36,7 +38,14 @@ public class LocalBackendComponents extends BackendComponents {
         // TODO add nested LocalWorkerComponents here, to reuse some components, and pass it into the LocalWorkerLauncher?
         workerLauncher = new LocalWorkerLauncher(config, fileStorage, gtfsCache, osmCache);
         broker = new Broker(config, fileStorage, eventBus, workerLauncher);
-        censusExtractor = new SeamlessCensusGridExtractor(config);
+        // Seamless census data is stored on S3, which is only accessible from the cluster backend.
+        SeamlessSource censusSource = new SeamlessSource() {
+            @Override
+            protected InputStream getInputStream (int x, int y) {
+                throw new UnsupportedOperationException("Seamless census extraction requires the cluster backend.");
+            }
+        };
+        censusExtractor = new SeamlessCensusGridExtractor(censusSource, config.seamlessCensusBucket());
         // Instantiate the HttpControllers last, when all the components except the HttpApi are already created.
         List<HttpController> httpControllers = standardHttpControllers();
         httpControllers.add(new LocalFilesController(fileStorage));

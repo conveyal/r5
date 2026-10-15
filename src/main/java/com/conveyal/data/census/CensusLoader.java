@@ -7,13 +7,27 @@ import java.io.File;
 import java.util.stream.Stream;
 
 /**
- * Import data from the US Census into a seamless store in S3 or on disk.
+ * Import data from the US Census into a seamless store on disk.
  */
 public class CensusLoader {
     protected static final Logger LOG = LoggerFactory.getLogger(CensusLoader.class);
 
     public static void main (String... args) throws Exception {
+        if (args.length != 1) {
+            System.err.println("usage: CensusLoader data_dir");
+            return;
+        }
         File indir = new File(args[0]);
+        ShapeDataStore store = load(indir);
+        store.writeTiles(new File(indir, "tiles"));
+        store.close();
+    }
+
+    /**
+     * Load TIGER geometries and LODES workforce and jobs data from the tiger, workforce and jobs subdirectories of
+     * the given directory. The caller is responsible for writing out and closing the returned store.
+     */
+    public static ShapeDataStore load (File indir) {
         File tiger = new File(indir, "tiger");
 
         ShapeDataStore store = new ShapeDataStore();
@@ -61,13 +75,6 @@ public class CensusLoader {
                     }
                 });
         LOG.info("Jobs done");
-
-        if (args.length == 1)
-            store.writeTiles(new File(indir, "tiles"));
-        else
-            // write to s3
-            store.writeTilesToS3(args[1]);
-
-        store.close();
+        return store;
     }
 }

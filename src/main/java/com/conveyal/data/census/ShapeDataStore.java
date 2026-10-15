@@ -1,8 +1,5 @@
 package com.conveyal.data.census;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
 import org.locationtech.jts.geom.Envelope;
@@ -19,14 +16,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -117,7 +109,7 @@ public class ShapeDataStore {
 
     /** Write GeoBuf tiles to a directory */
     public void writeTiles (File file) throws IOException {
-        writeTilesInternal((x, y) -> {
+        writeTilesTo((x, y) -> {
             // write out the features
             File dir = new File(file, "" + x);
             File out = new File(dir, y + ".pbf.gz");
@@ -126,40 +118,11 @@ public class ShapeDataStore {
         });
     }
 
-    /** Write GeoBuf tiles to S3 */
-    public void writeTilesToS3 (String bucketName) throws IOException {
-        // For the duration of this multiple-tile upload operation, manage a single upload thread for the S3 uploads.
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-
-        // initialize an S3 client
-        AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
-        try {
-            writeTilesInternal((x, y) -> {
-                PipedInputStream is = new PipedInputStream();
-                PipedOutputStream os = new PipedOutputStream(is);
-                ObjectMetadata metadata = new ObjectMetadata();
-                metadata.setContentType("application/gzip");
-
-                // perform the upload in its own thread so it doesn't deadlock
-                executor.execute(() -> s3.putObject(bucketName, String.format("%d/%d.pbf.gz", x, y), is, metadata));
-                return os;
-            });
-        } finally {
-            // allow the JVM to exit
-            executor.shutdown();
-            try {
-                executor.awaitTermination(1, TimeUnit.HOURS);
-            } catch (InterruptedException e) {
-                LOG.error("Interrupted while waiting for S3 uploads to finish");
-            }
-        }
-    }
-
     /**
-     * generic write tiles function, calls function with x and y indices to get an output stream, which it will close itself.
-     * The Internal suffix is because lambdas in java get confused with overloaded functions
+     * Write GeoBuf tiles to arbitrary destinations, e.g. S3. Calls the supplied function with the x and y indices of
+     * each tile to get an output stream for that tile, which this method will close itself.
      */
-    private void writeTilesInternal(TileOutputStreamProducer outputStreamForTile) throws IOException {
+    public void writeTilesTo (TileOutputStreamProducer outputStreamForTile) throws IOException {
         int lastx = -1, lasty = -1, tileCount = 0;
 
         List<GeobufFeature> featuresThisTile = new ArrayList<>();
@@ -204,7 +167,7 @@ public class ShapeDataStore {
     }
 
     @FunctionalInterface
-    private interface TileOutputStreamProducer {
-        public OutputStream apply (int x, int y) throws IOException;
+    public interface TileOutputStreamProducer {
+        OutputStream apply (int x, int y) throws IOException;
     }
 }

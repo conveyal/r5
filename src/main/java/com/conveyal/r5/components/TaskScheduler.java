@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
  * This provides application-wide queues of one-off or repeating tasks. It ensures that some tasks repeat regularly
  * while others are completed without too many tasks being handled concurrently. The two separate executors provide a
  * "heavy" executor (for slow tasks) and a "light" executor (for fast tasks, the "passing lane"), each with a number
- * of threads that can be limited in the main analysis.properties configuration file to help limit heavy concurrent
+ * of threads that can be limited in the configuration to help limit heavy concurrent
  * operations.
  *
  * The heavy/light distinction is somewhat like a work-stealing pool (see Javadoc on Executors.newWorkStealingPool()).

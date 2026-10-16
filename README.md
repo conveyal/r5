@@ -23,32 +23,17 @@ For details on the core methods implemented in Conveyal Analysis and R5, see:
 
 The Conveyal team is always eager to see cutting-edge uses of our software, so feel free to send us a copy of any thesis, report, or paper produced using this software. We also ask that any academic or research publications using this software cite the papers above, where relevant and appropriate.
 
-## Configuration
-
-It is possible to run a Conveyal Analysis UI and backend locally (e.g. on your laptop), which should produce results identical to those from our hosted platform. However, the computations for more complex analyses may take quite a long time. Extension points in the source code allow the system to be tailored to cloud computing environments to enable faster parallel computation.
-
-### Running Locally
-
-To get started, copy the template configuration (`analysis.properties.tmp`) to `analysis.properties`.
-To run locally, use the default values in the template configuration file. `offline=true` will create a local instance that avoids cloud-based storage, database, or authentication services.
-By default, analysis-backend will use the `analysis` database in a local MongoDB instance, so you'll also need to install and start a MongoDB instance.
-
-Database configuration variables include:
-
-- `database-uri`: URI to your MongoDB cluster
-- `database-name`: name of the database to use in your MongoDB cluster
-
 ## Building and running
 
-Once you have configured `analysis.properties` and started MongoDB locally, you can build and run the analysis backend with `gradle runBackend`. If you have checked out a commit (such as a release tag) where you are sure all tests will pass, you can skip the tests with `gradle -x test runBackend`.
+Build R5 and run its tests with `gradle build`. If you have checked out a commit (such as a release tag) where you are sure all tests will pass, you can skip the tests with `gradle build -x test`.
 
-You can build a single self-contained JAR file containing all the dependencies with `gradle shadowJar` and start it with `java -Xmx2g -cp build/libs/r5-vX.Y.Z-all.jar com.conveyal.analysis.BackendMain`.
+R5 runs on a single machine. Its main class, `com.conveyal.r5.point_to_point.PointToPointRouterServer`, builds a network from a directory of OSM and GTFS files with `--build <directory>`, and serves routing requests on that network with `--graphs <directory>`. You can run it with `gradle run --args="--build <directory>"`, or build a single self-contained JAR file containing all the dependencies with `gradle shadowJar` and start it with `java -Xmx2g -jar build/libs/r5-vX.Y.Z-all.jar --build <directory>`.
 
-Once you have this backend running, follow the instructions to start the [analysis-ui frontend](https://github.com/conveyal/analysis-ui). Once that the UI is running, you should be able to log in without authentication (using the frontend URL, e.g. http://localhost:3000). 
+The Conveyal Analysis backend server, which stores data in MongoDB and coordinates a cluster of R5 workers, is not part of this repository.
 
 ## Creating a development environment
 
-In order to do development on the frontend or backend, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on R5. Import R5 into IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.analysis.BackendMain`, which is the main class. You will need to configure the JVM options and properties file mentioned above.
+In order to do development on R5, you'll need to set up a local development environment. We use [IntelliJ IDEA](https://www.jetbrains.com/idea/). The free/community edition is sufficient for working on R5. Import R5 into IntelliJ as a new project from existing sources. You can then create a run configuration for `com.conveyal.r5.point_to_point.PointToPointRouterServer`, which is the main class.
 
 By default, IntelliJ will follow common Gradle practice and build R5 using the "Gradle wrapper" approach, in which operating-system specific scripts are run that download and install a specific version of Gradle in the projet directory. We have encountered problems with this approach where IntelliJ seems to have insufficient control over the build/run/debug cycle. IntelliJ has its own internal implementation of the Gradle build process, and in our experience this works quite smoothly and is better integrated with the debug cycle. To switch to this appraoch, in the Gradle section of the IntelliJ settings, choose "Build and run using IntelliJ IDEA" and "Run tests using IntelliJ IDEA". Below that you may also want to choose "Use Gradle from specified location" to use your local system-wide copy.
 

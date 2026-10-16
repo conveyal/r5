@@ -1,19 +1,16 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.analysis.models.AddTripPattern;
-import com.conveyal.analysis.models.Modification;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.scenario.AddTrips;
 import com.conveyal.r5.analyst.scenario.AdjustSpeed;
+import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.StopSpec;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -21,6 +18,7 @@ import org.locationtech.jts.geom.Coordinate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.network.SimpsonDesertTests.SIMPSON_DESERT_CORNER;
 import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
@@ -38,8 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /// - Add-trips modifications should only ever improve results. Travel times must not increase anywhere, and
 ///   accessibility must not decrease anywhere. Destinations served by new trips must see only benefits.
 ///
-/// The modifications are deserialized from a JSON representation of their UI form, then converted to the R5 backend
-/// versions. So this also tests the conversion from segments and speeds as drawn in the UI to backend hop times.
 /// All routes are scheduled (exactTimes not frequency-based), so results are deterministic allowing exact equality.
 ///
 /// Following production code paths, every analysis in this class (including the baseline) runs on a scenario copy of
@@ -52,11 +48,6 @@ public class ScenarioInvariantTests {
     private static final String FAR_ROUTE_ID = "far";
     private static final int ADDED_ROUTE_COLUMN = 10;
     private static final int N_BLOCKS = 30;
-
-    /// This JSON mapper does not mimic the production configuration (JsonUtil.getObjectMapper) because we do not want
-    /// its tolerance of unknown properties. Typos in JSON here should fail parsing, not produce default field values.
-    /// The modules added to the production mapper should not apply to these test JSON documents.
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static GridLayout gridLayout;
     private static TransportNetwork baseNetwork;
@@ -99,7 +90,7 @@ public class ScenarioInvariantTests {
     /// Apply a scenario containing the given modifications (possibly none) to the base network, returning the
     /// resulting scenario copy. All analyses in this class run on such copies, never on the base network object itself.
     private static TransportNetwork applyScenario (String id,
-            com.conveyal.r5.analyst.scenario.Modification... modifications) {
+            Modification... modifications) {
         Scenario scenario = new Scenario();
         scenario.id = id;
         // The modifications list must be mutable because scenario application sorts it in place.
@@ -197,150 +188,34 @@ public class ScenarioInvariantTests {
         assertTrue(strictlyGreater, "Added trips should strictly increase accessibility somewhere.");
     }
 
-    /// Build a backend AddTripPattern modification for the added north-south route. This is a scheduled (exactTimes)
-    /// pattern with a stop at every intersection of the column, drawn as straight two-point segments, at 24 km/h so
-    /// each 200 m hop should ideally take 30 seconds. It is built from JSON, which is how it would happen in production
-    /// but there is another reason: we will need to change the type of some fields which deserialization will tolerate.
-    private static com.conveyal.r5.analyst.scenario.Modification addedColumnRoute () {
-        AddTripPattern pattern = (AddTripPattern) modificationFromJson(
-                addTripPatternNode("addedColumnRoute", columnCoordinates(1), 24));
-        return pattern.toR5();
-    }
-
-    /// Coordinates of the added route running down ADDED_ROUTE_COLUMN, one segment per block, with
-    /// the given number of collinear line segments subdividing each block.
-    private static Coordinate[][] columnCoordinates (int pointsPerBlock) {
-        Coordinate[][] segments = new Coordinate[N_BLOCKS][];
-        for (int y = 0; y < N_BLOCKS; y++) {
-            Coordinate[] coords = new Coordinate[pointsPerBlock + 1];
-            for (int k = 0; k <= pointsPerBlock; k++) {
-                coords[k] = gridLayout.getPointLatLon(ADDED_ROUTE_COLUMN, y + k / (double) pointsPerBlock);
+    /// Build an AddTrips modification for the added north-south route. This is a scheduled (exactTimes) pattern with a
+    /// stop at every intersection of the column at 24 km/h, so each 200 m hop should ideally take 30 seconds.
+    private static AddTrips addedColumnRoute () {
+        double metersPerSecond = 24 * 1000 / 3600.0;
+        AddTrips addTrips = new AddTrips();
+        addTrips.comment = "addedColumnRoute";
+        addTrips.bidirectional = true;
+        addTrips.stops = new ArrayList<>();
+        Coordinate previous = null;
+        List<Integer> hopTimes = new ArrayList<>();
+        for (int y = 0; y <= N_BLOCKS; y++) {
+            Coordinate stop = gridLayout.getPointLatLon(ADDED_ROUTE_COLUMN, y);
+            addTrips.stops.add(new StopSpec(stop.x, stop.y));
+            if (previous != null) {
+                double meters = SphericalDistanceLibrary.fastDistance(previous, stop);
+                hopTimes.add((int) Math.round(meters / metersPerSecond));
             }
-            segments[y] = coords;
+            previous = stop;
         }
-        return segments;
-    }
-
-    private static Modification modificationFromJson (ObjectNode node) {
-        try {
-            return MAPPER.treeToValue(node, Modification.class);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not deserialize modification JSON.", e);
-        }
-    }
-
-    private static ObjectNode addTripPatternNode (String name, Coordinate[][] segments, double speedKph) {
-        ObjectNode node = MAPPER.createObjectNode();
-        node.put("type", "add-trip-pattern");
-        node.put("name", name);
-        node.put("bidirectional", true);
-        ArrayNode segmentsNode = node.putArray("segments");
-        for (Coordinate[] segment : segments) {
-            ObjectNode segmentNode = segmentsNode.addObject();
-            segmentNode.put("stopAtStart", true);
-            segmentNode.put("stopAtEnd", true);
-            segmentNode.put("spacing", 0);
-            ObjectNode geometry = segmentNode.putObject("geometry");
-            geometry.put("type", "LineString");
-            ArrayNode coordinates = geometry.putArray("coordinates");
-            for (Coordinate coordinate : segment) {
-                coordinates.addArray().add(coordinate.x).add(coordinate.y);
-            }
-        }
-        ObjectNode timetable = node.putArray("timetables").addObject();
-        timetable.put("_id", "TT");
-        timetable.put("name", "timetable");
-        for (String day : new String[] {"monday", "tuesday", "wednesday", "thursday", "friday"}) {
-            timetable.put(day, true);
-        }
-        timetable.put("saturday", false);
-        timetable.put("sunday", false);
-        timetable.put("startTime", 5 * 3600);
-        timetable.put("endTime", 10 * 3600);
-        timetable.put("headwaySecs", 600);
-        timetable.put("exactTimes", true);
-        timetable.put("dwellTime", 0);
-        ArrayNode speeds = timetable.putArray("segmentSpeeds");
-        for (int i = 0; i < segments.length; i++) {
-            speeds.add(speedKph);
-        }
-        return node;
-    }
-
-    /// Target unrounded total riding time along a sequence of segments at the given speed.
-    private static double idealPatternSeconds (Coordinate[][] segments, double speedKph) {
-        double meters = 0;
-        for (Coordinate[] segment : segments) {
-            for (int i = 1; i < segment.length; i++) {
-                meters += SphericalDistanceLibrary.fastDistance(segment[i - 1], segment[i]);
-            }
-        }
-        return meters / (speedKph * 1000 / 3600);
-    }
-
-    /// Converting segments drawn in the UI and their speeds to hop times may require rounding, but the error over a
-    /// whole pattern should stay within one second per inter-stop hop. A conversion that truncates once per line
-    /// segment rather than rounding once per hop accumulates more error and fails.
-    @Test
-    public void addTripsHopTimeBound () {
-        Coordinate[][] segments = columnCoordinates(10);
-        double speedKph = 23; // Chosen so ideal hop times are fractional, making rounding behavior visible.
-        AddTripPattern pattern = (AddTripPattern) modificationFromJson(
-                addTripPatternNode("roundingPattern", segments, speedKph));
-        AddTrips addTrips = pattern.toR5();
-        AddTrips.PatternTimetable timetable = addTrips.frequencies.iterator().next();
-        int scheduledSeconds = 0;
-        for (int hopTime : timetable.hopTimes) {
-            scheduledSeconds += hopTime;
-        }
-        double idealSeconds = idealPatternSeconds(segments, speedKph);
-        assertTrue(Math.abs(scheduledSeconds - idealSeconds) <= segments.length, String.format(
-                "Scheduled pattern time %d s differs from ideal %.1f s by more than one second per segment (%d segments).",
-                scheduledSeconds, idealSeconds, segments.length
-        ));
-    }
-
-    /// The same hop time bound for the Reroute modification, whose conversion uses the same
-    /// segment-to-hop-time machinery. Also expected to fail until hop time truncation fix is merged.
-    @Test
-    public void rerouteHopTimeBound () {
-        Coordinate[][] segments = columnCoordinates(10);
-        double speedKph = 23;
-        ObjectNode node = MAPPER.createObjectNode();
-        node.put("type", "reroute");
-        node.put("name", "roundingReroute");
-        node.put("feed", "GRID");
-        node.putArray("routes").add("0");
-        node.put("dwellTime", 0);
-        ArrayNode segmentsNode = node.putArray("segments");
-        for (Coordinate[] segment : segments) {
-            ObjectNode segmentNode = segmentsNode.addObject();
-            segmentNode.put("stopAtStart", true);
-            segmentNode.put("stopAtEnd", true);
-            segmentNode.put("spacing", 0);
-            ObjectNode geometry = segmentNode.putObject("geometry");
-            geometry.put("type", "LineString");
-            ArrayNode coordinates = geometry.putArray("coordinates");
-            for (Coordinate coordinate : segment) {
-                coordinates.addArray().add(coordinate.x).add(coordinate.y);
-            }
-        }
-        ArrayNode speeds = node.putArray("segmentSpeeds");
-        for (int i = 0; i < segments.length; i++) {
-            speeds.add(speedKph);
-        }
-        com.conveyal.analysis.models.Reroute reroute =
-                (com.conveyal.analysis.models.Reroute) modificationFromJson(node);
-        com.conveyal.r5.analyst.scenario.Reroute r5Reroute = reroute.toR5();
-        int scheduledSeconds = 0;
-        for (int hopTime : r5Reroute.hopTimes) {
-            scheduledSeconds += hopTime;
-        }
-        double idealSeconds = idealPatternSeconds(segments, speedKph);
-        assertTrue(Math.abs(scheduledSeconds - idealSeconds) <= segments.length, String.format(
-                "Rerouted pattern time %d s differs from ideal %.1f s by more than one second per segment (%d segments).",
-                scheduledSeconds, idealSeconds, segments.length
-        ));
+        AddTrips.PatternTimetable timetable = new AddTrips.PatternTimetable();
+        timetable.entryId = "TT";
+        timetable.monday = timetable.tuesday = timetable.wednesday = timetable.thursday = timetable.friday = true;
+        timetable.hopTimes = hopTimes.stream().mapToInt(Integer::intValue).toArray();
+        timetable.dwellTimes = new int[addTrips.stops.size()];
+        // Scheduled departures every 10 minutes from 05:00 to 10:00 inclusive.
+        timetable.firstDepartures = IntStream.rangeClosed(0, 30).map(i -> 5 * 3600 + i * 600).toArray();
+        addTrips.frequencies = List.of(timetable);
+        return addTrips;
     }
 
 }

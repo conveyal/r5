@@ -20,14 +20,14 @@ java {
 jar {
     // For Java 11+ Modules, specify a module name.
     // Do not create module-info.java until all our dependencies specify a module name.
-    // Main-Class BackendMain will start a local backend.
+    // Main-Class PointToPointRouterServer will build a network or start a local routing server.
     // Build-Jdk-Spec mimics a Maven manifest entry that helps us automatically install or select the right JVM.
     // Implementation-X attributes are needed for ImageIO (used by Geotools) to initialize in some environments.
     manifest {
         attributes 'Automatic-Module-Name': 'com.conveyal.r5',
-            'Main-Class': 'com.conveyal.analysis.BackendMain',
+            'Main-Class': 'com.conveyal.r5.point_to_point.PointToPointRouterServer',
             'Build-Jdk-Spec': java.toolchain.languageVersion,
-            'Implementation-Title': 'Conveyal Analysis Backend',
+            'Implementation-Title': 'Conveyal R5',
             'Implementation-Vendor': 'Conveyal LLC',
             'Implementation-Version': project.version
     }
@@ -68,7 +68,7 @@ publishing {
         // The shadow plugin automatically creates and registers a component called "shadow" for integration with this
         // Maven publish plugin. `gradle publish` will then upload both shadow jar and simple jar to Github Packages.
         // See https://imperceptiblethoughts.com/shadow/getting-started/#default-java-groovy-tasks
-        // To run R5 with dependencies, Conveyal does not use shadow jars anymore, only the zip distribution or runBackend.
+        // To run R5 with dependencies, Conveyal does not use shadow jars anymore, only the zip distribution.
         // For development builds and tests we don't need to produce a shadow jar, only publish the much smaller plain
         // jar without dependencies to Github Packages. For now, we continue to attach shadow jars to tagged releases.
         gpr(MavenPublication) {
@@ -94,25 +94,7 @@ task copyDependencies(type: Sync) {
 
 application {
     applicationDefaultJvmArgs = ['-Xmx6G']
-    mainClass = 'com.conveyal.analysis.BackendMain'
-}
-
-// Run R5 as a local analysis backend with all dependencies on the classpath, without building a shadowJar.
-task runBackend (type: JavaExec) {
-    dependsOn(build)
-    maxHeapSize('7G')
-    classpath(sourceSets.main.runtimeClasspath)
-    mainClass = 'com.conveyal.analysis.BackendMain'
-}
-
-// Start up an analysis local backend and ask it to shut down immediately.
-// This is used to check in the automated build that the JAR is usable in end-to-end tests before we keep it.
-// Create a configuration properties file (by copying the template) before running this task.
-task testRunnable(type: JavaExec) {
-    dependsOn(build)
-    classpath(sourceSets.main.runtimeClasspath)
-    mainClass = 'com.conveyal.analysis.BackendMain'
-    jvmArgs("-Dconveyal.immediate.shutdown=true")
+    mainClass = 'com.conveyal.r5.point_to_point.PointToPointRouterServer'
 }
 
 // Create a properties file so Java code can be aware of its own version. Properties allow exposing multiple values
@@ -158,21 +140,6 @@ configurations.all {
     exclude group: "junit", module: "junit"
 }
 
-// Hold all com.fasterxml.jackson modules at one version, overriding requests from transitive dependencies.
-// Under Jackson 2.15 or newer, bson4jackson corrupts numbers buffered during polymorphic deserialization,
-// yielding empty strings or zeros. An AWS SDK upgrade triggered this problem.
-// The cap may be raised or removed only when mongojack and bson4jackson are removed.
-// This is not an enforcedPlatform because that would force versions on downstream projects and is disallowed.
-// The group prefix ends with a dot to cover all Jackson modules while excluding the jackson-bom platform itself.
-configurations.all {
-    resolutionStrategy.eachDependency { details ->
-        if (details.requested.group.startsWith('com.fasterxml.jackson.')) {
-            details.useVersion(details.requested.name == 'jackson-databind' ? '2.10.5.1' : '2.10.5')
-            details.because('bson4jackson and mongojack corrupt MongoDB reads under Jackson 2.15 or newer')
-        }
-    }
-}
-
 dependencies {
     // Provides our logging API
     implementation 'org.slf4j:slf4j-api:2.0.7'
@@ -185,15 +152,8 @@ dependencies {
         exclude group: 'org.slf4j', module: 'slf4j-simple'
     }
 
-    // Database driver.
-    implementation 'org.mongodb:mongodb-driver-legacy:5.2.0'
-
-    // Legacy system for storing Java objects, this functionality is now provided by the MongoDB driver itself.
-    implementation 'org.mongojack:mongojack:2.10.1'
-
     // JSON serialization and deserialization from and to Java objects. The BOM aligns all
     // com.fasterxml.jackson modules on one version but is published only as an advisory import.
-    // The resolution rule above this dependencies block provides a hard cap on version numbers.
     implementation platform('com.fasterxml.jackson:jackson-bom:2.10.5.20201202')
     implementation 'com.fasterxml.jackson.core:jackson-core'
     implementation 'com.fasterxml.jackson.core:jackson-databind'

@@ -1,17 +1,18 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.ChaosParameters;
+import com.conveyal.r5.analyst.cluster.CsvResultOptions;
 import com.conveyal.r5.analyst.decay.DecayFunction;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.common.AnalysisServerException;
 import com.mongodb.QueryBuilder;
 import org.apache.commons.codec.digest.DigestUtils;
 

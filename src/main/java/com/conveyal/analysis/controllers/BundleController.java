@@ -1,9 +1,7 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.BackendComponents;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
@@ -21,6 +19,9 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.progress.ProgressInputStream;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.controllers.HttpController;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.mongodb.QueryBuilder;
@@ -155,7 +156,7 @@ public class BundleController implements HttpController {
         // constructed bundle from the HTTP handler. Process OSM first, then each GTFS feed sequentially.
         final UserPermissions userPermissions = UserPermissions.from(req);
         taskScheduler.enqueue(Task.create("Processing bundle " + bundle.name)
-            .forUser(userPermissions)
+            .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
             .setHeavy(true)
             .withWorkProduct(BUNDLE, bundle._id, bundle.regionId)
             .withAction(progressListener -> {

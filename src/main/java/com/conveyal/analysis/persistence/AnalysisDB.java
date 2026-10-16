@@ -1,7 +1,7 @@
 package com.conveyal.analysis.persistence;
 
-import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.models.BaseModel;
+import com.conveyal.r5.components.Component;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;

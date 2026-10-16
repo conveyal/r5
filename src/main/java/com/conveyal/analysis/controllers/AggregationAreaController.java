@@ -1,7 +1,6 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.datasource.derivation.AggregationAreaDerivation;
 import com.conveyal.analysis.datasource.derivation.DataDerivation;
 import com.conveyal.analysis.models.AggregationArea;
@@ -12,6 +11,8 @@ import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.UrlWithHumanName;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.controllers.HttpController;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -70,8 +71,9 @@ public class AggregationAreaController implements HttpController {
         // Create and enqueue an asynchronous background action to derive aggreagation areas from spatial data source.
         // The constructor will extract query parameters and range check them (not ideal separation, but it works).
         DataDerivation derivation = AggregationAreaDerivation.fromRequest(req, fileStorage, analysisDb);
+        UserPermissions userPermissions = UserPermissions.from(req);
         Task backgroundTask = Task.create("Aggregation area creation: " + derivation.dataSource().name)
-                .forUser(UserPermissions.from(req))
+                .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
                 .setHeavy(true)
                 .withAction(derivation);
 

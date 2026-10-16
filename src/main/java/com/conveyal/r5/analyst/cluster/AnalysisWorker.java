@@ -1,9 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.components.Component;
-import com.conveyal.analysis.components.eventbus.EventBus;
-import com.conveyal.analysis.components.eventbus.HandleRegionalEvent;
-import com.conveyal.analysis.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.AccessibilityResult;
@@ -13,6 +9,10 @@ import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.components.Component;
+import com.conveyal.r5.components.eventbus.EventBus;
+import com.conveyal.r5.components.eventbus.HandleRegionalEvent;
+import com.conveyal.r5.components.eventbus.HandleSinglePointEvent;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;

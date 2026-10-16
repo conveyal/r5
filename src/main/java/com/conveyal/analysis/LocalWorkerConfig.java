@@ -2,6 +2,7 @@ package com.conveyal.analysis;
 
 import com.conveyal.file.LocalFileStorage;
 
+import com.conveyal.r5.components.WorkerConfig;
 import java.util.Properties;
 
 /**

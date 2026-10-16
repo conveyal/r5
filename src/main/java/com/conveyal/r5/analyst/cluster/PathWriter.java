@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.components.WorkerComponents;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.path.Path;
 import com.conveyal.r5.transit.path.PatternSequence;

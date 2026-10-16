@@ -1,11 +1,11 @@
 package com.conveyal.r5.analyst.network;
 
-import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
+import com.conveyal.r5.analyst.cluster.CsvResultOptions;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.decay.StepDecayFunction;

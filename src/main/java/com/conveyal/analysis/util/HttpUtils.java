@@ -1,16 +1,16 @@
 package com.conveyal.analysis.util;
 
-import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.r5.common.AnalysisServerException;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileItemFactory;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.fileupload.servlet.ServletFileUpload;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
+import javax.servlet.http.HttpServletRequest;
 
 public abstract class HttpUtils {
 
@@ -18,7 +18,6 @@ public abstract class HttpUtils {
      * A Cache-Control header cvalue for immutable data. 2,592,000 seconds is one month.
      * https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
      */
-    public static final String CACHE_CONTROL_IMMUTABLE = "public, max-age=2592000, immutable";
 
     /**
      * Extract files from a Spark Request containing RFC 1867 multipart form-based file upload data.

@@ -1,7 +1,5 @@
-package com.conveyal.analysis;
+package com.conveyal.r5.components;
 
-import com.conveyal.analysis.components.TaskScheduler;
-import com.conveyal.analysis.components.WorkerHttpApi;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

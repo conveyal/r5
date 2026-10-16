@@ -2,11 +2,12 @@ package com.conveyal.analysis;
 
 import com.conveyal.analysis.components.HttpApi;
 import com.conveyal.analysis.components.LocalWorkerLauncher;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.persistence.AnalysisDB;
 import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.components.ConfigBase;
+import com.conveyal.r5.components.TaskScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

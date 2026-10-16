@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.r5.components.WorkerComponents;
 import org.geotools.data.geojson.GeoJSONDataStore;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.feature.FeatureCollection;

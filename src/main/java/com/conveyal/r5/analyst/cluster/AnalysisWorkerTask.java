@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridTransformWrapper;

@@ -1,18 +1,15 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.components.broker.WorkerObservation;
 import com.conveyal.analysis.components.broker.WorkerTags;
-import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.SinglePointEvent;
 import com.conveyal.analysis.models.AnalysisRequest;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.models.OpportunityDataset;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -21,7 +18,11 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
+import com.conveyal.r5.common.AnalysisServerException;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.components.eventbus.EventBus;
+import com.conveyal.r5.controllers.HttpController;
+import com.conveyal.r5.util.HttpStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -220,7 +221,7 @@ public class BrokerController implements HttpController {
                         analysisRequest.bundleId,
                         analysisRequest.regionId,
                         durationMsec
-                    ).forUser(userPermissions)
+                    ).forUser(userPermissions.email, userPermissions.accessGroup)
                 );
             }
             // If you return a stream to the Spark Framework, its SerializerChain will copy that stream out to the

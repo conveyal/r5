@@ -1,6 +1,6 @@
-package com.conveyal.analysis.components;
+package com.conveyal.r5.components;
 
-import com.conveyal.analysis.controllers.HttpController;
+import com.conveyal.r5.controllers.HttpController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

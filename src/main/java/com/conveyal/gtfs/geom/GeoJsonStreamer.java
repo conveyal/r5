@@ -42,7 +42,8 @@ public class GeoJsonStreamer extends JsonStreamer {
 
     private final IdSource idSource;
 
-    /// The number of numeric feature-level ids interpreted as strings (GTFS does not allow numbers).
+    /// The number of numeric ids interpreted as strings. Reported only by the GTFS feed loader
+    /// because user-drawn layers exported from GIS will routinely have numeric IDs.
     private int numericFeatureIds = 0;
 
     /// The name of the property holding each feature's display name,
@@ -65,7 +66,8 @@ public class GeoJsonStreamer extends JsonStreamer {
     /// An enum of the ways a feature can fail to be usable.
     /// These are used to tally skipped features, allowing a single error message per problem type.
     public enum FeatureProblem {
-        /// The feature has no string id, which this loader requires to allow references.
+        /// The feature has no string or numeric id at the configured source,
+        /// which this loader requires to allow references.
         MISSING_ID,
         /// The feature has no geometry or a null geometry.
         MISSING_GEOMETRY,
@@ -122,7 +124,7 @@ public class GeoJsonStreamer extends JsonStreamer {
         while (jp.nextToken() != JsonToken.END_OBJECT) {
             switch (fieldName()) {
                 case "type" -> expectString("Feature");
-                case "id" -> featureId = featureIdValue();
+                case "id" -> featureId = idValue();
                 case "properties" -> {
                     // Tolerate "properties": null, which is legal GeoJSON.
                     if (jp.currentToken() == JsonToken.VALUE_NULL) continue;
@@ -130,7 +132,7 @@ public class GeoJsonStreamer extends JsonStreamer {
                     while (jp.nextToken() != JsonToken.END_OBJECT) {
                         String property = fieldName();
                         if (property.equals("id")) {
-                            propertyId = stringValueOrNull();
+                            propertyId = idValue();
                         } else if (property.equals(nameProperty)) { // False for a null nameProperty.
                             name = stringValueOrNull();
                         } else {
@@ -157,9 +159,10 @@ public class GeoJsonStreamer extends JsonStreamer {
         sink.accept(id, name, geometry);
     }
 
-    /// Returns the current feature-level id as a String.
-    /// GTFS disallows numeric IDs so we perform this conversion and flag it to warn the user.
-    private String featureIdValue () throws IOException {
+    /// Returns the current id value as a String. Applicable to feature ids or id properties.
+    /// A numeric id becomes its text representation. GIS software commonly writes integer ids,
+    /// which is fine in a user-drawn layer, but GTFS disallows numeric ids so they are counted.
+    private String idValue () throws IOException {
         if (jp.currentToken().isNumeric()) {
             numericFeatureIds += 1;
             return jp.getText();

@@ -10,29 +10,39 @@ import com.google.common.collect.ImmutableBiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * This establishes a mapping between type codes embedded in JSON objects and Java Modification types on R5 workers.
- * It is used to achieve polymorphism in serialization and deserialization to and from JSON.
- * Almost everything here can be achieved with Jackson annotations @JsonTypeInfo and @JsonTypes on the classes.
- * But there's one exception: the custom modification type that pipes arbitrary JSON through the backend to the R5
- * worker. In that case we need to overwrite the type code "custom" with the type code we want the worker to see, which
- * might be completely unknown to the backend.
- *
- * Actually we might be able to perform the bulk of the class/type string mappings using those annotations, and just
- * override the behavior only on the CustomModificationHolder (with a TypeIdResolver that only handles the CustomModificationHolder
- * case). That could be done in addition to moving the R5 CustomModificationHolder to the backend, so it's clearly outside R5.
- *
- * Created by abyrd on 2019-03-15
- */
+import java.util.Map;
+
+/// This establishes a mapping between type codes embedded in JSON objects and Java Modification types on R5 workers.
+/// It is used to achieve polymorphism in serialization and deserialization to and from JSON. Almost everything here
+/// can be achieved with Jackson @JsonTypeInfo and @JsonTypes annotations on the classes. But there's one exception:
+/// the custom modification type that pipes arbitrary JSON through the backend to the R5 worker. In that case we need
+/// to overwrite the type code "custom" with the type code we want the worker to see, which might be completely unknown
+/// to the backend.
+///
+/// The two directions of this mapping run in different places.
+///
+/// Type codes are written (idFromValue) only on the backend, because workers never serialize modifications. The
+/// backend writes them in three places: when it forwards a single-point task to a worker with the scenario inline,
+/// when it writes the scenario file that workers fetch for a regional analysis, and when it stores a regional analysis
+/// record in MongoDB.
+///
+/// Type codes are read (typeFromId) mainly on workers: from the body of a single-point request, and from the scenario
+/// file of a regional analysis. Each worker recognizes the type codes in the table of the R5 version it was built
+/// from, so a specially built worker may recognize codes that the backend and other workers do not. The backend reads
+/// type codes only when it loads a regional analysis record without excluding its modifications, or parses a record
+/// sent to its update endpoint. The UI currently causes neither (see the request field of the backend's
+/// RegionalAnalysis model).
+///
+/// A type code that is missing from the table fails in typeFromId, while the JSON is being parsed. A worker reports the
+/// exception thrown there as an error on the task, covering type codes that are misspelled, that exist only on some
+/// other version of the worker, or that have been removed. 
 public class ModificationTypeResolver extends TypeIdResolverBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModificationTypeResolver.class);
 
-    /**
-     * A mapping between all Modification types known by this worker and their JSON type codes.
-     * This table is not really needed since there's a deterministic mapping between CamelCase and kebab-case here.
-     * We could just perform that mapping on the fly in methods, but I suppose this is more clear and efficient.
-     */
+    /// A mapping between all Modification types known by this worker and their JSON type codes.
+    /// It is not strictly necessary since there's a deterministic mapping between CamelCase and
+    /// kebab-case that could be performed on the fly, but the table seems more clear and efficient.
     private static final BiMap<String, Class<? extends Modification>> modificationTypes = new ImmutableBiMap.Builder()
             .put("add-streets", AddStreets.class)
             .put("add-trips", AddTrips.class)
@@ -40,16 +50,22 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
             .put("adjust-frequency", AdjustFrequency.class)
             .put("adjust-speed", AdjustSpeed.class)
             .put("modify-streets", ModifyStreets.class)
-            .put("add-on-demand", AddOnDemand.class)
             .put("remove-stops", RemoveStops.class)
             .put("remove-trips", RemoveTrips.class)
             .put("reroute", Reroute.class)
             // Undocumented "custom" modifications
-            .put("road-congestion", RoadCongestion.class)
+            .put("add-on-demand", AddOnDemand.class)
             .put("raster-cost", RasterCost.class)
-            .put("shapefile-lts", ShapefileLts.class)
+            .put("road-congestion", RoadCongestion.class)
             .put("set-fare-calculator", SetFareCalculator.class)
+            .put("shapefile-lts", ShapefileLts.class)
             .build();
+
+    /// This records type names that have been removed from the table above and associates them with
+    /// type codes that have replaced them, if any.
+    private static final Map<String, String> REPLACED_TYPES = Map.of(
+            "pickup-delay", "add-on-demand"
+    );
 
     @Override
     public String idFromValue (Object o) {
@@ -80,6 +96,10 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
         Class<? extends Modification> modificationClass = modificationTypes.get(id);
         if (modificationClass == null) {
             String message = String.format("The modification type ID '%s' was not recognized by this R5 worker.", id);
+            String replacement = REPLACED_TYPES.get(id);
+            if (replacement != null) {
+                message += String.format(" It has been replaced by '%s'.", replacement);
+            }
             LOG.error(message);
             throw new IllegalArgumentException(message);
         }

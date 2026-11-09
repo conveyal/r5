@@ -46,6 +46,7 @@ public abstract class KryoNetworkSerializer {
      * We considered using an ISO date string as the version but that could get confusing when seen in filenames.
      *
      * History of Network Version (NV) changes (in production releases):
+     * nv5 since 2026-07-31: on-demand (GTFS-Flex) services and compact polygon geometry in TransitLayer
      * nv4 since 2025-11: network config and transfer config retained in TransportNetwork, new GTFS transfer handling
      * nv3 since v7.0: switched to Kryo 5 serialization, WebMercatorGridPointSet now contains nested WebMercatorExtents
      * nv2 since 2022-04-05
@@ -54,7 +55,9 @@ public abstract class KryoNetworkSerializer {
      * When prototyping new features, use a unique identifier such as the branch or a commit ID, not sequential nvX ones.
      * This avoids conflicts when multiple changes are combined in a single production release, or some are abandoned.
      */
-    public static final String NETWORK_FORMAT_VERSION = "nv5";
+    // Placeholder for this branch: compact geometry field layout changed (CPackedCoords) and
+    // OnDemand/FlexLocation place types widened to CPolygonal. Replace with nv6 at release.
+    public static final String NETWORK_FORMAT_VERSION = "on-demand-egress";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 

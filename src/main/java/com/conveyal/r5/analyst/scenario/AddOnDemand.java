@@ -29,9 +29,9 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
 /// up. Services are directional. State a second service with the polygons reversed to allow
 /// travel in the return direction.
 ///
-/// The services are represented and routed exactly like those loaded from GTFS-Flex feeds.
-/// They are available at all times on every date. Multiple modifications of this kind may be
-/// applied in one scenario. Their services do not yet act on the post-transit egress side of trips.
+/// The services are represented and routed exactly like those loaded from GTFS-Flex feeds, but
+/// they are available at all times on every date. They are used when the access modes or egress
+/// modes include ON_DEMAND. Multiple modifications of this kind may be applied in one scenario.
 public class AddOnDemand extends Modification {
 
     // Public parameters deserialized from JSON
@@ -143,8 +143,13 @@ public class AddOnDemand extends Modification {
                     addError(String.format("More than one feature has the ID '%s'.", id));
                 }
             });
+            // This GeoJSON is usually a few polygons the user exported from GIS. Bad features are
+            // considered fixable mistakes, so we reject the modification and report to the user.
+            // This is stricter than the GTFS-Flex loader, which just ignores bad features and fails
+            // only if they are later referenced by a trip.
             if (streamer.skippedFeatureCount() > 0) {
-                addError(String.format("Ignored %d feature(s): %s.",
+                addError(String.format("%d feature(s) are not usable polygons with an id property: %s. " +
+                        "Fix or remove these features from the layer.",
                         streamer.skippedFeatureCount(), streamer.describeProblems()));
             }
         }

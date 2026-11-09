@@ -7,11 +7,15 @@ import com.conveyal.gtfs.geom.CMultiPolygon;
 import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.geom.CPolygonWithHoles;
 import com.conveyal.gtfs.geom.CPolygonal;
+import com.conveyal.gtfs.geom.GeoJsonStreamer;
+import com.conveyal.gtfs.geom.GeoJsonStreamer.IdSource;
 import com.conveyal.gtfs.geom.PointInPolygonTester;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -201,6 +205,28 @@ class GeoJsonStreamerTest {
         assertTrue(feed.locations.containsKey("42"), "The numeric id should become a string.");
         String message = summaryError(feed);
         assertTrue(message.contains("interpreted as strings"), message);
+    }
+
+    /// Layers drawn by users (such as the polygons of an AddOnDemand modification) take ids from
+    /// a property named id rather than the feature-level id, and GIS software commonly writes
+    /// integer ids there. A numeric id property is interpreted as its literal text, so a
+    /// modification may refer to the feature as "7". Unlike numeric feature-level ids in GTFS,
+    /// this is not a problem to be reported, and the feature-level id is never consulted.
+    @Test
+    void numericIdPropertyInterpretedAsString () throws Exception {
+        String numbered = json("{'type':'Feature','id':'ignored','properties':{'id':7},"
+            + "'geometry':{'type':'Polygon','coordinates':[%s]}}", SQUARE);
+        String named = json("{'type':'Feature','properties':{'id':'north'},"
+            + "'geometry':{'type':'Polygon','coordinates':[%s]}}", FAR_SQUARE);
+        String unnumbered = json("{'type':'Feature','id':'only-feature-id','properties':{},"
+            + "'geometry':{'type':'Polygon','coordinates':[%s]}}", SQUARE);
+        byte[] bytes = featureCollection(numbered, named, unnumbered).getBytes(StandardCharsets.UTF_8);
+        GeoJsonStreamer streamer = new GeoJsonStreamer(new ByteArrayInputStream(bytes), IdSource.ID_PROPERTY, null);
+        List<String> ids = new ArrayList<>();
+        streamer.stream((id, name, geometry) -> ids.add(id));
+        assertEquals(List.of("7", "north"), ids, "Numeric and string id properties should both be delivered.");
+        assertEquals(1, streamer.skippedFeatureCount(),
+            "A feature with no id property is skipped even though it has a feature-level id.");
     }
 
     /// If the legacy GeoJSON crs member is present, it should be accepted as long as it names a

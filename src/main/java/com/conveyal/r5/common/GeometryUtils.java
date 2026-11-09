@@ -72,11 +72,11 @@ public class GeometryUtils {
     public static double segmentFraction(int fixedLon0, int fixedLat0, int fixedLon1, int fixedLat1,
                                          int fixedLon, int fixedLat, double cosLat) {
         // Adjust x scale to account for lines of longitude converging toward the poles.
-        fixedLon0 = (int) (fixedLon0 * cosLat);
-        fixedLon1 = (int) (fixedLon1 * cosLat);
-        fixedLon  = (int) (fixedLon * cosLat);
-        LineSegment seg = new LineSegment(fixedLon0, fixedLat0, fixedLon1, fixedLat1);
-        return seg.segmentFraction(new Coordinate(fixedLon, fixedLat));
+        double x0 = fixedLon0 * cosLat;
+        double x1 = fixedLon1 * cosLat;
+        double x  = fixedLon * cosLat;
+        LineSegment seg = new LineSegment(x0, fixedLat0, x1, fixedLat1);
+        return seg.segmentFraction(new Coordinate(x, fixedLat));
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.geom;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.map.TObjectIntMap;
@@ -93,9 +94,22 @@ public class GeoJsonStreamer extends JsonStreamer {
         this.nameProperty = nameProperty;
     }
 
+    /// Read a FeatureCollection embedded in a larger JSON document, from a parser positioned on
+    /// the opening token of the FeatureCollection object.
+    public GeoJsonStreamer (JsonParser jsonParser, IdSource idSource, String nameProperty) {
+        super(jsonParser);
+        this.idSource = idSource;
+        this.nameProperty = nameProperty;
+    }
+
+    /// Consume one FeatureCollection, passing each usable feature to the sink. A parser newly
+    /// created on a file or stream has no current token and is advanced onto the first one. A
+    /// parser supplied by a caller must already be on the opening token of the FeatureCollection.
+    /// In both cases the cursor is left on the closing token of the FeatureCollection.
     public void stream (FeatureSink sink) {
         try {
-            advance(JsonToken.START_OBJECT);
+            if (jp.currentToken() == null) jp.nextToken();
+            expect(JsonToken.START_OBJECT);
             while (jp.nextToken() != JsonToken.END_OBJECT) {
                 switch (fieldName()) {
                     case "type" -> expectString("FeatureCollection");

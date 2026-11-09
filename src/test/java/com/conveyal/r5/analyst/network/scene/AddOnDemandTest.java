@@ -2,19 +2,23 @@ package com.conveyal.r5.analyst.network.scene;
 
 import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.gtfs.geom.CMultiPolygon;
-import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.scenario.AddOnDemand;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.Area;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.addOnDemand;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.apply;
+import static com.conveyal.r5.analyst.network.scene.SceneModifications.polygonsGeoJson;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.service;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.useFileStorage;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.writePolygons;
@@ -26,11 +30,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// Tests of the AddOnDemand modification. Polygons from a data source are resolved into on-demand
-/// services in a scenario network, including parameter validation and routing. Street routing here
-/// uses the same pipeline as production uses for on-demand, but for only one service at a time.
-/// Here we assert things that are not observable through travel times alone.
-/// Tests of the complete travel time computation are in OnDemandLegModeTest.
+/// Tests of the AddOnDemand modification. Polygons from a data source, from the modification's own
+/// JSON, or from both are resolved into on-demand services in a scenario network, including
+/// parameter validation and routing. Street routing here uses the same pipeline as production uses
+/// for on-demand, but for only one service at a time. Here we assert things that are not observable
+/// through travel times alone. Tests of the complete travel time computation are in
+/// OnDemandLegModeTest.
 public class AddOnDemandTest {
 
     @TempDir
@@ -63,13 +68,22 @@ public class AddOnDemandTest {
     static final int[] HUB_RECT = {2300, -150, 2700, 150};
     static final int[] WEST_RECT = {-700, -150, -300, 150};
 
-    /// Write a standard polygon layer. Features are "zone" and "hub" around street junctions,
+    /// The standard polygon layer. Features are "zone" and "hub" around street junctions,
     /// and "split" which is a multipolygon made of the "west" and "zone" rectangles.
+    static final Area[] FEEDER_AREAS = {
+        new Area("zone", ZONE_RECT),
+        new Area("hub", HUB_RECT),
+        new Area("split", WEST_RECT, ZONE_RECT)
+    };
+
+    /// Write the standard polygon layer as a data source, returning its ID.
     static String feederPolygons (Scene scene) {
-        return writePolygons(scene, "feeder.geojson",
-            new Area("zone", ZONE_RECT),
-            new Area("hub", HUB_RECT),
-            new Area("split", WEST_RECT, ZONE_RECT));
+        return writePolygons(scene, "feeder", FEEDER_AREAS);
+    }
+
+    /// Parse a modification from JSON text with the same object mapper that workers use.
+    static AddOnDemand parse (String json) throws IOException {
+        return (AddOnDemand) JsonUtilities.lenientObjectMapper.readValue(json, Modification.class);
     }
 
     /// Apply a modification adding service from "zone" to "hub" with the given wait, and the
@@ -219,10 +233,88 @@ public class AddOnDemandTest {
         assertTrue(String.join("\n", noServices.errors).contains("At least one service"));
         AddOnDemand noPolygons = addOnDemand(null, service("zone", "hub", 1));
         assertTrue(noPolygons.resolve(base));
-        assertTrue(String.join("\n", noPolygons.errors).contains("polygon data source"));
-        AddOnDemand missingFile = addOnDemand("absent.geojson", service("zone", "hub", 1));
+        assertTrue(String.join("\n", noPolygons.errors).contains("Polygons must be specified"));
+        AddOnDemand missingFile = addOnDemand("absent", service("zone", "hub", 1));
         assertTrue(missingFile.resolve(base));
-        assertFalse(missingFile.errors.isEmpty(), "A missing data source should be reported, not thrown.");
+        assertTrue(String.join("\n", missingFile.errors).contains("No GeoJSON data source"),
+            "A missing data source should be reported, with no exception thrown.");
+    }
+
+    /// Polygons written inline in the modification's JSON give the same services and the same
+    /// travel time as the same polygons read from a data source.
+    @Test
+    void inlinePolygons () throws IOException {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        TransportNetwork fromDataSource = feederScenario(base, scene, 5);
+        AddOnDemand modification = parse("""
+            {
+              "type": "add-on-demand",
+              "polygons": %s,
+              "services": [
+                {"from": "zone", "to": "hub", "waitMinutes": 5},
+                {"from": "hub", "to": "zone", "waitMinutes": 2},
+                {"from": "split", "to": "hub"}
+              ]
+            }
+            """.formatted(polygonsGeoJson(scene, FEEDER_AREAS)));
+        assertNull(modification.dataSourceId);
+        TransportNetwork inline = apply(base, "inline", modification);
+        assertEquals(3, inline.transitLayer.onDemandIndex.size());
+        assertTrue(onDemand(inline, "split>hub").fromPolygon instanceof CMultiPolygon);
+        int hub = vertexAt(base, scene, 2500, 0);
+        int inlineSeconds = SceneRouting.routeWithOnDemand(inline, scene, 500, 20, onDemand(inline, "zone>hub"))
+            .getTravelTimeToVertex(hub);
+        int dataSourceSeconds = SceneRouting.routeWithOnDemand(
+                fromDataSource, scene, 500, 20, onDemand(fromDataSource, "zone>hub"))
+            .getTravelTimeToVertex(hub);
+        assertEquals(dataSourceSeconds, inlineSeconds,
+            "Inline polygons should behave exactly like the same polygons in a data source.");
+    }
+
+    /// When a modification has both a data source and inline polygons, the two are combined
+    /// and a service can connect a polygon from one to a polygon from the other. Resolving the
+    /// modification more than once gives the same result.
+    @Test
+    void bothSources () throws IOException {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        String dataSourceId = writePolygons(scene, "hubOnly", new Area("hub", HUB_RECT));
+        AddOnDemand modification = parse("""
+            {
+              "type": "add-on-demand",
+              "dataSourceId": "%s",
+              "polygons": %s,
+              "services": [{"from": "zone", "to": "hub", "waitMinutes": 5}]
+            }
+            """.formatted(dataSourceId, polygonsGeoJson(scene, new Area("zone", ZONE_RECT))));
+        assertFalse(modification.resolve(base), String.join("\n", modification.errors));
+        assertFalse(modification.resolve(base), String.join("\n", modification.errors));
+        assertEquals(1, modification.polygons.polygonsById.size(),
+            "Resolving should not add the polygons from the data source to the inline layer.");
+        TransportNetwork scenario = apply(base, "both", modification);
+        var results = SceneRouting.routeWithOnDemand(scenario, scene, 500, 20, onDemand(scenario, "zone>hub"));
+        int seconds = results.getTravelTimeToVertex(vertexAt(scenario, scene, 2500, 0));
+        assertTrue(seconds > 300 && seconds < 900,
+            "Walk, a 300 second wait and the ride should take under 900 seconds, not " + seconds);
+    }
+
+    /// Duplicate polygon IDs, even across different sources (data source file vs inline polygons
+    /// property) should result in an error.
+    @Test
+    void duplicateAcrossSources () throws IOException {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        AddOnDemand modification = parse("""
+            {
+              "type": "add-on-demand",
+              "dataSourceId": "%s",
+              "polygons": %s,
+              "services": [{"from": "zone", "to": "hub"}]
+            }
+            """.formatted(feederPolygons(scene), polygonsGeoJson(scene, new Area("zone", ZONE_RECT))));
+        assertTrue(modification.resolve(base));
+        assertTrue(String.join("\n", modification.errors).contains("More than one feature has the ID 'zone'"));
     }
 
 }

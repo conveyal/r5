@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.network.scene;
 
 import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.LocalFileStorage;
 import com.conveyal.r5.analyst.FreeFormPointSet;
@@ -58,9 +59,24 @@ class SceneModifications {
     /// Rectangles are given in scene coordinates as (minX, minY, maxX, maxY) in meters.
     record Area (String id, int[]... rectangles) { }
 
-    /// Write the given areas as a GeoJSON data source with the given name into file storage,
-    /// returning the name for use as a modification's polygon data source.
-    static String writePolygons (Scene scene, String name, Area... areas) {
+    /// Write the given areas as a GeoJSON data source with the given ID into file storage,
+    /// returning the ID for use as a modification's dataSourceId.
+    static String writePolygons (Scene scene, String dataSourceId, Area... areas) {
+        String json = polygonsGeoJson(scene, areas);
+        FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, FileStorageFormat.GEOJSON.extension);
+        File file = WorkerComponents.fileStorage.getFile(key);
+        file.getParentFile().mkdirs();
+        try {
+            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return dataSourceId;
+    }
+
+    /// The text of a GeoJSON FeatureCollection containing the given areas. This can be used as the
+    /// contents of a data source file or the value of a modification's polygons property.
+    static String polygonsGeoJson (Scene scene, Area... areas) {
         List<String> features = new ArrayList<>();
         for (Area area : areas) {
             List<String> polygons = new ArrayList<>();
@@ -74,15 +90,7 @@ class SceneModifications {
                 "{\"type\":\"Feature\",\"properties\":{\"id\":\"%s\",\"name\":\"%s\"},\"geometry\":%s}",
                 area.id, area.id, geometry));
         }
-        String json = "{\"type\":\"FeatureCollection\",\"features\":[" + String.join(",", features) + "]}";
-        File file = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, name));
-        file.getParentFile().mkdirs();
-        try {
-            Files.writeString(file.toPath(), json, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        return name;
+        return "{\"type\":\"FeatureCollection\",\"features\":[" + String.join(",", features) + "]}";
     }
 
     /// Given a rectangle in scene coordinates in meters, produce a String containing a GeoJSON ring.
@@ -111,9 +119,9 @@ class SceneModifications {
         return service;
     }
 
-    static AddOnDemand addOnDemand (String polygons, AddOnDemand.Service... services) {
+    static AddOnDemand addOnDemand (String dataSourceId, AddOnDemand.Service... services) {
         AddOnDemand modification = new AddOnDemand();
-        modification.polygons = polygons;
+        modification.dataSourceId = dataSourceId;
         modification.services = List.of(services);
         return modification;
     }

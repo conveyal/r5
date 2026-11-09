@@ -221,7 +221,7 @@ public class OnDemandTransitEgressTest {
         Scene scene = new Scene();
         feederWithReturnBus(scene);
         TransportNetwork base = scene.buildNetwork();
-        String polygons = writePolygons(scene, "egress.geojson", new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT));
+        String polygons = writePolygons(scene, "egress", new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT));
         TransportNetwork scenario = apply(base, "egress", addOnDemand(polygons, service("hub", "zone", 1)));
         int onBase = minutesByTransit(base, scene, FAR[0], FAR[1],
             EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), ZONE)[0];

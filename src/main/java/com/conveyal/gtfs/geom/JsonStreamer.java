@@ -29,6 +29,13 @@ public abstract class JsonStreamer {
         }
     }
 
+    /// Read from a parser that someone else created and may already have advanced, such as the
+    /// parser Jackson passes to a custom deserializer. The parser is never closed here, so it
+    /// remains usable by its owner after the streamer has consumed one value from it.
+    public JsonStreamer (JsonParser jsonParser) {
+        jp = jsonParser;
+    }
+
     /// Throw an exception if the current token does not match the expected type.
     protected void expect (JsonToken expected) {
         if (jp.currentToken() != expected) {

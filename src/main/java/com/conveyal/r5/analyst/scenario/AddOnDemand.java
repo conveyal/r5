@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.gtfs.flex.OnDemandIndex;
@@ -15,7 +16,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,10 +24,16 @@ import java.util.Set;
 import static com.conveyal.file.FileCategory.DATASOURCES;
 
 /// This Modification adds on-demand services, such as ride-hailing or dial-a-ride feeders,
-/// connecting pairs of polygons in a GeoJSON data source. Each service picks riders up anywhere
-/// inside one polygon and drops them off anywhere inside another, after a fixed wait to be picked
-/// up. Services are directional. State a second service with the polygons reversed to allow
-/// travel in the return direction.
+/// connecting pairs of polygons. Each service picks riders up anywhere inside one polygon and
+/// drops them off anywhere inside another, after a fixed wait to be picked up. Services are
+/// directional. State a second service with the polygons reversed to allow travel in the return
+/// direction.
+///
+/// The polygons are GeoJSON features. They can be read from a GeoJSON data source named by
+/// dataSourceId, or written inline in the modification as the polygons property, or both. Each
+/// feature must have a text property named id. When both sources are given, their polygons are
+/// combined into one layer, and the ids must be unique across the two. Services and error or
+/// warning messages refer to polygons by these ids.
 ///
 /// The services are represented and routed exactly like those loaded from GTFS-Flex feeds, but
 /// they are available at all times on every date. They are used when the access modes or egress
@@ -36,10 +42,17 @@ public class AddOnDemand extends Modification {
 
     // Public parameters deserialized from JSON
 
-    /// The identifier of the GeoJSON data source containing the polygons. Each feature must
-    /// have a text property named id, unique within the layer. Services and error or warning
-    /// messages refer to polygons by these ids.
-    public String polygons;
+    /// The ID of a GeoJSON data source containing polygons. This may be null when polygons are
+    /// supplied inline. The data source must have been uploaded as GeoJSON and not in any other
+    /// format.
+    public String dataSourceId;
+
+    /// Polygons included inline as a GeoJSON FeatureCollection. Contents are structured identically
+    /// to a GeoJSON data source file. This may be null when a dataSourceId is supplied. Inline
+    /// polygons are stored and transmitted with the modification itself, so this is intended for a
+    /// relatively small number of simple polygons. Currently there is no serializer to write this
+    /// field back out as JSON because it is unneeded (see [PolygonLayer.Serializer]).
+    public PolygonLayer polygons;
 
     /// Default time in minutes a rider waits to be picked up after reaching the pick-up
     /// polygon, applied to every service that does not state its own. Defaults to zero,
@@ -75,8 +88,8 @@ public class AddOnDemand extends Modification {
     @Override
     public boolean resolve (TransportNetwork network) {
         resolved = new ArrayList<>();
-        if (polygons == null) {
-            addError("A polygon data source must be specified.");
+        if (dataSourceId == null && polygons == null) {
+            addError("Polygons must be specified with a dataSourceId, inline polygons, or both.");
         }
         if (services == null || services.isEmpty()) {
             addError("At least one service must be specified.");
@@ -88,13 +101,23 @@ public class AddOnDemand extends Modification {
             addError("The modification-level durationFactor must be positive.");
         }
         if (hasErrors()) return true;
-        Map<String, CPolygonal> polygonsById = new HashMap<>();
-        try {
-            streamPolygons(polygonsById);
-        } catch (Exception e) {
-            addError("Could not load polygons: " + ExceptionUtils.shortAndLongString(e));
-            return true;
+        // Combine the polygons from both sources in a new layer each time this method is called.
+        // The inline layer is left unchanged, so resolving this modification again (after a
+        // failed attempt to apply a cached scenario) gives the same result.
+        PolygonLayer layer = new PolygonLayer();
+        if (polygons != null) {
+            layer.add(polygons);
         }
+        if (dataSourceId != null) {
+            try {
+                readDataSource(layer);
+            } catch (Exception e) {
+                addError("Could not load polygons: " + ExceptionUtils.shortAndLongString(e));
+                return true;
+            }
+        }
+        addErrors(layer.problems);
+        Map<String, CPolygonal> polygonsById = layer.polygonsById;
         Set<String> ids = new HashSet<>();
         for (int i = 0; i < services.size(); i++) {
             Service service = services.get(i);
@@ -130,28 +153,17 @@ public class AddOnDemand extends Modification {
         return hasErrors();
     }
 
-    private void streamPolygons (Map<String, CPolygonal> polygonsById) throws Exception {
-        File file = WorkerComponents.fileStorage.getFile(new FileStorageKey(DATASOURCES, polygons));
+    /// Add the polygons in the GeoJSON data source to the given layer.
+    private void readDataSource (PolygonLayer layer) throws Exception {
+        FileStorageKey key = new FileStorageKey(DATASOURCES, dataSourceId, FileStorageFormat.GEOJSON.extension);
+        File file = WorkerComponents.fileStorage.getFile(key);
         if (!file.isFile()) {
-            addError("Polygon data source not found: " + polygons);
+            addError(String.format("No GeoJSON data source was found with the ID '%s'. " +
+                    "The data source must have been uploaded as GeoJSON.", dataSourceId));
             return;
         }
         try (InputStream inputStream = new FileInputStream(file)) {
-            GeoJsonStreamer streamer = new GeoJsonStreamer(inputStream, IdSource.ID_PROPERTY, null);
-            streamer.stream((id, name, geometry) -> {
-                if (polygonsById.putIfAbsent(id, geometry) != null) {
-                    addError(String.format("More than one feature has the ID '%s'.", id));
-                }
-            });
-            // This GeoJSON is usually a few polygons the user exported from GIS. Bad features are
-            // considered fixable mistakes, so we reject the modification and report to the user.
-            // This is stricter than the GTFS-Flex loader, which just ignores bad features and fails
-            // only if they are later referenced by a trip.
-            if (streamer.skippedFeatureCount() > 0) {
-                addError(String.format("%d feature(s) are not usable polygons with an id property: %s. " +
-                        "Fix or remove these features from the layer.",
-                        streamer.skippedFeatureCount(), streamer.describeProblems()));
-            }
+            layer.read(new GeoJsonStreamer(inputStream, IdSource.ID_PROPERTY, null));
         }
     }
 

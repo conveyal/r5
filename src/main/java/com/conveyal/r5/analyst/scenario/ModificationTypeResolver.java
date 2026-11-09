@@ -29,13 +29,11 @@ import java.util.Map;
 /// Type codes are read (typeFromId) mainly on workers: from the body of a single-point request, and from the scenario
 /// file of a regional analysis. Each worker recognizes the type codes in the table of the R5 version it was built
 /// from, so a specially built worker may recognize codes that the backend and other workers do not. The backend reads
-/// type codes only when it loads a regional analysis record without excluding its modifications, or parses a record
-/// sent to its update endpoint. The UI currently causes neither (see the request field of the backend's
-/// RegionalAnalysis model).
+/// type codes only when it loads a regional analysis record without excluding its modifications.
 ///
 /// A type code that is missing from the table fails in typeFromId, while the JSON is being parsed. A worker reports the
 /// exception thrown there as an error on the task, covering type codes that are misspelled, that exist only on some
-/// other version of the worker, or that have been removed. 
+/// other version of the worker, or that have been removed.
 public class ModificationTypeResolver extends TypeIdResolverBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModificationTypeResolver.class);

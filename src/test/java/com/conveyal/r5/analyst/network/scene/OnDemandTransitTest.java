@@ -99,7 +99,7 @@ public class OnDemandTransitTest {
     void feedAndModificationServicesCoexist () {
         Scene scene = new Scene();
         TransportNetwork base = feederTransitNetwork(scene);
-        String polygons = writePolygons(scene, "return.geojson", new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT));
+        String polygons = writePolygons(scene, "return", new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT));
         TransportNetwork scenario = apply(base, "return", addOnDemand(polygons, service("hub", "zone", 1)));
         assertEquals(1, base.transitLayer.onDemandIndex.size());
         assertEquals(2, scenario.transitLayer.onDemandIndex.size());

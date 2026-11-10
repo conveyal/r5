@@ -24,7 +24,7 @@ jobs:
       ledger_data_ref: main
       implementation_repository: conveyal/CLA-Ledger
       implementation_ref: v1.0.0
-      signing_url: https://github.com/conveyal/CLA-Ledger/blob/main/CLA.md
+      signing_url: https://conveyal.github.io/CLA-Ledger/
       pr_number: ${{ inputs.pr_number || github.event.pull_request.number }}
       personalized_signing_links: true
     permissions:

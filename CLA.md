@@ -2,7 +2,8 @@
 
 Contributions to R5 require the
 [Conveyal Contributor License Agreement](https://github.com/conveyal/CLA-Ledger/blob/main/CLA.md).
-Read the agreement and the signing instructions at that link.
+To sign, use the [CLA signing page](https://conveyal.github.io/CLA-Ledger/).
+Enter your GitHub login, and the page prepares your signature record.
 
 - Signature records are kept only in the central
   [`conveyal/CLA-Ledger`](https://github.com/conveyal/CLA-Ledger) repository.

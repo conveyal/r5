@@ -56,8 +56,9 @@ public abstract class KryoNetworkSerializer {
      * This avoids conflicts when multiple changes are combined in a single production release, or some are abandoned.
      */
     // Placeholder for this branch: compact geometry field layout changed (CPackedCoords) and
-    // OnDemand/FlexLocation place types widened to CPolygonal. Replace with nv6 at release.
-    public static final String NETWORK_FORMAT_VERSION = "on-demand-egress";
+    // OnDemand/FlexLocation place types widened to CPolygonal. OnDemand gained a streetMode field.
+    // Replace with nv6 at release.
+    public static final String NETWORK_FORMAT_VERSION = "on-demand-street-mode";
 
     public static final byte[] HEADER = "R5NETWORK".getBytes();
 

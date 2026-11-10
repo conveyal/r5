@@ -63,9 +63,9 @@ public class EgressCostTable implements Serializable {
 
     // CONSTANTS
 
-    public static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
+    public static final int BICYCLE_EGRESS_DISTANCE_LIMIT_METERS = 5000;
 
-    public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
+    public static final int CAR_EGRESS_TIME_LIMIT_SECONDS = 30 * 60;
 
     public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 22; // ~80 kilometers per hour
 
@@ -161,24 +161,24 @@ public class EgressCostTable implements Serializable {
 
 
         /**
-         * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
-         * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
-         * in the UI.
+         * The bound on the street search from each stop out to the already linked points when building this table,
+         * chosen for the street mode from the constants above. The value should be larger than any per-leg street
+         * mode limits that can be requested in the UI.
          * FIXME we should leave this uninitialized, only initializing once the linkage mode is known.
          * We would then fail fast on any programming errors that don't set or copy the limit.
          * FIXME this appears to be used only in the constructor, should we really save it in an instance field? Maybe,
          *       just for debugging.
          */
-        final int linkingDistanceLimitMeters;
+        final int egressDistanceLimitMeters;
 
         // This affects the distance that the street router will search, but in the case of selectively recalculating
         // for a scenario, it also affects the distance around the scenario modifications where we look for stops.
         if (streetMode == StreetMode.WALK) {
-            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
+            egressDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
         } else if (streetMode == StreetMode.BICYCLE) {
-            linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
+            egressDistanceLimitMeters = BICYCLE_EGRESS_DISTANCE_LIMIT_METERS;
         } else if (streetMode == StreetMode.CAR) {
-            linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
+            egressDistanceLimitMeters = CAR_EGRESS_TIME_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
         } else {
             throw new UnsupportedOperationException("Unrecognized streetMode");
         }
@@ -210,7 +210,7 @@ public class EgressCostTable implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
+            rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(egressDistanceLimitMeters);
         }
 
         LOG.info("Creating EgressCostTables from each transit stop to PointSet points for mode {}.", streetMode);
@@ -264,7 +264,7 @@ public class EgressCostTable implements Serializable {
 
             computeCounter.increment();
             Envelope envelopeAroundStop = stopPoint.getEnvelopeInternal();
-            GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, linkingDistanceLimitMeters);
+            GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, egressDistanceLimitMeters);
 
             if (streetMode == StreetMode.WALK) {
                 // Distances from stops to street vertices are saved in the TransitLayer, but only for the walk mode.
@@ -294,14 +294,14 @@ public class EgressCostTable implements Serializable {
 
                 // WALK is handled in the if clause above, this else block is exhaustively handling all other modes.
                 if (streetMode == StreetMode.BICYCLE) {
-                    sr.distanceLimitMeters = linkingDistanceLimitMeters;
+                    sr.distanceLimitMeters = egressDistanceLimitMeters;
                 } else if (streetMode == StreetMode.CAR) {
                     // Car speeds vary by link and cannot be set in analysis requests, so it makes sense to use
                     // seconds directly as the linkage cost. In contrast, the speeds for Walk and Bicycle can be
                     // specified in an analysis request, so it makes sense above to store distances and apply the
                     // requested speed.
                     // TODO confirm this works as expected when modifications can affect street layer.
-                    sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
+                    sr.timeLimitSeconds = CAR_EGRESS_TIME_LIMIT_SECONDS;
                 } else {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }

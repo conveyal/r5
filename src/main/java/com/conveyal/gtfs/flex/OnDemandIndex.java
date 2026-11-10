@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.geom.JTSConverter;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -10,7 +11,9 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static com.conveyal.r5.common.GeometryUtils.expandEnvelopeFixed;
@@ -49,6 +52,15 @@ public class OnDemandIndex implements Serializable {
     /// Read-only view of all on-demand services in this index, primarily for tests and reporting.
     public List<OnDemand> allServices () {
         return Collections.unmodifiableList(services);
+    }
+
+    /// Returns the street modes of all on-demand services in this index.
+    public Set<StreetMode> streetModes () {
+        Set<StreetMode> modes = EnumSet.noneOf(StreetMode.class);
+        for (OnDemand od : services) {
+            modes.add(od.streetMode);
+        }
+        return modes;
     }
 
     /// Potentially create and store a fromEnvelope for polygon + stops.

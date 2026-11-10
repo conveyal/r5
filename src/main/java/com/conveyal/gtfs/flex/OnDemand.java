@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.geom.CPolygonal;
+import com.conveyal.r5.profile.StreetMode;
 
 import java.io.Serializable;
 import java.util.BitSet;
@@ -41,11 +42,16 @@ public class OnDemand implements Serializable {
     /// Loaded from GTFS safe_duration_offset or from waitMinutes in an AddOnDemand modification.
     public double durationOffset;
 
-    /// A multiplicative factor that scales ride duration relative to driving at the speed limit.
-    /// This represents detours to serve other riders, as well as any slowdown due to the type of
-    /// vehicle or congestion not represented in the OSM data. Loaded from safe_duration_factor in
-    /// GTFS or from an AddOnDemand modification.
+    /// A multiplicative factor that scales ride duration relative to a normal ride on this
+    /// service's street mode. For CAR that is driving at the speed limit, and for BICYCLE it is
+    /// cycling at the request's bike speed. This represents detours to serve other riders, as
+    /// well as any slowdown due to the type of vehicle or congestion not represented in the OSM.
     public double durationFactor;
+
+    /// The street mode of the vehicle that carries riders, which determines the streets the
+    /// ride can use and its speed. This is CAR or BICYCLE. WALK is not permitted. Services loaded
+    /// from GTFS are always CAR. An AddOnDemand modification can state the mode of each service.
+    public StreetMode streetMode = StreetMode.CAR;
 
     // Time windows are in seconds after midnight. Following the literature on flexible transit we
     // refer to the moment the rider is available to board (the end of any access walk) as the

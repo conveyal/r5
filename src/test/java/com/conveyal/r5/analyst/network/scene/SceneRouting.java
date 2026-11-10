@@ -42,8 +42,15 @@ class SceneRouting {
     /// Run a street search in the given mode from the given scene coordinates, minimizing
     /// duration. Throws an exception if the origin cannot be linked to the street network.
     static StreetRouter route (TransportNetwork network, Scene scene, double x, double y, StreetMode mode) {
+        return route(network, scene, x, y, mode, defaultRequest());
+    }
+
+    /// Like the other [#route] but with the given request in place of the default one.
+    static StreetRouter route (
+            TransportNetwork network, Scene scene, double x, double y, StreetMode mode, ProfileRequest request
+    ) {
         StreetRouter router = new StreetRouter(network.streetLayer);
-        router.profileRequest = defaultRequest();
+        router.profileRequest = request;
         router.streetMode = mode;
         router.timeLimitSeconds = TIME_LIMIT_SECONDS;
         if (!router.setOrigin(scene.latForY(y), scene.lonForXY(x, y))) {
@@ -75,6 +82,18 @@ class SceneRouting {
     /// time surface and propagation machinery.
     static WalkAndFlexResults routeWithOnDemand (TransportNetwork network, Scene scene, double x, double y, OnDemand od) {
         StreetRouter walk = route(network, scene, x, y, StreetMode.WALK);
+        OnDemandAccess oda = OnDemandAccess.route(walk, List.of(od), NOON, null);
+        return new WalkAndFlexResults(walk, oda);
+    }
+
+    /// Like the other [#routeWithOnDemand] but with the given bike speed in meters per second in
+    /// the request, for tests of on-demand services whose vehicles are bicycles.
+    static WalkAndFlexResults routeWithOnDemand (
+            TransportNetwork network, Scene scene, double x, double y, OnDemand od, float bikeSpeed
+    ) {
+        ProfileRequest request = defaultRequest();
+        request.bikeSpeed = bikeSpeed;
+        StreetRouter walk = route(network, scene, x, y, StreetMode.WALK, request);
         OnDemandAccess oda = OnDemandAccess.route(walk, List.of(od), NOON, null);
         return new WalkAndFlexResults(walk, oda);
     }

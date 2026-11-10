@@ -12,7 +12,8 @@ public enum LegMode {
     BICYCLE_RENT,
     /// Park & Ride
     CAR_PARK,
-    /// On-demand ride (taxi, van, or minibus ride-hailing service).
+    /// On-demand services (taxi, van, minibus, motorbike, or bicycle-based services).
+    /// Each service states the street mode of its vehicle, which is CAR or BICYCLE.
     /// As an access or direct mode, this extends other leg modes present (walk and/or bicycle).
     /// As an egress mode, it carries riders to services' drop-off zones without walking onward.
     ON_DEMAND;

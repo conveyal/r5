@@ -20,9 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Tests of MeetingArea discovery and associated place filtering predicates. A stop's meeting area
-/// is the set of drivable-edge vertices within walking distance of the stop, discovered over the
-/// walking network. These tests reuse the scenes for [OnDemandStopAccessTest], whose geometry was
-/// designed to discriminate exactly these cases.
+/// is the set of vertices within walking distance of the stop on streets that allow the street
+/// mode of the on-demand vehicle, discovered over the walking network. Most of these tests are
+/// for CAR vehicles, where those streets are the drivable ones. These tests reuse the scenes for
+/// [OnDemandStopAccessTest], whose geometry was designed to discriminate exactly these cases.
 public class MeetingAreaTest {
 
     /// The station scene puts an elevated stop directly above a motorway with a frontage road
@@ -34,7 +35,7 @@ public class MeetingAreaTest {
     void barrierSeparatedStation () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.stationNetwork(scene);
-        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "elevated"));
+        TIntIntMap area = network.meetingAreas(StreetMode.CAR).areaWithDistances(stopIndex(network, "elevated"));
         int accessPath = vertexAt(network, scene, 200, 110);
         assertTrue(area.containsKey(accessPath),
             "The area should contain the Access Road vertex nearest the station on foot.");
@@ -52,13 +53,38 @@ public class MeetingAreaTest {
             "The motorway has no pedestrian connection at all.");
     }
 
+    /// Meeting areas are specific to the street mode of the vehicle that will pick up the rider.
+    /// In the station scene, the stop is linked to the pedestrian plaza 10 meters away which
+    /// allows bicycles but not cars. A bicycle can therefore meet the rider on the plaza right
+    /// beside the stop, where a car cannot. Since the stop's link lands on a street allowing
+    /// bicycles, its bicycle meeting area is discovered with the smaller budget, which does not
+    /// reach Access Road.
+    @Test
+    void bicycleMeetingArea () {
+        Scene scene = new Scene();
+        TransportNetwork network = OnDemandStopAccessTest.stationNetwork(scene);
+        int stop = stopIndex(network, "elevated");
+        TIntIntMap bicycleArea = network.meetingAreas(StreetMode.BICYCLE).areaWithDistances(stop);
+        TIntIntMap carArea = network.meetingAreas(StreetMode.CAR).areaWithDistances(stop);
+        int onPlaza = vertexAt(network, scene, 500, 110);
+        int accessPath = vertexAt(network, scene, 200, 110);
+        assertTrue(bicycleArea.containsKey(onPlaza),
+            "The bicycle area should contain the plaza vertex the stop is linked to.");
+        assertEquals(10_000, bicycleArea.get(onPlaza), 3_000,
+            "The plaza vertex should be recorded at the 10 meter link walk distance.");
+        assertFalse(bicycleArea.containsKey(accessPath),
+            "Access Road is a 310 meter walk, outside the smaller budget used for the bicycle area.");
+        assertFalse(carArea.containsKey(onPlaza), "The plaza does not allow cars, so it is not in the car area.");
+        assertTrue(carArea.containsKey(accessPath), "The car area should still reach Access Road.");
+    }
+
     /// A stop with no drivable street within the walking budget has an empty meeting area
     /// (also logged as a data quality warning), while its walk link continues to work.
     @Test
     void isolatedStop () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.islandNetwork(scene);
-        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "island"));
+        TIntIntMap area = network.meetingAreas(StreetMode.CAR).areaWithDistances(stopIndex(network, "island"));
         assertTrue(area.isEmpty(),
             "A stop with no drivable street in walking reach should have an empty meeting area.");
         assertTrue(stopVertex(network, "island") >= 0,
@@ -73,7 +99,7 @@ public class MeetingAreaTest {
     void curbStop () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.drivableStreetNetwork(scene, 10);
-        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "curb"));
+        TIntIntMap area = network.meetingAreas(StreetMode.CAR).areaWithDistances(stopIndex(network, "curb"));
         int curb = vertexAt(network, scene, 500, 0);
         assertTrue(area.containsKey(curb), "The street vertex below the stop should be in the area.");
         assertEquals(10_000, area.get(curb), 3_000,
@@ -92,7 +118,7 @@ public class MeetingAreaTest {
     void stopFarFromRoad () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.drivableStreetNetwork(scene, 200);
-        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "curb"));
+        TIntIntMap area = network.meetingAreas(StreetMode.CAR).areaWithDistances(stopIndex(network, "curb"));
         assertTrue(area.containsKey(vertexAt(network, scene, 500, 0)),
             "The linked street vertex, a 200 meter walk, should be in the area.");
         assertTrue(area.containsKey(vertexAt(network, scene, 750, 0)),
@@ -176,7 +202,7 @@ public class MeetingAreaTest {
     void impreciseStopCoordinates () {
         Scene scene = new Scene();
         TransportNetwork network = impreciseStopNetwork(scene);
-        TIntIntMap area = network.meetingAreas().areaWithDistances(stopIndex(network, "gate"));
+        TIntIntMap area = network.meetingAreas(StreetMode.CAR).areaWithDistances(stopIndex(network, "gate"));
         assertFalse(area.isEmpty(),
             "The road 12 meters from the stop should rescue the meeting area.");
         int westEnd = vertexAt(network, scene, 0, 0);

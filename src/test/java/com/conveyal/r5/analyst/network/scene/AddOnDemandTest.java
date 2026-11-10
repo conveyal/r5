@@ -5,6 +5,7 @@ import com.conveyal.gtfs.geom.CMultiPolygon;
 import com.conveyal.r5.analyst.scenario.AddOnDemand;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.BeforeEach;
@@ -209,9 +210,64 @@ public class AddOnDemandTest {
             scaledSeconds, plainSeconds, ratio));
     }
 
+    /// The street mode of a service follows the same pattern as the wait and the duration factor.
+    /// A service that states no mode inherits the modification's default. A service that declares
+    /// its own mode overrides that default. A modification that states no modes at all gives CAR
+    /// services. The modes are read here from JSON, as they are in production.
+    @Test
+    void streetModeDefaults () throws IOException {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        AddOnDemand modification = parse("""
+            {
+              "type": "add-on-demand",
+              "polygons": %s,
+              "streetMode": "BICYCLE",
+              "services": [
+                {"from": "zone", "to": "hub"},
+                {"from": "hub", "to": "zone", "streetMode": "CAR"}
+              ]
+            }
+            """.formatted(polygonsGeoJson(scene, FEEDER_AREAS)));
+        TransportNetwork scenario = apply(base, "modes", modification);
+        assertEquals(StreetMode.BICYCLE, onDemand(scenario, "zone>hub").streetMode,
+            "A service stating no street mode inherits the modification's.");
+        assertEquals(StreetMode.CAR, onDemand(scenario, "hub>zone").streetMode,
+            "A service's own street mode overrides the modification's.");
+        TransportNetwork unstated = feederScenario(base, scene, 5);
+        assertEquals(StreetMode.CAR, onDemand(unstated, "zone>hub").streetMode,
+            "A modification stating no street mode at all gives CAR services.");
+    }
+
+    /// A bicycle-based service uses the bike speed in the request. The rider boards at the origin,
+    /// 20 meters up Zone St from the zone junction, and rides 2020 meters to the hub junction with
+    /// no wait. A car service on the same streets drives at their speed limit, which is faster than
+    /// a bicycle at 4 meters per second.
+    @Test
+    void bicycleService () {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        String polygons = feederPolygons(scene);
+        TransportNetwork byCar = apply(base, "car", addOnDemand(polygons, service("zone", "hub", 0)));
+        TransportNetwork byBicycle = apply(base, "bicycle",
+            addOnDemand(polygons, service("zone", "hub", 0, StreetMode.BICYCLE)));
+        int hub = vertexAt(base, scene, 2500, 0);
+        OnDemand bicycle = onDemand(byBicycle, "zone>hub");
+        int slowSeconds = SceneRouting.routeWithOnDemand(byBicycle, scene, 500, 20, bicycle, 4)
+            .getTravelTimeToVertex(hub);
+        int fastSeconds = SceneRouting.routeWithOnDemand(byBicycle, scene, 500, 20, bicycle, 8)
+            .getTravelTimeToVertex(hub);
+        int carSeconds = SceneRouting.routeWithOnDemand(byCar, scene, 500, 20, onDemand(byCar, "zone>hub"))
+            .getTravelTimeToVertex(hub);
+        assertEquals(2020 / 4.0, slowSeconds, 10, "The bicycle should ride 2020 meters at 4 meters per second.");
+        assertEquals(2020 / 8.0, fastSeconds, 10, "The bicycle should ride 2020 meters at 8 meters per second.");
+        assertTrue(carSeconds < slowSeconds - 60, String.format(
+            "A car at the speed limit should be much faster than a bicycle at 4 meters per second "
+                + "(%d vs %d seconds).", carSeconds, slowSeconds));
+    }
+
     @Test
     void twoModificationsInOneScenario () {
-
         Scene scene = new Scene();
         TransportNetwork base = feederNetwork(scene);
         String polygons = feederPolygons(scene);

@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.geom.PointInPolygonTester;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntObjectMap;
@@ -9,13 +10,15 @@ import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /// Records which on-demand services can pick up a rider alighting from scheduled transit at each
 /// transit stop. Services are interpreted as directional on both the access and egress legs.
 /// The mapping depends only on the network's stops and services, not on the request, so one
 /// instance is built per TransportNetwork and reused across requests (like MeetingAreas).
-/// Availability on a particular date and time is evaluated per request during propagation.
+/// Availability at a particular date and time is evaluated per request during propagation.
 public class OnDemandEgressIndex {
 
     private final TIntObjectMap<List<OnDemand>> servicesForStop = new TIntObjectHashMap<>();
@@ -62,6 +65,36 @@ public class OnDemandEgressIndex {
     /// Returns the set of all stops where at least one service can pick up an alighting rider.
     public TIntSet stops () {
         return new TIntHashSet(servicesForStop.keySet());
+    }
+
+    /// Returns the set of stops where at least one service with the given street
+    /// mode can pick up an alighting rider. These are the stops that need a row in the
+    /// OnDemandEgressTable for that mode.
+    public TIntSet stops (StreetMode vehicleMode) {
+        TIntSet stops = new TIntHashSet();
+        servicesForStop.forEachEntry((stop, services) -> {
+            for (OnDemand od : services) {
+                if (od.streetMode == vehicleMode) {
+                    stops.add(stop);
+                    break;
+                }
+            }
+            return true;
+        });
+        return stops;
+    }
+
+    /// Returns the street modes of all services that can pick up an alighting
+    /// rider at any stop. There is one OnDemandEgressTable for each of these modes.
+    public Set<StreetMode> streetModes () {
+        Set<StreetMode> modes = EnumSet.noneOf(StreetMode.class);
+        servicesForStop.forEachValue(services -> {
+            for (OnDemand od : services) {
+                modes.add(od.streetMode);
+            }
+            return true;
+        });
+        return modes;
     }
 
     /// Returns true when no service can pick up an alighting rider at any stop.

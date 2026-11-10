@@ -8,6 +8,7 @@ import com.conveyal.gtfs.flex.OnDemandIndex;
 import com.conveyal.gtfs.geom.CPolygonal;
 import com.conveyal.gtfs.geom.GeoJsonStreamer;
 import com.conveyal.gtfs.geom.GeoJsonStreamer.IdSource;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;
@@ -35,6 +36,9 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
 /// combined into one layer, and the ids must be unique across the two. Services and error or
 /// warning messages refer to polygons by these ids.
 ///
+/// Each service has a street mode (CAR or BICYCLE). A default can be stated for the whole
+/// modification and overridden for individual services.
+///
 /// The services are represented and routed exactly like those loaded from GTFS-Flex feeds, but
 /// they are available at all times on every date. They are used when the access modes or egress
 /// modes include ON_DEMAND. Multiple modifications of this kind may be applied in one scenario.
@@ -59,9 +63,15 @@ public class AddOnDemand extends Modification {
     /// meaning immediate pick-up.
     public double waitMinutes = 0;
 
-    /// Default multiplier on ride duration relative to driving directly, representing detours
-    /// to serve other riders, applied to every service that does not state its own. Defaults to 1.
+    /// Default multiplier on ride duration relative to use outside on-demand. This captures detours
+    /// to serve other riders. Applied to every service that does not state its own. Defaults to 1.
     public double durationFactor = 1;
+
+    /// Default street mode, applied to every service that does not state its own. This may be CAR
+    /// or BICYCLE and defaults to CAR. Determines the streets a ride can use and its speed.
+    /// CAR services drive at the speed limit of each street. BICYCLE services use the bike speed
+    /// in the analysis request.
+    public StreetMode streetMode = StreetMode.CAR;
 
     public List<Service> services;
 
@@ -77,9 +87,13 @@ public class AddOnDemand extends Modification {
         /// When absent, the modification's top-level default applies.
         public Double waitMinutes;
 
-        /// Multiplier on ride duration relative to driving directly, representing detours to
+        /// Multiplier on ride duration relative to normal travel, representing detours to
         /// serve other riders. When absent, the modification's top-level default applies.
         public Double durationFactor;
+
+        /// The street mode of the vehicle that carries riders, CAR or BICYCLE.
+        /// When absent, the modification's top-level default applies.
+        public StreetMode streetMode;
 
     }
 
@@ -99,6 +113,9 @@ public class AddOnDemand extends Modification {
         }
         if (!(durationFactor > 0)) {
             addError("The modification-level durationFactor must be positive.");
+        }
+        if (!isVehicleMode(streetMode)) {
+            addError("The modification-level streetMode must be CAR or BICYCLE.");
         }
         if (hasErrors()) return true;
         // Combine the polygons from both sources in a new layer each time this method is called.
@@ -130,6 +147,10 @@ public class AddOnDemand extends Modification {
             if (service.durationFactor != null && !(service.durationFactor > 0)) {
                 addError(label + " must have a positive durationFactor.");
             }
+            StreetMode mode = service.streetMode != null ? service.streetMode : this.streetMode;
+            if (service.streetMode != null && !isVehicleMode(service.streetMode)) {
+                addError(label + " must have a streetMode of CAR or BICYCLE.");
+            }
             OnDemand od = new OnDemand();
             od.id = service.from + ">" + service.to;
             if (service.from != null && service.to != null && !ids.add(od.id)) {
@@ -144,6 +165,7 @@ public class AddOnDemand extends Modification {
             od.name = service.from + " to " + service.to;
             od.durationOffset = wait * 60;
             od.durationFactor = factor;
+            od.streetMode = mode;
             od.fromWindowStart = 0;
             od.fromWindowEnd = Integer.MAX_VALUE;
             od.toWindowEnd = Integer.MAX_VALUE;
@@ -151,6 +173,11 @@ public class AddOnDemand extends Modification {
             resolved.add(od);
         }
         return hasErrors();
+    }
+
+    /// Returns true when we allow on-demand services to use the given street mode.
+    private static boolean isVehicleMode (StreetMode mode) {
+        return mode == StreetMode.CAR || mode == StreetMode.BICYCLE;
     }
 
     /// Add the polygons in the GeoJSON data source to the given layer.

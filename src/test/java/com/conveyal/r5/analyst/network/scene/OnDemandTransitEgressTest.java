@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.network.scene;
 
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 
 import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.HUB_RECT;
+import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.WEST_RECT;
 import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.ZONE_RECT;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.Area;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.addOnDemand;
@@ -20,6 +22,7 @@ import static com.conveyal.r5.analyst.network.scene.SceneModifications.writePoly
 import static com.conveyal.r5.analyst.network.scene.SceneRouting.NOON;
 import static com.conveyal.r5.api.util.LegMode.ON_DEMAND;
 import static com.conveyal.r5.api.util.LegMode.WALK;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Tests of riding on-demand services as egress legs after scheduled transit.
@@ -229,6 +232,57 @@ public class OnDemandTransitEgressTest {
             EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), ZONE)[0];
         assertTrue(onBase >= 35, "Without any service the zone is reached on foot, not in " + onBase + " minutes.");
         assertTrue(onScenario <= 25, "The modification's service should carry riders from the bus, not in " + onScenario);
+    }
+
+    /// An on-demand service using bicycles carries alighting riders at the bike speed of the
+    /// request. The ride from the hub stop to the destination is about 2000 meters, which takes
+    /// over eight minutes at 4 meters per second and over four minutes at 8 meters per second. A
+    /// car at the speed limit takes about three. Everything before the ride is the same in the
+    /// three cases, so the differences between the trips are the differences between the rides.
+    @Test
+    void bicycleEgress () {
+        Scene scene = new Scene();
+        feederWithReturnBus(scene);
+        TransportNetwork base = scene.buildNetwork();
+        String polygons = writePolygons(scene, "egress", new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT));
+        TransportNetwork byCar = apply(base, "car", addOnDemand(polygons, service("hub", "zone", 1)));
+        TransportNetwork byBicycle = apply(base, "bicycle",
+            addOnDemand(polygons, service("hub", "zone", 1, StreetMode.BICYCLE)));
+        int car = minutesByTransit(byCar, scene, FAR[0], FAR[1],
+            EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), ZONE)[0];
+        int slow = minutesByTransit(byBicycle, scene, FAR[0], FAR[1],
+            EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), 4f, ZONE)[0];
+        int fast = minutesByTransit(byBicycle, scene, FAR[0], FAR[1],
+            EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), 8f, ZONE)[0];
+        assertEquals(4, slow - fast, 1, "Doubling the bike speed should save about four minutes of the "
+            + "ride, but the trip went from " + slow + " to " + fast);
+        assertTrue(slow >= car + 4, "A bicycle at 4 meters per second should take several minutes longer "
+            + "than a car, but the trips took " + slow + " and " + car);
+    }
+
+    /// A car service and a bicycle service offer pick-up at the same stop. Each ride must come from
+    /// the egress table for the street mode of its own vehicle. The car carries riders 2000 meters
+    /// to the zone in about three minutes. The bicycle carries riders 3000 meters to the west
+    /// junction in over twelve minutes at 4 meters per second. If the bicycle ride were taken from
+    /// the car table it would take under five minutes, and if the car ride were taken from the
+    /// bicycle table it would take over eight.
+    @Test
+    void mixedModesAtStop () {
+        Scene scene = new Scene();
+        feederWithReturnBus(scene);
+        TransportNetwork base = scene.buildNetwork();
+        String polygons = writePolygons(scene, "mixed",
+            new Area("zone", ZONE_RECT), new Area("hub", HUB_RECT), new Area("west", WEST_RECT));
+        TransportNetwork scenario = apply(base, "mixed", addOnDemand(polygons,
+            service("hub", "zone", 1),
+            service("hub", "west", 1, StreetMode.BICYCLE)));
+        int[] minutes = minutesByTransit(scenario, scene, FAR[0], FAR[1],
+            EnumSet.of(WALK), EnumSet.of(WALK, ON_DEMAND), ZONE, WEST);
+        assertTrue(minutes[0] <= 25, "The car service should carry riders to the zone, not in " + minutes[0]);
+        int difference = minutes[1] - minutes[0];
+        assertTrue(difference >= 8 && difference <= 11, "The bicycle ride to the west junction should take "
+            + "about nine and a half minutes longer than the car ride to the zone, but the trips took "
+            + minutes[1] + " and " + minutes[0]);
     }
 
 }

@@ -2,21 +2,19 @@ package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.ReferentialIntegrityError;
+import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.geom.CMultiPolygon;
 import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.geom.PointInPolygonTester;
-import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import org.locationtech.jts.geom.Envelope;
-import java.time.LocalDate;
-import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
-import com.conveyal.gtfs.error.ReferentialIntegrityError;
-import com.conveyal.gtfs.error.UnsupportedFlexError;
 import com.conveyal.gtfs.validator.PostLoadValidator;
 import com.conveyal.gtfs.validator.model.Priority;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.locationtech.jts.geom.Envelope;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -26,11 +24,13 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -178,7 +178,6 @@ public class FlexNetworkBuildTest {
     }
 
     // --- Tests that only load GTFS but do not build networks due to HIGH severity errors ---
-
 
     @Test
     void badReferenceDetected () throws Exception {

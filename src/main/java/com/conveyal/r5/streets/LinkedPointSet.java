@@ -120,9 +120,10 @@ public class LinkedPointSet implements Serializable {
      */
     private EgressCostTable egressCostTable;
 
-    /// Car travel times from on-demand pick-up stops to the points of this linkage.
-    /// Only relevant on CAR linkages. Only built when a request uses on-demand egress.
-    /// Linkages for unmodified scenario street layers leave this null and read their base linkage's table instead.
+    /// Travel times of on-demand rides from pick-up stops to the points of this linkage, for
+    /// services using this linkage's street mode. Only relevant on CAR and BICYCLE linkages.
+    /// Only built when a request uses on-demand egress. Linkages for unmodified scenario street
+    /// layers leave this null and read their base linkage's table instead.
     private OnDemandEgressTable onDemandEgressTable;
 
     /**
@@ -301,7 +302,7 @@ public class LinkedPointSet implements Serializable {
 
     /// Get or lazily create an on-demand egress cost table. It may be stored on this LinkedPointSet
     /// or on its base linkage. When a scenario has modified the street layer, that scenario's
-    /// LinkedPointSet has its own OnDemandEgressTable since its car times can differ near the
+    /// LinkedPointSet has its own OnDemandEgressTable since its ride times can differ near the
     /// changed streets. A linkage produced by cropping also owns its own table, since its base
     /// linkage is for a different PointSet with different point indexes.
     public OnDemandEgressTable getOnDemandEgressTable () {

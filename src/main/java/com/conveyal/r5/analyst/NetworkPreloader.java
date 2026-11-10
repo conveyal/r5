@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.gtfs.flex.OnDemandEgressIndex;
+import com.conveyal.gtfs.flex.OnDemandIndex;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.progress.NetworkPreloaderProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
@@ -146,28 +147,39 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             }
         }
 
-        // Build an egress cost table for on-demand services. This is one car search per stop where
-        // any on-demand service picks up riders. Rows are built for all stops in the egress index,
-        // a date-independent superset of any single request's candidate stops.
+        // On-demand rides are evaluated with a linkage for each on-demand service's street mode.
+        // Those modes are not in the key, because they are known only once the scenario
+        // has been applied. They are fully determined by the network and scenario in the key.
+        OnDemandIndex onDemandIndex = scenarioNetwork.transitLayer.onDemandIndex;
+        if ((key.onDemandAccess || key.onDemandEgress) && onDemandIndex != null) {
+            for (StreetMode vehicleMode : onDemandIndex.streetModes()) {
+                setProgress(key, 0, "Linking destination grid to streets for on-demand " + vehicleMode + "...");
+                scenarioNetwork.linkageCache.getLinkage(pointSet, scenarioNetwork.streetLayer, vehicleMode);
+            }
+        }
+
+        // Build the egress cost tables for on-demand services, one for each street mode they use.
+        // This is one street search per stop where any on-demand service of that mode picks up
+        // riders. Rows are built for all such stops in the egress index, a date-independent
+        // superset of any single request's candidate stops.
         if (key.onDemandEgress) {
             OnDemandEgressIndex egressIndex = scenarioNetwork.onDemandEgressIndex();
-            if (!egressIndex.isEmpty()) {
-                setProgress(key, 0, "Building on-demand egress tables...");
-                LinkedPointSet carLinkage = scenarioNetwork.linkageCache
-                        .getLinkage(pointSet, scenarioNetwork.streetLayer, StreetMode.CAR);
+            for (StreetMode vehicleMode : egressIndex.streetModes()) {
+                setProgress(key, 0, "Building on-demand egress table for " + vehicleMode + "...");
+                LinkedPointSet vehicleLinkage = scenarioNetwork.linkageCache
+                        .getLinkage(pointSet, scenarioNetwork.streetLayer, vehicleMode);
                 ProgressListener progressListener = new NetworkPreloaderProgressListener(this, key);
-                carLinkage.getOnDemandEgressTable().ensureStops(egressIndex.stops(), progressListener);
+                vehicleLinkage.getOnDemandEgressTable().ensureStops(egressIndex.stops(vehicleMode), progressListener);
             }
         }
         // Finished building all needed inputs for analysis, return the completed network
         return scenarioNetwork;
     }
 
-    /**
-     * A compound key containing all items uniquely identifying the set of data is needed to perform an analysis.
-     * Namely: the network ID, the scenario ID, the extents of the grid, and the modes of on-street transport.
-     * A final key element could be the destination density grids, but those are relatively quick to load.
-     */
+    /// A compound key containing all items uniquely identifying the set of data is needed to
+    /// perform an analysis. Namely: the network ID, the scenario ID, the extents of the grid, and
+    /// the modes of on-street transport. A final key element could be the destination density
+    /// grids, but those are relatively quick to load.
     public static class Key {
 
         public final String networkId;
@@ -176,31 +188,33 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final EnumSet<StreetMode> allModes;
         public final EnumSet<StreetMode> egressModes;
 
+        /// Whether the task uses on-demand services as access or direct legs. The street modes of
+        /// the services' vehicles are not in allModes, because they are known only once the
+        /// scenario has been applied. The linkages for them are added in buildValue.
+        public final boolean onDemandAccess;
+
         /// Whether the task uses on-demand services as egress legs after transit. Tracked separate
         /// from egressModes because ON_DEMAND is not a street mode and its table is not a full EgressCostTable.
         public final boolean onDemandEgress;
 
-        /**
-         * If a destination opportunity grid is present in the request - not a grid ID but the actual grid object,
-         * then the destination extents should be taken from that grid. This should only be the case for
-         * non-static-site regional tasks. The grid ID should have been resolved to a grid object before calling
-         * this constructor. If no grid object is present, then the destination extents should be taken from the
-         * task.
-         *
-         * This follows our intended behavior: regional tasks that compute accessibility indicators find paths to all
-         * the points in some specified opportunity density grid. All other requests (single-point time surfaces and
-         * static sites) find paths to all the points in the extents specified in the task.
-         *
-         * That is to say, the extents specified in the task are the destination points of a single point request,
-         * are both the origin and destination points of a static site, and are only the origins of a regional
-         * accessibility task, where the destinations are given by the specified opportunity grid.
-         *
-         * Travel time results (single point or static sites) may be combined with any number of different grids,
-         * so we don't want to limit their geographic extent to that of any one grid. Instead we use the extents
-         * supplied in the request. The UI only sends these if the user has changed them to something other than
-         * "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
-         * the region.
-         */
+        /// If a destination opportunity grid is present in the request - not a grid ID but the actual grid object,
+        /// then the destination extents should be taken from that grid. This should only be the case for
+        /// non-static-site regional tasks. The grid ID should have been resolved to a grid object before calling
+        /// this constructor. If no grid object is present, then the destination extents should be taken from the
+        /// task.
+        ///
+        /// This follows our intended behavior: regional tasks that compute accessibility indicators find paths to all
+        /// the points in some specified opportunity density grid. All other requests (single-point time surfaces and
+        /// static sites) find paths to all the points in the extents specified in the task.
+        /// That is to say, the extents specified in the task are the destination points of a single point request,
+        /// are both the origin and destination points of a static site, and are only the origins of a regional
+        /// accessibility task, where the destinations are given by the specified opportunity grid.
+        ///
+        /// Travel time results (single point or static sites) may be combined with any number of different grids,
+        /// so we don't want to limit their geographic extent to that of any one grid. Instead we use the extents
+        /// supplied in the request. The UI only sends these if the user has changed them to something other than
+        /// "full region". If "full region" is selected, the UI sends nothing and the backend fills in the bounds of
+        /// the region.
         public Key (AnalysisWorkerTask task) {
             this.networkId = task.graphId;
             // A supplied scenario ID will always override any full scenario that is present.
@@ -215,19 +229,18 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             // transit is used). See code in TravelTimeComputer for when each is used.
             this.allModes = LegMode.toStreetModeSet(task.directModes, task.accessModes);
             this.allModes.addAll(this.egressModes);
-            // On-demand services use a car-like vehicle, then riders walk onward from the drop-off.
-            // We will need the CAR and WALK linkages whatever the other modes in the request are.
-            if (task.accessModes.contains(LegMode.ON_DEMAND)) {
-                this.allModes.add(StreetMode.CAR);
+            // Riders walk onward after being dropped off by an on-demand ride, so we will need the
+            // WALK linkage whatever the other modes in the request are. The linkages for the street
+            // modes of the on-demand vehicles are added in buildValue.
+            this.onDemandAccess = task.accessModes.contains(LegMode.ON_DEMAND);
+            if (this.onDemandAccess) {
                 this.allModes.add(StreetMode.WALK);
             }
-            // On-demand egress determines ride durations over the CAR linkage of the destinations.
-            // Its sparse cost table is built in buildValue alongside the full egress tables
-            // (toStreetModeSet above drops ON_DEMAND, so no full CAR egress table is built for it).
+            // On-demand egress determines ride durations relative to destination linkages for the
+            // on-demand services' street modes. Its sparse cost tables are built in buildValue
+            // alongside the full egress tables (toStreetModeSet above drops ON_DEMAND, so no full
+            // egress table is built for it).
             this.onDemandEgress = !task.transitModes.isEmpty() && task.egressModes.contains(LegMode.ON_DEMAND);
-            if (this.onDemandEgress) {
-                this.allModes.add(StreetMode.CAR);
-            }
             this.destinationGridExtents = task.getWebMercatorExtents();
         }
 
@@ -245,12 +258,14 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                     Objects.equals(destinationGridExtents, other.destinationGridExtents) &&
                     Objects.equals(allModes, other.allModes) &&
                     Objects.equals(egressModes, other.egressModes) &&
+                    onDemandAccess == other.onDemandAccess &&
                     onDemandEgress == other.onDemandEgress;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(networkId, scenarioId, destinationGridExtents, allModes, egressModes, onDemandEgress);
+            return Objects.hash(networkId, scenarioId, destinationGridExtents, allModes, egressModes,
+                    onDemandAccess, onDemandEgress);
         }
     }
 

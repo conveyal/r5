@@ -376,16 +376,25 @@ public class PerTargetPropagater {
     }
 
     /// Improve the travel times at the given target with egress legs riding on-demand services
-    /// from alighting stops. For each stop that reaches the target and for each candidate service
-    /// picking up at that stop, the target must lie in the service's drop-off place. The service's
-    /// time windows are tested per iteration against the clock time the rider alights from transit.
-    /// The duration of the stored on-demand ride is recomputed for this request. Its walk portion
-    /// uses the request's walk speed, and its car portion is scaled by the service's duration factor.
+    /// from alighting stops. On-demand rides are read from one cost table per street mode, and each
+    /// ride can be used only by the candidate services at its stop which use that mode.
+    /// For each stop that can reach the target and for each such service, the target must lie in
+    /// the service's drop-off place. The service's time windows are tested per iteration against
+    /// the clock time at which the rider alights from transit.
+    /// The duration of the stored on-demand ride is recomputed for the current request. Its walk
+    /// portion uses the request's walk speed, and its ride portion is scaled by the service's
+    /// duration factor and, for a bicycle service, converted to the request's bike speed.
     /// The ride is bounded by the maximum trip duration and the service's drop-off window, but not
     /// by the rider's street leg time limit (an on-demand ride is treated as transit).
-    /// Iterations where we find an improved travel time record CAR egress marked as on-demand.
     private void propagateOnDemand (int targetIndex) {
-        int[] rides = onDemandEgress.ridesForTarget(targetIndex);
+        for (StreetMode vehicleMode : onDemandEgress.vehicleModes()) {
+            propagateOnDemand(targetIndex, vehicleMode);
+        }
+    }
+
+    /// Improve the travel times at the given target with rides on the given street mode.
+    private void propagateOnDemand (int targetIndex, StreetMode vehicleMode) {
+        int[] rides = onDemandEgress.ridesForTarget(vehicleMode, targetIndex);
         if (rides == null) {
             return;
         }
@@ -396,12 +405,15 @@ public class PerTargetPropagater {
                 continue; // The table can hold rows for stops other requests needed.
             }
             int walkSeconds = onDemandEgress.walkSeconds(rides[entry + 1]);
-            int unscaledCarSeconds = rides[entry + 2];
+            int unscaledRideSeconds = rides[entry + 2];
             for (OnDemand od : services) {
+                if (od.streetMode != vehicleMode) {
+                    continue; // This ride is on another mode's streets, so this service cannot use it.
+                }
                 if (!onDemandEgress.dropOffAccepts(od, targetIndex)) {
                     continue;
                 }
-                int rideSeconds = onDemandEgress.rideSeconds(od, unscaledCarSeconds);
+                int rideSeconds = onDemandEgress.rideSeconds(od, unscaledRideSeconds);
                 for (int iteration = 0; iteration < nIterations; iteration++) {
                     int timeToReachStop = travelTimesToStop[stop][iteration];
                     if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
@@ -420,7 +432,7 @@ public class PerTargetPropagater {
                             if (path != null) {
                                 perIterationPaths[iteration] = path;
                                 perIterationEgress[iteration] = new StreetTimesAndModes.StreetTimeAndMode(
-                                    egressSeconds, StreetMode.CAR, true);
+                                    egressSeconds, od.streetMode, true);
                             }
                         }
                     }

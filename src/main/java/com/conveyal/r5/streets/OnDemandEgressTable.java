@@ -4,6 +4,7 @@ import com.conveyal.gtfs.flex.MeetingAreas;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.LambdaCounter;
 import gnu.trove.list.TIntList;
@@ -21,47 +22,67 @@ import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.stream.IntStream;
 
-import static com.conveyal.r5.streets.EgressCostTable.CAR_TIME_LINKING_LIMIT_SECONDS;
+import static com.conveyal.r5.streets.EgressCostTable.BICYCLE_EGRESS_DISTANCE_LIMIT_METERS;
+import static com.conveyal.r5.streets.EgressCostTable.CAR_EGRESS_TIME_LIMIT_SECONDS;
 import static com.conveyal.r5.streets.EgressCostTable.MAX_CAR_SPEED_METERS_PER_SECOND;
 import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+import static com.conveyal.r5.profile.StreetMode.BICYCLE;
 import static com.conveyal.r5.profile.StreetMode.CAR;
 import static com.google.common.base.Preconditions.checkArgument;
 
 /// Travel times of on-demand rides from transit stops to destination points for propagation. This
-/// is the expensive-to-prepare, request-independent half of on-demand egress. The other half,
+/// is the expensive-to-prepare, request-independent part of on-demand egress. The other part,
 /// everything that depends on the request or a particular service, is evaluated in
 /// PerTargetPropagater.
 ///
+/// Each table holds rides on one street mode, the mode of the LinkedPointSet it is attached to.
+/// It serves the on-demand services whose vehicles have that mode, which is CAR or BICYCLE. A
+/// CAR ride is stored at the speed limit of each street. A BICYCLE ride is stored at a fixed
+/// reference speed and is rescaled to the bike speed of each request during propagation, which
+/// keeps the rows independent of the request.
+///
 /// Unlike EgressCostTable, which covers every transit stop for one street mode, this table is
-/// sparse. Rows exist only for stops where some on-demand service can pick up a transit rider. The
-/// assumption is that most stops in most networks are not served by an on-demand service.
-/// Currently, on-demand egress is also slightly different than normal car egress in that it may
-/// include a short walk component to reach the pick-up point. Eventually the two should be
-/// unified.
+/// sparse. Rows exist only for stops where some on-demand service of this table's mode can pick up
+/// a transit rider. The assumption is that most stops in most networks are not served by an
+/// on-demand service. Currently, on-demand egress is also slightly different than normal car or
+/// bicycle egress in that it may include a short walk component to reach the pick-up point.
+/// Eventually the two should be unified.
 ///
 /// Like other egress tables, rows are computed asynchronously by the NetworkPreloader before any
 /// search runs, never during a search.
 ///
 /// Each destination PointSet linked to each distinct street network needs its own instance of this
-/// class.
+/// class for each street mode used by on-demand vehicles.
 ///
 /// Per-stop rows are not clipped to any on-demand drop-off place because they are reused between
-/// services, including any services added later by scenario modifications. The pick-up side of a
-/// row is also service-independent. MeetingAreas are a property of the stop, not of any service
+/// services of the same mode, including any services added later by scenario modifications. The
+/// pick-up side of a row is also service-independent. MeetingAreas are a property of the stop and
+/// the mode, not of any service.
 ///
-/// The stored times never exceed the same car linking limit as EgressCostTable, which bounds the
-/// search; the propagator further bounds each ride by the total trip duration and the service's
-/// drop-off window, never by the rider's street leg time limit (an on-demand ride is transit usage,
-/// not a rider street leg).
+/// The stored times never exceed the per-mode egress search limit that EgressCostTable uses,
+/// which bounds the search. The propagator further bounds each ride by the total trip duration and
+/// the service's drop-off window, but not by the rider's street leg time limit (an on-demand ride
+/// is considered transit usage, not a street leg).
+///
+/// The traffic stress limit of a request cannot be applied to BICYCLE rows, because they are
+/// computed once for all requests. They are computed with no limit. On the access side the ride
+/// search does apply the request's limit, so the two sides can differ for a bicycle service.
 public class OnDemandEgressTable {
 
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+    /// The speed at which BICYCLE rides are stored. OnDemandEgress rescales the stored ride
+    /// seconds by the ratio of this speed to the bike speed of the request.
+    public static final float REFERENCE_BICYCLE_SPEED_METERS_PER_SECOND = 4;
+
     private final LinkedPointSet linkedPointSet;
+
+    /// The street mode of the vehicles whose rides this table holds, CAR or BICYCLE.
+    private final StreetMode vehicleMode;
 
     /// Values for one stop as three parallel arrays indexed on destination point number.
     /// Rows exist only briefly until they are transposed and merged into the point-major snapshot.
-    private record Row (int[] points, int[] walkMillimeters, int[] carSeconds) { }
+    private record Row (int[] points, int[] walkMillimeters, int[] rideSeconds) { }
 
     /// Stands in for the row of a stop whose search reached nothing.
     private static final Row EMPTY_ROW = new Row(new int[0], new int[0], new int[0]);
@@ -74,23 +95,24 @@ public class OnDemandEgressTable {
     public static final int INTS_PER_RIDE = 3;
 
     /// The transposed (destination-point-major) form. For each point, the rides reaching it as
-    /// packed (stop, walk millimeters, car seconds) triples, or null where no stop reaches the
+    /// packed (stop, walk millimeters, ride seconds) triples, or null where no stop reaches the
     /// point. Published for lock-free reads during propagation and replaced when new rows added.
     /// The inner arrays are never modified after publication so a reader holding any published
     /// outer array sees consistent data.
     private volatile int[][] triplesForPoint;
 
     public OnDemandEgressTable (LinkedPointSet linkedPointSet) {
-        checkArgument(linkedPointSet.streetMode == CAR,
-            "On-demand egress cost tables represent car-like travel and require a CAR linkage.");
+        checkArgument(linkedPointSet.streetMode == CAR || linkedPointSet.streetMode == BICYCLE,
+            "On-demand vehicles are CAR or BICYCLE, so their egress cost tables require a linkage for one of those modes.");
         this.linkedPointSet = linkedPointSet;
+        this.vehicleMode = linkedPointSet.streetMode;
     }
 
     /// Ensure rows exist for all the given stops, computing any missing ones in parallel and
     /// republishing the point-major table when rows were added. Computing rows can take a long time
     /// so this is normally called by the NetworkPreloader with all stops in the network's
-    /// OnDemandEgressIndex. There is a fallback for tests and regional tasks with freeform
-    /// destinations, which the preloader skips.
+    /// OnDemandEgressIndex for this table's mode. There is a fallback for tests and regional
+    /// tasks with freeform destinations, which the preloader skips.
     public synchronized void ensureStops (TIntSet stops) {
         ensureStops(stops, new NoopProgressListener());
     }
@@ -123,34 +145,60 @@ public class OnDemandEgressTable {
     }
 
     /// Returns the on-demand rides reaching the given point as packed (stop, walk millimeters,
-    /// car seconds) triples, or null when no stop with an on-demand egress row reaches the point.
+    /// ride seconds) triples, or null when no stop with an on-demand egress row reaches the point.
+    /// For a BICYCLE table the ride seconds are at the reference bicycle speed.
     /// May overselect stops for which no service is active for the current request.
     /// The returned array must not be modified.
     public int[] ridesForPoint (int pointIndex) {
         return triplesForPoint[pointIndex];
     }
 
-    /// Find travel times from one stop to all destination points within the car linking limit.
-    /// This includes a walk to each MeetingArea vertex followed by car travel, minimized together
-    /// at the typical walk speed, with the winning path's two portions recorded separately.
+    /// An upper bound in seconds on the rides this table stores. The search from each stop ends
+    /// at this duration, so no stored ride exceeds it. This is also a bound on the EgressCostTable
+    /// for the same mode. The bicycle bound there is a distance, which we convert to a duration at
+    /// the reference bicycle speed.
+    private int rideTimeLimitSeconds () {
+        if (vehicleMode == BICYCLE) {
+            return (int) (BICYCLE_EGRESS_DISTANCE_LIMIT_METERS / REFERENCE_BICYCLE_SPEED_METERS_PER_SECOND);
+        }
+        return CAR_EGRESS_TIME_LIMIT_SECONDS;
+    }
+
+    /// An upper bound in meters on the distance a ride in this table can cover within the time
+    /// bound, used only to limit which destination points are examined for each stop.
+    private int rideDistanceLimitMeters () {
+        if (vehicleMode == BICYCLE) {
+            return BICYCLE_EGRESS_DISTANCE_LIMIT_METERS;
+        }
+        return CAR_EGRESS_TIME_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
+    }
+
+    /// Find travel times from one stop to all destination points within the egress search limit for
+    /// this table's mode. This includes a walk to each MeetingArea vertex followed by a ride,
+    /// minimized together at the typical walk speed, with the winning path's two portions
+    /// recorded separately.
     private Row computeRow (int stop) {
         TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
         Point stopPoint = transitLayer.getJTSPointForStopFixed(stop);
         if (stopPoint == null) {
             return EMPTY_ROW; // The stop is not linked to the street network.
         }
-        TIntIntMap meetingArea = linkedPointSet.streetLayer.parentNetwork.meetingAreas()
+        TIntIntMap meetingArea = linkedPointSet.streetLayer.parentNetwork.meetingAreas(vehicleMode)
             .areaWithDistances(stop);
         if (meetingArea.isEmpty()) {
-            return EMPTY_ROW; // No drivable street in reach, on-demand cannot serve this stop.
+            // No street allowing the vehicle mode in reach, on-demand cannot serve this stop.
+            return EMPTY_ROW;
         }
         StreetRouter router = new StreetRouter(linkedPointSet.streetLayer);
-        router.streetMode = CAR;
+        router.streetMode = vehicleMode;
+        // The router has its own new request. Its bike speed is set explicitly so that BICYCLE
+        // rows do not depend on the default value in ProfileRequest. CAR rides ignore this speed.
+        router.profileRequest.bikeSpeed = REFERENCE_BICYCLE_SPEED_METERS_PER_SECOND;
         router.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
-        router.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
+        router.timeLimitSeconds = rideTimeLimitSeconds();
         router.setOrigins(meetingArea, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
         router.route();
-        // Total seconds (walk plus car) and the walked distance alone, for every reached vertex.
+        // Total seconds (walk plus ride) and the walked distance alone, for every reached vertex.
         // Each state's chain of back states ends at the initial state at the meeting vertex where
         // its path began, whose distance field holds exactly the walked distance to that vertex.
         TIntIntMap totalForVertex = new TIntIntHashMap(1024, 0.5f, -1, Integer.MAX_VALUE);
@@ -177,8 +225,7 @@ public class OnDemandEgressTable {
         });
         Envelope envelopeAroundStop = stopPoint.getEnvelopeInternal();
         GeometryUtils.expandEnvelopeFixed(envelopeAroundStop,
-            CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND
-                + MeetingAreas.MEETING_AREA_RADIUS_METERS);
+            rideDistanceLimitMeters() + MeetingAreas.MEETING_AREA_RADIUS_METERS);
         return extendToPoints(totalForVertex, walkMmForVertex, envelopeAroundStop);
     }
 
@@ -197,7 +244,7 @@ public class OnDemandEgressTable {
     private Row extendToPoints (TIntIntMap totalForVertex, TIntIntMap walkMmForVertex, Envelope envelopeAroundStop) {
         TIntList points = new TIntArrayList();
         TIntList walks = new TIntArrayList();
-        TIntList cars = new TIntArrayList();
+        TIntList rides = new TIntArrayList();
         EdgeStore.Edge edge = linkedPointSet.streetLayer.edgeStore.getCursor();
         TIntList relevantPoints = linkedPointSet.pointSet.getPointsInEnvelope(envelopeAroundStop);
         relevantPoints.forEach(p -> {
@@ -205,7 +252,10 @@ public class OnDemandEgressTable {
                 return true; // Point is unlinked, continue iteration.
             }
             edge.seek(linkedPointSet.edges[p]);
-            int onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            float onStreetMetersPerSecond = (vehicleMode == CAR)
+                ? edge.getCarSpeedMetersPerSecond()
+                : REFERENCE_BICYCLE_SPEED_METERS_PER_SECOND;
+            int onStreetSpeed = (int) (onStreetMetersPerSecond * 1000);
             int offStreetSeconds = linkedPointSet.distancesToEdge_mm[p] / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
             int total0 = LinkedPointSet.timeViaVertex(totalForVertex.get(edge.getFromVertex()),
                 linkedPointSet.distances0_mm[p], onStreetSpeed, offStreetSeconds);
@@ -220,13 +270,13 @@ public class OnDemandEgressTable {
             int walkSeconds = walkMillimeters / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
             points.add(p);
             walks.add(walkMillimeters);
-            cars.add(total - walkSeconds);
+            rides.add(total - walkSeconds);
             return true;
         });
         if (points.isEmpty()) {
             return EMPTY_ROW;
         }
-        return new Row(points.toArray(), walks.toArray(), cars.toArray());
+        return new Row(points.toArray(), walks.toArray(), rides.toArray());
     }
 
     /// Merge freshly computed rows into the point-major table and publish the result. Merge uses
@@ -249,7 +299,7 @@ public class OnDemandEgressTable {
                 }
                 extended[extended.length - 3] = stop;
                 extended[extended.length - 2] = row.walkMillimeters[i];
-                extended[extended.length - 1] = row.carSeconds[i];
+                extended[extended.length - 1] = row.rideSeconds[i];
                 merged[point] = extended;
             }
         }

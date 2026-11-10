@@ -16,6 +16,7 @@ import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Coordinate;
 
@@ -119,6 +120,13 @@ class SceneModifications {
         return service;
     }
 
+    /// A service whose using the given street mode.
+    static AddOnDemand.Service service (String from, String to, double waitMinutes, StreetMode streetMode) {
+        AddOnDemand.Service service = service(from, to, waitMinutes);
+        service.streetMode = streetMode;
+        return service;
+    }
+
     static AddOnDemand addOnDemand (String dataSourceId, AddOnDemand.Service... services) {
         AddOnDemand modification = new AddOnDemand();
         modification.dataSourceId = dataSourceId;
@@ -146,7 +154,15 @@ class SceneModifications {
     static int[] minutesTo (
           TransportNetwork network, Scene scene, double x, double y,
           EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, double[]... xy) {
-        return minutes(network, scene, x, y, accessModes, egressModes, false, xy);
+        return minutes(network, scene, x, y, accessModes, egressModes, false, DEFAULT_BIKE_SPEED, xy);
+    }
+
+    /// Like the walk-egress [#minutesTo] but with the given bike speed in meters per second, for
+    /// tests of on-demand services whose vehicles are bicycles.
+    static int[] minutesTo (
+          TransportNetwork network, Scene scene, double x, double y,
+          EnumSet<LegMode> accessModes, float bikeSpeed, double[]... xy) {
+        return minutes(network, scene, x, y, accessModes, EnumSet.of(LegMode.WALK), false, bikeSpeed, xy);
     }
 
     /// Like [#minutesTo] but also using any scheduled transit in the network, with walk egress.
@@ -161,18 +177,31 @@ class SceneModifications {
     static int[] minutesByTransit (
           TransportNetwork network, Scene scene, double x, double y,
           EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, double[]... xy) {
-        return minutes(network, scene, x, y, accessModes, egressModes, true, xy);
+        return minutes(network, scene, x, y, accessModes, egressModes, true, DEFAULT_BIKE_SPEED, xy);
     }
 
-    /// The common core of minutesTo and minutesByTransit above, which set the egress modes and
-    /// transit usage. Builds a RegionalTask with free-form destinations at the given scene
-    /// coordinate pairs and default speeds and limits, runs it through TravelTimeComputer, and
-    /// returns the median travel time in whole minutes to each destination in the order given, with
-    /// Integer.MAX_VALUE meaning unreached.
+    /// Like the [#minutesByTransit] with egress modes but with the given bike speed in meters per
+    /// second, for tests of on-demand services whose vehicles are bicycles.
+    static int[] minutesByTransit (
+          TransportNetwork network, Scene scene, double x, double y,
+          EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, float bikeSpeed, double[]... xy) {
+        return minutes(network, scene, x, y, accessModes, egressModes, true, bikeSpeed, xy);
+    }
+
+    /// The bike speed of a request that does not state one.
+    private static final float DEFAULT_BIKE_SPEED = new RegionalTask().bikeSpeed;
+
+    /// The common core of minutesTo and minutesByTransit above, which set the egress modes,
+    /// transit usage and bike speed. Builds a RegionalTask with free-form destinations at the
+    /// given scene coordinate pairs and otherwise default speeds and limits, runs it through
+    /// TravelTimeComputer, and returns the median travel time in whole minutes to each destination
+    /// in the order given, with Integer.MAX_VALUE meaning unreached.
     private static int[] minutes (
           TransportNetwork network, Scene scene, double x, double y,
-          EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, boolean transit, double[]... xy) {
+          EnumSet<LegMode> accessModes, EnumSet<LegMode> egressModes, boolean transit, float bikeSpeed,
+          double[]... xy) {
         RegionalTask task = new RegionalTask();
+        task.bikeSpeed = bikeSpeed;
         task.date = Scene.SERVICE_DATE;
         task.fromTime = NOON - 1800;
         task.toTime = NOON + 1800;

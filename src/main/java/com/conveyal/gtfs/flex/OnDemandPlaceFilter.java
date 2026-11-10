@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.flex;
 
 import com.conveyal.gtfs.geom.CPolygonal;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.set.TIntSet;
@@ -30,31 +31,33 @@ public interface OnDemandPlaceFilter {
     /// filter (from a spatial index envelope query, possibly overselecting), or null when no
     /// mechanism exists for producing candidates and every state must be examined individually.
     ///
-    /// Clipping a large car search result to the interior of a comparatively small polygon is
+    /// Clipping a large search result to the interior of a comparatively small polygon is
     /// much faster given a set of candidate edges within the polygon's envelope. On the other
     /// hand, MeetingAreas are small sets of vertices for which exhaustive scans are cheap.
     TIntSet candidateEdges ();
 
     /// Returns a filter for the given service's pick-up place.
     static OnDemandPlaceFilter pickUp (OnDemand od, TransportNetwork network) {
-        return of(od.fromPolygon, od.fromStopIndexes, network);
+        return of(od.fromPolygon, od.fromStopIndexes, od.streetMode, network);
     }
 
     /// Returns a filter for the given service's drop-off place.
     static OnDemandPlaceFilter dropOff (OnDemand od, TransportNetwork network) {
-        return of(od.toPolygon, od.toStopIndexes, network);
+        return of(od.toPolygon, od.toStopIndexes, od.streetMode, network);
     }
 
     /// GTFS validation ensures every endpoint of every flex trip references exactly one
     /// polygonal zone or location group. If a polygon is present it takes precedence. If
     /// neither kind is present, return a filter containing nothing, making the service unusable.
-    private static OnDemandPlaceFilter of (CPolygonal polygon, int[] stopIndexes, TransportNetwork network) {
-
+    /// The meeting areas of a location group are those for the service's StreetMode.
+    private static OnDemandPlaceFilter of (
+            CPolygonal polygon, int[] stopIndexes, StreetMode vehicleMode, TransportNetwork network
+    ) {
         if (polygon != null) {
             return new PolygonPlaceFilter(polygon, network.streetLayer);
         }
         if (stopIndexes != null) {
-            return new MeetingAreaPlaceFilter(network.meetingAreas().unionForStops(stopIndexes));
+            return new MeetingAreaPlaceFilter(network.meetingAreas(vehicleMode).unionForStops(stopIndexes));
         }
         return new MeetingAreaPlaceFilter(new TIntHashSet());
     }

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.network.scene;
 
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,8 +10,12 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 
 import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.feederNetwork;
+import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.feederPolygons;
 import static com.conveyal.r5.analyst.network.scene.AddOnDemandTest.feederScenario;
+import static com.conveyal.r5.analyst.network.scene.SceneModifications.addOnDemand;
+import static com.conveyal.r5.analyst.network.scene.SceneModifications.apply;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.minutesTo;
+import static com.conveyal.r5.analyst.network.scene.SceneModifications.service;
 import static com.conveyal.r5.analyst.network.scene.SceneModifications.useFileStorage;
 import static com.conveyal.r5.api.util.LegMode.BICYCLE;
 import static com.conveyal.r5.api.util.LegMode.CAR;
@@ -61,6 +66,23 @@ public class OnDemandLegModeTest {
         int ridden = minutesTo(network, scene, 500, 20, EnumSet.of(BICYCLE, ON_DEMAND), HUB)[0];
         assertTrue(cycled >= 8, "Cycling to the hub should take over 8 minutes, not " + cycled);
         assertTrue(ridden <= 6, "Cycling to the pick-up and riding should take a few minutes, not " + ridden);
+    }
+
+    /// An on-demand service using bicycles carries a rider who walks to it, at the bike speed of
+    /// the request. After a one minute wait, a 2040 meter ride from the origin to the destination
+    /// beside the hub junction takes over eight minutes at 4 meters per second and over four
+    /// minutes at 8 meters per second. Here the destination is a point, so its time comes from the
+    /// BICYCLE linkage of the destinations rather than from a street vertex.
+    @Test
+    void bicycleService () {
+        Scene scene = new Scene();
+        TransportNetwork base = feederNetwork(scene);
+        TransportNetwork network = apply(base, "bicycle",
+            addOnDemand(feederPolygons(scene), service("zone", "hub", 1, StreetMode.BICYCLE)));
+        int slow = minutesTo(network, scene, 500, 20, EnumSet.of(WALK, ON_DEMAND), 4f, HUB)[0];
+        int fast = minutesTo(network, scene, 500, 20, EnumSet.of(WALK, ON_DEMAND), 8f, HUB)[0];
+        assertEquals(9, slow, 1, "Waiting a minute and riding at 4 meters per second takes about 9.5 minutes.");
+        assertEquals(5, fast, 1, "Waiting a minute and riding at 8 meters per second takes about 5.3 minutes.");
     }
 
     /// A rider outside every pick-up polygon still has ordinary street access with ON_DEMAND

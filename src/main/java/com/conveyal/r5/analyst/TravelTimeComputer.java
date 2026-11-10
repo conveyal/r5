@@ -427,13 +427,15 @@ public class TravelTimeComputer {
             }
         }
         if (onDemandEgress != null) {
-            for (int target = firstTarget; target < lastTargetExclusive; target++) {
-                int[] rides = onDemandEgress.ridesForTarget(target);
-                if (rides != null) {
-                    for (int entry = 0; entry < rides.length; entry += OnDemandEgressTable.INTS_PER_RIDE) {
-                        int stop = rides[entry];
-                        if (onDemandEgress.servicesForStop(stop) != null) {
-                            stops.set(stop);
+            for (StreetMode vehicleMode : onDemandEgress.vehicleModes()) {
+                for (int target = firstTarget; target < lastTargetExclusive; target++) {
+                    int[] rides = onDemandEgress.ridesForTarget(vehicleMode, target);
+                    if (rides != null) {
+                        for (int entry = 0; entry < rides.length; entry += OnDemandEgressTable.INTS_PER_RIDE) {
+                            int stop = rides[entry];
+                            if (onDemandEgress.servicesForStop(stop) != null) {
+                                stops.set(stop);
+                            }
                         }
                     }
                 }

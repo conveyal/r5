@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,18 +87,19 @@ public class TransportNetwork implements Serializable {
 
     public InRoutingFareCalculator fareCalculator;
 
-    /// Per-stop "meeting areas" for on-demand service. These are built lazily and never serialized.
-    /// Each TransportNetwork has its own instance of this, with scenarioCopy networks discovering
-    /// new meeting areas using their own street layer and scenario-created stops through the standard mechanism.
-    private transient MeetingAreas meetingAreas;
+    /// For each StreetMode used by an on-demand service so far, the streets near each relevant stop
+    /// that allow that StreetMode. Built lazily and never serialized. Each TransportNetwork has its
+    /// own instances. scenarioCopy networks discover new meeting areas using their own street layer
+    /// considering any stops created by modifications.
+    private transient Map<StreetMode, MeetingAreas> meetingAreasForMode;
 
-    /// Returns this network's meeting area cache, creating it on first use. Synchronized
-    /// because worker threads race to first use on a freshly loaded network.
-    public synchronized MeetingAreas meetingAreas () {
-        if (meetingAreas == null) {
-            meetingAreas = new MeetingAreas(this);
+    /// Return this network's meeting area cache for on-demand services using the given street mode,
+    /// creating it on first use. Synchronized because first use by worker threads is a race.
+    public synchronized MeetingAreas meetingAreas (StreetMode vehicleMode) {
+        if (meetingAreasForMode == null) {
+            meetingAreasForMode = new EnumMap<>(StreetMode.class);
         }
-        return meetingAreas;
+        return meetingAreasForMode.computeIfAbsent(vehicleMode, mode -> new MeetingAreas(this, mode));
     }
 
     /// Which on-demand services can pick up a rider alighting at each transit stop.

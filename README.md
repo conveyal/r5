@@ -54,7 +54,7 @@ By default, IntelliJ will follow common Gradle practice and build R5 using the "
 
 ## Contributing
 
-Before contributing, sign the [Conveyal Contributor License Agreement](https://github.com/conveyal/CLA-Ledger/blob/main/CLA.md).
+Before contributing, sign the [Conveyal Contributor License Agreement](https://conveyal.github.io/CLA-Ledger/).
 The automated check requires current CLA coverage for every human commit author.
 
 ## Structured Commit Messages

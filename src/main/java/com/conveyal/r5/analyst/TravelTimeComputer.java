@@ -123,6 +123,9 @@ public class TravelTimeComputer {
         // multiple LegModes that have the same StreetMode (such as BIKE and BIKE_RENT).
         EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
 
+        // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
+        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
+
         // Perform a street search for each access mode. For now, direct modes must be the same as access modes.
         for (StreetMode accessMode : accessModes) {
             LOG.info("Performing street search for mode: {}", accessMode);
@@ -163,13 +166,12 @@ public class TravelTimeComputer {
             // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
             // The overall time limit specified in the request may further decrease that mode-specific limit.
             boolean enableOnDemand = request.hasFlag("ON_DEMAND");
-            {
-                int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
-                if (request.hasTransit() || enableOnDemand) {
-                    limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
-                }
-                sr.timeLimitSeconds = limitSeconds;
+
+            int limitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+            if (request.hasTransit() || enableOnDemand) {
+                limitSeconds = Math.min(limitSeconds, request.getMaxTimeSeconds(accessMode));
             }
+            sr.timeLimitSeconds = limitSeconds;
 
             // Even if generalized cost tags were present on the input data, we always minimize travel time.
             // The generalized cost calculations currently increment time and weight by the same amount.
@@ -251,9 +253,6 @@ public class TravelTimeComputer {
                     throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
                 }
 
-                // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-                int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-
                 Split origin = sr.getOriginSplit();
 
                 PointSetTimes pointSetTimes = linkedDestinations.eval(
@@ -262,6 +261,12 @@ public class TravelTimeComputer {
                         walkSpeedMillimetersPerSecond,
                         origin
                 );
+
+                // Time up to the vertices of the destination edge are constrained by sr.timeLimitSeconds; 
+                // but additional (from those vertices along the final edge, and from that edge to the 
+                // destination point) can lead to travel times that exceed requested limits. So apply the
+                // relevant leg time limit to total times at points here.
+                pointSetTimes.applyLimit(limitSeconds);
 
                 if (onDemandAccess != null) {
                     // Destinations are also reached using on-demand services.

@@ -117,10 +117,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.saveFinalStates = saveFinalStates;
         if (saveFinalStates) this.finalStatesByDepartureTime = new TIntObjectHashMap<>();
 
-        // To make results repeatable from one run to the next, seed with some characteristic of the request itself,
-        // e.g. (int) (request.fromLat * 1e9).  Leaving out an argument will make it use a combination of time and
+        // To make results repeatable from one run to the next, seed with some characteristic of the request itself.
+        // Leaving out an argument will make it use a combination of time and
         // the instance's identity hash code, which makes it truly random for all practical purposes.
-        this.mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
+        this.mersenneTwister = new MersenneTwister((int) (Double.hashCode(request.fromLat) ^ Double.hashCode(request.fromLon)));
     }
 
     /** Get a McRAPTOR state bag for every departure minute */

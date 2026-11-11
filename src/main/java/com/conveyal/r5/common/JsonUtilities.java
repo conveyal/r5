@@ -7,7 +7,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.entity.ByteArrayEntity;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.io.entity.ByteArrayEntity;
 
 /**
  * A library containing static methods for working with JSON.
@@ -57,7 +58,7 @@ public abstract class JsonUtilities {
 
     /** Convert the supplied object to an HttpEntity containing its representation as JSON. */
     public static ByteArrayEntity objectToJsonHttpEntity (Object object) {
-        return new ByteArrayEntity(objectToJsonBytes(object));
+        return new ByteArrayEntity(objectToJsonBytes(object), ContentType.APPLICATION_JSON);
     }
 
     /**

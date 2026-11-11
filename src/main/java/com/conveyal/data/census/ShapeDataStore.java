@@ -1,10 +1,9 @@
 package com.conveyal.data.census;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.conveyal.data.geobuf.GeobufEncoder;
 import com.conveyal.data.geobuf.GeobufFeature;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.PeekingIterator;
 import org.locationtech.jts.geom.Envelope;
 import org.mapdb.BTreeKeySerializer;
 import org.mapdb.BTreeMap;
@@ -13,19 +12,25 @@ import org.mapdb.DBMaker;
 import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableSet;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
@@ -128,21 +133,34 @@ public class ShapeDataStore {
 
     /** Write GeoBuf tiles to S3 */
     public void writeTilesToS3 (String bucketName) throws IOException {
-        // For the duration of this multiple-tile upload operation, manage a single upload thread for the S3 uploads.
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+        // Upload on a single separate thread, overlapping the upload of one tile with the encoding of the next.
+        // The queue of one task and the caller-runs policy limit memory usage to three tile buffers: one uploading,
+        // one queued, and one being produced (either encoded or uploaded by the caller when the queue is full).
+        ExecutorService executor = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(1), new ThreadPoolExecutor.CallerRunsPolicy());
 
-        // initialize an S3 client
-        AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
+        // Retain the pending result of every upload, keyed on the S3 object key for error reporting.
+        // Using submit instead of execute ensures failures are recorded in the Future instance.
+        // Otherwise behavior depends on which thread runs the task (consider caller-runs rejection policy).
+        List<Map.Entry<String, Future<?>>> uploads = new ArrayList<>();
+
+        S3Client s3 = S3Client.create();
         try {
-            writeTilesInternal((x, y) -> {
-                PipedInputStream is = new PipedInputStream();
-                PipedOutputStream os = new PipedOutputStream(is);
-                ObjectMetadata metadata = new ObjectMetadata();
-                metadata.setContentType("application/gzip");
-
-                // perform the upload in its own thread so it doesn't deadlock
-                executor.execute(() -> s3.putObject(bucketName, String.format("%d/%d.pbf.gz", x, y), is, metadata));
-                return os;
+            writeTilesInternal((x, y) -> new ByteArrayOutputStream() {
+                // The AWS S3 SDK requires the content length before uploading. We buffer each
+                // gzipped tile in a BAOS and override the close method to upload it when closed.
+                @Override
+                public void close () {
+                    String key = String.format("%d/%d.pbf.gz", x, y);
+                    PutObjectRequest request = PutObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(key)
+                            .contentType("application/gzip")
+                            .build();
+                    byte[] tile = toByteArray();
+                    uploads.add(Map.entry(key,
+                            executor.submit(() -> s3.putObject(request, RequestBody.fromBytes(tile)))));
+                }
             });
         } finally {
             // allow the JVM to exit
@@ -151,41 +169,58 @@ public class ShapeDataStore {
                 executor.awaitTermination(1, TimeUnit.HOURS);
             } catch (InterruptedException e) {
                 LOG.error("Interrupted while waiting for S3 uploads to finish");
+                // Leave the thread's interrupted status set so Future.get calls below fail fast.
+                Thread.currentThread().interrupt();
             }
+        }
+        // The executor has terminated. Every Future is complete, calling get on them will not block.
+        int failedUploads = 0;
+        for (Map.Entry<String, Future<?>> upload : uploads) {
+            try {
+                upload.getValue().get();
+            } catch (ExecutionException e) {
+                failedUploads += 1;
+                LOG.error("Uploading tile {} failed: {}", upload.getKey(), e.getCause().toString());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while waiting for S3 uploads to finish.", e);
+            }
+        }
+        if (failedUploads > 0) {
+            throw new IOException(failedUploads + " of " + uploads.size() + " tile uploads to S3 failed.");
         }
     }
 
     /**
-     * generic write tiles function, calls function with x and y indices to get an output stream, which it will close itself.
-     * The Internal suffix is because lambdas in java get confused with overloaded functions
+     * Generic write tiles function. Calls the supplied function with x and y indices to get an
+     * output stream, which this method will close when all relevant features have been added.
+     * The name is suffixed with Internal to avoid confusing Java interactions between lambdas and
+     * overloaded functions.
      */
     private void writeTilesInternal(TileOutputStreamProducer outputStreamForTile) throws IOException {
-        int lastx = -1, lasty = -1, tileCount = 0;
-
+        int tileCount = 0;
         List<GeobufFeature> featuresThisTile = new ArrayList<>();
-
-        for (Fun.Tuple3 val : tiles) {
-            int x = (Integer) val.a;
-            int y = (Integer) val.b;
-            long id = (Long) val.c;
-            if (x != lastx || y != lasty) {
-                if (!featuresThisTile.isEmpty()) {
-                    LOG.debug("x: {}, y: {}, {} features", lastx, lasty, featuresThisTile.size());
-                    GeobufEncoder enc = new GeobufEncoder(new GZIPOutputStream(new BufferedOutputStream(outputStreamForTile.apply(lastx, lasty))), PRECISION);
-                    enc.writeFeatureCollection(featuresThisTile);
-                    enc.close();
-                    featuresThisTile.clear();
-
-                    tileCount++;
-                }
+        // The set is sorted, so all entries for one tile are consecutive. Gather features until the next entry
+        // belongs to a different tile or there is no next entry, then write the finished tile out. Looking ahead
+        // rather than comparing against the previous entry ensures the final tile is also written.
+        PeekingIterator<Fun.Tuple3<Integer, Integer, Long>> iterator = Iterators.peekingIterator(tiles.iterator());
+        while (iterator.hasNext()) {
+            Fun.Tuple3<Integer, Integer, Long> entry = iterator.next();
+            featuresThisTile.add(features.get(entry.c));
+            boolean tileFinished = !iterator.hasNext()
+                    || !entry.a.equals(iterator.peek().a)
+                    || !entry.b.equals(iterator.peek().b);
+            if (tileFinished) {
+                LOG.debug("x: {}, y: {}, {} features", entry.a, entry.b, featuresThisTile.size());
+                GeobufEncoder enc = new GeobufEncoder(
+                        new GZIPOutputStream(new BufferedOutputStream(outputStreamForTile.apply(entry.a, entry.b))),
+                        PRECISION);
+                enc.writeFeatureCollection(featuresThisTile);
+                enc.close();
+                featuresThisTile.clear();
+                tileCount++;
             }
-
-            featuresThisTile.add(features.get(id));
-
-            lastx = x;
-            lasty = y;
         }
-
         LOG.info("Wrote {} tiles", tileCount);
     }
 

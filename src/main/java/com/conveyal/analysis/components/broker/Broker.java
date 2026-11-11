@@ -227,7 +227,7 @@ public class Broker implements Component {
             LOG.debug("Not requesting a worker on {}, a recently requested one should start soon.", category);
             return;
         }
-        int requested = createWorkersInCategory(category, workerTags, 1, 0);
+        int requested = createWorkersInCategory(category, workerTags, 1, false);
         if (requested > 0) {
             eventBus.send(new WorkerEvent(SINGLE_POINT, category, REQUESTED, requested).forUser(workerTags.user, workerTags.group));
         }
@@ -239,22 +239,20 @@ public class Broker implements Component {
      * TODO lift all the limits out of createWorkersInCategory into FleetManager so callers
      *      don't need to check if their request was reduced or zeroed
      */
-    public int createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
-        int n = createWorkersInCategory(category, workerTags, nOnDemand, nSpot);
+    public int createRegionalWorkers(WorkerCategory category, WorkerTags workerTags, int nWorkers, boolean spot) {
+        int n = createWorkersInCategory(category, workerTags, nWorkers, spot);
         eventBus.send(new WorkerEvent(REGIONAL, category, REQUESTED, n).forUser(workerTags.user, workerTags.group));
         return n;
     }
 
     /**
-     * Create on-demand/spot workers for a given job, after certain checks. The actual number requested may be lower if
-     * the total number of workers running is approaching the maximum specified in the Broker config.
-     * @param nOnDemand EC2 on-demand instances to request
-     * @param nSpot EC2 spot instances to request
-     * @return the total number actually requested after limits were imposed
+     * Create on-demand or spot workers for a given job, after certain checks. The actual number requested may be
+     * lower if the total number of workers running is approaching the maximum specified in the Broker config.
+     * @param nWorkers number of instances to request
+     * @param spot whether to request spot instances rather than on-demand ones
+     * @return the number actually requested after limits were imposed
      */
-    int createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
-        final int initialRequest = nOnDemand + nSpot;
-
+    int createWorkersInCategory (WorkerCategory category, WorkerTags workerTags, int nWorkers, boolean spot) {
         // Log error messages rather than throwing exceptions, as this code often runs in worker poll handlers.
         // Throwing an exception there would not report any useful information to anyone.
         if (config.offline()) {
@@ -262,13 +260,8 @@ public class Broker implements Component {
             return 0;
         }
 
-        if (nOnDemand < 0 || nSpot < 0) {
-            LOG.error("Negative number of workers requested, not starting any.");
-            return 0;
-        }
-
-        if (initialRequest <= 0) {
-            LOG.error("No workers requested, not starting any.");
+        if (nWorkers <= 0) {
+            LOG.error("Requested number of workers is not positive, not starting any.");
             return 0;
         }
 
@@ -280,16 +273,14 @@ public class Broker implements Component {
             return 0;
         }
 
-        if (initialRequest > maxToStart) {
-            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", initialRequest);
-            nOnDemand = Math.min(nOnDemand, maxToStart);
-            nSpot = Math.min(nSpot, maxToStart);
-            LOG.warn("Lowered to {} on-demand and {} spot workers.", nOnDemand, nSpot);
+        if (nWorkers > maxToStart) {
+            LOG.warn("Request for {} workers is more than half the remaining worker pool capacity.", nWorkers);
+            nWorkers = maxToStart;
+            LOG.warn("Lowered to {} workers.", nWorkers);
         }
 
         // Just an assertion for consistent state - this should never happen.
-        // Re-sum nOnDemand + nSpot here instead of using nTotal, as they may have been revised.
-        if (workerCatalog.totalWorkerCount() + nOnDemand + nSpot > config.maxWorkers()) {
+        if (workerCatalog.totalWorkerCount() + nWorkers > config.maxWorkers()) {
             LOG.error(
                 "Starting workers would exceed the maximum capacity of {}. Jobs may stall on {}.",
                 config.maxWorkers(),
@@ -298,9 +289,9 @@ public class Broker implements Component {
             return 0;
         }
 
-        workerLauncher.launch(category, workerTags, nOnDemand, nSpot);
-        LOG.info("Requested {} on-demand and {} spot workers on {}", nOnDemand, nSpot, category);
-        return nOnDemand + nSpot;
+        workerLauncher.launch(category, workerTags, nWorkers, spot);
+        LOG.info("Requested {} {} workers on {}", nWorkers, spot ? "spot" : "on-demand", category);
+        return nWorkers;
     }
 
     /**

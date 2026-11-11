@@ -60,8 +60,6 @@ public abstract class BackendComponents {
     public FileStorage fileStorage;
     public GTFSCache gtfsCache;
     public OSMCache osmCache;
-    /** System for processing incoming accessibility analysis requests. */
-    public Compute compute = null;
     public WorkerLauncher workerLauncher;
     public Broker broker;
     // TODO  Unified persistence of Java objects within and between sessions (an abstraction for a database)

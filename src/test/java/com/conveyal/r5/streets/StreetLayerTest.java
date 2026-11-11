@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.VertexStore.VertexFlag;
 import gnu.trove.TIntCollection;
@@ -240,6 +241,25 @@ public class StreetLayerTest {
          assertEquals(originalLength, accumulatedForwardLength);
          assertEquals(originalLength, accumulatedBackwardLength);
      }
+
+    /** Test scaling to account for converging lines of longitude, see R5 Issue #1021 **/
+    @Test
+    public void nearestPointOnADiagonalSegmentAt60North () {
+        // Coordinates for a point near Oslo
+        float x = 10;
+        float y = 60;
+        int lon0 = VertexStore.floatingDegreesToFixed(x);
+        int lat0 = VertexStore.floatingDegreesToFixed(y);
+        // Northeast of the first point
+        int lon1 = VertexStore.floatingDegreesToFixed(x + 0.002);
+        int lat1 = VertexStore.floatingDegreesToFixed(y + 0.001);
+        // Due east of the first point and due south of the second, should split the edge at fraction 0.5.
+        int lon = VertexStore.floatingDegreesToFixed(x + 0.002);
+        int lat = VertexStore.floatingDegreesToFixed(y);
+        double cosLat = Math.cos(Math.toRadians(y));
+        double fraction = GeometryUtils.segmentFraction(lon0, lat0, lon1, lat1, lon, lat, cosLat);
+        assertEquals(0.5, fraction, 0.01);
+    }
 
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
     @Test

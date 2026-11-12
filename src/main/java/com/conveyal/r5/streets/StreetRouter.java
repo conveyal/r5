@@ -378,18 +378,24 @@ public class StreetRouter implements Cloneable {
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
         int offStreetTime = split.distanceToEdge_mm / (int) (profileRequest.walkSpeed * 1000);
 
+        // The part of each directed edge that is traversed. In a forward search the traveler leaves the split point
+        // towards the end of the edge. In a reverse search the vertices are swapped below: each state is at the
+        // start of its edge, and the traveler goes from there to the split point.
+        int forwardEdgePart_mm = profileRequest.reverseSearch ? split.distance0_mm : split.distance1_mm;
+        int backwardEdgePart_mm = profileRequest.reverseSearch ? split.distance1_mm : split.distance0_mm;
+
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.durationSeconds = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond) + offStreetTime;
-        startState1.distance = split.distance1_mm + split.distanceToEdge_mm;
+        startState1.durationSeconds = (int) ((forwardEdgePart_mm / 1000) / speedMetersPerSecond) + offStreetTime;
+        startState1.distance = forwardEdgePart_mm + split.distanceToEdge_mm;
         edge.advance();
 
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.durationSeconds = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond) + offStreetTime;
-        startState0.distance = split.distance0_mm + split.distanceToEdge_mm;
+        startState0.durationSeconds = (int) ((backwardEdgePart_mm / 1000) / speedMetersPerSecond) + offStreetTime;
+        startState0.distance = backwardEdgePart_mm + split.distanceToEdge_mm;
 
-        // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
+        // In a reverse search the states are at the start of their back edges rather than at the end.
         if (profileRequest.reverseSearch) {
              startState0.vertex = split.vertex1;
              startState1.vertex = split.vertex0;
@@ -990,6 +996,10 @@ public class StreetRouter implements Cloneable {
                 ret = child;
                 orig = orig.backState;
             }
+            // The first state of the search can already have a cost, e.g. the partial edge and off-street walk
+            // from the vertex to an origin point. It has no edge of its own in the path, so add it at the end.
+            ret.durationSeconds += orig.durationSeconds;
+            ret.distance += orig.distance;
             return ret;
         }
 

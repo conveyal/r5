@@ -44,6 +44,14 @@ public interface CostField {
      */
     double getDisplayValue (int edgeIndex);
 
+    /**
+     * Return a copy of this CostField when duplicating for scenarios.
+     * If field won't be mutated in scenario, may return this.
+     */
+    default CostField extendOnlyCopy (EdgeStore copiedEdgeStore) {
+        return this;
+    }
+
     /** Interface for classes that create a CostField for a given StreetLayer, usually by overlaying a raster file. */
     interface Loader<T extends CostField> {
         void setNorthShiftMeters (double northShiftMeters);

@@ -882,7 +882,7 @@ public final class Geobuf {
       }
 
       public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
+        return DEFAULT_INSTANCE.createBuilder();
       }
       public static Builder newBuilder(Geobuf.Data.Feature prototype) {
         return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
@@ -2312,7 +2312,7 @@ public final class Geobuf {
       }
 
       public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
+        return DEFAULT_INSTANCE.createBuilder();
       }
       public static Builder newBuilder(Geobuf.Data.Geometry prototype) {
         return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
@@ -3317,7 +3317,7 @@ public final class Geobuf {
       }
 
       public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
+        return DEFAULT_INSTANCE.createBuilder();
       }
       public static Builder newBuilder(Geobuf.Data.FeatureCollection prototype) {
         return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
@@ -4190,7 +4190,7 @@ public final class Geobuf {
       }
 
       public static Builder newBuilder() {
-        return (Builder) DEFAULT_INSTANCE.createBuilder();
+        return DEFAULT_INSTANCE.createBuilder();
       }
       public static Builder newBuilder(Geobuf.Data.Value prototype) {
         return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);
@@ -5057,7 +5057,7 @@ public final class Geobuf {
     }
 
     public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
+      return DEFAULT_INSTANCE.createBuilder();
     }
     public static Builder newBuilder(Geobuf.Data prototype) {
       return (Builder) DEFAULT_INSTANCE.createBuilder(prototype);

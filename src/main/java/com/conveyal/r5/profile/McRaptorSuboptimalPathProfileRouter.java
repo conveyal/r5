@@ -325,9 +325,10 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
             RouteInfo routeInfo = network.transitLayer.routes.get(pattern.routeIndex);
-            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+            // Null for route types R5 does not route on (e.g. taxi), which are never contained in the requested modes.
+            TransitModes mode = TransitLayer.getTransitModesOrNull(routeInfo.route_type);
             // skips trip patterns with trips which don't run on wanted date
-            if (!pattern.servicesActive.intersects(servicesActive) ||
+            if (mode == null || !pattern.servicesActive.intersects(servicesActive) ||
                 // skips pattern with Transit mode which isn't wanted by profileRequest
                 !request.transitModes.contains(mode)) {
                 continue;

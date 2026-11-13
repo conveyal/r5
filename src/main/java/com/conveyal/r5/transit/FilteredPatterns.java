@@ -8,7 +8,7 @@ import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 
-import static com.conveyal.r5.transit.TransitLayer.getTransitModes;
+import static com.conveyal.r5.transit.TransitLayer.getTransitModesOrNull;
 
 /**
  * Holds all the FilteredPatterns instances for a particular TransitLayer (scenario) given a particular set of
@@ -43,8 +43,9 @@ public class FilteredPatterns {
         for (int patternIndex = 0; patternIndex < sourcePatterns.size(); patternIndex++) {
             TripPattern pattern = sourcePatterns.get(patternIndex);
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
-            TransitModes mode = getTransitModes(routeInfo.route_type);
-            if (pattern.servicesActive.intersects(services) && modes.contains(mode)) {
+            // Null for route types R5 does not route on (e.g. taxi), which are then never included in the filtered set.
+            TransitModes mode = getTransitModesOrNull(routeInfo.route_type);
+            if (mode != null && pattern.servicesActive.intersects(services) && modes.contains(mode)) {
                 patterns.add(new FilteredPattern(pattern, services));
                 // At least one trip on this pattern is relevant, based on the profile request's date and modes.
                 if (pattern.hasFrequencies) {

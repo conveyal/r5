@@ -4,13 +4,16 @@ import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.datasource.DataSourcePreviewGenerator;
 import com.conveyal.analysis.datasource.DataSourceUploadAction;
+import com.conveyal.analysis.datasource.ProtomapsDownloader;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.GtfsDataSource;
 import com.conveyal.analysis.models.OsmDataSource;
+import com.conveyal.analysis.models.Region;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.analysis.persistence.AnalysisCollection;
 import com.conveyal.analysis.persistence.AnalysisDB;
+import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.util.HttpUtils;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -177,6 +180,30 @@ public class DataSourceController implements HttpController {
         return backgroundTask.id.toString();
     }
 
+    /**
+     * Hit this endpoint like curl -v -X POST 'http://localhost:7070/api/dataSource/pmdl/6053738bc5469ddf9e69efe9'
+     * Progress should be visible in the web UI, as long as it's actively polling the activity endpoint.
+     *
+     * @return the ID of the background task tracking the progress of extraction and download from Protomaps
+     */
+    private String protomapsDownload (Request req, Response res) {
+        // Do some initial synchronous work setting up, in order to fail fast if the request is bad.
+        // final UserPermissions userPermissions = new UserPermissions("local", true, "local");
+        final UserPermissions userPermissions = UserPermissions.from(req);
+        final String regionId = req.params("regionId");
+        final Region region = Persistence.regions.findByIdIfPermitted(regionId, userPermissions);
+
+        // Kick off a background task so the HTTP request can return immediately.
+        // This should ideally be a subtask of an overall bundle creation task.
+        Task backgroundTask = Task.create("Downloading OSM for " + region.name)
+                .forUser(userPermissions)
+                .setHeavy(true)
+                .withAction(new ProtomapsDownloader(region, userPermissions, fileStorage, dataSourceCollection));
+
+        taskScheduler.enqueue(backgroundTask);
+        return backgroundTask.id.toString();
+    }
+
     @Override
     public void registerEndpoints (spark.Service sparkService) {
         sparkService.path("/api/dataSource", () -> {
@@ -185,8 +212,8 @@ public class DataSourceController implements HttpController {
             sparkService.delete("/:_id", this::deleteOneDataSourceById, toJson);
             sparkService.get("/:_id/preview", this::getDataSourcePreview, toJson);
             sparkService.post("", this::handleUpload, toJson);
-            // regionId will be in query parameter
             sparkService.post("/addLodesDataSource", this::downloadLODES, toJson);
+            sparkService.post("/pmdl/:regionId", this::protomapsDownload, toJson);
         });
     }
 

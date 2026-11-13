@@ -62,7 +62,7 @@ public class PointToPointQuery {
     /** How many seconds worse driving to transit is than just walking */
     private static final int CAR_PENALTY = 1200;
 
-    private static final EnumSet<LegMode> egressUnsupportedModes = EnumSet.of(LegMode.CAR_PARK);
+    private static final EnumSet<LegMode> egressUnsupportedModes = EnumSet.of(LegMode.CAR_PARK, LegMode.ON_DEMAND);
 
     /** Time to rent a bike in seconds */
     private static final int BIKE_RENTAL_PICKUP_TIME_S = 60;
@@ -316,11 +316,15 @@ public class PointToPointQuery {
                         "MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!",
                         mode);
                 }
+            } else if (mode == LegMode.ON_DEMAND) {
+                LOG.warn("On-demand access is not supported in point-to-point routing, ignoring it.");
+                continue;
             } else if (mode == LegMode.BICYCLE_RENT) {
                 if (!transportNetwork.streetLayer.bikeSharing) {
                     LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
                     continue;
                 }
+
                 streetRouter = findBikeRentalPath(request, streetRouter, false);
                 if (streetRouter != null) {
                     accessRouter.put(LegMode.BICYCLE_RENT, streetRouter);

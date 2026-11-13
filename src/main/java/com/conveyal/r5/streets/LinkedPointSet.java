@@ -120,6 +120,12 @@ public class LinkedPointSet implements Serializable {
      */
     private EgressCostTable egressCostTable;
 
+    /// Travel times of on-demand rides from pick-up stops to the points of this linkage, for
+    /// services using this linkage's street mode. Only relevant on CAR and BICYCLE linkages.
+    /// Only built when a request uses on-demand egress. Linkages for unmodified scenario street
+    /// layers leave this null and read their base linkage's table instead.
+    private OnDemandEgressTable onDemandEgressTable;
+
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -292,6 +298,38 @@ public class LinkedPointSet implements Serializable {
      */
     public synchronized EgressCostTable getEgressCostTable () {
         return getEgressCostTable(new NoopProgressListener());
+    }
+
+    /// Get or lazily create an on-demand egress cost table. It may be stored on this LinkedPointSet
+    /// or on its base linkage. When a scenario has modified the street layer, that scenario's
+    /// LinkedPointSet has its own OnDemandEgressTable since its ride times can differ near the
+    /// changed streets. A linkage produced by cropping also owns its own table, since its base
+    /// linkage is for a different PointSet with different point indexes.
+    public OnDemandEgressTable getOnDemandEgressTable () {
+        LinkedPointSet owner = onDemandEgressTableOwner();
+        // Scenarios are only ever applied to base networks, never to other scenario networks, so
+        // ownership resolution needs only a single step. Fail fast if that ever changes.
+        if (owner != this && owner.onDemandEgressTableOwner() != owner) {
+            throw new IllegalStateException("On-demand egress table ownership requires more than one resolution step. "
+                + "Are scenarios being applied on top of other scenarios?");
+        }
+        synchronized (owner) {
+            if (owner.onDemandEgressTable == null) {
+                owner.onDemandEgressTable = new OnDemandEgressTable(owner);
+            }
+            return owner.onDemandEgressTable;
+        }
+    }
+
+    /// Determine which LinkedPointSet holds the on-demand egress cost table for the current
+    /// LinkedPointSet. It could be this linkage's base linkage if this linkage is an identical copy
+    /// of the base (when a scenario doesn't modify the streets), otherwise this instance.
+    private LinkedPointSet onDemandEgressTableOwner () {
+        boolean streetsUnmodified = streetLayer.isScenarioCopy() && !streetLayer.edgeStore.isExtendOnlyCopy();
+        if (streetsUnmodified && baseLinkage != null && baseLinkage.pointSet == pointSet) {
+            return baseLinkage;
+        }
+        return this;
     }
 
     /**
@@ -473,16 +511,8 @@ public class LinkedPointSet implements Serializable {
             int edgeOnStreetSpeed = (streetMode == StreetMode.CAR)
                   ? (int) (edge.getCarSpeedMetersPerSecond() * 1000)
                   : onStreetSpeed;
-            if (place != null) {
-                placeSplit.edge = edges[i];
-                placeSplit.vertex0 = edge.getFromVertex();
-                placeSplit.vertex1 = edge.getToVertex();
-                placeSplit.distance0_mm = distances0_mm[i];
-                placeSplit.distance1_mm = distances1_mm[i];
-                placeSplit.distanceToEdge_mm = distancesToEdge_mm[i];
-                if (!place.containsPoint(pointSet.getLat(i), pointSet.getLon(i), placeSplit)) {
-                    continue;
-                }
+            if (place != null && !pointWithinPlace(i, place, edge, placeSplit)) {
+                continue;
             }
             if (origin != null && origin.edge == edges[i]) {
                 // The target point lies along the same edge as the origin
@@ -495,6 +525,24 @@ public class LinkedPointSet implements Serializable {
             }
         }
         return new PointSetTimes(pointSet, travelTimes);
+    }
+
+    /// Returns true when the given point of this linkage is accepted by the given place filter,
+    /// reconstructing enough of the point's linkage Split for the filter's containment test.
+    /// Returns false for unlinked points. The supplied edge cursor and Split are scratch objects
+    /// overwritten on every call. Callers testing many points can reuse them without allocation.
+    public boolean pointWithinPlace (int i, OnDemandPlaceFilter place, EdgeStore.Edge edge, Split split) {
+        if (edges[i] < 0) {
+            return false;
+        }
+        edge.seek(edges[i]);
+        split.edge = edges[i];
+        split.vertex0 = edge.getFromVertex();
+        split.vertex1 = edge.getToVertex();
+        split.distance0_mm = distances0_mm[i];
+        split.distance1_mm = distances1_mm[i];
+        split.distanceToEdge_mm = distancesToEdge_mm[i];
+        return place.containsPoint(pointSet.getLat(i), pointSet.getLon(i), split);
     }
 
     /**
@@ -513,8 +561,8 @@ public class LinkedPointSet implements Serializable {
     public int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         return extendCostsToPoints(distanceTableToVertices::get,
                 RoutingVariable.DISTANCE_MILLIMETERS,
-                distanceTableZone,
-                null);
+                distanceTableZone);
+
     }
 
     /**
@@ -528,15 +576,13 @@ public class LinkedPointSet implements Serializable {
      * @param costToVertex method to get the travel time or distance for a given vertex id
      * @param routingVariable whether the costToVertex method returns distances (millimeters) or times (seconds)
      * @param envelopeAroundStop the envelope in FIXED POINT DEGREES within which we want to find all points.
-     * @param egressArea area served by on-demand service from this stop. If null, there are no restrictions on which
-     *                  points can be reached in the egress leg from this stop.
      * @return A packed array of (pointIndex, cost), or null if there are no reachable points. Cost units match
      * supplied sr.routingVariable
      */
     public int[] extendCostsToPoints(CostToVertexFunction costToVertex,
                                      RoutingVariable routingVariable,
-                                     Envelope envelopeAroundStop,
-                                     Geometry egressArea) {
+                                     Envelope envelopeAroundStop) {
+
         int nPoints = this.size();
         TIntIntMap costToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
@@ -548,10 +594,6 @@ public class LinkedPointSet implements Serializable {
             // An edge index of -1 for a particular point indicates that this point is unlinked.
             if (edges[p] == -1) {
                 return true; // Continue to next iteration.
-            }
-
-            if (egressArea != null && !GeometryUtils.containsPoint(egressArea, pointSet.getLon(p), pointSet.getLat(p))) {
-                return true; // Point is outside supplied area, continue to next iteration.
             }
 
             edge.seek(edges[p]);
@@ -647,19 +689,25 @@ public class LinkedPointSet implements Serializable {
      */
     private int timeToPoint(CostToVertexFunction costToVertex, Edge edge, int pointIndex, int onStreetSpeed,
                             int offStreetSpeed) {
-        int time0 = costToVertex.getCost(edge.getFromVertex());
-        int time1 = costToVertex.getCost(edge.getToVertex());
-        if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        } else {
-            int offStreetTime = distancesToEdge_mm[pointIndex] / offStreetSpeed;
-            time0 += distances0_mm[pointIndex] / onStreetSpeed + offStreetTime;
-            time1 += distances1_mm[pointIndex] / onStreetSpeed + offStreetTime;
-            return Math.min(handleOverflow(time0), handleOverflow(time1));
-        }
+        int offStreetSeconds = distancesToEdge_mm[pointIndex] / offStreetSpeed;
+        return Math.min(
+            timeViaVertex(costToVertex.getCost(edge.getFromVertex()),
+                distances0_mm[pointIndex], onStreetSpeed, offStreetSeconds),
+            timeViaVertex(costToVertex.getCost(edge.getToVertex()),
+                distances1_mm[pointIndex], onStreetSpeed, offStreetSeconds)
+        );
     }
 
-    private int handleOverflow (int value) {
+    /// Calculate the time in seconds to reach a point via one end vertex of its linked edge.
+    /// Returns Integer.MAX_VALUE when the vertex is unreachable or the sum overflows.
+    static int timeViaVertex (int vertexCost, int distanceAlongEdgeMm, int onStreetSpeed, int offStreetSeconds) {
+        if (vertexCost == Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return handleOverflow(vertexCost + distanceAlongEdgeMm / onStreetSpeed + offStreetSeconds);
+    }
+
+    private static int handleOverflow (int value) {
         return value < 0 ? Integer.MAX_VALUE : value;
     }
 

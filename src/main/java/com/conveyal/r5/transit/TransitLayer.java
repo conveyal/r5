@@ -3,11 +3,11 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.flex.FlexGroup;
 import com.conveyal.gtfs.flex.FlexLocation;
+import com.conveyal.gtfs.flex.FlexStopTime;
 import com.conveyal.gtfs.flex.FlexTrip;
 import com.conveyal.gtfs.flex.OnDemand;
 import com.conveyal.gtfs.flex.OnDemandIndex;
-import com.conveyal.gtfs.flex.FlexStopTime;
-import com.conveyal.gtfs.geom.CPolygon;
+import com.conveyal.gtfs.geom.CPolygonal;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Frequency;
@@ -17,7 +17,6 @@ import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.util.Util;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
@@ -538,10 +537,10 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
                 // To support trips with more than two stops, windows could move to a separate
                 // class. Only the end of drop-off windows is required (see OnDemand).
-                // Missing time window bounds are flagged with a feed error at load time, as the
-                // spec requires them, but are tolerated and treated as unbounded, making the
-                // service always available. PickupDelay-derived on-demand services will use this
-                // always-available representation when merged into OnDemand.
+                // Missing time window bounds are flagged with a feed error at load time because the
+                // spec requires them. But they are tolerated and treated as unbounded, making the
+                // service always available. Services added by the AddOnDemand modification use
+                // this same always-available representation.
                 if (fromStopTime.start_pickup_drop_off_window == INT_MISSING ||
                     fromStopTime.end_pickup_drop_off_window == INT_MISSING ||
                     toStopTime.end_pickup_drop_off_window == INT_MISSING) {
@@ -558,7 +557,8 @@ public class TransitLayer implements Serializable, Cloneable {
     /// Constraints in the GTFS reference documentation imply that it is not possible to reference
     /// multiple location polygons as a single stop_time in a flex trip, nor is it possible to mix
     /// polygonal locations with sets of pointlike stops in a single stop_time.
-    private static CPolygon extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
+    private static CPolygonal extractLocationPolygon (FlexStopTime fst, GTFSFeed gtfs) {
+
         // Referential integrity should already be validated on the GTFS feed. We can assume all
         // non-optional ID lookups yield a non-null object or positive index and otherwise fail hard.
         if (fst.location_id != null) {

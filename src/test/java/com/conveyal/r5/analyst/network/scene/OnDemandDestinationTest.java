@@ -45,7 +45,7 @@ public class OnDemandDestinationTest {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandZoneAccessTest.twoVillagesNetwork(scene);
         OnDemandAccess flex = evaluate(network, scene, 1000, 30, "village", new double[] {2000, 10});
-        int atVertex = flex.egressRouter.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
+        int atVertex = flex.onwardWalkRouter.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         int atDoor = flex.directTimes.getTravelTimeToPoint(0);
         assertTrue(atDoor >= atVertex,
             "Door delivery extends the ride, so it cannot beat the time at the vertex itself.");
@@ -63,7 +63,7 @@ public class OnDemandDestinationTest {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandZoneAccessTest.twoVillagesNetwork(scene);
         OnDemandAccess flex = evaluate(network, scene, 1000, 30, "village", new double[] {1500, 10});
-        int atVertex = flex.egressRouter.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
+        int atVertex = flex.onwardWalkRouter.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         int outside = flex.directTimes.getTravelTimeToPoint(0);
         assertNotEquals(Integer.MAX_VALUE, outside,
             "Walking onward from the drop-off should still reach a point outside the zone.");
@@ -81,24 +81,24 @@ public class OnDemandDestinationTest {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.drivableStreetNetwork(scene, 10);
         OnDemandAccess flex = evaluate(network, scene, 1000, 10, "flexIn", new double[] {560, -10});
-        int atCurb = flex.egressRouter.getTravelTimeToVertex(vertexAt(network, scene, 500, 0));
+        int atCurb = flex.onwardWalkRouter.getTravelTimeToVertex(vertexAt(network, scene, 500, 0));
         int atDoor = flex.directTimes.getTravelTimeToPoint(0);
         assertTrue(atDoor >= atCurb,
             "Door delivery extends the ride, so it cannot beat the time at the curb vertex.");
         assertTrue(atDoor < atCurb + 60,
-            "The 60 meter partial edge should be priced at riding pace, but the door took "
+            "The 60 meter partial edge should be traversed at riding pace, but the door took "
                 + (atDoor - atCurb) + " seconds beyond the curb.");
     }
 
     /// A destination on a side street that does not touch the curb stop's meeting area. No flex
-    /// driving state reaches it, so it is reached by the egress walk from the curb, at walking pace
+    /// driving state reaches it, so it is reached by the onward walk from the curb, at walking pace
     /// over a series of street edges.
     @Test
     void destinationOffMeetingArea () {
         Scene scene = new Scene();
         TransportNetwork network = OnDemandStopAccessTest.drivableStreetNetwork(scene, 10);
         OnDemandAccess flex = evaluate(network, scene, 1000, 10, "flexIn", new double[] {740, 190});
-        int atCurb = flex.egressRouter.getTravelTimeToVertex(vertexAt(network, scene, 500, 0));
+        int atCurb = flex.onwardWalkRouter.getTravelTimeToVertex(vertexAt(network, scene, 500, 0));
         int offArea = flex.directTimes.getTravelTimeToPoint(0);
         assertNotEquals(Integer.MAX_VALUE, offArea,
             "Walking onward from the curb should reach the side street.");

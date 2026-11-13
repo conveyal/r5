@@ -426,6 +426,29 @@ public class StreetRouter implements Cloneable {
         queue.add(startState);
     }
 
+    /// Sets several vertices as origins of this search, each with an initial cost equal to the
+    /// time needed to walk the given distance at the given speed. Used for on-demand egress.
+    public void setOrigins (TIntIntMap distanceMillimetersToVertices, int walkSpeedMillimetersPerSecond) {
+        originLat = Double.NaN;
+        originLon = Double.NaN;
+        bestStatesAtEdge.clear();
+        queue.clear();
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+        final int[] maxAbsLat = { Integer.MIN_VALUE };
+        distanceMillimetersToVertices.forEachEntry((fromVertex, distanceMm) -> {
+            vertex.seek(fromVertex);
+            maxAbsLat[0] = Math.max(maxAbsLat[0], Math.abs(vertex.getFixedLat()));
+            // As in single-vertex setOrigin, backEdge of -1 bypasses dominance check when dequeued.
+            State state = new State(fromVertex, -1, streetMode);
+            state.durationSeconds = distanceMm / walkSpeedMillimetersPerSecond;
+            state.durationBeforeLegSeconds = state.durationSeconds;
+            state.distance = distanceMm;
+            queue.add(state);
+            return true;
+        });
+        maxAbsOriginLat = maxAbsLat[0];
+    }
+
     /**
      * Adds multiple origins.
      *
@@ -1335,17 +1358,18 @@ public class StreetRouter implements Cloneable {
 
     /// Interpreting the current router instance as a completed access search on a street mode,
     /// returns a new StreetRouter instance initialized to represent one ride on the specified
-    /// OnDemand service. The new instance is configured to route by car (standing in for taxi,
-    /// van, or minibus). The queue is initialized with every result state from the current router
-    /// that is accepted by a filter for the supplied service's pick-up area. If the exact origin
-    /// point is accepted by the filter it is also injected as a search start state.
+    /// OnDemand service. The new instance is configured to route on the service's streetMode. The
+    /// queue is initialized with every result state from the current router that is accepted by a
+    /// filter for the supplied service's pick-up area. If the exact origin point is accepted by the
+    /// filter it is also injected as a search start state.
     ///
     /// Any non-unity ride time scaling factor for the on-demand service is applied as a wrapper
     /// TraversalTimeCalculator, inside the search so the router minimizes the quantity it reports.
     /// The pick-up wait, as well as any wait for the pick-up window to begin, are applied to the
     /// initial states, such that any retained boarding times fall within the service's pickup
-    /// window. The supplied midTime is a representative point in the departure window at the origin.
-    /// It is advanced by each state's durationSeconds before testing on-demand service availability.
+    /// window. The supplied midTime is a representative point in the departure window at the
+    /// origin. It is advanced by each state's durationSeconds before testing on-demand service
+    /// availability.
     public StreetRouter copyAndRouteFor (OnDemand od, int midTime) {
         StreetRouter sr = this.shallowCopyForRouting();
         // The end of the arrival time window caps ride duration along with the full trip limit.
@@ -1357,7 +1381,7 @@ public class StreetRouter implements Cloneable {
         if (od.durationFactor != 1) {
             sr.timeCalculator = new OnDemandTraversalTimeCalculator(this.timeCalculator, od.durationFactor);
         }
-        sr.streetMode = StreetMode.CAR;
+        sr.streetMode = od.streetMode;
         OnDemandPlaceFilter pickUpPlace = OnDemandPlaceFilter.pickUp(od, streetLayer.parentNetwork);
         // People typically use on-demand service when they have no car at the origin. When
         // walking (as opposed to driving) to on-demand, the set of reached vertices is small,
@@ -1374,7 +1398,7 @@ public class StreetRouter implements Cloneable {
         });
         sr.injectOriginSeed(pickUpPlace, od, midTime);
         // This copied router inherits a street mode time limit such as maxWalkTime. We consider
-        // the on-demand ride to be transit usage, so street mode limits (even car) do not apply.
+        // the on-demand ride to be transit usage, so street mode limits do not apply.
         // The caps on walk-plus-on-demand-ride are the total trip duration and the drop-off
         // window end, combined above. In any case, imposing any other kind of limit leads to
         // resource constraint and algorithmic validity problems.
@@ -1407,25 +1431,28 @@ public class StreetRouter implements Cloneable {
     /// Any future treatment of points where roads enter pick-up zones would probably be here.
     private void seedOnDemand (Split split, int walkSeconds, OnDemand od, int midTime) {
         // Use a throwaway state to apply the standard boarding procedure.
-        State atPosition = new State(-1, -1, StreetMode.CAR);
+        State atPosition = new State(-1, -1, od.streetMode);
         atPosition.durationSeconds = walkSeconds;
         atPosition.distance = split.distanceToEdge_mm;
         if (!applyBoarding(atPosition, od, midTime)) return;
         // The states are located at the ends of edges. Vertex1 is at the end of the forward
         // edge and vertex0 at the end of the backward edge, as in setOrigin.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor(split.edge);
-        State toVertex1 = new State(split.vertex1, split.edge, StreetMode.CAR);
-        toVertex1.durationSeconds = atPosition.durationSeconds + partialRideSeconds(edge, split.distance1_mm);
+        State toVertex1 = new State(split.vertex1, split.edge, od.streetMode);
+        toVertex1.durationSeconds = atPosition.durationSeconds
+                + partialRideSeconds(edge, split.distance1_mm, od.streetMode);
         toVertex1.durationBeforeLegSeconds = atPosition.durationBeforeLegSeconds;
         toVertex1.distance = atPosition.distance + split.distance1_mm;
         edge.advance();
-        State toVertex0 = new State(split.vertex0, split.edge + 1, StreetMode.CAR);
-        toVertex0.durationSeconds = atPosition.durationSeconds + partialRideSeconds(edge, split.distance0_mm);
+        State toVertex0 = new State(split.vertex0, split.edge + 1, od.streetMode);
+        toVertex0.durationSeconds = atPosition.durationSeconds
+                + partialRideSeconds(edge, split.distance0_mm, od.streetMode);
         toVertex0.durationBeforeLegSeconds = atPosition.durationBeforeLegSeconds;
         toVertex0.distance = atPosition.distance + split.distance0_mm;
         // If there is a turn restriction on this edge, the search must know it begins inside one.
-        streetLayer.edgeStore.startTurnRestriction(StreetMode.CAR, profileRequest.reverseSearch, toVertex0);
-        streetLayer.edgeStore.startTurnRestriction(StreetMode.CAR, profileRequest.reverseSearch, toVertex1);
+        // Turn restrictions apply only to cars, so these calls do nothing for a bicycle ride.
+        streetLayer.edgeStore.startTurnRestriction(od.streetMode, profileRequest.reverseSearch, toVertex0);
+        streetLayer.edgeStore.startTurnRestriction(od.streetMode, profileRequest.reverseSearch, toVertex1);
         bestStatesAtEdge.put(toVertex1.backEdge, toVertex1);
         queue.add(toVertex1);
         bestStatesAtEdge.put(toVertex0.backEdge, toVertex0);
@@ -1455,17 +1482,17 @@ public class StreetRouter implements Cloneable {
         return true;
     }
 
-    /// When the origin point is accepted by an on-demand service's pick-up place filter,
-    /// initialize the ride search from a CAR-mode split for that point. This additional state
-    /// better models a rider standing mid-edge on a long drivable road, who would otherwise walk
-    /// to a junction before boarding the on-demand service. The space between the origin point and
-    /// the split on the edge is traversed at walk speed, as setOrigin does for every origin.
-    /// If edge allowing cars is within the linking radius, or if the nearest such edge is not
-    /// accepted by the place filter, the states from vertices in the access search should provide
-    /// a reasonable fallback.
+    /// When the origin point is accepted by an on-demand service's pick-up place filter, initialize
+    /// the ride search from a split for that point on an edge allowing the service's street mode.
+    /// This additional state better models a rider standing mid-edge on a long road, who would
+    /// otherwise walk to a junction before boarding the on-demand service. The space between the
+    /// origin point and the split on the edge is traversed at walk speed, as setOrigin does for
+    /// every origin. If no edge allowing the vehicle's mode is within the linking radius, or if the
+    /// nearest such edge is not accepted by the place filter, the states from vertices in the
+    /// access search should provide a reasonable fallback.
     private void injectOriginSeed (OnDemandPlaceFilter pickUpPlace, OnDemand od, int midTime) {
         if (Double.isNaN(originLat)) return; // The search was seeded from vertices, not a point.
-        Split split = streetLayer.findSplit(originLat, originLon, StreetLayer.LINK_RADIUS_METERS, StreetMode.CAR);
+        Split split = streetLayer.findSplit(originLat, originLon, StreetLayer.LINK_RADIUS_METERS, od.streetMode);
         if (split == null) return;
         if (!pickUpPlace.containsPoint(originLat, originLon, split)) return;
         int walkSeconds = (int) (split.distanceToEdge_mm / (profileRequest.walkSpeed * 1000));
@@ -1480,7 +1507,7 @@ public class StreetRouter implements Cloneable {
     /// inherit the time calculator of the current router. Call this on merged results holding an
     /// unwrapped time calculator, not on a single ride search whose calculator often scales times
     /// by a duration factor.
-    public StreetRouter copyAndRouteEgressWalk () {
+    public StreetRouter copyAndRouteOnwardWalk () {
         StreetRouter sr = shallowCopyForRouting();
         sr.streetMode = StreetMode.WALK;
         sr.timeLimitSeconds = profileRequest.maxTripDurationMinutes * 60;
@@ -1505,12 +1532,12 @@ public class StreetRouter implements Cloneable {
         return sr;
     }
 
-    /// Duration of riding a partial edge, as the traversed fraction of the whole-edge
-    /// traversal time produced by this router's calculator.
-    private int partialRideSeconds (EdgeStore.Edge edge, int partialLengthMm) {
+    /// Determine the time needed to traverse a partial edge using the given street mode, based on
+    /// the whole-edge traversal time produced by this router's calculator.
+    private int partialRideSeconds (EdgeStore.Edge edge, int partialLengthMm, StreetMode vehicleMode) {
         int lengthMm = edge.getLengthMm();
         if (lengthMm <= 0) return 0;
-        int wholeEdgeSeconds = timeCalculator.traversalTimeSeconds(edge, StreetMode.CAR, profileRequest);
+        int wholeEdgeSeconds = timeCalculator.traversalTimeSeconds(edge, vehicleMode, profileRequest);
         return (int) Math.round(wholeEdgeSeconds * ((double) partialLengthMm / lengthMm));
     }
 

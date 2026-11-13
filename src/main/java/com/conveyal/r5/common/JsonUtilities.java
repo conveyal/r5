@@ -66,13 +66,14 @@ public abstract class JsonUtilities {
      * deserialize into, but that field doesn't exist on the resulting Java classes; 2. R5 modificaton classes may
      * evolve, usually in a backward compatible way by adding new fields, and we want older modifications without those
      * fields to deserialize without errors.
+     * If the body cannot be parsed, this throws an unchecked exception wrapping the cause. It used to return null,
+     * which hid the cause from the caller and from the user.
      */
     public static <T> T objectFromRequestBody(spark.Request request, Class<T> classe) {
         try {
             return lenientObjectMapper.readValue(request.bodyAsBytes(), classe);
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            throw new RuntimeException("Could not parse the request body as " + classe.getSimpleName() + ".", e);
         }
     }
 

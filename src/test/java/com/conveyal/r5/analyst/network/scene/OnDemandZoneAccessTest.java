@@ -127,7 +127,7 @@ public class OnDemandZoneAccessTest {
         var router = routeWithOnDemand(network, scene, 260, 350, onDemand(network, "village"));
         int timeToDropOff = router.getTravelTimeToVertex(vertexAt(network, scene, 2400, 0));
         assertTrue(timeToDropOff > 30 && timeToDropOff < 400,
-            "The ride out through the village should be priced as riding from the rider's own "
+            "The ride out through the village should be timed as riding from the rider's own "
                 + "street, but the drop-off zone was reached in " + timeToDropOff + " seconds.");
     }
 

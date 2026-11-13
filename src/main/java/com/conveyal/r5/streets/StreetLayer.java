@@ -7,7 +7,6 @@ import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
-import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -56,7 +55,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import static com.conveyal.r5.analyst.scenario.PickupWaitTimes.NO_WAIT_ALL_STOPS;
 import static com.conveyal.r5.common.GeometryUtils.checkWgsEnvelopeSize;
 import static com.conveyal.r5.streets.VertexStore.VertexFlag.IMPASSABLE;
 import static com.conveyal.r5.streets.VertexStore.VertexFlag.TRAFFIC_SIGNAL;
@@ -195,12 +193,6 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public StreetLayer baseStreetLayer = null;
 
-    /**
-     * This set of polygons specifies a spatially varying wait time to use a ride hailing service. Negative wait times
-     * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
-     * Note that this is a single field, rather than a collection: we only support one set of polygons for one mode.
-     */
-    public PickupWaitTimes pickupWaitTimes;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -1718,22 +1710,6 @@ public class StreetLayer implements Serializable, Cloneable {
         return bikeRentalStations;
     }
 
-    /**
-     * For the given location and mode of travel, get an object representing the available on-demand mobility service,
-     * including pick-up delay and which stops it will take you to. We currently only support one StreetMode per pickup
-     * delay polygon collection. If the supplied mode matches the wait time polygons' mode, return the pickup delay
-     * (or -1 for no service). Otherwise, return an object representing a 0 second delay.
-     * @param lat latitude of the starting point in floating point degrees
-     * @param lon longitude the starting point in floating point degrees
-     * @return object with pick-up time and stops served
-     */
-    public PickupWaitTimes.AccessService getAccessService (double lat, double lon, StreetMode streetMode) {
-        if (pickupWaitTimes != null && pickupWaitTimes.streetMode == streetMode) {
-            return pickupWaitTimes.getAccessService(lat, lon);
-        } else {
-            return NO_WAIT_ALL_STOPS;
-        }
-    }
 
     public boolean edgeIsDeletedByScenario (int p) {
         return edgeStore.temporarilyDeletedEdges != null && edgeStore.temporarilyDeletedEdges.contains(p);

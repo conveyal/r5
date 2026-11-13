@@ -42,8 +42,15 @@ class SceneRouting {
     /// Run a street search in the given mode from the given scene coordinates, minimizing
     /// duration. Throws an exception if the origin cannot be linked to the street network.
     static StreetRouter route (TransportNetwork network, Scene scene, double x, double y, StreetMode mode) {
+        return route(network, scene, x, y, mode, defaultRequest());
+    }
+
+    /// Like the other [#route] but with the given request in place of the default one.
+    static StreetRouter route (
+            TransportNetwork network, Scene scene, double x, double y, StreetMode mode, ProfileRequest request
+    ) {
         StreetRouter router = new StreetRouter(network.streetLayer);
-        router.profileRequest = defaultRequest();
+        router.profileRequest = request;
         router.streetMode = mode;
         router.timeLimitSeconds = TIME_LIMIT_SECONDS;
         if (!router.setOrigin(scene.latForY(y), scene.lonForXY(x, y))) {
@@ -69,11 +76,24 @@ class SceneRouting {
 
     /// Run a walk search from the given scene coordinates, then extend it with on-demand rides and
     /// a final post-on-demand walk. This invokes the same [OnDemandAccess] method that
-    /// TravelTimeComputer uses for the access leg when the ON_DEMAND flag is set, ensuring tests
+    /// TravelTimeComputer uses for the access leg when ON_DEMAND is among the access leg modes, ensuring tests
+
     /// use exactly the same sequence of actions as production, but, without the surrounding travel
     /// time surface and propagation machinery.
     static WalkAndFlexResults routeWithOnDemand (TransportNetwork network, Scene scene, double x, double y, OnDemand od) {
         StreetRouter walk = route(network, scene, x, y, StreetMode.WALK);
+        OnDemandAccess oda = OnDemandAccess.route(walk, List.of(od), NOON, null);
+        return new WalkAndFlexResults(walk, oda);
+    }
+
+    /// Like the other [#routeWithOnDemand] but with the given bike speed in meters per second in
+    /// the request, for tests of on-demand services whose vehicles are bicycles.
+    static WalkAndFlexResults routeWithOnDemand (
+            TransportNetwork network, Scene scene, double x, double y, OnDemand od, float bikeSpeed
+    ) {
+        ProfileRequest request = defaultRequest();
+        request.bikeSpeed = bikeSpeed;
+        StreetRouter walk = route(network, scene, x, y, StreetMode.WALK, request);
         OnDemandAccess oda = OnDemandAccess.route(walk, List.of(od), NOON, null);
         return new WalkAndFlexResults(walk, oda);
     }
@@ -88,13 +108,13 @@ class SceneRouting {
         int getTravelTimeToVertex (int vertexIndex) {
             return Math.min(
                 access.getTravelTimeToVertex(vertexIndex),
-                flex.egressRouter.getTravelTimeToVertex(vertexIndex));
+                flex.onwardWalkRouter.getTravelTimeToVertex(vertexIndex));
         }
 
         /// Travel times to all reached transit stops, by walking directly or after a flex ride.
         TIntIntMap getReachedStops () {
             TIntIntMap merged = access.getReachedStops();
-            flex.egressRouter.getReachedStops().forEachEntry((stop, seconds) -> {
+            flex.onwardWalkRouter.getReachedStops().forEachEntry((stop, seconds) -> {
                 if (!merged.containsKey(stop) || merged.get(stop) > seconds) {
                     merged.put(stop, seconds);
                 }

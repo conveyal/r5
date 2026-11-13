@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14120 320" width="14120" height="320" font-family="sans-serif">
+<rect x="0" y="0" width="14120" height="320" fill="white"/>
+<polyline points="60.0,160.0 560.0,160.0 1560.0,160.0 3560.0,160.0 13560.0,160.0 14060.0,160.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="560.0,260.0 560.0,160.0 560.0,60.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1560.0,260.0 1560.0,160.0 1560.0,60.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="3560.0,260.0 3560.0,160.0 3560.0,60.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="13560.0,260.0 13560.0,160.0 13560.0,60.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="560.0" cy="160.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="1560.0" cy="160.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="3560.0" cy="160.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="13560.0" cy="160.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<line x1="20" y1="300" x2="120" y2="300" stroke="#111111" stroke-width="2"/>
+<text x="4960.0" y="160.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Main Rd</text>
+<text x="560.0" y="190.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">West St</text>
+<text x="1560.0" y="190.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Zone St</text>
+<text x="3560.0" y="190.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Hub St</text>
+<text x="13560.0" y="190.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Far St</text>
+<g transform="translate(566.0,154.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">west jct.</text></g>
+<g transform="translate(1566.0,154.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">zone jct.</text></g>
+<g transform="translate(3566.0,154.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">hub jct.</text></g>
+<g transform="translate(13566.0,154.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">far jct.</text></g>
+<text x="130.0" y="304.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

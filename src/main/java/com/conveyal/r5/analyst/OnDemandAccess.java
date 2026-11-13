@@ -9,7 +9,9 @@ import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
@@ -22,34 +24,35 @@ public class OnDemandAccess {
 
     /// Performs a walk search onward from the clipped final states of all candidate services.
     /// Transit stop arrival times for on-demand access are read from this router.
-    public final StreetRouter egressRouter;
+    public final StreetRouter onwardWalkRouter;
 
     /// Direct on-demand travel times to the supplied destination points, which are the cell-wise
-    /// minimum of the car and walk searches (for on-demand and the following walk), or null when
+    /// minimum of the ride and walk searches (for on-demand and the following walk), or null when
     /// no destinations were supplied. This does not include times using the pre-on-demand access
     /// mode alone, which the caller determines using its own access router.
     public final PointSetTimes directTimes;
 
-    private OnDemandAccess (StreetRouter egressRouter, PointSetTimes directTimes) {
-        this.egressRouter = egressRouter;
+    private OnDemandAccess (StreetRouter onwardWalkRouter, PointSetTimes directTimes) {
+        this.onwardWalkRouter = onwardWalkRouter;
         this.directTimes = directTimes;
     }
 
     /// Runs the complete on-demand portion of routing, for access to scheduled transit or direct
     /// access to destinations.
     ///
-    /// 1. Per candidate service, a car search is run from all access states accepted by the pick-up
-    ///    place filter, as well as the origin point, and results clipped to its drop-off place filter.
+    /// 1. Per candidate service, a search using the service's street mode is run from all access
+    ///    states accepted by the pick-up place filter, as well as the origin point, and results
+    ///    clipped to its drop-off place filter.
     /// 2. Clipped results for each service are merged into one temporary router without ever modifying
     ///    the supplied access router. Walking states do not evict ride states or vice versa.
     /// 3. A single walk search is initialized from those states. Its results feed every downstream
     ///    stage: flex drop-off stops, scheduled transit stops reached by transfers, streets reached
     ///    by walking including pedestrian-only areas.
-    /// 4. When a destination PointSet is supplied, travel times are propagated to them as the
-    ///    minimum of a) the car linkage clipped by the destination drop-off place and b) the WALK
-    ///    linkage with no such filtering.
+    /// 4. When a destination PointSet is supplied, travel times are propagated to those points as
+    ///    the minimum of a) the linkage for each service's street mode clipped by the destination
+    ///    drop-off place and b) the WALK linkage with no such filtering.
     ///
-    /// The car search must be run separately per service as different destination filtering must be
+    /// The ride search must be run separately per service as different destination filtering must be
     /// applied to their results separately.
     ///
     /// The supplied OnDemand services should be pre-filtered for plausible spatial and temporal
@@ -66,40 +69,42 @@ public class OnDemandAccess {
         TransportNetwork network = accessRouter.streetLayer.parentNetwork;
         ProfileRequest request = accessRouter.profileRequest;
         LinkedPointSet walkLinkage = null;
-        LinkedPointSet carLinkage = null;
         int walkSpeedMmPerSecond = 0;
-        int carSpeedMmPerSecond = 0;
         if (destinations != null) {
             walkLinkage = network.linkageCache.getLinkage(destinations, network.streetLayer, StreetMode.WALK);
-            carLinkage = network.linkageCache.getLinkage(destinations, network.streetLayer, StreetMode.CAR);
             walkSpeedMmPerSecond = (int) (request.walkSpeed * MM_PER_METER);
-            // The car linkage replaces this speed with each destination edge's own car speed.
-            carSpeedMmPerSecond = (int) (request.getSpeedForMode(StreetMode.CAR) * MM_PER_METER);
         }
+        // The destination linkage for each street mode used by the candidate services' vehicles.
+        // These are fetched on first use, so a linkage is not built for modes no candidate uses.
+        Map<StreetMode, LinkedPointSet> linkageForVehicleMode = new EnumMap<>(StreetMode.class);
         // Merged results accumulate in a temporary router so each service's sub-search becomes
         // garbage before the next one is initialized. Initial states are always taken from the
         // access search, preventing chained on-demand rides.
         StreetRouter rides = accessRouter.shallowCopyForRouting();
-        PointSetTimes carArmTimes = null;
+        PointSetTimes rideArmTimes = null;
         for (OnDemand od : candidates) {
             OnDemandPlaceFilter dropOffPlace = OnDemandPlaceFilter.dropOff(od, network);
             StreetRouter ride = accessRouter.copyAndRouteFor(od, midTime);
             ride.clipStates(dropOffPlace);
-            if (carLinkage != null) {
-                PointSetTimes delivered = carLinkage.evalClipped(
-                        ride::getTravelTimeToVertex, carSpeedMmPerSecond, walkSpeedMmPerSecond, dropOffPlace);
-                carArmTimes = PointSetTimes.minMerge(carArmTimes, delivered);
+            if (destinations != null) {
+                LinkedPointSet vehicleLinkage = linkageForVehicleMode.computeIfAbsent(od.streetMode,
+                        mode -> network.linkageCache.getLinkage(destinations, network.streetLayer, mode));
+                // A CAR linkage replaces this speed with each destination edge's own car speed.
+                int rideSpeedMmPerSecond = (int) (request.getSpeedForMode(od.streetMode) * MM_PER_METER);
+                PointSetTimes delivered = vehicleLinkage.evalClipped(
+                        ride::getTravelTimeToVertex, rideSpeedMmPerSecond, walkSpeedMmPerSecond, dropOffPlace);
+                rideArmTimes = PointSetTimes.minMerge(rideArmTimes, delivered);
             }
             rides.mergeStatesFrom(ride);
         }
-        StreetRouter egressRouter = rides.copyAndRouteEgressWalk();
-        PointSetTimes directTimes = carArmTimes;
+        StreetRouter onwardWalkRouter = rides.copyAndRouteOnwardWalk();
+        PointSetTimes directTimes = rideArmTimes;
         if (walkLinkage != null) {
             PointSetTimes walked = walkLinkage.eval(
-                    egressRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null);
+                    onwardWalkRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null);
             directTimes = PointSetTimes.minMerge(directTimes, walked);
         }
-        return new OnDemandAccess(egressRouter, directTimes);
+        return new OnDemandAccess(onwardWalkRouter, directTimes);
     }
 
 }

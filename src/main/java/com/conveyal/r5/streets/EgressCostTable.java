@@ -2,7 +2,6 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.progress.ProgressListener;
-import com.conveyal.r5.analyst.scenario.PickupWaitTimes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
@@ -64,9 +63,9 @@ public class EgressCostTable implements Serializable {
 
     // CONSTANTS
 
-    public static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
+    public static final int BICYCLE_EGRESS_DISTANCE_LIMIT_METERS = 5000;
 
-    public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
+    public static final int CAR_EGRESS_TIME_LIMIT_SECONDS = 30 * 60;
 
     public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 22; // ~80 kilometers per hour
 
@@ -112,13 +111,6 @@ public class EgressCostTable implements Serializable {
      */
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
-    /**
-     * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomous vehicle,
-     * scooter pickup, etc.). We track this separately so the egress time limit can exclude waiting time.
-     *
-     * Should remain null if there is not a pickup delay modification applied for this streetmode.
-     */
-    public int[] egressStopDelaysSeconds;
 
     /**
      * Build an EgressCostTable for the given LinkedPointSet.
@@ -160,13 +152,6 @@ public class EgressCostTable implements Serializable {
 
         TransitLayer transitLayer = linkedPointSet.streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
-        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
-        PickupWaitTimes pickupWaitTimes = streetLayer.pickupWaitTimes;
-
-        if (pickupWaitTimes != null && streetMode == pickupWaitTimes.streetMode) {
-            egressStopDelaysSeconds = new int[nStops];
-            Arrays.fill(egressStopDelaysSeconds, pickupWaitTimes.getDefaultWaitInSeconds());
-        }
 
         if (streetMode == StreetMode.CAR) {
             this.linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
@@ -176,24 +161,24 @@ public class EgressCostTable implements Serializable {
 
 
         /**
-         * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
-         * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
-         * in the UI.
+         * The bound on the street search from each stop out to the already linked points when building this table,
+         * chosen for the street mode from the constants above. The value should be larger than any per-leg street
+         * mode limits that can be requested in the UI.
          * FIXME we should leave this uninitialized, only initializing once the linkage mode is known.
          * We would then fail fast on any programming errors that don't set or copy the limit.
          * FIXME this appears to be used only in the constructor, should we really save it in an instance field? Maybe,
          *       just for debugging.
          */
-        final int linkingDistanceLimitMeters;
+        final int egressDistanceLimitMeters;
 
         // This affects the distance that the street router will search, but in the case of selectively recalculating
         // for a scenario, it also affects the distance around the scenario modifications where we look for stops.
         if (streetMode == StreetMode.WALK) {
-            linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
+            egressDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
         } else if (streetMode == StreetMode.BICYCLE) {
-            linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
+            egressDistanceLimitMeters = BICYCLE_EGRESS_DISTANCE_LIMIT_METERS;
         } else if (streetMode == StreetMode.CAR) {
-            linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
+            egressDistanceLimitMeters = CAR_EGRESS_TIME_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
         } else {
             throw new UnsupportedOperationException("Unrecognized streetMode");
         }
@@ -225,7 +210,7 @@ public class EgressCostTable implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
+            rebuildZone = linkedPointSet.streetLayer.scenarioEdgesBoundingGeometry(egressDistanceLimitMeters);
         }
 
         LOG.info("Creating EgressCostTables from each transit stop to PointSet points for mode {}.", streetMode);
@@ -263,7 +248,8 @@ public class EgressCostTable implements Serializable {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
-            if (rebuildZone != null && !rebuildZone.contains(stopPoint) && egressStopDelaysSeconds == null) {
+            if (rebuildZone != null && !rebuildZone.contains(stopPoint)) {
+
                 // This cannot be affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so
                 // all stops outside the relink zone should already have a distance table entry.
@@ -278,7 +264,7 @@ public class EgressCostTable implements Serializable {
 
             computeCounter.increment();
             Envelope envelopeAroundStop = stopPoint.getEnvelopeInternal();
-            GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, linkingDistanceLimitMeters);
+            GeometryUtils.expandEnvelopeFixed(envelopeAroundStop, egressDistanceLimitMeters);
 
             if (streetMode == StreetMode.WALK) {
                 // Distances from stops to street vertices are saved in the TransitLayer, but only for the walk mode.
@@ -291,29 +277,8 @@ public class EgressCostTable implements Serializable {
                         linkedPointSet.extendDistanceTableToPoints(distanceTableToVertices, envelopeAroundStop);
             } else {
                 // For non-walk modes perform a search from each stop, as stop-to-vertex tables are not precomputed.
-                Geometry egressArea = null;
-
-                // If a pickup delay modification is present for this street mode, egressStopDelaysSeconds is
-                // initialized and filled with the default value in the constructor. Here, we override the default
-                // values with any stop-specific values.
-                if (egressStopDelaysSeconds != null) {
-                    // TODO handle case where stopsForZone is not specified in the modification, implying the main
-                    //  polygon can be used for both access and egress service.
-                    PickupWaitTimes.EgressService egressService = pickupWaitTimes.getEgressService(stopIndex);
-                    if (egressService == null) {
-                        if (pickupWaitTimes.getDefaultWaitInSeconds() < 0) {
-                            // Bail out early if egress from this stop is not specified and the default is no available
-                            // on-demand mode
-                            LOG.debug("{} egress from stop {} unavailable in pickup delay modification", streetMode, stopIndex);
-                            return null;
-                        }
-                    } else {
-                        egressArea = egressService.serviceArea;
-                        egressStopDelaysSeconds[stopIndex] = egressService.waitTimeSeconds;
-                    }
-                }
-
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
+
                 sr.streetMode = streetMode;
                 int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
                 if (vertexId < 0) {
@@ -329,14 +294,14 @@ public class EgressCostTable implements Serializable {
 
                 // WALK is handled in the if clause above, this else block is exhaustively handling all other modes.
                 if (streetMode == StreetMode.BICYCLE) {
-                    sr.distanceLimitMeters = linkingDistanceLimitMeters;
+                    sr.distanceLimitMeters = egressDistanceLimitMeters;
                 } else if (streetMode == StreetMode.CAR) {
                     // Car speeds vary by link and cannot be set in analysis requests, so it makes sense to use
                     // seconds directly as the linkage cost. In contrast, the speeds for Walk and Bicycle can be
                     // specified in an analysis request, so it makes sense above to store distances and apply the
                     // requested speed.
                     // TODO confirm this works as expected when modifications can affect street layer.
-                    sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
+                    sr.timeLimitSeconds = CAR_EGRESS_TIME_LIMIT_SECONDS;
                 } else {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }
@@ -344,8 +309,8 @@ public class EgressCostTable implements Serializable {
                 sr.route();
                 return linkedPointSet.extendCostsToPoints(sr.getReachedVertices()::get,
                         sr.quantityToMinimize,
-                        envelopeAroundStop,
-                        egressArea);
+                        envelopeAroundStop);
+
             }
         }).collect(Collectors.toList());
         computeCounter.done();
@@ -361,7 +326,7 @@ public class EgressCostTable implements Serializable {
         this.linkedPointSet = linkedPointSet;
         this.linkageCostUnit = superCostTable.linkageCostUnit;
         this.stopToPointLinkageCostTables = stopToPointLinkageCostTables;
-        this.egressStopDelaysSeconds = superCostTable.egressStopDelaysSeconds;
+
     }
 
     /**
@@ -439,6 +404,8 @@ public class EgressCostTable implements Serializable {
      * calling the method that lazily transposed the tables.
      * TODO really we should have separate EgressCostTable and PropagationEgressCostTable classes, one copied from the other.
      * One should represent the region, or read-through crops of the whole region, and the other should be per-scenario.
+     * Under that split, OnDemandEgressTable would become a second builder feeding the shared propagation-side
+     * structure, instead of a parallel table duplicating the transposition and point-major lookup.
      */
     public synchronized void destructivelyTransposeForPropagationAsNeeded() {
         if (pointToStopLinkageCostTables == null) {

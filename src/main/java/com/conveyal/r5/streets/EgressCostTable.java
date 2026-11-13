@@ -113,6 +113,14 @@ public class EgressCostTable implements Serializable {
     private transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
+     * The same information as pointToStopLinkageCostTables, but for each point the nearby stops are stored as an
+     * array of (stop, cost) pairs sorted by ascending cost: [stop0, cost0, stop1, cost1, ...]. Visiting stops in
+     * this order allows PerTargetPropagater to stop early once no remaining stop can improve any travel time.
+     * Null entries for points with no nearby stops. Built together with pointToStopLinkageCostTables.
+     */
+    private transient List<int[]> pointToSortedStopLinkageCosts;
+
+    /**
      * For each transit stop, extra seconds to wait due to a pickup delay modification (e.g. for autonomous vehicle,
      * scooter pickup, etc.). We track this separately so the egress time limit can exclude waiting time.
      *
@@ -465,7 +473,36 @@ public class EgressCostTable implements Serializable {
             }
             // Make the transposed table available to propagation.
             this.pointToStopLinkageCostTables = Arrays.asList(result);
+            this.pointToSortedStopLinkageCosts = Arrays.asList(sortByCost(result));
         }
+    }
+
+    /**
+     * For each point, flatten its stop -> cost map into an array of (stop, cost) pairs sorted by ascending cost.
+     * Sorting packed (cost, stop) longs orders primarily by cost, with the stop index as a deterministic tie-breaker.
+     */
+    private static int[][] sortByCost (TIntIntMap[] pointToStopCosts) {
+        int[][] result = new int[pointToStopCosts.length][];
+        for (int point = 0; point < pointToStopCosts.length; point++) {
+            TIntIntMap costs = pointToStopCosts[point];
+            if (costs == null || costs.isEmpty()) {
+                continue;
+            }
+            long[] packed = new long[costs.size()];
+            int[] n = new int[1];
+            costs.forEachEntry((stop, cost) -> {
+                packed[n[0]++] = (((long) cost) << 32) | (stop & 0xffffffffL);
+                return true;
+            });
+            Arrays.sort(packed);
+            int[] pairs = new int[2 * packed.length];
+            for (int i = 0; i < packed.length; i++) {
+                pairs[2 * i] = (int) (packed[i] & 0xffffffffL);
+                pairs[2 * i + 1] = (int) (packed[i] >>> 32);
+            }
+            result[point] = pairs;
+        }
+        return result;
     }
 
     /**
@@ -474,6 +511,15 @@ public class EgressCostTable implements Serializable {
      */
     public TIntIntMap getCostTableForPoint (int pointIndex) {
         return pointToStopLinkageCostTables.get(pointIndex);
+    }
+
+    /**
+     * You should first call destructivelyTransposeForPropagationAsNeeded before calling this method.
+     * @return for the given destination point index, the nearby stops as interleaved (stop_index, cost) pairs
+     *         sorted by ascending cost, or null if there are no nearby stops.
+     */
+    public int[] getSortedCostTableForPoint (int pointIndex) {
+        return pointToSortedStopLinkageCosts.get(pointIndex);
     }
 
 }

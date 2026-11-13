@@ -1,10 +1,10 @@
-package com.conveyal.analysis.components;
+package com.conveyal.r5.components;
 
-import com.conveyal.analysis.components.eventbus.EventBus;
-import com.conveyal.analysis.controllers.NetworkTileController;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
+import com.conveyal.r5.components.eventbus.EventBus;
+import com.conveyal.r5.controllers.NetworkTileController;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetworkCache;
 

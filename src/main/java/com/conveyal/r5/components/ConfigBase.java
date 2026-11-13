@@ -1,4 +1,4 @@
-package com.conveyal.analysis;
+package com.conveyal.r5.components;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

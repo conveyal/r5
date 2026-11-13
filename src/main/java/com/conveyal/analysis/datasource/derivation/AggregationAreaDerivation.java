@@ -1,9 +1,6 @@
 package com.conveyal.analysis.datasource.derivation;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.datasource.DataSourceException;
-import com.conveyal.analysis.datasource.SpatialAttribute;
 import com.conveyal.analysis.models.AggregationArea;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.DataSource;
@@ -17,6 +14,9 @@ import com.conveyal.file.FileUtils;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.progress.ProgressListener;
 import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.datasource.DataSourceException;
+import com.conveyal.r5.datasource.SpatialAttribute;
 import com.conveyal.r5.util.ShapefileReader;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -223,7 +223,7 @@ public class AggregationAreaDerivation implements DataDerivation<SpatialDataSour
         });
         aggregationAreaCollection.insertMany(aggregationAreas);
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(AGGREGATION_AREA, dataGroup, spatialDataSource.regionId));
+        progressListener.setWorkProduct(new WorkProduct(AGGREGATION_AREA, dataGroup._id.toString(), spatialDataSource.regionId, true));
         progressListener.increment();
 
     }

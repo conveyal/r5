@@ -1,14 +1,16 @@
 package com.conveyal.analysis.components;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
-import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.HttpApiEvent;
-import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.r5.SoftwareVersion;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.components.Component;
+import com.conveyal.r5.components.eventbus.Event;
+import com.conveyal.r5.components.eventbus.EventBus;
+import com.conveyal.r5.controllers.HttpController;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.fileupload.FileUploadException;
 import org.slf4j.Logger;
@@ -21,11 +23,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-import static com.conveyal.analysis.AnalysisServerException.Type.BAD_REQUEST;
-import static com.conveyal.analysis.AnalysisServerException.Type.FORBIDDEN;
-import static com.conveyal.analysis.AnalysisServerException.Type.RUNTIME;
-import static com.conveyal.analysis.AnalysisServerException.Type.UNAUTHORIZED;
-import static com.conveyal.analysis.AnalysisServerException.Type.UNKNOWN;
+import static com.conveyal.r5.common.AnalysisServerException.Type.BAD_REQUEST;
+import static com.conveyal.r5.common.AnalysisServerException.Type.FORBIDDEN;
+import static com.conveyal.r5.common.AnalysisServerException.Type.RUNTIME;
+import static com.conveyal.r5.common.AnalysisServerException.Type.UNAUTHORIZED;
+import static com.conveyal.r5.common.AnalysisServerException.Type.UNKNOWN;
 
 /**
  * This Component is a web server that serves up our HTTP API endpoints, contacted by both the UI and the workers.
@@ -115,8 +117,10 @@ public class HttpApi implements Component {
             // but may fail to record requests experiencing authentication problems.
             Instant requestStartTime = req.attribute(REQUEST_START_TIME_ATTRIBUTE);
             Duration elapsed = Duration.between(requestStartTime, Instant.now());
-            eventBus.send(new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis())
-                    .forUser(UserPermissions.from(req)));
+            eventBus.send(withUser(
+                    new HttpApiEvent(req.requestMethod(), res.status(), req.pathInfo(), elapsed.toMillis()),
+                    UserPermissions.from(req)
+            ));
         });
 
         // Handle CORS preflight requests (which are OPTIONS requests).
@@ -165,12 +169,18 @@ public class HttpApi implements Component {
         return sparkService;
     }
 
+    /** Set the user and group on the event from the supplied userPermissions. If they are null, this has no effect. */
+    private static Event withUser (Event event, UserPermissions userPermissions) {
+        if (userPermissions == null) return event;
+        return event.forUser(userPermissions.email, userPermissions.accessGroup);
+    }
+
     private void respondToException(Exception e, Request request, Response response,
                                     AnalysisServerException.Type type, String message, int code) {
 
         // Stacktrace in ErrorEvent reused below to avoid repeatedly generating String of stacktrace.
         ErrorEvent errorEvent = new ErrorEvent(e, request.pathInfo());
-        eventBus.send(errorEvent.forUser(request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
+        eventBus.send(withUser(errorEvent, request.attribute(USER_PERMISSIONS_ATTRIBUTE)));
 
         ObjectNode body = JsonUtil.objectNode()
                 .put("type", type.toString())

@@ -1,4 +1,4 @@
-package com.conveyal.analysis;
+package com.conveyal.r5.common;
 
 import com.conveyal.r5.util.ExceptionUtils;
 import org.slf4j.Logger;

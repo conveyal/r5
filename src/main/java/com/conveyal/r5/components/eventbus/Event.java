@@ -1,6 +1,5 @@
-package com.conveyal.analysis.components.eventbus;
+package com.conveyal.r5.components.eventbus;
 
-import com.conveyal.analysis.UserPermissions;
 
 import java.util.Date;
 import java.util.Set;
@@ -28,19 +27,10 @@ public abstract class Event {
     // Could also include lat / lon for affected entities, to allow easy map visualization.
 
     /**
-     * Set the user and groups from the supplied userPermissions object (if any) and return the modified instance.
+     * Set the user and group and return the modified instance.
      * These fluent setter methods return this abstract supertype instead of the specific subtype, which can be a
      * little awkward. But the alternative of declaring Event <S extends Event> and casting is more ugly.
-     * @param userPermissions if this is null, the call will have no effect.
      */
-    public Event forUser (UserPermissions userPermissions) {
-        if (userPermissions != null) {
-            this.user = userPermissions.email;
-            this.accessGroup = userPermissions.accessGroup;
-        }
-        return this;
-    }
-
     public Event forUser (String user, String accessGroup) {
         this.user = user;
         this.accessGroup = accessGroup;

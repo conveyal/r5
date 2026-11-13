@@ -1,5 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
+import com.conveyal.r5.components.eventbus.Event;
+import com.conveyal.r5.components.eventbus.EventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

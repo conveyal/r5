@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.analysis.components.WorkerComponents;
-import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.r5.components.WorkerComponents;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.conveyal.r5.rastercost.ElevationLoader;
 import com.conveyal.r5.shapefile.ShapefileMatcher;
 import com.conveyal.r5.transit.TransportNetwork;

@@ -1,4 +1,4 @@
-package com.conveyal.analysis.datasource;
+package com.conveyal.r5.datasource;
 
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.coverage.SampleDimensionType;

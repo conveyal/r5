@@ -1,17 +1,17 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.analysis.components.Component;
 import com.conveyal.file.FileCategory;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OsmLibException;
+import com.conveyal.r5.components.Component;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.util.concurrent.ExecutionException;
+import javax.annotation.Nonnull;
 
 /**
  * TODO this should be moved so we don't need to have a dependency on AWS S3 SDK and multiple S3 clients.

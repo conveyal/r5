@@ -1,7 +1,7 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.r5.analyst.scenario.AddTrips;
+import com.conveyal.r5.common.AnalysisServerException;
 
 import java.util.ArrayList;
 import java.util.List;

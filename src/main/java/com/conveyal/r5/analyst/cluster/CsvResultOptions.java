@@ -1,4 +1,4 @@
-package com.conveyal.analysis.models;
+package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.transit.TransitLayer.EntityRepresentation;
 

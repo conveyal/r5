@@ -1,6 +1,6 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
+import com.conveyal.r5.common.AnalysisServerException;
 
 /**
  * Represents a region.

@@ -1,6 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
 import com.conveyal.r5.analyst.WorkerCategory;
+import com.conveyal.r5.components.eventbus.Event;
 
 /**
  * Created by abyrd on 2020-06-12

@@ -1,4 +1,4 @@
-package com.conveyal.analysis.datasource;
+package com.conveyal.r5.datasource;
 
 public class DataSourceException extends RuntimeException {
 

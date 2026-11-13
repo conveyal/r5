@@ -1,4 +1,4 @@
-package com.conveyal.analysis.components.eventbus;
+package com.conveyal.r5.components.eventbus;
 
 /** Interface for classes that receive events. */
 public interface EventHandler {

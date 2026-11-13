@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.models.CsvResultOptions;
 import com.conveyal.r5.analyst.StreetTimesAndModes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.path.Path;

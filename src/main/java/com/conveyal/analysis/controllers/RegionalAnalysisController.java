@@ -1,9 +1,7 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.SelectingGridReducer;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.components.broker.Broker;
 import com.conveyal.analysis.components.broker.JobStatus;
 import com.conveyal.analysis.models.AnalysisRequest;
@@ -13,7 +11,6 @@ import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.analysis.results.GridResultType;
-import com.conveyal.analysis.util.HttpStatus;
 import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
@@ -26,6 +23,10 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.controllers.HttpController;
+import com.conveyal.r5.util.HttpStatus;
 import com.conveyal.r5.util.SemVer;
 import com.google.common.primitives.Ints;
 import com.mongodb.QueryBuilder;
@@ -298,7 +299,7 @@ public class RegionalAnalysisController implements HttpController {
         // File did not exist. Create it in the background and ask caller to request it later.
         filesBeingPrepared.add(zippedResultsKey.path);
         Task task = Task.create("Preparing regional results archive (hit download again when complete)")
-            .forUser(userPermissions)
+            .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
             .withAction(progressListener -> {
                 int nSteps = analysis.destinationPointSetIds.length * analysis.cutoffsMinutes.length *
                         analysis.travelTimePercentiles.length * 2 + 1;

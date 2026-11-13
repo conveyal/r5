@@ -1,8 +1,8 @@
 package com.conveyal.analysis.models;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.results.CsvResultType;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.common.AnalysisServerException;
 import org.locationtech.jts.geom.Geometry;
 
 import java.util.HashMap;

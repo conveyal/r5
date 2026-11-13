@@ -1,9 +1,9 @@
 package com.conveyal.analysis.models;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.datasource.SpatialAttribute;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.r5.datasource.SpatialAttribute;
 import com.conveyal.r5.util.ShapefileReader;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.locationtech.jts.geom.Envelope;

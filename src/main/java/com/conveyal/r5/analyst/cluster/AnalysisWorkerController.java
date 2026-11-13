@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.controllers.HttpController;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.controllers.HttpController;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;

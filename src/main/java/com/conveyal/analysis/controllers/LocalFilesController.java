@@ -6,6 +6,7 @@ import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.file.LocalFileStorage;
+import com.conveyal.r5.controllers.HttpController;
 import spark.Request;
 import spark.Response;
 import spark.Service;

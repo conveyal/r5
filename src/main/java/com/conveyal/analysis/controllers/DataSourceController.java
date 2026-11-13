@@ -1,7 +1,6 @@
 package com.conveyal.analysis.controllers;
 
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.datasource.DataSourcePreviewGenerator;
 import com.conveyal.analysis.datasource.DataSourceUploadAction;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
@@ -16,6 +15,8 @@ import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageFormat;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.r5.analyst.progress.Task;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.controllers.HttpController;
 import com.mongodb.client.result.DeleteResult;
 import org.apache.commons.fileupload.FileItem;
 import org.geotools.data.geojson.GeoJSONWriter;
@@ -37,6 +38,7 @@ import static com.conveyal.file.FileCategory.DATASOURCES;
 import static com.conveyal.file.FileStorageFormat.SHP;
 import static com.conveyal.r5.analyst.WebMercatorExtents.parseZoom;
 import static com.mongodb.client.model.Filters.eq;
+import static com.conveyal.r5.analyst.progress.WorkProductType.DATA_SOURCE;
 
 /**
  * Controller that handles CRUD of DataSources, which are Mongo metadata about user-uploaded files.
@@ -146,9 +148,9 @@ public class DataSourceController implements HttpController {
         source.regionId = regionId;
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
-                .forUser(userPermissions)
+                .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
                 .setHeavy(true)
-                .withWorkProduct(source)
+                .withWorkProduct(DATA_SOURCE, source._id.toString(), null)
                 .withAction((progressListener) -> {
                     // TODO implement
                     throw new UnsupportedOperationException();
@@ -170,7 +172,7 @@ public class DataSourceController implements HttpController {
                 fileStorage, dataSourceCollection, formFields, userPermissions
         );
         Task backgroundTask = Task.create("Processing uploaded files: " + uploadAction.getDataSourceName())
-                .forUser(userPermissions)
+                .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
                 .withAction(uploadAction);
 
         taskScheduler.enqueue(backgroundTask);

@@ -1,5 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
+import com.conveyal.r5.components.eventbus.Event;
+
 /**
  * Fired when the Backend is handling a single point request (forwarding it to a worker).
  */

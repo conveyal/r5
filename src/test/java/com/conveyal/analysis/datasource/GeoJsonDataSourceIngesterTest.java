@@ -1,6 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import com.conveyal.analysis.models.SpatialDataSource;
+import com.conveyal.r5.datasource.DataSourceException;
 import org.junit.jupiter.api.Test;
 
 import static com.conveyal.analysis.datasource.SpatialDataSourceIngesterTest.assertIngestException;

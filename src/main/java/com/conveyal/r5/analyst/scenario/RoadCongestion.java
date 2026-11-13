@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.analysis.components.WorkerComponents;
 import com.conveyal.file.FileStorageKey;
+import com.conveyal.r5.components.WorkerComponents;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.ExceptionUtils;

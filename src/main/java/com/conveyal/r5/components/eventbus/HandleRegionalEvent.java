@@ -1,8 +1,8 @@
-package com.conveyal.analysis.components.eventbus;
+package com.conveyal.r5.components.eventbus;
 
 /**
  * Event fired by a worker when it is handling a single point task (after it has loaded the relevant transport network).
  */
-public class HandleSinglePointEvent extends Event {
+public class HandleRegionalEvent extends Event {
 
 }

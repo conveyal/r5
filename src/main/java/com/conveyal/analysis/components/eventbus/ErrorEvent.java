@@ -1,5 +1,6 @@
 package com.conveyal.analysis.components.eventbus;
 
+import com.conveyal.r5.components.eventbus.Event;
 import com.conveyal.r5.util.ExceptionUtils;
 
 import static com.conveyal.r5.util.ExceptionUtils.filterStackTrace;

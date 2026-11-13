@@ -1,9 +1,7 @@
 package com.conveyal.analysis.components.broker;
 
-import com.conveyal.analysis.components.Component;
 import com.conveyal.analysis.components.WorkerLauncher;
 import com.conveyal.analysis.components.eventbus.ErrorEvent;
-import com.conveyal.analysis.components.eventbus.EventBus;
 import com.conveyal.analysis.components.eventbus.RegionalAnalysisEvent;
 import com.conveyal.analysis.components.eventbus.WorkerEvent;
 import com.conveyal.analysis.models.RegionalAnalysis;
@@ -17,6 +15,8 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.components.Component;
+import com.conveyal.r5.components.eventbus.EventBus;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;

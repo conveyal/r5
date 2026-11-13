@@ -1,6 +1,5 @@
 package com.conveyal.analysis.results;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.components.broker.Job;
 import com.conveyal.analysis.models.RegionalAnalysis;
 import com.conveyal.analysis.persistence.Persistence;
@@ -10,6 +9,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.cluster.PathResult;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.common.AnalysisServerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

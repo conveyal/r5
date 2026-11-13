@@ -1,4 +1,4 @@
-package com.conveyal.analysis.util;
+package com.conveyal.r5.util;
 
 /**
  * It's kind of absurd to have our own set of HTTP status code constants, but I can't find any in the Spark project.

@@ -1,7 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.analysis.components.Component;
-import com.conveyal.analysis.datasource.DataSourceException;
 import com.conveyal.file.FileStorage;
 import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
@@ -12,6 +10,8 @@ import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.components.Component;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.streets.OSMCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -19,11 +19,11 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.annotation.Nonnull;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.DATASOURCES;

@@ -1,4 +1,4 @@
-package com.conveyal.analysis.util;
+package com.conveyal.r5.util;
 
 import com.conveyal.gtfs.util.GeometryUtil;
 import com.conveyal.r5.common.GeometryUtils;

@@ -1,13 +1,14 @@
 package com.conveyal.analysis.components;
 
 import com.conveyal.analysis.LocalWorkerConfig;
-import com.conveyal.analysis.WorkerConfig;
 import com.conveyal.analysis.components.broker.WorkerTags;
 import com.conveyal.file.FileStorage;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.analyst.cluster.AnalysisWorker;
 import com.conveyal.r5.analyst.cluster.Worker;
+import com.conveyal.r5.components.WorkerComponents;
+import com.conveyal.r5.components.WorkerConfig;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import org.slf4j.Logger;

@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.analysis.components.WorkerComponents;
+import com.conveyal.r5.components.WorkerComponents;
 
 public class Worker implements Runnable {
 

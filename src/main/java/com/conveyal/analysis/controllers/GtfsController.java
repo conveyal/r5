@@ -1,15 +1,16 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.models.Bundle;
 import com.conveyal.analysis.persistence.Persistence;
-import com.conveyal.analysis.util.VectorMapTile;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.controllers.HttpController;
+import com.conveyal.r5.util.VectorMapTile;
 import com.mongodb.QueryBuilder;
 import org.locationtech.jts.geom.Geometry;
 import org.mapdb.Fun;
@@ -24,8 +25,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.conveyal.analysis.util.HttpStatus.OK_200;
-import static com.conveyal.analysis.util.HttpUtils.CACHE_CONTROL_IMMUTABLE;
+import static com.conveyal.r5.util.HttpStatus.OK_200;
 import static com.conveyal.analysis.util.JsonUtil.toJson;
 
 /**

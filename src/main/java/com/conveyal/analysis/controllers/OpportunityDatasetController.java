@@ -1,8 +1,6 @@
 package com.conveyal.analysis.controllers;
 
-import com.conveyal.analysis.AnalysisServerException;
 import com.conveyal.analysis.UserPermissions;
-import com.conveyal.analysis.components.TaskScheduler;
 import com.conveyal.analysis.grids.SeamlessCensusGridExtractor;
 import com.conveyal.analysis.models.DataGroup;
 import com.conveyal.analysis.models.OpportunityDataset;
@@ -24,6 +22,9 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.progress.NoopProgressListener;
 import com.conveyal.r5.analyst.progress.Task;
 import com.conveyal.r5.analyst.progress.WorkProduct;
+import com.conveyal.r5.common.AnalysisServerException;
+import com.conveyal.r5.components.TaskScheduler;
+import com.conveyal.r5.controllers.HttpController;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.conveyal.r5.util.InputStreamProvider;
 import com.conveyal.r5.util.ProgressListener;
@@ -154,7 +155,7 @@ public class OpportunityDatasetController implements HttpController {
         DataGroup dataGroup = new DataGroup(userPermissions, source._id.toString(), description);
 
         taskScheduler.enqueue(Task.create("Extracting LODES data")
-                .forUser(userPermissions)
+                .forUser(userPermissions.email).inGroup(userPermissions.accessGroup)
                 .setHeavy(true)
                 .withAction((progressListener) -> {
                     try {
@@ -247,7 +248,7 @@ public class OpportunityDatasetController implements HttpController {
         }
         // Set the workProduct - TODO update UI so it can handle a link to a group of OPPORTUNITY_DATASET
         dataGroupCollection.insert(dataGroup);
-        progressListener.setWorkProduct(WorkProduct.forDataGroup(OPPORTUNITY_DATASET, dataGroup, source.regionId));
+        progressListener.setWorkProduct(new WorkProduct(OPPORTUNITY_DATASET, dataGroup._id.toString(), source.regionId, true));
     }
 
     private static FileStorageFormat getFormatCode (PointSet pointSet) {

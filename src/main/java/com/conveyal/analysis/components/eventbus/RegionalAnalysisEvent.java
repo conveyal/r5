@@ -1,5 +1,7 @@
 package com.conveyal.analysis.components.eventbus;
 
+import com.conveyal.r5.components.eventbus.Event;
+
 /**
  * Represents the progress of a regional analysis over time.
  */

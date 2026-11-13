@@ -4,6 +4,8 @@ import com.conveyal.analysis.models.Bounds;
 import com.conveyal.analysis.models.DataSource;
 import com.conveyal.analysis.models.SpatialDataSource;
 import com.conveyal.r5.analyst.progress.ProgressListener;
+import com.conveyal.r5.datasource.DataSourceException;
+import com.conveyal.r5.datasource.SpatialAttribute;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;

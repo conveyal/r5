@@ -1,6 +1,7 @@
 package com.conveyal.analysis.datasource;
 
 import com.conveyal.file.FileStorageFormat;
+import com.conveyal.r5.datasource.DataSourceException;
 import com.google.common.collect.Sets;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItem;

@@ -62,18 +62,20 @@ public class SpeedConfig {
     public static SpeedConfig defaultConfig() {
         SpeedConfig speedConfig = new SpeedConfig();
         speedConfig.units = SpeedUnit.MPH;
-        speedConfig.addCarSpeed("motorway", 65);
-        speedConfig.addCarSpeed("motorway_link", 35);
-        speedConfig.addCarSpeed("trunk", 55);
-        speedConfig.addCarSpeed("trunk_link", 35);
-        speedConfig.addCarSpeed("primary", 45);
-        speedConfig.addCarSpeed("primary_link", 25);
-        speedConfig.addCarSpeed("secondary", 35);
-        speedConfig.addCarSpeed("secondary_link", 25);
-        speedConfig.addCarSpeed("tertiary", 25);
-        speedConfig.addCarSpeed("tertiary_link", 25);
-        speedConfig.addCarSpeed("living_street", 5);
-        speedConfig.defaultSpeed = 25;
+        speedConfig.addCarSpeed("motorway", 50);
+        speedConfig.addCarSpeed("motorway_link", 32);
+        speedConfig.addCarSpeed("trunk", 33);
+        speedConfig.addCarSpeed("trunk_link", 25);
+        speedConfig.addCarSpeed("primary", 27);
+        speedConfig.addCarSpeed("primary_link", 18);
+        speedConfig.addCarSpeed("secondary", 26);
+        speedConfig.addCarSpeed("secondary_link", 18);
+        speedConfig.addCarSpeed("tertiary", 20);
+        speedConfig.addCarSpeed("tertiary_link", 16);
+        speedConfig.addCarSpeed("living_street", 17);
+        speedConfig.addCarSpeed("residential", 17);
+        speedConfig.addCarSpeed("service", 14);
+        speedConfig.defaultSpeed = 17;
         return speedConfig;
     }
 

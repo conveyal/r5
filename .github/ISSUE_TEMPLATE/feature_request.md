@@ -7,14 +7,18 @@ assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## User Issue
+Who are the target users for this feature? What current issues prevent them from accomplishing what they want with R5?
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+_As an [x], I want to [y] so that [z]._
 
-**Describe alternatives you've considered**
+## User Solution
+What changes in the appearance, functionality, or behavior of the system will address the issue?
+Do this in detail, describing as specifically as possible what users will see and ways the system will behave.
+
+## Suggested Implementation, Side Effects, and Alternatives
+Technical suggestions on implementation and how to test, if any. 
 A clear and concise description of any alternative solutions or features you've considered.
 
-**Additional context**
+## Additional Context
 Add any other context or screenshots about the feature request here.

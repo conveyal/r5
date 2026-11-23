@@ -54,13 +54,13 @@ public class LocalWorkerLauncher implements WorkerLauncher {
     }
 
     @Override
-    public void launch (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot) {
+    public void launch (WorkerCategory category, WorkerTags workerTags, int nRequested, boolean spot) {
         if (!workerThreads.isEmpty()) {
             LOG.error("Will not start additional workers, some are already running.");
             return;
         }
-        int nTotal = nOnDemand + nSpot;
-        LOG.debug("Number of workers requested is {}.", nTotal);
+        LOG.debug("Number of workers requested is {}.", nRequested);
+        int nTotal = nRequested;
         if (nTotal != nWorkers) {
             nTotal = nWorkers;
             LOG.debug("Ignoring that and starting {} local Analysis workers...", nTotal);

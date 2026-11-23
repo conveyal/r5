@@ -826,7 +826,7 @@ public class TransitLayer implements Serializable, Cloneable {
             return TransitModes.TRAM;
         } else if (routeType >= 1000 && routeType < 1100) { //Water Transport Service
             return TransitModes.FERRY;
-        } else if (routeType >= 1100 && routeType < 1200) { //Air Service
+        } else if (routeType >= 1100 && routeType < 1200) { //Air Service. Typically ignored in Conveyal.
             return TransitModes.AIR;
         } else if (routeType >= 1200 && routeType < 1300) { //Ferry Service
             return TransitModes.FERRY;
@@ -834,8 +834,8 @@ public class TransitLayer implements Serializable, Cloneable {
             return TransitModes.GONDOLA;
         } else if (routeType >= 1400 && routeType < 1500) { //Funicalar Service
             return TransitModes.FUNICULAR;
-        } else if (routeType >= 1500 && routeType < 1600) { //Taxi Service
-            throw new IllegalArgumentException("Taxi route_type code not supported: " + routeType);
+        } else if (routeType >= 1500 && routeType < 1600) { //Taxi Service. Typically ignored in Conveyal.
+            return TransitModes.TAXI;
         } else if (routeType >= 1600) {
             throw new IllegalArgumentException("Car or other route_type code above 1600 not supported: " + routeType);
         }

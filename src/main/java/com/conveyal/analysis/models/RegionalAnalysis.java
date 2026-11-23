@@ -26,13 +26,13 @@ public class RegionalAnalysis extends Model implements Cloneable {
     public int north;
     public int west;
 
-    /**
-     * TODO: Fix confusing naming. An `AnalysisRequest` is used to create a `AnalysisWorkerTask` (which `RegionalTask`
-     *       extends) but is not the same as a task. Naming this parameter `request` can create confusion that it refers
-     *       to that incoming `AnalysisRequest` object and not the `RegionalTask` itself. Either 1) rename this parameter
-     *       "task" (which would require a migration) or 2) rename `AnalysisRequest` something more unique to
-     *       differentiate or 3) ?.
-     */
+    /// The task this regional analysis was created with. Despite the name of this field, it is a
+    /// RegionalTask and not the AnalysisRequest sent by the UI.
+    /// TODO: Fix confusing naming. An `AnalysisRequest` is used to create a `AnalysisWorkerTask` (which `RegionalTask`
+    ///       extends) but is not the same as a task. Naming this parameter `request` can create confusion that it refers
+    ///       to that incoming `AnalysisRequest` object and not the `RegionalTask` itself. Either 1) rename this parameter
+    ///       "task" (which would require a migration) or 2) rename `AnalysisRequest` something more unique to
+    ///       differentiate or 3) ?.
     public RegionalTask request;
 
     /**

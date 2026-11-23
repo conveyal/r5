@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.flex;
 
-import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.geom.CPolygonal;
 
 import java.io.Serializable;
@@ -19,13 +18,13 @@ public class FlexLocation implements Serializable {
     /// A description of the location to help orient riders.
     public String stopDesc;
 
-    /// Constrained to be Polygon or MultiPolygon by the GTFS Flex spec. Currently only supporting
-    /// Polygon until we can evaluate the mix of geometry types in real world fees. Using our own
-    /// CGeometry types to avoid complexities around serializing JTS Geometries to MapDB (they
-    /// reference context like GeometryFactory, coordinate reference systems, and precision models).
-    public CPolygon geometry;
+    /// Constrained to be Polygon or MultiPolygon by the GTFS Flex spec. Using our own CGeometry
+    /// types to avoid complexities around serializing JTS Geometries to MapDB (they reference
+    /// context like GeometryFactory, coordinate reference systems, and precision models).
+    public CPolygonal geometry;
 
-    public FlexLocation (String id, String stopName, String stopDesc, CPolygon geometry) {
+    public FlexLocation (String id, String stopName, String stopDesc, CPolygonal geometry) {
+
         this.id = id;
         this.stopName = stopName;
         this.stopDesc = stopDesc;

@@ -6,19 +6,16 @@ import org.locationtech.jts.geom.CoordinateSequenceFactory;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
-import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.geom.Polygonal;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.locationtech.jts.geom.impl.CoordinateArraySequenceFactory;
 import org.locationtech.jts.geom.impl.PackedCoordinateSequence;
 import org.locationtech.jts.geom.impl.PackedCoordinateSequenceFactory;
 
-/// It may be a good idea to load data into JTS objects before compacting them down to our own
-/// format because JTS can perform rigorous validation on its input data.
-/// The static final objects here should be reused as much as possible to improve memory access
-/// patterns and cut down heap sizes.
+/// Shared JTS conversion infrastructure for the compact geometry classes.
+/// Per-type conversions are on the CGeometry classes themselves.
+/// The static final JTS objects here should be reused as much as possible to improve memory access
+/// patterns and cut down heap sizes when converting large numbers of objects to JTS representation.
 public abstract class JTSConverter {
 
     /// GeoJSON is defined to use spatial reference system 4326, which is WGS84 in (lat, lon) order.
@@ -44,55 +41,12 @@ public abstract class JTSConverter {
     public static final PackedCoordinateSequenceFactory PACKED_COORDINATE_SEQUENCE_FACTORY =
           PackedCoordinateSequenceFactory.DOUBLE_FACTORY;
 
-    /// Convert a JTS polygon to a compact Conveyal polygon.
-    public static CPolygon fromJts (Polygon jtsPolygon) {
-        if (jtsPolygon.getDimension() != 2) {
-            throw new IllegalArgumentException("Only 2D geometries are supported.");
-        }
-        CoordinateSequence shellSeq = jtsPolygon.getExteriorRing().getCoordinateSequence();
-        double[] shellPackedCoords = toPackedCoordinateArray(shellSeq);
-        int nHoles = jtsPolygon.getNumInteriorRing();
-        if (nHoles != 0) {
-            CLinearRing[] holes = new CLinearRing[nHoles];
-            for (int i = 0; i < nHoles; i++) {
-                CoordinateSequence cSeq = jtsPolygon.getInteriorRingN(i).getCoordinateSequence();
-                double[] packedCoords = toPackedCoordinateArray(cSeq);
-                holes[i] = new CLinearRing(packedCoords);
-            }
-            return new CPolygonWithHoles(shellPackedCoords, holes);
-        }
-        return new CPolygon(shellPackedCoords);
-    }
-
-    public static CPolygonal fromJts (Polygonal jtsPolygonal) {
-        return switch (jtsPolygonal) {
-            case Polygon p -> fromJts(p);
-            case MultiPolygon mp -> fromJts(mp);
-            case null, default ->
-                  throw new IllegalArgumentException("Only polygon and multipolygon are supported.");
-        };
-    }
-
-    public static Polygon toJts (CPolygon cPolygon) {
-        LinearRing shellRing = jtsRingFromPackedCoords(cPolygon.packedCoords);
-        if (cPolygon.hasHoles()) {
-            CLinearRing[] cInnerRings = cPolygon.getHoles();
-            LinearRing[] innerRings = new LinearRing[cInnerRings.length];
-            for (int i = 0; i < cInnerRings.length; i++) {
-                innerRings[i] = jtsRingFromPackedCoords(cInnerRings[i].packedCoords);
-            }
-            return GEOMETRY_FACTORY.createPolygon(shellRing, innerRings);
-        } else {
-            return GEOMETRY_FACTORY.createPolygon(shellRing);
-        }
-    }
-
     /// Convert a compact bounding box to a floating-point WGS84 JTS Envelope.
     public static Envelope toJts (CBox box) {
         return new Envelope(box.minLon, box.maxLon, box.minLat, box.maxLat);
     }
 
-    private static LinearRing jtsRingFromPackedCoords (double[] packedCoords) {
+    static LinearRing jtsRingFromPackedCoords (double[] packedCoords) {
         CoordinateSequence jtsSequence = toJts(packedCoords);
         return GEOMETRY_FACTORY.createLinearRing(jtsSequence);
     }

@@ -129,7 +129,7 @@ public class OnDemandStopAccessTest {
     /// On-demand pickup for a rider on a car-free plaza. The vehicle cannot enter the plaza,
     /// so it meets the rider at the nearest point of the stop's meeting area. Here the origin
     /// itself is accepted by the boarding predicate (the street below the plaza is in the boarding
-    /// area), so origin is injected. The gap from the rider to the street is priced at walking
+    /// area), so origin is injected. The gap from the rider to the street is crossed at walking
     /// pace, the same treatment every car search gives its origin point.
     @Test
     void pickUpOnCarfreePlaza () {
@@ -138,7 +138,7 @@ public class OnDemandStopAccessTest {
         var router = routeWithOnDemand(network, scene, 550, 50, onDemand(network, "fromStop"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 1000, 0));
         assertTrue(timeToZone >= 50 && timeToZone <= 450,
-            "Riding on-demand should include the priced gap to the street and the drive to the zone, "
+            "Riding on-demand should include the walked gap to the street and the drive to the zone, "
                 + "but took " + timeToZone + " seconds.");
     }
 
@@ -249,7 +249,7 @@ public class OnDemandStopAccessTest {
         var router = routeWithOnDemand(network, scene, 550, 110, onDemand(network, "taxiOut"));
         int timeToZone = router.getTravelTimeToVertex(vertexAt(network, scene, 2000, 0));
         assertTrue(timeToZone >= 380 && timeToZone <= 800,
-            "The on-demand ride should start at Access Rd after a 310 meter priced walk and drive "
+            "The on-demand ride should start at Access Rd after a 310 meter walk and drive "
                 + "around via Main St, but the zone was reached in " + timeToZone + " seconds.");
     }
 

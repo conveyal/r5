@@ -11,6 +11,8 @@ import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import org.mapdb.Fun;
 
 import java.io.File;
@@ -58,7 +60,37 @@ class GtfsRenderer {
             feed.locations.put(polygon.id, new FlexLocation(polygon.id, polygon.id, null, toCPolygon(scene, polygon)));
         }
 
+        for (SceneRoute sceneRoute : scene.routes) {
+            Route route = new Route();
+            route.route_id = sceneRoute.id;
+            route.agency_id = AGENCY_ID;
+            route.route_short_name = sceneRoute.id;
+            route.route_type = 3;
+            feed.routes.put(route.route_id, route);
+            int tripIndex = 0;
+            for (int start = sceneRoute.firstDeparture; start <= sceneRoute.lastDeparture; start += sceneRoute.headwaySeconds) {
+                Trip trip = new Trip();
+                trip.trip_id = String.format("%s:%d", sceneRoute.id, tripIndex++);
+                trip.route_id = sceneRoute.id;
+                trip.service_id = SERVICE_ID;
+                trip.direction_id = 0;
+                feed.trips.put(trip.trip_id, trip);
+                int time = start;
+                for (int sequence = 0; sequence < sceneRoute.stops.size(); sequence++) {
+                    StopTime stopTime = new StopTime();
+                    stopTime.trip_id = trip.trip_id;
+                    stopTime.stop_id = sceneRoute.stops.get(sequence).id;
+                    stopTime.stop_sequence = sequence;
+                    stopTime.arrival_time = time;
+                    stopTime.departure_time = time;
+                    feed.stop_times.put(new Fun.Tuple2<>(trip.trip_id, sequence), stopTime);
+                    time += sceneRoute.hopSeconds;
+                }
+            }
+        }
+
         if (!scene.onDemands.isEmpty()) {
+
             Route route = new Route();
             route.route_id = FLEX_ROUTE_ID;
             route.agency_id = AGENCY_ID;

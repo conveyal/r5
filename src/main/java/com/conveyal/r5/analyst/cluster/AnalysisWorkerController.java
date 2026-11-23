@@ -40,13 +40,16 @@ public class AnalysisWorkerController implements HttpController {
         // This header will cause the Spark Framework to gzip the data automatically if requested by the client.
         // FIXME I'm not seeing this on the wire, is the client asking for gzipped responses?
         response.header("Content-Encoding", "gzip");
-        TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         // TODO do not return raw binary data from method, return better typed response.
         // TODO possibly move data preloading to this point, to allow returning different HTTP status codes.
-        if (task.logRequest){
-            LOG.info(request.body());
-        }
         try {
+            // The body is parsed inside this try block so that a failure is reported to the user like any other
+            // error. The scenario arrives inside the body, so a modification with a type code this worker does not
+            // recognize fails here, and the user needs to see which type code it was (see ModificationTypeResolver).
+            TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
+            if (task.logRequest){
+                LOG.info(request.body());
+            }
             byte[] binaryResult = analysisWorker.handleAndSerializeOneSinglePointTask(task);
             response.status(HttpStatus.OK_200);
             if (task.getFormat().equals(GEOTIFF)) {

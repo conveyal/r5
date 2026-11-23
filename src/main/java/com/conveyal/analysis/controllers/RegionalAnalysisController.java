@@ -114,9 +114,19 @@ public class RegionalAnalysisController implements HttpController {
         return getRegionalAnalysesForRegion(req.params("regionId"), UserPermissions.from(req));
     }
 
-    // Note: this includes the modifications object which can be very large
+    /// Deprecated because the UI does not call this endpoint, and it does not work. It is
+    /// registered without a JSON response transformer, so the response body is not JSON. It also
+    /// loads the whole record, including the modifications of the scenario, which can be very
+    /// large. Every other method here excludes the modifications when it loads a record.
+    ///
+    /// This endpoint now refuses every request and logs an error, so that we will notice any
+    /// remaining use before removing it. It used to return the result of
+    /// Persistence.regionalAnalyses.findByIdIfPermitted for the ID in the request.
+    @Deprecated
     private RegionalAnalysis getRegionalAnalysis(Request req, Response res) {
-        return Persistence.regionalAnalyses.findByIdIfPermitted(req.params("_id"), UserPermissions.from(req));
+        LOG.error("Deprecated endpoint called: GET /api/regional/{}", req.params("_id"));
+        throw AnalysisServerException.badRequest(
+            "Fetching a single regional analysis from the backend is deprecated and has been disabled.");
     }
 
     /**
@@ -641,9 +651,22 @@ public class RegionalAnalysisController implements HttpController {
         return regionalAnalysis;
     }
 
-    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) throws IOException {
-        RegionalAnalysis regionalAnalysis = JsonUtil.objectMapper.readValue(request.body(), RegionalAnalysis.class);
-        return Persistence.regionalAnalyses.updateByUserIfPermitted(regionalAnalysis, UserPermissions.from(request));
+    /// Deprecated because the UI does not call this endpoint. The UI updates regional analysis
+    /// records in the database itself. This method used to replace the whole stored record with
+    /// the one in the request body. If that record contained the modifications of its scenario,
+    /// they were parsed into R5 modification objects and written back to the database in whatever
+    /// form those objects serialize to, which is not guaranteed to match what was stored. A
+    /// modification that cannot be written back, such as one with inline polygons, would have made
+    /// the update fail.
+    ///
+    /// This endpoint now refuses every request and logs an error, so that we will notice any
+    /// remaining use before removing it. It used to parse the request body as a RegionalAnalysis
+    /// and pass it to Persistence.regionalAnalyses.updateByUserIfPermitted.
+    @Deprecated
+    private RegionalAnalysis updateRegionalAnalysis (Request request, Response response) {
+        LOG.error("Deprecated endpoint called: PUT /api/regional/{}", request.params("_id"));
+        throw AnalysisServerException.badRequest(
+            "Updating a regional analysis through the backend is deprecated and has been disabled.");
     }
 
     /**

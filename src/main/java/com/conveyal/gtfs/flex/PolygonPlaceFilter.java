@@ -1,6 +1,6 @@
 package com.conveyal.gtfs.flex;
 
-import com.conveyal.gtfs.geom.CPolygon;
+import com.conveyal.gtfs.geom.CPolygonal;
 import com.conveyal.gtfs.geom.JTSConverter;
 import com.conveyal.gtfs.geom.PointInPolygonTester;
 import com.conveyal.r5.streets.Split;
@@ -11,12 +11,12 @@ import gnu.trove.set.TIntSet;
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 
 /// The implementation of [OnDemandPlaceFilter] for polygonal zones. A state or point is within the
-/// place when its coordinates fall inside the polygon. The only slow part of containment testing is
-/// the preparatory calculations, so one prepared tester is built per filter instance and reused for
-/// all tests during a request.
+/// place when its coordinate is contained by the polygon or a multipolygon.
+/// The only slow part of containment testing is the preparatory calculations, so one prepared
+/// tester is built per filter instance and reused for all tests during a request.
 public class PolygonPlaceFilter implements OnDemandPlaceFilter {
 
-    private final CPolygon polygon;
+    private final CPolygonal polygon;
 
     private final PointInPolygonTester tester;
 
@@ -25,7 +25,8 @@ public class PolygonPlaceFilter implements OnDemandPlaceFilter {
     /// Reusable cursor to avoid excessive object creation in vertex containment loops.
     private final VertexStore.Vertex vertex;
 
-    public PolygonPlaceFilter (CPolygon polygon, StreetLayer streetLayer) {
+    public PolygonPlaceFilter (CPolygonal polygon, StreetLayer streetLayer) {
+
         this.polygon = polygon;
         this.tester = new PointInPolygonTester(polygon);
         this.streetLayer = streetLayer;

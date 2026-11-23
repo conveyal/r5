@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.flex;
 
-import com.conveyal.gtfs.geom.CPolygon;
 import com.conveyal.gtfs.geom.JTSConverter;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -11,21 +11,36 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.r5.common.GeometryUtils.envelopeToFixed;
 import static com.conveyal.r5.common.GeometryUtils.expandEnvelopeFixed;
 
 /// Groups together all OnDemand instances within the TransportNetwork and provides some related
-/// methods for indexing and searching them. The transient spatial index handles services is
-/// important for reasonable performance with services that have large numbers of polygons.
-/// See IndexedPolygonCollection and PickupWaitTimes, with which this should eventually be merged.
+/// methods for indexing and searching them. Services come from GTFS-Flex feeds at network build
+/// time and from scenario modifications at scenario application time. The transient spatial
+/// index is important for reasonable performance with large numbers of services.
 public class OnDemandIndex implements Serializable {
     private List<OnDemand> services = new ArrayList<>();
     private transient IntHashGrid spatialIndex = null;
 
+    /// Adding a service discards any built spatial index, so that index never omits a service.
+    /// It is rebuilt by the next call to indexIfNeeded.
     public void add (OnDemand onDemand) {
         services.add(onDemand);
+        spatialIndex = null;
+    }
+
+    /// Returns a copy for a scenario network, holding the same services in a new list so that
+    /// modifications can add services without affecting the base network. The spatial index is
+    /// not copied. It is rebuilt lazily by indexIfNeeded, which scenario application calls after
+    /// all modifications are applied.
+    public OnDemandIndex scenarioCopy () {
+        OnDemandIndex copy = new OnDemandIndex();
+        copy.services.addAll(this.services);
+        return copy;
     }
 
     /// Returns the number of on-demand services in this index (one per GTFS Flex trip).
@@ -37,6 +52,15 @@ public class OnDemandIndex implements Serializable {
     /// Read-only view of all on-demand services in this index, primarily for tests and reporting.
     public List<OnDemand> allServices () {
         return Collections.unmodifiableList(services);
+    }
+
+    /// Returns the street modes of all on-demand services in this index.
+    public Set<StreetMode> streetModes () {
+        Set<StreetMode> modes = EnumSet.noneOf(StreetMode.class);
+        for (OnDemand od : services) {
+            modes.add(od.streetMode);
+        }
+        return modes;
     }
 
     /// Potentially create and store a fromEnvelope for polygon + stops.

@@ -6,11 +6,12 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * This is the UI/Backend model for a freeform JSON modification.
- * It uses the JsonAnyGetter and JsonAnySetter annotations to handle all unrecognized properties, i.e. anything
- * that does not map to a field on the base class.
- */
+/// This is the UI/Backend model for a freeform JSON modification. It uses the JsonAnyGetter and
+/// JsonAnySetter annotations to handle any properties that do not map to fields on the Modification
+/// base class. One of those freeform properties should be 'r5type', which names the R5 modification
+/// type the worker should deserialize it as. That type may be one the backend does not know about.
+/// This includes experimental modifications known only to special custom workers and obsolete
+/// modifications only recognized by old workers.
 public class CustomModificationHolder extends Modification {
 
     public String getType() {

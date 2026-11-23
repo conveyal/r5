@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.geom;
 
+import org.locationtech.jts.geom.Geometry;
+
 import java.io.Serializable;
 
 /// The subclasses of CGeometry are custom implementations of geometry types, analogous to the
@@ -18,10 +20,23 @@ import java.io.Serializable;
 /// These support only 2D coordinates which are assumed to be in WGS84 degrees. We are currently
 /// using double-precision floats for simplicity but could conceivably use fixed-precision ints.
 ///
-/// On this top-level CGeometry interface: Shared methods at this level always end up having very
-/// generic return types that require later assignability checks like instanceof. The only reason
-/// we might need a superinterface for all geometries is for some kind of serialization or storage
-/// system generic across types.
+/// This interface declares a few general traits of geometry objects regarding bounding boxes,
+/// JTS convertibility and validation (via that conversion). Not all geometry types are implemented
+/// yet, focusing on use for zones in on-demand transit services.
 public interface CGeometry extends Serializable {
+
+    /// The bounding box of this geometry, which may have zero extent.
+    CBox toBox ();
+
+    /// Convert to a JTS geometry, for operations that use JTS algorithms such as point-in-polygon
+    /// testing. Each call results in a new object so should be retained by the caller when reused.
+    Geometry toJts ();
+
+    /// For thorough validation, convert to JTS and throw the instance away. Validation of rings
+    /// at construction time looks only at closed rings and the number of points. This method should
+    /// also detect problems like zero-area polygons and self-intersecting rings.
+    default boolean validate () {
+        return toJts().isValid();
+    }
 
 }

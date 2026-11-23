@@ -6,8 +6,9 @@ import com.conveyal.r5.analyst.WorkerCategory;
 /// Interface for Components that start workers.
 public interface WorkerLauncher extends Component {
 
-    /// Start worker instances to handle single point or regional tasks.
-    public void launch (WorkerCategory category, WorkerTags workerTags, int nOnDemand, int nSpot);
+    /// Start `nWorkers` worker instances to handle single point or regional tasks.
+    /// When `spot` is true, workers are requested as interruptible surplus cloud capacity at a lower price.
+    public void launch (WorkerCategory category, WorkerTags workerTags, int nWorkers, boolean spot);
 
     /// Return how many workers were recently requested in the given category and are presumed to
     /// still be starting up. This is a count of requests, not of machines known to exist.

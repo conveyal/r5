@@ -17,7 +17,6 @@ import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.path.Path;
 import com.conveyal.r5.transit.path.PatternSequence;
-import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +76,15 @@ public class PerTargetPropagater {
 
     /** Times at transit stops for each iteration. Plus a transposed version of that same matrix as an optimization. */
     private int[][] travelTimesToStopsForIteration, travelTimesToStop;
+
+    /**
+     * For each stop, the minimum over all iterations of the travel time to reach it. Used to skip stops that cannot
+     * improve the travel time to the target in any iteration. Filled in by invertTravelTimes().
+     */
+    private int[] minTravelTimeToStop;
+
+    /** The minimum of minTravelTimeToStop over all stops: the earliest any transit stop is reached. */
+    private int minTravelTimeToAnyStop;
 
     /**
      * The number of "iterations" (departure minutes & Monte Carlo schedules) and the number of stops and destination
@@ -338,11 +346,36 @@ public class PerTargetPropagater {
      */
     private void invertTravelTimes() {
         travelTimesToStop = new int[nStops][nIterations];
-        for (int iteration = 0; iteration < nIterations; iteration++) {
-            for (int stop = 0; stop < nStops; stop++) {
-                travelTimesToStop[stop][iteration] = travelTimesToStopsForIteration[iteration][stop];
+        minTravelTimeToStop = new int[nStops];
+        minTravelTimeToAnyStop = Integer.MAX_VALUE;
+        for (int stop = 0; stop < nStops; stop++) {
+            int min = Integer.MAX_VALUE;
+            for (int iteration = 0; iteration < nIterations; iteration++) {
+                int time = travelTimesToStopsForIteration[iteration][stop];
+                travelTimesToStop[stop][iteration] = time;
+                if (time < min) {
+                    min = time;
+                }
+            }
+            minTravelTimeToStop[stop] = min;
+            if (min < minTravelTimeToAnyStop) {
+                minTravelTimeToAnyStop = min;
             }
         }
+    }
+
+    /**
+     * An upper bound on any travel time that could still be recorded at the target currently being processed:
+     * the worst travel time known so far over all iterations, capped at the maximum travel time.
+     */
+    private int currentUpperBound () {
+        int worst = 0;
+        for (int iteration = 0; iteration < nIterations; iteration++) {
+            if (perIterationTravelTimes[iteration] > worst) {
+                worst = perIterationTravelTimes[iteration];
+            }
+        }
+        return Math.min(worst, maxTravelTimeSeconds);
     }
 
     /**
@@ -366,12 +399,28 @@ public class PerTargetPropagater {
      * For every "iteration" (departure minute and Monte Carlo schedule), find a complete travel time to the specified
      * target from the given nearby stop, and update the best known time for that iteration and target.
      * Also record the best paths if we're going to be saving transit path details.
+     *
+     * Nearby stops are visited in ascending order of egress time, and work that provably cannot change the result
+     * is skipped. With t(s,i) the time to reach stop s in iteration i, e(s) the egress time from s to the target and
+     * best(i) the best known time at the target, iteration i is only ever updated when t(s,i) + e(s) < best(i) and
+     * t(s,i) + e(s) < maxTravelTimeSeconds. Let bound = min(max_i best(i), maxTravelTimeSeconds):
+     *   - if min_i t(s,i) + e(s) >= bound, stop s cannot improve any iteration, so it is skipped;
+     *   - if min_s min_i t(s,i) + e(s) >= bound, no stop with an egress time >= e(s) can improve any iteration, so
+     *     the ascending scan ends.
+     * Every skipped (stop, iteration) pair would have failed the update test, so travel times are unchanged. When
+     * several stops yield exactly the same travel time in an iteration, the path recorded is now the one through
+     * the stop with the shortest egress leg rather than an arbitrary one (hash iteration order).
      */
     private void propagateTransit (int targetIndex, LinkedPointSet linkedTargets) {
 
-        // Grab the set of nearby stops for this target, with their distances.
+        // If no stop is reached in any iteration, nothing can be propagated from this origin.
+        if (minTravelTimeToAnyStop >= maxTravelTimeSeconds) {
+            return;
+        }
+
+        // Grab the set of nearby stops for this target, with their distances, sorted by ascending distance.
         EgressCostTable egressCostTable = linkedTargets.getEgressCostTable();
-        TIntIntMap pointToStopLinkageCostTable = egressCostTable.getCostTableForPoint(targetIndex);
+        int[] sortedStopsAndCosts = egressCostTable.getSortedCostTableForPoint(targetIndex);
         StreetRouter.State.RoutingVariable unit = egressCostTable.linkageCostUnit;
 
         /**
@@ -385,12 +434,20 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
+        // Per-stop pickup delays are not monotone in the sorted order, so with delays the scan cannot end early.
+        // The per-stop skip test below remains exact because it uses the delay-inclusive egress time.
+        int[] egressStopDelays = egressCostTable.egressStopDelaysSeconds;
+        boolean egressTimesAreSorted = (egressStopDelays == null);
+
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
-        if (pointToStopLinkageCostTable != null) {
+        if (sortedStopsAndCosts != null) {
+            int upperBound = currentUpperBound();
             // Propagate all iterations from each relevant alighting stop out to this target.
-            pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
+            for (int i = 0; i < sortedStopsAndCosts.length; i += 2) {
+                int stop = sortedStopsAndCosts[i];
+                int linkageCost = sortedStopsAndCosts[i + 1];
                 int secondsFromStopToTarget;
                 if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
                     secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
@@ -399,53 +456,67 @@ public class PerTargetPropagater {
                 } else {
                     throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                 }
-                if (secondsFromStopToTarget < egressLegTimeLimitSeconds){
-                    // Account for any additional delay waiting for pickup at the egress stop.
-                    if (egressCostTable.egressStopDelaysSeconds != null) {
-                        int delayAtEgress = egressCostTable.egressStopDelaysSeconds[stop];
-                        if (delayAtEgress < 0) {
-                            // Pickup for this mode not allowed at this stop, so trove iteration should
-                            // continue
-                            return true;
-                        } else {
-                            secondsFromStopToTarget += delayAtEgress;
-                        }
+                // Egress leg too long: every remaining stop has an egress leg at least this long.
+                if (secondsFromStopToTarget >= egressLegTimeLimitSeconds) {
+                    break;
+                }
+                // Even the earliest-reached stop with this egress time cannot improve any iteration, nor can any
+                // remaining stop (longer egress legs).
+                if (egressTimesAreSorted && secondsFromStopToTarget >= upperBound - minTravelTimeToAnyStop) {
+                    break;
+                }
+                // Account for any additional delay waiting for pickup at the egress stop.
+                if (egressStopDelays != null) {
+                    int delayAtEgress = egressStopDelays[stop];
+                    if (delayAtEgress < 0) {
+                        // Pickup for this mode not allowed at this stop.
+                        continue;
+                    }
+                    secondsFromStopToTarget += delayAtEgress;
+                }
+                // This stop cannot improve any iteration (this also skips stops never reached in any iteration).
+                if (minTravelTimeToStop[stop] >= upperBound - secondsFromStopToTarget) {
+                    continue;
+                }
+
+                StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
+                        secondsFromStopToTarget,
+                        linkedTargets.streetMode
+                );
+
+                int[] travelTimesToThisStop = travelTimesToStop[stop];
+                boolean improved = false;
+                for (int iteration = 0; iteration < nIterations; iteration++) {
+                    // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
+                    // calculated in the Raptor route() method.
+                    int timeToReachStop = travelTimesToThisStop[iteration];
+                    if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
+                        // Skip propagation if the travel time to reach this stop is longer than the maximum
+                        // travel time, or the travel time all the way to this target (via another stop).
+                        continue;
                     }
 
-                    StreetTimesAndModes.StreetTimeAndMode egress = new StreetTimesAndModes.StreetTimeAndMode(
-                            secondsFromStopToTarget,
-                            linkedTargets.streetMode
-                    );
-
-                    for (int iteration = 0; iteration < nIterations; iteration++) {
-                        // The travel time (in seconds) needed to reach this stop. Note this is indeed a duration, as
-                        // calculated in the Raptor route() method.
-                        int timeToReachStop = travelTimesToStop[stop][iteration];
-                        if (timeToReachStop >= maxTravelTimeSeconds || timeToReachStop >= perIterationTravelTimes[iteration]) {
-                            // Skip propagation if the travel time to reach this stop is longer than the maximum
-                            // travel time, or the travel time all the way to this target (via another stop).
-                            continue;
-                        }
-
-                        int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
-                        if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
-                            // To reach this target in this iteration, alighting at this stop and proceeding by this
-                            // egress mode is faster than any previously checked stop/egress mode combination.
-                            // Because that's the case, update the best known travel time and, if requested, the
-                            // corresponding path.
-                            perIterationTravelTimes[iteration] = timeToReachTarget;
-                            if (pathsToStopsForIteration != null) {
-                                Path path = pathsToStopsForIteration.get(iteration)[stop];
-                                if (path != null) {
-                                    perIterationPaths[iteration] = path;
-                                    perIterationEgress[iteration] = egress;
-                                }
+                    int timeToReachTarget = timeToReachStop + secondsFromStopToTarget;
+                    if (timeToReachTarget < maxTravelTimeSeconds && timeToReachTarget < perIterationTravelTimes[iteration]) {
+                        // To reach this target in this iteration, alighting at this stop and proceeding by this
+                        // egress mode is faster than any previously checked stop/egress mode combination.
+                        // Because that's the case, update the best known travel time and, if requested, the
+                        // corresponding path.
+                        perIterationTravelTimes[iteration] = timeToReachTarget;
+                        improved = true;
+                        if (pathsToStopsForIteration != null) {
+                            Path path = pathsToStopsForIteration.get(iteration)[stop];
+                            if (path != null) {
+                                perIterationPaths[iteration] = path;
+                                perIterationEgress[iteration] = egress;
                             }
                         }
                     }
                 }
-                return true; // Trove "continue iteration" signal.
-            });
+                if (improved) {
+                    upperBound = currentUpperBound();
+                }
+            }
         }
     }
 

@@ -1,0 +1,6 @@
+This feed mixes an unsupported flex trip with a supported one and an ordinary scheduled trip,
+to confirm that only the unsupported trip is skipped. locations.geojson defines three zones.
+
+Trip T visits all three zones as flex stop_times -> unsupported
+Trip TVALID goes from Z1 to Z2 -> supported
+Trip SCHED is non-flex and goes from stop X to stop Y -> supported

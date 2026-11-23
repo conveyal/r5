@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2354 970" width="2354" height="970" font-family="sans-serif">
+<rect x="0" y="0" width="2354" height="970" fill="white"/>
+<polygon points="760.0,160.0 960.0,160.0 960.0,60.0 760.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polygon points="1810.0,560.0 1910.0,560.0 1910.0,60.0 1810.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="860.0,110.0 1860.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="860.0,110.0 860.0,610.0 60.0,610.0 60.0,910.0 1860.0,910.0 1860.0,510.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1860.0,510.0 2016.0,510.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="1860.0,110.0 2016.0,110.0 2016.0,510.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2016.0,510.0 2094.0,510.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="2094.0,510.0 2294.0,510.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="860.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="1860.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="1860.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2016.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="2094.0" cy="510.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<line x1="20" y1="950" x2="120" y2="950" stroke="#111111" stroke-width="2"/>
+<text x="766.0" y="154.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">pickup</text>
+<text x="1816.0" y="554.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">dropoff</text>
+<text x="1210.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Direct Rd</text>
+<text x="60.0" y="640.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Loop Rd</text>
+<text x="1914.6" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">S1 Path</text>
+<text x="2016.0" y="148.6" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">S2 Path</text>
+<text x="2043.3" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Tail Path</text>
+<text x="2164.0" y="510.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Dead End Path</text>
+<g transform="translate(866.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">origin jct.</text></g>
+<g transform="translate(1866.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">s1 jct.</text></g>
+<g transform="translate(1866.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">s2 jct.</text></g>
+<g transform="translate(2022.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">w jct.</text></g>
+<g transform="translate(2100.0,504.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">v jct.</text></g>
+<text x="130.0" y="954.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

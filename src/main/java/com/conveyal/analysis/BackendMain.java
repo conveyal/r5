@@ -3,6 +3,7 @@ package com.conveyal.analysis;
 import com.conveyal.analysis.components.BackendComponents;
 import com.conveyal.analysis.components.LocalBackendComponents;
 import com.conveyal.analysis.persistence.Persistence;
+import com.conveyal.analysis.util.JsonUtil;
 import com.conveyal.r5.SoftwareVersion;
 import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
@@ -37,8 +38,10 @@ public abstract class BackendMain {
 
     private static void startServerInternal (BackendComponents components, TaskAction... postStartupTasks) {
         LOG.info("Starting Conveyal analysis backend version {}", SoftwareVersion.instance.version);
-        LOG.info("Connecting to database...");
+        // Refuse to start when using Jackson versions that would corrupt reads from MongoDB.
+        JsonUtil.verifyJacksonVersions();
 
+        LOG.info("Connecting to database...");
         // Persistence, the census extractor, and ApiMain are initialized statically, without creating instances,
         // passing in non-static components we've already created.
         // TODO migrate to non-static Components.
@@ -52,7 +55,7 @@ public abstract class BackendMain {
             LOG.info("Running in OFFLINE mode.");
             LOG.info("Pre-starting local cluster of Analysis workers...");
             // WorkerCategory(null, null) means a worker is not on any network, and is waiting to be assigned one.
-            components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, 0);
+            components.workerLauncher.launch(new WorkerCategory(null, null), null, 1, false);
         }
 
         LOG.info("Conveyal Analysis server is ready.");

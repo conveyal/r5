@@ -1,0 +1,2 @@
+route_id,trip_id,trip_short_name,direction_id,service_id
+R,T,Flex Trip,0,S

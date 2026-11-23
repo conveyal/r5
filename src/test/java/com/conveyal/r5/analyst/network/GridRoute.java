@@ -98,6 +98,12 @@ public class GridRoute {
         return scale * stopSpacingBlocks * gridLayout.transitBlockTraversalTimeSeconds;
     }
 
+    /// Service on the default timetable added to every route begins at this hour of the day.
+    public static final int DEFAULT_SERVICE_START_HOUR = 5;
+
+    /// Service on the default timetable added to every route ends at this hour of the day.
+    public static final int DEFAULT_SERVICE_END_HOUR = 10;
+
     private static GridRoute newBareRoute (GridLayout gridLayout, int headwayMinutes) {
         GridRoute route = new GridRoute();
         route.id = gridLayout.nextIntegerId(); // Avoid collisions when same route is added multiple times
@@ -105,7 +111,7 @@ public class GridRoute {
         route.gridLayout = gridLayout;
         route.bidirectional = true;
         route.nStops = gridLayout.widthAndHeightInBlocks + 1;
-        route.addTimetable(Services.WEEKDAY, 5, 10, headwayMinutes);
+        route.addTimetable(Services.WEEKDAY, DEFAULT_SERVICE_START_HOUR, DEFAULT_SERVICE_END_HOUR, headwayMinutes);
         return route;
     }
 

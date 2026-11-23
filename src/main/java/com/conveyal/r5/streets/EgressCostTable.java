@@ -39,8 +39,17 @@ import static com.google.common.base.Preconditions.checkState;
  * Individual requests may specify lower time limits or car speeds, but these tables place hard upper limits on travel
  * time, distance, and speed. For this reason, egress searches are are more limited than searches for transit access.
  *
- * Typically there are fewer transit stops than destination grid cells, so these tables are built outward from the
- * transit stops. The tables are then transposed for actual use in propagation, where we iterate over the destinations.
+ * Typically there are fewer transit stops than destination grid cells, so these tables are built with street searches
+ * outward from the transit stops and stored in stop-major structures. Before they're first used in propagation, they
+ * are destructively transposed once into point-major order, as the propagation iterates over the destinations rather
+ * than the transit stops. The linkage remains in that form and is reused from a cache for all subsequent analyses that
+ * need the same linkage.
+ *
+ * Scenario application and geographic cropping build new tables, but for efficiency they reuse (copy) as many entries
+ * from the stop-major table of the underlying base linkage as trhey can. Those untransposed tables remain available
+ * because scenarios are applied only to networks that have never been analyzed. This is possible because every analysis
+ * runs on a scenario copy (which may be an empty no-op scenario) while the base network's linkage tables remain in their
+ * original untransposed form.
  *
  * Note that these cost tables are only needed for egress from public transit. They are not needed for a particular
  * mode if that mode is only being used for access to transit or direct travel to the destination points.
@@ -79,7 +88,9 @@ public class EgressCostTable implements Serializable {
 
     /**
      * For each transit stop, the distances or times (i.e. "costs") to all nearby PointSet points as a flattened
-     * sequence of (point_index, cost) pairs. This is not final to allow it to be nulled when we transpose the table.
+     * sequence of (point_index, cost) pairs. This field is nulled by the destructive transposition step that prepares
+     * the table for use in propagation. A null value therefore does not mean the table was never built; it means the
+     * table has already been used and only the transposed form remains.
      */
     public List<int[]> stopToPointLinkageCostTables;
 
@@ -135,6 +146,14 @@ public class EgressCostTable implements Serializable {
 
         final EgressCostTable baseEgressCostTable = (baseLinkage == null) ? null
                 : baseLinkage.getEgressCostTable(progressListener);
+
+        if (baseLinkage != null) {
+            checkState(baseEgressCostTable.stopToPointLinkageCostTables != null,
+                "The base linkage's egress cost table has been transposed for use in propagation. Its stop-major form" +
+                "is therefore no longer available for copying. This probably means an analysis was run directly against" +
+                "the base network (before a scenario was applied to it). See TransportNetworkCache.getNetworkForScenario."
+            );
+        }
 
         this.linkedPointSet = linkedPointSet;
         final StreetMode streetMode = linkedPointSet.streetMode;
@@ -402,20 +421,22 @@ public class EgressCostTable implements Serializable {
     }
 
     /**
-     * This method transposes the cost tables, yielding impedance from each point back to all stops that can reach it.
-     * The original calculation is performed from each stop out to the points it can reach, primarily because there are
-     * usually fewer stops than destination points.
-     *
-     * Throwing away the original stop -> point tables should save a lot of memory. We null out the entries in the
-     * source list as they are converted, allowing garbage collection of values.
-     *
-     * The geographic cropping and scenario base copying processes expect the original stop -> point tables to still
-     * exist. However, each table seems to be used only as a source table for copies, or as a propagation table, but not
-     * both. Copied tables are always used for propagation, and once any one thread uses it for propagation it should
-     * never be a source for any other copies.
-     *
-     * We were effectively already avoiding data duplication in the region-wide cost tables by never calling the method
-     * that lazily transposed the tables.
+     * This method transposes the cost tables, yielding impedance from each destination point back
+     * to all stops that can reach it. The original calculation is performed from each stop out to
+     * the points it can reach, primarily because there are usually fewer stops than destination
+     * points.
+     * <p>
+     * Throwing away the original stop -> point tables should save a lot of memory. We null out the
+     * entries in the source list as they are converted, allowing garbage collection of values.
+     * <p>
+     * Transposition consumes the original stop-major form, after which this table can no longer
+     * serve as a source for scenario application or cropping. This does not conflict with normal
+     * operation because scenarios are not applied to networks that have already been analyzed.
+     * That is to say, we always apply some scenario before analysis, and never apply a scenario on
+     * top of another scenario.
+     * <p>
+     * We were effectively already avoiding data duplication in the region-wide cost tables by never
+     * calling the method that lazily transposed the tables.
      * TODO really we should have separate EgressCostTable and PropagationEgressCostTable classes, one copied from the other.
      * One should represent the region, or read-through crops of the whole region, and the other should be per-scenario.
      */

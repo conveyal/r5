@@ -78,7 +78,7 @@ public class ShapefileMain {
     private void run () throws Throwable {
 
         // OSM data store using temporary file.
-        osm = new OSM(null);
+        osm = OSM.newWritableTempFile();
 
         // We could pre-load OSM data here: osm.readFromFile(x);
         // Then we would need to pre-initialize the node deduplicator with OSM nodes from those OSM inputs.

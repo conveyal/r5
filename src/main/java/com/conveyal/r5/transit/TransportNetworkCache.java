@@ -7,20 +7,15 @@ import com.conveyal.file.FileStorageKey;
 import com.conveyal.file.FileUtils;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.analyst.cluster.TransportNetworkConfig;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RasterCost;
 import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.analyst.scenario.ShapefileLts;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.OSMCache;
-import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +23,7 @@ import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.conveyal.file.FileCategory.BUNDLES;
 import static com.conveyal.file.FileCategory.DATASOURCES;
@@ -144,6 +139,10 @@ public class TransportNetworkCache implements Component {
      * Javadoc on the Caffeine LoadingCache indicates that it will throw exceptions when the cache loader method throws
      * them, without establishing a mapping in the cache. So exceptions occurring during scenario application are
      * expected to bubble up unimpeded.
+     *
+     * Because all analyses run against scenario copies produced here (baseline analyses apply an empty scenario), base
+     * networks themselves are never analyzed, and the egress cost tables for their linkages remain in their original
+     * stop-major form, suitable for copying when different scenarios are applied to the same base. See EgressCostTable.
      */
     public TransportNetwork getNetworkForScenario (String networkId, String scenarioId) {
         TransportNetwork scenarioNetwork = scenarioNetworkCache.get(new BaseAndScenarioId(networkId, scenarioId));
@@ -208,22 +207,11 @@ public class TransportNetworkCache implements Component {
         } else {
             network = buildNetworkFromConfig(networkConfig);
         }
+        // Distance tables and linked grid pointsets are built inside TransportNetwork.build. Networks in this cache
+        // are identified by their external networkId, so overwrite the random ID assigned by the build (nothing in
+        // the build reads scenarioId, so assigning it afterwards is equivalent to the former assignment before the
+        // distance table step).
         network.scenarioId = networkId;
-
-        // Pre-compute distance tables from stops out to street vertices, then pre-build a linked grid pointset for the
-        // whole region covered by the street network. These tables and linkages will be serialized along with the
-        // network, which avoids building them when every analysis worker starts. The linkage we create here will never
-        // be used directly, but serves as a basis for scenario linkages, making analyses much faster to start up.
-        // Note, this retains stop-to-vertex distances for the WALK MODE ONLY, even when they are produced as
-        // intermediate results while building linkages for other modes.
-        // This is a candidate for optimization if car or bicycle scenarios are slow to apply.
-        network.transitLayer.buildDistanceTables(null);
-
-        Set<StreetMode> buildGridsForModes = Sets.newHashSet(StreetMode.WALK);
-        if (networkConfig != null && networkConfig.buildGridsForModes != null) {
-            buildGridsForModes.addAll(networkConfig.buildGridsForModes);
-        }
-        network.rebuildLinkedGridPointSet(buildGridsForModes);
 
         // Cache the serialized network on the local filesystem and mirror it to any remote storage.
         try {
@@ -237,66 +225,16 @@ public class TransportNetworkCache implements Component {
         return network;
     }
 
-    /**
-     * Build a network from a JSON TransportNetworkConfig in file storage.
-     * This describes the locations of files used to create a bundle, as well as options applied at network build time.
-     * It contains the unique IDs of the GTFS feeds and OSM extract.
-     */
+    /// Build a network from a TransportNetworkConfig, which is often deserialized from a JSON file in storage.
+    /// It describes the locations of files used to create a bundle, as well as options applied at network build time.
+    /// It contains the unique IDs of the GTFS feeds and OSM extract. Shared network building logic is in
+    /// TransportNetwork.build. This method only resolves the input IDs in the config to MapDB backed objects held by
+    /// the OSM and GTFS caches. Those caches own and manage the MapDB objects and potentially reuse them, so the
+    /// inputs must be left open here (the closeInputs parameter is false).
     private TransportNetwork buildNetworkFromConfig (TransportNetworkConfig config) {
-        // FIXME All internal building logic should be encapsulated in a method like TransportNetwork.build(osm,
-        //  gtfs1, gtfs2...) (see various methods in TransportNetwork).
-        TransportNetwork network = new TransportNetwork();
-        network.streetLayer = new StreetLayer(config);
-        network.streetLayer.loadFromOsm(osmCache.get(config.osmId));
-        network.streetLayer.parentNetwork = network;
-        network.streetLayer.indexStreets();
-
-        // The GTFS transfer loader persists across all loaded feeds so we can feed information about all the transfers
-        // it created into the later OSM transfer generation step.
-        // The street network is loaded before the transit network, so at first it seems reasonable to create transfers
-        // feed-by-feed. However, stops need to be connected to streets before we find street transfers, and we want to
-        // create inter-feed transfers. So on-street transfers need to be discovered after all feeds have been loaded,
-        // while nonetheless giving priority to GTFS transfers from transfers.txt.
-
-        network.transitLayer = new TransitLayer(config);
-        var gtfsTransferLoader = new GtfsTransferLoader(network.transitLayer, config.transfers);
-        for (String gtfsId : config.gtfsIds) {
-            GTFSFeed feed = gtfsCache.get(gtfsId);
-            network.transitLayer.loadFromGtfs(feed, gtfsTransferLoader);
-        }
-        gtfsTransferLoader.logErrors();
-        network.transitLayer.parentNetwork = network;
-        network.streetLayer.associateStops(network.transitLayer);
-        network.streetLayer.buildEdgeLists();
-        network.rebuildTransientIndexes();
-
-        // TODO Do we really want street transfers and park+ride transfers to be two separate steps? Consider effects on scenario application.
-        TransferFinder transferFinder = new TransferFinder(network, gtfsTransferLoader);
-        transferFinder.findTransfers();
-        transferFinder.findParkRideTransfer();
-
-        // Apply modifications embedded in the TransportNetworkConfig JSON
-        final Set<Class<? extends Modification>> ACCEPT_MODIFICATIONS = Set.of(
-                RasterCost.class, ShapefileLts.class
-        );
-        if (config.modifications != null) {
-            // Scenario scenario = new Scenario();
-            // scenario.modifications = config.modifications;
-            // scenario.applyToTransportNetwork(network);
-            // This is applying the modifications _without creating a scenario copy_.
-            // This will destructively edit the network and will only work for certain modifications.
-            for (Modification modification : config.modifications) {
-                if (!ACCEPT_MODIFICATIONS.contains(modification.getClass())) {
-                    throw new UnsupportedOperationException(
-                        "Modification type has not been evaluated for application at network build time:" +
-                        modification.getClass().toString()
-                    );
-                }
-                modification.resolve(network);
-                modification.apply(network);
-            }
-        }
-        return network;
+        OSM osm = osmCache.get(config.osmId);
+        Stream<GTFSFeed> gtfsFeedStream = config.gtfsIds.stream().map(gtfsCache::get);
+        return TransportNetwork.build(config, osm, gtfsFeedStream, false);
     }
 
     /**

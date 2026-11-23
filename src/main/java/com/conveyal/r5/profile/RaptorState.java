@@ -58,25 +58,13 @@ public class RaptorState {
      */
     public int[] bestNonTransferTimes;
 
-    /**
-     * Cumulative transit wait time for the best path to each stop, parallel to bestNonTransferTimes.
-     * This is "non-transfer" because it reflects arriving at this stop by transit. If you arrive at this stop by
-     * a transfer, the time breakdown is instead the one from the transfer source stop.
-     */
-    public int[] nonTransferWaitTime;
-
-    /**
-     * Cumulative in-vehicle travel time for the best path to each stop, parallel to bestNonTransferTimes.
-     * This is "non-transfer" because it reflects arriving at this stop by transit. If you arrive at this stop by
-     * a transfer, the time breakdown is instead the one from the transfer source stop.
-     * TODO instead of accumulating these values couldn't we just derive them when building the paths?
-     * TODO could we return paths/times as a tree flowed into an array, with forward-pointers to nodes in the tree?
-     */
-    public int[] nonTransferInVehicleTravelTime;
-
-    public int[] previousWaitTime;
-
-    public int[] previousInVehicleTravelTime;
+    /// Clock time at which the ride recorded in bestNonTransferTimes departed its boarding stop, parallel to
+    /// bestNonTransferTimes. Unlike relative quantities such as waiting time, this clock time remains valid when
+    /// range-raptor reuses this state at earlier departure minutes. All relative time breakdowns (waiting, riding,
+    /// transfer walking) are derived from clock times when paths are reconstructed (see the Path constructor).
+    /// NOTE that for stops with dwell times, this is not actually the board time, but rather the vehicle departure time.
+    /// TODO Taui sites materialize a Path per stop per iteration. Per-round parent-pointer arrays could be snapshotted to share path prefixes.
+    public int[] previousBoardTime;
 
     /**
      * The transit pattern used to achieve the travel times recorded for each stop in bestNonTransferTimes.
@@ -139,12 +127,7 @@ public class RaptorState {
         this.previousPatterns = newIntArray(nStops, -1);
         this.previousStop = newIntArray(nStops, -1);
         this.transferStop = newIntArray(nStops, -1);
-
-        // These fields accumulate times, so are initially filled with zeros.
-        this.nonTransferWaitTime = new int[nStops];
-        this.nonTransferInVehicleTravelTime = new int[nStops];
-        this.previousInVehicleTravelTime = new int[nStops];
-        this.previousWaitTime = new int[nStops];
+        this.previousBoardTime = newIntArray(nStops, -1);
 
         // Previous round reference should be set as needed by the code calling this constructor.
         this.previous = null;
@@ -161,12 +144,7 @@ public class RaptorState {
         this.previousPatterns = Arrays.copyOf(state.previousPatterns, state.previousPatterns.length);
         this.previousStop = Arrays.copyOf(state.previousStop, state.previousStop.length);
         this.transferStop = Arrays.copyOf(state.transferStop, state.transferStop.length);
-        this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
-        this.nonTransferInVehicleTravelTime =
-                Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
-        this.previousWaitTime = Arrays.copyOf(state.previousWaitTime, state.previousWaitTime.length);
-        this.previousInVehicleTravelTime = Arrays.copyOf(state.previousInVehicleTravelTime,
-                state.previousInVehicleTravelTime.length);
+        this.previousBoardTime = Arrays.copyOf(state.previousBoardTime, state.previousBoardTime.length);
         this.departureTime = state.departureTime;
         this.maxDurationSeconds = state.maxDurationSeconds;
 
@@ -214,10 +192,7 @@ public class RaptorState {
                 this.bestNonTransferTimes[stop] = previous.bestNonTransferTimes[stop];
                 this.previousPatterns[stop] = previous.previousPatterns[stop];
                 this.previousStop[stop] = previous.previousStop[stop];
-                this.nonTransferInVehicleTravelTime[stop] = previous.nonTransferInVehicleTravelTime[stop];
-                this.previousWaitTime[stop] = previous.previousWaitTime[stop];
-                this.previousInVehicleTravelTime[stop] = previous.previousInVehicleTravelTime[stop];
-                this.nonTransferWaitTime[stop] = previous.nonTransferWaitTime[stop];
+                this.previousBoardTime[stop] = previous.previousBoardTime[stop];
             }
         }
     }
@@ -228,10 +203,11 @@ public class RaptorState {
      * When transfer is false, times can update both the bestNonTransferTime and the bestTime; when transfer is true,
      * only bestTimes can be updated.
      *
+     * @param boardTime the clock time at which the vehicle departed its boarding stop (ignored for transfers)
      * @param transfer if true, we are recording a time obtained via a transfer or the initial access leg in round 0
      * @return true if the new time was optimal and the state was updated, false if the existing values were better
      */
-    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer) {
+    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int boardTime, boolean transfer) {
         // First check whether the supplied travel time exceeds the specified maximum for this search.
         if (time >= departureTime + maxDurationSeconds) {
             return false;
@@ -247,20 +223,13 @@ public class RaptorState {
             // in the current implementation can only happen in a later round, since the first round contains only
             // non-transit times.
             checkState(previous != null, "Setting times at stops before an initial round is complete.");
+            checkState(boardTime > previous.bestTimes[fromStop] && boardTime <= time,
+                    "Board time must fall between arrival at the boarding stop and arrival at the alighting stop.");
             bestNonTransferTimes[stop] = time;
             previousPatterns[stop] = fromPattern;
             previousStop[stop] = fromStop;
-            // Increment the travel time components (wait and in-vehicle time).
-            int previousAlightingStop = previous.transferStop[fromStop] == -1 ? fromStop : previous.transferStop[fromStop];
-            int totalWaitTime = previous.nonTransferWaitTime[previousAlightingStop] + waitTime;
-            int totalInVehicleTime = previous.nonTransferInVehicleTravelTime[previousAlightingStop] + inVehicleTime;
-            nonTransferWaitTime[stop] = totalWaitTime;
-            nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
-            checkState(totalInVehicleTime + totalWaitTime <= (time - departureTime),
-                    "Components of travel time are greater than total travel time.");
+            previousBoardTime[stop] = boardTime;
             optimal = true;
-            previousWaitTime[stop] = waitTime;
-            previousInVehicleTravelTime[stop] = inVehicleTime;
             nonTransferStopsUpdated.set(stop);
         }
 
@@ -325,22 +294,13 @@ public class RaptorState {
                     // These were not being set before - they might not be necessary but at least it's clearer to set them.
                     previousPatterns[i] = -1;
                     previousStop[i] = -1;
+                    previousBoardTime[i] = -1;
                 }
             }
         }
-        // Update waiting times for all remaining trips, to reflect additional waiting time at first boarding.
-        for (int stop = 0; stop < this.bestTimes.length; stop++) {
-            if (this.previousPatterns[stop] > -1) {
-                this.nonTransferWaitTime[stop] += additionalWaitSeconds;
-                if (this.previous.previous == null) {
-                    // increment initial wait
-                    this.previousWaitTime[stop] += additionalWaitSeconds;
-                }
-            } else {
-                this.nonTransferWaitTime[stop] = 0;
-                this.nonTransferInVehicleTravelTime[stop] = 0;
-            }
-        }
+        // Waiting times for reporting paths are not stored in this state, so they need no adjustment here. Only clock
+        // times are retained, which remain valid at the decremented departure time. The longer initial wait implied by
+        // an earlier departure is noted when waiting times are derived from the clock times during path reconstruction.
     }
 
     /**

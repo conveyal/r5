@@ -79,4 +79,9 @@ public abstract class Util {
         return new String(chars);
     }
 
+    /// Java has no logical XOR operator. Despite having && and || there is no ^^.
+    /// Not-equals has the same truth table as logical exclusive-or on boolean operands.
+    public static boolean xor (boolean a, boolean b) {
+        return a != b;
+    }
 }

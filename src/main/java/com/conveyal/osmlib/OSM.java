@@ -72,43 +72,68 @@ public class OSM implements OSMEntitySource, OSMEntitySink {
     /** If true we are reading already filled OSM mapdb **/
     private boolean reading = false;
 
-    /**
-     * Construct a new MapDB-based random-access OSM data store.
-     * If diskPath is null, OSM will be loaded into a temporary file and deleted on shutdown.
-     * If diskPath is the string "__MEMORY__" the OSM will be stored entirely in memory. 
-     * 
-     * @param diskPath - the file in which to save the data, null for a temp file, or "__MEMORY__" for in-memory.
-     */
-    public OSM (String diskPath) {
-        DBMaker dbMaker;
-        if (diskPath == null) {
-            LOG.info("OSM will be stored in a temporary file.");
-            dbMaker = DBMaker.newTempFileDB().deleteFilesAfterClose();
-        } else {
-            if (diskPath.equals("__MEMORY__")) {
-                LOG.info("OSM will be stored in memory.");
-                // 'direct' means off-heap memory, no garbage collection overhead
-                dbMaker = DBMaker.newMemoryDirectDB(); 
-            } else {
-                File dp = new File(diskPath);
-                reading = (diskPath.endsWith(".mapdb") || diskPath.endsWith(".db")) && dp.exists();
-                if (reading) {
-                    LOG.info("Reading OSM DB from: {}", diskPath);
-                } else {
-                    LOG.info("OSM will be stored in file {}.", diskPath);
-                }
-                dbMaker = DBMaker.newFileDB(dp);
-            }
+    /// STATIC FACTORY METHODS
+    /// Each factory method selects a particular kind of backing storage, similar to GTFSFeed.
+
+    /// OSM backed by heap memory with no file. Intended for small synthetic networks in tests.
+    /// Using heap memory rather than direct (off-heap) buffers. In both cases MapDB allocates
+    /// memory in 1MB chunks. The garbage collection overhead for such large primitive arrays
+    /// should be negligible, and direct buffers may leak if a store is not closed properly.
+    public static OSM newWritableInMemory () {
+        LOG.info("OSM will be stored in heap memory.");
+        return new OSM(DBMaker.newMemoryDB(), false);
+    }
+
+    /// OSM backed by a temporary file, deleted on close or JVM exit.
+    /// File will be memory-mapped unless JVM does not support it (32-bit JVMs).
+    public static OSM newWritableTempFile () {
+        LOG.info("OSM will be stored in a temporary file.");
+        return new OSM(DBMaker.newTempFileDB().deleteFilesAfterClose().mmapFileEnableIfSupported(), false);
+    }
+
+    /// OSM backed by a new memory-mapped file at the specified location. The file must not already
+    /// exist, because otherwise it could be mistaken for an already-prepared database
+    /// (a caching behavior provided by the openOrCreateFile factory method).
+    public static OSM newWritableFile (File file) {
+        if (file.exists() && file.length() > 0) {
+            throw new OsmLibException("Cannot create new OSM database, file already exists: " + file);
         }
+        LOG.info("OSM will be stored in file {}.", file);
+        return new OSM(DBMaker.newFileDB(file).mmapFileEnableIfSupported(), false);
+    }
 
+    /// Open the specified OSM database file if it already contains data, otherwise create the file
+    /// and import the given OSM data (usually in PBF format). This gives callers persistent caching
+    /// of the imported database across runs. Intersection detection is always enabled and
+    /// performed when a source file is specified, providing that transient index to the callers.
+    /// A null sourceFile opens or creates an empty database. This alternative should eventually be
+    /// eliminated when point-to-point routing no longer uses it.
+    public static OSM openOrCreateFile (File dbFile, String sourceFile) {
+        OSM osm;
+        if (dbFile.exists() && dbFile.length() > 0) {
+            LOG.info("Reading OSM DB from existing file: {}", dbFile);
+            osm = new OSM(DBMaker.newFileDB(dbFile).mmapFileEnableIfSupported(), true);
+        } else {
+            osm = newWritableFile(dbFile);
+        }
+        if (sourceFile != null) {
+            osm.intersectionDetection = true;
+            osm.readFromFile(sourceFile);
+        }
+        return osm;
+    }
 
+    /// The factory methods for all backing storage types call through to this private constructor.
+    /// The supplied DBMaker must already be configured with its backing storage, including enabling
+    /// mmap in file-backed cases. Enabling mmap on in-memory stores will be rejected by MapDB.
+    private OSM (DBMaker dbMaker, boolean reading) {
+        this.reading = reading;
         if (reading) {
             db = dbMaker
                 .transactionDisable()
                 .compressionEnable()
                 //.cacheLRUEnable()
                 //.cacheSize(1000)
-                .mmapFileEnableIfSupported()
                 .make();
         } else {
             // Compression has no appreciable effect on speed but reduces file size by about 16 percent.
@@ -120,7 +145,6 @@ public class OSM implements OSMEntitySource, OSMEntitySink {
                 .transactionDisable()
                 //.cacheDisable()
                 .compressionEnable()
-                .mmapFileEnableIfSupported()
                 .closeOnJvmShutdown()
                 .make();
         }

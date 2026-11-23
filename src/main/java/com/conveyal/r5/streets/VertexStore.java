@@ -4,12 +4,10 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 
@@ -166,16 +164,6 @@ public class VertexStore implements Serializable {
             c.x = fixedDegreesToFloating(c.x); c.y = fixedDegreesToFloating(c.y);
         });
         return wgsResult;
-    }
-
-    /** Convert a JTS envelope to fixed-point degrees. */
-    public static Envelope envelopeToFixed(Envelope env) {
-        return new Envelope(
-                floatingDegreesToFixed(env.getMinX()),
-                floatingDegreesToFixed(env.getMaxX()),
-                floatingDegreesToFixed(env.getMinY()),
-                floatingDegreesToFixed(env.getMaxY())
-        );
     }
 
     public boolean getFlag (int index, VertexFlag flag) {

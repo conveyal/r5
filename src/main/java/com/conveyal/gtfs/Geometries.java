@@ -508,4 +508,16 @@ public class Geometries {
         return geometryFactory.toGeometry(new Envelope(4.002074, 4.98848, 51.696796, 52.278661));
     }
 
+    public static Geometry forBoundingBox(double minLon, double minLat, double maxLon, double maxLat) {
+        return geometryFactory.toGeometry(new Envelope(minLon, maxLon, minLat, maxLat));
+    }
+
+    public static Geometry getNeuchatel60min () {
+        return Geometries.forBoundingBox(6.414515, 46.416727, 7.693993, 47.511720);
+    }
+
+    public static Geometry getZuerich60min () {
+        return Geometries.forBoundingBox(7.604162, 46.939300, 9.480928, 47.808599);
+    }
+
 }

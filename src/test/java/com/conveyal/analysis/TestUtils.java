@@ -62,26 +62,6 @@ public class TestUtils {
         removeKeysAndValues(json, new String[]{"_id", "createdAt", "nonce", "updatedAt"});
     }
 
-    /**
-     * Zip files in a folder into a temporary zip file
-     */
-    public static String zipFolderFiles(String folderName) throws IOException {
-        // create temporary zip file
-        File tempFile = File.createTempFile("temp-gtfs-zip-", ".zip");
-        tempFile.deleteOnExit();
-        String tempFilePath = tempFile.getAbsolutePath();
-
-        // create a zip output stream for adding files to
-        ZipOutputStream zipFile = new ZipOutputStream(new FileOutputStream(tempFilePath));
-
-        // recursively add files from a folder to the zip file
-        String fullFolderPath = getResourceFileName(folderName);
-        compressDirectoryToZipfile(fullFolderPath, fullFolderPath, zipFile);
-        IOUtils.closeQuietly(zipFile);
-
-        return tempFilePath;
-    }
-
     private static void compressDirectoryToZipfile(
         String rootDir,
         String sourceDir,

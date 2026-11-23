@@ -4,6 +4,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mapdb.Fun;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class OSMTest {
 	@Test
     public void testOSM(){
-		OSM osm = new OSM("./src/test/resources/tmp");
+		OSM osm = OSM.newWritableFile(new File("./src/test/resources/tmp"));
 		osm.readFromFile("./src/test/resources/bangor_maine.osm.pbf");
 		assertEquals(osm.nodes.size(), 12030);
 		assertEquals(osm.ways.size(), 1828);

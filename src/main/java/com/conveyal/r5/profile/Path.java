@@ -79,9 +79,6 @@ public class Path implements Cloneable {
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
 
-        this.waitTime = state.nonTransferWaitTime[stop];
-        this.inVehicleTime = state.nonTransferInVehicleTravelTime[stop];
-
         while (state.previous != null) {
             // We copy the state at each stop from one round to the next. If a stop is not updated in a particular
             // round, the information about how it was reached optimally will be found in a previous round.

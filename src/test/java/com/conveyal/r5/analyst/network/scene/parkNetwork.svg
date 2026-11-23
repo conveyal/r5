@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3070 2470" width="3070" height="2470" font-family="sans-serif">
+<rect x="0" y="0" width="3070" height="2470" fill="white"/>
+<polygon points="510.0,160.0 1010.0,160.0 1010.0,60.0 510.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polygon points="2910.0,160.0 3010.0,160.0 3010.0,60.0 2910.0,60.0" fill="#2563eb" fill-opacity="0.10" stroke="#2563eb" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="8,6"/>
+<polyline points="60.0,110.0 560.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="560.0,110.0 960.0,110.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="560.0,110.0 560.0,2410.0 960.0,2410.0 960.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="960.0,110.0 2960.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="560.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="960.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<line x1="20" y1="2450" x2="120" y2="2450" stroke="#111111" stroke-width="2"/>
+<text x="516.0" y="154.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">park-pickup</text>
+<text x="2916.0" y="154.0" fill="#2563eb" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">park-dropoff</text>
+<text x="235.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Approach Rd</text>
+<text x="700.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Park Path</text>
+<text x="560.0" y="1860.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Loop Rd</text>
+<text x="1660.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Onward Rd</text>
+<g transform="translate(566.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">f jct.</text></g>
+<g transform="translate(966.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">p jct.</text></g>
+<text x="130.0" y="2454.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

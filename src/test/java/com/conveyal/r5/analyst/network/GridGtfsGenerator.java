@@ -40,6 +40,9 @@ public class GridGtfsGenerator {
     public GridGtfsGenerator (GridLayout gridLayout) {
         this.gridLayout = gridLayout;
         feed = GTFSFeed.newWritableInMemory();
+        // Set a known feed ID on the in-memory GTFS data, making feed-scoped entity identifiers
+        // in the built network predictable (`GRID:X`) so scenario modifications can reference them.
+        feed.feedId = FEED_ID;
         mergeStops = true;
     }
 

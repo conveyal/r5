@@ -1,0 +1,6 @@
+route_id,trip_id,trip_short_name,direction_id,service_id
+R,T1,Location To Location,0,S
+R,T2,Location To Location Group,0,S
+R,T3,Location Group To Location,0,S
+R,T4,Location Group To Location Group,0,S
+R,SCHED,Scheduled Trip,0,S

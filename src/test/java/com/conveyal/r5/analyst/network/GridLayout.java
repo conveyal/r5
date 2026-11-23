@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.network;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXY;
@@ -11,7 +10,6 @@ import org.locationtech.jts.geom.Envelope;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
@@ -103,20 +101,35 @@ public class GridLayout {
         return new CoordinateXY(lon, lat);
     }
 
-    /** Once a GridLayout is completely set up, calling this method will produce the corresponding TransportNetwork. */
+    /**
+     * Get the latitude and longitude of an arbitrary location in this grid. X and Y parameters are in units of blocks
+     * from the grid origin. Fractional coordinates yield points along blocks (when the other coordinate is an integer)
+     * or off the streets entirely (when both are fractional), for tests of street splitting and off-street linking.
+     */
+    public Coordinate getPointLatLon (double xBlocks, double yBlocks) {
+        double lat = originPoint.y + SphericalDistanceLibrary.metersToDegreesLatitude(streetGridSpacingMeters * yBlocks);
+        double lon = originPoint.x + SphericalDistanceLibrary.metersToDegreesLongitude(streetGridSpacingMeters * xBlocks, lat);
+        return new CoordinateXY(lon, lat);
+    }
+
+    /// Once a GridLayout is completely set up, calling this method will produce the corresponding TransportNetwork.
+    /// The production analysis code path always applies a scenario, even for baseline cases where the scenario is
+    /// empty. It analyzes only the resulting scenario copy, never a base network object like the one returned here.
+    /// When a network is used in analysis, the egress cost tables of its linkages are destructively transposed. This
+    /// is intentional: the tables are large and the untransposed form is not needed during analysis, so it is left to
+    /// be garbage collected. However, scenario application copies entries from the base network's untransposed tables,
+    /// so a network that has been analyzed directly can no longer have scenarios applied to it (see EgressCostTable).
+    /// So in sum, scenarios are always applied before analysis, but only ever applied one layer deep to a base network.
+    /// Tests that never apply scenarios may analyze the returned network directly. Tests that apply scenarios must
+    /// follow the production pattern, analyzing only scenario copies.
+    /// The steps below are taken when the TNCache loads or builds a network, but not in the network build methods.
+    /// Presumably this is to save time and space when we make a network not used in analysis. Should we change that?
     public TransportNetwork generateNetwork () {
         OSM osm = new GridOsmGenerator(this).generate();
         GTFSFeed gtfs = new GridGtfsGenerator(this).generate();
-        TransportNetwork network = TransportNetwork.fromInputs(osm, Stream.of(gtfs));
         // The usual analysis code path always applies a scenario, even an empty one to baseline cases.
         // We are not doing that here.
-        // The steps below are taken when the TNCache loads or builds a network, but not in the network build methods.
-        // Presumably this is to save time and space when we make a network not used in analysis. Should we change that?
-        network.transitLayer.buildDistanceTables(null);
-        network.rebuildLinkedGridPointSet(StreetMode.WALK);
-        // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.scenarioId = UUID.randomUUID().toString();
-        return network;
+        return TransportNetwork.build(null, osm, Stream.of(gtfs), true);
     }
 
     /**
@@ -132,35 +145,48 @@ public class GridLayout {
         gtfs.close();
     }
 
-    /** Add an east-west route at the given row of the grid, running at the default speed and the given headway. */
-    public void addHorizontalRoute (int row, int headwayMinutes) {
-        this.routes.add(GridRoute.newHorizontalRoute(this, row, headwayMinutes));
+    /**
+     * Add an east-west route at the given row of the grid, running at the default speed and the given headway.
+     * This and the other route-adding methods return the created GridRoute so callers can adjust its fields,
+     * for example assigning a known route ID to replace the sequentially generated default.
+     */
+    public GridRoute addHorizontalRoute (int row, int headwayMinutes) {
+        GridRoute route = GridRoute.newHorizontalRoute(this, row, headwayMinutes);
+        this.routes.add(route);
+        return route;
     }
 
     /** Add an east-west route at the given row of the grid, running at the default speed. Explicit schedules must be
      set separately via startTimes *  */
-    public void addHorizontalRoute (int row) {
-        this.routes.add(GridRoute.newHorizontalRoute(this, row, -1));
+    public GridRoute addHorizontalRoute (int row) {
+        GridRoute route = GridRoute.newHorizontalRoute(this, row, -1);
+        this.routes.add(route);
+        return route;
     }
 
-
     /** Add a north-south route at the given column of the grid, running at the default speed and the given headway. */
-    public void addVerticalRoute (int col, int headwayMinutes) {
-        this.routes.add(GridRoute.newVerticalRoute(this, col, headwayMinutes));
+    public GridRoute addVerticalRoute (int col, int headwayMinutes) {
+        GridRoute route = GridRoute.newVerticalRoute(this, col, headwayMinutes);
+        this.routes.add(route);
+        return route;
     }
 
     // TODO builder pattern for direction (row or column methods), headway, frequency etc.
-    public void addHorizontalFrequencyRoute (int row, int headwayMinutes) {
-        this.routes.add(GridRoute.newHorizontalRoute(this, row, headwayMinutes).pureFrequency());
+    public GridRoute addHorizontalFrequencyRoute (int row, int headwayMinutes) {
+        GridRoute route = GridRoute.newHorizontalRoute(this, row, headwayMinutes).pureFrequency();
+        this.routes.add(route);
+        return route;
     }
 
-    public void addVerticalFrequencyRoute (int col, int headwayMinutes) {
-        this.routes.add(GridRoute.newVerticalRoute(this, col, headwayMinutes).pureFrequency());
+    public GridRoute addVerticalFrequencyRoute (int col, int headwayMinutes) {
+        GridRoute route = GridRoute.newVerticalRoute(this, col, headwayMinutes).pureFrequency();
+        this.routes.add(route);
+        return route;
     }
 
     /** Creates a builder for analysis worker tasks, which represent searches on this grid network. */
-    public GridRegionalTaskBuilder newTaskBuilder() {
-        return new GridRegionalTaskBuilder(this);
+    public GridTaskBuilder newTaskBuilder() {
+        return new GridTaskBuilder(this);
     }
 
     /** Get the minimum envelope containing all the points in this grid. */

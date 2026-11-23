@@ -4,6 +4,7 @@ import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.cluster.AnalysisWorkerTask;
 import com.conveyal.r5.analyst.cluster.PathResult;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TimeGridWriter;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.junit.jupiter.api.Test;
@@ -46,11 +47,11 @@ public class SimpsonDesertTests {
         // System.out.println("Grid envelope: " + gridLayout.gridEnvelope());
         // gridLayout.exportFiles("test");
 
-        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+        RegionalTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .singleFreeformDestination(40, 40)
-                .build();
+                .buildRegional();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
@@ -82,11 +83,11 @@ public class SimpsonDesertTests {
         gridLayout.addVerticalFrequencyRoute(40, 20);
         TransportNetwork network = gridLayout.generateNetwork();
 
-        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+        RegionalTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .singleFreeformDestination(40, 40)
-                .build();
+                .buildRegional();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
@@ -116,12 +117,12 @@ public class SimpsonDesertTests {
         gridLayout.addVerticalFrequencyRoute(40, 20);
         TransportNetwork network = gridLayout.generateNetwork();
 
-        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+        RegionalTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .singleFreeformDestination(40, 40)
                 .monteCarloDraws(10000)
-                .build();
+                .buildRegional();
 
         TravelTimeComputer computer = new TravelTimeComputer(task, network);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
@@ -178,21 +179,21 @@ public class SimpsonDesertTests {
         TransportNetwork network = gridLayout.generateNetwork();
 
         // 0. Reuse this task builder to produce several tasks. See caveats on build() method.
-        GridRegionalTaskBuilder taskBuilder = gridLayout.newTaskBuilder()
+        GridTaskBuilder taskBuilder = gridLayout.newTaskBuilder()
                 .departureTimeWindow(7, 0, 5)
                 .maxRides(1)
                 .setOrigin(30, 50)
                 .singleFreeformDestination(42, 50);
 
         // 1. Standard rider: upstream overtaking means Trip B departs origin first and is fastest to destination.
-        AnalysisWorkerTask standardRider = taskBuilder.build();
+        RegionalTask standardRider = taskBuilder.buildRegional();
         OneOriginResult standardResult = new TravelTimeComputer(standardRider, network).computeTravelTimes();
         // Trip B departs stop 30 at 7:35. So 30-35 minute wait, plus 7 minute ride.
         Distribution standardExpected = new Distribution(30, 5).delay(7);
         standardExpected.multiAssertSimilar(standardResult.travelTimes, 0);
 
         // 2. Naive rider: downstream overtaking means Trip A departs origin first but is not fastest to destination.
-        AnalysisWorkerTask naiveRider = taskBuilder.setOrigin(10, 50).build();
+        RegionalTask naiveRider = taskBuilder.setOrigin(10, 50).buildRegional();
         OneOriginResult naiveResult = new TravelTimeComputer(naiveRider, network).computeTravelTimes();
         // Trip A departs stop 10 at 7:15. So 10-15 minute wait, plus 36 minute ride.
         Distribution naiveExpected = new Distribution(10, 5).delay(36);
@@ -200,8 +201,8 @@ public class SimpsonDesertTests {
 
         // 3. Savvy rider (look-ahead abilities from starting the trip 13 minutes later): waits to board Trip B, even
         // when boarding Trip A is possible
-        AnalysisWorkerTask savvyRider = taskBuilder
-                .departureTimeWindow(7, 13, 5).build();
+        RegionalTask savvyRider = taskBuilder
+                .departureTimeWindow(7, 13, 5).buildRegional();
         OneOriginResult savvyResult = new TravelTimeComputer(savvyRider, network).computeTravelTimes();
         // Trip B departs stop 10 at 7:25. So 8-13 minute wait, plus 16 minute ride.
         Distribution savvyExpected = new Distribution(8, 5).delay(16);
@@ -221,12 +222,12 @@ public class SimpsonDesertTests {
         gridLayout.addVerticalFrequencyRoute(80, 20);
         TransportNetwork network = gridLayout.generateNetwork();
 
-        AnalysisWorkerTask task = gridLayout.newTaskBuilder()
+        RegionalTask task = gridLayout.newTaskBuilder()
                 .weekdayMorningPeak()
                 .setOrigin(20, 20)
                 .singleFreeformDestination(80, 80)
                 .monteCarloDraws(10000)
-                .build();
+                .buildRegional();
 
         OneOriginResult oneOriginResult = new TravelTimeComputer(task, network).computeTravelTimes();
 

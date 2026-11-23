@@ -67,6 +67,12 @@ public abstract class Util {
         return array;
     }
 
+    /// Format a time in seconds after midnight as HH:MM. Times on service days that run past
+    /// midnight yield hour fields of 24 or more (e.g. 25:10), following GTFS conventions.
+    public static String secondsToHhMm (int seconds) {
+        return String.format("%02d:%02d", seconds / 3600, (seconds % 3600) / 60);
+    }
+
     /**
      * Convenience method to create a 2D array and fill it immediately with new instances of a class.
      * The supplier can be a method reference to a constructor like ToBeInstantiated::new, and the returned

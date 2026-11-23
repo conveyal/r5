@@ -1,0 +1,17 @@
+Contents:
+- locations.geojson: two polygonal zones, Z1 and Z2 (single-ring Polygons).
+- location_groups.txt / location_group_stops.txt: two location groups, LG1 (stops X and Y)
+  and LG2 (stop Y).
+- four flex trips, each with exactly two flex stop_times, one per supported reference combination:
+    T1 : location       -> location        (Z1 -> Z2)
+    T2 : location       -> location group   (Z1 -> LG1)
+    T3 : location group -> location         (LG1 -> Z2)
+    T4 : location group -> location group   (LG1 -> LG2)
+- a scheduled (non-flex) trip SCHED running from stop X to stop Y, mixed into the same feed
+  alongside the supported flex trips.
+
+Expected behavior:
+- Load records no flex errors and no referential integrity errors.
+- Building a network produces four OnDemand services (one per flex trip), none skipped.
+- The scheduled trip SCHED also loads: the network has one trip pattern, coexisting with the
+  four flex services.

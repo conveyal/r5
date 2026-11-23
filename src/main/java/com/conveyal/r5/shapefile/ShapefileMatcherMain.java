@@ -1,5 +1,6 @@
 package com.conveyal.r5.shapefile;
 
+import java.io.File;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.streets.StreetLayer;
 
@@ -25,9 +26,7 @@ public class ShapefileMatcherMain {
     }
 
     private static StreetLayer loadStreetLayer () {
-        OSM osm = new OSM(OSM_FILE + ".mapdb");
-        osm.intersectionDetection = true;
-        osm.readFromFile(OSM_FILE);
+        OSM osm = OSM.openOrCreateFile(new File(OSM_FILE + ".mapdb"), OSM_FILE);
         StreetLayer streetLayer = new StreetLayer();
         streetLayer.loadFromOsm(osm);
         osm.close();

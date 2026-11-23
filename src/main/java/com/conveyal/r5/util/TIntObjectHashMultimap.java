@@ -3,6 +3,7 @@ package com.conveyal.r5.util;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.procedure.TIntObjectProcedure;
+import gnu.trove.procedure.TIntProcedure;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,8 +38,18 @@ public class TIntObjectHashMultimap<V> implements TIntObjectMultimap<V> {
     }
 
     @Override
-    public void forEachEntry(TIntObjectProcedure<Collection<V>> procedure) {
-        wrapped.forEachEntry(procedure);
+    public boolean forEachKey (TIntProcedure procedure) {
+        return wrapped.forEachKey(procedure);
+    }
+
+    @Override
+    public boolean forEachEntry(TIntObjectProcedure<Collection<V>> procedure) {
+        return wrapped.forEachEntry(procedure);
+    }
+
+    @Override
+    public boolean retainEntries (TIntObjectProcedure<Collection<V>> procedure) {
+        return wrapped.retainEntries(procedure);
     }
 
     @Override

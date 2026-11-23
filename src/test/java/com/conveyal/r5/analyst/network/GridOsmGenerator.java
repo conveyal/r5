@@ -24,7 +24,7 @@ public class GridOsmGenerator {
 
     public GridOsmGenerator (GridLayout gridLayout) {
         this.gridLayout = gridLayout;
-        osm = new OSM(null);
+        osm = OSM.newWritableInMemory();
         // osm.intersectionDetection = true;
     }
 

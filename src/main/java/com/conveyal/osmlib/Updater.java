@@ -189,7 +189,7 @@ public class Updater implements Runnable {
     }
 
     public static void main(String[] args) {
-        spawnUpdateThread(new OSM(null));
+        spawnUpdateThread(OSM.newWritableTempFile());
     }
 
     /** Run the updater, usually in another thread. */

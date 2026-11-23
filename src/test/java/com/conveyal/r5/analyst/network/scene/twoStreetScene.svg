@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 270" width="920" height="270" font-family="sans-serif">
+<rect x="0" y="0" width="920" height="270" fill="white"/>
+<polyline points="60.0,110.0 460.0,110.0 860.0,110.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="60.0,210.0 860.0,210.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="860.0,110.0 860.0,210.0" fill="none" stroke="#6b7280" stroke-width="6.0" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="460.0,110.0 460.0,60.0" fill="none" stroke="#15803d" stroke-width="2.5" stroke-dasharray="7,5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="460.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="860.0" cy="110.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<circle cx="860.0" cy="210.0" r="5" fill="white" stroke="#111111" stroke-width="2"/>
+<rect x="454.0" y="174.0" width="12" height="12" fill="#dc2626" stroke="white" stroke-width="2"/>
+<rect x="754.0" y="174.0" width="12" height="12" fill="#dc2626" stroke="white" stroke-width="2"/>
+<line x1="20" y1="250" x2="120" y2="250" stroke="#111111" stroke-width="2"/>
+<text x="340.0" y="110.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">North St</text>
+<text x="340.0" y="210.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">South St</text>
+<text x="860.0" y="145.0" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">East St</text>
+<text x="460.0" y="92.5" fill="#666666" font-size="11" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">Stub Path</text>
+<g transform="translate(466.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">stub jct.</text></g>
+<g transform="translate(866.0,104.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">ne jct.</text></g>
+<g transform="translate(866.0,204.0) rotate(-45)"><text fill="#111111" font-size="12" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">se jct.</text></g>
+<text x="470.0" y="184.0" fill="#dc2626" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">mid</text>
+<text x="770.0" y="184.0" fill="#dc2626" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">east</text>
+<text x="130.0" y="254.0" fill="#111111" font-size="12" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">100 m</text>
+</svg>

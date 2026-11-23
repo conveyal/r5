@@ -165,7 +165,7 @@ public class BundleController implements HttpController {
                     bundle.osmId = new ObjectId().toString();
                     DiskFileItem fi = (DiskFileItem) files.get("osm").get(0);
                     // Here we perform minimal validation by loading the OSM, but don't retain the resulting MapDB.
-                    OSM osm = new OSM(null);
+                    OSM osm = OSM.newWritableTempFile();
                     osm.intersectionDetection = true;
                     // Number of entities in an OSM file is unknown, so derive progress from the number of bytes read.
                     // Wrapping in buffered input stream should reduce number of progress updates.

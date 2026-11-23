@@ -290,20 +290,24 @@ public class TravelTimeReducer {
      * @param target index for destination target
      * @param perIterationTimes total travel time for each iteration
      * @param perIterationPaths paths for each iteration
+     * @param perIterationDepartureTimes clock time at which the rider departs the origin in each iteration, needed
+     *                                   to derive the initial wait from the clock times recorded in the path
      */
     public void recordPathsForTarget (int target, int[] perIterationTimes, Path[] perIterationPaths,
-                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress) {
+                                      StreetTimesAndModes.StreetTimeAndMode[] perIterationEgress,
+                                      int[] perIterationDepartureTimes) {
         Multimap<PatternSequence, PathResult.Iteration> paths = HashMultimap.create();
         for (int i = 0; i < perIterationTimes.length; i++) {
             Path path = perIterationPaths[i];
             int totalTime = perIterationTimes[i];
+            int departureTime = perIterationDepartureTimes[i];
             if (path != null) {
                 PatternSequence patternSequence = new PatternSequence(path.patternSequence, perIterationEgress[i]);
-                PathResult.Iteration iteration = new PathResult.Iteration(path, totalTime);
+                PathResult.Iteration iteration = new PathResult.Iteration(path, departureTime, totalTime);
                 paths.put(patternSequence, iteration);
             } else if (totalTime < UNREACHED){
-                PatternSequence patternSequence = new PatternSequence(null, null, null, null);
-                PathResult.Iteration iteration = new PathResult.Iteration(totalTime);
+                PatternSequence patternSequence = new PatternSequence(null, null, null, null, null);
+                PathResult.Iteration iteration = new PathResult.Iteration(departureTime, totalTime);
                 paths.put(patternSequence, iteration);
             }
         }

@@ -1,6 +1,8 @@
 .gradle/
 /build/
 /out/
+/dependencies/
+/notes/
 
 # Ignore Gradle GUI config
 gradle-app.setting

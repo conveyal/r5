@@ -100,8 +100,12 @@ public class OnDemandAccess {
         StreetRouter onwardWalkRouter = rides.copyAndRouteOnwardWalk();
         PointSetTimes directTimes = rideArmTimes;
         if (walkLinkage != null) {
+            // The walk segment after an on-demand ride is time-limited at the street vertices.
+            // But eval checks its limit against the total time since the origin so we don't (yet)
+            // have enough information to properly limit that final walk here.
             PointSetTimes walked = walkLinkage.eval(
-                    onwardWalkRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null);
+                    onwardWalkRouter::getTravelTimeToVertex, walkSpeedMmPerSecond, walkSpeedMmPerSecond, null,
+                    LinkedPointSet.NO_TIME_LIMIT);
             directTimes = PointSetTimes.minMerge(directTimes, walked);
         }
         return new OnDemandAccess(onwardWalkRouter, directTimes);

@@ -362,7 +362,7 @@ public class LinkedPointSet implements Serializable {
                 double pointLatFixed = floatingDegreesToFixed(pointSet.getLat(p));
                 double pointLonFixed = floatingDegreesToFixed(pointSet.getLon(p));
                 Envelope pointEnvelopeFixed = new Envelope(pointLonFixed, pointLonFixed, pointLatFixed, pointLatFixed);
-                double radiusMeters = StreetLayer.LINK_RADIUS_METERS;
+                double radiusMeters = streetLayer.pointsetLinkRadiusMeters;
                 if (edges[p] != -1) {
                     radiusMeters = this.distancesToEdge_mm[p] / 1000.0;
                 }
@@ -374,7 +374,7 @@ public class LinkedPointSet implements Serializable {
             if (relinkThisPoint) {
                 // Use radius from StreetLayer such that maximum origin and destination walk distances are symmetric.
                 Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p),
-                        StreetLayer.LINK_RADIUS_METERS, streetMode);
+                        streetLayer.pointsetLinkRadiusMeters, streetMode);
                 if (split == null) {
                     edges[p] = -1;
                 } else {

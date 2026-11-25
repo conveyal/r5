@@ -125,4 +125,18 @@ public class TransportNetworkConfig {
      */
     public boolean stepFree;
 
+    /*
+     * Specifies the distance to link to stops to streets, null to use default.
+     */
+    public Double stopLinkRadiusMeters = null;
+
+    /**
+     * Specifies the distance to link to origins and destinations to streets, null to use default.
+     */
+    public Double pointsetLinkRadiusMeters = null;
+
+    /**
+     * Minimum subgraph (island) size to retain when building networks. 
+     */
+    public Integer minSubgraphSize = null;
 }

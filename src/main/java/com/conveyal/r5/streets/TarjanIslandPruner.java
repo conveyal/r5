@@ -279,6 +279,11 @@ public class TarjanIslandPruner {
             edgeCursor.seek(eidx);
 
             // filter by mode
+            // NB by not including e.g. NO_THRU_TRAFFIC_PEDESTRIAN here, NO_THRU_TRAFFIC edges
+            // will create separate subgraphs. Prima facie, this seems pretty sensible, but it does
+            // mean that e.g. driveways marked access=private (and thus no thru traffic) will get removed
+            // by the island removal process, because the node at the end of the driveway will be considered
+            // an island of size one.
             switch (mode) {
                 case WALK:
                     if (!edgeCursor.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
